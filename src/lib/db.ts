@@ -1,10 +1,27 @@
 import Database from 'better-sqlite3';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 
 // GDPR note: this table intentionally has no column that could identify a person.
 // Don't add one later "just in case" — see the SEO/security/compliance guide.
-const DATA_DIR = path.join(process.cwd(), 'data');
+//
+// Azure note: Azure App Service on Linux mounts persistent storage (/home,
+// where process.cwd() lives) over a network file share. SQLite's WAL mode
+// relies on file-locking behaviour that network shares don't reliably
+// support — a very commonly reported cause of "the app crashes instantly on
+// Azure" for anything using SQLite. WEBSITE_SITE_NAME is set automatically
+// by Azure App Service, so this only changes behaviour there, not locally.
+//
+// Trade-off: os.tmpdir() on Azure is LOCAL disk, not network-backed, so WAL
+// mode works — but it's ephemeral. Data here can be wiped on restart/redeploy.
+// Acceptable for now; this is exactly why the original plan always said
+// "SQLite → Postgres only if needed" — this is the "needed" moment arriving
+// once real data starts to matter, not something to solve by fighting SQLite
+// further on Azure.
+const DATA_DIR = process.env.WEBSITE_SITE_NAME
+  ? path.join(os.tmpdir(), 'roadverdict-data')
+  : path.join(process.cwd(), 'data');
 const DB_PATH = path.join(DATA_DIR, 'roadverdict.db');
 
 if (!fs.existsSync(DATA_DIR)) {
