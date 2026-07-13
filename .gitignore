@@ -1,0 +1,20 @@
+# dependencies
+node_modules/
+
+# next.js
+.next/
+out/
+
+# local data — never commit the price-log database
+data/*.db
+data/*.db-journal
+data/*.db-wal
+
+# env files — never commit real values
+.env
+.env.local
+.env.*.local
+
+# misc
+.DS_Store
+*.log

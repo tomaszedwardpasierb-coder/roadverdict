@@ -1,0 +1,410 @@
+:root {
+  --asphalt: #1c1b1a;
+  --stone: #e9eae6;
+  --paper: #f7f6f2;
+  --amber: #e8a33d;
+  --amber-ink: #7a5211;
+  --verdict-green: #4c7a4e;
+  --verdict-red: #b5432e;
+  --ink: #1c1b1a;
+  --ink-soft: #57554e;
+  --border: #cfcdc4;
+
+  --font-display: 'Oswald', 'Arial Narrow', sans-serif;
+  --font-body: 'IBM Plex Sans', system-ui, sans-serif;
+  --font-mono: 'IBM Plex Mono', 'Courier New', monospace;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background: var(--stone);
+  color: var(--ink);
+  font-family: var(--font-body);
+}
+
+body {
+  min-height: 100vh;
+}
+
+a {
+  color: var(--amber-ink);
+}
+
+:focus-visible {
+  outline: 3px solid var(--amber);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+
+.site-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1.25rem 1.5rem;
+  border-bottom: 2px solid var(--asphalt);
+}
+
+.site-header__logo {
+  font-family: var(--font-display);
+  font-size: 1.25rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--asphalt);
+  text-decoration: none;
+}
+
+.site-header__nav a {
+  margin-left: 1.5rem;
+  font-size: 0.9rem;
+  text-decoration: none;
+  color: var(--ink-soft);
+}
+
+main {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 3rem 1.5rem 4rem;
+}
+
+.hero h1 {
+  font-family: var(--font-display);
+  font-size: clamp(2rem, 5vw, 2.75rem);
+  line-height: 1.1;
+  margin: 0 0 0.5rem;
+  color: var(--asphalt);
+}
+
+.hero p {
+  font-size: 1.1rem;
+  color: var(--ink-soft);
+  margin: 0 0 2.5rem;
+  max-width: 34ch;
+}
+
+/* --- Ticket card: the input form styled as a workshop docket --- */
+.ticket {
+  background: var(--paper);
+  border: 2px solid var(--asphalt);
+  border-radius: 6px;
+  padding: 0;
+  position: relative;
+}
+
+.ticket__section {
+  padding: 1.5rem 1.75rem;
+}
+
+.ticket__divider {
+  border: none;
+  border-top: 2px dashed var(--border);
+  margin: 0;
+}
+
+.ticket__eyebrow {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 0.6rem;
+}
+
+.ticket__label {
+  font-family: var(--font-display);
+  font-size: 0.85rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--asphalt);
+}
+
+.ticket__step {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: var(--ink-soft);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.field select,
+.field input {
+  font-family: var(--font-body);
+  font-size: 1rem;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: #fff;
+  color: var(--ink);
+}
+
+.field input[type='number'] {
+  font-family: var(--font-mono);
+}
+
+.price-field {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.price-field__input-wrap {
+  position: relative;
+  flex: 1;
+  min-width: 160px;
+}
+
+.price-field__currency {
+  position: absolute;
+  left: 0.75rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--ink-soft);
+  font-family: var(--font-mono);
+}
+
+.price-field input {
+  padding-left: 1.75rem;
+  width: 100%;
+}
+
+.submit-button {
+  font-family: var(--font-display);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  font-size: 0.95rem;
+  background: var(--amber);
+  color: var(--asphalt);
+  border: 2px solid var(--asphalt);
+  border-radius: 4px;
+  padding: 0.8rem 1.5rem;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.submit-button:hover {
+  background: #d6912e;
+}
+
+.submit-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.error-text {
+  color: var(--verdict-red);
+  font-size: 0.9rem;
+  margin-top: 0.75rem;
+}
+
+/* --- Verdict stamp: the signature element --- */
+.verdict-wrap {
+  margin-top: 2.5rem;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1rem;
+}
+
+.stamp {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  border: 4px solid currentColor;
+  border-radius: 8px;
+  padding: 0.9rem 1.75rem;
+  transform: rotate(-3deg);
+  font-family: var(--font-display);
+}
+
+.stamp--fair {
+  color: var(--verdict-green);
+}
+
+.stamp--high {
+  color: var(--amber-ink);
+}
+
+.stamp--second-opinion {
+  color: var(--verdict-red);
+}
+
+.stamp__word {
+  font-size: 1.75rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.stamp__range {
+  font-family: var(--font-mono);
+  font-size: 0.95rem;
+  color: var(--ink-soft);
+  margin-top: 0.2rem;
+}
+
+.verdict-summary {
+  color: var(--ink);
+  font-size: 1.05rem;
+  max-width: 40ch;
+}
+
+.verdict-factors {
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  color: var(--ink-soft);
+  margin: 0;
+}
+
+.community-stats {
+  font-size: 0.85rem;
+  color: var(--ink-soft);
+  border-left: 2px solid var(--border);
+  padding-left: 0.75rem;
+  max-width: 40ch;
+  margin-top: 0.5rem;
+}
+
+/* --- Cost calculator receipt --- */
+.receipt {
+  background: var(--paper);
+  border: 2px solid var(--asphalt);
+  border-radius: 6px;
+  padding: 1.5rem 1.75rem;
+  font-family: var(--font-mono);
+  width: 100%;
+  max-width: 360px;
+}
+
+.receipt__header {
+  font-family: var(--font-display);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-size: 0.95rem;
+  margin-bottom: 0.9rem;
+  color: var(--asphalt);
+}
+
+.receipt__line {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.95rem;
+  padding: 0.3rem 0;
+}
+
+.receipt__line--insurance {
+  color: var(--ink-soft);
+  font-style: italic;
+}
+
+.receipt__line--total {
+  font-family: var(--font-display);
+  font-size: 1.1rem;
+  padding-top: 0.6rem;
+}
+
+.insurance-cta {
+  margin-top: 1rem;
+  max-width: 40ch;
+}
+
+.insurance-cta p {
+  font-size: 0.9rem;
+  color: var(--ink-soft);
+  margin-bottom: 0.9rem;
+}
+
+.insurance-cta__link {
+  display: inline-block;
+  text-decoration: none;
+}
+
+/* --- Buying guide checklist --- */
+.checklist-card {
+  background: var(--paper);
+  border: 2px solid var(--asphalt);
+  border-radius: 6px;
+  padding: 1.5rem 1.75rem;
+  max-width: 480px;
+}
+
+.checklist-emphasis {
+  font-size: 1rem;
+  color: var(--ink);
+  border-left: 2px solid var(--amber);
+  padding-left: 0.75rem;
+  margin: 0.75rem 0 1.25rem;
+}
+
+.checklist-heading {
+  font-family: var(--font-display);
+  font-size: 0.9rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--asphalt);
+  margin: 1rem 0 0.5rem;
+}
+
+.checklist-list {
+  margin: 0;
+  padding-left: 1.1rem;
+  font-size: 0.95rem;
+  color: var(--ink);
+}
+
+.checklist-list li {
+  margin-bottom: 0.4rem;
+}
+
+.checklist-addendum {
+  margin-top: 1.2rem;
+  padding-top: 0.9rem;
+  border-top: 1px dashed var(--border);
+  font-size: 0.85rem;
+  color: var(--ink-soft);
+}
+
+.no-verdict-note {
+  font-size: 0.85rem;
+  color: var(--verdict-red);
+  max-width: 40ch;
+  margin-top: 0.5rem;
+}
+
+.brand-notes-caveat {
+  font-size: 0.8rem;
+  color: var(--ink-soft);
+  font-style: italic;
+  margin-top: 0.4rem;
+}
+
+.disclaimer {
+  margin-top: 3rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--border);
+  font-size: 0.85rem;
+  color: var(--ink-soft);
+}
+
+.site-footer {
+  text-align: center;
+  padding: 2rem 1.5rem;
+  font-size: 0.85rem;
+  color: var(--ink-soft);
+}
+
+.site-footer a {
+  color: var(--ink-soft);
+}

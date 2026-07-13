@@ -1,0 +1,2 @@
+This directory holds the local SQLite price-log database at runtime.
+The .db file itself is gitignored — see .gitignore.

@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://roadverdict.co.uk/sitemap.xml
