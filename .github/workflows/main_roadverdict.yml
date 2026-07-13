@@ -5,7 +5,7 @@ on:
       - main
   workflow_dispatch:
 jobs:
-build:
+  build:
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -36,7 +36,6 @@ build:
         uses: actions/download-artifact@v4
         with:
           name: node-app
-
       - name: Login to Azure
         uses: azure/login@v2
         with:
