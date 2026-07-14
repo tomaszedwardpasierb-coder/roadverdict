@@ -68,12 +68,7 @@ export function BuyingGuideResult({
             by direct search, not assumed. Rather than leave this as a dead link, it's a real,
             honest, unmonetised search — genuinely useful, no partnership to misrepresent.
             Revisit if a real inspection-provider relationship ever gets set up directly. */}
-        
-          href="https://www.google.com/search?q=motorcycle+pre-purchase+inspection+UK"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="submit-button insurance-cta__link"
-        >
+        <a href="https://www.google.com/search?q=motorcycle+pre-purchase+inspection+UK" target="_blank" rel="noopener noreferrer" className="submit-button insurance-cta__link">
           Search for a local inspector
         </a>
       </div>
