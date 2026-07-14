@@ -64,11 +64,17 @@ export function BuyingGuideResult({
 
       <div className="insurance-cta">
         <p>Want a second opinion beyond a checklist? A pre-purchase inspection covers what you can&apos;t check yourself.</p>
-        {/* Referral slot — currently a dead link. Needs an account with a
-            pre-purchase inspection provider or affiliate programme before
-            this does anything. */}
-        <a href="#" className="submit-button insurance-cta__link">
-          Find a pre-purchase inspection
+        {/* No motorcycle-specific pre-purchase inspection affiliate exists on Awin — confirmed
+            by direct search, not assumed. Rather than leave this as a dead link, it's a real,
+            honest, unmonetised search — genuinely useful, no partnership to misrepresent.
+            Revisit if a real inspection-provider relationship ever gets set up directly. */}
+        
+          href="https://www.google.com/search?q=motorcycle+pre-purchase+inspection+UK"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="submit-button insurance-cta__link"
+        >
+          Search for a local inspector
         </a>
       </div>
     </div>
