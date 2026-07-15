@@ -52,6 +52,8 @@ a {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.75rem 1.5rem;
   padding: 1.25rem 1.5rem;
   border-bottom: 2px solid var(--asphalt);
 }
@@ -65,11 +67,26 @@ a {
   text-decoration: none;
 }
 
+.site-header__nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1.25rem;
+}
+
 .site-header__nav a {
-  margin-left: 1.5rem;
   font-size: 0.9rem;
   text-decoration: none;
   color: var(--ink-soft);
+}
+
+@media (max-width: 480px) {
+  .site-header {
+    padding: 1rem;
+  }
+
+  .site-header__nav a {
+    font-size: 0.85rem;
+  }
 }
 
 main {
@@ -148,6 +165,22 @@ main {
   border-radius: 4px;
   background: #fff;
   color: var(--ink);
+}
+
+@media (max-width: 480px) {
+  .field select,
+  .field input,
+  .submit-button {
+    min-height: 44px;
+  }
+
+  main {
+    padding: 2rem 1.25rem 3rem;
+  }
+
+  .ticket__section {
+    padding: 1.25rem 1.25rem;
+  }
 }
 
 .field input[type='number'] {
