@@ -1,0 +1,85 @@
+﻿/* Place at: src/app/dashboard/dashboard.module.css */
+.wrapper {
+  --ink: #1b1d1f;
+  --paper: #f5f4f1;
+  --line: #d8d5cf;
+  --accent-ink: #4a2f05;
+  min-height: 100dvh;
+  background: var(--paper);
+  color: var(--ink);
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 24px;
+  border-bottom: 1px solid var(--line);
+}
+
+.mark {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent-ink);
+  margin: 0;
+}
+
+.logoutButton {
+  padding: 8px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.logoutButton:hover:not(:disabled) {
+  border-color: var(--ink);
+}
+
+.logoutButton:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.main {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 40px 24px;
+}
+
+.heading {
+  font-size: 26px;
+  font-weight: 600;
+  margin: 0 0 6px;
+}
+
+.subtext {
+  font-size: 15px;
+  color: #55524c;
+  margin: 0 0 32px;
+}
+
+.card {
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 20px 22px;
+  margin-bottom: 16px;
+}
+
+.cardTitle {
+  font-size: 16px;
+  font-weight: 600;
+  margin: 0 0 8px;
+}
+
+.cardBody {
+  font-size: 14px;
+  color: #55524c;
+  margin: 0;
+}
