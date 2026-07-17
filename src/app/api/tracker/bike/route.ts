@@ -1,8 +1,9 @@
 ﻿// Place at: src/app/api/tracker/bike/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/session";
-import { createBike, updateBikeMileage } from "@/lib/tracker/bike";
+import { createBike, updateBikeMileage, updateBikeRegion } from "@/lib/tracker/bike";
 import { getBikeClassForCC } from "@/lib/motorcycleModels";
+import type { Region } from "@/lib/priceData";
 
 export const dynamic = "force-dynamic";
 
@@ -19,16 +20,17 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
   }
 
-  const { make, model, engineCC, year, currentMileage, nickname } = body as {
+  const { make, model, engineCC, year, currentMileage, nickname, region } = body as {
     make?: string;
     model?: string;
     engineCC?: number;
     year?: number;
     currentMileage?: number;
     nickname?: string;
+    region?: Region;
   };
 
-  if (!make || !model || !engineCC || !year || currentMileage == null) {
+  if (!make || !model || !engineCC || !year || currentMileage == null || !region) {
     return NextResponse.json({ error: "Please fill in all required fields." }, { status: 400 });
   }
 
@@ -41,6 +43,7 @@ export async function POST(request: NextRequest) {
     year,
     currentMileage,
     nickname: nickname ?? "",
+    region,
   });
 
   return NextResponse.json({ bike });
@@ -59,12 +62,23 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
   }
 
-  const { currentMileage } = body as { currentMileage?: number };
-  if (currentMileage == null || currentMileage < 0) {
-    return NextResponse.json({ error: "Enter a valid mileage." }, { status: 400 });
+  const { currentMileage, region } = body as { currentMileage?: number; region?: Region };
+
+  if (currentMileage == null && !region) {
+    return NextResponse.json({ error: "Nothing to update." }, { status: 400 });
   }
 
-  const bike = await updateBikeMileage(session.email, currentMileage);
+  let bike = null;
+  if (currentMileage != null) {
+    if (currentMileage < 0) {
+      return NextResponse.json({ error: "Enter a valid mileage." }, { status: 400 });
+    }
+    bike = await updateBikeMileage(session.email, currentMileage);
+  }
+  if (region) {
+    bike = await updateBikeRegion(session.email, region);
+  }
+
   if (!bike) {
     return NextResponse.json({ error: "No bike found for this account." }, { status: 404 });
   }

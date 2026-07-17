@@ -83,3 +83,39 @@
   color: var(--ink-soft);
   margin: 0;
 }
+
+.jobCard {
+  background: var(--paper);
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--asphalt);
+  border-radius: 4px;
+  padding: 0.9rem 1.1rem;
+  margin-bottom: 0.7rem;
+}
+.jobCardTop { display: flex; justify-content: space-between; align-items: baseline; gap: 0.5rem; flex-wrap: wrap; }
+.jobCardJob { font-weight: 600; }
+.jobCardCost { font-family: var(--font-mono); font-weight: 500; }
+.jobCardMeta { font-family: var(--font-mono); font-size: 0.8rem; color: var(--ink-soft); margin-top: 0.2rem; }
+.jobCardNotes { font-size: 0.85rem; color: var(--ink-soft); margin-top: 0.4rem; }
+.tag {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 0.15rem 0.5rem;
+  border-radius: 3px;
+  margin-top: 0.3rem;
+  margin-right: 0.3rem;
+}
+.tagFair { background: #e7f0e7; color: var(--verdict-green); }
+.tagHigh { background: #fbeecd; color: var(--amber-ink); }
+.tagSecondOpinion { background: #f8e2dd; color: var(--verdict-red); }
+.affiliateNudge {
+  border: 1px dashed var(--amber-ink);
+  border-radius: 6px;
+  padding: 0.8rem 1rem;
+  margin-top: 0.9rem;
+  font-size: 0.85rem;
+}
+.affiliateNudge a { display: inline-block; margin-right: 0.9rem; font-weight: 500; }

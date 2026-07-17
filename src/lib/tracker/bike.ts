@@ -1,6 +1,6 @@
 ﻿// Place at: src/lib/tracker/bike.ts
 import { getContainer } from "@/lib/cosmos";
-import type { BikeClass } from "@/lib/priceData";
+import type { BikeClass, Region } from "@/lib/priceData";
 
 // id is NOT the plain email - the user doc already uses id=email with the
 // same pk=email, and Cosmos requires the (id, pk) pair to be unique. This
@@ -22,6 +22,7 @@ export interface BikeDoc {
   currentMileage: number;
   startingMileage: number;
   nickname: string;
+  region?: Region; // optional: bikes created before this field existed won't have it
   dateAdded: string;
 }
 
@@ -31,7 +32,6 @@ export async function getBike(email: string): Promise<BikeDoc | null> {
     const { resource } = await container.item(bikeDocId(email), email).read<BikeDoc>();
     return resource ?? null;
   } catch {
-    // Doc doesn't exist yet (new account, no bike added) - not a real error.
     return null;
   }
 }
@@ -46,6 +46,7 @@ export async function createBike(
     year: number;
     currentMileage: number;
     nickname: string;
+    region: Region;
   }
 ): Promise<BikeDoc> {
   const container = getContainer();
@@ -61,6 +62,7 @@ export async function createBike(
     currentMileage: data.currentMileage,
     startingMileage: data.currentMileage,
     nickname: data.nickname,
+    region: data.region,
     dateAdded: new Date().toISOString().slice(0, 10),
   };
   await container.items.upsert(doc);
@@ -72,6 +74,15 @@ export async function updateBikeMileage(email: string, newMileage: number): Prom
   const { resource } = await container.item(bikeDocId(email), email).read<BikeDoc>();
   if (!resource) return null;
   resource.currentMileage = newMileage;
+  await container.items.upsert(resource);
+  return resource;
+}
+
+export async function updateBikeRegion(email: string, region: Region): Promise<BikeDoc | null> {
+  const container = getContainer();
+  const { resource } = await container.item(bikeDocId(email), email).read<BikeDoc>();
+  if (!resource) return null;
+  resource.region = region;
   await container.items.upsert(resource);
   return resource;
 }

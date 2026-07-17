@@ -4,6 +4,9 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ALL_BRANDS, MOTORCYCLE_MODELS, getBikeClassForCC } from '@/lib/motorcycleModels';
+import { REGION_LABELS, type Region } from '@/lib/priceData';
+
+const REGIONS = Object.keys(REGION_LABELS) as Region[];
 
 export function AddBikeForm() {
   const router = useRouter();
@@ -13,6 +16,7 @@ export function AddBikeForm() {
   const [year, setYear] = useState('2020');
   const [mileage, setMileage] = useState('12000');
   const [nickname, setNickname] = useState('');
+  const [region, setRegion] = useState<Region>('rest-england-wales');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -43,6 +47,7 @@ export function AddBikeForm() {
           year: Number(year),
           currentMileage: Number(mileage),
           nickname,
+          region,
         }),
       });
       const data = await response.json();
@@ -90,6 +95,14 @@ export function AddBikeForm() {
         <div className="field" style={{ marginTop: '0.9rem' }}>
           <label htmlFor="bike-mileage">Current mileage</label>
           <input id="bike-mileage" type="number" min="0" value={mileage} onChange={(e) => setMileage(e.target.value)} required />
+        </div>
+        <div className="field" style={{ marginTop: '0.9rem' }}>
+          <label htmlFor="bike-region">Where you keep and run it</label>
+          <select id="bike-region" value={region} onChange={(e) => setRegion(e.target.value as Region)}>
+            {REGIONS.map((r) => (
+              <option key={r} value={r}>{REGION_LABELS[r]}</option>
+            ))}
+          </select>
         </div>
         <div className="field" style={{ marginTop: '0.9rem' }}>
           <label htmlFor="bike-nickname">Nickname (optional)</label>
