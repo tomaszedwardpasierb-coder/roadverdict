@@ -7,6 +7,13 @@ export const dynamic = "force-dynamic";
 
 const SESSION_TTL_SECONDS = 30 * 24 * 60 * 60;
 
+// Built explicitly from APP_URL rather than the incoming request's own
+// URL - Azure proxies external traffic to the container over an
+// internal address (this is where "localhost:8080" was coming from),
+// so a redirect based on req.url picks up that internal address
+// instead of the real public domain.
+const APP_URL = process.env.APP_URL;
+
 export async function GET(req: NextRequest) {
   const container = getContainer();
   const url = new URL(req.url);
@@ -14,7 +21,7 @@ export async function GET(req: NextRequest) {
   const encodedEmail = url.searchParams.get("e");
 
   if (!rawToken || !encodedEmail) {
-    return NextResponse.redirect(new URL("/login?error=invalid_link", req.url));
+    return NextResponse.redirect(`${APP_URL}/login?error=invalid_link`);
   }
 
   const email = decodeEmail(encodedEmail);
@@ -25,7 +32,7 @@ export async function GET(req: NextRequest) {
     const { resource } = await container.item(tokenHash, email).read();
     magicLinkDoc = resource;
   } catch {
-    return NextResponse.redirect(new URL("/login?error=invalid_link", req.url));
+    return NextResponse.redirect(`${APP_URL}/login?error=invalid_link`);
   }
 
   if (
@@ -34,7 +41,7 @@ export async function GET(req: NextRequest) {
     magicLinkDoc.used ||
     new Date(magicLinkDoc.expiresAt) < new Date()
   ) {
-    return NextResponse.redirect(new URL("/login?error=expired_link", req.url));
+    return NextResponse.redirect(`${APP_URL}/login?error=expired_link`);
   }
 
   await container.item(tokenHash, email).patch([
@@ -66,7 +73,7 @@ export async function GET(req: NextRequest) {
     ttl: SESSION_TTL_SECONDS,
   });
 
-  const response = NextResponse.redirect(new URL("/dashboard", req.url));
+  const response = NextResponse.redirect(`${APP_URL}/dashboard`);
 
   response.cookies.set("session", `${encodeEmail(email)}.${sessionRaw}`, {
     httpOnly: true,
