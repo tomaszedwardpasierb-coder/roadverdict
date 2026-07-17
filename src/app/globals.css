@@ -454,3 +454,64 @@ main {
 .site-footer a {
   color: var(--ink-soft);
 }
+
+/* --- Tracker landing page --- */
+.problem-grid, .feature-grid, .benefit-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1rem;
+  margin: 1.5rem 0 2.5rem;
+}
+.info-card {
+  background: var(--paper);
+  border: 2px solid var(--asphalt);
+  border-radius: 6px;
+  padding: 1.25rem 1.4rem;
+}
+.info-card h3 {
+  font-family: var(--font-display);
+  font-size: 1rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin: 0 0 0.5rem;
+  color: var(--asphalt);
+}
+.info-card p {
+  font-size: 0.92rem;
+  color: var(--ink-soft);
+  margin: 0;
+}
+.steps-list {
+  counter-reset: step;
+  list-style: none;
+  padding: 0;
+  margin: 1.5rem 0 2.5rem;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+}
+.steps-list li {
+  background: var(--paper);
+  border: 2px solid var(--asphalt);
+  border-radius: 6px;
+  padding: 1.25rem 1.4rem;
+  position: relative;
+}
+.steps-list li::before {
+  counter-increment: step;
+  content: counter(step);
+  font-family: var(--font-display);
+  font-size: 1.3rem;
+  color: var(--amber-ink);
+  display: block;
+  margin-bottom: 0.4rem;
+}
+.tracker-cta {
+  text-align: center;
+  padding: 2.5rem 1.5rem;
+  background: var(--paper);
+  border: 2px solid var(--asphalt);
+  border-radius: 6px;
+  margin: 2.5rem 0;
+}
+.tracker-cta h2 { margin-top: 0; }
