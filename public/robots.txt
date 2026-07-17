@@ -1,4 +1,7 @@
-User-agent: *
+﻿User-agent: *
 Allow: /
+Disallow: /login
+Disallow: /dashboard
+Disallow: /api/
 
 Sitemap: https://roadverdict.co.uk/sitemap.xml
