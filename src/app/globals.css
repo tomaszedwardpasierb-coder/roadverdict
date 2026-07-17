@@ -1,12 +1,12 @@
-:root {
-  --asphalt: #1c1b1a;
-  --stone: #e9eae6;
+﻿:root {
+  --asphalt: #000000;
+  --stone: #e4e2dd;
   --paper: #f7f6f2;
   --amber: #e8a33d;
   --amber-ink: #7a5211;
   --verdict-green: #4c7a4e;
   --verdict-red: #b5432e;
-  --ink: #1c1b1a;
+  --ink: #000000;
   --ink-soft: #57554e;
   --border: #cfcdc4;
 
@@ -59,12 +59,15 @@ a {
 }
 
 .site-header__logo {
-  font-family: var(--font-display);
-  font-size: 1.25rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--asphalt);
+  display: flex;
+  align-items: center;
   text-decoration: none;
+}
+
+.site-header__logo-img {
+  height: 36px;
+  width: auto;
+  display: block;
 }
 
 .site-header__nav {
@@ -165,6 +168,16 @@ main {
   border-radius: 4px;
   background: #fff;
   color: var(--ink);
+}
+
+.field-note {
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  color: var(--ink-soft);
+  padding: 0.65rem 0.75rem;
+  background: var(--stone);
+  border: 1px dashed var(--border);
+  border-radius: 4px;
 }
 
 @media (max-width: 480px) {

@@ -13,7 +13,7 @@ export default async function DashboardPage() {
   return (
     <div className={styles.wrapper}>
       <header className={styles.header}>
-        <p className={styles.mark}>RoadVerdict</p>
+        <img src="/logo.png" alt="RoadVerdict" className={styles.logoImg} />
         <LogoutButton />
       </header>
 

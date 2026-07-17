@@ -1,23 +1,12 @@
-/* Place at: app/login/login.module.css */
-/* Placeholder palette - swap these tokens for your real site's if they
-   already exist in a global stylesheet. Kept local to this module so
-   nothing here fights your existing CSS. */
+﻿/* Place at: src/app/login/login.module.css */
 .wrapper {
-  --ink: #1b1d1f;
-  --paper: #f5f4f1;
-  --line: #d8d5cf;
-  --accent: #d68910;
-  --accent-ink: #4a2f05;
-  --error: #b3261e;
-  --error-bg: #fbeceb;
-
   min-height: 100dvh;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 24px;
-  background: var(--paper);
-  color: var(--ink);
+  background: var(--stone);
+  color: var(--asphalt);
 }
 
 .card {
@@ -25,33 +14,33 @@
   max-width: 400px;
 }
 
-.mark {
-  font-family: ui-monospace, "SF Mono", Menlo, monospace;
-  font-size: 12px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--accent-ink);
+.logoImg {
+  height: 32px;
+  width: auto;
+  display: block;
   margin: 0 0 24px;
 }
 
 .heading {
+  font-family: var(--font-display);
   font-size: 24px;
   font-weight: 600;
   line-height: 1.25;
   margin: 0 0 8px;
+  color: var(--asphalt);
 }
 
 .subtext {
   font-size: 15px;
   line-height: 1.5;
-  color: #55524c;
+  color: var(--ink-soft);
   margin: 0 0 28px;
 }
 
 .banner {
-  border: 1px solid var(--error);
-  background: var(--error-bg);
-  color: var(--error);
+  border: 1px solid var(--verdict-red);
+  background: #fbeceb;
+  color: var(--verdict-red);
   font-size: 14px;
   padding: 12px 14px;
   border-radius: 6px;
@@ -75,42 +64,44 @@
   box-sizing: border-box;
   padding: 12px 14px;
   font-size: 16px;
-  border: 1px solid var(--line);
+  border: 1px solid var(--border);
   border-radius: 6px;
   background: #fff;
-  color: var(--ink);
+  color: var(--asphalt);
 }
 
 .input:focus-visible {
-  outline: 2px solid var(--accent);
+  outline: 2px solid var(--amber);
   outline-offset: 1px;
-  border-color: var(--accent);
+  border-color: var(--amber);
 }
 
 .error {
   font-size: 13px;
-  color: var(--error);
+  color: var(--verdict-red);
   margin: 6px 0 0;
 }
 
 .submit {
   width: 100%;
   padding: 13px 14px;
-  font-size: 15px;
-  font-weight: 600;
-  color: #fff;
-  background: var(--ink);
-  border: none;
-  border-radius: 6px;
+  font-family: var(--font-display);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  font-size: 0.95rem;
+  color: var(--asphalt);
+  background: var(--amber);
+  border: 2px solid var(--asphalt);
+  border-radius: 4px;
   cursor: pointer;
 }
 
 .submit:hover:not(:disabled) {
-  background: #33363a;
+  background: #d6912e;
 }
 
 .submit:focus-visible {
-  outline: 2px solid var(--accent);
+  outline: 3px solid var(--amber);
   outline-offset: 2px;
 }
 
@@ -123,8 +114,8 @@
   width: 40px;
   height: 40px;
   border-radius: 50%;
-  background: var(--accent);
-  color: #fff;
+  background: var(--amber);
+  color: var(--asphalt);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -137,7 +128,7 @@
   border: none;
   padding: 0;
   font-size: 14px;
-  color: var(--accent-ink);
+  color: var(--amber-ink);
   text-decoration: underline;
   cursor: pointer;
   margin-top: 20px;

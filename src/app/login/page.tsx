@@ -1,4 +1,4 @@
-// Place at: app/login/page.tsx
+﻿// Place at: src/app/login/page.tsx
 "use client";
 
 import { Suspense, useState } from "react";
@@ -68,7 +68,7 @@ function LoginForm() {
 
   return (
     <div className={styles.card}>
-      <p className={styles.mark}>RoadVerdict</p>
+      <img src="/logo.png" alt="RoadVerdict" className={styles.logoImg} />
       <h1 className={styles.heading}>Sign in to track your bike</h1>
       <p className={styles.subtext}>
         Enter your email and we'll send you a link to sign in — no password to remember.

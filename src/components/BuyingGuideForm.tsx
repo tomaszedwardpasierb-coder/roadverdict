@@ -115,20 +115,26 @@ export function BuyingGuideForm() {
               ))}
             </select>
           </div>
-          <div className="field" style={{ marginTop: '0.9rem' }}>
-            <label htmlFor="bg-bikeClass">Engine size</label>
-            <select
-              id="bg-bikeClass"
-              value={bikeClass}
-              onChange={(e) => setBikeClass(e.target.value as BikeClass)}
-            >
-              {BIKE_CLASSES.map((key) => (
-                <option key={key} value={key}>
-                  {BIKE_CLASS_LABELS[key]}
-                </option>
-              ))}
-            </select>
-          </div>
+          {model ? (
+            <div className="field-note" style={{ marginTop: '0.9rem' }}>
+              Engine size: {BIKE_CLASS_LABELS[bikeClass]} (from {model})
+            </div>
+          ) : (
+            <div className="field" style={{ marginTop: '0.9rem' }}>
+              <label htmlFor="bg-bikeClass">Engine size</label>
+              <select
+                id="bg-bikeClass"
+                value={bikeClass}
+                onChange={(e) => setBikeClass(e.target.value as BikeClass)}
+              >
+                {BIKE_CLASSES.map((key) => (
+                  <option key={key} value={key}>
+                    {BIKE_CLASS_LABELS[key]}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
         </div>
 
         <hr className="ticket__divider" />
