@@ -1,11 +1,11 @@
-import { NextRequest, NextResponse } from 'next/server';
+﻿import { NextRequest, NextResponse } from 'next/server';
 import { costCalculatorRequestSchema } from '@/lib/validation';
 import { computeAnnualCost } from '@/lib/costCalculator';
 import { BRAND_OPTIONS, REGION_LABELS } from '@/lib/priceData';
 
 export const runtime = 'nodejs';
 
-// Same lightweight limiter as the verdict endpoint — same caveat: fine for a
+// Same lightweight limiter as the verdict endpoint â€” same caveat: fine for a
 // single free-tier instance, not sufficient once this is a real public site.
 const RATE_LIMIT_WINDOW_MS = 60_000;
 const RATE_LIMIT_MAX_REQUESTS = 20;
@@ -48,9 +48,9 @@ export async function POST(request: NextRequest) {
   }
 
   const { bikeClass, brand, region, annualMileage } = parsed.data;
-  const breakdown = computeAnnualCost(bikeClass, brand, region, annualMileage);
+  const breakdown = await computeAnnualCost(bikeClass, brand, region, annualMileage);
 
-  // No logging here yet — this endpoint doesn't write to quote_logs. Could add
+  // No logging here yet â€” this endpoint doesn't write to quote_logs. Could add
   // its own anonymised log later the same way the verdict endpoint does, but
   // that's a deliberate "not yet" rather than an oversight.
 
