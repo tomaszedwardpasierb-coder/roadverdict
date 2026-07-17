@@ -273,3 +273,5 @@ export function getBikeClassForCC(engineCC: number): "small" | "medium" | "large
   if (engineCC <= 750) return "medium";
   return "large";
 }
+
+export const ALL_BRANDS = [...new Set(MOTORCYCLE_MODELS.map((m) => m.make))].sort();
