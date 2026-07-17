@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useState, type FormEvent } from 'react';
 import {
@@ -8,6 +8,10 @@ import {
   type BikeClass,
   type Region,
 } from '@/lib/priceData';
+import {
+  getModelsForBrand,
+  getBikeClassForCC,
+} from '@/lib/motorcycleModels';
 import type { AnnualCostBreakdown } from '@/lib/costCalculator';
 import { CostBreakdownResult } from './CostBreakdownResult';
 
@@ -24,11 +28,29 @@ const REGIONS = Object.keys(REGION_LABELS) as Region[];
 export function CostCalculatorForm() {
   const [bikeClass, setBikeClass] = useState<BikeClass>('medium');
   const [brand, setBrand] = useState(BRAND_OPTIONS[0].value);
+  const [model, setModel] = useState('');
   const [region, setRegion] = useState<Region>('rest-england-wales');
   const [annualMileage, setAnnualMileage] = useState('4000');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<ApiResponse | null>(null);
+
+  const modelsForBrand = getModelsForBrand(brand);
+
+  function handleBrandChange(newBrand: string) {
+    setBrand(newBrand);
+    setModel('');
+  }
+
+  function handleModelChange(newModel: string) {
+    setModel(newModel);
+    if (newModel) {
+      const selected = modelsForBrand.find((m) => m.model === newModel);
+      if (selected) {
+        setBikeClass(getBikeClassForCC(selected.engineCC));
+      }
+    }
+  }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -72,10 +94,29 @@ export function CostCalculatorForm() {
           </div>
           <div className="field">
             <label htmlFor="cc-brand">Make</label>
-            <select id="cc-brand" value={brand} onChange={(e) => setBrand(e.target.value)}>
+            <select
+              id="cc-brand"
+              value={brand}
+              onChange={(e) => handleBrandChange(e.target.value)}
+            >
               {BRAND_OPTIONS.map((option) => (
                 <option key={option.value} value={option.value}>
                   {option.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="field" style={{ marginTop: '0.9rem' }}>
+            <label htmlFor="cc-model">Model</label>
+            <select
+              id="cc-model"
+              value={model}
+              onChange={(e) => handleModelChange(e.target.value)}
+            >
+              <option value="">Not sure / other model</option>
+              {modelsForBrand.map((m) => (
+                <option key={m.model} value={m.model}>
+                  {m.model} ({m.engineCC}cc)
                 </option>
               ))}
             </select>

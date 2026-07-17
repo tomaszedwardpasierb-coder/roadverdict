@@ -1,0 +1,275 @@
+﻿// Place at: src/lib/motorcycleModels.ts
+//
+// UK-market motorcycle models, 2000-present, mainstream/high-volume models
+// only - this is NOT exhaustive. Rare variants, region-specific trims,
+// scooters, and off-road-only models are generally excluded. Anything not
+// listed here should fall back to the existing "Other / not sure" option,
+// same pattern as the quote checker already uses.
+//
+// engineCC is the nominal/marketed displacement, not a precise spec figure.
+
+export interface MotorcycleModel {
+  make: string;
+  model: string;
+  engineCC: number;
+}
+
+export const MOTORCYCLE_MODELS: MotorcycleModel[] = [
+  // ---- Honda ----
+  { make: "Honda", model: "CB125R", engineCC: 125 },
+  { make: "Honda", model: "MSX125 Grom", engineCC: 125 },
+  { make: "Honda", model: "DAX125", engineCC: 125 },
+  { make: "Honda", model: "CBF125", engineCC: 125 },
+  { make: "Honda", model: "CBR125R", engineCC: 125 },
+  { make: "Honda", model: "Varadero XL125V", engineCC: 125 },
+  { make: "Honda", model: "CB500F", engineCC: 471 },
+  { make: "Honda", model: "CB500X", engineCC: 471 },
+  { make: "Honda", model: "CBR500R", engineCC: 471 },
+  { make: "Honda", model: "NX500", engineCC: 471 },
+  { make: "Honda", model: "CMX500 Rebel", engineCC: 471 },
+  { make: "Honda", model: "CB500 (older)", engineCC: 499 },
+  { make: "Honda", model: "CBF600", engineCC: 599 },
+  { make: "Honda", model: "CBR600F", engineCC: 599 },
+  { make: "Honda", model: "CBR600RR", engineCC: 599 },
+  { make: "Honda", model: "Hornet 600 (CB600F)", engineCC: 599 },
+  { make: "Honda", model: "VFR750", engineCC: 748 },
+  { make: "Honda", model: "CB650R", engineCC: 649 },
+  { make: "Honda", model: "CBR650R", engineCC: 649 },
+  { make: "Honda", model: "Transalp XL650V/XL700V", engineCC: 680 },
+  { make: "Honda", model: "Deauville NT650V/NT700V", engineCC: 680 },
+  { make: "Honda", model: "NC750X", engineCC: 745 },
+  { make: "Honda", model: "CB750 Hornet", engineCC: 755 },
+  { make: "Honda", model: "XL750 Transalp", engineCC: 755 },
+  { make: "Honda", model: "VFR800", engineCC: 782 },
+  { make: "Honda", model: "Fireblade CBR900RR", engineCC: 919 },
+  { make: "Honda", model: "Hornet 900", engineCC: 919 },
+  { make: "Honda", model: "CBF1000", engineCC: 998 },
+  { make: "Honda", model: "CBR1000RR Fireblade", engineCC: 999 },
+  { make: "Honda", model: "CBR1000RR-R Fireblade", engineCC: 999 },
+  { make: "Honda", model: "CB1000R", engineCC: 998 },
+  { make: "Honda", model: "CB1000 Hornet", engineCC: 1000 },
+  { make: "Honda", model: "CB1000GT", engineCC: 1000 },
+  { make: "Honda", model: "VTR1000 Firestorm", engineCC: 996 },
+  { make: "Honda", model: "Varadero XL1000V", engineCC: 996 },
+  { make: "Honda", model: "Blackbird CBR1100XX", engineCC: 1137 },
+  { make: "Honda", model: "Africa Twin CRF1100L", engineCC: 1084 },
+  { make: "Honda", model: "NT1100", engineCC: 1084 },
+  { make: "Honda", model: "CMX1100 Rebel", engineCC: 1084 },
+  { make: "Honda", model: "Pan European ST1300", engineCC: 1261 },
+  { make: "Honda", model: "Gold Wing", engineCC: 1833 },
+
+  // ---- Yamaha ----
+  { make: "Yamaha", model: "YBR125", engineCC: 125 },
+  { make: "Yamaha", model: "YZF-R125", engineCC: 125 },
+  { make: "Yamaha", model: "MT-125", engineCC: 125 },
+  { make: "Yamaha", model: "WR125", engineCC: 125 },
+  { make: "Yamaha", model: "YZF-R3", engineCC: 321 },
+  { make: "Yamaha", model: "MT-03", engineCC: 321 },
+  { make: "Yamaha", model: "YZF600R Thundercat", engineCC: 599 },
+  { make: "Yamaha", model: "YZF-R6", engineCC: 599 },
+  { make: "Yamaha", model: "FZ6 / Fazer 600", engineCC: 599 },
+  { make: "Yamaha", model: "XJ6", engineCC: 600 },
+  { make: "Yamaha", model: "Diversion XJ600", engineCC: 600 },
+  { make: "Yamaha", model: "MT-07", engineCC: 689 },
+  { make: "Yamaha", model: "Tracer 7", engineCC: 689 },
+  { make: "Yamaha", model: "XSR700", engineCC: 689 },
+  { make: "Yamaha", model: "Tenere 700", engineCC: 689 },
+  { make: "Yamaha", model: "TDM900", engineCC: 897 },
+  { make: "Yamaha", model: "MT-09", engineCC: 890 },
+  { make: "Yamaha", model: "Tracer 9", engineCC: 890 },
+  { make: "Yamaha", model: "XSR900", engineCC: 890 },
+  { make: "Yamaha", model: "Niken", engineCC: 890 },
+  { make: "Yamaha", model: "Diversion XJ900", engineCC: 900 },
+  { make: "Yamaha", model: "Fazer 1000", engineCC: 998 },
+  { make: "Yamaha", model: "FZ1", engineCC: 998 },
+  { make: "Yamaha", model: "YZF-R1", engineCC: 998 },
+  { make: "Yamaha", model: "MT-10", engineCC: 998 },
+  { make: "Yamaha", model: "Super Tenere XT1200Z", engineCC: 1199 },
+  { make: "Yamaha", model: "XJR1300", engineCC: 1251 },
+  { make: "Yamaha", model: "FJR1300", engineCC: 1298 },
+
+  // ---- Kawasaki ----
+  { make: "Kawasaki", model: "Ninja 125", engineCC: 125 },
+  { make: "Kawasaki", model: "Ninja 300", engineCC: 296 },
+  { make: "Kawasaki", model: "Ninja 400", engineCC: 399 },
+  { make: "Kawasaki", model: "Z650", engineCC: 649 },
+  { make: "Kawasaki", model: "Ninja 650", engineCC: 649 },
+  { make: "Kawasaki", model: "Versys 650", engineCC: 649 },
+  { make: "Kawasaki", model: "ER-6n / ER-6f", engineCC: 649 },
+  { make: "Kawasaki", model: "Vulcan S", engineCC: 649 },
+  { make: "Kawasaki", model: "ZX-6R", engineCC: 636 },
+  { make: "Kawasaki", model: "ZZR600", engineCC: 599 },
+  { make: "Kawasaki", model: "Zephyr 750", engineCC: 738 },
+  { make: "Kawasaki", model: "Z750", engineCC: 748 },
+  { make: "Kawasaki", model: "W800", engineCC: 773 },
+  { make: "Kawasaki", model: "Vulcan 900", engineCC: 903 },
+  { make: "Kawasaki", model: "ZX-9R", engineCC: 899 },
+  { make: "Kawasaki", model: "Z900", engineCC: 948 },
+  { make: "Kawasaki", model: "Z1000", engineCC: 1043 },
+  { make: "Kawasaki", model: "Ninja 1000SX", engineCC: 1043 },
+  { make: "Kawasaki", model: "Versys 1000", engineCC: 1043 },
+  { make: "Kawasaki", model: "ZX-10R", engineCC: 998 },
+  { make: "Kawasaki", model: "ZX-12R", engineCC: 1199 },
+  { make: "Kawasaki", model: "ZZR1400 / ZX-14R", engineCC: 1441 },
+
+  // ---- Suzuki ----
+  { make: "Suzuki", model: "GSX-R125", engineCC: 124 },
+  { make: "Suzuki", model: "GSX-S125", engineCC: 124 },
+  { make: "Suzuki", model: "SV650", engineCC: 645 },
+  { make: "Suzuki", model: "V-Strom 650", engineCC: 645 },
+  { make: "Suzuki", model: "Bandit GSF600/650", engineCC: 645 },
+  { make: "Suzuki", model: "GSX-R600", engineCC: 599 },
+  { make: "Suzuki", model: "GSX-R750", engineCC: 749 },
+  { make: "Suzuki", model: "GSX-S750", engineCC: 749 },
+  { make: "Suzuki", model: "Bandit GSF1200/1250", engineCC: 1255 },
+  { make: "Suzuki", model: "SV1000", engineCC: 996 },
+  { make: "Suzuki", model: "V-Strom 1000/1050", engineCC: 1037 },
+  { make: "Suzuki", model: "GSX-R1000", engineCC: 999 },
+  { make: "Suzuki", model: "GSX-S1000", engineCC: 999 },
+  { make: "Suzuki", model: "Katana", engineCC: 999 },
+  { make: "Suzuki", model: "Hayabusa GSX1300R", engineCC: 1340 },
+
+  // ---- KTM ----
+  { make: "KTM", model: "Duke 125", engineCC: 125 },
+  { make: "KTM", model: "RC 125", engineCC: 125 },
+  { make: "KTM", model: "Duke 200", engineCC: 199 },
+  { make: "KTM", model: "Duke 250", engineCC: 249 },
+  { make: "KTM", model: "RC 390", engineCC: 373 },
+  { make: "KTM", model: "Duke 390", engineCC: 373 },
+  { make: "KTM", model: "Adventure 390", engineCC: 373 },
+  { make: "KTM", model: "Duke 690", engineCC: 692 },
+  { make: "KTM", model: "Adventure 690", engineCC: 692 },
+  { make: "KTM", model: "Duke 790", engineCC: 799 },
+  { make: "KTM", model: "Adventure 790", engineCC: 799 },
+  { make: "KTM", model: "Duke 890", engineCC: 889 },
+  { make: "KTM", model: "Adventure 890", engineCC: 889 },
+  { make: "KTM", model: "Duke 990", engineCC: 947 },
+  { make: "KTM", model: "Adventure 1050/1090", engineCC: 1050 },
+  { make: "KTM", model: "Adventure 1190", engineCC: 1195 },
+  { make: "KTM", model: "Adventure 1290", engineCC: 1301 },
+  { make: "KTM", model: "Super Duke R 1290", engineCC: 1301 },
+
+  // ---- Triumph ----
+  { make: "Triumph", model: "Street Triple 660", engineCC: 660 },
+  { make: "Triumph", model: "Trident 660", engineCC: 660 },
+  { make: "Triumph", model: "Tiger 660 Sport", engineCC: 660 },
+  { make: "Triumph", model: "Street Triple 675", engineCC: 675 },
+  { make: "Triumph", model: "Daytona 675", engineCC: 675 },
+  { make: "Triumph", model: "Daytona 600/650", engineCC: 650 },
+  { make: "Triumph", model: "Bonneville T100", engineCC: 900 },
+  { make: "Triumph", model: "Street Twin", engineCC: 900 },
+  { make: "Triumph", model: "Scrambler 900", engineCC: 900 },
+  { make: "Triumph", model: "Street Triple 765", engineCC: 765 },
+  { make: "Triumph", model: "Daytona 955i", engineCC: 955 },
+  { make: "Triumph", model: "Speed Triple 955", engineCC: 955 },
+  { make: "Triumph", model: "Tiger 800", engineCC: 800 },
+  { make: "Triumph", model: "Tiger 900", engineCC: 888 },
+  { make: "Triumph", model: "Speed Triple 1050", engineCC: 1050 },
+  { make: "Triumph", model: "Bonneville T120", engineCC: 1200 },
+  { make: "Triumph", model: "Scrambler 1200", engineCC: 1200 },
+  { make: "Triumph", model: "Thruxton 1200", engineCC: 1200 },
+  { make: "Triumph", model: "Tiger 1200", engineCC: 1160 },
+  { make: "Triumph", model: "Speed Triple 1200", engineCC: 1160 },
+  { make: "Triumph", model: "Rocket III / Rocket 3", engineCC: 2458 },
+
+  // ---- BMW ----
+  { make: "BMW", model: "G310R", engineCC: 313 },
+  { make: "BMW", model: "G310GS", engineCC: 313 },
+  { make: "BMW", model: "F650GS", engineCC: 652 },
+  { make: "BMW", model: "F700GS", engineCC: 798 },
+  { make: "BMW", model: "F750GS", engineCC: 853 },
+  { make: "BMW", model: "F800GS", engineCC: 798 },
+  { make: "BMW", model: "F850GS", engineCC: 853 },
+  { make: "BMW", model: "F900R / F900XR", engineCC: 895 },
+  { make: "BMW", model: "R nineT", engineCC: 1170 },
+  { make: "BMW", model: "R1100RT", engineCC: 1085 },
+  { make: "BMW", model: "R1150GS", engineCC: 1130 },
+  { make: "BMW", model: "R1200GS", engineCC: 1170 },
+  { make: "BMW", model: "R1200RT", engineCC: 1170 },
+  { make: "BMW", model: "R1250GS", engineCC: 1254 },
+  { make: "BMW", model: "S1000RR", engineCC: 999 },
+  { make: "BMW", model: "S1000R", engineCC: 999 },
+  { make: "BMW", model: "S1000XR", engineCC: 999 },
+  { make: "BMW", model: "K1200S/K1200R", engineCC: 1157 },
+  { make: "BMW", model: "K1300S/K1300R", engineCC: 1293 },
+
+  // ---- Ducati ----
+  { make: "Ducati", model: "Scrambler 400", engineCC: 399 },
+  { make: "Ducati", model: "Monster 620", engineCC: 618 },
+  { make: "Ducati", model: "Monster 696", engineCC: 696 },
+  { make: "Ducati", model: "Monster 797", engineCC: 803 },
+  { make: "Ducati", model: "Panigale 899", engineCC: 899 },
+  { make: "Ducati", model: "SuperSport 939", engineCC: 937 },
+  { make: "Ducati", model: "Hypermotard 939", engineCC: 937 },
+  { make: "Ducati", model: "Monster 821", engineCC: 821 },
+  { make: "Ducati", model: "Monster 937", engineCC: 937 },
+  { make: "Ducati", model: "Scrambler 800", engineCC: 803 },
+  { make: "Ducati", model: "Panigale 959", engineCC: 955 },
+  { make: "Ducati", model: "Panigale V2", engineCC: 955 },
+  { make: "Ducati", model: "Multistrada 950", engineCC: 937 },
+  { make: "Ducati", model: "Monster 1200", engineCC: 1198 },
+  { make: "Ducati", model: "Diavel 1200", engineCC: 1198 },
+  { make: "Ducati", model: "Panigale 1199", engineCC: 1198 },
+  { make: "Ducati", model: "Panigale 1299", engineCC: 1285 },
+  { make: "Ducati", model: "Diavel 1260", engineCC: 1262 },
+  { make: "Ducati", model: "Multistrada 1200/1260", engineCC: 1198 },
+  { make: "Ducati", model: "Multistrada V4", engineCC: 1158 },
+  { make: "Ducati", model: "Panigale V4", engineCC: 1103 },
+
+  // ---- Aprilia ----
+  { make: "Aprilia", model: "RS125", engineCC: 124 },
+  { make: "Aprilia", model: "RS4 125", engineCC: 124 },
+  { make: "Aprilia", model: "Tuono 660", engineCC: 659 },
+  { make: "Aprilia", model: "RS660", engineCC: 659 },
+  { make: "Aprilia", model: "Shiver 750", engineCC: 750 },
+  { make: "Aprilia", model: "Dorsoduro 750", engineCC: 750 },
+  { make: "Aprilia", model: "Shiver 900", engineCC: 896 },
+  { make: "Aprilia", model: "Dorsoduro 900", engineCC: 896 },
+  { make: "Aprilia", model: "Tuono V4", engineCC: 1077 },
+  { make: "Aprilia", model: "RSV4", engineCC: 999 },
+  { make: "Aprilia", model: "Caponord 1200", engineCC: 1197 },
+
+  // ---- Harley-Davidson ----
+  { make: "Harley-Davidson", model: "Street 500", engineCC: 494 },
+  { make: "Harley-Davidson", model: "Street 750", engineCC: 749 },
+  { make: "Harley-Davidson", model: "Iron 883", engineCC: 883 },
+  { make: "Harley-Davidson", model: "Sportster 883", engineCC: 883 },
+  { make: "Harley-Davidson", model: "Nightster", engineCC: 975 },
+  { make: "Harley-Davidson", model: "Sportster 1200", engineCC: 1202 },
+  { make: "Harley-Davidson", model: "Fat Boy", engineCC: 1745 },
+  { make: "Harley-Davidson", model: "Softail (range)", engineCC: 1750 },
+  { make: "Harley-Davidson", model: "Road King", engineCC: 1868 },
+  { make: "Harley-Davidson", model: "Street Glide", engineCC: 1868 },
+  { make: "Harley-Davidson", model: "Road Glide", engineCC: 1868 },
+  { make: "Harley-Davidson", model: "Pan America 1250", engineCC: 1252 },
+
+  // ---- Royal Enfield ----
+  { make: "Royal Enfield", model: "Bullet 500", engineCC: 499 },
+  { make: "Royal Enfield", model: "Classic 350", engineCC: 349 },
+  { make: "Royal Enfield", model: "Classic 500", engineCC: 499 },
+  { make: "Royal Enfield", model: "Meteor 350", engineCC: 349 },
+  { make: "Royal Enfield", model: "Hunter 350", engineCC: 349 },
+  { make: "Royal Enfield", model: "Scram 411", engineCC: 411 },
+  { make: "Royal Enfield", model: "Himalayan 411", engineCC: 411 },
+  { make: "Royal Enfield", model: "Himalayan 452", engineCC: 452 },
+  { make: "Royal Enfield", model: "Interceptor 650", engineCC: 648 },
+  { make: "Royal Enfield", model: "Continental GT 650", engineCC: 648 },
+];
+
+// Matches the exact slug format used by BRAND_OPTIONS in priceData.ts
+// (e.g. "Harley-Davidson" -> "harley-davidson", "Royal Enfield" -> "royal-enfield").
+export function slugifyMake(make: string): string {
+  return make.toLowerCase().replace(/\s+/g, "-");
+}
+
+export function getModelsForBrand(brandValue: string): MotorcycleModel[] {
+  return MOTORCYCLE_MODELS.filter((m) => slugifyMake(m.make) === brandValue);
+}
+
+// Mirrors the thresholds in BIKE_CLASS_LABELS: small up to 400cc,
+// medium 401-750cc, large 751cc+.
+export function getBikeClassForCC(engineCC: number): "small" | "medium" | "large" {
+  if (engineCC <= 400) return "small";
+  if (engineCC <= 750) return "medium";
+  return "large";
+}
