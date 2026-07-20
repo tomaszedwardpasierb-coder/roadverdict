@@ -5,12 +5,14 @@ import styles from "./dashboard.module.css";
 import LogoutButton from "./LogoutButton";
 import { getBike } from "@/lib/tracker/bike";
 import { getServiceRecords, type ServiceRecordDoc } from "@/lib/tracker/serviceRecord";
+import { getFuelLogs, computeActualMPG, type FuelLogDoc } from "@/lib/tracker/fuelLog";
 import { getAdjustedBenchmark, type BikeClass, type Region } from "@/lib/priceData";
 import { slugifyMake } from "@/lib/motorcycleModels";
 import { AFFILIATE_LINKS, isBenchmarkedJob, JOB_LABELS } from "@/lib/tracker/jobTypes";
 import { AddBikeForm } from "./AddBikeForm";
 import { SetRegionForm } from "./SetRegionForm";
 import { LogServiceForm } from "./LogServiceForm";
+import { LogFuelForm } from "./LogFuelForm";
 
 export const dynamic = "force-dynamic";
 
@@ -75,6 +77,21 @@ function ServiceHistoryCard({ record, verdict }: { record: ServiceRecordDoc; ver
   );
 }
 
+function FuelLogCard({ log }: { log: FuelLogDoc }) {
+  const perLitre = (log.cost / log.litres).toFixed(2);
+  return (
+    <div className={styles.jobCard}>
+      <div className={styles.jobCardTop}>
+        <span className={styles.jobCardJob}>{log.litres.toFixed(1)} L{log.filledToFull ? " (full tank)" : ""}</span>
+        <span className={styles.jobCardCost}>{fmtMoney(log.cost)}</span>
+      </div>
+      <div className={styles.jobCardMeta}>
+        {fmtDate(log.date)} · {log.mileage.toLocaleString()} miles · {perLitre}p/litre
+      </div>
+    </div>
+  );
+}
+
 export default async function DashboardPage() {
   const session = await getSession();
   if (!session) redirect("/login");
@@ -114,8 +131,12 @@ export default async function DashboardPage() {
     );
   }
 
-  const records = await getServiceRecords(session.email);
+  const [records, fuelLogs] = await Promise.all([
+    getServiceRecords(session.email),
+    getFuelLogs(session.email),
+  ]);
   const brandValue = slugifyMake(bike.make);
+  const actualMpg = computeActualMPG(fuelLogs);
 
   return (
     <div className={styles.wrapper}>
@@ -147,6 +168,29 @@ export default async function DashboardPage() {
               verdict={computeVerdict(r.jobType, bike.bikeClass, brandValue, bike.region as Region, r.cost)}
             />
           ))
+        )}
+
+        <div style={{ marginTop: "2rem" }}>
+          <LogFuelForm initialMileage={bike.currentMileage} />
+        </div>
+
+        <h2 className={styles.cardTitle} style={{ marginTop: "1.5rem" }}>Fuel log</h2>
+        {actualMpg ? (
+          <p className={styles.subtext} style={{ marginBottom: "0.9rem" }}>
+            Your actual average from logged fill-ups: <strong>{actualMpg.toFixed(1)} mpg</strong> (the Cost
+            Calculator assumes 57 mpg generally - this is specific to your bike and riding).
+          </p>
+        ) : (
+          <p className={styles.subtext} style={{ marginBottom: "0.9rem" }}>
+            Log at least two consecutive full-tank fill-ups to see your bike&apos;s real MPG here.
+          </p>
+        )}
+        {fuelLogs.length === 0 ? (
+          <div className={styles.card}>
+            <p className={styles.cardBody}>No fuel fill-ups logged yet. Log your first one above.</p>
+          </div>
+        ) : (
+          fuelLogs.map((f) => <FuelLogCard key={f.id} log={f} />)
         )}
       </main>
     </div>
