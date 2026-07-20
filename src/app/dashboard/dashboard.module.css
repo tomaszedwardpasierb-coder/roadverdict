@@ -42,7 +42,7 @@
 }
 
 .main {
-  max-width: 680px;
+  max-width: 1000px;
   margin: 0 auto;
   padding: 40px 24px;
 }
@@ -178,4 +178,8 @@
 
 @media (max-width: 480px) {
   .tab { padding: 0.6rem 0.85rem; font-size: 0.78rem; }
+}
+
+.contentColumn {
+  max-width: 640px;
 }
