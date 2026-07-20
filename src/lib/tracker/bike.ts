@@ -2,10 +2,6 @@
 import { getContainer } from "@/lib/cosmos";
 import type { BikeClass, Region } from "@/lib/priceData";
 
-// id is NOT the plain email - the user doc already uses id=email with the
-// same pk=email, and Cosmos requires the (id, pk) pair to be unique. This
-// keeps bike docs in the same partition (fast point-reads, no cross-
-// partition queries) without colliding with the user doc.
 function bikeDocId(email: string): string {
   return `${email}::bike`;
 }
@@ -22,7 +18,8 @@ export interface BikeDoc {
   currentMileage: number;
   startingMileage: number;
   nickname: string;
-  region?: Region; // optional: bikes created before this field existed won't have it
+  region?: Region;
+  annualBudget?: number;
   dateAdded: string;
 }
 
@@ -83,6 +80,15 @@ export async function updateBikeRegion(email: string, region: Region): Promise<B
   const { resource } = await container.item(bikeDocId(email), email).read<BikeDoc>();
   if (!resource) return null;
   resource.region = region;
+  await container.items.upsert(resource);
+  return resource;
+}
+
+export async function updateBikeBudget(email: string, annualBudget: number): Promise<BikeDoc | null> {
+  const container = getContainer();
+  const { resource } = await container.item(bikeDocId(email), email).read<BikeDoc>();
+  if (!resource) return null;
+  resource.annualBudget = annualBudget;
   await container.items.upsert(resource);
   return resource;
 }

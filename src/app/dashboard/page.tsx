@@ -5,10 +5,11 @@ import styles from "./dashboard.module.css";
 import LogoutButton from "./LogoutButton";
 import { getBike } from "@/lib/tracker/bike";
 import { getServiceRecords } from "@/lib/tracker/serviceRecord";
-import { getFuelLogs, computeActualMPG } from "@/lib/tracker/fuelLog";
+import { getFuelLogs, computeActualMPG, computeMPGSeries } from "@/lib/tracker/fuelLog";
 import { getMods } from "@/lib/tracker/mod";
 import { getBills } from "@/lib/tracker/bill";
 import { getReminders, computeReminderStatus } from "@/lib/tracker/reminder";
+import { computeSpendSummary, computeYearSpend, gatherMileagePoints } from "@/lib/tracker/summary";
 import { slugifyMake } from "@/lib/motorcycleModels";
 import type { Region } from "@/lib/priceData";
 import { AddBikeForm } from "./AddBikeForm";
@@ -23,8 +24,18 @@ import { ModCard } from "./ModCard";
 import { BillCard } from "./BillCard";
 import { ReminderItem } from "./ReminderItem";
 import { DashboardTabs } from "./DashboardTabs";
+import { BudgetWidget } from "./BudgetWidget";
+import { SpendDonutChart } from "./SpendDonutChart";
+import { MpgChart } from "./MpgChart";
+import { MileageChart } from "./MileageChart";
+import { FuelCostChart } from "./FuelCostChart";
+import { UpdateMileageButton } from "./UpdateMileageButton";
 
 export const dynamic = "force-dynamic";
+
+function fmtMoney(n: number): string {
+  return `£${n.toFixed(0)}`;
+}
 
 export default async function DashboardPage() {
   const session = await getSession();
@@ -34,34 +45,28 @@ export default async function DashboardPage() {
 
   if (!bike) {
     return (
-      <div className={styles.wrapper}>
-        <header className={styles.header}>
-          <img src="/logo.png" alt="RoadVerdict" className={styles.logoImg} />
+      <main className={styles.main}>
+        <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "1rem" }}>
           <LogoutButton />
-        </header>
-        <main className={styles.main}>
-          <h1 className={styles.heading}>Add your bike</h1>
-          <p className={styles.subtext}>Signed in as {session.email}.</p>
-          <AddBikeForm />
-        </main>
-      </div>
+        </div>
+        <h1 className={styles.heading}>Add your bike</h1>
+        <p className={styles.subtext}>Signed in as {session.email}.</p>
+        <AddBikeForm />
+      </main>
     );
   }
 
   if (!bike.region) {
     return (
-      <div className={styles.wrapper}>
-        <header className={styles.header}>
-          <img src="/logo.png" alt="RoadVerdict" className={styles.logoImg} />
+      <main className={styles.main}>
+        <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "1rem" }}>
           <LogoutButton />
-        </header>
-        <main className={styles.main}>
-          <h1 className={styles.heading}>
-            {bike.nickname ? `${bike.nickname} — ${bike.make} ${bike.model}` : `${bike.make} ${bike.model}`}
-          </h1>
-          <SetRegionForm />
-        </main>
-      </div>
+        </div>
+        <h1 className={styles.heading}>
+          {bike.nickname ? `${bike.nickname} — ${bike.make} ${bike.model}` : `${bike.make} ${bike.model}`}
+        </h1>
+        <SetRegionForm />
+      </main>
     );
   }
 
@@ -74,6 +79,14 @@ export default async function DashboardPage() {
   ]);
   const brandValue = slugifyMake(bike.make);
   const actualMpg = computeActualMPG(fuelLogs);
+  const mpgSeries = computeMPGSeries(fuelLogs);
+  const mileagePoints = gatherMileagePoints(records, mods, fuelLogs);
+  const fuelCostPoints = fuelLogs.map((f) => ({ date: f.date, cost: f.cost }));
+  const summary = computeSpendSummary(records, mods, fuelLogs, bills);
+  const currentYear = new Date().getFullYear();
+  const yearSpend = computeYearSpend(records, mods, fuelLogs, bills, currentYear);
+  const milesTracked = bike.currentMileage - bike.startingMileage;
+  const overBudget = bike.annualBudget != null && yearSpend >= bike.annualBudget;
 
   const serviceContent = (
     <>
@@ -167,28 +180,97 @@ export default async function DashboardPage() {
   );
 
   return (
-    <div className={styles.wrapper}>
-      <header className={styles.header}>
-        <img src="/logo.png" alt="RoadVerdict" className={styles.logoImg} />
-        <LogoutButton />
-      </header>
+    <main className={styles.main}>
+      {overBudget && (
+        <div className={styles.budgetWarningBanner}>
+          ⚠️ <strong>You&apos;re over your {currentYear} budget</strong> - {fmtMoney(yearSpend)} spent against a{" "}
+          {fmtMoney(bike.annualBudget as number)} budget, {fmtMoney(yearSpend - (bike.annualBudget as number))} over.
+        </div>
+      )}
 
-      <main className={styles.main}>
-        <h1 className={styles.heading}>
+      <div className={styles.dashboardTopBar}>
+        <h1 className={styles.heading} style={{ margin: 0 }}>
           {bike.nickname ? `${bike.nickname} — ${bike.make} ${bike.model}` : `${bike.make} ${bike.model}`}
         </h1>
-        <p className={styles.subtext}>
-          {bike.year} · {bike.engineCC}cc ({bike.bikeClass}) · {bike.currentMileage.toLocaleString()} miles
-        </p>
+        <div style={{ display: "flex", gap: "0.6rem", alignItems: "center" }}>
+          <UpdateMileageButton currentMileage={bike.currentMileage} />
+          <LogoutButton />
+        </div>
+      </div>
+      <p className={styles.subtext}>
+        {bike.year} · {bike.engineCC}cc ({bike.bikeClass}) · {bike.currentMileage.toLocaleString()} miles
+      </p>
 
-        <DashboardTabs
-          serviceContent={serviceContent}
-          fuelContent={fuelContent}
-          modsContent={modsContent}
-          billsContent={billsContent}
-          remindersContent={remindersContent}
-        />
-      </main>
-    </div>
+      <div className={styles.statsStrip}>
+        <div className={styles.statCard}>
+          <div className={styles.statCardValue}>{fmtMoney(summary.grandTotal)}</div>
+          <div className={styles.statCardLabel}>Total spend</div>
+        </div>
+        <div className={styles.statCard}>
+          <div className={styles.statCardValue}>{actualMpg ? actualMpg.toFixed(1) : "—"}</div>
+          <div className={styles.statCardLabel}>Actual mpg</div>
+        </div>
+        <div className={styles.statCard}>
+          <div className={styles.statCardValue}>
+            {milesTracked > 0 ? `${((summary.grandTotal / milesTracked) * 100).toFixed(1)}p` : "—"}
+          </div>
+          <div className={styles.statCardLabel}>Per mile</div>
+        </div>
+        <div className={styles.statCard}>
+          <div className={styles.statCardValue}>{bike.currentMileage.toLocaleString()}</div>
+          <div className={styles.statCardLabel}>Current miles</div>
+        </div>
+      </div>
+
+      <BudgetWidget yearSpend={yearSpend} currentYear={currentYear} initialBudget={bike.annualBudget} />
+
+      <div className={styles.chartsGrid}>
+        <div className={styles.chartCard}>
+          <div className={styles.chartCardTitle}>Spend by category</div>
+          {summary.grandTotal > 0 ? (
+            <SpendDonutChart
+              servicingTotal={summary.servicingTotal}
+              modsTotal={summary.modsTotal}
+              fuelTotal={summary.fuelTotal}
+              billsTotal={summary.billsTotal}
+            />
+          ) : (
+            <p className={styles.emptyNote}>Log something to see this fill in.</p>
+          )}
+        </div>
+        <div className={styles.chartCard}>
+          <div className={styles.chartCardTitle}>MPG over time</div>
+          {mpgSeries.length > 0 ? (
+            <MpgChart series={mpgSeries} />
+          ) : (
+            <p className={styles.emptyNote}>Log two consecutive full-tank fill-ups to see this.</p>
+          )}
+        </div>
+        <div className={styles.chartCard}>
+          <div className={styles.chartCardTitle}>Mileage over time</div>
+          {mileagePoints.length > 0 ? (
+            <MileageChart points={mileagePoints} />
+          ) : (
+            <p className={styles.emptyNote}>Log a couple of entries to see your mileage build up.</p>
+          )}
+        </div>
+        <div className={styles.chartCard}>
+          <div className={styles.chartCardTitle}>Fuel cost over time</div>
+          {fuelCostPoints.length > 0 ? (
+            <FuelCostChart points={fuelCostPoints} />
+          ) : (
+            <p className={styles.emptyNote}>Log a fuel fill-up to see cost trends here.</p>
+          )}
+        </div>
+      </div>
+
+      <DashboardTabs
+        serviceContent={serviceContent}
+        fuelContent={fuelContent}
+        modsContent={modsContent}
+        billsContent={billsContent}
+        remindersContent={remindersContent}
+      />
+    </main>
   );
 }

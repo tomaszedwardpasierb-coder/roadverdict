@@ -1,7 +1,7 @@
 ﻿// Place at: src/app/api/tracker/bike/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/session";
-import { createBike, updateBikeMileage, updateBikeRegion } from "@/lib/tracker/bike";
+import { createBike, updateBikeMileage, updateBikeRegion, updateBikeBudget } from "@/lib/tracker/bike";
 import { getBikeClassForCC } from "@/lib/motorcycleModels";
 import type { Region } from "@/lib/priceData";
 
@@ -62,9 +62,13 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
   }
 
-  const { currentMileage, region } = body as { currentMileage?: number; region?: Region };
+  const { currentMileage, region, annualBudget } = body as {
+    currentMileage?: number;
+    region?: Region;
+    annualBudget?: number;
+  };
 
-  if (currentMileage == null && !region) {
+  if (currentMileage == null && !region && annualBudget == null) {
     return NextResponse.json({ error: "Nothing to update." }, { status: 400 });
   }
 
@@ -77,6 +81,12 @@ export async function PATCH(request: NextRequest) {
   }
   if (region) {
     bike = await updateBikeRegion(session.email, region);
+  }
+  if (annualBudget != null) {
+    if (annualBudget <= 0) {
+      return NextResponse.json({ error: "Enter a valid budget amount." }, { status: 400 });
+    }
+    bike = await updateBikeBudget(session.email, annualBudget);
   }
 
   if (!bike) {
