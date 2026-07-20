@@ -61,14 +61,6 @@ export function gatherMileagePoints(
   return points.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 }
 
-export interface MonthlySpend {
-  month: string;
-  servicing: number;
-  mods: number;
-  fuel: number;
-  bills: number;
-}
-
 function monthKey(dateStr: string): string {
   const d = new Date(dateStr);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
@@ -79,25 +71,20 @@ function monthLabel(key: string): string {
   return new Date(y, m - 1, 1).toLocaleDateString("en-GB", { month: "short", year: "2-digit" });
 }
 
-export function computeMonthlySpend(
-  records: ServiceRecordDoc[],
-  mods: ModDoc[],
-  fuelLogs: FuelLogDoc[],
-  bills: BillDoc[]
-): MonthlySpend[] {
-  const buckets = new Map<string, MonthlySpend>();
-  function add(dateStr: string, cost: number, field: "servicing" | "mods" | "fuel" | "bills") {
-    const key = monthKey(dateStr);
-    if (!buckets.has(key)) {
-      buckets.set(key, { month: monthLabel(key), servicing: 0, mods: 0, fuel: 0, bills: 0 });
-    }
-    buckets.get(key)![field] += cost;
-  }
-  records.forEach((r) => add(r.date, r.cost, "servicing"));
-  mods.forEach((m) => add(m.date, m.cost, "mods"));
-  fuelLogs.forEach((f) => add(f.date, f.cost, "fuel"));
-  bills.forEach((b) => add(b.date, b.cost, "bills"));
+export interface MonthlyTotal {
+  month: string;
+  total: number;
+}
 
+// Generic single-category monthly bucketing - used by each tab's own
+// spend-over-time chart (Service, Mods, Bills), rather than one combined
+// chart that mixes categories together meaninglessly.
+export function bucketByMonth(items: { date: string; cost: number }[]): MonthlyTotal[] {
+  const buckets = new Map<string, number>();
+  items.forEach((i) => {
+    const key = monthKey(i.date);
+    buckets.set(key, (buckets.get(key) ?? 0) + i.cost);
+  });
   const sortedKeys = [...buckets.keys()].sort();
-  return sortedKeys.map((k) => buckets.get(k) as MonthlySpend);
+  return sortedKeys.map((k) => ({ month: monthLabel(k), total: buckets.get(k) as number }));
 }

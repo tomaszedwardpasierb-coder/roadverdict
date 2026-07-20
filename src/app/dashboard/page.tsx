@@ -9,7 +9,7 @@ import { getFuelLogs, computeActualMPG, computeMPGSeries } from "@/lib/tracker/f
 import { getMods } from "@/lib/tracker/mod";
 import { getBills } from "@/lib/tracker/bill";
 import { getReminders, computeReminderStatus } from "@/lib/tracker/reminder";
-import { computeSpendSummary, computeYearSpend, gatherMileagePoints, computeMonthlySpend } from "@/lib/tracker/summary";
+import { computeSpendSummary, computeYearSpend, gatherMileagePoints, bucketByMonth } from "@/lib/tracker/summary";
 import { slugifyMake } from "@/lib/motorcycleModels";
 import type { Region } from "@/lib/priceData";
 import { AddBikeForm } from "./AddBikeForm";
@@ -29,7 +29,7 @@ import { SpendDonutChart } from "./SpendDonutChart";
 import { MpgChart } from "./MpgChart";
 import { MileageChart } from "./MileageChart";
 import { FuelCostChart } from "./FuelCostChart";
-import { SpendOverTimeChart } from "./SpendOverTimeChart";
+import { CategorySpendChart } from "./CategorySpendChart";
 import { UpdateMileageButton } from "./UpdateMileageButton";
 
 export const dynamic = "force-dynamic";
@@ -84,7 +84,9 @@ export default async function DashboardPage() {
   const mileagePoints = gatherMileagePoints(records, mods, fuelLogs);
   const fuelCostPoints = fuelLogs.map((f) => ({ date: f.date, cost: f.cost }));
   const summary = computeSpendSummary(records, mods, fuelLogs, bills);
-  const monthlySpend = computeMonthlySpend(records, mods, fuelLogs, bills);
+  const serviceMonthly = bucketByMonth(records.map((r) => ({ date: r.date, cost: r.cost })));
+  const modsMonthly = bucketByMonth(mods.map((m) => ({ date: m.date, cost: m.cost })));
+  const billsMonthly = bucketByMonth(bills.map((b) => ({ date: b.date, cost: b.cost })));
   const currentYear = new Date().getFullYear();
   const yearSpend = computeYearSpend(records, mods, fuelLogs, bills, currentYear);
   const milesTracked = bike.currentMileage - bike.startingMileage;
@@ -93,6 +95,14 @@ export default async function DashboardPage() {
   const serviceContent = (
     <>
       <LogServiceForm initialMileage={bike.currentMileage} />
+      <div className={styles.chartCard} style={{ marginBottom: "0.9rem" }}>
+        <div className={styles.chartCardTitle}>Servicing spend over time</div>
+        {serviceMonthly.length > 1 ? (
+          <CategorySpendChart data={serviceMonthly} color="#1a1a1a" />
+        ) : (
+          <p className={styles.emptyNote}>Check back once you&apos;ve logged servicing across a couple of months.</p>
+        )}
+      </div>
       <h2 className={styles.sectionHeading}>Service history</h2>
       {records.length === 0 ? (
         <div className={styles.card}>
@@ -158,6 +168,14 @@ export default async function DashboardPage() {
   const modsContent = (
     <>
       <LogModForm initialMileage={bike.currentMileage} />
+      <div className={styles.chartCard} style={{ marginBottom: "0.9rem" }}>
+        <div className={styles.chartCardTitle}>Modifications spend over time</div>
+        {modsMonthly.length > 1 ? (
+          <CategorySpendChart data={modsMonthly} color="#e8a33d" />
+        ) : (
+          <p className={styles.emptyNote}>Check back once you&apos;ve logged mods across a couple of months.</p>
+        )}
+      </div>
       <h2 className={styles.sectionHeading}>Modifications & accessories</h2>
       {mods.length === 0 ? (
         <div className={styles.card}>
@@ -172,6 +190,14 @@ export default async function DashboardPage() {
   const billsContent = (
     <>
       <LogBillForm />
+      <div className={styles.chartCard} style={{ marginBottom: "0.9rem" }}>
+        <div className={styles.chartCardTitle}>Insurance, tax & MOT spend over time</div>
+        {billsMonthly.length > 1 ? (
+          <CategorySpendChart data={billsMonthly} color="#6b5b95" />
+        ) : (
+          <p className={styles.emptyNote}>Check back once you&apos;ve logged bills across a couple of months.</p>
+        )}
+      </div>
       <h2 className={styles.sectionHeading}>Insurance, tax & MOT</h2>
       {bills.length === 0 ? (
         <div className={styles.card}>
@@ -267,15 +293,6 @@ export default async function DashboardPage() {
             <p className={styles.emptyNote}>Log a couple of entries to see your mileage build up.</p>
           )}
         </div>
-      </div>
-
-      <div className={styles.chartCard} style={{ marginBottom: "1.6rem" }}>
-        <div className={styles.chartCardTitle}>Spend over time</div>
-        {monthlySpend.length > 0 ? (
-          <SpendOverTimeChart data={monthlySpend} />
-        ) : (
-          <p className={styles.emptyNote}>Log something to see this fill in.</p>
-        )}
       </div>
 
       <DashboardTabs

@@ -555,19 +555,15 @@ main {
   }
 }
 
-body { position: relative; }
-body::before {
-  content: "";
-  position: fixed;
-  inset: 0;
-  z-index: -1;
-  background: url('/road-backdrop.jpg') center/cover no-repeat;
-  filter: blur(22px) brightness(0.55) saturate(0.85);
-  display: none;
-}
+
+
 
 @media (min-width: 900px) {
-  body::before {
-    display: block;
+  body {
+    background-image: url('/road-backdrop.jpg');
+    background-size: cover;
+    background-position: center;
+    background-attachment: fixed;
+    background-repeat: no-repeat;
   }
 }
