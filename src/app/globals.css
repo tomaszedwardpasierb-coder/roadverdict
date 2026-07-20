@@ -558,12 +558,3 @@ main {
 
 
 
-@media (min-width: 900px) {
-  body {
-    background-image: url('/road-backdrop.jpg');
-    background-size: cover;
-    background-position: center;
-    background-attachment: fixed;
-    background-repeat: no-repeat;
-  }
-}

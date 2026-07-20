@@ -31,6 +31,7 @@ import { MileageChart } from "./MileageChart";
 import { FuelCostChart } from "./FuelCostChart";
 import { CategorySpendChart } from "./CategorySpendChart";
 import { UpdateMileageButton } from "./UpdateMileageButton";
+import { ExportShareSection } from "./ExportShareSection";
 
 export const dynamic = "force-dynamic";
 
@@ -295,6 +296,8 @@ export default async function DashboardPage() {
         </div>
       </div>
 
+      <ExportShareSection />
+
       <DashboardTabs
         serviceContent={serviceContent}
         fuelContent={fuelContent}
@@ -305,3 +308,4 @@ export default async function DashboardPage() {
     </main>
   );
 }
+

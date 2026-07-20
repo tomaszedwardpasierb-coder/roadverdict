@@ -20,6 +20,7 @@ export interface BikeDoc {
   nickname: string;
   region?: Region;
   annualBudget?: number;
+  shareToken?: string;
   dateAdded: string;
 }
 
@@ -89,6 +90,15 @@ export async function updateBikeBudget(email: string, annualBudget: number): Pro
   const { resource } = await container.item(bikeDocId(email), email).read<BikeDoc>();
   if (!resource) return null;
   resource.annualBudget = annualBudget;
+  await container.items.upsert(resource);
+  return resource;
+}
+
+export async function updateBikeShareToken(email: string, shareToken: string): Promise<BikeDoc | null> {
+  const container = getContainer();
+  const { resource } = await container.item(bikeDocId(email), email).read<BikeDoc>();
+  if (!resource) return null;
+  resource.shareToken = shareToken;
   await container.items.upsert(resource);
   return resource;
 }
