@@ -2,6 +2,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/session";
 import { createBill } from "@/lib/tracker/bill";
+import { createReminder, deleteRemindersBySourceKey } from "@/lib/tracker/reminder";
+import { getBike } from "@/lib/tracker/bike";
+import { BILL_LABELS } from "@/lib/tracker/billTypes";
 
 export const dynamic = "force-dynamic";
 
@@ -18,11 +21,12 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
   }
 
-  const { billType, cost, date, notes } = body as {
+  const { billType, cost, date, notes, reminder } = body as {
     billType?: string;
     cost?: number;
     date?: string;
     notes?: string;
+    reminder?: { intervalType: "mileage" | "months" | "date"; intervalValue?: number; exactDate?: string };
   };
 
   if (!billType || cost == null || !date) {
@@ -30,5 +34,21 @@ export async function POST(request: NextRequest) {
   }
 
   const bill = await createBill(session.email, { billType, cost, date, notes: notes ?? "" });
+
+  if (reminder) {
+    const sourceKey = `bill:${billType}`;
+    await deleteRemindersBySourceKey(session.email, sourceKey);
+    const bike = await getBike(session.email);
+    await createReminder(session.email, {
+      name: `${BILL_LABELS[billType] ?? billType} renewal`,
+      intervalType: reminder.intervalType,
+      intervalValue: reminder.intervalValue,
+      exactDate: reminder.exactDate,
+      baseMileage: bike?.currentMileage,
+      date,
+      sourceKey,
+    });
+  }
+
   return NextResponse.json({ bill });
 }

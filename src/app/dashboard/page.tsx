@@ -8,6 +8,7 @@ import { getServiceRecords } from "@/lib/tracker/serviceRecord";
 import { getFuelLogs, computeActualMPG } from "@/lib/tracker/fuelLog";
 import { getMods } from "@/lib/tracker/mod";
 import { getBills } from "@/lib/tracker/bill";
+import { getReminders, computeReminderStatus } from "@/lib/tracker/reminder";
 import { slugifyMake } from "@/lib/motorcycleModels";
 import type { Region } from "@/lib/priceData";
 import { AddBikeForm } from "./AddBikeForm";
@@ -20,6 +21,7 @@ import { ServiceHistoryCard } from "./ServiceHistoryCard";
 import { FuelLogCard } from "./FuelLogCard";
 import { ModCard } from "./ModCard";
 import { BillCard } from "./BillCard";
+import { ReminderItem } from "./ReminderItem";
 
 export const dynamic = "force-dynamic";
 
@@ -62,11 +64,12 @@ export default async function DashboardPage() {
     );
   }
 
-  const [records, fuelLogs, mods, bills] = await Promise.all([
+  const [records, fuelLogs, mods, bills, reminders] = await Promise.all([
     getServiceRecords(session.email),
     getFuelLogs(session.email),
     getMods(session.email),
     getBills(session.email),
+    getReminders(session.email),
   ]);
   const brandValue = slugifyMake(bike.make);
   const actualMpg = computeActualMPG(fuelLogs);
@@ -152,6 +155,19 @@ export default async function DashboardPage() {
           </div>
         ) : (
           bills.map((b) => <BillCard key={b.id} bill={b} />)
+        )}
+
+        <h2 className={styles.cardTitle} style={{ marginTop: "1.5rem" }}>Reminders</h2>
+        {reminders.length === 0 ? (
+          <div className={styles.card}>
+            <p className={styles.cardBody}>
+              No reminders set yet. Tick &quot;Remind me&quot; when logging a service or a bill above to add one.
+            </p>
+          </div>
+        ) : (
+          reminders.map((r) => (
+            <ReminderItem key={r.id} reminder={r} status={computeReminderStatus(r, bike.currentMileage)} />
+          ))
         )}
       </main>
     </div>

@@ -1,10 +1,6 @@
 ﻿// Place at: src/lib/tracker/jobTypes.ts
 import type { JobType } from "@/lib/priceData";
 
-// Expanded to match what real maintenance-tracker competitors cover
-// (Drivvo, MotorManage, AUTOsist), same list as the local prototype. Only
-// the 5 in BENCHMARKED_JOB_TYPES have real UK price data behind them (see
-// priceData.ts) - the rest log cost honestly with no fair/high claim.
 export const JOB_LABELS: Record<string, string> = {
   "basic-service": "Basic service",
   "full-service": "Full service",
@@ -64,4 +60,27 @@ export const AFFILIATE_LINKS: Record<string, { name: string; url: string }[]> = 
     { name: "GhostBikes.com", url: "https://www.ghostbikes.com" },
     { name: "The Green Spark Plug Co", url: "https://www.greensparkplug.co.uk" },
   ],
+};
+
+// Default reminder interval offered when logging each job - typical
+// starting points from general motorcycle maintenance guides, NOT
+// model-specific. Always editable. "other" has no default - too vague to
+// guess at.
+export const JOB_REMINDER_DEFAULTS: Record<string, { type: "mileage" | "months"; value: number; note?: string }> = {
+  "oil-filter": { type: "mileage", value: 4000 },
+  "full-service": { type: "mileage", value: 6000 },
+  "basic-service": { type: "mileage", value: 4000 },
+  "spark-plugs": { type: "mileage", value: 10000 },
+  "valve-clearance": { type: "mileage", value: 12000, note: "Varies hugely by bike (6,000-25,000+ mi). Check your owner's manual for the real figure." },
+  "air-filter": { type: "mileage", value: 12000 },
+  "coolant-flush": { type: "months", value: 24 },
+  "brake-fluid-flush": { type: "months", value: 24, note: "Time-based, not mileage - brake fluid absorbs moisture from the air regardless of use." },
+  "brake-pads-front": { type: "mileage", value: 12000 },
+  "brake-pads-rear": { type: "mileage", value: 14000 },
+  "tyres-pair": { type: "mileage", value: 5000 },
+  "tyres-front": { type: "mileage", value: 6000 },
+  "tyres-rear": { type: "mileage", value: 5000 },
+  "chain-and-sprockets": { type: "mileage", value: 15000 },
+  "drive-belt": { type: "mileage", value: 20000 },
+  "battery": { type: "months", value: 36 },
 };

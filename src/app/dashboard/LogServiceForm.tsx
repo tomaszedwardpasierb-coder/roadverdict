@@ -2,8 +2,10 @@
 'use client';
 
 import { useState } from 'react';
-import { JOB_GROUPS, JOB_LABELS } from '@/lib/tracker/jobTypes';
+import { JOB_GROUPS, JOB_LABELS, JOB_REMINDER_DEFAULTS } from '@/lib/tracker/jobTypes';
 import { useTrackerFormSubmit } from './useTrackerFormSubmit';
+
+type RemindType = 'mileage' | 'months' | 'date';
 
 export function LogServiceForm({ initialMileage }: { initialMileage: number }) {
   const [jobType, setJobType] = useState('basic-service');
@@ -11,22 +13,54 @@ export function LogServiceForm({ initialMileage }: { initialMileage: number }) {
   const [mileage, setMileage] = useState(String(initialMileage));
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
   const [notes, setNotes] = useState('');
+  const [remindChecked, setRemindChecked] = useState(false);
+  const [remindType, setRemindType] = useState<RemindType>('mileage');
+  const [remindValue, setRemindValue] = useState('');
+  const [remindDate, setRemindDate] = useState('');
   const { submit, submitting, error } = useTrackerFormSubmit('/api/tracker/services');
+
+  function applyDefaults(forJobType: string) {
+    const def = JOB_REMINDER_DEFAULTS[forJobType];
+    setRemindType(def ? def.type : 'mileage');
+    setRemindValue(def ? String(def.value) : '');
+  }
+
+  function handleRemindToggle(checked: boolean) {
+    setRemindChecked(checked);
+    if (checked) applyDefaults(jobType);
+  }
+
+  function handleJobChange(newJobType: string) {
+    setJobType(newJobType);
+    if (remindChecked) applyDefaults(newJobType);
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    const ok = await submit({
-      jobType,
-      cost: Number(cost),
-      mileage: Number(mileage),
-      date,
-      notes,
-    });
+    const body: {
+      jobType: string;
+      cost: number;
+      mileage: number;
+      date: string;
+      notes: string;
+      reminder?: { intervalType: RemindType; intervalValue?: number; exactDate?: string };
+    } = { jobType, cost: Number(cost), mileage: Number(mileage), date, notes };
+
+    if (remindChecked) {
+      body.reminder =
+        remindType === 'date'
+          ? { intervalType: 'date', exactDate: remindDate }
+          : { intervalType: remindType, intervalValue: Number(remindValue) };
+    }
+
+    const ok = await submit(body);
     if (ok) {
       setCost('');
       setNotes('');
     }
   }
+
+  const remindDef = JOB_REMINDER_DEFAULTS[jobType];
 
   return (
     <form className="ticket" onSubmit={handleSubmit}>
@@ -38,7 +72,7 @@ export function LogServiceForm({ initialMileage }: { initialMileage: number }) {
         </div>
         <div className="field" style={{ marginTop: '0.9rem' }}>
           <label htmlFor="job-type">Job</label>
-          <select id="job-type" value={jobType} onChange={(e) => setJobType(e.target.value)}>
+          <select id="job-type" value={jobType} onChange={(e) => handleJobChange(e.target.value)}>
             {JOB_GROUPS.map((g) => (
               <optgroup key={g.group} label={g.group}>
                 {g.jobs.map((j) => (
@@ -60,6 +94,38 @@ export function LogServiceForm({ initialMileage }: { initialMileage: number }) {
           <label htmlFor="job-notes">Notes (optional)</label>
           <textarea id="job-notes" rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="e.g. front only, done at Halfords Autocentre" />
         </div>
+
+        <div className="field-checkbox">
+          <label>
+            <input type="checkbox" checked={remindChecked} onChange={(e) => handleRemindToggle(e.target.checked)} />
+            🔔 Remind me when this is due again
+          </label>
+        </div>
+
+        {remindChecked && (
+          <div style={{ marginTop: '0.6rem', paddingLeft: '1.4rem', borderLeft: '2px solid var(--amber)' }}>
+            <div className="field">
+              <label htmlFor="remind-type">Track by</label>
+              <select id="remind-type" value={remindType} onChange={(e) => setRemindType(e.target.value as RemindType)}>
+                <option value="mileage">Mileage</option>
+                <option value="months">Time (months)</option>
+                <option value="date">Exact date</option>
+              </select>
+            </div>
+            {remindType === 'date' ? (
+              <div className="field" style={{ marginTop: '0.9rem' }}>
+                <label htmlFor="remind-date">Date</label>
+                <input id="remind-date" type="date" value={remindDate} onChange={(e) => setRemindDate(e.target.value)} required />
+              </div>
+            ) : (
+              <div className="field" style={{ marginTop: '0.9rem' }}>
+                <label htmlFor="remind-value">Interval</label>
+                <input id="remind-value" type="number" min="1" value={remindValue} onChange={(e) => setRemindValue(e.target.value)} required />
+              </div>
+            )}
+            {remindDef?.note && <p className="field-note" style={{ marginTop: '0.9rem' }}>{remindDef.note}</p>}
+          </div>
+        )}
       </div>
       <hr className="ticket__divider" />
       <div className="ticket__section">

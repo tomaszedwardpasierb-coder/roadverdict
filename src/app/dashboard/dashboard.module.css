@@ -133,3 +133,12 @@
 }
 .iconBtn:hover:not(:disabled) { border-color: var(--asphalt); color: var(--asphalt); }
 .iconBtn:disabled { opacity: 0.6; cursor: default; }
+
+.reminderItem { display: flex; justify-content: space-between; align-items: center; gap: 0.8rem; background: var(--paper); border: 1px solid var(--border); border-radius: 4px; padding: 0.7rem 1rem; margin-bottom: 0.5rem; flex-wrap: wrap; }
+.reminderItemName { font-weight: 500; }
+.reminderItemDetail { font-family: var(--font-mono); font-size: 0.78rem; color: var(--ink-soft); }
+.reminderItemActions { display: flex; gap: 0.5rem; align-items: center; }
+.reminderStatus { font-family: var(--font-mono); font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.04em; padding: 0.2rem 0.55rem; border-radius: 3px; }
+.reminderStatusOk { background: #e7f0e7; color: var(--verdict-green); }
+.reminderStatusDueSoon { background: #fbeecd; color: var(--amber-ink); }
+.reminderStatusOverdue { background: #f8e2dd; color: var(--verdict-red); }
