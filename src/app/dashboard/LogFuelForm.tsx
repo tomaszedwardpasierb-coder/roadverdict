@@ -2,46 +2,28 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useTrackerFormSubmit } from './useTrackerFormSubmit';
 
 export function LogFuelForm({ initialMileage }: { initialMileage: number }) {
-  const router = useRouter();
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
   const [litres, setLitres] = useState('');
   const [cost, setCost] = useState('');
   const [mileage, setMileage] = useState(String(initialMileage));
   const [filledToFull, setFilledToFull] = useState(true);
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const { submit, submitting, error } = useTrackerFormSubmit('/api/tracker/fuel');
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setError(null);
-    setSubmitting(true);
-    try {
-      const response = await fetch('/api/tracker/fuel', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          litres: Number(litres),
-          cost: Number(cost),
-          mileage: Number(mileage),
-          date,
-          filledToFull,
-        }),
-      });
-      const data = await response.json();
-      if (!response.ok) {
-        setError(data.error ?? 'Something went wrong. Try again.');
-        return;
-      }
+    const ok = await submit({
+      litres: Number(litres),
+      cost: Number(cost),
+      mileage: Number(mileage),
+      date,
+      filledToFull,
+    });
+    if (ok) {
       setLitres('');
       setCost('');
-      router.refresh();
-    } catch {
-      setError('Could not reach RoadVerdict. Check your connection and try again.');
-    } finally {
-      setSubmitting(false);
     }
   }
 

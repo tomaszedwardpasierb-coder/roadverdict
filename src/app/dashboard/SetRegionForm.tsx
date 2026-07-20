@@ -2,38 +2,18 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { REGION_LABELS, type Region } from '@/lib/priceData';
+import { useTrackerFormSubmit } from './useTrackerFormSubmit';
 
 const REGIONS = Object.keys(REGION_LABELS) as Region[];
 
 export function SetRegionForm() {
-  const router = useRouter();
   const [region, setRegion] = useState<Region>('rest-england-wales');
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const { submit, submitting, error } = useTrackerFormSubmit('/api/tracker/bike');
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setError(null);
-    setSubmitting(true);
-    try {
-      const response = await fetch('/api/tracker/bike', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ region }),
-      });
-      const data = await response.json();
-      if (!response.ok) {
-        setError(data.error ?? 'Something went wrong. Try again.');
-        return;
-      }
-      router.refresh();
-    } catch {
-      setError('Could not reach RoadVerdict. Check your connection and try again.');
-    } finally {
-      setSubmitting(false);
-    }
+    await submit({ region }, 'PATCH');
   }
 
   return (

@@ -1,47 +1,23 @@
 ﻿// Place at: src/lib/tracker/fuelLog.ts
-import { getContainer } from "@/lib/cosmos";
+import { createTrackerDoc, queryTrackerDocs, type TrackerDocBase } from "./cosmosHelpers";
 
-export interface FuelLogDoc {
-  id: string;
-  pk: string;
+export interface FuelLogDoc extends TrackerDocBase {
   type: "fuelLog";
   litres: number;
   cost: number;
   mileage: number;
-  date: string;
   filledToFull: boolean;
-  createdAt: string;
 }
 
 export async function createFuelLog(
   email: string,
   data: { litres: number; cost: number; mileage: number; date: string; filledToFull: boolean }
 ): Promise<FuelLogDoc> {
-  const container = getContainer();
-  const doc: FuelLogDoc = {
-    id: `${email}::fuel::${Date.now()}`,
-    pk: email,
-    type: "fuelLog",
-    litres: data.litres,
-    cost: data.cost,
-    mileage: data.mileage,
-    date: data.date,
-    filledToFull: data.filledToFull,
-    createdAt: new Date().toISOString(),
-  };
-  await container.items.upsert(doc);
-  return doc;
+  return createTrackerDoc<FuelLogDoc>(email, "fuel", "fuelLog", data);
 }
 
 export async function getFuelLogs(email: string): Promise<FuelLogDoc[]> {
-  const container = getContainer();
-  const { resources } = await container.items
-    .query<FuelLogDoc>(
-      { query: "SELECT * FROM c WHERE c.type = 'fuelLog' ORDER BY c.date DESC" },
-      { partitionKey: email }
-    )
-    .fetchAll();
-  return resources;
+  return queryTrackerDocs<FuelLogDoc>(email, "fuelLog");
 }
 
 export interface MpgSegment {

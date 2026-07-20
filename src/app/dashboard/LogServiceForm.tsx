@@ -2,47 +2,29 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { JOB_GROUPS, JOB_LABELS } from '@/lib/tracker/jobTypes';
+import { useTrackerFormSubmit } from './useTrackerFormSubmit';
 
 export function LogServiceForm({ initialMileage }: { initialMileage: number }) {
-  const router = useRouter();
   const [jobType, setJobType] = useState('basic-service');
   const [cost, setCost] = useState('');
   const [mileage, setMileage] = useState(String(initialMileage));
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
   const [notes, setNotes] = useState('');
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const { submit, submitting, error } = useTrackerFormSubmit('/api/tracker/services');
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setError(null);
-    setSubmitting(true);
-    try {
-      const response = await fetch('/api/tracker/services', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          jobType,
-          cost: Number(cost),
-          mileage: Number(mileage),
-          date,
-          notes,
-        }),
-      });
-      const data = await response.json();
-      if (!response.ok) {
-        setError(data.error ?? 'Something went wrong. Try again.');
-        return;
-      }
+    const ok = await submit({
+      jobType,
+      cost: Number(cost),
+      mileage: Number(mileage),
+      date,
+      notes,
+    });
+    if (ok) {
       setCost('');
       setNotes('');
-      router.refresh();
-    } catch {
-      setError('Could not reach RoadVerdict. Check your connection and try again.');
-    } finally {
-      setSubmitting(false);
     }
   }
 

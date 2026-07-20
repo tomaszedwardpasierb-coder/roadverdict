@@ -2,14 +2,13 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { ALL_BRANDS, MOTORCYCLE_MODELS, getBikeClassForCC } from '@/lib/motorcycleModels';
 import { REGION_LABELS, type Region } from '@/lib/priceData';
+import { useTrackerFormSubmit } from './useTrackerFormSubmit';
 
 const REGIONS = Object.keys(REGION_LABELS) as Region[];
 
 export function AddBikeForm() {
-  const router = useRouter();
   const [make, setMake] = useState(ALL_BRANDS[0]);
   const modelsForBrand = MOTORCYCLE_MODELS.filter((m) => m.make === make);
   const [model, setModel] = useState(modelsForBrand[0]?.model ?? '');
@@ -17,8 +16,7 @@ export function AddBikeForm() {
   const [mileage, setMileage] = useState('12000');
   const [nickname, setNickname] = useState('');
   const [region, setRegion] = useState<Region>('rest-england-wales');
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const { submit, submitting, error } = useTrackerFormSubmit('/api/tracker/bike');
 
   function handleMakeChange(newMake: string) {
     setMake(newMake);
@@ -30,37 +28,16 @@ export function AddBikeForm() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setError(null);
-    if (!selectedModelData) {
-      setError('Please pick a model.');
-      return;
-    }
-    setSubmitting(true);
-    try {
-      const response = await fetch('/api/tracker/bike', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          make,
-          model,
-          engineCC: selectedModelData.engineCC,
-          year: Number(year),
-          currentMileage: Number(mileage),
-          nickname,
-          region,
-        }),
-      });
-      const data = await response.json();
-      if (!response.ok) {
-        setError(data.error ?? 'Something went wrong. Try again.');
-        return;
-      }
-      router.refresh();
-    } catch {
-      setError('Could not reach RoadVerdict. Check your connection and try again.');
-    } finally {
-      setSubmitting(false);
-    }
+    if (!selectedModelData) return;
+    await submit({
+      make,
+      model,
+      engineCC: selectedModelData.engineCC,
+      year: Number(year),
+      currentMileage: Number(mileage),
+      nickname,
+      region,
+    });
   }
 
   return (
