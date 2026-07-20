@@ -6,14 +6,20 @@ import LogoutButton from "./LogoutButton";
 import { getBike } from "@/lib/tracker/bike";
 import { getServiceRecords } from "@/lib/tracker/serviceRecord";
 import { getFuelLogs, computeActualMPG } from "@/lib/tracker/fuelLog";
+import { getMods } from "@/lib/tracker/mod";
+import { getBills } from "@/lib/tracker/bill";
 import { slugifyMake } from "@/lib/motorcycleModels";
 import type { Region } from "@/lib/priceData";
 import { AddBikeForm } from "./AddBikeForm";
 import { SetRegionForm } from "./SetRegionForm";
 import { LogServiceForm } from "./LogServiceForm";
 import { LogFuelForm } from "./LogFuelForm";
+import { LogModForm } from "./LogModForm";
+import { LogBillForm } from "./LogBillForm";
 import { ServiceHistoryCard } from "./ServiceHistoryCard";
 import { FuelLogCard } from "./FuelLogCard";
+import { ModCard } from "./ModCard";
+import { BillCard } from "./BillCard";
 
 export const dynamic = "force-dynamic";
 
@@ -56,9 +62,11 @@ export default async function DashboardPage() {
     );
   }
 
-  const [records, fuelLogs] = await Promise.all([
+  const [records, fuelLogs, mods, bills] = await Promise.all([
     getServiceRecords(session.email),
     getFuelLogs(session.email),
+    getMods(session.email),
+    getBills(session.email),
   ]);
   const brandValue = slugifyMake(bike.make);
   const actualMpg = computeActualMPG(fuelLogs);
@@ -118,6 +126,32 @@ export default async function DashboardPage() {
           </div>
         ) : (
           fuelLogs.map((f) => <FuelLogCard key={f.id} log={f} />)
+        )}
+
+        <div style={{ marginTop: "2rem" }}>
+          <LogModForm initialMileage={bike.currentMileage} />
+        </div>
+
+        <h2 className={styles.cardTitle} style={{ marginTop: "1.5rem" }}>Modifications & accessories</h2>
+        {mods.length === 0 ? (
+          <div className={styles.card}>
+            <p className={styles.cardBody}>No modifications or accessories logged yet.</p>
+          </div>
+        ) : (
+          mods.map((m) => <ModCard key={m.id} mod={m} />)
+        )}
+
+        <div style={{ marginTop: "2rem" }}>
+          <LogBillForm />
+        </div>
+
+        <h2 className={styles.cardTitle} style={{ marginTop: "1.5rem" }}>Insurance, tax & MOT</h2>
+        {bills.length === 0 ? (
+          <div className={styles.card}>
+            <p className={styles.cardBody}>No insurance, tax, or MOT payments logged yet.</p>
+          </div>
+        ) : (
+          bills.map((b) => <BillCard key={b.id} bill={b} />)
         )}
       </main>
     </div>
