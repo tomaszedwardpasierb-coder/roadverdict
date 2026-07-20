@@ -19,7 +19,7 @@ export function SpendDonutChart({ servicingTotal, modsTotal, fuelTotal, billsTot
     datasets: [
       {
         data: [servicingTotal, modsTotal, fuelTotal, billsTotal],
-        backgroundColor: ['#000000', '#e8a33d', '#4c7a4e', '#7a5211'],
+        backgroundColor: ['#1a1a1a', '#e8a33d', '#3d8b6f', '#6b5b95'],
         borderColor: '#f7f6f2',
         borderWidth: 2,
       },

@@ -519,3 +519,38 @@ main {
 .field-checkbox { margin: 0.9rem 0; }
 .field-checkbox label { display: flex; align-items: center; gap: 0.5rem; font-size: 0.92rem; font-weight: 500; cursor: pointer; }
 .field-checkbox input[type="checkbox"] { width: 18px; height: 18px; }
+
+/* --- Homepage hero: two-column on desktop, breaks out wider than the
+   standard 640px column deliberately, since this is the one place a
+   first-time visitor forms their whole impression of the site. --- */
+.homeHero {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  margin-bottom: 1rem;
+}
+
+.homeHeroImageWrap {
+  border: 2px solid var(--asphalt);
+  border-radius: 6px;
+  overflow: hidden;
+  aspect-ratio: 4 / 3;
+}
+
+.homeHeroImage {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+@media (min-width: 1040px) {
+  .homeHero {
+    display: grid;
+    grid-template-columns: 1.1fr 1fr;
+    align-items: center;
+    gap: 2.5rem;
+    margin-left: -180px;
+    margin-right: -180px;
+  }
+}
