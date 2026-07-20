@@ -42,7 +42,7 @@
 }
 
 .main {
-  max-width: 640px;
+  max-width: 680px;
   margin: 0 auto;
   padding: 40px 24px;
 }
@@ -69,19 +69,22 @@
   margin-bottom: 16px;
 }
 
-.cardTitle {
-  font-family: var(--font-display);
-  font-size: 0.9rem;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  margin: 0 0 8px;
-  color: var(--asphalt);
-}
-
 .cardBody {
   font-size: 14px;
   color: var(--ink-soft);
   margin: 0;
+}
+
+/* Real section heading - replaces the earlier misuse of .cardTitle as a
+   bare heading outside any .card, which needed a repeated inline
+   margin-top override every time it was used. */
+.sectionHeading {
+  font-family: var(--font-display);
+  font-size: 0.9rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin: 1.5rem 0 0.9rem;
+  color: var(--asphalt);
 }
 
 .jobCard {
@@ -142,3 +145,37 @@
 .reminderStatusOk { background: #e7f0e7; color: var(--verdict-green); }
 .reminderStatusDueSoon { background: #fbeecd; color: var(--amber-ink); }
 .reminderStatusOverdue { background: #f8e2dd; color: var(--verdict-red); }
+
+/* Tabs - the fix for the endless single-column scroll */
+.tabBar {
+  display: flex;
+  gap: 0;
+  border-bottom: 2px solid var(--asphalt);
+  margin-bottom: 1.5rem;
+  overflow-x: auto;
+}
+.tab {
+  font-family: var(--font-display);
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  padding: 0.7rem 1.1rem;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--ink-soft);
+  white-space: nowrap;
+  border-bottom: 3px solid transparent;
+  margin-bottom: -2px;
+}
+.tabActive {
+  color: var(--asphalt);
+  border-bottom-color: var(--amber);
+}
+.tab:hover:not(.tabActive) {
+  color: var(--asphalt);
+}
+
+@media (max-width: 480px) {
+  .tab { padding: 0.6rem 0.85rem; font-size: 0.78rem; }
+}

@@ -22,6 +22,7 @@ import { FuelLogCard } from "./FuelLogCard";
 import { ModCard } from "./ModCard";
 import { BillCard } from "./BillCard";
 import { ReminderItem } from "./ReminderItem";
+import { DashboardTabs } from "./DashboardTabs";
 
 export const dynamic = "force-dynamic";
 
@@ -74,6 +75,97 @@ export default async function DashboardPage() {
   const brandValue = slugifyMake(bike.make);
   const actualMpg = computeActualMPG(fuelLogs);
 
+  const serviceContent = (
+    <>
+      <LogServiceForm initialMileage={bike.currentMileage} />
+      <h2 className={styles.sectionHeading}>Service history</h2>
+      {records.length === 0 ? (
+        <div className={styles.card}>
+          <p className={styles.cardBody}>No service records logged yet. Log your first one above.</p>
+        </div>
+      ) : (
+        records.map((r) => (
+          <ServiceHistoryCard
+            key={r.id}
+            record={r}
+            bikeClass={bike.bikeClass}
+            brandValue={brandValue}
+            region={bike.region as Region}
+          />
+        ))
+      )}
+    </>
+  );
+
+  const fuelContent = (
+    <>
+      <LogFuelForm initialMileage={bike.currentMileage} />
+      <h2 className={styles.sectionHeading}>Fuel log</h2>
+      {actualMpg ? (
+        <p className={styles.subtext} style={{ marginBottom: "0.9rem" }}>
+          Your actual average from logged fill-ups: <strong>{actualMpg.toFixed(1)} mpg</strong> (the Cost
+          Calculator assumes 57 mpg generally - this is specific to your bike and riding).
+        </p>
+      ) : (
+        <p className={styles.subtext} style={{ marginBottom: "0.9rem" }}>
+          Log at least two consecutive full-tank fill-ups to see your bike&apos;s real MPG here.
+        </p>
+      )}
+      {fuelLogs.length === 0 ? (
+        <div className={styles.card}>
+          <p className={styles.cardBody}>No fuel fill-ups logged yet. Log your first one above.</p>
+        </div>
+      ) : (
+        fuelLogs.map((f) => <FuelLogCard key={f.id} log={f} />)
+      )}
+    </>
+  );
+
+  const modsContent = (
+    <>
+      <LogModForm initialMileage={bike.currentMileage} />
+      <h2 className={styles.sectionHeading}>Modifications & accessories</h2>
+      {mods.length === 0 ? (
+        <div className={styles.card}>
+          <p className={styles.cardBody}>No modifications or accessories logged yet.</p>
+        </div>
+      ) : (
+        mods.map((m) => <ModCard key={m.id} mod={m} />)
+      )}
+    </>
+  );
+
+  const billsContent = (
+    <>
+      <LogBillForm />
+      <h2 className={styles.sectionHeading}>Insurance, tax & MOT</h2>
+      {bills.length === 0 ? (
+        <div className={styles.card}>
+          <p className={styles.cardBody}>No insurance, tax, or MOT payments logged yet.</p>
+        </div>
+      ) : (
+        bills.map((b) => <BillCard key={b.id} bill={b} />)
+      )}
+    </>
+  );
+
+  const remindersContent = (
+    <>
+      <h2 className={styles.sectionHeading} style={{ marginTop: 0 }}>Reminders</h2>
+      {reminders.length === 0 ? (
+        <div className={styles.card}>
+          <p className={styles.cardBody}>
+            No reminders set yet. Tick &quot;Remind me&quot; when logging a service or a bill to add one.
+          </p>
+        </div>
+      ) : (
+        reminders.map((r) => (
+          <ReminderItem key={r.id} reminder={r} status={computeReminderStatus(r, bike.currentMileage)} />
+        ))
+      )}
+    </>
+  );
+
   return (
     <div className={styles.wrapper}>
       <header className={styles.header}>
@@ -89,86 +181,13 @@ export default async function DashboardPage() {
           {bike.year} · {bike.engineCC}cc ({bike.bikeClass}) · {bike.currentMileage.toLocaleString()} miles
         </p>
 
-        <LogServiceForm initialMileage={bike.currentMileage} />
-
-        <h2 className={styles.cardTitle} style={{ marginTop: "1.5rem" }}>Service history</h2>
-        {records.length === 0 ? (
-          <div className={styles.card}>
-            <p className={styles.cardBody}>No service records logged yet. Log your first one above.</p>
-          </div>
-        ) : (
-          records.map((r) => (
-            <ServiceHistoryCard
-              key={r.id}
-              record={r}
-              bikeClass={bike.bikeClass}
-              brandValue={brandValue}
-              region={bike.region as Region}
-            />
-          ))
-        )}
-
-        <div style={{ marginTop: "2rem" }}>
-          <LogFuelForm initialMileage={bike.currentMileage} />
-        </div>
-
-        <h2 className={styles.cardTitle} style={{ marginTop: "1.5rem" }}>Fuel log</h2>
-        {actualMpg ? (
-          <p className={styles.subtext} style={{ marginBottom: "0.9rem" }}>
-            Your actual average from logged fill-ups: <strong>{actualMpg.toFixed(1)} mpg</strong> (the Cost
-            Calculator assumes 57 mpg generally - this is specific to your bike and riding).
-          </p>
-        ) : (
-          <p className={styles.subtext} style={{ marginBottom: "0.9rem" }}>
-            Log at least two consecutive full-tank fill-ups to see your bike&apos;s real MPG here.
-          </p>
-        )}
-        {fuelLogs.length === 0 ? (
-          <div className={styles.card}>
-            <p className={styles.cardBody}>No fuel fill-ups logged yet. Log your first one above.</p>
-          </div>
-        ) : (
-          fuelLogs.map((f) => <FuelLogCard key={f.id} log={f} />)
-        )}
-
-        <div style={{ marginTop: "2rem" }}>
-          <LogModForm initialMileage={bike.currentMileage} />
-        </div>
-
-        <h2 className={styles.cardTitle} style={{ marginTop: "1.5rem" }}>Modifications & accessories</h2>
-        {mods.length === 0 ? (
-          <div className={styles.card}>
-            <p className={styles.cardBody}>No modifications or accessories logged yet.</p>
-          </div>
-        ) : (
-          mods.map((m) => <ModCard key={m.id} mod={m} />)
-        )}
-
-        <div style={{ marginTop: "2rem" }}>
-          <LogBillForm />
-        </div>
-
-        <h2 className={styles.cardTitle} style={{ marginTop: "1.5rem" }}>Insurance, tax & MOT</h2>
-        {bills.length === 0 ? (
-          <div className={styles.card}>
-            <p className={styles.cardBody}>No insurance, tax, or MOT payments logged yet.</p>
-          </div>
-        ) : (
-          bills.map((b) => <BillCard key={b.id} bill={b} />)
-        )}
-
-        <h2 className={styles.cardTitle} style={{ marginTop: "1.5rem" }}>Reminders</h2>
-        {reminders.length === 0 ? (
-          <div className={styles.card}>
-            <p className={styles.cardBody}>
-              No reminders set yet. Tick &quot;Remind me&quot; when logging a service or a bill above to add one.
-            </p>
-          </div>
-        ) : (
-          reminders.map((r) => (
-            <ReminderItem key={r.id} reminder={r} status={computeReminderStatus(r, bike.currentMileage)} />
-          ))
-        )}
+        <DashboardTabs
+          serviceContent={serviceContent}
+          fuelContent={fuelContent}
+          modsContent={modsContent}
+          billsContent={billsContent}
+          remindersContent={remindersContent}
+        />
       </main>
     </div>
   );
