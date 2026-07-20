@@ -1,4 +1,5 @@
-﻿import type { Metadata } from 'next';
+﻿// Place at: src/app/layout.tsx
+import type { Metadata } from 'next';
 import { Oswald, IBM_Plex_Sans, IBM_Plex_Mono } from 'next/font/google';
 import Link from 'next/link';
 import './globals.css';
@@ -47,7 +48,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <footer className="site-footer">
           <p>
             RoadVerdict is guidance benchmarked against typical prices, not a professional
-            inspection. <Link href="/privacy">Privacy</Link>
+            inspection. <Link href="/privacy">Privacy</Link> · <a href="mailto:hello@roadverdict.co.uk">hello@roadverdict.co.uk</a>
           </p>
         </footer>
       </body>
