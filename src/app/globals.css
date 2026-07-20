@@ -93,7 +93,7 @@ a {
 }
 
 main {
-  max-width: 640px;
+  max-width: 900px;
   margin: 0 auto;
   padding: 3rem 1.5rem 4rem;
 }
@@ -116,7 +116,7 @@ main {
 /* --- Ticket card: the input form styled as a workshop docket --- */
 .ticket {
   background: var(--paper);
-  border: 2px solid var(--asphalt);
+  border: 1px solid var(--asphalt);
   border-radius: 6px;
   padding: 0;
   position: relative;
@@ -234,7 +234,7 @@ main {
   font-size: 0.95rem;
   background: var(--amber);
   color: var(--asphalt);
-  border: 2px solid var(--asphalt);
+  border: 1px solid var(--asphalt);
   border-radius: 4px;
   padding: 0.8rem 1.5rem;
   cursor: pointer;
@@ -326,7 +326,7 @@ main {
 /* --- Cost calculator receipt --- */
 .receipt {
   background: var(--paper);
-  border: 2px solid var(--asphalt);
+  border: 1px solid var(--asphalt);
   border-radius: 6px;
   padding: 1.5rem 1.75rem;
   font-family: var(--font-mono);
@@ -380,7 +380,7 @@ main {
 /* --- Buying guide checklist --- */
 .checklist-card {
   background: var(--paper);
-  border: 2px solid var(--asphalt);
+  border: 1px solid var(--asphalt);
   border-radius: 6px;
   padding: 1.5rem 1.75rem;
   max-width: 480px;
@@ -464,7 +464,7 @@ main {
 }
 .info-card {
   background: var(--paper);
-  border: 2px solid var(--asphalt);
+  border: 1px solid var(--asphalt);
   border-radius: 6px;
   padding: 1.25rem 1.4rem;
 }
@@ -492,7 +492,7 @@ main {
 }
 .steps-list li {
   background: var(--paper);
-  border: 2px solid var(--asphalt);
+  border: 1px solid var(--asphalt);
   border-radius: 6px;
   padding: 1.25rem 1.4rem;
   position: relative;
@@ -510,7 +510,7 @@ main {
   text-align: center;
   padding: 2.5rem 1.5rem;
   background: var(--paper);
-  border: 2px solid var(--asphalt);
+  border: 1px solid var(--asphalt);
   border-radius: 6px;
   margin: 2.5rem 0;
 }
@@ -531,7 +531,7 @@ main {
 }
 
 .homeHeroImageWrap {
-  border: 2px solid var(--asphalt);
+  border: 1px solid var(--asphalt);
   border-radius: 6px;
   overflow: hidden;
   aspect-ratio: 4 / 3;
@@ -544,13 +544,30 @@ main {
   display: block;
 }
 
-@media (min-width: 1040px) {
+@media (min-width: 900px) {
   .homeHero {
     display: grid;
     grid-template-columns: 1.1fr 1fr;
     align-items: center;
     gap: 2.5rem;
-    margin-left: -180px;
-    margin-right: -180px;
+
+
+  }
+}
+
+body { position: relative; }
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background: url('/road-backdrop.jpg') center/cover no-repeat;
+  filter: blur(22px) brightness(0.55) saturate(0.85);
+  display: none;
+}
+
+@media (min-width: 900px) {
+  body::before {
+    display: block;
   }
 }

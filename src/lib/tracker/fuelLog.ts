@@ -35,12 +35,9 @@ export async function deleteFuelLog(email: string, id: string): Promise<void> {
 export interface MpgSegment {
   mileage: number;
   mpg: number;
+  date: string;
 }
 
-// Real MPG from actual fill-ups, not the site-wide 57mpg assumption used
-// in the Cost Calculator. Only valid between two consecutive "filled to
-// full" entries - partial fills in between just accumulate litres used.
-// Same methodology fuel-tracking apps like Fuelly use.
 export function computeMPGSeries(fuelLogs: FuelLogDoc[]): MpgSegment[] {
   const sorted = [...fuelLogs].sort((a, b) => a.mileage - b.mileage);
   const segments: MpgSegment[] = [];
@@ -53,7 +50,7 @@ export function computeMPGSeries(fuelLogs: FuelLogDoc[]): MpgSegment[] {
         const miles = log.mileage - lastFullMileage;
         if (miles > 0 && litresSinceLastFull > 0) {
           const gallons = litresSinceLastFull / 4.546;
-          segments.push({ mileage: log.mileage, mpg: miles / gallons });
+          segments.push({ mileage: log.mileage, mpg: miles / gallons, date: log.date });
         }
       }
       lastFullMileage = log.mileage;

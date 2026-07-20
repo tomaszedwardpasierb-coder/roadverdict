@@ -27,7 +27,7 @@
   font-size: 0.85rem;
   color: var(--asphalt);
   background: var(--paper);
-  border: 2px solid var(--asphalt);
+  border: 1px solid var(--asphalt);
   border-radius: 4px;
   cursor: pointer;
 }
@@ -63,7 +63,7 @@
 
 .card {
   background: var(--paper);
-  border: 2px solid var(--asphalt);
+  border: 1px solid var(--asphalt);
   border-radius: 6px;
   padding: 20px 22px;
   margin-bottom: 16px;
@@ -185,12 +185,12 @@
 }
 
 .statsStrip { display: grid; grid-template-columns: repeat(auto-fit, minmax(115px, 1fr)); gap: 0.7rem; margin-bottom: 1.4rem; }
-.statCard { background: var(--paper); border: 2px solid var(--asphalt); border-radius: 6px; padding: 0.9rem 0.8rem; text-align: center; }
+.statCard { background: var(--paper); border: 1px solid var(--asphalt); border-radius: 6px; padding: 0.9rem 0.8rem; text-align: center; }
 .statCardValue { font-family: var(--font-display); font-size: 1.4rem; color: var(--asphalt); line-height: 1.1; }
 .statCardLabel { font-family: var(--font-mono); font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.03em; color: var(--ink-soft); margin-top: 0.3rem; }
 
 .chartsGrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem; margin-bottom: 1.6rem; }
-.chartCard { background: var(--paper); border: 2px solid var(--asphalt); border-radius: 6px; padding: 1rem 1.1rem; }
+.chartCard { background: var(--paper); border: 1px solid var(--asphalt); border-radius: 6px; padding: 1rem 1.1rem; }
 .chartCardTitle { font-family: var(--font-display); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.7rem; color: var(--asphalt); }
 
 .emptyNote { font-size: 0.85rem; color: var(--ink-soft); }
@@ -200,7 +200,7 @@
 .rangeTabActive { background: var(--asphalt); color: var(--stone); border-color: var(--asphalt); }
 .rangeTab:hover:not(.rangeTabActive) { border-color: var(--asphalt); color: var(--asphalt); }
 
-.budgetCard { background: var(--paper); border: 2px solid var(--asphalt); border-radius: 6px; padding: 1rem 1.2rem; margin-bottom: 1.4rem; }
+.budgetCard { background: var(--paper); border: 1px solid var(--asphalt); border-radius: 6px; padding: 1rem 1.2rem; margin-bottom: 1.4rem; }
 .budgetCardOver { border-color: var(--verdict-red); }
 .budgetCardWarning { border-color: var(--amber-ink); }
 .budgetCardTitle { font-family: var(--font-display); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.6rem; color: var(--asphalt); }

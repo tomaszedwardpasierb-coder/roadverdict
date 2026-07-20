@@ -9,7 +9,7 @@ import { getFuelLogs, computeActualMPG, computeMPGSeries } from "@/lib/tracker/f
 import { getMods } from "@/lib/tracker/mod";
 import { getBills } from "@/lib/tracker/bill";
 import { getReminders, computeReminderStatus } from "@/lib/tracker/reminder";
-import { computeSpendSummary, computeYearSpend, gatherMileagePoints } from "@/lib/tracker/summary";
+import { computeSpendSummary, computeYearSpend, gatherMileagePoints, computeMonthlySpend } from "@/lib/tracker/summary";
 import { slugifyMake } from "@/lib/motorcycleModels";
 import type { Region } from "@/lib/priceData";
 import { AddBikeForm } from "./AddBikeForm";
@@ -29,6 +29,7 @@ import { SpendDonutChart } from "./SpendDonutChart";
 import { MpgChart } from "./MpgChart";
 import { MileageChart } from "./MileageChart";
 import { FuelCostChart } from "./FuelCostChart";
+import { SpendOverTimeChart } from "./SpendOverTimeChart";
 import { UpdateMileageButton } from "./UpdateMileageButton";
 
 export const dynamic = "force-dynamic";
@@ -83,6 +84,7 @@ export default async function DashboardPage() {
   const mileagePoints = gatherMileagePoints(records, mods, fuelLogs);
   const fuelCostPoints = fuelLogs.map((f) => ({ date: f.date, cost: f.cost }));
   const summary = computeSpendSummary(records, mods, fuelLogs, bills);
+  const monthlySpend = computeMonthlySpend(records, mods, fuelLogs, bills);
   const currentYear = new Date().getFullYear();
   const yearSpend = computeYearSpend(records, mods, fuelLogs, bills, currentYear);
   const milesTracked = bike.currentMileage - bike.startingMileage;
@@ -113,7 +115,6 @@ export default async function DashboardPage() {
   const fuelContent = (
     <>
       <LogFuelForm initialMileage={bike.currentMileage} />
-      <h2 className={styles.sectionHeading}>Fuel log</h2>
       {actualMpg ? (
         <p className={styles.subtext} style={{ marginBottom: "0.9rem" }}>
           Your actual average from logged fill-ups: <strong>{actualMpg.toFixed(1)} mpg</strong> (the Cost
@@ -124,6 +125,26 @@ export default async function DashboardPage() {
           Log at least two consecutive full-tank fill-ups to see your bike&apos;s real MPG here.
         </p>
       )}
+
+      <div className={styles.chartCard} style={{ marginBottom: "0.9rem" }}>
+        <div className={styles.chartCardTitle}>MPG over time</div>
+        {mpgSeries.length > 0 ? (
+          <MpgChart series={mpgSeries} />
+        ) : (
+          <p className={styles.emptyNote}>Log two consecutive full-tank fill-ups to see this.</p>
+        )}
+      </div>
+
+      <div className={styles.chartCard} style={{ marginBottom: "0.9rem" }}>
+        <div className={styles.chartCardTitle}>Fuel cost over time</div>
+        {fuelCostPoints.length > 0 ? (
+          <FuelCostChart points={fuelCostPoints} />
+        ) : (
+          <p className={styles.emptyNote}>Log a fuel fill-up to see cost trends here.</p>
+        )}
+      </div>
+
+      <h2 className={styles.sectionHeading}>Fuel log</h2>
       {fuelLogs.length === 0 ? (
         <div className={styles.card}>
           <p className={styles.cardBody}>No fuel fill-ups logged yet. Log your first one above.</p>
@@ -239,14 +260,6 @@ export default async function DashboardPage() {
           )}
         </div>
         <div className={styles.chartCard}>
-          <div className={styles.chartCardTitle}>MPG over time</div>
-          {mpgSeries.length > 0 ? (
-            <MpgChart series={mpgSeries} />
-          ) : (
-            <p className={styles.emptyNote}>Log two consecutive full-tank fill-ups to see this.</p>
-          )}
-        </div>
-        <div className={styles.chartCard}>
           <div className={styles.chartCardTitle}>Mileage over time</div>
           {mileagePoints.length > 0 ? (
             <MileageChart points={mileagePoints} />
@@ -254,14 +267,15 @@ export default async function DashboardPage() {
             <p className={styles.emptyNote}>Log a couple of entries to see your mileage build up.</p>
           )}
         </div>
-        <div className={styles.chartCard}>
-          <div className={styles.chartCardTitle}>Fuel cost over time</div>
-          {fuelCostPoints.length > 0 ? (
-            <FuelCostChart points={fuelCostPoints} />
-          ) : (
-            <p className={styles.emptyNote}>Log a fuel fill-up to see cost trends here.</p>
-          )}
-        </div>
+      </div>
+
+      <div className={styles.chartCard} style={{ marginBottom: "1.6rem" }}>
+        <div className={styles.chartCardTitle}>Spend over time</div>
+        {monthlySpend.length > 0 ? (
+          <SpendOverTimeChart data={monthlySpend} />
+        ) : (
+          <p className={styles.emptyNote}>Log something to see this fill in.</p>
+        )}
       </div>
 
       <DashboardTabs

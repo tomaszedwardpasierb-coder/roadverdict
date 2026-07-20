@@ -3,12 +3,12 @@
 
 import { useState } from 'react';
 import { Line } from 'react-chartjs-2';
-import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Legend, Filler } from 'chart.js';
+import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Legend } from 'chart.js';
 import { RANGE_OPTIONS, filterByDateRange, type RangeValue } from '@/lib/tracker/dateRange';
 import type { MileagePoint } from '@/lib/tracker/summary';
 import styles from './dashboard.module.css';
 
-ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Legend, Filler);
+ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Legend);
 
 function fmtDate(d: string): string {
   return new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
@@ -17,21 +17,6 @@ function fmtDate(d: string): string {
 export function MileageChart({ points }: { points: MileagePoint[] }) {
   const [range, setRange] = useState<RangeValue>('all');
   const filtered = filterByDateRange(points, range);
-
-  const data = {
-    labels: filtered.map((p) => fmtDate(p.date)),
-    datasets: [
-      {
-        label: 'Mileage',
-        data: filtered.map((p) => p.mileage),
-        borderColor: '#000000',
-        backgroundColor: '#00000011',
-        tension: 0.2,
-        fill: true,
-        pointRadius: 2,
-      },
-    ],
-  };
 
   return (
     <div>
@@ -50,7 +35,29 @@ export function MileageChart({ points }: { points: MileagePoint[] }) {
       {filtered.length < 2 ? (
         <p className={styles.emptyNote}>No entries logged in this time range.</p>
       ) : (
-        <Line data={data} options={{ plugins: { legend: { display: false } }, maintainAspectRatio: true }} />
+        <Line
+          data={{
+            labels: filtered.map((p) => fmtDate(p.date)),
+            datasets: [
+              {
+                label: 'Mileage',
+                data: filtered.map((p) => p.mileage),
+                borderColor: '#000000',
+                backgroundColor: 'transparent',
+                borderWidth: 1.25,
+                tension: 0.2,
+                fill: false,
+                pointRadius: 2,
+                pointBackgroundColor: '#000000',
+              },
+            ],
+          }}
+          options={{
+            plugins: { legend: { display: false } },
+            scales: { y: { grid: { color: '#00000012' } }, x: { grid: { display: false } } },
+            maintainAspectRatio: true,
+          }}
+        />
       )}
     </div>
   );

@@ -31,8 +31,6 @@ export function computeSpendSummary(
   };
 }
 
-// Spend within the current calendar year only - what "this year's budget"
-// naturally means. Resets automatically each January.
 export function computeYearSpend(
   records: ServiceRecordDoc[],
   mods: ModDoc[],
@@ -50,9 +48,6 @@ export interface MileagePoint {
   mileage: number;
 }
 
-// Every logged event that carries a mileage reading, across all
-// categories, sorted chronologically. Bills don't carry mileage, so
-// they're excluded here.
 export function gatherMileagePoints(
   records: ServiceRecordDoc[],
   mods: ModDoc[],
@@ -64,4 +59,45 @@ export function gatherMileagePoints(
     ...fuelLogs.map((f) => ({ date: f.date, mileage: f.mileage })),
   ];
   return points.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+}
+
+export interface MonthlySpend {
+  month: string;
+  servicing: number;
+  mods: number;
+  fuel: number;
+  bills: number;
+}
+
+function monthKey(dateStr: string): string {
+  const d = new Date(dateStr);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+}
+
+function monthLabel(key: string): string {
+  const [y, m] = key.split("-").map(Number);
+  return new Date(y, m - 1, 1).toLocaleDateString("en-GB", { month: "short", year: "2-digit" });
+}
+
+export function computeMonthlySpend(
+  records: ServiceRecordDoc[],
+  mods: ModDoc[],
+  fuelLogs: FuelLogDoc[],
+  bills: BillDoc[]
+): MonthlySpend[] {
+  const buckets = new Map<string, MonthlySpend>();
+  function add(dateStr: string, cost: number, field: "servicing" | "mods" | "fuel" | "bills") {
+    const key = monthKey(dateStr);
+    if (!buckets.has(key)) {
+      buckets.set(key, { month: monthLabel(key), servicing: 0, mods: 0, fuel: 0, bills: 0 });
+    }
+    buckets.get(key)![field] += cost;
+  }
+  records.forEach((r) => add(r.date, r.cost, "servicing"));
+  mods.forEach((m) => add(m.date, m.cost, "mods"));
+  fuelLogs.forEach((f) => add(f.date, f.cost, "fuel"));
+  bills.forEach((b) => add(b.date, b.cost, "bills"));
+
+  const sortedKeys = [...buckets.keys()].sort();
+  return sortedKeys.map((k) => buckets.get(k) as MonthlySpend);
 }
