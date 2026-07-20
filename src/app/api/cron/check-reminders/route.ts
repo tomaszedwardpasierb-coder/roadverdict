@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAllReminders, computeReminderStatus, reminderDetailLabel, markReminderNotified } from "@/lib/tracker/reminder";
 import { getBike } from "@/lib/tracker/bike";
 import { sendReminderEmail } from "@/lib/resend";
+import { getContainer } from "@/lib/cosmos";
 
 export const dynamic = "force-dynamic";
 
@@ -14,13 +15,21 @@ export async function POST(req: NextRequest) {
   }
 
   try {
+    // --- TEMPORARY DIAGNOSTICS - remove once this is confirmed working ---
+    const container = getContainer();
+    const anyDocs = await container.items.query({ query: "SELECT VALUE COUNT(1) FROM c" }).fetchAll();
+    const reminderDocsRaw = await container.items
+      .query({ query: "SELECT * FROM c WHERE c.type = 'reminder'" })
+      .fetchAll();
+    // --- end diagnostics ---
+
     const reminders = await getAllReminders();
     let checked = 0;
     let sent = 0;
 
     for (const reminder of reminders) {
       checked++;
-      if (reminder.notifiedAt) continue; // already emailed for this occurrence
+      if (reminder.notifiedAt) continue;
 
       const email = reminder.pk;
       let currentMileage = 0;
@@ -38,8 +47,20 @@ export async function POST(req: NextRequest) {
       sent++;
     }
 
-    return NextResponse.json({ ok: true, checked, sent });
-  } catch {
-    return NextResponse.json({ error: "Unexpected error checking reminders" }, { status: 500 });
+    return NextResponse.json({
+      ok: true,
+      checked,
+      sent,
+      diagnostics: {
+        totalDocsInContainer: anyDocs.resources[0],
+        reminderDocsFoundRaw: reminderDocsRaw.resources.length,
+        reminderDocsViaHelper: reminders.length,
+      },
+    });
+  } catch (err) {
+    return NextResponse.json(
+      { error: "Unexpected error checking reminders", detail: String(err) },
+      { status: 500 }
+    );
   }
 }
