@@ -1,5 +1,5 @@
 ﻿// Place at: src/lib/tracker/fuelLog.ts
-import { createTrackerDoc, queryTrackerDocs, type TrackerDocBase } from "./cosmosHelpers";
+import { createTrackerDoc, queryTrackerDocs, updateTrackerDoc, deleteTrackerDoc, type TrackerDocBase } from "./cosmosHelpers";
 
 export interface FuelLogDoc extends TrackerDocBase {
   type: "fuelLog";
@@ -18,6 +18,18 @@ export async function createFuelLog(
 
 export async function getFuelLogs(email: string): Promise<FuelLogDoc[]> {
   return queryTrackerDocs<FuelLogDoc>(email, "fuelLog");
+}
+
+export async function updateFuelLog(
+  email: string,
+  id: string,
+  data: { litres: number; cost: number; mileage: number; date: string; filledToFull: boolean }
+): Promise<FuelLogDoc | null> {
+  return updateTrackerDoc<FuelLogDoc>(email, id, data);
+}
+
+export async function deleteFuelLog(email: string, id: string): Promise<void> {
+  return deleteTrackerDoc(email, id);
 }
 
 export interface MpgSegment {

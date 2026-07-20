@@ -54,3 +54,25 @@ export async function queryTrackerDocs<TDoc extends TrackerDocBase>(
     .fetchAll();
   return resources;
 }
+
+// Updates an existing tracker doc in place (read, merge, upsert). email
+// is always the authenticated session's email, never client input - that
+// is what makes it structurally impossible to edit or delete another
+// user's doc, regardless of what id a request claims.
+export async function updateTrackerDoc<TDoc extends TrackerDocBase>(
+  email: string,
+  id: string,
+  updates: Partial<Omit<TDoc, "id" | "pk" | "type" | "createdAt">>
+): Promise<TDoc | null> {
+  const container = getContainer();
+  const { resource } = await container.item(id, email).read<TDoc>();
+  if (!resource) return null;
+  const updated = { ...resource, ...updates } as TDoc;
+  await container.items.upsert(updated);
+  return updated;
+}
+
+export async function deleteTrackerDoc(email: string, id: string): Promise<void> {
+  const container = getContainer();
+  await container.item(id, email).delete();
+}

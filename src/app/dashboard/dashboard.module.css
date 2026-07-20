@@ -119,3 +119,17 @@
   font-size: 0.85rem;
 }
 .affiliateNudge a { display: inline-block; margin-right: 0.9rem; font-weight: 500; }
+
+.cardActions { display: flex; gap: 0.5rem; margin-top: 0.6rem; }
+.iconBtn {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  padding: 0.25rem 0.5rem;
+  cursor: pointer;
+  color: var(--ink-soft);
+}
+.iconBtn:hover:not(:disabled) { border-color: var(--asphalt); color: var(--asphalt); }
+.iconBtn:disabled { opacity: 0.6; cursor: default; }

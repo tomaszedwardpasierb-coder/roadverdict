@@ -1,5 +1,5 @@
 ﻿// Place at: src/lib/tracker/serviceRecord.ts
-import { createTrackerDoc, queryTrackerDocs, type TrackerDocBase } from "./cosmosHelpers";
+import { createTrackerDoc, queryTrackerDocs, updateTrackerDoc, deleteTrackerDoc, type TrackerDocBase } from "./cosmosHelpers";
 
 export interface ServiceRecordDoc extends TrackerDocBase {
   type: "serviceRecord";
@@ -18,4 +18,16 @@ export async function createServiceRecord(
 
 export async function getServiceRecords(email: string): Promise<ServiceRecordDoc[]> {
   return queryTrackerDocs<ServiceRecordDoc>(email, "serviceRecord");
+}
+
+export async function updateServiceRecord(
+  email: string,
+  id: string,
+  data: { jobType: string; cost: number; mileage: number; date: string; notes: string }
+): Promise<ServiceRecordDoc | null> {
+  return updateTrackerDoc<ServiceRecordDoc>(email, id, data);
+}
+
+export async function deleteServiceRecord(email: string, id: string): Promise<void> {
+  return deleteTrackerDoc(email, id);
 }

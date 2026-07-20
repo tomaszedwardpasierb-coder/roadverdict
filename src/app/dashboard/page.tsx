@@ -4,93 +4,18 @@ import { redirect } from "next/navigation";
 import styles from "./dashboard.module.css";
 import LogoutButton from "./LogoutButton";
 import { getBike } from "@/lib/tracker/bike";
-import { getServiceRecords, type ServiceRecordDoc } from "@/lib/tracker/serviceRecord";
-import { getFuelLogs, computeActualMPG, type FuelLogDoc } from "@/lib/tracker/fuelLog";
-import { getAdjustedBenchmark, type BikeClass, type Region } from "@/lib/priceData";
+import { getServiceRecords } from "@/lib/tracker/serviceRecord";
+import { getFuelLogs, computeActualMPG } from "@/lib/tracker/fuelLog";
 import { slugifyMake } from "@/lib/motorcycleModels";
-import { AFFILIATE_LINKS, isBenchmarkedJob, JOB_LABELS } from "@/lib/tracker/jobTypes";
+import type { Region } from "@/lib/priceData";
 import { AddBikeForm } from "./AddBikeForm";
 import { SetRegionForm } from "./SetRegionForm";
 import { LogServiceForm } from "./LogServiceForm";
 import { LogFuelForm } from "./LogFuelForm";
+import { ServiceHistoryCard } from "./ServiceHistoryCard";
+import { FuelLogCard } from "./FuelLogCard";
 
 export const dynamic = "force-dynamic";
-
-function fmtMoney(n: number): string {
-  return `£${n.toFixed(0)}`;
-}
-function fmtDate(d: string): string {
-  return new Date(d).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
-}
-
-interface Verdict {
-  label: string;
-  cls: "fair" | "high" | "second-opinion";
-  low: number;
-  high: number;
-}
-
-function computeVerdict(
-  jobType: string,
-  bikeClass: BikeClass,
-  brandValue: string,
-  region: Region,
-  cost: number
-): Verdict | null {
-  if (!isBenchmarkedJob(jobType)) return null;
-  const bench = getAdjustedBenchmark(jobType, bikeClass, brandValue, region);
-  if (cost <= bench.high) return { label: "Fair", cls: "fair", low: bench.low, high: bench.high };
-  if (cost <= bench.high * 1.25) return { label: "High", cls: "high", low: bench.low, high: bench.high };
-  return { label: "Second opinion", cls: "second-opinion", low: bench.low, high: bench.high };
-}
-
-function ServiceHistoryCard({ record, verdict }: { record: ServiceRecordDoc; verdict: Verdict | null }) {
-  const jobLabel = JOB_LABELS[record.jobType] ?? record.jobType;
-  const affiliate = AFFILIATE_LINKS[record.jobType];
-  const tagClass =
-    verdict?.cls === "fair" ? styles.tagFair : verdict?.cls === "high" ? styles.tagHigh : styles.tagSecondOpinion;
-
-  return (
-    <div className={styles.jobCard}>
-      <div className={styles.jobCardTop}>
-        <span className={styles.jobCardJob}>{jobLabel}</span>
-        <span className={styles.jobCardCost}>{fmtMoney(record.cost)}</span>
-      </div>
-      <div className={styles.jobCardMeta}>
-        {fmtDate(record.date)} · {record.mileage.toLocaleString()} miles
-      </div>
-      {record.notes && <div className={styles.jobCardNotes}>{record.notes}</div>}
-      {verdict && (
-        <span className={`${styles.tag} ${tagClass}`}>
-          {verdict.label} (typical £{verdict.low}-{verdict.high})
-        </span>
-      )}
-      {affiliate && (
-        <div className={styles.affiliateNudge}>
-          Need parts for next time?{" "}
-          {affiliate.map((a) => (
-            <a key={a.url} href={a.url} target="_blank" rel="noopener">{a.name}</a>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function FuelLogCard({ log }: { log: FuelLogDoc }) {
-  const perLitre = (log.cost / log.litres).toFixed(2);
-  return (
-    <div className={styles.jobCard}>
-      <div className={styles.jobCardTop}>
-        <span className={styles.jobCardJob}>{log.litres.toFixed(1)} L{log.filledToFull ? " (full tank)" : ""}</span>
-        <span className={styles.jobCardCost}>{fmtMoney(log.cost)}</span>
-      </div>
-      <div className={styles.jobCardMeta}>
-        {fmtDate(log.date)} · {log.mileage.toLocaleString()} miles · {perLitre}p/litre
-      </div>
-    </div>
-  );
-}
 
 export default async function DashboardPage() {
   const session = await getSession();
@@ -165,7 +90,9 @@ export default async function DashboardPage() {
             <ServiceHistoryCard
               key={r.id}
               record={r}
-              verdict={computeVerdict(r.jobType, bike.bikeClass, brandValue, bike.region as Region, r.cost)}
+              bikeClass={bike.bikeClass}
+              brandValue={brandValue}
+              region={bike.region as Region}
             />
           ))
         )}

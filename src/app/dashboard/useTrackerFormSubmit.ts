@@ -13,7 +13,7 @@ export function useTrackerFormSubmit(endpoint: string) {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  async function submit(body: unknown, method: 'POST' | 'PATCH' = 'POST'): Promise<boolean> {
+  async function submit(body: unknown, method: 'POST' | 'PATCH' | 'DELETE' = 'POST'): Promise<boolean> {
     setError(null);
     setSubmitting(true);
     try {
