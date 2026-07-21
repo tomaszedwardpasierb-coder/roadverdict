@@ -5,6 +5,7 @@ import { useState, useMemo } from 'react';
 import { MOD_GROUPS, MOD_LABELS } from '@/lib/tracker/modTypes';
 import { checkMileageConsistency, type HistoryPoint } from '@/lib/tracker/mileageCheck';
 import { convertMilesToDisplay, convertDisplayToMiles, distanceUnitLabel, type DistanceUnit } from '@/lib/tracker/unitFormat';
+import { convertDisplayToGbp, CURRENCY_SYMBOLS, type Currency, type ExchangeRates } from '@/lib/tracker/currency';
 import { useTrackerFormSubmit } from './useTrackerFormSubmit';
 import { MileageWarning } from './MileageWarning';
 
@@ -12,14 +13,18 @@ export function LogModForm({
   initialMileage,
   mileageHistory,
   distanceUnit,
+  currency,
+  rates,
 }: {
   initialMileage: number;
   mileageHistory: HistoryPoint[];
   distanceUnit: DistanceUnit;
+  currency: Currency;
+  rates: ExchangeRates | null;
 }) {
   const [category, setCategory] = useState(MOD_GROUPS[0].mods[0]);
   const [name, setName] = useState('');
-  const [cost, setCost] = useState('');
+  const [costDisplay, setCostDisplay] = useState('');
   const [mileageDisplay, setMileageDisplay] = useState(
     String(Math.round(convertMilesToDisplay(initialMileage, distanceUnit)))
   );
@@ -39,16 +44,18 @@ export function LogModForm({
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (isBlocked) return;
-    const ok = await submit({ category, name, cost: Number(cost), mileage: Math.round(mileageInMiles), date, notes });
+    const costInGbp = convertDisplayToGbp(Number(costDisplay), currency, rates);
+    const ok = await submit({ category, name, cost: costInGbp, mileage: Math.round(mileageInMiles), date, notes });
     if (ok) {
       setName('');
-      setCost('');
+      setCostDisplay('');
       setNotes('');
       setMileageAcknowledged(false);
     }
   }
 
   const unitLabel = distanceUnitLabel(distanceUnit);
+  const symbol = CURRENCY_SYMBOLS[currency];
 
   return (
     <form className="ticket" onSubmit={handleSubmit}>
@@ -75,8 +82,8 @@ export function LogModForm({
           <input id="mod-name" type="text" placeholder="e.g. Akrapovic slip-on can" value={name} onChange={(e) => setName(e.target.value)} required />
         </div>
         <div className="field" style={{ marginTop: '0.9rem' }}>
-          <label htmlFor="mod-cost">Cost (£)</label>
-          <input id="mod-cost" type="number" min="0" step="0.01" value={cost} onChange={(e) => setCost(e.target.value)} required />
+          <label htmlFor="mod-cost">Cost ({symbol})</label>
+          <input id="mod-cost" type="number" min="0" step="0.01" value={costDisplay} onChange={(e) => setCostDisplay(e.target.value)} required />
         </div>
         <div className="field" style={{ marginTop: '0.9rem' }}>
           <label htmlFor="mod-mileage">Mileage at the time ({unitLabel})</label>

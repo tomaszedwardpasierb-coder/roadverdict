@@ -5,6 +5,7 @@ import { useState, useMemo } from 'react';
 import { JOB_GROUPS, JOB_LABELS, JOB_REMINDER_DEFAULTS } from '@/lib/tracker/jobTypes';
 import { checkMileageConsistency, type HistoryPoint } from '@/lib/tracker/mileageCheck';
 import { convertMilesToDisplay, convertDisplayToMiles, distanceUnitLabel, type DistanceUnit } from '@/lib/tracker/unitFormat';
+import { convertDisplayToGbp, CURRENCY_SYMBOLS, type Currency, type ExchangeRates } from '@/lib/tracker/currency';
 import { useTrackerFormSubmit } from './useTrackerFormSubmit';
 import { MileageWarning } from './MileageWarning';
 
@@ -14,13 +15,17 @@ export function LogServiceForm({
   initialMileage,
   mileageHistory,
   distanceUnit,
+  currency,
+  rates,
 }: {
   initialMileage: number;
   mileageHistory: HistoryPoint[];
   distanceUnit: DistanceUnit;
+  currency: Currency;
+  rates: ExchangeRates | null;
 }) {
   const [jobType, setJobType] = useState('basic-service');
-  const [cost, setCost] = useState('');
+  const [costDisplay, setCostDisplay] = useState('');
   const [mileageDisplay, setMileageDisplay] = useState(
     String(Math.round(convertMilesToDisplay(initialMileage, distanceUnit)))
   );
@@ -60,6 +65,7 @@ export function LogServiceForm({
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (isBlocked) return;
+    const costInGbp = convertDisplayToGbp(Number(costDisplay), currency, rates);
     const body: {
       jobType: string;
       cost: number;
@@ -67,7 +73,7 @@ export function LogServiceForm({
       date: string;
       notes: string;
       reminder?: { intervalType: RemindType; intervalValue?: number; exactDate?: string };
-    } = { jobType, cost: Number(cost), mileage: Math.round(mileageInMiles), date, notes };
+    } = { jobType, cost: costInGbp, mileage: Math.round(mileageInMiles), date, notes };
 
     if (remindChecked) {
       body.reminder =
@@ -78,7 +84,7 @@ export function LogServiceForm({
 
     const ok = await submit(body);
     if (ok) {
-      setCost('');
+      setCostDisplay('');
       setNotes('');
       setMileageAcknowledged(false);
     }
@@ -86,6 +92,7 @@ export function LogServiceForm({
 
   const remindDef = JOB_REMINDER_DEFAULTS[jobType];
   const unitLabel = distanceUnitLabel(distanceUnit);
+  const symbol = CURRENCY_SYMBOLS[currency];
 
   return (
     <form className="ticket" onSubmit={handleSubmit}>
@@ -108,8 +115,8 @@ export function LogServiceForm({
           </select>
         </div>
         <div className="field" style={{ marginTop: '0.9rem' }}>
-          <label htmlFor="job-cost">Cost paid (£)</label>
-          <input id="job-cost" type="number" min="0" step="0.01" value={cost} onChange={(e) => setCost(e.target.value)} required />
+          <label htmlFor="job-cost">Cost paid ({symbol})</label>
+          <input id="job-cost" type="number" min="0" step="0.01" value={costDisplay} onChange={(e) => setCostDisplay(e.target.value)} required />
         </div>
         <div className="field" style={{ marginTop: '0.9rem' }}>
           <label htmlFor="job-mileage">Mileage at the time ({unitLabel})</label>

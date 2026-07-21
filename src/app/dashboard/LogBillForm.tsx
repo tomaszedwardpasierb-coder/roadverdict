@@ -3,13 +3,14 @@
 
 import { useState } from 'react';
 import { BILL_LABELS, BILL_REMINDER_DEFAULTS } from '@/lib/tracker/billTypes';
+import { convertDisplayToGbp, CURRENCY_SYMBOLS, type Currency, type ExchangeRates } from '@/lib/tracker/currency';
 import { useTrackerFormSubmit } from './useTrackerFormSubmit';
 
 type RemindType = 'mileage' | 'months' | 'date';
 
-export function LogBillForm() {
+export function LogBillForm({ currency, rates }: { currency: Currency; rates: ExchangeRates | null }) {
   const [billType, setBillType] = useState('insurance');
-  const [cost, setCost] = useState('');
+  const [costDisplay, setCostDisplay] = useState('');
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
   const [notes, setNotes] = useState('');
   const [remindChecked, setRemindChecked] = useState(true);
@@ -29,13 +30,14 @@ export function LogBillForm() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    const costInGbp = convertDisplayToGbp(Number(costDisplay), currency, rates);
     const body: {
       billType: string;
       cost: number;
       date: string;
       notes: string;
       reminder?: { intervalType: RemindType; intervalValue?: number; exactDate?: string };
-    } = { billType, cost: Number(cost), date, notes };
+    } = { billType, cost: costInGbp, date, notes };
 
     if (remindChecked) {
       body.reminder =
@@ -46,10 +48,12 @@ export function LogBillForm() {
 
     const ok = await submit(body);
     if (ok) {
-      setCost('');
+      setCostDisplay('');
       setNotes('');
     }
   }
+
+  const symbol = CURRENCY_SYMBOLS[currency];
 
   return (
     <form className="ticket" onSubmit={handleSubmit}>
@@ -68,8 +72,8 @@ export function LogBillForm() {
           </select>
         </div>
         <div className="field" style={{ marginTop: '0.9rem' }}>
-          <label htmlFor="bill-cost">Cost (£)</label>
-          <input id="bill-cost" type="number" min="0" step="0.01" value={cost} onChange={(e) => setCost(e.target.value)} required />
+          <label htmlFor="bill-cost">Cost ({symbol})</label>
+          <input id="bill-cost" type="number" min="0" step="0.01" value={costDisplay} onChange={(e) => setCostDisplay(e.target.value)} required />
         </div>
         <div className="field" style={{ marginTop: '0.9rem' }}>
           <label htmlFor="bill-notes">Notes (optional)</label>

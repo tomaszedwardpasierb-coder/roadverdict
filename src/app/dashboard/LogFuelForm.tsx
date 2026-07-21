@@ -4,6 +4,7 @@
 import { useState, useMemo } from 'react';
 import { checkMileageConsistency, type HistoryPoint } from '@/lib/tracker/mileageCheck';
 import { convertMilesToDisplay, convertDisplayToMiles, distanceUnitLabel, type DistanceUnit } from '@/lib/tracker/unitFormat';
+import { convertDisplayToGbp, CURRENCY_SYMBOLS, type Currency, type ExchangeRates } from '@/lib/tracker/currency';
 import { useTrackerFormSubmit } from './useTrackerFormSubmit';
 import { MileageWarning } from './MileageWarning';
 
@@ -11,14 +12,18 @@ export function LogFuelForm({
   initialMileage,
   mileageHistory,
   distanceUnit,
+  currency,
+  rates,
 }: {
   initialMileage: number;
   mileageHistory: HistoryPoint[];
   distanceUnit: DistanceUnit;
+  currency: Currency;
+  rates: ExchangeRates | null;
 }) {
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
   const [litres, setLitres] = useState('');
-  const [cost, setCost] = useState('');
+  const [costDisplay, setCostDisplay] = useState('');
   const [mileageDisplay, setMileageDisplay] = useState(
     String(Math.round(convertMilesToDisplay(initialMileage, distanceUnit)))
   );
@@ -37,21 +42,23 @@ export function LogFuelForm({
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (isBlocked) return;
+    const costInGbp = convertDisplayToGbp(Number(costDisplay), currency, rates);
     const ok = await submit({
       litres: Number(litres),
-      cost: Number(cost),
+      cost: costInGbp,
       mileage: Math.round(mileageInMiles),
       date,
       filledToFull,
     });
     if (ok) {
       setLitres('');
-      setCost('');
+      setCostDisplay('');
       setMileageAcknowledged(false);
     }
   }
 
   const unitLabel = distanceUnitLabel(distanceUnit);
+  const symbol = CURRENCY_SYMBOLS[currency];
 
   return (
     <form className="ticket" onSubmit={handleSubmit}>
@@ -66,8 +73,8 @@ export function LogFuelForm({
           <input id="fuel-litres" type="number" min="0" step="0.01" value={litres} onChange={(e) => setLitres(e.target.value)} required />
         </div>
         <div className="field" style={{ marginTop: '0.9rem' }}>
-          <label htmlFor="fuel-cost">Cost paid (£)</label>
-          <input id="fuel-cost" type="number" min="0" step="0.01" value={cost} onChange={(e) => setCost(e.target.value)} required />
+          <label htmlFor="fuel-cost">Cost paid ({symbol})</label>
+          <input id="fuel-cost" type="number" min="0" step="0.01" value={costDisplay} onChange={(e) => setCostDisplay(e.target.value)} required />
         </div>
         <div className="field" style={{ marginTop: '0.9rem' }}>
           <label htmlFor="fuel-mileage">Mileage at the time ({unitLabel})</label>

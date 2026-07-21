@@ -7,10 +7,12 @@ import {
   updateBikeRegion,
   updateBikeBudget,
   updateBikeUnits,
+  updateBikeCurrency,
 } from "@/lib/tracker/bike";
 import { getBikeClassForCC } from "@/lib/motorcycleModels";
 import type { Region } from "@/lib/priceData";
 import type { DistanceUnit, FuelEconomyUnit } from "@/lib/tracker/unitFormat";
+import type { Currency } from "@/lib/tracker/currency";
 
 export const dynamic = "force-dynamic";
 
@@ -69,15 +71,23 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
   }
 
-  const { currentMileage, region, annualBudget, distanceUnit, fuelEconomyUnit } = body as {
+  const { currentMileage, region, annualBudget, distanceUnit, fuelEconomyUnit, currency } = body as {
     currentMileage?: number;
     region?: Region;
     annualBudget?: number;
     distanceUnit?: DistanceUnit;
     fuelEconomyUnit?: FuelEconomyUnit;
+    currency?: Currency;
   };
 
-  if (currentMileage == null && !region && annualBudget == null && !distanceUnit && !fuelEconomyUnit) {
+  if (
+    currentMileage == null &&
+    !region &&
+    annualBudget == null &&
+    !distanceUnit &&
+    !fuelEconomyUnit &&
+    !currency
+  ) {
     return NextResponse.json({ error: "Nothing to update." }, { status: 400 });
   }
 
@@ -99,6 +109,9 @@ export async function PATCH(request: NextRequest) {
   }
   if (distanceUnit || fuelEconomyUnit) {
     bike = await updateBikeUnits(session.email, distanceUnit, fuelEconomyUnit);
+  }
+  if (currency) {
+    bike = await updateBikeCurrency(session.email, currency);
   }
 
   if (!bike) {

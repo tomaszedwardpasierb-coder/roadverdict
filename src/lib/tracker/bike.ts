@@ -2,6 +2,7 @@
 import { getContainer } from "@/lib/cosmos";
 import type { BikeClass, Region } from "@/lib/priceData";
 import type { DistanceUnit, FuelEconomyUnit } from "@/lib/tracker/unitFormat";
+import type { Currency } from "@/lib/tracker/currency";
 
 function bikeDocId(email: string): string {
   return `${email}::bike`;
@@ -24,6 +25,7 @@ export interface BikeDoc {
   shareToken?: string;
   distanceUnit?: DistanceUnit;
   fuelEconomyUnit?: FuelEconomyUnit;
+  currency?: Currency;
   dateAdded: string;
 }
 
@@ -116,6 +118,15 @@ export async function updateBikeUnits(
   if (!resource) return null;
   if (distanceUnit) resource.distanceUnit = distanceUnit;
   if (fuelEconomyUnit) resource.fuelEconomyUnit = fuelEconomyUnit;
+  await container.items.upsert(resource);
+  return resource;
+}
+
+export async function updateBikeCurrency(email: string, currency: Currency): Promise<BikeDoc | null> {
+  const container = getContainer();
+  const { resource } = await container.item(bikeDocId(email), email).read<BikeDoc>();
+  if (!resource) return null;
+  resource.currency = currency;
   await container.items.upsert(resource);
   return resource;
 }

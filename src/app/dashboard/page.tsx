@@ -39,6 +39,8 @@ import { MpgChart } from "./MpgChart";
 import { FuelCostChart } from "./FuelCostChart";
 import { CategorySpendChart } from "./CategorySpendChart";
 import { UpdateMileageButton } from "./UpdateMileageButton";
+import { type Currency } from "@/lib/tracker/currency";
+import { getExchangeRates } from "@/lib/tracker/currencyRates";
 import { UnitSettings } from "./UnitSettings";
 import { ExportShareSection } from "./ExportShareSection";
 
@@ -83,13 +85,15 @@ export default async function DashboardPage() {
 
   const distanceUnit: DistanceUnit = bike.distanceUnit ?? "mi";
   const fuelEconomyUnit: FuelEconomyUnit = bike.fuelEconomyUnit ?? "mpg";
+  const currency: Currency = bike.currency ?? "GBP";
 
-  const [records, fuelLogs, mods, bills, reminders] = await Promise.all([
+  const [records, fuelLogs, mods, bills, reminders, rates] = await Promise.all([
     getServiceRecords(session.email),
     getFuelLogs(session.email),
     getMods(session.email),
     getBills(session.email),
     getReminders(session.email),
+    getExchangeRates(),
   ]);
   const brandValue = slugifyMake(bike.make);
   const actualMpg = computeActualMPG(fuelLogs);
@@ -107,7 +111,7 @@ export default async function DashboardPage() {
 
   const serviceContent = (
     <>
-      <LogServiceForm initialMileage={bike.currentMileage} mileageHistory={mileagePoints} distanceUnit={distanceUnit} />
+      <LogServiceForm initialMileage={bike.currentMileage} mileageHistory={mileagePoints} distanceUnit={distanceUnit} currency={currency} rates={rates} />
       <div className={styles.chartCard} style={{ marginBottom: "0.9rem" }}>
         <div className={styles.chartCardTitle}>Servicing spend over time</div>
         {serviceMonthly.length > 1 ? (
@@ -138,7 +142,7 @@ export default async function DashboardPage() {
 
   const fuelContent = (
     <>
-      <LogFuelForm initialMileage={bike.currentMileage} mileageHistory={mileagePoints} distanceUnit={distanceUnit} />
+      <LogFuelForm initialMileage={bike.currentMileage} mileageHistory={mileagePoints} distanceUnit={distanceUnit} currency={currency} rates={rates} />
       {actualMpg ? (
         <p className={styles.subtext} style={{ marginBottom: "0.9rem" }}>
           Your actual average from logged fill-ups: <strong>{formatFuelEconomy(actualMpg, fuelEconomyUnit)}</strong>{" "}
@@ -181,7 +185,7 @@ export default async function DashboardPage() {
 
   const modsContent = (
     <>
-      <LogModForm initialMileage={bike.currentMileage} mileageHistory={mileagePoints} distanceUnit={distanceUnit} />
+      <LogModForm initialMileage={bike.currentMileage} mileageHistory={mileagePoints} distanceUnit={distanceUnit} currency={currency} rates={rates} />
       <div className={styles.chartCard} style={{ marginBottom: "0.9rem" }}>
         <div className={styles.chartCardTitle}>Modifications spend over time</div>
         {modsMonthly.length > 1 ? (
@@ -203,7 +207,7 @@ export default async function DashboardPage() {
 
   const billsContent = (
     <>
-      <LogBillForm />
+      <LogBillForm currency={currency} rates={rates} />
       <div className={styles.chartCard} style={{ marginBottom: "0.9rem" }}>
         <div className={styles.chartCardTitle}>Insurance, tax & MOT spend over time</div>
         {billsMonthly.length > 1 ? (
@@ -263,7 +267,7 @@ export default async function DashboardPage() {
       </p>
 
       <div style={{ marginBottom: "1rem" }}>
-        <UnitSettings distanceUnit={distanceUnit} fuelEconomyUnit={fuelEconomyUnit} />
+        <UnitSettings distanceUnit={distanceUnit} fuelEconomyUnit={fuelEconomyUnit} currency={currency} />
       </div>
 
       <div className={styles.statsStrip}>
@@ -327,5 +331,6 @@ export default async function DashboardPage() {
     </main>
   );
 }
+
 
 
