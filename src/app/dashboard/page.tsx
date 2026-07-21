@@ -95,7 +95,7 @@ export default async function DashboardPage() {
 
   const serviceContent = (
     <>
-      <LogServiceForm initialMileage={bike.currentMileage} />
+      <LogServiceForm initialMileage={bike.currentMileage} mileageHistory={mileagePoints} />
       <div className={styles.chartCard} style={{ marginBottom: "0.9rem" }}>
         <div className={styles.chartCardTitle}>Servicing spend over time</div>
         {serviceMonthly.length > 1 ? (
@@ -125,7 +125,7 @@ export default async function DashboardPage() {
 
   const fuelContent = (
     <>
-      <LogFuelForm initialMileage={bike.currentMileage} />
+      <LogFuelForm initialMileage={bike.currentMileage} mileageHistory={mileagePoints} />
       {actualMpg ? (
         <p className={styles.subtext} style={{ marginBottom: "0.9rem" }}>
           Your actual average from logged fill-ups: <strong>{actualMpg.toFixed(1)} mpg</strong> (the Cost
@@ -168,7 +168,7 @@ export default async function DashboardPage() {
 
   const modsContent = (
     <>
-      <LogModForm initialMileage={bike.currentMileage} />
+      <LogModForm initialMileage={bike.currentMileage} mileageHistory={mileagePoints} />
       <div className={styles.chartCard} style={{ marginBottom: "0.9rem" }}>
         <div className={styles.chartCardTitle}>Modifications spend over time</div>
         {modsMonthly.length > 1 ? (

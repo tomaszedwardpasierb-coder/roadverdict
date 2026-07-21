@@ -1,23 +1,38 @@
 ﻿// Place at: src/app/dashboard/LogServiceForm.tsx
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { JOB_GROUPS, JOB_LABELS, JOB_REMINDER_DEFAULTS } from '@/lib/tracker/jobTypes';
+import { checkMileageConsistency, type HistoryPoint } from '@/lib/tracker/mileageCheck';
 import { useTrackerFormSubmit } from './useTrackerFormSubmit';
+import { MileageWarning } from './MileageWarning';
 
 type RemindType = 'mileage' | 'months' | 'date';
 
-export function LogServiceForm({ initialMileage }: { initialMileage: number }) {
+export function LogServiceForm({
+  initialMileage,
+  mileageHistory,
+}: {
+  initialMileage: number;
+  mileageHistory: HistoryPoint[];
+}) {
   const [jobType, setJobType] = useState('basic-service');
   const [cost, setCost] = useState('');
   const [mileage, setMileage] = useState(String(initialMileage));
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
   const [notes, setNotes] = useState('');
+  const [mileageAcknowledged, setMileageAcknowledged] = useState(false);
   const [remindChecked, setRemindChecked] = useState(false);
   const [remindType, setRemindType] = useState<RemindType>('mileage');
   const [remindValue, setRemindValue] = useState('');
   const [remindDate, setRemindDate] = useState('');
   const { submit, submitting, error } = useTrackerFormSubmit('/api/tracker/services');
+
+  const mileageResult = useMemo(
+    () => checkMileageConsistency(Number(mileage), date, mileageHistory, initialMileage),
+    [mileage, date, mileageHistory, initialMileage]
+  );
+  const isBlocked = mileageResult.status === 'blocked' || (mileageResult.status === 'warning' && !mileageAcknowledged);
 
   function applyDefaults(forJobType: string) {
     const def = JOB_REMINDER_DEFAULTS[forJobType];
@@ -37,6 +52,7 @@ export function LogServiceForm({ initialMileage }: { initialMileage: number }) {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (isBlocked) return;
     const body: {
       jobType: string;
       cost: number;
@@ -57,6 +73,7 @@ export function LogServiceForm({ initialMileage }: { initialMileage: number }) {
     if (ok) {
       setCost('');
       setNotes('');
+      setMileageAcknowledged(false);
     }
   }
 
@@ -90,6 +107,7 @@ export function LogServiceForm({ initialMileage }: { initialMileage: number }) {
           <label htmlFor="job-mileage">Mileage at the time</label>
           <input id="job-mileage" type="number" min="0" value={mileage} onChange={(e) => setMileage(e.target.value)} required />
         </div>
+        <MileageWarning result={mileageResult} acknowledged={mileageAcknowledged} onAcknowledgeChange={setMileageAcknowledged} />
         <div className="field" style={{ marginTop: '0.9rem' }}>
           <label htmlFor="job-notes">Notes (optional)</label>
           <textarea id="job-notes" rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="e.g. front only, done at Halfords Autocentre" />
@@ -129,7 +147,7 @@ export function LogServiceForm({ initialMileage }: { initialMileage: number }) {
       </div>
       <hr className="ticket__divider" />
       <div className="ticket__section">
-        <button className="submit-button" type="submit" disabled={submitting}>
+        <button className="submit-button" type="submit" disabled={submitting || isBlocked}>
           {submitting ? 'Logging…' : 'Log it'}
         </button>
         {error && <p className="error-text" role="alert">{error}</p>}

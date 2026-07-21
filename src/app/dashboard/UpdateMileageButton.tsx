@@ -10,9 +10,13 @@ export function UpdateMileageButton({ currentMileage }: { currentMileage: number
   const [value, setValue] = useState(String(currentMileage));
   const { submit, submitting, error } = useTrackerFormSubmit('/api/tracker/bike');
 
+  const valueNum = Number(value);
+  const isBlocked = valueNum > 0 && valueNum < currentMileage;
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    const ok = await submit({ currentMileage: Number(value) }, 'PATCH');
+    if (isBlocked) return;
+    const ok = await submit({ currentMileage: valueNum }, 'PATCH');
     if (ok) setEditing(false);
   }
 
@@ -27,12 +31,17 @@ export function UpdateMileageButton({ currentMileage }: { currentMileage: number
           className={styles.mileageEditInput}
           required
         />
-        <button className={styles.iconBtn} type="submit" disabled={submitting}>
+        <button className={styles.iconBtn} type="submit" disabled={submitting || isBlocked}>
           {submitting ? 'Saving…' : 'Save'}
         </button>
         <button className={styles.iconBtn} type="button" onClick={() => setEditing(false)} disabled={submitting}>
           Cancel
         </button>
+        {isBlocked && (
+          <p className="field-note" style={{ borderColor: 'var(--verdict-red)', color: '#7a251b', width: '100%' }}>
+            ⛔ This can&apos;t be lower than your bike&apos;s current recorded mileage ({currentMileage.toLocaleString()}) - there&apos;s no backdating case for &quot;right now.&quot;
+          </p>
+        )}
         {error && <span className="error-text">{error}</span>}
       </form>
     );

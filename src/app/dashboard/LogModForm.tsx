@@ -1,26 +1,43 @@
 ﻿// Place at: src/app/dashboard/LogModForm.tsx
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { MOD_GROUPS, MOD_LABELS } from '@/lib/tracker/modTypes';
+import { checkMileageConsistency, type HistoryPoint } from '@/lib/tracker/mileageCheck';
 import { useTrackerFormSubmit } from './useTrackerFormSubmit';
+import { MileageWarning } from './MileageWarning';
 
-export function LogModForm({ initialMileage }: { initialMileage: number }) {
+export function LogModForm({
+  initialMileage,
+  mileageHistory,
+}: {
+  initialMileage: number;
+  mileageHistory: HistoryPoint[];
+}) {
   const [category, setCategory] = useState(MOD_GROUPS[0].mods[0]);
   const [name, setName] = useState('');
   const [cost, setCost] = useState('');
   const [mileage, setMileage] = useState(String(initialMileage));
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
   const [notes, setNotes] = useState('');
+  const [mileageAcknowledged, setMileageAcknowledged] = useState(false);
   const { submit, submitting, error } = useTrackerFormSubmit('/api/tracker/mods');
+
+  const mileageResult = useMemo(
+    () => checkMileageConsistency(Number(mileage), date, mileageHistory, initialMileage),
+    [mileage, date, mileageHistory, initialMileage]
+  );
+  const isBlocked = mileageResult.status === 'blocked' || (mileageResult.status === 'warning' && !mileageAcknowledged);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (isBlocked) return;
     const ok = await submit({ category, name, cost: Number(cost), mileage: Number(mileage), date, notes });
     if (ok) {
       setName('');
       setCost('');
       setNotes('');
+      setMileageAcknowledged(false);
     }
   }
 
@@ -56,6 +73,7 @@ export function LogModForm({ initialMileage }: { initialMileage: number }) {
           <label htmlFor="mod-mileage">Mileage at the time</label>
           <input id="mod-mileage" type="number" min="0" value={mileage} onChange={(e) => setMileage(e.target.value)} required />
         </div>
+        <MileageWarning result={mileageResult} acknowledged={mileageAcknowledged} onAcknowledgeChange={setMileageAcknowledged} />
         <div className="field" style={{ marginTop: '0.9rem' }}>
           <label htmlFor="mod-notes">Notes (optional)</label>
           <textarea id="mod-notes" rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="e.g. fitted by Bob's Motorcycles" />
@@ -66,7 +84,7 @@ export function LogModForm({ initialMileage }: { initialMileage: number }) {
       </div>
       <hr className="ticket__divider" />
       <div className="ticket__section">
-        <button className="submit-button" type="submit" disabled={submitting}>
+        <button className="submit-button" type="submit" disabled={submitting || isBlocked}>
           {submitting ? 'Logging…' : 'Log it'}
         </button>
         {error && <p className="error-text" role="alert">{error}</p>}
