@@ -31,18 +31,9 @@ export default function HomePage() {
         // eslint-disable-next-line react/no-danger
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
-      <div className="homeHero">
-        <div className="hero homeHeroText">
-          <h1>Is your service quote fair?</h1>
-          <p>Three quick questions. One honest answer, benchmarked against typical UK prices.</p>
-        </div>
-        <div className="homeHeroImageWrap">
-          <img
-            src="/hero-road.jpg"
-            alt="A quiet UK country road - the kind of everyday riding these price benchmarks are built around"
-            className="homeHeroImage"
-          />
-        </div>
+      <div className="hero">
+        <h1>Is your service quote fair?</h1>
+        <p>Three quick questions. One honest answer, benchmarked against typical UK prices.</p>
       </div>
       <QuoteForm />
       <p className="disclaimer">
