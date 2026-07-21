@@ -6,11 +6,30 @@ import { Line } from 'react-chartjs-2';
 import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Legend } from 'chart.js';
 import { RANGE_OPTIONS, filterByDateRange, type RangeValue } from '@/lib/tracker/dateRange';
 import type { MpgSegment } from '@/lib/tracker/fuelLog';
+import { formatDistance, type FuelEconomyUnit, type DistanceUnit } from '@/lib/tracker/unitFormat';
 import styles from './dashboard.module.css';
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Legend);
 
-export function MpgChart({ series }: { series: MpgSegment[] }) {
+const LITRES_PER_UK_GALLON = 4.546;
+const KM_PER_MILE = 1.60934;
+
+function convertMpgValue(mpg: number, unit: FuelEconomyUnit): number {
+  if (unit === 'l100km') {
+    return (LITRES_PER_UK_GALLON * 100) / (mpg * KM_PER_MILE);
+  }
+  return mpg;
+}
+
+export function MpgChart({
+  series,
+  fuelEconomyUnit,
+  distanceUnit,
+}: {
+  series: MpgSegment[];
+  fuelEconomyUnit: FuelEconomyUnit;
+  distanceUnit: DistanceUnit;
+}) {
   const [range, setRange] = useState<RangeValue>('all');
   const filtered = filterByDateRange(series, range);
 
@@ -33,11 +52,11 @@ export function MpgChart({ series }: { series: MpgSegment[] }) {
       ) : (
         <Line
           data={{
-            labels: filtered.map((s) => `${s.mileage.toLocaleString()} mi`),
+            labels: filtered.map((s) => formatDistance(s.mileage, distanceUnit)),
             datasets: [
               {
-                label: 'MPG',
-                data: filtered.map((s) => Number(s.mpg.toFixed(1))),
+                label: fuelEconomyUnit === 'l100km' ? 'L/100km' : 'MPG',
+                data: filtered.map((s) => Number(convertMpgValue(s.mpg, fuelEconomyUnit).toFixed(1))),
                 borderColor: '#e8a33d',
                 backgroundColor: 'transparent',
                 borderWidth: 1.25,
@@ -51,7 +70,10 @@ export function MpgChart({ series }: { series: MpgSegment[] }) {
           options={{
             plugins: { legend: { display: false } },
             scales: {
-              y: { title: { display: true, text: 'mpg' }, grid: { color: '#00000012' } },
+              y: {
+                title: { display: true, text: fuelEconomyUnit === 'l100km' ? 'L/100km' : 'mpg' },
+                grid: { color: '#00000012' },
+              },
               x: { grid: { display: false } },
             },
             maintainAspectRatio: true,

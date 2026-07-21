@@ -151,9 +151,9 @@ export default async function DashboardPage() {
       )}
 
       <div className={styles.chartCard} style={{ marginBottom: "0.9rem" }}>
-        <div className={styles.chartCardTitle}>MPG over time</div>
+        <div className={styles.chartCardTitle}>{fuelEconomyUnit === "l100km" ? "Fuel economy" : "MPG"} over time</div>
         {mpgSeries.length > 0 ? (
-          <MpgChart series={mpgSeries} />
+          <MpgChart series={mpgSeries} fuelEconomyUnit={fuelEconomyUnit} distanceUnit={distanceUnit} />
         ) : (
           <p className={styles.emptyNote}>Log two consecutive full-tank fill-ups to see this.</p>
         )}
@@ -306,9 +306,9 @@ export default async function DashboardPage() {
           )}
         </div>
         <div className={styles.chartCard}>
-          <div className={styles.chartCardTitle}>Mileage over time</div>
+          <div className={styles.chartCardTitle}>{distanceUnit === "km" ? "Kilometres" : "Mileage"} over time</div>
           {mileagePoints.length > 0 ? (
-            <MileageChart points={mileagePoints} />
+            <MileageChart points={mileagePoints} distanceUnit={distanceUnit} />
           ) : (
             <p className={styles.emptyNote}>Log a couple of entries to see your mileage build up.</p>
           )}
@@ -327,3 +327,5 @@ export default async function DashboardPage() {
     </main>
   );
 }
+
+

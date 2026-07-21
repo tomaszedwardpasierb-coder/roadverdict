@@ -6,6 +6,7 @@ import { Line } from 'react-chartjs-2';
 import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Legend } from 'chart.js';
 import { RANGE_OPTIONS, filterByDateRange, type RangeValue } from '@/lib/tracker/dateRange';
 import type { MileagePoint } from '@/lib/tracker/summary';
+import { convertMilesToDisplay, distanceUnitLabel, type DistanceUnit } from '@/lib/tracker/unitFormat';
 import styles from './dashboard.module.css';
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Legend);
@@ -14,7 +15,7 @@ function fmtDate(d: string): string {
   return new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
-export function MileageChart({ points }: { points: MileagePoint[] }) {
+export function MileageChart({ points, distanceUnit }: { points: MileagePoint[]; distanceUnit: DistanceUnit }) {
   const [range, setRange] = useState<RangeValue>('all');
   const filtered = filterByDateRange(points, range);
 
@@ -41,7 +42,7 @@ export function MileageChart({ points }: { points: MileagePoint[] }) {
             datasets: [
               {
                 label: 'Mileage',
-                data: filtered.map((p) => p.mileage),
+                data: filtered.map((p) => Math.round(convertMilesToDisplay(p.mileage, distanceUnit))),
                 borderColor: '#000000',
                 backgroundColor: 'transparent',
                 borderWidth: 1.25,
@@ -54,7 +55,10 @@ export function MileageChart({ points }: { points: MileagePoint[] }) {
           }}
           options={{
             plugins: { legend: { display: false } },
-            scales: { y: { grid: { color: '#00000012' } }, x: { grid: { display: false } } },
+            scales: {
+              y: { title: { display: true, text: distanceUnitLabel(distanceUnit) }, grid: { color: '#00000012' } },
+              x: { grid: { display: false } },
+            },
             maintainAspectRatio: true,
           }}
         />
