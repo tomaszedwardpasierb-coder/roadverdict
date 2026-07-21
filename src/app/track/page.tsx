@@ -19,7 +19,7 @@ export default async function TrackLandingPage() {
   return (
     <div className="hero">
       <h1>Know exactly what your bike costs you</h1>
-      <p>
+      <p style={{ maxWidth: 'none', margin: '0 0 1.5rem' }}>
         Log every service, fill-up, and modification - free, for as long as you own the
         bike. Sign in with just your email, no password to remember.
       </p>
@@ -46,6 +46,14 @@ export default async function TrackLandingPage() {
         <div className="info-card">
           <h3>No real picture of the cost</h3>
           <p>Servicing, fuel, insurance, tax, mods - add it all up and most riders genuinely don&apos;t know what a bike costs them a year.</p>
+        </div>
+        <div className="info-card">
+          <h3>Mods and bills, scattered everywhere</h3>
+          <p>Insurance renewal in one place, an MOT reminder in your calendar, a mod receipt buried in an email somewhere - nothing lives together.</p>
+        </div>
+        <div className="info-card">
+          <h3>Nothing to show when you sell</h3>
+          <p>Full service history adds real value to a used bike - but only if you can actually produce it, not just remember it existed.</p>
         </div>
       </div>
 
@@ -111,7 +119,7 @@ export default async function TrackLandingPage() {
 
       <div className="tracker-cta">
         <h2>Start tracking your bike, free</h2>
-        <p>No credit card, no premium tier, no catch.</p>
+        <p style={{ maxWidth: 'none', margin: '0 auto' }}>No credit card, no premium tier, no catch.</p>
         <Link href="/login" className="submit-button" style={{ textDecoration: 'none', display: 'inline-block', marginTop: '0.5rem' }}>
           Start tracking free
         </Link>
@@ -119,3 +127,6 @@ export default async function TrackLandingPage() {
     </div>
   );
 }
+
+
+
