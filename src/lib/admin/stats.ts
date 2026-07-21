@@ -25,6 +25,14 @@ export async function getActiveSessionCount(): Promise<number> {
   return resources[0] ?? 0;
 }
 
+export async function getTotalUserCount(): Promise<number> {
+  const container = getContainer();
+  const { resources } = await container.items
+    .query<number>({ query: "SELECT VALUE COUNT(1) FROM c WHERE c.type = 'user'" })
+    .fetchAll();
+  return resources[0] ?? 0;
+}
+
 export interface FuelPriceStatus {
   pricePenceLitre: number;
   weekCommencing: string;
@@ -56,4 +64,45 @@ export async function getReminderCronStatus(): Promise<ReminderCronStatus | null
   } catch {
     return null;
   }
+}
+
+export interface MagicLinkRequestSummary {
+  email: string;
+  requestCount: number;
+  lastRequestedAt: string;
+}
+
+// One row per email that has ever requested a magic link - not one row
+// per request, which could be very repetitive for someone who's
+// requested a dozen times. Includes emails that never actually
+// completed sign-in, which is worth knowing on its own.
+export async function getMagicLinkRequests(): Promise<MagicLinkRequestSummary[]> {
+  const container = getContainer();
+  const { resources } = await container.items
+    .query<MagicLinkRequestSummary>({
+      query:
+        "SELECT c.pk as email, COUNT(1) as requestCount, MAX(c.createdAt) as lastRequestedAt FROM c WHERE c.type = 'magicLink' GROUP BY c.pk",
+    })
+    .fetchAll();
+  return resources.sort((a, b) => new Date(b.lastRequestedAt).getTime() - new Date(a.lastRequestedAt).getTime());
+}
+
+export interface RecentSession {
+  email: string;
+  createdAt: string;
+  ip?: string;
+}
+
+// Most recent logins, newest first. IP will show as missing for any
+// session created before this feature existed - genuinely absent, not
+// a display bug.
+export async function getRecentSessions(limit = 50): Promise<RecentSession[]> {
+  const container = getContainer();
+  const { resources } = await container.items
+    .query<RecentSession>({
+      query: "SELECT TOP @limit c.pk as email, c.createdAt, c.ip FROM c WHERE c.type = 'session' ORDER BY c.createdAt DESC",
+      parameters: [{ name: "@limit", value: limit }],
+    })
+    .fetchAll();
+  return resources;
 }

@@ -7,12 +7,17 @@ export const dynamic = "force-dynamic";
 
 const SESSION_TTL_SECONDS = 30 * 24 * 60 * 60;
 
-// Built explicitly from APP_URL rather than the incoming request's own
-// URL - Azure proxies external traffic to the container over an
-// internal address (this is where "localhost:8080" was coming from),
-// so a redirect based on req.url picks up that internal address
-// instead of the real public domain.
 const APP_URL = process.env.APP_URL;
+
+// Azure sits in front of the app as a reverse proxy, so the real
+// visitor IP arrives via this header, not the raw connection - the
+// first entry is the original client, anything after it is
+// intermediate proxies.
+function getClientIp(req: NextRequest): string {
+  const forwarded = req.headers.get("x-forwarded-for");
+  if (forwarded) return forwarded.split(",")[0].trim();
+  return "unknown";
+}
 
 export async function GET(req: NextRequest) {
   const container = getContainer();
@@ -71,6 +76,7 @@ export async function GET(req: NextRequest) {
     createdAt: now.toISOString(),
     expiresAt: expiresAt.toISOString(),
     ttl: SESSION_TTL_SECONDS,
+    ip: getClientIp(req),
   });
 
   const response = NextResponse.redirect(`${APP_URL}/dashboard`);
