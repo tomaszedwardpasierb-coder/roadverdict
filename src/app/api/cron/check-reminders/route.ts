@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAllReminders, computeReminderStatus, reminderDetailLabel, markReminderNotified } from "@/lib/tracker/reminder";
 import { getBike } from "@/lib/tracker/bike";
 import { sendReminderEmail } from "@/lib/resend";
+import { getContainer } from "@/lib/cosmos";
 
 export const dynamic = "force-dynamic";
 
@@ -37,6 +38,16 @@ export async function POST(req: NextRequest) {
       await markReminderNotified(email, reminder.id);
       sent++;
     }
+
+    const container = getContainer();
+    await container.items.upsert({
+      id: "cronStatus::reminders",
+      pk: "system",
+      type: "cronStatus",
+      lastRunAt: new Date().toISOString(),
+      checked,
+      sent,
+    });
 
     return NextResponse.json({ ok: true, checked, sent });
   } catch {
