@@ -7,11 +7,9 @@ import { getAdjustedBenchmark, type BikeClass, type Region } from '@/lib/priceDa
 import type { ServiceRecordDoc } from '@/lib/tracker/serviceRecord';
 import { useTrackerFormSubmit } from './useTrackerFormSubmit';
 import { formatDistance, convertMilesToDisplay, convertDisplayToMiles, distanceUnitLabel, type DistanceUnit } from '@/lib/tracker/unitFormat';
+import { convertGbpToDisplay, convertDisplayToGbp, formatCurrency, CURRENCY_SYMBOLS, type Currency, type ExchangeRates } from '@/lib/tracker/currency';
 import styles from './dashboard.module.css';
 
-function fmtMoney(n: number): string {
-  return `£${n.toFixed(0)}`;
-}
 function fmtDate(d: string): string {
   return new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
 }
@@ -43,12 +41,16 @@ interface Props {
   brandValue: string;
   region: Region;
   distanceUnit: DistanceUnit;
+  currency: Currency;
+  rates: ExchangeRates | null;
 }
 
-export function ServiceHistoryCard({ record, bikeClass, brandValue, region, distanceUnit }: Props) {
+export function ServiceHistoryCard({ record, bikeClass, brandValue, region, distanceUnit, currency, rates }: Props) {
   const [isEditing, setIsEditing] = useState(false);
   const [jobType, setJobType] = useState(record.jobType);
-  const [cost, setCost] = useState(String(record.cost));
+  const [costDisplay, setCostDisplay] = useState(
+    convertGbpToDisplay(record.cost, currency, rates).toFixed(2)
+  );
   const [mileageDisplay, setMileageDisplay] = useState(
     String(Math.round(convertMilesToDisplay(record.mileage, distanceUnit)))
   );
@@ -64,11 +66,13 @@ export function ServiceHistoryCard({ record, bikeClass, brandValue, region, dist
   const tagClass =
     verdict?.cls === 'fair' ? styles.tagFair : verdict?.cls === 'high' ? styles.tagHigh : styles.tagSecondOpinion;
   const unitLabel = distanceUnitLabel(distanceUnit);
+  const symbol = CURRENCY_SYMBOLS[currency];
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
     const mileageInMiles = Math.round(convertDisplayToMiles(Number(mileageDisplay), distanceUnit));
-    const ok = await submit({ jobType, cost: Number(cost), mileage: mileageInMiles, date, notes }, 'PATCH');
+    const costInGbp = convertDisplayToGbp(Number(costDisplay), currency, rates);
+    const ok = await submit({ jobType, cost: costInGbp, mileage: mileageInMiles, date, notes }, 'PATCH');
     if (ok) setIsEditing(false);
   }
 
@@ -98,8 +102,8 @@ export function ServiceHistoryCard({ record, bikeClass, brandValue, region, dist
             </select>
           </div>
           <div className="field" style={{ marginTop: '0.9rem' }}>
-            <label htmlFor={`edit-cost-${record.id}`}>Cost paid (£)</label>
-            <input id={`edit-cost-${record.id}`} type="number" min="0" step="0.01" value={cost} onChange={(e) => setCost(e.target.value)} required />
+            <label htmlFor={`edit-cost-${record.id}`}>Cost paid ({symbol})</label>
+            <input id={`edit-cost-${record.id}`} type="number" min="0" step="0.01" value={costDisplay} onChange={(e) => setCostDisplay(e.target.value)} required />
           </div>
           <div className="field" style={{ marginTop: '0.9rem' }}>
             <label htmlFor={`edit-mileage-${record.id}`}>Mileage ({unitLabel})</label>
@@ -128,7 +132,7 @@ export function ServiceHistoryCard({ record, bikeClass, brandValue, region, dist
     <div className={styles.jobCard}>
       <div className={styles.jobCardTop}>
         <span className={styles.jobCardJob}>{jobLabel}</span>
-        <span className={styles.jobCardCost}>{fmtMoney(record.cost)}</span>
+        <span className={styles.jobCardCost}>{formatCurrency(record.cost, currency, rates)}</span>
       </div>
       <div className={styles.jobCardMeta}>
         {fmtDate(record.date)} · {formatDistance(record.mileage, distanceUnit)}
@@ -136,7 +140,7 @@ export function ServiceHistoryCard({ record, bikeClass, brandValue, region, dist
       {record.notes && <div className={styles.jobCardNotes}>{record.notes}</div>}
       {verdict && (
         <span className={`${styles.tag} ${tagClass}`}>
-          {verdict.label} (typical £{verdict.low}-{verdict.high})
+          {verdict.label} (typical {formatCurrency(verdict.low, currency, rates)}-{formatCurrency(verdict.high, currency, rates)})
         </span>
       )}
       {affiliate && (

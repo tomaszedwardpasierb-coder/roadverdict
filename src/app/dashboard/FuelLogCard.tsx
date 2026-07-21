@@ -5,19 +5,29 @@ import { useState } from 'react';
 import type { FuelLogDoc } from '@/lib/tracker/fuelLog';
 import { useTrackerFormSubmit } from './useTrackerFormSubmit';
 import { formatDistance, convertMilesToDisplay, convertDisplayToMiles, distanceUnitLabel, type DistanceUnit } from '@/lib/tracker/unitFormat';
+import { convertGbpToDisplay, convertDisplayToGbp, formatCurrency, CURRENCY_SYMBOLS, type Currency, type ExchangeRates } from '@/lib/tracker/currency';
 import styles from './dashboard.module.css';
 
-function fmtMoney(n: number): string {
-  return `£${n.toFixed(0)}`;
-}
 function fmtDate(d: string): string {
   return new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
-export function FuelLogCard({ log, distanceUnit }: { log: FuelLogDoc; distanceUnit: DistanceUnit }) {
+export function FuelLogCard({
+  log,
+  distanceUnit,
+  currency,
+  rates,
+}: {
+  log: FuelLogDoc;
+  distanceUnit: DistanceUnit;
+  currency: Currency;
+  rates: ExchangeRates | null;
+}) {
   const [isEditing, setIsEditing] = useState(false);
   const [litres, setLitres] = useState(String(log.litres));
-  const [cost, setCost] = useState(String(log.cost));
+  const [costDisplay, setCostDisplay] = useState(
+    convertGbpToDisplay(log.cost, currency, rates).toFixed(2)
+  );
   const [mileageDisplay, setMileageDisplay] = useState(
     String(Math.round(convertMilesToDisplay(log.mileage, distanceUnit)))
   );
@@ -27,14 +37,16 @@ export function FuelLogCard({ log, distanceUnit }: { log: FuelLogDoc; distanceUn
     `/api/tracker/fuel/${encodeURIComponent(log.id)}`
   );
 
-  const perLitre = (log.cost / log.litres).toFixed(2);
+  const perLitreGbp = log.cost / log.litres;
   const unitLabel = distanceUnitLabel(distanceUnit);
+  const symbol = CURRENCY_SYMBOLS[currency];
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
     const mileageInMiles = Math.round(convertDisplayToMiles(Number(mileageDisplay), distanceUnit));
+    const costInGbp = convertDisplayToGbp(Number(costDisplay), currency, rates);
     const ok = await submit(
-      { litres: Number(litres), cost: Number(cost), mileage: mileageInMiles, date, filledToFull },
+      { litres: Number(litres), cost: costInGbp, mileage: mileageInMiles, date, filledToFull },
       'PATCH'
     );
     if (ok) setIsEditing(false);
@@ -58,8 +70,8 @@ export function FuelLogCard({ log, distanceUnit }: { log: FuelLogDoc; distanceUn
             <input id={`edit-fuel-litres-${log.id}`} type="number" min="0" step="0.01" value={litres} onChange={(e) => setLitres(e.target.value)} required />
           </div>
           <div className="field" style={{ marginTop: '0.9rem' }}>
-            <label htmlFor={`edit-fuel-cost-${log.id}`}>Cost paid (£)</label>
-            <input id={`edit-fuel-cost-${log.id}`} type="number" min="0" step="0.01" value={cost} onChange={(e) => setCost(e.target.value)} required />
+            <label htmlFor={`edit-fuel-cost-${log.id}`}>Cost paid ({symbol})</label>
+            <input id={`edit-fuel-cost-${log.id}`} type="number" min="0" step="0.01" value={costDisplay} onChange={(e) => setCostDisplay(e.target.value)} required />
           </div>
           <div className="field" style={{ marginTop: '0.9rem' }}>
             <label htmlFor={`edit-fuel-mileage-${log.id}`}>Mileage ({unitLabel})</label>
@@ -90,10 +102,10 @@ export function FuelLogCard({ log, distanceUnit }: { log: FuelLogDoc; distanceUn
     <div className={styles.jobCard}>
       <div className={styles.jobCardTop}>
         <span className={styles.jobCardJob}>{log.litres.toFixed(1)} L{log.filledToFull ? ' (full tank)' : ''}</span>
-        <span className={styles.jobCardCost}>{fmtMoney(log.cost)}</span>
+        <span className={styles.jobCardCost}>{formatCurrency(log.cost, currency, rates)}</span>
       </div>
       <div className={styles.jobCardMeta}>
-        {fmtDate(log.date)} · {formatDistance(log.mileage, distanceUnit)} · {perLitre}p/litre
+        {fmtDate(log.date)} · {formatDistance(log.mileage, distanceUnit)} · {symbol}{convertGbpToDisplay(perLitreGbp, currency, rates).toFixed(2)}/litre
       </div>
       <div className={styles.cardActions}>
         <button type="button" className={styles.iconBtn} onClick={() => setIsEditing(true)}>Edit</button>

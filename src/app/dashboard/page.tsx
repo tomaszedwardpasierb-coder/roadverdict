@@ -20,6 +20,8 @@ import {
   type DistanceUnit,
   type FuelEconomyUnit,
 } from "@/lib/tracker/unitFormat";
+import { type Currency, formatCurrency } from "@/lib/tracker/currency";
+import { getExchangeRates } from "@/lib/tracker/currencyRates";
 import { AddBikeForm } from "./AddBikeForm";
 import { SetRegionForm } from "./SetRegionForm";
 import { LogServiceForm } from "./LogServiceForm";
@@ -39,16 +41,10 @@ import { MpgChart } from "./MpgChart";
 import { FuelCostChart } from "./FuelCostChart";
 import { CategorySpendChart } from "./CategorySpendChart";
 import { UpdateMileageButton } from "./UpdateMileageButton";
-import { type Currency } from "@/lib/tracker/currency";
-import { getExchangeRates } from "@/lib/tracker/currencyRates";
 import { UnitSettings } from "./UnitSettings";
 import { ExportShareSection } from "./ExportShareSection";
 
 export const dynamic = "force-dynamic";
-
-function fmtMoney(n: number): string {
-  return `£${n.toFixed(0)}`;
-}
 
 export default async function DashboardPage() {
   const session = await getSession();
@@ -111,7 +107,13 @@ export default async function DashboardPage() {
 
   const serviceContent = (
     <>
-      <LogServiceForm initialMileage={bike.currentMileage} mileageHistory={mileagePoints} distanceUnit={distanceUnit} currency={currency} rates={rates} />
+      <LogServiceForm
+        initialMileage={bike.currentMileage}
+        mileageHistory={mileagePoints}
+        distanceUnit={distanceUnit}
+        currency={currency}
+        rates={rates}
+      />
       <div className={styles.chartCard} style={{ marginBottom: "0.9rem" }}>
         <div className={styles.chartCardTitle}>Servicing spend over time</div>
         {serviceMonthly.length > 1 ? (
@@ -134,6 +136,8 @@ export default async function DashboardPage() {
             brandValue={brandValue}
             region={bike.region as Region}
             distanceUnit={distanceUnit}
+            currency={currency}
+            rates={rates}
           />
         ))
       )}
@@ -142,7 +146,13 @@ export default async function DashboardPage() {
 
   const fuelContent = (
     <>
-      <LogFuelForm initialMileage={bike.currentMileage} mileageHistory={mileagePoints} distanceUnit={distanceUnit} currency={currency} rates={rates} />
+      <LogFuelForm
+        initialMileage={bike.currentMileage}
+        mileageHistory={mileagePoints}
+        distanceUnit={distanceUnit}
+        currency={currency}
+        rates={rates}
+      />
       {actualMpg ? (
         <p className={styles.subtext} style={{ marginBottom: "0.9rem" }}>
           Your actual average from logged fill-ups: <strong>{formatFuelEconomy(actualMpg, fuelEconomyUnit)}</strong>{" "}
@@ -178,14 +188,20 @@ export default async function DashboardPage() {
           <p className={styles.cardBody}>No fuel fill-ups logged yet. Log your first one above.</p>
         </div>
       ) : (
-        fuelLogs.map((f) => <FuelLogCard key={f.id} log={f} distanceUnit={distanceUnit} />)
+        fuelLogs.map((f) => <FuelLogCard key={f.id} log={f} distanceUnit={distanceUnit} currency={currency} rates={rates} />)
       )}
     </>
   );
 
   const modsContent = (
     <>
-      <LogModForm initialMileage={bike.currentMileage} mileageHistory={mileagePoints} distanceUnit={distanceUnit} currency={currency} rates={rates} />
+      <LogModForm
+        initialMileage={bike.currentMileage}
+        mileageHistory={mileagePoints}
+        distanceUnit={distanceUnit}
+        currency={currency}
+        rates={rates}
+      />
       <div className={styles.chartCard} style={{ marginBottom: "0.9rem" }}>
         <div className={styles.chartCardTitle}>Modifications spend over time</div>
         {modsMonthly.length > 1 ? (
@@ -200,7 +216,7 @@ export default async function DashboardPage() {
           <p className={styles.cardBody}>No modifications or accessories logged yet.</p>
         </div>
       ) : (
-        mods.map((m) => <ModCard key={m.id} mod={m} distanceUnit={distanceUnit} />)
+        mods.map((m) => <ModCard key={m.id} mod={m} distanceUnit={distanceUnit} currency={currency} rates={rates} />)
       )}
     </>
   );
@@ -222,7 +238,7 @@ export default async function DashboardPage() {
           <p className={styles.cardBody}>No insurance, tax, or MOT payments logged yet.</p>
         </div>
       ) : (
-        bills.map((b) => <BillCard key={b.id} bill={b} />)
+        bills.map((b) => <BillCard key={b.id} bill={b} currency={currency} rates={rates} />)
       )}
     </>
   );
@@ -248,8 +264,8 @@ export default async function DashboardPage() {
     <main className={styles.main}>
       {overBudget && (
         <div className={styles.budgetWarningBanner}>
-          ⚠️ <strong>You&apos;re over your {currentYear} budget</strong> - {fmtMoney(yearSpend)} spent against a{" "}
-          {fmtMoney(bike.annualBudget as number)} budget, {fmtMoney(yearSpend - (bike.annualBudget as number))} over.
+          ⚠️ <strong>You&apos;re over your {currentYear} budget</strong> - {formatCurrency(yearSpend, currency, rates)} spent against a{" "}
+          {formatCurrency(bike.annualBudget as number, currency, rates)} budget, {formatCurrency(yearSpend - (bike.annualBudget as number), currency, rates)} over.
         </div>
       )}
 
@@ -272,7 +288,7 @@ export default async function DashboardPage() {
 
       <div className={styles.statsStrip}>
         <div className={styles.statCard}>
-          <div className={styles.statCardValue}>{fmtMoney(summary.grandTotal)}</div>
+          <div className={styles.statCardValue}>{formatCurrency(summary.grandTotal, currency, rates)}</div>
           <div className={styles.statCardLabel}>Total spend</div>
         </div>
         <div className={styles.statCard}>
@@ -293,7 +309,7 @@ export default async function DashboardPage() {
         </div>
       </div>
 
-      <BudgetWidget yearSpend={yearSpend} currentYear={currentYear} initialBudget={bike.annualBudget} />
+      <BudgetWidget yearSpend={yearSpend} currentYear={currentYear} initialBudget={bike.annualBudget} currency={currency} rates={rates} />
 
       <div className={styles.chartsGrid}>
         <div className={styles.chartCard}>
@@ -331,6 +347,3 @@ export default async function DashboardPage() {
     </main>
   );
 }
-
-
-

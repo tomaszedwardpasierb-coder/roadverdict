@@ -5,26 +5,37 @@ import { useState } from 'react';
 import { BILL_LABELS } from '@/lib/tracker/billTypes';
 import type { BillDoc } from '@/lib/tracker/bill';
 import { useTrackerFormSubmit } from './useTrackerFormSubmit';
+import { convertGbpToDisplay, convertDisplayToGbp, formatCurrency, CURRENCY_SYMBOLS, type Currency, type ExchangeRates } from '@/lib/tracker/currency';
 import styles from './dashboard.module.css';
 
-function fmtMoney(n: number): string {
-  return `£${n.toFixed(0)}`;
-}
 function fmtDate(d: string): string {
   return new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
-export function BillCard({ bill }: { bill: BillDoc }) {
+export function BillCard({
+  bill,
+  currency,
+  rates,
+}: {
+  bill: BillDoc;
+  currency: Currency;
+  rates: ExchangeRates | null;
+}) {
   const [isEditing, setIsEditing] = useState(false);
   const [billType, setBillType] = useState(bill.billType);
-  const [cost, setCost] = useState(String(bill.cost));
+  const [costDisplay, setCostDisplay] = useState(
+    convertGbpToDisplay(bill.cost, currency, rates).toFixed(2)
+  );
   const [date, setDate] = useState(bill.date);
   const [notes, setNotes] = useState(bill.notes);
   const { submit, submitting, error } = useTrackerFormSubmit(`/api/tracker/bills/${encodeURIComponent(bill.id)}`);
 
+  const symbol = CURRENCY_SYMBOLS[currency];
+
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
-    const ok = await submit({ billType, cost: Number(cost), date, notes }, 'PATCH');
+    const costInGbp = convertDisplayToGbp(Number(costDisplay), currency, rates);
+    const ok = await submit({ billType, cost: costInGbp, date, notes }, 'PATCH');
     if (ok) setIsEditing(false);
   }
 
@@ -50,8 +61,8 @@ export function BillCard({ bill }: { bill: BillDoc }) {
             </select>
           </div>
           <div className="field" style={{ marginTop: '0.9rem' }}>
-            <label htmlFor={`edit-bill-cost-${bill.id}`}>Cost (£)</label>
-            <input id={`edit-bill-cost-${bill.id}`} type="number" min="0" step="0.01" value={cost} onChange={(e) => setCost(e.target.value)} required />
+            <label htmlFor={`edit-bill-cost-${bill.id}`}>Cost ({symbol})</label>
+            <input id={`edit-bill-cost-${bill.id}`} type="number" min="0" step="0.01" value={costDisplay} onChange={(e) => setCostDisplay(e.target.value)} required />
           </div>
           <div className="field" style={{ marginTop: '0.9rem' }}>
             <label htmlFor={`edit-bill-notes-${bill.id}`}>Notes</label>
@@ -76,7 +87,7 @@ export function BillCard({ bill }: { bill: BillDoc }) {
     <div className={styles.jobCard}>
       <div className={styles.jobCardTop}>
         <span className={styles.jobCardJob}>{BILL_LABELS[bill.billType] ?? bill.billType}</span>
-        <span className={styles.jobCardCost}>{fmtMoney(bill.cost)}</span>
+        <span className={styles.jobCardCost}>{formatCurrency(bill.cost, currency, rates)}</span>
       </div>
       <div className={styles.jobCardMeta}>{fmtDate(bill.date)}</div>
       {bill.notes && <div className={styles.jobCardNotes}>{bill.notes}</div>}

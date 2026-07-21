@@ -6,20 +6,30 @@ import { MOD_GROUPS, MOD_LABELS } from '@/lib/tracker/modTypes';
 import type { ModDoc } from '@/lib/tracker/mod';
 import { useTrackerFormSubmit } from './useTrackerFormSubmit';
 import { formatDistance, convertMilesToDisplay, convertDisplayToMiles, distanceUnitLabel, type DistanceUnit } from '@/lib/tracker/unitFormat';
+import { convertGbpToDisplay, convertDisplayToGbp, formatCurrency, CURRENCY_SYMBOLS, type Currency, type ExchangeRates } from '@/lib/tracker/currency';
 import styles from './dashboard.module.css';
 
-function fmtMoney(n: number): string {
-  return `£${n.toFixed(0)}`;
-}
 function fmtDate(d: string): string {
   return new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
-export function ModCard({ mod, distanceUnit }: { mod: ModDoc; distanceUnit: DistanceUnit }) {
+export function ModCard({
+  mod,
+  distanceUnit,
+  currency,
+  rates,
+}: {
+  mod: ModDoc;
+  distanceUnit: DistanceUnit;
+  currency: Currency;
+  rates: ExchangeRates | null;
+}) {
   const [isEditing, setIsEditing] = useState(false);
   const [category, setCategory] = useState(mod.category);
   const [name, setName] = useState(mod.name);
-  const [cost, setCost] = useState(String(mod.cost));
+  const [costDisplay, setCostDisplay] = useState(
+    convertGbpToDisplay(mod.cost, currency, rates).toFixed(2)
+  );
   const [mileageDisplay, setMileageDisplay] = useState(
     String(Math.round(convertMilesToDisplay(mod.mileage, distanceUnit)))
   );
@@ -28,11 +38,13 @@ export function ModCard({ mod, distanceUnit }: { mod: ModDoc; distanceUnit: Dist
   const { submit, submitting, error } = useTrackerFormSubmit(`/api/tracker/mods/${encodeURIComponent(mod.id)}`);
 
   const unitLabel = distanceUnitLabel(distanceUnit);
+  const symbol = CURRENCY_SYMBOLS[currency];
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
     const mileageInMiles = Math.round(convertDisplayToMiles(Number(mileageDisplay), distanceUnit));
-    const ok = await submit({ category, name, cost: Number(cost), mileage: mileageInMiles, date, notes }, 'PATCH');
+    const costInGbp = convertDisplayToGbp(Number(costDisplay), currency, rates);
+    const ok = await submit({ category, name, cost: costInGbp, mileage: mileageInMiles, date, notes }, 'PATCH');
     if (ok) setIsEditing(false);
   }
 
@@ -66,8 +78,8 @@ export function ModCard({ mod, distanceUnit }: { mod: ModDoc; distanceUnit: Dist
             <input id={`edit-mod-name-${mod.id}`} type="text" value={name} onChange={(e) => setName(e.target.value)} required />
           </div>
           <div className="field" style={{ marginTop: '0.9rem' }}>
-            <label htmlFor={`edit-mod-cost-${mod.id}`}>Cost (£)</label>
-            <input id={`edit-mod-cost-${mod.id}`} type="number" min="0" step="0.01" value={cost} onChange={(e) => setCost(e.target.value)} required />
+            <label htmlFor={`edit-mod-cost-${mod.id}`}>Cost ({symbol})</label>
+            <input id={`edit-mod-cost-${mod.id}`} type="number" min="0" step="0.01" value={costDisplay} onChange={(e) => setCostDisplay(e.target.value)} required />
           </div>
           <div className="field" style={{ marginTop: '0.9rem' }}>
             <label htmlFor={`edit-mod-mileage-${mod.id}`}>Mileage ({unitLabel})</label>
@@ -96,7 +108,7 @@ export function ModCard({ mod, distanceUnit }: { mod: ModDoc; distanceUnit: Dist
     <div className={styles.jobCard}>
       <div className={styles.jobCardTop}>
         <span className={styles.jobCardJob}>{mod.name}</span>
-        <span className={styles.jobCardCost}>{fmtMoney(mod.cost)}</span>
+        <span className={styles.jobCardCost}>{formatCurrency(mod.cost, currency, rates)}</span>
       </div>
       <div className={styles.jobCardMeta}>
         {MOD_LABELS[mod.category]} · {fmtDate(mod.date)} · {formatDistance(mod.mileage, distanceUnit)}
