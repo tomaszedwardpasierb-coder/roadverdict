@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { MOD_GROUPS, MOD_LABELS } from '@/lib/tracker/modTypes';
 import type { ModDoc } from '@/lib/tracker/mod';
 import { useTrackerFormSubmit } from './useTrackerFormSubmit';
+import { formatDistance, convertMilesToDisplay, convertDisplayToMiles, distanceUnitLabel, type DistanceUnit } from '@/lib/tracker/unitFormat';
 import styles from './dashboard.module.css';
 
 function fmtMoney(n: number): string {
@@ -14,19 +15,24 @@ function fmtDate(d: string): string {
   return new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
-export function ModCard({ mod }: { mod: ModDoc }) {
+export function ModCard({ mod, distanceUnit }: { mod: ModDoc; distanceUnit: DistanceUnit }) {
   const [isEditing, setIsEditing] = useState(false);
   const [category, setCategory] = useState(mod.category);
   const [name, setName] = useState(mod.name);
   const [cost, setCost] = useState(String(mod.cost));
-  const [mileage, setMileage] = useState(String(mod.mileage));
+  const [mileageDisplay, setMileageDisplay] = useState(
+    String(Math.round(convertMilesToDisplay(mod.mileage, distanceUnit)))
+  );
   const [date, setDate] = useState(mod.date);
   const [notes, setNotes] = useState(mod.notes);
   const { submit, submitting, error } = useTrackerFormSubmit(`/api/tracker/mods/${encodeURIComponent(mod.id)}`);
 
+  const unitLabel = distanceUnitLabel(distanceUnit);
+
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
-    const ok = await submit({ category, name, cost: Number(cost), mileage: Number(mileage), date, notes }, 'PATCH');
+    const mileageInMiles = Math.round(convertDisplayToMiles(Number(mileageDisplay), distanceUnit));
+    const ok = await submit({ category, name, cost: Number(cost), mileage: mileageInMiles, date, notes }, 'PATCH');
     if (ok) setIsEditing(false);
   }
 
@@ -64,8 +70,8 @@ export function ModCard({ mod }: { mod: ModDoc }) {
             <input id={`edit-mod-cost-${mod.id}`} type="number" min="0" step="0.01" value={cost} onChange={(e) => setCost(e.target.value)} required />
           </div>
           <div className="field" style={{ marginTop: '0.9rem' }}>
-            <label htmlFor={`edit-mod-mileage-${mod.id}`}>Mileage</label>
-            <input id={`edit-mod-mileage-${mod.id}`} type="number" min="0" value={mileage} onChange={(e) => setMileage(e.target.value)} required />
+            <label htmlFor={`edit-mod-mileage-${mod.id}`}>Mileage ({unitLabel})</label>
+            <input id={`edit-mod-mileage-${mod.id}`} type="number" min="0" value={mileageDisplay} onChange={(e) => setMileageDisplay(e.target.value)} required />
           </div>
           <div className="field" style={{ marginTop: '0.9rem' }}>
             <label htmlFor={`edit-mod-notes-${mod.id}`}>Notes</label>
@@ -93,7 +99,7 @@ export function ModCard({ mod }: { mod: ModDoc }) {
         <span className={styles.jobCardCost}>{fmtMoney(mod.cost)}</span>
       </div>
       <div className={styles.jobCardMeta}>
-        {MOD_LABELS[mod.category]} · {fmtDate(mod.date)} · {mod.mileage.toLocaleString()} miles
+        {MOD_LABELS[mod.category]} · {fmtDate(mod.date)} · {formatDistance(mod.mileage, distanceUnit)}
       </div>
       {mod.notes && <div className={styles.jobCardNotes}>{mod.notes}</div>}
       <div className={styles.cardActions}>

@@ -6,6 +6,7 @@ import { JOB_GROUPS, JOB_LABELS, AFFILIATE_LINKS, isBenchmarkedJob } from '@/lib
 import { getAdjustedBenchmark, type BikeClass, type Region } from '@/lib/priceData';
 import type { ServiceRecordDoc } from '@/lib/tracker/serviceRecord';
 import { useTrackerFormSubmit } from './useTrackerFormSubmit';
+import { formatDistance, convertMilesToDisplay, convertDisplayToMiles, distanceUnitLabel, type DistanceUnit } from '@/lib/tracker/unitFormat';
 import styles from './dashboard.module.css';
 
 function fmtMoney(n: number): string {
@@ -41,13 +42,16 @@ interface Props {
   bikeClass: BikeClass;
   brandValue: string;
   region: Region;
+  distanceUnit: DistanceUnit;
 }
 
-export function ServiceHistoryCard({ record, bikeClass, brandValue, region }: Props) {
+export function ServiceHistoryCard({ record, bikeClass, brandValue, region, distanceUnit }: Props) {
   const [isEditing, setIsEditing] = useState(false);
   const [jobType, setJobType] = useState(record.jobType);
   const [cost, setCost] = useState(String(record.cost));
-  const [mileage, setMileage] = useState(String(record.mileage));
+  const [mileageDisplay, setMileageDisplay] = useState(
+    String(Math.round(convertMilesToDisplay(record.mileage, distanceUnit)))
+  );
   const [date, setDate] = useState(record.date);
   const [notes, setNotes] = useState(record.notes);
   const { submit, submitting, error } = useTrackerFormSubmit(
@@ -59,10 +63,12 @@ export function ServiceHistoryCard({ record, bikeClass, brandValue, region }: Pr
   const affiliate = AFFILIATE_LINKS[record.jobType];
   const tagClass =
     verdict?.cls === 'fair' ? styles.tagFair : verdict?.cls === 'high' ? styles.tagHigh : styles.tagSecondOpinion;
+  const unitLabel = distanceUnitLabel(distanceUnit);
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
-    const ok = await submit({ jobType, cost: Number(cost), mileage: Number(mileage), date, notes }, 'PATCH');
+    const mileageInMiles = Math.round(convertDisplayToMiles(Number(mileageDisplay), distanceUnit));
+    const ok = await submit({ jobType, cost: Number(cost), mileage: mileageInMiles, date, notes }, 'PATCH');
     if (ok) setIsEditing(false);
   }
 
@@ -96,8 +102,8 @@ export function ServiceHistoryCard({ record, bikeClass, brandValue, region }: Pr
             <input id={`edit-cost-${record.id}`} type="number" min="0" step="0.01" value={cost} onChange={(e) => setCost(e.target.value)} required />
           </div>
           <div className="field" style={{ marginTop: '0.9rem' }}>
-            <label htmlFor={`edit-mileage-${record.id}`}>Mileage</label>
-            <input id={`edit-mileage-${record.id}`} type="number" min="0" value={mileage} onChange={(e) => setMileage(e.target.value)} required />
+            <label htmlFor={`edit-mileage-${record.id}`}>Mileage ({unitLabel})</label>
+            <input id={`edit-mileage-${record.id}`} type="number" min="0" value={mileageDisplay} onChange={(e) => setMileageDisplay(e.target.value)} required />
           </div>
           <div className="field" style={{ marginTop: '0.9rem' }}>
             <label htmlFor={`edit-notes-${record.id}`}>Notes</label>
@@ -125,7 +131,7 @@ export function ServiceHistoryCard({ record, bikeClass, brandValue, region }: Pr
         <span className={styles.jobCardCost}>{fmtMoney(record.cost)}</span>
       </div>
       <div className={styles.jobCardMeta}>
-        {fmtDate(record.date)} · {record.mileage.toLocaleString()} miles
+        {fmtDate(record.date)} · {formatDistance(record.mileage, distanceUnit)}
       </div>
       {record.notes && <div className={styles.jobCardNotes}>{record.notes}</div>}
       {verdict && (

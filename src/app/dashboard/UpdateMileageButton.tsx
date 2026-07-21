@@ -3,20 +3,22 @@
 
 import { useState } from 'react';
 import { useTrackerFormSubmit } from './useTrackerFormSubmit';
+import { convertMilesToDisplay, convertDisplayToMiles, distanceUnitLabel, type DistanceUnit } from '@/lib/tracker/unitFormat';
 import styles from './dashboard.module.css';
 
-export function UpdateMileageButton({ currentMileage }: { currentMileage: number }) {
+export function UpdateMileageButton({ currentMileage, distanceUnit }: { currentMileage: number; distanceUnit: DistanceUnit }) {
   const [editing, setEditing] = useState(false);
-  const [value, setValue] = useState(String(currentMileage));
+  const [value, setValue] = useState(String(Math.round(convertMilesToDisplay(currentMileage, distanceUnit))));
   const { submit, submitting, error } = useTrackerFormSubmit('/api/tracker/bike');
 
-  const valueNum = Number(value);
-  const isBlocked = valueNum > 0 && valueNum < currentMileage;
+  const valueInMiles = convertDisplayToMiles(Number(value), distanceUnit);
+  const isBlocked = valueInMiles > 0 && valueInMiles < currentMileage;
+  const unitLabel = distanceUnitLabel(distanceUnit);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (isBlocked) return;
-    const ok = await submit({ currentMileage: valueNum }, 'PATCH');
+    const ok = await submit({ currentMileage: Math.round(valueInMiles) }, 'PATCH');
     if (ok) setEditing(false);
   }
 
@@ -31,6 +33,7 @@ export function UpdateMileageButton({ currentMileage }: { currentMileage: number
           className={styles.mileageEditInput}
           required
         />
+        <span style={{ fontSize: '0.75rem', color: 'var(--ink-soft)' }}>{unitLabel}</span>
         <button className={styles.iconBtn} type="submit" disabled={submitting || isBlocked}>
           {submitting ? 'Saving…' : 'Save'}
         </button>
@@ -39,7 +42,8 @@ export function UpdateMileageButton({ currentMileage }: { currentMileage: number
         </button>
         {isBlocked && (
           <p className="field-note" style={{ borderColor: 'var(--verdict-red)', color: '#7a251b', width: '100%' }}>
-            ⛔ This can&apos;t be lower than your bike&apos;s current recorded mileage ({currentMileage.toLocaleString()}) - there&apos;s no backdating case for &quot;right now.&quot;
+            ⛔ This can&apos;t be lower than your bike&apos;s current recorded {unitLabel} (
+            {Math.round(convertMilesToDisplay(currentMileage, distanceUnit)).toLocaleString()}).
           </p>
         )}
         {error && <span className="error-text">{error}</span>}

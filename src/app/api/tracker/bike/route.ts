@@ -1,9 +1,16 @@
 ﻿// Place at: src/app/api/tracker/bike/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/session";
-import { createBike, updateBikeMileage, updateBikeRegion, updateBikeBudget } from "@/lib/tracker/bike";
+import {
+  createBike,
+  updateBikeMileage,
+  updateBikeRegion,
+  updateBikeBudget,
+  updateBikeUnits,
+} from "@/lib/tracker/bike";
 import { getBikeClassForCC } from "@/lib/motorcycleModels";
 import type { Region } from "@/lib/priceData";
+import type { DistanceUnit, FuelEconomyUnit } from "@/lib/tracker/unitFormat";
 
 export const dynamic = "force-dynamic";
 
@@ -62,13 +69,15 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
   }
 
-  const { currentMileage, region, annualBudget } = body as {
+  const { currentMileage, region, annualBudget, distanceUnit, fuelEconomyUnit } = body as {
     currentMileage?: number;
     region?: Region;
     annualBudget?: number;
+    distanceUnit?: DistanceUnit;
+    fuelEconomyUnit?: FuelEconomyUnit;
   };
 
-  if (currentMileage == null && !region && annualBudget == null) {
+  if (currentMileage == null && !region && annualBudget == null && !distanceUnit && !fuelEconomyUnit) {
     return NextResponse.json({ error: "Nothing to update." }, { status: 400 });
   }
 
@@ -87,6 +96,9 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: "Enter a valid budget amount." }, { status: 400 });
     }
     bike = await updateBikeBudget(session.email, annualBudget);
+  }
+  if (distanceUnit || fuelEconomyUnit) {
+    bike = await updateBikeUnits(session.email, distanceUnit, fuelEconomyUnit);
   }
 
   if (!bike) {

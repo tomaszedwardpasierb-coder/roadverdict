@@ -5,9 +5,13 @@ export interface HistoryPoint {
   mileage: number;
 }
 
+export type MileageCheckReason = "today-lower" | "below-earlier" | "above-later";
+
 export interface MileageCheckResult {
   status: "ok" | "warning" | "blocked";
-  message?: string;
+  reason?: MileageCheckReason;
+  referenceMileage?: number;
+  referenceDate?: string;
 }
 
 function startOfToday(): number {
@@ -16,17 +20,8 @@ function startOfToday(): number {
   return d.getTime();
 }
 
-function fmtDate(d: string): string {
-  return new Date(d).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
-}
-
-// A same-day/future entry can never be lower than the bike's current
-// mileage - hard block, no override, since there's no legitimate
-// backdating explanation for "today." A backdated entry is instead
-// checked against its real chronological neighbours (the closest
-// existing entry before it and after it), not just the single latest
-// reading - so a genuinely old record slots in correctly, while one
-// that's inconsistent with the actual timeline still gets flagged.
+// Returns structured data, not a pre-built message - the display layer
+// formats the numbers in whatever distance unit the person prefers.
 export function checkMileageConsistency(
   enteredMileage: number,
   entryDate: string,
@@ -40,10 +35,7 @@ export function checkMileageConsistency(
 
   if (isTodayOrFuture) {
     if (enteredMileage < currentMileage) {
-      return {
-        status: "blocked",
-        message: `This is dated today or later, so it can't be lower than your bike's current recorded mileage (${currentMileage.toLocaleString()}).`,
-      };
+      return { status: "blocked", reason: "today-lower", referenceMileage: currentMileage };
     }
     return { status: "ok" };
   }
@@ -61,16 +53,10 @@ export function checkMileageConsistency(
   }
 
   if (prev && enteredMileage < prev.mileage) {
-    return {
-      status: "warning",
-      message: `This is lower than an earlier entry on ${fmtDate(prev.date)} (${prev.mileage.toLocaleString()} miles). If this is correct, confirm below.`,
-    };
+    return { status: "warning", reason: "below-earlier", referenceMileage: prev.mileage, referenceDate: prev.date };
   }
   if (next && enteredMileage > next.mileage) {
-    return {
-      status: "warning",
-      message: `This is higher than a later entry on ${fmtDate(next.date)} (${next.mileage.toLocaleString()} miles). If this is correct, confirm below.`,
-    };
+    return { status: "warning", reason: "above-later", referenceMileage: next.mileage, referenceDate: next.date };
   }
 
   return { status: "ok" };

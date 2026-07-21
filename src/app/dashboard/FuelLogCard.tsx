@@ -4,6 +4,7 @@
 import { useState } from 'react';
 import type { FuelLogDoc } from '@/lib/tracker/fuelLog';
 import { useTrackerFormSubmit } from './useTrackerFormSubmit';
+import { formatDistance, convertMilesToDisplay, convertDisplayToMiles, distanceUnitLabel, type DistanceUnit } from '@/lib/tracker/unitFormat';
 import styles from './dashboard.module.css';
 
 function fmtMoney(n: number): string {
@@ -13,11 +14,13 @@ function fmtDate(d: string): string {
   return new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
-export function FuelLogCard({ log }: { log: FuelLogDoc }) {
+export function FuelLogCard({ log, distanceUnit }: { log: FuelLogDoc; distanceUnit: DistanceUnit }) {
   const [isEditing, setIsEditing] = useState(false);
   const [litres, setLitres] = useState(String(log.litres));
   const [cost, setCost] = useState(String(log.cost));
-  const [mileage, setMileage] = useState(String(log.mileage));
+  const [mileageDisplay, setMileageDisplay] = useState(
+    String(Math.round(convertMilesToDisplay(log.mileage, distanceUnit)))
+  );
   const [date, setDate] = useState(log.date);
   const [filledToFull, setFilledToFull] = useState(log.filledToFull);
   const { submit, submitting, error } = useTrackerFormSubmit(
@@ -25,11 +28,13 @@ export function FuelLogCard({ log }: { log: FuelLogDoc }) {
   );
 
   const perLitre = (log.cost / log.litres).toFixed(2);
+  const unitLabel = distanceUnitLabel(distanceUnit);
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
+    const mileageInMiles = Math.round(convertDisplayToMiles(Number(mileageDisplay), distanceUnit));
     const ok = await submit(
-      { litres: Number(litres), cost: Number(cost), mileage: Number(mileage), date, filledToFull },
+      { litres: Number(litres), cost: Number(cost), mileage: mileageInMiles, date, filledToFull },
       'PATCH'
     );
     if (ok) setIsEditing(false);
@@ -57,8 +62,8 @@ export function FuelLogCard({ log }: { log: FuelLogDoc }) {
             <input id={`edit-fuel-cost-${log.id}`} type="number" min="0" step="0.01" value={cost} onChange={(e) => setCost(e.target.value)} required />
           </div>
           <div className="field" style={{ marginTop: '0.9rem' }}>
-            <label htmlFor={`edit-fuel-mileage-${log.id}`}>Mileage</label>
-            <input id={`edit-fuel-mileage-${log.id}`} type="number" min="0" value={mileage} onChange={(e) => setMileage(e.target.value)} required />
+            <label htmlFor={`edit-fuel-mileage-${log.id}`}>Mileage ({unitLabel})</label>
+            <input id={`edit-fuel-mileage-${log.id}`} type="number" min="0" value={mileageDisplay} onChange={(e) => setMileageDisplay(e.target.value)} required />
           </div>
           <div className="field-checkbox">
             <label>
@@ -88,7 +93,7 @@ export function FuelLogCard({ log }: { log: FuelLogDoc }) {
         <span className={styles.jobCardCost}>{fmtMoney(log.cost)}</span>
       </div>
       <div className={styles.jobCardMeta}>
-        {fmtDate(log.date)} · {log.mileage.toLocaleString()} miles · {perLitre}p/litre
+        {fmtDate(log.date)} · {formatDistance(log.mileage, distanceUnit)} · {perLitre}p/litre
       </div>
       <div className={styles.cardActions}>
         <button type="button" className={styles.iconBtn} onClick={() => setIsEditing(true)}>Edit</button>

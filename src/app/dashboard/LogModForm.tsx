@@ -4,35 +4,42 @@
 import { useState, useMemo } from 'react';
 import { MOD_GROUPS, MOD_LABELS } from '@/lib/tracker/modTypes';
 import { checkMileageConsistency, type HistoryPoint } from '@/lib/tracker/mileageCheck';
+import { convertMilesToDisplay, convertDisplayToMiles, distanceUnitLabel, type DistanceUnit } from '@/lib/tracker/unitFormat';
 import { useTrackerFormSubmit } from './useTrackerFormSubmit';
 import { MileageWarning } from './MileageWarning';
 
 export function LogModForm({
   initialMileage,
   mileageHistory,
+  distanceUnit,
 }: {
   initialMileage: number;
   mileageHistory: HistoryPoint[];
+  distanceUnit: DistanceUnit;
 }) {
   const [category, setCategory] = useState(MOD_GROUPS[0].mods[0]);
   const [name, setName] = useState('');
   const [cost, setCost] = useState('');
-  const [mileage, setMileage] = useState(String(initialMileage));
+  const [mileageDisplay, setMileageDisplay] = useState(
+    String(Math.round(convertMilesToDisplay(initialMileage, distanceUnit)))
+  );
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
   const [notes, setNotes] = useState('');
   const [mileageAcknowledged, setMileageAcknowledged] = useState(false);
   const { submit, submitting, error } = useTrackerFormSubmit('/api/tracker/mods');
 
+  const mileageInMiles = convertDisplayToMiles(Number(mileageDisplay), distanceUnit);
+
   const mileageResult = useMemo(
-    () => checkMileageConsistency(Number(mileage), date, mileageHistory, initialMileage),
-    [mileage, date, mileageHistory, initialMileage]
+    () => checkMileageConsistency(mileageInMiles, date, mileageHistory, initialMileage),
+    [mileageInMiles, date, mileageHistory, initialMileage]
   );
   const isBlocked = mileageResult.status === 'blocked' || (mileageResult.status === 'warning' && !mileageAcknowledged);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (isBlocked) return;
-    const ok = await submit({ category, name, cost: Number(cost), mileage: Number(mileage), date, notes });
+    const ok = await submit({ category, name, cost: Number(cost), mileage: Math.round(mileageInMiles), date, notes });
     if (ok) {
       setName('');
       setCost('');
@@ -40,6 +47,8 @@ export function LogModForm({
       setMileageAcknowledged(false);
     }
   }
+
+  const unitLabel = distanceUnitLabel(distanceUnit);
 
   return (
     <form className="ticket" onSubmit={handleSubmit}>
@@ -70,10 +79,10 @@ export function LogModForm({
           <input id="mod-cost" type="number" min="0" step="0.01" value={cost} onChange={(e) => setCost(e.target.value)} required />
         </div>
         <div className="field" style={{ marginTop: '0.9rem' }}>
-          <label htmlFor="mod-mileage">Mileage at the time</label>
-          <input id="mod-mileage" type="number" min="0" value={mileage} onChange={(e) => setMileage(e.target.value)} required />
+          <label htmlFor="mod-mileage">Mileage at the time ({unitLabel})</label>
+          <input id="mod-mileage" type="number" min="0" value={mileageDisplay} onChange={(e) => setMileageDisplay(e.target.value)} required />
         </div>
-        <MileageWarning result={mileageResult} acknowledged={mileageAcknowledged} onAcknowledgeChange={setMileageAcknowledged} />
+        <MileageWarning result={mileageResult} distanceUnit={distanceUnit} acknowledged={mileageAcknowledged} onAcknowledgeChange={setMileageAcknowledged} />
         <div className="field" style={{ marginTop: '0.9rem' }}>
           <label htmlFor="mod-notes">Notes (optional)</label>
           <textarea id="mod-notes" rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="e.g. fitted by Bob's Motorcycles" />

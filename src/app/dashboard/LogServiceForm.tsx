@@ -4,6 +4,7 @@
 import { useState, useMemo } from 'react';
 import { JOB_GROUPS, JOB_LABELS, JOB_REMINDER_DEFAULTS } from '@/lib/tracker/jobTypes';
 import { checkMileageConsistency, type HistoryPoint } from '@/lib/tracker/mileageCheck';
+import { convertMilesToDisplay, convertDisplayToMiles, distanceUnitLabel, type DistanceUnit } from '@/lib/tracker/unitFormat';
 import { useTrackerFormSubmit } from './useTrackerFormSubmit';
 import { MileageWarning } from './MileageWarning';
 
@@ -12,13 +13,17 @@ type RemindType = 'mileage' | 'months' | 'date';
 export function LogServiceForm({
   initialMileage,
   mileageHistory,
+  distanceUnit,
 }: {
   initialMileage: number;
   mileageHistory: HistoryPoint[];
+  distanceUnit: DistanceUnit;
 }) {
   const [jobType, setJobType] = useState('basic-service');
   const [cost, setCost] = useState('');
-  const [mileage, setMileage] = useState(String(initialMileage));
+  const [mileageDisplay, setMileageDisplay] = useState(
+    String(Math.round(convertMilesToDisplay(initialMileage, distanceUnit)))
+  );
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
   const [notes, setNotes] = useState('');
   const [mileageAcknowledged, setMileageAcknowledged] = useState(false);
@@ -28,9 +33,11 @@ export function LogServiceForm({
   const [remindDate, setRemindDate] = useState('');
   const { submit, submitting, error } = useTrackerFormSubmit('/api/tracker/services');
 
+  const mileageInMiles = convertDisplayToMiles(Number(mileageDisplay), distanceUnit);
+
   const mileageResult = useMemo(
-    () => checkMileageConsistency(Number(mileage), date, mileageHistory, initialMileage),
-    [mileage, date, mileageHistory, initialMileage]
+    () => checkMileageConsistency(mileageInMiles, date, mileageHistory, initialMileage),
+    [mileageInMiles, date, mileageHistory, initialMileage]
   );
   const isBlocked = mileageResult.status === 'blocked' || (mileageResult.status === 'warning' && !mileageAcknowledged);
 
@@ -60,7 +67,7 @@ export function LogServiceForm({
       date: string;
       notes: string;
       reminder?: { intervalType: RemindType; intervalValue?: number; exactDate?: string };
-    } = { jobType, cost: Number(cost), mileage: Number(mileage), date, notes };
+    } = { jobType, cost: Number(cost), mileage: Math.round(mileageInMiles), date, notes };
 
     if (remindChecked) {
       body.reminder =
@@ -78,6 +85,7 @@ export function LogServiceForm({
   }
 
   const remindDef = JOB_REMINDER_DEFAULTS[jobType];
+  const unitLabel = distanceUnitLabel(distanceUnit);
 
   return (
     <form className="ticket" onSubmit={handleSubmit}>
@@ -104,10 +112,10 @@ export function LogServiceForm({
           <input id="job-cost" type="number" min="0" step="0.01" value={cost} onChange={(e) => setCost(e.target.value)} required />
         </div>
         <div className="field" style={{ marginTop: '0.9rem' }}>
-          <label htmlFor="job-mileage">Mileage at the time</label>
-          <input id="job-mileage" type="number" min="0" value={mileage} onChange={(e) => setMileage(e.target.value)} required />
+          <label htmlFor="job-mileage">Mileage at the time ({unitLabel})</label>
+          <input id="job-mileage" type="number" min="0" value={mileageDisplay} onChange={(e) => setMileageDisplay(e.target.value)} required />
         </div>
-        <MileageWarning result={mileageResult} acknowledged={mileageAcknowledged} onAcknowledgeChange={setMileageAcknowledged} />
+        <MileageWarning result={mileageResult} distanceUnit={distanceUnit} acknowledged={mileageAcknowledged} onAcknowledgeChange={setMileageAcknowledged} />
         <div className="field" style={{ marginTop: '0.9rem' }}>
           <label htmlFor="job-notes">Notes (optional)</label>
           <textarea id="job-notes" rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="e.g. front only, done at Halfords Autocentre" />
