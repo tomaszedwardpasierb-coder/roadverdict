@@ -178,7 +178,7 @@ export default async function DashboardPage() {
         <div className={styles.chartCard}>
           <div className={styles.chartCardTitle}>Spend by category</div>
           {summary.grandTotal > 0 ? (
-            <SpendDonutChart servicingTotal={summary.servicingTotal} modsTotal={summary.modsTotal} fuelTotal={summary.fuelTotal} billsTotal={summary.billsTotal} />
+            <SpendDonutChart servicingTotal={summary.servicingTotal} modsTotal={summary.modsTotal} fuelTotal={summary.fuelTotal} billsTotal={summary.billsTotal} currency={currency} rates={rates} />
           ) : (
             <p className={styles.emptyNote}>Log something to see this fill in.</p>
           )}
@@ -287,19 +287,19 @@ export default async function DashboardPage() {
         </div>
         <div className={styles.chartCard}>
           <div className={styles.chartCardTitle}>Fuel cost over time</div>
-          {fuelCostPoints.length > 0 ? <FuelCostChart points={fuelCostPoints} /> : <p className={styles.emptyNote}>Log a fuel fill-up to see cost trends here.</p>}
+          {fuelCostPoints.length > 0 ? <FuelCostChart points={fuelCostPoints} currency={currency} rates={rates} /> : <p className={styles.emptyNote}>Log a fuel fill-up to see cost trends here.</p>}
         </div>
         <div className={styles.chartCard}>
           <div className={styles.chartCardTitle}>Servicing spend over time</div>
-          {serviceMonthly.length > 1 ? <CategorySpendChart data={serviceMonthly} color="#1a1a1a" /> : <p className={styles.emptyNote}>Check back once you&apos;ve logged servicing across a couple of months.</p>}
+          {serviceMonthly.length > 1 ? <CategorySpendChart data={serviceMonthly} color="#1a1a1a" currency={currency} rates={rates} /> : <p className={styles.emptyNote}>Check back once you&apos;ve logged servicing across a couple of months.</p>}
         </div>
         <div className={styles.chartCard}>
           <div className={styles.chartCardTitle}>Modifications spend over time</div>
-          {modsMonthly.length > 1 ? <CategorySpendChart data={modsMonthly} color="#e8a33d" /> : <p className={styles.emptyNote}>Check back once you&apos;ve logged mods across a couple of months.</p>}
+          {modsMonthly.length > 1 ? <CategorySpendChart data={modsMonthly} color="#e8a33d" currency={currency} rates={rates} /> : <p className={styles.emptyNote}>Check back once you&apos;ve logged mods across a couple of months.</p>}
         </div>
         <div className={styles.chartCard}>
           <div className={styles.chartCardTitle}>Insurance, tax & MOT spend over time</div>
-          {billsMonthly.length > 1 ? <CategorySpendChart data={billsMonthly} color="#6b5b95" /> : <p className={styles.emptyNote}>Check back once you&apos;ve logged bills across a couple of months.</p>}
+          {billsMonthly.length > 1 ? <CategorySpendChart data={billsMonthly} color="#6b5b95" currency={currency} rates={rates} /> : <p className={styles.emptyNote}>Check back once you&apos;ve logged bills across a couple of months.</p>}
         </div>
       </div>
     </>

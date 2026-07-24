@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { Line } from 'react-chartjs-2';
 import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Legend } from 'chart.js';
 import { RANGE_OPTIONS, filterByDateRange, type RangeValue } from '@/lib/tracker/dateRange';
+import { convertGbpToDisplay, CURRENCY_SYMBOLS, type Currency, type ExchangeRates } from '@/lib/tracker/currency';
 import styles from './dashboard.module.css';
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Legend);
@@ -18,9 +19,20 @@ function fmtDate(d: string): string {
   return new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
-export function FuelCostChart({ points }: { points: FuelPoint[] }) {
+export function FuelCostChart({
+  points,
+  currency,
+  rates,
+}: {
+  points: FuelPoint[];
+  currency: Currency;
+  rates: ExchangeRates | null;
+}) {
   const [range, setRange] = useState<RangeValue>('all');
-  const filtered = filterByDateRange(points, range).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+  const filtered = filterByDateRange(points, range).sort(
+    (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
+  );
+  const symbol = CURRENCY_SYMBOLS[currency];
 
   return (
     <div>
@@ -44,8 +56,8 @@ export function FuelCostChart({ points }: { points: FuelPoint[] }) {
             labels: filtered.map((p) => fmtDate(p.date)),
             datasets: [
               {
-                label: 'Fuel cost per fill-up (£)',
-                data: filtered.map((p) => Number(p.cost.toFixed(2))),
+                label: `Fuel cost per fill-up (${symbol})`,
+                data: filtered.map((p) => convertGbpToDisplay(p.cost, currency, rates)),
                 borderColor: '#3d8b6f',
                 backgroundColor: 'transparent',
                 borderWidth: 1.25,
@@ -57,8 +69,14 @@ export function FuelCostChart({ points }: { points: FuelPoint[] }) {
             ],
           }}
           options={{
-            plugins: { legend: { display: false } },
-            scales: { y: { grid: { color: '#00000012' } }, x: { grid: { display: false } } },
+            plugins: {
+              legend: { display: false },
+              tooltip: { callbacks: { label: (ctx) => `${symbol}${(ctx.parsed.y as number).toFixed(2)}` } },
+            },
+            scales: {
+              y: { grid: { color: '#00000012' }, ticks: { callback: (value) => `${symbol}${value}` } },
+              x: { grid: { display: false } },
+            },
             maintainAspectRatio: true,
           }}
         />

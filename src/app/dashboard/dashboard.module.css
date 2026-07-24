@@ -364,3 +364,17 @@
   .shell { flex-direction: column; }
   .content { height: auto; flex: 1; }
 }
+
+/* Fix: Budget widget and Spend-by-category were mismatched heights -
+   the donut grew to whatever size it wanted, dwarfing the budget card
+   next to it. Fixed, equal height for both. */
+.dashboardTwoCol .budgetCard,
+.dashboardTwoCol > .chartCard {
+  height: 340px;
+  display: flex;
+  flex-direction: column;
+}
+.dashboardTwoCol .chartCard > div:last-child {
+  flex: 1;
+  min-height: 0;
+}
