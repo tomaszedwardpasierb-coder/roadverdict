@@ -356,3 +356,11 @@
     display: block; position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 35;
   }
 }
+
+/* Fix: on mobile, .shell must stack vertically (top bar above content) -
+   it was still using the default row direction, squeezing content
+   sideways instead of showing it below the bike-info bar. */
+@media (max-width: 900px) {
+  .shell { flex-direction: column; }
+  .content { height: auto; flex: 1; }
+}
