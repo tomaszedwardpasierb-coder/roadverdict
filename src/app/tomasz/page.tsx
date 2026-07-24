@@ -9,6 +9,9 @@ import {
   getTotalUserCount,
   getMagicLinkRequests,
   getRecentSessions,
+  getServerHealth,
+  getCosmosContainerInfo,
+  getDetailedCounts,
 } from '@/lib/admin/stats';
 import styles from './tomasz.module.css';
 import { RunCronButton } from './RunCronButton';
@@ -26,20 +29,41 @@ function fmtDate(d: string): string {
   });
 }
 
+function fmtUptime(seconds: number): string {
+  const days = Math.floor(seconds / 86400);
+  const hours = Math.floor((seconds % 86400) / 3600);
+  const mins = Math.floor((seconds % 3600) / 60);
+  if (days > 0) return `${days}d ${hours}h ${mins}m`;
+  if (hours > 0) return `${hours}h ${mins}m`;
+  return `${mins}m`;
+}
+
 export default async function AdminDashboardPage() {
   const isAdmin = await getAdminSession();
   if (!isAdmin) redirect('/tomasz/login');
 
-  const [dbStats, activeSessions, fuelStatus, reminderStatus, totalUsers, magicLinkRequests, recentSessions] =
-    await Promise.all([
-      getDbStats(),
-      getActiveSessionCount(),
-      getFuelPriceStatus(),
-      getReminderCronStatus(),
-      getTotalUserCount(),
-      getMagicLinkRequests(),
-      getRecentSessions(50),
-    ]);
+  const [
+    dbStats,
+    activeSessions,
+    fuelStatus,
+    reminderStatus,
+    totalUsers,
+    magicLinkRequests,
+    recentSessions,
+    cosmosInfo,
+    detailedCounts,
+  ] = await Promise.all([
+    getDbStats(),
+    getActiveSessionCount(),
+    getFuelPriceStatus(),
+    getReminderCronStatus(),
+    getTotalUserCount(),
+    getMagicLinkRequests(),
+    getRecentSessions(50),
+    getCosmosContainerInfo(),
+    getDetailedCounts(),
+  ]);
+  const health = getServerHealth();
 
   return (
     <div className={styles.wrapper}>
@@ -48,14 +72,31 @@ export default async function AdminDashboardPage() {
         <AdminLogoutButton />
       </div>
 
+      <h2 className={styles.sectionHeading}>Server & hosting</h2>
+      <div className={styles.statusGrid}>
+        <div className={styles.statusCard}>
+          <div className={styles.statusTitle}>This instance</div>
+          <p>Site: {health.siteName}</p>
+          <p>Host: {health.hostname}</p>
+          <p>Region: {health.region}</p>
+          <p>Resource group: {health.resourceGroup}</p>
+          <p>Instance ID: {health.instanceId}</p>
+        </div>
+        <div className={styles.statusCard}>
+          <div className={styles.statusTitle}>Runtime health</div>
+          <p>Uptime: {fmtUptime(health.uptimeSeconds)}</p>
+          <p>Node version: {health.nodeVersion}</p>
+          <p>Environment: {health.nodeEnv}</p>
+          <p>Memory: {health.memoryUsedMB}MB / {health.memoryTotalMB}MB</p>
+        </div>
+      </div>
+
       <h2 className={styles.sectionHeading}>Scheduled jobs</h2>
       <div className={styles.statusGrid}>
         <div className={styles.statusCard}>
           <div className={styles.statusTitle}>Fuel price (weekly)</div>
           {fuelStatus ? (
-            <p>
-              Week commencing {fuelStatus.weekCommencing} · {fuelStatus.pricePenceLitre}p/litre
-            </p>
+            <p>Week commencing {fuelStatus.weekCommencing} · {fuelStatus.pricePenceLitre}p/litre</p>
           ) : (
             <p className={styles.warn}>No record found - has this ever run successfully?</p>
           )}
@@ -85,6 +126,16 @@ export default async function AdminDashboardPage() {
           <div className={styles.statusTitle}>Active sessions right now</div>
           <p style={{ fontSize: '1.6rem', fontFamily: 'var(--font-display)' }}>{activeSessions}</p>
         </div>
+        <div className={styles.statusCard}>
+          <div className={styles.statusTitle}>Magic links</div>
+          <p>Used: {detailedCounts.usedMagicLinks}</p>
+          <p>Requested but never clicked: {detailedCounts.unusedMagicLinks}</p>
+        </div>
+        <div className={styles.statusCard}>
+          <div className={styles.statusTitle}>Sessions</div>
+          <p>Active: {activeSessions}</p>
+          <p>Expired (still stored): {detailedCounts.expiredSessions}</p>
+        </div>
       </div>
 
       <h2 className={styles.sectionHeading}>Magic link requests (every email, ever - including ones that never completed sign-in)</h2>
@@ -113,8 +164,8 @@ export default async function AdminDashboardPage() {
 
       <h2 className={styles.sectionHeading}>Recent logins (last 50)</h2>
       <p className={styles.warn} style={{ marginBottom: '0.6rem' }}>
-        IP capture was only just added - it will show as &quot;-&quot; for any login before today,
-        genuinely absent, not a display bug.
+        IP capture was only added partway through development - it will show as &quot;-&quot; for any login before
+        that point, genuinely absent, not a display bug.
       </p>
       {recentSessions.length === 0 ? (
         <p className={styles.warn}>No sessions recorded.</p>
@@ -140,6 +191,12 @@ export default async function AdminDashboardPage() {
       )}
 
       <h2 className={styles.sectionHeading}>Database</h2>
+      {cosmosInfo && (
+        <p style={{ marginBottom: '0.6rem' }}>
+          Partition key: <code>{cosmosInfo.partitionKeyPath}</code> · Indexing: {cosmosInfo.indexingMode}
+          {cosmosInfo.defaultTtl != null && ` · Default TTL: ${cosmosInfo.defaultTtl}s`}
+        </p>
+      )}
       <table className={styles.table}>
         <thead>
           <tr>

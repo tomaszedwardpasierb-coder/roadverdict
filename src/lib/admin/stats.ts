@@ -106,3 +106,87 @@ export async function getRecentSessions(limit = 50): Promise<RecentSession[]> {
     .fetchAll();
   return resources;
 }
+
+export interface ServerHealth {
+  uptimeSeconds: number;
+  nodeVersion: string;
+  memoryUsedMB: number;
+  memoryTotalMB: number;
+  siteName: string;
+  hostname: string;
+  region: string;
+  resourceGroup: string;
+  instanceId: string;
+  nodeEnv: string;
+}
+
+// Pulled from Node's own process APIs plus environment variables Azure
+// App Service automatically injects into every instance - no new
+// credentials or API calls needed for any of this.
+export function getServerHealth(): ServerHealth {
+  const mem = process.memoryUsage();
+  return {
+    uptimeSeconds: Math.floor(process.uptime()),
+    nodeVersion: process.version,
+    memoryUsedMB: Math.round(mem.heapUsed / 1024 / 1024),
+    memoryTotalMB: Math.round(mem.heapTotal / 1024 / 1024),
+    siteName: process.env.WEBSITE_SITE_NAME ?? "unknown",
+    hostname: process.env.WEBSITE_HOSTNAME ?? "unknown",
+    region: process.env.REGION_NAME ?? "unknown",
+    resourceGroup: process.env.WEBSITE_RESOURCE_GROUP ?? "unknown",
+    instanceId: (process.env.WEBSITE_INSTANCE_ID ?? "unknown").slice(0, 12),
+    nodeEnv: process.env.NODE_ENV ?? "unknown",
+  };
+}
+
+export interface CosmosContainerInfo {
+  partitionKeyPath: string;
+  defaultTtl: number | null;
+  indexingMode: string;
+}
+
+// Container-level metadata the Cosmos SDK already has access to via the
+// same connection every other query uses - not a new API surface.
+export async function getCosmosContainerInfo(): Promise<CosmosContainerInfo | null> {
+  try {
+    const container = getContainer();
+    const { resource } = await container.read();
+    if (!resource) return null;
+    return {
+      partitionKeyPath: resource.partitionKey?.paths?.[0] ?? "unknown",
+      defaultTtl: resource.defaultTtl ?? null,
+      indexingMode: resource.indexingPolicy?.indexingMode ?? "unknown",
+    };
+  } catch {
+    return null;
+  }
+}
+
+export interface DetailedCounts {
+  expiredSessions: number;
+  usedMagicLinks: number;
+  unusedMagicLinks: number;
+}
+
+export async function getDetailedCounts(): Promise<DetailedCounts> {
+  const container = getContainer();
+  const now = new Date().toISOString();
+  const [expiredSessions, usedMagicLinks, unusedMagicLinks] = await Promise.all([
+    container.items
+      .query<number>({
+        query: "SELECT VALUE COUNT(1) FROM c WHERE c.type = 'session' AND c.expiresAt <= @now",
+        parameters: [{ name: "@now", value: now }],
+      })
+      .fetchAll()
+      .then((r) => r.resources[0] ?? 0),
+    container.items
+      .query<number>({ query: "SELECT VALUE COUNT(1) FROM c WHERE c.type = 'magicLink' AND c.used = true" })
+      .fetchAll()
+      .then((r) => r.resources[0] ?? 0),
+    container.items
+      .query<number>({ query: "SELECT VALUE COUNT(1) FROM c WHERE c.type = 'magicLink' AND c.used = false" })
+      .fetchAll()
+      .then((r) => r.resources[0] ?? 0),
+  ]);
+  return { expiredSessions, usedMagicLinks, unusedMagicLinks };
+}
