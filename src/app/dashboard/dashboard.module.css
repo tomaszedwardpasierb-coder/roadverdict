@@ -365,18 +365,27 @@
   .content { height: auto; flex: 1; }
 }
 
-/* Fix: Budget widget and Spend-by-category were mismatched heights -
-   the donut grew to whatever size it wanted, dwarfing the budget card
-   next to it. Fixed, equal height for both. */
-.dashboardTwoCol .budgetCard,
-.dashboardTwoCol > .chartCard {
+/* Fix: only the Budget/Donut row needs the fixed equal-height square
+   treatment - applying it to every .dashboardTwoCol chart card also
+   hit the Mileage/Recent-Activity row, where the activity table
+   naturally needs more room and was overflowing past its box,
+   visually overlapping whatever came after it. */
+.equalHeightRow .budgetCard,
+.equalHeightRow > .chartCard {
   height: 340px;
   display: flex;
   flex-direction: column;
 }
-.dashboardTwoCol .chartCard > div:last-child {
+.equalHeightRow .chartCard > div:last-child {
   flex: 1;
   min-height: 0;
+}
+
+/* Safety net for every other two-column row: never silently overflow
+   onto the next section again - scroll internally instead. */
+.dashboardTwoCol > .chartCard {
+  max-height: 460px;
+  overflow-y: auto;
 }
 
 

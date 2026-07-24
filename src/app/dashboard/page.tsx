@@ -173,7 +173,7 @@ export default async function DashboardPage() {
         </div>
       </div>
 
-      <div className={styles.dashboardTwoCol}>
+      <div className={`${styles.dashboardTwoCol} ${styles.equalHeightRow}`}>
         <BudgetWidget yearSpend={yearSpend} currentYear={currentYear} initialBudget={bike.annualBudget} currency={currency} rates={rates} />
         <div className={styles.chartCard}>
           <div className={styles.chartCardTitle}>Spend by category</div>
