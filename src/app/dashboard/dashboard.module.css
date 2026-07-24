@@ -217,3 +217,78 @@
 .dashboardTopBar { display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; flex-wrap: wrap; }
 .mileageEditForm { display: flex; gap: 0.4rem; align-items: center; flex-wrap: wrap; }
 .mileageEditInput { width: 110px; padding: 0.4rem 0.5rem; font-family: var(--font-mono); border: 1px solid var(--border); border-radius: 4px; }
+
+/* --- Sidebar shell layout: replaces the old tab-bar dashboard structure --- */
+.shell {
+  display: flex;
+  min-height: 100vh;
+  background: var(--stone);
+}
+
+.sidebar {
+  width: 260px;
+  flex-shrink: 0;
+  background: var(--paper);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  padding: 1.5rem 1.2rem;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  overflow-y: auto;
+}
+
+.sidebarLogo { margin-bottom: 2rem; }
+.sidebarLogo img { width: 140px; display: block; }
+
+.sidebarNav { display: flex; flex-direction: column; gap: 0.2rem; flex: 1; }
+
+.sidebarNavItem {
+  display: flex; align-items: center; gap: 0.7rem;
+  padding: 0.65rem 0.8rem; border-radius: 6px;
+  font-family: var(--font-display); font-size: 0.9rem;
+  color: var(--ink); background: none; border: none;
+  text-align: left; cursor: pointer; width: 100%;
+}
+.sidebarNavItem:hover { background: var(--stone); }
+.sidebarNavItemActive { background: var(--amber); color: var(--asphalt); font-weight: 600; }
+.sidebarNavItemActive:hover { background: var(--amber); }
+
+.sidebarBikeCard { border-top: 1px solid var(--border); padding-top: 1rem; margin-top: 1rem; font-size: 0.85rem; }
+.sidebarBikeLabel { font-family: var(--font-mono); font-size: 0.65rem; text-transform: uppercase; color: var(--ink-soft); margin-bottom: 0.3rem; }
+.sidebarBikeName { font-weight: 600; }
+.sidebarBikeMeta { color: var(--ink-soft); font-size: 0.8rem; margin-bottom: 0.6rem; }
+
+.sidebarUserFooter { border-top: 1px solid var(--border); padding-top: 1rem; margin-top: 1rem; display: flex; align-items: center; gap: 0.6rem; }
+.sidebarUserAvatar { width: 28px; height: 28px; border-radius: 50%; background: var(--asphalt); color: var(--paper); display: flex; align-items: center; justify-content: center; font-size: 0.7rem; font-weight: 600; flex-shrink: 0; }
+.sidebarUserEmail { font-size: 0.75rem; color: var(--ink-soft); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Content area - deliberately NO max-width, fills whatever space the sidebar doesn't take */
+.content { flex: 1; min-width: 0; padding: 2.5rem 3rem 4rem; }
+
+.mobileBottomNav { display: none; }
+
+@media (max-width: 900px) {
+  .sidebar { display: none; }
+  .content { padding: 1.2rem 1rem 5rem; }
+  .mobileBottomNav {
+    display: flex; position: fixed; bottom: 0; left: 0; right: 0;
+    background: var(--paper); border-top: 1px solid var(--border);
+    justify-content: space-around; padding: 0.6rem 0; z-index: 50;
+  }
+}
+
+.dashboardStatsGrid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 0.8rem; margin-bottom: 1.2rem; }
+.dashboardTwoCol { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem; }
+@media (max-width: 1100px) {
+  .dashboardStatsGrid { grid-template-columns: repeat(2, 1fr); }
+  .dashboardTwoCol { grid-template-columns: 1fr; }
+}
+
+.recentActivityTable { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+.recentActivityTable th, .recentActivityTable td { text-align: left; padding: 0.5rem 0.6rem; border-bottom: 1px solid var(--border); }
+.recentActivityTable th { font-family: var(--font-mono); font-size: 0.65rem; text-transform: uppercase; color: var(--ink-soft); }
+
+.reportsGrid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+@media (max-width: 1100px) { .reportsGrid { grid-template-columns: 1fr; } }
