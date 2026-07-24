@@ -27,6 +27,12 @@ const MOBILE_NAV_ITEMS: { key: Section; label: string; icon: string }[] = [
   { key: 'mods', label: 'Mods', icon: '⚙️' },
 ];
 
+const MORE_ITEMS: { key: Section; label: string; icon: string }[] = [
+  { key: 'bills', label: 'Bills', icon: '📄' },
+  { key: 'reminders', label: 'Reminders', icon: '🔔' },
+  { key: 'reports', label: 'Reports', icon: '📊' },
+];
+
 interface Props {
   bikeName: string;
   bikeYear: number;
@@ -57,6 +63,7 @@ export function DashboardShell({
   reportsContent,
 }: Props) {
   const [active, setActive] = useState<Section>('dashboard');
+  const [showMore, setShowMore] = useState(false);
 
   const contentMap: Record<Section, ReactNode> = {
     dashboard: dashboardContent,
@@ -67,6 +74,8 @@ export function DashboardShell({
     reminders: remindersContent,
     reports: reportsContent,
   };
+
+  const isMoreActive = active === 'bills' || active === 'reminders' || active === 'reports';
 
   return (
     <div className={styles.shell}>
@@ -109,6 +118,16 @@ export function DashboardShell({
         </div>
       </aside>
 
+      <div className={styles.mobileTopBar}>
+        <div className={styles.mobileTopBarBike}>
+          <strong>{bikeName}</strong>
+          <span>
+            {bikeYear} · {formatDistance(currentMileage, distanceUnit)}
+          </span>
+        </div>
+        <UpdateMileageButton currentMileage={currentMileage} distanceUnit={distanceUnit} />
+      </div>
+
       <div className={styles.content}>{contentMap[active]}</div>
 
       <nav className={styles.mobileBottomNav}>
@@ -116,44 +135,60 @@ export function DashboardShell({
           <button
             key={item.key}
             type="button"
-            onClick={() => setActive(item.key)}
+            onClick={() => {
+              setActive(item.key);
+              setShowMore(false);
+            }}
             style={{
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              gap: '0.2rem',
-              background: 'none',
-              border: 'none',
-              fontSize: '0.65rem',
+              display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.2rem',
+              background: 'none', border: 'none', fontSize: '0.65rem',
               color: active === item.key ? 'var(--amber-ink)' : 'var(--ink-soft)',
             }}
           >
-            <span style={{ fontSize: '1.1rem' }} aria-hidden="true">
-              {item.icon}
-            </span>
+            <span style={{ fontSize: '1.1rem' }} aria-hidden="true">{item.icon}</span>
             {item.label}
           </button>
         ))}
         <button
           type="button"
-          onClick={() => setActive('reports')}
+          onClick={() => setShowMore(true)}
           style={{
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            gap: '0.2rem',
-            background: 'none',
-            border: 'none',
-            fontSize: '0.65rem',
-            color: active === 'reports' ? 'var(--amber-ink)' : 'var(--ink-soft)',
+            display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.2rem',
+            background: 'none', border: 'none', fontSize: '0.65rem',
+            color: isMoreActive || showMore ? 'var(--amber-ink)' : 'var(--ink-soft)',
           }}
         >
-          <span style={{ fontSize: '1.1rem' }} aria-hidden="true">
-            ⋯
-          </span>
+          <span style={{ fontSize: '1.1rem' }} aria-hidden="true">⋯</span>
           More
         </button>
       </nav>
+
+      {showMore && (
+        <>
+          <div className={styles.mobileMoreSheetBackdrop} onClick={() => setShowMore(false)} />
+          <div className={styles.mobileMoreSheet}>
+            {MORE_ITEMS.map((item) => (
+              <button
+                key={item.key}
+                type="button"
+                className={styles.mobileMoreSheetItem}
+                onClick={() => {
+                  setActive(item.key);
+                  setShowMore(false);
+                }}
+              >
+                <span aria-hidden="true">{item.icon}</span> {item.label}
+              </button>
+            ))}
+            <div style={{ marginTop: '0.8rem', paddingTop: '0.8rem', borderTop: '1px solid var(--border)', fontSize: '0.8rem', color: 'var(--ink-soft)' }}>
+              Signed in as {userEmail}
+            </div>
+            <div style={{ marginTop: '0.5rem' }}>
+              <LogoutButton />
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }
