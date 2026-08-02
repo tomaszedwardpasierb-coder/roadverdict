@@ -8,6 +8,7 @@ export interface ShareLinkDoc {
   pk: string;
   type: "shareLink";
   email: string;
+  bikeId: string;
   createdAt: string;
 }
 
@@ -16,9 +17,11 @@ function generateToken(): string {
 }
 
 // Reuses the same token every time once created, rather than generating
-// a new one per request - so a link shared once keeps working.
-export async function getOrCreateShareToken(email: string): Promise<string> {
-  const bike = await getBike(email);
+// a new one per request - so a link shared once keeps working. Scoped to
+// one specific bike now, not just the account, since an account can have
+// more than one.
+export async function getOrCreateShareToken(email: string, bikeId: string): Promise<string> {
+  const bike = await getBike(email, bikeId);
   if (bike?.shareToken) return bike.shareToken;
 
   const token = generateToken();
@@ -28,20 +31,24 @@ export async function getOrCreateShareToken(email: string): Promise<string> {
     pk: token,
     type: "shareLink",
     email,
+    bikeId,
     createdAt: new Date().toISOString(),
   };
   await container.items.upsert(doc);
-  await updateBikeShareToken(email, token);
+  await updateBikeShareToken(email, bikeId, token);
   return token;
 }
 
 // Cheap point-read, not a search - the token itself is both the id and
 // the partition key, so resolving it never needs a cross-partition query.
-export async function resolveShareToken(token: string): Promise<string | null> {
+// Returns both email and bikeId now, so the report page knows exactly
+// which bike this link was generated for, not just which account.
+export async function resolveShareToken(token: string): Promise<{ email: string; bikeId: string } | null> {
   try {
     const container = getContainer();
     const { resource } = await container.item(token, token).read<ShareLinkDoc>();
-    return resource?.email ?? null;
+    if (!resource) return null;
+    return { email: resource.email, bikeId: resource.bikeId };
   } catch {
     return null;
   }

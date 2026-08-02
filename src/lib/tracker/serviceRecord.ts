@@ -11,13 +11,13 @@ export interface ServiceRecordDoc extends TrackerDocBase {
 
 export async function createServiceRecord(
   email: string,
-  data: { jobType: string; cost: number; mileage: number; date: string; notes: string }
+  data: { bikeId: string; jobType: string; cost: number; mileage: number; date: string; notes: string }
 ): Promise<ServiceRecordDoc> {
   return createTrackerDoc<ServiceRecordDoc>(email, "service", "serviceRecord", data);
 }
 
-export async function getServiceRecords(email: string): Promise<ServiceRecordDoc[]> {
-  return queryTrackerDocs<ServiceRecordDoc>(email, "serviceRecord");
+export async function getServiceRecords(email: string, bikeId: string): Promise<ServiceRecordDoc[]> {
+  return queryTrackerDocs<ServiceRecordDoc>(email, "serviceRecord", bikeId);
 }
 
 export async function updateServiceRecord(

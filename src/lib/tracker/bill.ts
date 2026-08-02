@@ -10,13 +10,13 @@ export interface BillDoc extends TrackerDocBase {
 
 export async function createBill(
   email: string,
-  data: { billType: string; cost: number; date: string; notes: string }
+  data: { bikeId: string; billType: string; cost: number; date: string; notes: string }
 ): Promise<BillDoc> {
   return createTrackerDoc<BillDoc>(email, "bill", "bill", data);
 }
 
-export async function getBills(email: string): Promise<BillDoc[]> {
-  return queryTrackerDocs<BillDoc>(email, "bill");
+export async function getBills(email: string, bikeId: string): Promise<BillDoc[]> {
+  return queryTrackerDocs<BillDoc>(email, "bill", bikeId);
 }
 
 export async function updateBill(

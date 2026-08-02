@@ -5,7 +5,7 @@ import { getServiceRecords } from "@/lib/tracker/serviceRecord";
 import { getFuelLogs } from "@/lib/tracker/fuelLog";
 import { getMods } from "@/lib/tracker/mod";
 import { getBills } from "@/lib/tracker/bill";
-import { getBike } from "@/lib/tracker/bike";
+import { getPrimaryBike } from "@/lib/tracker/bike";
 import { JOB_LABELS } from "@/lib/tracker/jobTypes";
 import { MOD_LABELS } from "@/lib/tracker/modTypes";
 import { BILL_LABELS } from "@/lib/tracker/billTypes";
@@ -26,12 +26,16 @@ export async function GET() {
     return NextResponse.json({ error: "Not signed in." }, { status: 401 });
   }
 
-  const bike = await getBike(session.email);
+  const bike = await getPrimaryBike(session.email);
+  if (!bike) {
+    return NextResponse.json({ error: "No bike found for this account." }, { status: 404 });
+  }
+
   const [records, fuelLogs, mods, bills] = await Promise.all([
-    getServiceRecords(session.email),
-    getFuelLogs(session.email),
-    getMods(session.email),
-    getBills(session.email),
+    getServiceRecords(session.email, bike.id),
+    getFuelLogs(session.email, bike.id),
+    getMods(session.email, bike.id),
+    getBills(session.email, bike.id),
   ]);
 
   interface Row {

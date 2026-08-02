@@ -70,6 +70,7 @@ export interface BikeIdBackfillStatus {
   lastRunAt: string;
   bikesProcessed: number;
   docsPatched: number;
+  shareLinksPatched?: number;
 }
 
 export async function getBikeIdBackfillStatus(): Promise<BikeIdBackfillStatus | null> {

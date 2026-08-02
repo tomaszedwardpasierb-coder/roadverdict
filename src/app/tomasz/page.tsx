@@ -131,6 +131,7 @@ export default async function AdminDashboardPage() {
             <p>
               Last run {fmtDate(bikeIdBackfillStatus.lastRunAt)} · {bikeIdBackfillStatus.bikesProcessed} bike(s) ·{' '}
               {bikeIdBackfillStatus.docsPatched} record(s) patched
+              {bikeIdBackfillStatus.shareLinksPatched != null && ` · ${bikeIdBackfillStatus.shareLinksPatched} share link(s) patched`}
             </p>
           ) : (
             <p className={styles.warn}>Not run yet.</p>

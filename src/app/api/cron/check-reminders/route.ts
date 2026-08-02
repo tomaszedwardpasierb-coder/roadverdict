@@ -26,7 +26,8 @@ export async function POST(req: NextRequest) {
       const email = reminder.pk;
       let currentMileage = 0;
       if (reminder.intervalType === "mileage") {
-        const bike = await getBike(email);
+        if (!reminder.bikeId) continue; // pre-migration data shouldn't exist anymore, but skip defensively rather than crash
+        const bike = await getBike(email, reminder.bikeId);
         if (!bike) continue;
         currentMileage = bike.currentMileage;
       }

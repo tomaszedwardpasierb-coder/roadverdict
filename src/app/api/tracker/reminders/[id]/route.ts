@@ -2,7 +2,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/session";
 import { updateReminder, deleteReminder } from "@/lib/tracker/reminder";
-import { getBike } from "@/lib/tracker/bike";
+import { getPrimaryBike } from "@/lib/tracker/bike";
 
 export const dynamic = "force-dynamic";
 
@@ -20,7 +20,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     return NextResponse.json({ error: "Reminder not found." }, { status: 404 });
   }
 
-  const bike = await getBike(session.email);
+  const bike = await getPrimaryBike(session.email);
   const reminder = await updateReminder(session.email, id, {
     baseMileage: bike?.currentMileage,
     date: new Date().toISOString().slice(0, 10),

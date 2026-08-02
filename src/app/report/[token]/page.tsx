@@ -21,16 +21,17 @@ function fmtDate(d: string): string {
 }
 
 export default async function SaleReportPage({ params }: { params: { token: string } }) {
-  const email = await resolveShareToken(params.token);
-  if (!email) notFound();
+  const resolved = await resolveShareToken(params.token);
+  if (!resolved) notFound();
+  const { email, bikeId } = resolved;
 
-  const bike = await getBike(email);
+  const bike = await getBike(email, bikeId);
   if (!bike) notFound();
 
   const [records, mods, bills] = await Promise.all([
-    getServiceRecords(email),
-    getMods(email),
-    getBills(email),
+    getServiceRecords(email, bikeId),
+    getMods(email, bikeId),
+    getBills(email, bikeId),
   ]);
 
   interface Row {

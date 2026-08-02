@@ -11,13 +11,13 @@ export interface FuelLogDoc extends TrackerDocBase {
 
 export async function createFuelLog(
   email: string,
-  data: { litres: number; cost: number; mileage: number; date: string; filledToFull: boolean }
+  data: { bikeId: string; litres: number; cost: number; mileage: number; date: string; filledToFull: boolean }
 ): Promise<FuelLogDoc> {
   return createTrackerDoc<FuelLogDoc>(email, "fuel", "fuelLog", data);
 }
 
-export async function getFuelLogs(email: string): Promise<FuelLogDoc[]> {
-  return queryTrackerDocs<FuelLogDoc>(email, "fuelLog");
+export async function getFuelLogs(email: string, bikeId: string): Promise<FuelLogDoc[]> {
+  return queryTrackerDocs<FuelLogDoc>(email, "fuelLog", bikeId);
 }
 
 export async function updateFuelLog(

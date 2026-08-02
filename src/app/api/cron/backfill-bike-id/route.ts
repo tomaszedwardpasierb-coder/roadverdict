@@ -65,6 +65,30 @@ export async function POST(req: NextRequest) {
       perBike.push({ email: bike.pk, bikeId: bike.id, patched: patchedForThisBike });
     }
 
+    // shareLink docs are partitioned by token, not email - a completely
+    // different partition scheme from every other tracker doc - so the
+    // per-bike loop above never reaches them. Handled separately here:
+    // cross-partition scan for the (hopefully small) number of share
+    // links created before this migration existed, each patched using
+    // the same account's primary bike.
+    let shareLinksPatched = 0;
+    const { resources: shareLinks } = await container.items
+      .query<{ id: string; pk: string; email: string }>({
+        query: "SELECT * FROM c WHERE c.type = 'shareLink' AND NOT IS_DEFINED(c.bikeId)",
+      })
+      .fetchAll();
+
+    for (const link of shareLinks) {
+      const linkBikes = await container.items
+        .query<BikeDoc>({ query: "SELECT * FROM c WHERE c.type = 'bike' ORDER BY c.dateAdded ASC" }, { partitionKey: link.email })
+        .fetchAll()
+        .then((r) => r.resources);
+      const primaryBike = linkBikes[0];
+      if (!primaryBike) continue;
+      await container.items.upsert({ ...link, bikeId: primaryBike.id });
+      shareLinksPatched++;
+    }
+
     await container.items.upsert({
       id: "cronStatus::backfillBikeId",
       pk: "system",
@@ -72,9 +96,10 @@ export async function POST(req: NextRequest) {
       lastRunAt: new Date().toISOString(),
       bikesProcessed,
       docsPatched,
+      shareLinksPatched,
     });
 
-    return NextResponse.json({ ok: true, bikesProcessed, docsPatched, perBike });
+    return NextResponse.json({ ok: true, bikesProcessed, docsPatched, shareLinksPatched, perBike });
   } catch (err) {
     return NextResponse.json(
       { error: "Unexpected error running bike-id backfill", detail: err instanceof Error ? err.message : String(err) },

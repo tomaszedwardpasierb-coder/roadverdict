@@ -12,13 +12,13 @@ export interface ModDoc extends TrackerDocBase {
 
 export async function createMod(
   email: string,
-  data: { category: string; name: string; cost: number; mileage: number; date: string; notes: string }
+  data: { bikeId: string; category: string; name: string; cost: number; mileage: number; date: string; notes: string }
 ): Promise<ModDoc> {
   return createTrackerDoc<ModDoc>(email, "mod", "mod", data);
 }
 
-export async function getMods(email: string): Promise<ModDoc[]> {
-  return queryTrackerDocs<ModDoc>(email, "mod");
+export async function getMods(email: string, bikeId: string): Promise<ModDoc[]> {
+  return queryTrackerDocs<ModDoc>(email, "mod", bikeId);
 }
 
 export async function updateMod(

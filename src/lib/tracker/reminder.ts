@@ -16,6 +16,7 @@ export interface ReminderDoc extends TrackerDocBase {
 export async function createReminder(
   email: string,
   data: {
+    bikeId: string;
     name: string;
     intervalType: "mileage" | "months" | "date";
     intervalValue?: number;
@@ -28,8 +29,8 @@ export async function createReminder(
   return createTrackerDoc<ReminderDoc>(email, "reminder", "reminder", { ...data, notifiedAt: null });
 }
 
-export async function getReminders(email: string): Promise<ReminderDoc[]> {
-  return queryTrackerDocs<ReminderDoc>(email, "reminder");
+export async function getReminders(email: string, bikeId: string): Promise<ReminderDoc[]> {
+  return queryTrackerDocs<ReminderDoc>(email, "reminder", bikeId);
 }
 
 // Resetting also clears notifiedAt, so if it crosses back into "overdue"
@@ -49,9 +50,9 @@ export async function deleteReminder(email: string, id: string): Promise<void> {
 // Replaces any existing reminder tied to the same job/bill type - used
 // when logging a new service or bill that already has an active
 // reminder, so there's never a duplicate for the same thing.
-export async function deleteRemindersBySourceKey(email: string, sourceKey: string): Promise<void> {
+export async function deleteRemindersBySourceKey(email: string, bikeId: string, sourceKey: string): Promise<void> {
   const container = getContainer();
-  const existing = await queryTrackerDocs<ReminderDoc>(email, "reminder");
+  const existing = await queryTrackerDocs<ReminderDoc>(email, "reminder", bikeId);
   const toDelete = existing.filter((r) => r.sourceKey === sourceKey);
   for (const r of toDelete) {
     await container.item(r.id, email).delete();

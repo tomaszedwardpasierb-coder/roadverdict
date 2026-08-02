@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/session";
 import { createBill } from "@/lib/tracker/bill";
 import { createReminder, deleteRemindersBySourceKey } from "@/lib/tracker/reminder";
-import { getBike } from "@/lib/tracker/bike";
+import { getPrimaryBike } from "@/lib/tracker/bike";
 import { BILL_LABELS } from "@/lib/tracker/billTypes";
 
 export const dynamic = "force-dynamic";
@@ -33,18 +33,23 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Please fill in all required fields." }, { status: 400 });
   }
 
-  const bill = await createBill(session.email, { billType, cost, date, notes: notes ?? "" });
+  const bike = await getPrimaryBike(session.email);
+  if (!bike) {
+    return NextResponse.json({ error: "No bike found for this account." }, { status: 404 });
+  }
+
+  const bill = await createBill(session.email, { bikeId: bike.id, billType, cost, date, notes: notes ?? "" });
 
   if (reminder) {
     const sourceKey = `bill:${billType}`;
-    await deleteRemindersBySourceKey(session.email, sourceKey);
-    const bike = await getBike(session.email);
+    await deleteRemindersBySourceKey(session.email, bike.id, sourceKey);
     await createReminder(session.email, {
+      bikeId: bike.id,
       name: `${BILL_LABELS[billType] ?? billType} renewal`,
       intervalType: reminder.intervalType,
       intervalValue: reminder.intervalValue,
       exactDate: reminder.exactDate,
-      baseMileage: bike?.currentMileage,
+      baseMileage: bike.currentMileage,
       date,
       sourceKey,
     });

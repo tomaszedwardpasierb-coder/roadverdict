@@ -2,7 +2,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/session";
 import { createFuelLog } from "@/lib/tracker/fuelLog";
-import { getBike, updateBikeMileage } from "@/lib/tracker/bike";
+import { getPrimaryBike, updateBikeMileage } from "@/lib/tracker/bike";
 
 export const dynamic = "force-dynamic";
 
@@ -31,7 +31,13 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Please fill in all required fields." }, { status: 400 });
   }
 
+  const bike = await getPrimaryBike(session.email);
+  if (!bike) {
+    return NextResponse.json({ error: "No bike found for this account." }, { status: 404 });
+  }
+
   const log = await createFuelLog(session.email, {
+    bikeId: bike.id,
     litres,
     cost,
     mileage,
@@ -39,9 +45,8 @@ export async function POST(request: NextRequest) {
     filledToFull: Boolean(filledToFull),
   });
 
-  const bike = await getBike(session.email);
-  if (bike && mileage > bike.currentMileage) {
-    await updateBikeMileage(session.email, mileage);
+  if (mileage > bike.currentMileage) {
+    await updateBikeMileage(session.email, bike.id, mileage);
   }
 
   return NextResponse.json({ log });

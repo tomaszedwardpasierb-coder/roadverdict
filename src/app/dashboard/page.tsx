@@ -3,7 +3,7 @@ import { getSession } from "@/lib/auth/session";
 import { redirect } from "next/navigation";
 import styles from "./dashboard.module.css";
 import LogoutButton from "./LogoutButton";
-import { getBike } from "@/lib/tracker/bike";
+import { getPrimaryBike } from "@/lib/tracker/bike";
 import { getServiceRecords } from "@/lib/tracker/serviceRecord";
 import { getFuelLogs, computeActualMPG, computeMPGSeries } from "@/lib/tracker/fuelLog";
 import { getMods } from "@/lib/tracker/mod";
@@ -52,7 +52,7 @@ export default async function DashboardPage() {
   const session = await getSession();
   if (!session) redirect("/login");
 
-  const bike = await getBike(session.email);
+  const bike = await getPrimaryBike(session.email);
 
   if (!bike) {
     return (
@@ -86,11 +86,11 @@ export default async function DashboardPage() {
   const currency: Currency = bike.currency ?? "GBP";
 
   const [records, fuelLogs, mods, bills, reminders, rates] = await Promise.all([
-    getServiceRecords(session.email),
-    getFuelLogs(session.email),
-    getMods(session.email),
-    getBills(session.email),
-    getReminders(session.email),
+    getServiceRecords(session.email, bike.id),
+    getFuelLogs(session.email, bike.id),
+    getMods(session.email, bike.id),
+    getBills(session.email, bike.id),
+    getReminders(session.email, bike.id),
     getExchangeRates(),
   ]);
   const brandValue = slugifyMake(bike.make);

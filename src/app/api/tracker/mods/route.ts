@@ -2,7 +2,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/session";
 import { createMod } from "@/lib/tracker/mod";
-import { getBike, updateBikeMileage } from "@/lib/tracker/bike";
+import { getPrimaryBike, updateBikeMileage } from "@/lib/tracker/bike";
 
 export const dynamic = "force-dynamic";
 
@@ -32,11 +32,15 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Please fill in all required fields." }, { status: 400 });
   }
 
-  const mod = await createMod(session.email, { category, name, cost, mileage, date, notes: notes ?? "" });
+  const bike = await getPrimaryBike(session.email);
+  if (!bike) {
+    return NextResponse.json({ error: "No bike found for this account." }, { status: 404 });
+  }
 
-  const bike = await getBike(session.email);
-  if (bike && mileage > bike.currentMileage) {
-    await updateBikeMileage(session.email, mileage);
+  const mod = await createMod(session.email, { bikeId: bike.id, category, name, cost, mileage, date, notes: notes ?? "" });
+
+  if (mileage > bike.currentMileage) {
+    await updateBikeMileage(session.email, bike.id, mileage);
   }
 
   return NextResponse.json({ mod });

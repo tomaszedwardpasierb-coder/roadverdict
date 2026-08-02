@@ -2,7 +2,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/session";
 import { updateMod, deleteMod } from "@/lib/tracker/mod";
-import { getBike, updateBikeMileage } from "@/lib/tracker/bike";
+import { getPrimaryBike, updateBikeMileage } from "@/lib/tracker/bike";
 
 export const dynamic = "force-dynamic";
 
@@ -42,9 +42,9 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     return NextResponse.json({ error: "Entry not found." }, { status: 404 });
   }
 
-  const bike = await getBike(session.email);
+  const bike = await getPrimaryBike(session.email);
   if (bike && mileage > bike.currentMileage) {
-    await updateBikeMileage(session.email, mileage);
+    await updateBikeMileage(session.email, bike.id, mileage);
   }
 
   return NextResponse.json({ mod });

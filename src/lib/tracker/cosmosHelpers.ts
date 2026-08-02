@@ -41,19 +41,26 @@ export async function createTrackerDoc<TDoc extends TrackerDocBase>(
   return doc;
 }
 
-// Queries every doc of a given type within one user's partition, newest
-// first. Scoped via the partitionKey option (not just a WHERE clause) so
-// it stays a cheap single-partition query, not a cross-partition fan-out.
+// Queries every doc of a given type AND bike within one user's
+// partition, newest first. Scoped via partitionKey (not just a WHERE
+// clause) so it stays a cheap single-partition query. Filtering strictly
+// on bikeId is safe now that the one-time backfill has tagged every
+// pre-existing doc - there's no "docs without a bikeId" case left to
+// account for.
 export async function queryTrackerDocs<TDoc extends TrackerDocBase>(
   email: string,
-  type: string
+  type: string,
+  bikeId: string
 ): Promise<TDoc[]> {
   const container = getContainer();
   const { resources } = await container.items
     .query<TDoc>(
       {
-        query: "SELECT * FROM c WHERE c.type = @type ORDER BY c.date DESC",
-        parameters: [{ name: "@type", value: type }],
+        query: "SELECT * FROM c WHERE c.type = @type AND c.bikeId = @bikeId ORDER BY c.date DESC",
+        parameters: [
+          { name: "@type", value: type },
+          { name: "@bikeId", value: bikeId },
+        ],
       },
       { partitionKey: email }
     )

@@ -1,11 +1,21 @@
-﻿// Place at: src/lib/tracker/bike.ts
+// Place at: src/lib/tracker/bike.ts
 import { getContainer } from "@/lib/cosmos";
 import type { BikeClass, Region } from "@/lib/priceData";
 import type { DistanceUnit, FuelEconomyUnit } from "@/lib/tracker/unitFormat";
 import type { Currency } from "@/lib/tracker/currency";
 
-function bikeDocId(email: string): string {
-  return `${email}::bike`;
+// Free-tier cap. No paid tier exists yet - when it does, the natural
+// extension point is a `plan` field on some account-level doc, checked
+// alongside this constant, not a rewrite of the cap logic itself.
+export const MAX_FREE_BIKES = 2;
+
+// Unique per bike, unlike the old `${email}::bike` scheme this replaces.
+// The old scheme meant a second createBike() call would silently
+// overwrite the first bike's document (same id, upsert just replaces) -
+// this is the actual fix for that. The random suffix guards against the
+// theoretical case of two bikes being created in the same millisecond.
+function generateBikeId(email: string): string {
+  return `${email}::bike::${Date.now()}::${Math.random().toString(36).slice(2, 8)}`;
 }
 
 export interface BikeDoc {
@@ -29,23 +39,10 @@ export interface BikeDoc {
   dateAdded: string;
 }
 
-export async function getBike(email: string): Promise<BikeDoc | null> {
-  try {
-    const container = getContainer();
-    const { resource } = await container.item(bikeDocId(email), email).read<BikeDoc>();
-    return resource ?? null;
-  } catch {
-    return null;
-  }
-}
-
-// New, additive - not called anywhere yet. Lists every bike doc in a
-// user's partition (there's only ever one today, since createBike still
-// writes the single deterministic id). This is groundwork for multi-bike
-// support: once createBike is changed to generate a unique id per bike
-// (a later step, deployed together with every call site that needs it),
-// this becomes the way the garage page and bike switcher list a user's
-// bikes. Safe to add now since it's a pure read, scoped to one partition.
+// Lists every bike doc in a user's partition, oldest first. There's only
+// ever one today for existing accounts (their original bike, still using
+// the old `email::bike` id from before this change - that's fine, this
+// query doesn't care about id format, only the `type` field).
 export async function getBikesForUser(email: string): Promise<BikeDoc[]> {
   const container = getContainer();
   const { resources } = await container.items
@@ -59,6 +56,31 @@ export async function getBikesForUser(email: string): Promise<BikeDoc[]> {
   return resources;
 }
 
+// Resolves which bike a request should act on when there's no explicit
+// bike-switcher UI yet (that's a later step - the garage page). For now,
+// and for every account's most common case (one bike), this is simply
+// "their first bike". Once the switcher ships, this is the function that
+// changes to read an active-bike cookie/param first, falling back to
+// this same "first bike" behaviour if none is set.
+export async function getPrimaryBike(email: string): Promise<BikeDoc | null> {
+  const bikes = await getBikesForUser(email);
+  return bikes[0] ?? null;
+}
+
+export async function getBike(email: string, bikeId: string): Promise<BikeDoc | null> {
+  try {
+    const container = getContainer();
+    const { resource } = await container.item(bikeId, email).read<BikeDoc>();
+    return resource ?? null;
+  } catch {
+    return null;
+  }
+}
+
+export type CreateBikeResult =
+  | { ok: true; bike: BikeDoc }
+  | { ok: false; reason: "limit_reached"; limit: number };
+
 export async function createBike(
   email: string,
   data: {
@@ -71,10 +93,15 @@ export async function createBike(
     nickname: string;
     region: Region;
   }
-): Promise<BikeDoc> {
+): Promise<CreateBikeResult> {
+  const existing = await getBikesForUser(email);
+  if (existing.length >= MAX_FREE_BIKES) {
+    return { ok: false, reason: "limit_reached", limit: MAX_FREE_BIKES };
+  }
+
   const container = getContainer();
   const doc: BikeDoc = {
-    id: bikeDocId(email),
+    id: generateBikeId(email),
     pk: email,
     type: "bike",
     make: data.make,
@@ -89,39 +116,39 @@ export async function createBike(
     dateAdded: new Date().toISOString().slice(0, 10),
   };
   await container.items.upsert(doc);
-  return doc;
+  return { ok: true, bike: doc };
 }
 
-export async function updateBikeMileage(email: string, newMileage: number): Promise<BikeDoc | null> {
+export async function updateBikeMileage(email: string, bikeId: string, newMileage: number): Promise<BikeDoc | null> {
   const container = getContainer();
-  const { resource } = await container.item(bikeDocId(email), email).read<BikeDoc>();
+  const { resource } = await container.item(bikeId, email).read<BikeDoc>();
   if (!resource) return null;
   resource.currentMileage = newMileage;
   await container.items.upsert(resource);
   return resource;
 }
 
-export async function updateBikeRegion(email: string, region: Region): Promise<BikeDoc | null> {
+export async function updateBikeRegion(email: string, bikeId: string, region: Region): Promise<BikeDoc | null> {
   const container = getContainer();
-  const { resource } = await container.item(bikeDocId(email), email).read<BikeDoc>();
+  const { resource } = await container.item(bikeId, email).read<BikeDoc>();
   if (!resource) return null;
   resource.region = region;
   await container.items.upsert(resource);
   return resource;
 }
 
-export async function updateBikeBudget(email: string, annualBudget: number): Promise<BikeDoc | null> {
+export async function updateBikeBudget(email: string, bikeId: string, annualBudget: number): Promise<BikeDoc | null> {
   const container = getContainer();
-  const { resource } = await container.item(bikeDocId(email), email).read<BikeDoc>();
+  const { resource } = await container.item(bikeId, email).read<BikeDoc>();
   if (!resource) return null;
   resource.annualBudget = annualBudget;
   await container.items.upsert(resource);
   return resource;
 }
 
-export async function updateBikeShareToken(email: string, shareToken: string): Promise<BikeDoc | null> {
+export async function updateBikeShareToken(email: string, bikeId: string, shareToken: string): Promise<BikeDoc | null> {
   const container = getContainer();
-  const { resource } = await container.item(bikeDocId(email), email).read<BikeDoc>();
+  const { resource } = await container.item(bikeId, email).read<BikeDoc>();
   if (!resource) return null;
   resource.shareToken = shareToken;
   await container.items.upsert(resource);
@@ -130,11 +157,12 @@ export async function updateBikeShareToken(email: string, shareToken: string): P
 
 export async function updateBikeUnits(
   email: string,
+  bikeId: string,
   distanceUnit?: DistanceUnit,
   fuelEconomyUnit?: FuelEconomyUnit
 ): Promise<BikeDoc | null> {
   const container = getContainer();
-  const { resource } = await container.item(bikeDocId(email), email).read<BikeDoc>();
+  const { resource } = await container.item(bikeId, email).read<BikeDoc>();
   if (!resource) return null;
   if (distanceUnit) resource.distanceUnit = distanceUnit;
   if (fuelEconomyUnit) resource.fuelEconomyUnit = fuelEconomyUnit;
@@ -142,9 +170,9 @@ export async function updateBikeUnits(
   return resource;
 }
 
-export async function updateBikeCurrency(email: string, currency: Currency): Promise<BikeDoc | null> {
+export async function updateBikeCurrency(email: string, bikeId: string, currency: Currency): Promise<BikeDoc | null> {
   const container = getContainer();
-  const { resource } = await container.item(bikeDocId(email), email).read<BikeDoc>();
+  const { resource } = await container.item(bikeId, email).read<BikeDoc>();
   if (!resource) return null;
   resource.currency = currency;
   await container.items.upsert(resource);

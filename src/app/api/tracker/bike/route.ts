@@ -1,8 +1,9 @@
-﻿// Place at: src/app/api/tracker/bike/route.ts
+// Place at: src/app/api/tracker/bike/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/session";
 import {
   createBike,
+  getPrimaryBike,
   updateBikeMileage,
   updateBikeRegion,
   updateBikeBudget,
@@ -44,7 +45,7 @@ export async function POST(request: NextRequest) {
   }
 
   const bikeClass = getBikeClassForCC(engineCC);
-  const bike = await createBike(session.email, {
+  const result = await createBike(session.email, {
     make,
     model,
     engineCC,
@@ -55,7 +56,16 @@ export async function POST(request: NextRequest) {
     region,
   });
 
-  return NextResponse.json({ bike });
+  if (!result.ok) {
+    // Free-tier cap reached. 403 (not 400) since the request itself is
+    // well-formed - it's disallowed by account limits, not bad input.
+    return NextResponse.json(
+      { error: `Free accounts can track up to ${result.limit} bikes. Upgrade to add more.`, reason: result.reason },
+      { status: 403 }
+    );
+  }
+
+  return NextResponse.json({ bike: result.bike });
 }
 
 export async function PATCH(request: NextRequest) {
@@ -91,27 +101,37 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ error: "Nothing to update." }, { status: 400 });
   }
 
+  // No bike-switcher UI yet, so every request acts on the account's
+  // primary bike - the same behaviour as before this change for every
+  // account that still has exactly one bike (which is every account
+  // today, since nothing yet lets someone create a second one).
+  const primaryBike = await getPrimaryBike(session.email);
+  if (!primaryBike) {
+    return NextResponse.json({ error: "No bike found for this account." }, { status: 404 });
+  }
+  const bikeId = primaryBike.id;
+
   let bike = null;
   if (currentMileage != null) {
     if (currentMileage < 0) {
       return NextResponse.json({ error: "Enter a valid mileage." }, { status: 400 });
     }
-    bike = await updateBikeMileage(session.email, currentMileage);
+    bike = await updateBikeMileage(session.email, bikeId, currentMileage);
   }
   if (region) {
-    bike = await updateBikeRegion(session.email, region);
+    bike = await updateBikeRegion(session.email, bikeId, region);
   }
   if (annualBudget != null) {
     if (annualBudget <= 0) {
       return NextResponse.json({ error: "Enter a valid budget amount." }, { status: 400 });
     }
-    bike = await updateBikeBudget(session.email, annualBudget);
+    bike = await updateBikeBudget(session.email, bikeId, annualBudget);
   }
   if (distanceUnit || fuelEconomyUnit) {
-    bike = await updateBikeUnits(session.email, distanceUnit, fuelEconomyUnit);
+    bike = await updateBikeUnits(session.email, bikeId, distanceUnit, fuelEconomyUnit);
   }
   if (currency) {
-    bike = await updateBikeCurrency(session.email, currency);
+    bike = await updateBikeCurrency(session.email, bikeId, currency);
   }
 
   if (!bike) {

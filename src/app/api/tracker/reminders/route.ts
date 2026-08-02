@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/session";
 import { createReminder, deleteRemindersBySourceKey } from "@/lib/tracker/reminder";
+import { getPrimaryBike } from "@/lib/tracker/bike";
 
 export const dynamic = "force-dynamic";
 
@@ -38,11 +39,17 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Please pick a date." }, { status: 400 });
   }
 
+  const bike = await getPrimaryBike(session.email);
+  if (!bike) {
+    return NextResponse.json({ error: "No bike found for this account." }, { status: 404 });
+  }
+
   if (sourceKey) {
-    await deleteRemindersBySourceKey(session.email, sourceKey);
+    await deleteRemindersBySourceKey(session.email, bike.id, sourceKey);
   }
 
   const reminder = await createReminder(session.email, {
+    bikeId: bike.id,
     name,
     intervalType,
     intervalValue,
