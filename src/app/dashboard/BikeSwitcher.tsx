@@ -49,9 +49,10 @@ export function BikeSwitcher({ bikes, activeBikeId, distanceUnit }: Props) {
 
   if (!active) return null;
 
-  // The common case today: exactly one bike. No dropdown chrome at all -
-  // this is deliberately identical to how the sidebar looked before the
-  // switcher existed.
+  // The common case today: exactly one bike. Sidebar card looks the same
+  // as before this change, plus one small addition - a quiet link to the
+  // garage page. Without this there'd be no way for a single-bike account
+  // to ever discover "add another bike" exists on desktop at all.
   if (bikes.length <= 1) {
     return (
       <div className={styles.sidebarBikeCard}>
@@ -60,6 +61,9 @@ export function BikeSwitcher({ bikes, activeBikeId, distanceUnit }: Props) {
         <div className={styles.sidebarBikeMeta}>
           {active.year} · {formatDistance(active.currentMileage, distanceUnit)}
         </div>
+        <Link href="/garage" className={styles.bikeSwitcherManageLinkInline}>
+          + Add another bike
+        </Link>
       </div>
     );
   }
