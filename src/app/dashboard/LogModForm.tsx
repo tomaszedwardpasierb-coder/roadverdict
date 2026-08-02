@@ -22,7 +22,8 @@ export function LogModForm({
   currency: Currency;
   rates: ExchangeRates | null;
 }) {
-  const [category, setCategory] = useState(MOD_GROUPS[0].mods[0]);
+  const [group, setGroup] = useState(MOD_GROUPS[0].group);
+  const [category, setCategory] = useState(MOD_GROUPS[0].subgroups[0].mods[0]);
   const [name, setName] = useState('');
   const [costDisplay, setCostDisplay] = useState('');
   const [mileageDisplay, setMileageDisplay] = useState(
@@ -32,6 +33,14 @@ export function LogModForm({
   const [notes, setNotes] = useState('');
   const [mileageAcknowledged, setMileageAcknowledged] = useState(false);
   const { submit, submitting, error } = useTrackerFormSubmit('/api/tracker/mods');
+
+  function handleGroupChange(newGroup: string) {
+    setGroup(newGroup);
+    const groupData = MOD_GROUPS.find((g) => g.group === newGroup);
+    setCategory(groupData?.subgroups[0]?.mods[0] ?? '');
+  }
+
+  const selectedGroupData = MOD_GROUPS.find((g) => g.group === group);
 
   const mileageInMiles = convertDisplayToMiles(Number(mileageDisplay), distanceUnit);
 
@@ -66,11 +75,19 @@ export function LogModForm({
           <input id="mod-date" type="date" value={date} onChange={(e) => setDate(e.target.value)} required />
         </div>
         <div className="field" style={{ marginTop: '0.9rem' }}>
+          <label htmlFor="mod-group">Group</label>
+          <select id="mod-group" value={group} onChange={(e) => handleGroupChange(e.target.value)}>
+            {MOD_GROUPS.map((g) => (
+              <option key={g.group} value={g.group}>{g.group}</option>
+            ))}
+          </select>
+        </div>
+        <div className="field" style={{ marginTop: '0.9rem' }}>
           <label htmlFor="mod-category">Category</label>
           <select id="mod-category" value={category} onChange={(e) => setCategory(e.target.value)}>
-            {MOD_GROUPS.map((g) => (
-              <optgroup key={g.group} label={g.group}>
-                {g.mods.map((m) => (
+            {selectedGroupData?.subgroups.map((sg) => (
+              <optgroup key={sg.subcategory} label={sg.subcategory}>
+                {sg.mods.map((m) => (
                   <option key={m} value={m}>{MOD_LABELS[m]}</option>
                 ))}
               </optgroup>

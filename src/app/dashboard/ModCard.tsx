@@ -2,7 +2,7 @@
 'use client';
 
 import { useState } from 'react';
-import { MOD_GROUPS, MOD_LABELS } from '@/lib/tracker/modTypes';
+import { MOD_GROUPS, MOD_LABELS, findGroupForCategory } from '@/lib/tracker/modTypes';
 import type { ModDoc } from '@/lib/tracker/mod';
 import { useTrackerFormSubmit } from './useTrackerFormSubmit';
 import { formatDistance, convertMilesToDisplay, convertDisplayToMiles, distanceUnitLabel, type DistanceUnit } from '@/lib/tracker/unitFormat';
@@ -25,6 +25,7 @@ export function ModCard({
   rates: ExchangeRates | null;
 }) {
   const [isEditing, setIsEditing] = useState(false);
+  const [group, setGroup] = useState(() => findGroupForCategory(mod.category));
   const [category, setCategory] = useState(mod.category);
   const [name, setName] = useState(mod.name);
   const [costDisplay, setCostDisplay] = useState(
@@ -36,6 +37,14 @@ export function ModCard({
   const [date, setDate] = useState(mod.date);
   const [notes, setNotes] = useState(mod.notes);
   const { submit, submitting, error } = useTrackerFormSubmit(`/api/tracker/mods/${encodeURIComponent(mod.id)}`);
+
+  function handleGroupChange(newGroup: string) {
+    setGroup(newGroup);
+    const groupData = MOD_GROUPS.find((g) => g.group === newGroup);
+    setCategory(groupData?.subgroups[0]?.mods[0] ?? '');
+  }
+
+  const selectedGroupData = MOD_GROUPS.find((g) => g.group === group);
 
   const unitLabel = distanceUnitLabel(distanceUnit);
   const symbol = CURRENCY_SYMBOLS[currency];
@@ -62,11 +71,19 @@ export function ModCard({
             <input id={`edit-mod-date-${mod.id}`} type="date" value={date} onChange={(e) => setDate(e.target.value)} required />
           </div>
           <div className="field" style={{ marginTop: '0.9rem' }}>
+            <label htmlFor={`edit-mod-group-${mod.id}`}>Group</label>
+            <select id={`edit-mod-group-${mod.id}`} value={group} onChange={(e) => handleGroupChange(e.target.value)}>
+              {MOD_GROUPS.map((g) => (
+                <option key={g.group} value={g.group}>{g.group}</option>
+              ))}
+            </select>
+          </div>
+          <div className="field" style={{ marginTop: '0.9rem' }}>
             <label htmlFor={`edit-mod-category-${mod.id}`}>Category</label>
             <select id={`edit-mod-category-${mod.id}`} value={category} onChange={(e) => setCategory(e.target.value)}>
-              {MOD_GROUPS.map((g) => (
-                <optgroup key={g.group} label={g.group}>
-                  {g.mods.map((m) => (
+              {selectedGroupData?.subgroups.map((sg) => (
+                <optgroup key={sg.subcategory} label={sg.subcategory}>
+                  {sg.mods.map((m) => (
                     <option key={m} value={m}>{MOD_LABELS[m]}</option>
                   ))}
                 </optgroup>
