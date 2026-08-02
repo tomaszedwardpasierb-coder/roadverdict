@@ -16,6 +16,11 @@ export interface MotorcycleModel {
 
 export const MOTORCYCLE_MODELS: MotorcycleModel[] = [
   // ---- Honda ----
+  // A deliberate one-off addition, outside this file's usual "2000-present,
+  // mainstream UK models" scope - kept at the top of Honda's list so it's
+  // the first thing you see, with a marker in the name since a plain
+  // <option> element can't be styled to stand out any other way.
+  { make: "Honda", model: "CL400 (1998) 🎁 Bonus bike", engineCC: 397 },
   { make: "Honda", model: "CB125R", engineCC: 125 },
   { make: "Honda", model: "MSX125 Grom", engineCC: 125 },
   { make: "Honda", model: "DAX125", engineCC: 125 },
