@@ -9,6 +9,8 @@ import {
   updateBikeBudget,
   updateBikeUnits,
   updateBikeCurrency,
+  updateBikeChartType,
+  type ChartKind,
 } from "@/lib/tracker/bike";
 import { getBikeClassForCC } from "@/lib/motorcycleModels";
 import type { Region } from "@/lib/priceData";
@@ -81,13 +83,14 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
   }
 
-  const { currentMileage, region, annualBudget, distanceUnit, fuelEconomyUnit, currency } = body as {
+  const { currentMileage, region, annualBudget, distanceUnit, fuelEconomyUnit, currency, chartType } = body as {
     currentMileage?: number;
     region?: Region;
     annualBudget?: number;
     distanceUnit?: DistanceUnit;
     fuelEconomyUnit?: FuelEconomyUnit;
     currency?: Currency;
+    chartType?: { chartId: string; kind: ChartKind };
   };
 
   if (
@@ -96,7 +99,8 @@ export async function PATCH(request: NextRequest) {
     annualBudget == null &&
     !distanceUnit &&
     !fuelEconomyUnit &&
-    !currency
+    !currency &&
+    !chartType
   ) {
     return NextResponse.json({ error: "Nothing to update." }, { status: 400 });
   }
@@ -132,6 +136,9 @@ export async function PATCH(request: NextRequest) {
   }
   if (currency) {
     bike = await updateBikeCurrency(session.email, bikeId, currency);
+  }
+  if (chartType?.chartId && chartType?.kind) {
+    bike = await updateBikeChartType(session.email, bikeId, chartType.chartId, chartType.kind);
   }
 
   if (!bike) {

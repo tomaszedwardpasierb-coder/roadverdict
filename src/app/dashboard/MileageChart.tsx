@@ -1,26 +1,47 @@
-﻿// Place at: src/app/dashboard/MileageChart.tsx
+// Place at: src/app/dashboard/MileageChart.tsx
 'use client';
 
 import { useState } from 'react';
-import { Line } from 'react-chartjs-2';
-import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Legend } from 'chart.js';
+import { Line, Bar } from 'react-chartjs-2';
+import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, BarElement, Tooltip, Legend } from 'chart.js';
 import { RANGE_OPTIONS, filterByDateRange, type RangeValue } from '@/lib/tracker/dateRange';
 import type { MileagePoint } from '@/lib/tracker/summary';
 import { convertMilesToDisplay, distanceUnitLabel, type DistanceUnit } from '@/lib/tracker/unitFormat';
+import { useChartTypePreference } from './useChartTypePreference';
+import { ChartTypeToggle } from './ChartTypeToggle';
 import styles from './dashboard.module.css';
 
-ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Legend);
+ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, BarElement, Tooltip, Legend);
+
+const CHART_ID = 'mileage';
 
 function fmtDate(d: string): string {
   return new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
-export function MileageChart({ points, distanceUnit }: { points: MileagePoint[]; distanceUnit: DistanceUnit }) {
+export function MileageChart({
+  points,
+  distanceUnit,
+  initialChartType,
+}: {
+  points: MileagePoint[];
+  distanceUnit: DistanceUnit;
+  initialChartType?: 'line' | 'bar';
+}) {
   const [range, setRange] = useState<RangeValue>('all');
+  const { kind, changeKind } = useChartTypePreference(CHART_ID, initialChartType ?? 'line');
   const filtered = filterByDateRange(points, range);
+  const title = `${distanceUnit === 'km' ? 'Kilometres' : 'Mileage'} over time`;
+
+  const dataValues = filtered.map((p) => Math.round(convertMilesToDisplay(p.mileage, distanceUnit)));
+  const labels = filtered.map((p) => fmtDate(p.date));
 
   return (
     <div>
+      <div className={styles.chartCardHeader}>
+        <span className={styles.chartCardTitle}>{title}</span>
+        <ChartTypeToggle value={kind} onChange={changeKind} options={['line', 'bar']} />
+      </div>
       <div className={styles.rangeTabs}>
         {RANGE_OPTIONS.map((o) => (
           <button
@@ -35,14 +56,29 @@ export function MileageChart({ points, distanceUnit }: { points: MileagePoint[];
       </div>
       {filtered.length < 2 ? (
         <p className={styles.emptyNote}>No entries logged in this time range.</p>
+      ) : kind === 'bar' ? (
+        <Bar
+          data={{
+            labels,
+            datasets: [{ label: 'Mileage', data: dataValues, backgroundColor: '#1a1a1a' }],
+          }}
+          options={{
+            plugins: { legend: { display: false } },
+            scales: {
+              y: { title: { display: true, text: distanceUnitLabel(distanceUnit) }, grid: { color: '#00000012' } },
+              x: { grid: { display: false } },
+            },
+            maintainAspectRatio: true,
+          }}
+        />
       ) : (
         <Line
           data={{
-            labels: filtered.map((p) => fmtDate(p.date)),
+            labels,
             datasets: [
               {
                 label: 'Mileage',
-                data: filtered.map((p) => Math.round(convertMilesToDisplay(p.mileage, distanceUnit))),
+                data: dataValues,
                 borderColor: '#000000',
                 backgroundColor: 'transparent',
                 borderWidth: 1.25,

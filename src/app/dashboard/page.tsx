@@ -177,22 +177,26 @@ export default async function DashboardPage() {
       <div className={`${styles.dashboardTwoCol} ${styles.equalHeightRow}`}>
         <BudgetWidget yearSpend={yearSpend} currentYear={currentYear} initialBudget={bike.annualBudget} currency={currency} rates={rates} />
         <div className={styles.chartCard}>
-          <div className={styles.chartCardTitle}>Spend by category</div>
           {summary.grandTotal > 0 ? (
-            <SpendDonutChart servicingTotal={summary.servicingTotal} modsTotal={summary.modsTotal} fuelTotal={summary.fuelTotal} billsTotal={summary.billsTotal} currency={currency} rates={rates} />
+            <SpendDonutChart servicingTotal={summary.servicingTotal} modsTotal={summary.modsTotal} fuelTotal={summary.fuelTotal} billsTotal={summary.billsTotal} currency={currency} rates={rates} initialChartType={bike.chartTypes?.["spend-donut"] === "bar" ? "bar" : "pie"} />
           ) : (
-            <p className={styles.emptyNote}>Log something to see this fill in.</p>
+            <>
+              <div className={styles.chartCardTitle}>Spend by category</div>
+              <p className={styles.emptyNote}>Log something to see this fill in.</p>
+            </>
           )}
         </div>
       </div>
 
       <div className={styles.dashboardTwoCol}>
         <div className={styles.chartCard}>
-          <div className={styles.chartCardTitle}>{distanceUnit === "km" ? "Kilometres" : "Mileage"} over time</div>
           {mileagePoints.length > 0 ? (
-            <MileageChart points={mileagePoints} distanceUnit={distanceUnit} />
+            <MileageChart points={mileagePoints} distanceUnit={distanceUnit} initialChartType={bike.chartTypes?.["mileage"] === "bar" ? "bar" : "line"} />
           ) : (
-            <p className={styles.emptyNote}>Log a couple of entries to see your mileage build up.</p>
+            <>
+              <div className={styles.chartCardTitle}>{distanceUnit === "km" ? "Kilometres" : "Mileage"} over time</div>
+              <p className={styles.emptyNote}>Log a couple of entries to see your mileage build up.</p>
+            </>
           )}
         </div>
         <div className={styles.chartCard}>
@@ -283,24 +287,54 @@ export default async function DashboardPage() {
       <p className={styles.subtext} style={{ marginBottom: "1rem" }}>Every chart in one place.</p>
       <div className={styles.reportsGrid}>
         <div className={styles.chartCard}>
-          <div className={styles.chartCardTitle}>{fuelEconomyUnit === "l100km" ? "Fuel economy" : "MPG"} over time</div>
-          {mpgSeries.length > 0 ? <MpgChart series={mpgSeries} fuelEconomyUnit={fuelEconomyUnit} distanceUnit={distanceUnit} /> : <p className={styles.emptyNote}>Log two consecutive full-tank fill-ups to see this.</p>}
+          {mpgSeries.length > 0 ? (
+            <MpgChart series={mpgSeries} fuelEconomyUnit={fuelEconomyUnit} distanceUnit={distanceUnit} initialChartType={bike.chartTypes?.["mpg"] === "bar" ? "bar" : "line"} />
+          ) : (
+            <>
+              <div className={styles.chartCardTitle}>{fuelEconomyUnit === "l100km" ? "Fuel economy" : "MPG"} over time</div>
+              <p className={styles.emptyNote}>Log two consecutive full-tank fill-ups to see this.</p>
+            </>
+          )}
         </div>
         <div className={styles.chartCard}>
-          <div className={styles.chartCardTitle}>Fuel cost over time</div>
-          {fuelCostPoints.length > 0 ? <FuelCostChart points={fuelCostPoints} currency={currency} rates={rates} /> : <p className={styles.emptyNote}>Log a fuel fill-up to see cost trends here.</p>}
+          {fuelCostPoints.length > 0 ? (
+            <FuelCostChart points={fuelCostPoints} currency={currency} rates={rates} initialChartType={bike.chartTypes?.["fuel-cost"] === "bar" ? "bar" : "line"} />
+          ) : (
+            <>
+              <div className={styles.chartCardTitle}>Fuel cost over time</div>
+              <p className={styles.emptyNote}>Log a fuel fill-up to see cost trends here.</p>
+            </>
+          )}
         </div>
         <div className={styles.chartCard}>
-          <div className={styles.chartCardTitle}>Servicing spend over time</div>
-          {serviceMonthly.length > 1 ? <CategorySpendChart data={serviceMonthly} color="#1a1a1a" currency={currency} rates={rates} /> : <p className={styles.emptyNote}>Check back once you&apos;ve logged servicing across a couple of months.</p>}
+          {serviceMonthly.length > 1 ? (
+            <CategorySpendChart chartId="servicing-spend" title="Servicing spend over time" data={serviceMonthly} color="#1a1a1a" currency={currency} rates={rates} initialChartType={bike.chartTypes?.["servicing-spend"] === "line" ? "line" : "bar"} />
+          ) : (
+            <>
+              <div className={styles.chartCardTitle}>Servicing spend over time</div>
+              <p className={styles.emptyNote}>Check back once you&apos;ve logged servicing across a couple of months.</p>
+            </>
+          )}
         </div>
         <div className={styles.chartCard}>
-          <div className={styles.chartCardTitle}>Modifications spend over time</div>
-          {modsMonthly.length > 1 ? <CategorySpendChart data={modsMonthly} color="#e8a33d" currency={currency} rates={rates} /> : <p className={styles.emptyNote}>Check back once you&apos;ve logged mods across a couple of months.</p>}
+          {modsMonthly.length > 1 ? (
+            <CategorySpendChart chartId="mods-spend" title="Modifications spend over time" data={modsMonthly} color="#e8a33d" currency={currency} rates={rates} initialChartType={bike.chartTypes?.["mods-spend"] === "line" ? "line" : "bar"} />
+          ) : (
+            <>
+              <div className={styles.chartCardTitle}>Modifications spend over time</div>
+              <p className={styles.emptyNote}>Check back once you&apos;ve logged mods across a couple of months.</p>
+            </>
+          )}
         </div>
         <div className={styles.chartCard}>
-          <div className={styles.chartCardTitle}>Insurance, tax & MOT spend over time</div>
-          {billsMonthly.length > 1 ? <CategorySpendChart data={billsMonthly} color="#6b5b95" currency={currency} rates={rates} /> : <p className={styles.emptyNote}>Check back once you&apos;ve logged bills across a couple of months.</p>}
+          {billsMonthly.length > 1 ? (
+            <CategorySpendChart chartId="bills-spend" title="Insurance, tax & MOT spend over time" data={billsMonthly} color="#6b5b95" currency={currency} rates={rates} initialChartType={bike.chartTypes?.["bills-spend"] === "line" ? "line" : "bar"} />
+          ) : (
+            <>
+              <div className={styles.chartCardTitle}>Insurance, tax & MOT spend over time</div>
+              <p className={styles.emptyNote}>Check back once you&apos;ve logged bills across a couple of months.</p>
+            </>
+          )}
         </div>
       </div>
     </>

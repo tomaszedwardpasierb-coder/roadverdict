@@ -15,6 +15,12 @@ export const MAX_FREE_BIKES = 2;
 // preference, not an auth token, so it doesn't need to be short-lived.
 export const ACTIVE_BIKE_COOKIE = "activeBikeId";
 
+// Per-chart display preference - "which chart id maps to which chart
+// type". Stored per-bike (same pattern as distanceUnit/currency below)
+// rather than in the browser, so it follows the account across devices
+// instead of being lost if browser data is cleared.
+export type ChartKind = "line" | "bar" | "pie";
+
 // Unique per bike, unlike the old `${email}::bike` scheme this replaces.
 // The old scheme meant a second createBike() call would silently
 // overwrite the first bike's document (same id, upsert just replaces) -
@@ -42,6 +48,7 @@ export interface BikeDoc {
   distanceUnit?: DistanceUnit;
   fuelEconomyUnit?: FuelEconomyUnit;
   currency?: Currency;
+  chartTypes?: Record<string, ChartKind>;
   dateAdded: string;
 }
 
@@ -196,6 +203,23 @@ export async function updateBikeCurrency(email: string, bikeId: string, currency
   const { resource } = await container.item(bikeId, email).read<BikeDoc>();
   if (!resource) return null;
   resource.currency = currency;
+  await container.items.upsert(resource);
+  return resource;
+}
+
+// Updates a single chart's type preference without disturbing any other
+// chart's saved preference - reads the existing map, sets one key, merges
+// back in, rather than replacing the whole map each time.
+export async function updateBikeChartType(
+  email: string,
+  bikeId: string,
+  chartId: string,
+  kind: ChartKind
+): Promise<BikeDoc | null> {
+  const container = getContainer();
+  const { resource } = await container.item(bikeId, email).read<BikeDoc>();
+  if (!resource) return null;
+  resource.chartTypes = { ...(resource.chartTypes ?? {}), [chartId]: kind };
   await container.items.upsert(resource);
   return resource;
 }
