@@ -3,19 +3,26 @@
 
 import { Bar, Line } from 'react-chartjs-2';
 import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, PointElement, LineElement, Tooltip } from 'chart.js';
-import type { MonthlyTotal } from '@/lib/tracker/summary';
+import { bucketByMonth } from '@/lib/tracker/summary';
+import { filterByDateRange } from '@/lib/tracker/dateRange';
 import { convertGbpToDisplay, CURRENCY_SYMBOLS, type Currency, type ExchangeRates } from '@/lib/tracker/currency';
 import { useChartTypePreference } from './useChartTypePreference';
 import { ChartTypeToggle } from './ChartTypeToggle';
 import { barGradient, BAR_BORDER_RADIUS } from './chartStyle';
+import { useChartFilter } from './ChartFilterContext';
 import styles from './dashboard.module.css';
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, PointElement, LineElement, Tooltip);
 
+interface CostItem {
+  date: string;
+  cost: number;
+}
+
 export function CategorySpendChart({
   chartId,
   title,
-  data,
+  items,
   color,
   currency,
   rates,
@@ -23,14 +30,20 @@ export function CategorySpendChart({
 }: {
   chartId: string;
   title: string;
-  data: MonthlyTotal[];
+  items: CostItem[];
   color: string;
   currency: Currency;
   rates: ExchangeRates | null;
   initialChartType?: 'bar' | 'line';
 }) {
+  const { range } = useChartFilter();
   const { kind, changeKind } = useChartTypePreference(chartId, initialChartType ?? 'bar');
   const symbol = CURRENCY_SYMBOLS[currency];
+
+  // Bucketed here, client-side, from the raw items - reacts to the shared
+  // Range control instantly rather than showing a fixed server-computed
+  // view that can never change after the page loads.
+  const data = bucketByMonth(filterByDateRange(items, range));
   const labels = data.map((d) => d.month);
   const dataValues = data.map((d) => convertGbpToDisplay(d.total, currency, rates));
 
@@ -40,7 +53,9 @@ export function CategorySpendChart({
         <span className={styles.chartCardTitle}>{title}</span>
         <ChartTypeToggle value={kind} onChange={changeKind} options={['bar', 'line']} />
       </div>
-      {kind === 'line' ? (
+      {data.length < 2 ? (
+        <p className={styles.emptyNote}>Not enough data in this range to chart yet.</p>
+      ) : kind === 'line' ? (
         <Line
           data={{
             labels,

@@ -9,7 +9,7 @@ import { getFuelLogs, computeActualMPG, computeMPGSeries } from "@/lib/tracker/f
 import { getMods } from "@/lib/tracker/mod";
 import { getBills } from "@/lib/tracker/bill";
 import { getReminders, computeReminderStatus } from "@/lib/tracker/reminder";
-import { computeSpendSummary, computeYearSpend, gatherMileagePoints, bucketByMonth } from "@/lib/tracker/summary";
+import { computeSpendSummary, computeYearSpend, gatherMileagePoints } from "@/lib/tracker/summary";
 import { slugifyMake } from "@/lib/motorcycleModels";
 import type { Region } from "@/lib/priceData";
 import { JOB_LABELS } from "@/lib/tracker/jobTypes";
@@ -102,9 +102,6 @@ export default async function DashboardPage() {
   const mileagePoints = gatherMileagePoints(records, mods, fuelLogs);
   const fuelCostPoints = fuelLogs.map((f) => ({ date: f.date, cost: f.cost }));
   const summary = computeSpendSummary(records, mods, fuelLogs, bills);
-  const serviceMonthly = bucketByMonth(records.map((r) => ({ date: r.date, cost: r.cost })));
-  const modsMonthly = bucketByMonth(mods.map((m) => ({ date: m.date, cost: m.cost })));
-  const billsMonthly = bucketByMonth(bills.map((b) => ({ date: b.date, cost: b.cost })));
   const currentYear = new Date().getFullYear();
   const yearSpend = computeYearSpend(records, mods, fuelLogs, bills, currentYear);
   const milesTracked = bike.currentMileage - bike.startingMileage;
@@ -182,7 +179,7 @@ export default async function DashboardPage() {
         <BudgetWidget yearSpend={yearSpend} currentYear={currentYear} initialBudget={bike.annualBudget} currency={currency} rates={rates} />
         <div className={styles.chartCard}>
           {summary.grandTotal > 0 ? (
-            <SpendDonutChart servicingTotal={summary.servicingTotal} modsTotal={summary.modsTotal} fuelTotal={summary.fuelTotal} billsTotal={summary.billsTotal} currency={currency} rates={rates} initialChartType={bike.chartTypes?.["spend-donut"] === "bar" ? "bar" : "pie"} />
+            <SpendDonutChart records={records} mods={mods} fuelLogs={fuelLogs} bills={bills} currency={currency} rates={rates} initialChartType={bike.chartTypes?.["spend-donut"] === "bar" ? "bar" : "pie"} />
           ) : (
             <>
               <div className={styles.chartCardTitle}>Spend by category</div>
@@ -312,32 +309,32 @@ export default async function DashboardPage() {
           )}
         </div>
         <div className={styles.chartCard}>
-          {serviceMonthly.length > 1 ? (
-            <CategorySpendChart chartId="servicing-spend" title="Servicing spend over time" data={serviceMonthly} color="#1a1a1a" currency={currency} rates={rates} initialChartType={bike.chartTypes?.["servicing-spend"] === "line" ? "line" : "bar"} />
+          {records.length > 0 ? (
+            <CategorySpendChart chartId="servicing-spend" title="Servicing spend over time" items={records} color="#1a1a1a" currency={currency} rates={rates} initialChartType={bike.chartTypes?.["servicing-spend"] === "line" ? "line" : "bar"} />
           ) : (
             <>
               <div className={styles.chartCardTitle}>Servicing spend over time</div>
-              <p className={styles.emptyNote}>Check back once you&apos;ve logged servicing across a couple of months.</p>
+              <p className={styles.emptyNote}>No servicing logged yet.</p>
             </>
           )}
         </div>
         <div className={styles.chartCard}>
-          {modsMonthly.length > 1 ? (
-            <CategorySpendChart chartId="mods-spend" title="Modifications spend over time" data={modsMonthly} color="#e8a33d" currency={currency} rates={rates} initialChartType={bike.chartTypes?.["mods-spend"] === "line" ? "line" : "bar"} />
+          {mods.length > 0 ? (
+            <CategorySpendChart chartId="mods-spend" title="Modifications spend over time" items={mods} color="#e8a33d" currency={currency} rates={rates} initialChartType={bike.chartTypes?.["mods-spend"] === "line" ? "line" : "bar"} />
           ) : (
             <>
               <div className={styles.chartCardTitle}>Modifications spend over time</div>
-              <p className={styles.emptyNote}>Check back once you&apos;ve logged mods across a couple of months.</p>
+              <p className={styles.emptyNote}>No modifications logged yet.</p>
             </>
           )}
         </div>
         <div className={styles.chartCard}>
-          {billsMonthly.length > 1 ? (
-            <CategorySpendChart chartId="bills-spend" title="Insurance, tax & MOT spend over time" data={billsMonthly} color="#6b5b95" currency={currency} rates={rates} initialChartType={bike.chartTypes?.["bills-spend"] === "line" ? "line" : "bar"} />
+          {bills.length > 0 ? (
+            <CategorySpendChart chartId="bills-spend" title="Insurance, tax & MOT spend over time" items={bills} color="#6b5b95" currency={currency} rates={rates} initialChartType={bike.chartTypes?.["bills-spend"] === "line" ? "line" : "bar"} />
           ) : (
             <>
               <div className={styles.chartCardTitle}>Insurance, tax & MOT spend over time</div>
-              <p className={styles.emptyNote}>Check back once you&apos;ve logged bills across a couple of months.</p>
+              <p className={styles.emptyNote}>No insurance, tax, or MOT payments logged yet.</p>
             </>
           )}
         </div>
