@@ -5,6 +5,7 @@ import { Line, Bar } from 'react-chartjs-2';
 import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, BarElement, Tooltip, Legend } from 'chart.js';
 import { filterByDateRange } from '@/lib/tracker/dateRange';
 import { convertGbpToDisplay, CURRENCY_SYMBOLS, type Currency, type ExchangeRates } from '@/lib/tracker/currency';
+import { formatDistance, type DistanceUnit } from '@/lib/tracker/unitFormat';
 import { useChartTypePreference } from './useChartTypePreference';
 import { ChartTypeToggle } from './ChartTypeToggle';
 import { barGradient, BAR_BORDER_RADIUS } from './chartStyle';
@@ -18,6 +19,7 @@ const CHART_ID = 'fuel-cost';
 interface FuelPoint {
   date: string;
   cost: number;
+  mileage: number;
 }
 
 function fmtDate(d: string): string {
@@ -28,20 +30,24 @@ export function FuelCostChart({
   points,
   currency,
   rates,
+  distanceUnit,
   initialChartType,
 }: {
   points: FuelPoint[];
   currency: Currency;
   rates: ExchangeRates | null;
+  distanceUnit: DistanceUnit;
   initialChartType?: 'line' | 'bar';
 }) {
-  const { range } = useChartFilter();
+  const { range, viewBy } = useChartFilter();
   const { kind, changeKind } = useChartTypePreference(CHART_ID, initialChartType ?? 'line');
-  const filtered = filterByDateRange(points, range).sort(
-    (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
-  );
+  const dateFiltered = filterByDateRange(points, range);
+  const filtered =
+    viewBy === 'mileage'
+      ? [...dateFiltered].sort((a, b) => a.mileage - b.mileage)
+      : [...dateFiltered].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
   const symbol = CURRENCY_SYMBOLS[currency];
-  const labels = filtered.map((p) => fmtDate(p.date));
+  const labels = viewBy === 'mileage' ? filtered.map((p) => formatDistance(p.mileage, distanceUnit)) : filtered.map((p) => fmtDate(p.date));
   const dataValues = filtered.map((p) => convertGbpToDisplay(p.cost, currency, rates));
 
   return (

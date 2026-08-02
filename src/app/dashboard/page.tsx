@@ -100,7 +100,7 @@ export default async function DashboardPage() {
   const actualMpg = computeActualMPG(fuelLogs);
   const mpgSeries = computeMPGSeries(fuelLogs);
   const mileagePoints = gatherMileagePoints(records, mods, fuelLogs);
-  const fuelCostPoints = fuelLogs.map((f) => ({ date: f.date, cost: f.cost }));
+  const fuelCostPoints = fuelLogs.map((f) => ({ date: f.date, cost: f.cost, mileage: f.mileage }));
   const summary = computeSpendSummary(records, mods, fuelLogs, bills);
   const currentYear = new Date().getFullYear();
   const yearSpend = computeYearSpend(records, mods, fuelLogs, bills, currentYear);
@@ -300,7 +300,7 @@ export default async function DashboardPage() {
         </div>
         <div className={styles.chartCard}>
           {fuelCostPoints.length > 0 ? (
-            <FuelCostChart points={fuelCostPoints} currency={currency} rates={rates} initialChartType={bike.chartTypes?.["fuel-cost"] === "bar" ? "bar" : "line"} />
+            <FuelCostChart points={fuelCostPoints} currency={currency} rates={rates} distanceUnit={distanceUnit} initialChartType={bike.chartTypes?.["fuel-cost"] === "bar" ? "bar" : "line"} />
           ) : (
             <>
               <div className={styles.chartCardTitle}>Fuel cost over time</div>
@@ -310,7 +310,7 @@ export default async function DashboardPage() {
         </div>
         <div className={styles.chartCard}>
           {records.length > 0 ? (
-            <CategorySpendChart chartId="servicing-spend" title="Servicing spend over time" items={records} color="#1a1a1a" currency={currency} rates={rates} initialChartType={bike.chartTypes?.["servicing-spend"] === "line" ? "line" : "bar"} />
+            <CategorySpendChart chartId="servicing-spend" title="Servicing spend over time" items={records} color="#1a1a1a" currency={currency} rates={rates} distanceUnit={distanceUnit} initialChartType={bike.chartTypes?.["servicing-spend"] === "line" ? "line" : "bar"} />
           ) : (
             <>
               <div className={styles.chartCardTitle}>Servicing spend over time</div>
@@ -320,7 +320,7 @@ export default async function DashboardPage() {
         </div>
         <div className={styles.chartCard}>
           {mods.length > 0 ? (
-            <CategorySpendChart chartId="mods-spend" title="Modifications spend over time" items={mods} color="#e8a33d" currency={currency} rates={rates} initialChartType={bike.chartTypes?.["mods-spend"] === "line" ? "line" : "bar"} />
+            <CategorySpendChart chartId="mods-spend" title="Modifications spend over time" items={mods} color="#e8a33d" currency={currency} rates={rates} distanceUnit={distanceUnit} initialChartType={bike.chartTypes?.["mods-spend"] === "line" ? "line" : "bar"} />
           ) : (
             <>
               <div className={styles.chartCardTitle}>Modifications spend over time</div>
@@ -330,7 +330,7 @@ export default async function DashboardPage() {
         </div>
         <div className={styles.chartCard}>
           {bills.length > 0 ? (
-            <CategorySpendChart chartId="bills-spend" title="Insurance, tax & MOT spend over time" items={bills} color="#6b5b95" currency={currency} rates={rates} initialChartType={bike.chartTypes?.["bills-spend"] === "line" ? "line" : "bar"} />
+            <CategorySpendChart chartId="bills-spend" title="Insurance, tax & MOT spend over time" items={bills} color="#6b5b95" currency={currency} rates={rates} distanceUnit={distanceUnit} supportsMileageView={false} initialChartType={bike.chartTypes?.["bills-spend"] === "line" ? "line" : "bar"} />
           ) : (
             <>
               <div className={styles.chartCardTitle}>Insurance, tax & MOT spend over time</div>

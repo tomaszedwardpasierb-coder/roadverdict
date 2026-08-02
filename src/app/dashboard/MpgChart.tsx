@@ -25,6 +25,10 @@ function convertMpgValue(mpg: number, unit: FuelEconomyUnit): number {
   return mpg;
 }
 
+function fmtDate(d: string): string {
+  return new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
 export function MpgChart({
   series,
   fuelEconomyUnit,
@@ -36,13 +40,19 @@ export function MpgChart({
   distanceUnit: DistanceUnit;
   initialChartType?: 'line' | 'bar';
 }) {
-  const { range } = useChartFilter();
+  const { range, viewBy } = useChartFilter();
   const { kind, changeKind } = useChartTypePreference(CHART_ID, initialChartType ?? 'line');
-  const filtered = filterByDateRange(series, range);
+  const dateFiltered = filterByDateRange(series, range);
+  // "series" arrives already sorted by mileage (computeMPGSeries's own
+  // sort order) - for the Time view, re-sort by date instead, since the
+  // two orders aren't guaranteed to match (a backdated entry, for
+  // example).
+  const filtered =
+    viewBy === 'time' ? [...dateFiltered].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()) : dateFiltered;
   const title = `${fuelEconomyUnit === 'l100km' ? 'Fuel economy' : 'MPG'} over time`;
   const yLabel = fuelEconomyUnit === 'l100km' ? 'L/100km' : 'mpg';
 
-  const labels = filtered.map((s) => formatDistance(s.mileage, distanceUnit));
+  const labels = viewBy === 'time' ? filtered.map((s) => fmtDate(s.date)) : filtered.map((s) => formatDistance(s.mileage, distanceUnit));
   const dataValues = filtered.map((s) => Number(convertMpgValue(s.mpg, fuelEconomyUnit).toFixed(1)));
 
   return (

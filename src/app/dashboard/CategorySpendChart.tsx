@@ -3,9 +3,10 @@
 
 import { Bar, Line } from 'react-chartjs-2';
 import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, PointElement, LineElement, Tooltip } from 'chart.js';
-import { bucketByMonth } from '@/lib/tracker/summary';
+import { bucketByMonth, bucketByMileage } from '@/lib/tracker/summary';
 import { filterByDateRange } from '@/lib/tracker/dateRange';
 import { convertGbpToDisplay, CURRENCY_SYMBOLS, type Currency, type ExchangeRates } from '@/lib/tracker/currency';
+import { convertMilesToDisplay, distanceUnitLabel, type DistanceUnit } from '@/lib/tracker/unitFormat';
 import { useChartTypePreference } from './useChartTypePreference';
 import { ChartTypeToggle } from './ChartTypeToggle';
 import { barGradient, BAR_BORDER_RADIUS } from './chartStyle';
@@ -17,6 +18,7 @@ ChartJS.register(CategoryScale, LinearScale, BarElement, PointElement, LineEleme
 interface CostItem {
   date: string;
   cost: number;
+  mileage?: number;
 }
 
 export function CategorySpendChart({
@@ -26,6 +28,8 @@ export function CategorySpendChart({
   color,
   currency,
   rates,
+  distanceUnit,
+  supportsMileageView = true,
   initialChartType,
 }: {
   chartId: string;
@@ -34,18 +38,35 @@ export function CategorySpendChart({
   color: string;
   currency: Currency;
   rates: ExchangeRates | null;
+  distanceUnit: DistanceUnit;
+  // false for anything not logged against a mileage reading (Bills) - that
+  // chart always shows by date regardless of the shared toggle, with a
+  // note explaining why, rather than silently ignoring the setting.
+  supportsMileageView?: boolean;
   initialChartType?: 'bar' | 'line';
 }) {
-  const { range } = useChartFilter();
+  const { range, viewBy } = useChartFilter();
   const { kind, changeKind } = useChartTypePreference(chartId, initialChartType ?? 'bar');
   const symbol = CURRENCY_SYMBOLS[currency];
+  const usingMileageView = supportsMileageView && viewBy === 'mileage';
 
-  // Bucketed here, client-side, from the raw items - reacts to the shared
-  // Range control instantly rather than showing a fixed server-computed
-  // view that can never change after the page loads.
-  const data = bucketByMonth(filterByDateRange(items, range));
-  const labels = data.map((d) => d.month);
-  const dataValues = data.map((d) => convertGbpToDisplay(d.total, currency, rates));
+  const filteredItems = filterByDateRange(items, range);
+
+  let labels: string[];
+  let dataValues: number[];
+
+  if (usingMileageView) {
+    const withMileage = filteredItems.filter((i): i is CostItem & { mileage: number } => i.mileage != null);
+    const bands = bucketByMileage(withMileage);
+    labels = bands.map(
+      (b) => `${Math.round(convertMilesToDisplay(b.bandStart, distanceUnit))}-${Math.round(convertMilesToDisplay(b.bandEnd, distanceUnit))} ${distanceUnitLabel(distanceUnit)}`
+    );
+    dataValues = bands.map((b) => convertGbpToDisplay(b.total, currency, rates));
+  } else {
+    const months = bucketByMonth(filteredItems);
+    labels = months.map((m) => m.month);
+    dataValues = months.map((m) => convertGbpToDisplay(m.total, currency, rates));
+  }
 
   return (
     <div>
@@ -53,7 +74,12 @@ export function CategorySpendChart({
         <span className={styles.chartCardTitle}>{title}</span>
         <ChartTypeToggle value={kind} onChange={changeKind} options={['bar', 'line']} />
       </div>
-      {data.length < 2 ? (
+      {!supportsMileageView && viewBy === 'mileage' && (
+        <p className="field-note" style={{ marginBottom: '0.6rem' }}>
+          Shown by date - this isn&apos;t logged against a mileage reading.
+        </p>
+      )}
+      {labels.length < 2 ? (
         <p className={styles.emptyNote}>Not enough data in this range to chart yet.</p>
       ) : kind === 'line' ? (
         <Line
