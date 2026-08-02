@@ -3,7 +3,7 @@ import { getSession } from "@/lib/auth/session";
 import { redirect } from "next/navigation";
 import styles from "./dashboard.module.css";
 import LogoutButton from "./LogoutButton";
-import { getPrimaryBike } from "@/lib/tracker/bike";
+import { getBikesForUser, pickActiveBike } from "@/lib/tracker/bike";
 import { getServiceRecords } from "@/lib/tracker/serviceRecord";
 import { getFuelLogs, computeActualMPG, computeMPGSeries } from "@/lib/tracker/fuelLog";
 import { getMods } from "@/lib/tracker/mod";
@@ -52,7 +52,8 @@ export default async function DashboardPage() {
   const session = await getSession();
   if (!session) redirect("/login");
 
-  const bike = await getPrimaryBike(session.email);
+  const bikes = await getBikesForUser(session.email);
+  const bike = await pickActiveBike(bikes);
 
   if (!bike) {
     return (
@@ -305,6 +306,13 @@ export default async function DashboardPage() {
     </>
   );
 
+  const switcherBikes = bikes.map((b) => ({
+    id: b.id,
+    name: b.nickname ? `${b.nickname} — ${b.make} ${b.model}` : `${b.make} ${b.model}`,
+    year: b.year,
+    currentMileage: b.currentMileage,
+  }));
+
   return (
     <DashboardShell
       bikeName={bikeName}
@@ -312,6 +320,8 @@ export default async function DashboardPage() {
       currentMileage={bike.currentMileage}
       distanceUnit={distanceUnit}
       userEmail={session.email}
+      bikes={switcherBikes}
+      activeBikeId={bike.id}
       dashboardContent={dashboardContent}
       serviceContent={serviceContent}
       fuelContent={fuelContent}

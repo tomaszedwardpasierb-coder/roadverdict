@@ -4,6 +4,7 @@
 import { useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import { UpdateMileageButton } from './UpdateMileageButton';
+import { BikeSwitcher, type SwitcherBike } from './BikeSwitcher';
 import LogoutButton from './LogoutButton';
 import { formatDistance, type DistanceUnit } from '@/lib/tracker/unitFormat';
 import styles from './dashboard.module.css';
@@ -39,6 +40,8 @@ interface Props {
   currentMileage: number;
   distanceUnit: DistanceUnit;
   userEmail: string;
+  bikes: SwitcherBike[];
+  activeBikeId: string;
   dashboardContent: ReactNode;
   serviceContent: ReactNode;
   fuelContent: ReactNode;
@@ -54,6 +57,8 @@ export function DashboardShell({
   currentMileage,
   distanceUnit,
   userEmail,
+  bikes,
+  activeBikeId,
   dashboardContent,
   serviceContent,
   fuelContent,
@@ -100,12 +105,8 @@ export function DashboardShell({
           ))}
         </nav>
 
-        <div className={styles.sidebarBikeCard}>
-          <div className={styles.sidebarBikeLabel}>My bike</div>
-          <div className={styles.sidebarBikeName}>{bikeName}</div>
-          <div className={styles.sidebarBikeMeta}>
-            {bikeYear} · {formatDistance(currentMileage, distanceUnit)}
-          </div>
+        <BikeSwitcher bikes={bikes} activeBikeId={activeBikeId} distanceUnit={distanceUnit} />
+        <div style={{ marginTop: '0.6rem' }}>
           <UpdateMileageButton currentMileage={currentMileage} distanceUnit={distanceUnit} />
         </div>
 
@@ -182,6 +183,9 @@ export function DashboardShell({
             ))}
             <div style={{ marginTop: '0.8rem', paddingTop: '0.8rem', borderTop: '1px solid var(--border)', fontSize: '0.8rem', color: 'var(--ink-soft)' }}>
               Signed in as {userEmail}
+            </div>
+            <div style={{ marginTop: '0.5rem' }}>
+              <Link href="/garage" onClick={() => setShowMore(false)}>Manage bikes →</Link>
             </div>
             <div style={{ marginTop: '0.5rem' }}>
               <LogoutButton />

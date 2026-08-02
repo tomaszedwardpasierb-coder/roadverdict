@@ -1,4 +1,5 @@
 // Place at: src/lib/tracker/bike.ts
+import { cookies } from "next/headers";
 import { getContainer } from "@/lib/cosmos";
 import type { BikeClass, Region } from "@/lib/priceData";
 import type { DistanceUnit, FuelEconomyUnit } from "@/lib/tracker/unitFormat";
@@ -8,6 +9,11 @@ import type { Currency } from "@/lib/tracker/currency";
 // extension point is a `plan` field on some account-level doc, checked
 // alongside this constant, not a rewrite of the cap logic itself.
 export const MAX_FREE_BIKES = 2;
+
+// Which bike a browser is currently "looking at" - set by the bike
+// switcher / garage page, read here to resolve every request. A UI
+// preference, not an auth token, so it doesn't need to be short-lived.
+export const ACTIVE_BIKE_COOKIE = "activeBikeId";
 
 // Unique per bike, unlike the old `${email}::bike` scheme this replaces.
 // The old scheme meant a second createBike() call would silently
@@ -56,15 +62,30 @@ export async function getBikesForUser(email: string): Promise<BikeDoc[]> {
   return resources;
 }
 
-// Resolves which bike a request should act on when there's no explicit
-// bike-switcher UI yet (that's a later step - the garage page). For now,
-// and for every account's most common case (one bike), this is simply
-// "their first bike". Once the switcher ships, this is the function that
-// changes to read an active-bike cookie/param first, falling back to
-// this same "first bike" behaviour if none is set.
+// Resolves which of a given list of bikes is "active" - the one set via
+// the bike switcher/garage page, falling back to the first (oldest) bike
+// if no cookie is set, or if the cookie points to a bike not in this
+// list (e.g. stale after switching accounts). Takes the list as a
+// parameter rather than querying itself, so callers that already have
+// the full list (like the garage page) don't pay for a second query.
+export async function pickActiveBike(bikes: BikeDoc[]): Promise<BikeDoc | null> {
+  if (bikes.length === 0) return null;
+  const cookieStore = await cookies();
+  const activeId = cookieStore.get(ACTIVE_BIKE_COOKIE)?.value;
+  if (activeId) {
+    const match = bikes.find((b) => b.id === activeId);
+    if (match) return match;
+  }
+  return bikes[0];
+}
+
+// Resolves which bike a request should act on. Every existing call site
+// (dashboard page, every tracker API route) already calls this - keeping
+// the same name and signature here means the switcher becomes "live"
+// everywhere at once, with zero changes needed to those 13+ files.
 export async function getPrimaryBike(email: string): Promise<BikeDoc | null> {
   const bikes = await getBikesForUser(email);
-  return bikes[0] ?? null;
+  return pickActiveBike(bikes);
 }
 
 export async function getBike(email: string, bikeId: string): Promise<BikeDoc | null> {

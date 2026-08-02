@@ -1,0 +1,59 @@
+.backLink {
+  font-size: 0.85rem;
+  color: var(--ink-soft);
+  text-decoration: none;
+}
+.backLink:hover {
+  color: var(--ink);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.card {
+  position: relative;
+  background: var(--paper);
+  border: 1px solid var(--asphalt);
+  border-radius: 6px;
+  padding: 1.1rem;
+}
+
+.activeBadge {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  color: var(--verdict-green);
+  border: 1px solid var(--verdict-green);
+  border-radius: 4px;
+  padding: 0.15rem 0.4rem;
+  margin-bottom: 0.6rem;
+}
+
+.cardName {
+  font-weight: 600;
+  margin-bottom: 0.2rem;
+}
+
+.cardMeta {
+  color: var(--ink-soft);
+  font-size: 0.85rem;
+  margin-bottom: 0.9rem;
+}
+
+.capNotice {
+  background: var(--stone);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.9rem 1.1rem;
+  font-size: 0.9rem;
+  color: var(--ink-soft);
+}
+
+.addFormWrapper {
+  max-width: 420px;
+}

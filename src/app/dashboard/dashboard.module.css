@@ -255,10 +255,19 @@
 .sidebarNavItemActive { background: var(--amber); color: var(--asphalt); font-weight: 600; }
 .sidebarNavItemActive:hover { background: var(--amber); }
 
-.sidebarBikeCard { border-top: 1px solid var(--border); padding-top: 1rem; margin-top: 1rem; font-size: 0.85rem; }
+.sidebarBikeCard { border-top: 1px solid var(--border); padding-top: 1rem; margin-top: 1rem; font-size: 0.85rem; position: relative; }
 .sidebarBikeLabel { font-family: var(--font-mono); font-size: 0.65rem; text-transform: uppercase; color: var(--ink-soft); margin-bottom: 0.3rem; }
 .sidebarBikeName { font-weight: 600; }
 .sidebarBikeMeta { color: var(--ink-soft); font-size: 0.8rem; margin-bottom: 0.6rem; }
+.bikeSwitcherTrigger { display: block; width: 100%; text-align: left; background: none; border: none; padding: 0; cursor: pointer; font-family: inherit; color: inherit; }
+.bikeSwitcherDropdown { position: absolute; left: 0; right: 0; top: 100%; margin-top: 0.4rem; background: var(--paper); border: 1px solid var(--asphalt); border-radius: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.12); z-index: 20; overflow: hidden; }
+.bikeSwitcherRow { display: block; width: 100%; text-align: left; background: none; border: none; border-bottom: 1px solid var(--border); padding: 0.55rem 0.7rem; font-size: 0.82rem; cursor: pointer; color: var(--ink); }
+.bikeSwitcherRow:hover { background: var(--stone); }
+.bikeSwitcherRow:last-of-type { border-bottom: none; }
+.bikeSwitcherRowActive { font-weight: 600; background: var(--stone); }
+.bikeSwitcherRowMeta { color: var(--ink-soft); font-weight: 400; }
+.bikeSwitcherManageLink { display: block; padding: 0.55rem 0.7rem; font-size: 0.78rem; color: var(--amber-ink); border-top: 1px solid var(--border); text-decoration: none; }
+.bikeSwitcherManageLink:hover { background: var(--stone); }
 
 .sidebarUserFooter { border-top: 1px solid var(--border); padding-top: 1rem; margin-top: 1rem; display: flex; align-items: center; gap: 0.6rem; }
 .sidebarUserAvatar { width: 28px; height: 28px; border-radius: 50%; background: var(--asphalt); color: var(--paper); display: flex; align-items: center; justify-content: center; font-size: 0.7rem; font-weight: 600; flex-shrink: 0; }
