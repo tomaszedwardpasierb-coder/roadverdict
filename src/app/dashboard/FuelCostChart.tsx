@@ -8,6 +8,7 @@ import { RANGE_OPTIONS, filterByDateRange, type RangeValue } from '@/lib/tracker
 import { convertGbpToDisplay, CURRENCY_SYMBOLS, type Currency, type ExchangeRates } from '@/lib/tracker/currency';
 import { useChartTypePreference } from './useChartTypePreference';
 import { ChartTypeToggle } from './ChartTypeToggle';
+import { barGradient, BAR_BORDER_RADIUS } from './chartStyle';
 import styles from './dashboard.module.css';
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, BarElement, Tooltip, Legend);
@@ -67,7 +68,7 @@ export function FuelCostChart({
         <Bar
           data={{
             labels,
-            datasets: [{ label: `Fuel cost per fill-up (${symbol})`, data: dataValues, backgroundColor: '#3d8b6f' }],
+            datasets: [{ label: `Fuel cost per fill-up (${symbol})`, data: dataValues, backgroundColor: barGradient('#3d8b6f'), borderRadius: BAR_BORDER_RADIUS }],
           }}
           options={{
             plugins: {

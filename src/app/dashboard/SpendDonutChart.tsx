@@ -6,6 +6,7 @@ import { Chart as ChartJS, ArcElement, BarElement, CategoryScale, LinearScale, T
 import { convertGbpToDisplay, CURRENCY_SYMBOLS, type Currency, type ExchangeRates } from '@/lib/tracker/currency';
 import { useChartTypePreference } from './useChartTypePreference';
 import { ChartTypeToggle } from './ChartTypeToggle';
+import { barGradient, BAR_BORDER_RADIUS } from './chartStyle';
 import styles from './dashboard.module.css';
 
 ChartJS.register(ArcElement, BarElement, CategoryScale, LinearScale, Tooltip, Legend);
@@ -45,7 +46,11 @@ export function SpendDonutChart({ servicingTotal, modsTotal, fuelTotal, billsTot
           <Bar
             data={{
               labels: LABELS,
-              datasets: [{ data: values, backgroundColor: COLORS }],
+              datasets: [{
+                data: values,
+                backgroundColor: (ctx) => barGradient(COLORS[ctx.dataIndex % COLORS.length])(ctx),
+                borderRadius: BAR_BORDER_RADIUS,
+              }],
             }}
             options={{
               maintainAspectRatio: false,

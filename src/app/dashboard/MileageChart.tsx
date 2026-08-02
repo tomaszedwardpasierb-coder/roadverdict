@@ -9,6 +9,7 @@ import type { MileagePoint } from '@/lib/tracker/summary';
 import { convertMilesToDisplay, distanceUnitLabel, type DistanceUnit } from '@/lib/tracker/unitFormat';
 import { useChartTypePreference } from './useChartTypePreference';
 import { ChartTypeToggle } from './ChartTypeToggle';
+import { barGradient, BAR_BORDER_RADIUS } from './chartStyle';
 import styles from './dashboard.module.css';
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, BarElement, Tooltip, Legend);
@@ -60,7 +61,7 @@ export function MileageChart({
         <Bar
           data={{
             labels,
-            datasets: [{ label: 'Mileage', data: dataValues, backgroundColor: '#1a1a1a' }],
+            datasets: [{ label: 'Mileage', data: dataValues, backgroundColor: barGradient('#1a1a1a'), borderRadius: BAR_BORDER_RADIUS }],
           }}
           options={{
             plugins: { legend: { display: false } },

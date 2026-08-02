@@ -9,6 +9,7 @@ import type { MpgSegment } from '@/lib/tracker/fuelLog';
 import { formatDistance, type FuelEconomyUnit, type DistanceUnit } from '@/lib/tracker/unitFormat';
 import { useChartTypePreference } from './useChartTypePreference';
 import { ChartTypeToggle } from './ChartTypeToggle';
+import { barGradient, BAR_BORDER_RADIUS } from './chartStyle';
 import styles from './dashboard.module.css';
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, BarElement, Tooltip, Legend);
@@ -68,7 +69,7 @@ export function MpgChart({
         <Bar
           data={{
             labels,
-            datasets: [{ label: fuelEconomyUnit === 'l100km' ? 'L/100km' : 'MPG', data: dataValues, backgroundColor: '#e8a33d' }],
+            datasets: [{ label: fuelEconomyUnit === 'l100km' ? 'L/100km' : 'MPG', data: dataValues, backgroundColor: barGradient('#e8a33d'), borderRadius: BAR_BORDER_RADIUS }],
           }}
           options={{
             plugins: { legend: { display: false } },

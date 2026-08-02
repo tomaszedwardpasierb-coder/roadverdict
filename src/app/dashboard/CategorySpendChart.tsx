@@ -7,6 +7,7 @@ import type { MonthlyTotal } from '@/lib/tracker/summary';
 import { convertGbpToDisplay, CURRENCY_SYMBOLS, type Currency, type ExchangeRates } from '@/lib/tracker/currency';
 import { useChartTypePreference } from './useChartTypePreference';
 import { ChartTypeToggle } from './ChartTypeToggle';
+import { barGradient, BAR_BORDER_RADIUS } from './chartStyle';
 import styles from './dashboard.module.css';
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, PointElement, LineElement, Tooltip);
@@ -72,7 +73,7 @@ export function CategorySpendChart({
         <Bar
           data={{
             labels,
-            datasets: [{ data: dataValues, backgroundColor: color }],
+            datasets: [{ data: dataValues, backgroundColor: barGradient(color), borderRadius: BAR_BORDER_RADIUS }],
           }}
           options={{
             maintainAspectRatio: true,
