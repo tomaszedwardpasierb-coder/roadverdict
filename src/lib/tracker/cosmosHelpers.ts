@@ -1,6 +1,17 @@
 ﻿// Place at: src/lib/tracker/cosmosHelpers.ts
 import { getContainer } from "@/lib/cosmos";
 
+// A single uploaded receipt/invoice. blobName is the unguessable random
+// path in blob storage (never the full URL) - the actual file is only ever
+// served through the authenticated /api/tracker/attachment/[blobName]
+// route, never a direct/public blob URL.
+export interface Attachment {
+  blobName: string;
+  fileName: string;
+  fileType: "image/jpeg" | "image/png" | "application/pdf";
+  uploadedAt: string;
+}
+
 // Shared shape every tracker doc type has in common. Individual doc
 // interfaces (ServiceRecordDoc, FuelLogDoc, and future mod/bill docs)
 // extend this rather than repeating id/pk/date/createdAt each time.
@@ -16,6 +27,9 @@ export interface TrackerDocBase {
   // create-call site starts passing this once multi-bike support is
   // actually wired up (a later step) - until then this is inert.
   bikeId?: string;
+  // Optional, additive - existing records simply have none until someone
+  // uploads a receipt/invoice against them.
+  attachments?: Attachment[];
 }
 
 // Creates and upserts a new tracker doc. id is auto-generated as

@@ -1,5 +1,5 @@
 ﻿// Place at: src/lib/tracker/bill.ts
-import { createTrackerDoc, queryTrackerDocs, updateTrackerDoc, deleteTrackerDoc, type TrackerDocBase } from "./cosmosHelpers";
+import { createTrackerDoc, queryTrackerDocs, updateTrackerDoc, deleteTrackerDoc, type TrackerDocBase, type Attachment } from "./cosmosHelpers";
 
 export interface BillDoc extends TrackerDocBase {
   type: "bill";
@@ -10,7 +10,7 @@ export interface BillDoc extends TrackerDocBase {
 
 export async function createBill(
   email: string,
-  data: { bikeId: string; billType: string; cost: number; date: string; notes: string }
+  data: { bikeId: string; billType: string; cost: number; date: string; notes: string; attachments?: Attachment[] }
 ): Promise<BillDoc> {
   return createTrackerDoc<BillDoc>(email, "bill", "bill", data);
 }
@@ -22,7 +22,7 @@ export async function getBills(email: string, bikeId: string): Promise<BillDoc[]
 export async function updateBill(
   email: string,
   id: string,
-  data: { billType: string; cost: number; date: string; notes: string }
+  data: { billType: string; cost: number; date: string; notes: string; attachments?: Attachment[] }
 ): Promise<BillDoc | null> {
   return updateTrackerDoc<BillDoc>(email, id, data);
 }

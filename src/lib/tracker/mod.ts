@@ -1,5 +1,5 @@
 ﻿// Place at: src/lib/tracker/mod.ts
-import { createTrackerDoc, queryTrackerDocs, updateTrackerDoc, deleteTrackerDoc, type TrackerDocBase } from "./cosmosHelpers";
+import { createTrackerDoc, queryTrackerDocs, updateTrackerDoc, deleteTrackerDoc, type TrackerDocBase, type Attachment } from "./cosmosHelpers";
 
 export interface ModDoc extends TrackerDocBase {
   type: "mod";
@@ -12,7 +12,7 @@ export interface ModDoc extends TrackerDocBase {
 
 export async function createMod(
   email: string,
-  data: { bikeId: string; category: string; name: string; cost: number; mileage: number; date: string; notes: string }
+  data: { bikeId: string; category: string; name: string; cost: number; mileage: number; date: string; notes: string; attachments?: Attachment[] }
 ): Promise<ModDoc> {
   return createTrackerDoc<ModDoc>(email, "mod", "mod", data);
 }
@@ -24,7 +24,7 @@ export async function getMods(email: string, bikeId: string): Promise<ModDoc[]> 
 export async function updateMod(
   email: string,
   id: string,
-  data: { category: string; name: string; cost: number; mileage: number; date: string; notes: string }
+  data: { category: string; name: string; cost: number; mileage: number; date: string; notes: string; attachments?: Attachment[] }
 ): Promise<ModDoc | null> {
   return updateTrackerDoc<ModDoc>(email, id, data);
 }
