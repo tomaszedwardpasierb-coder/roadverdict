@@ -4,6 +4,9 @@
 import { useState } from 'react';
 import type { FuelLogDoc } from '@/lib/tracker/fuelLog';
 import { useTrackerFormSubmit } from './useTrackerFormSubmit';
+import { AttachmentUploader } from './AttachmentUploader';
+import { AttachmentThumb } from './AttachmentThumb';
+import type { Attachment } from '@/lib/tracker/cosmosHelpers';
 import { formatDistance, convertMilesToDisplay, convertDisplayToMiles, distanceUnitLabel, type DistanceUnit } from '@/lib/tracker/unitFormat';
 import { convertGbpToDisplay, convertDisplayToGbp, formatCurrency, CURRENCY_SYMBOLS, type Currency, type ExchangeRates } from '@/lib/tracker/currency';
 import styles from './dashboard.module.css';
@@ -33,6 +36,7 @@ export function FuelLogCard({
   );
   const [date, setDate] = useState(log.date);
   const [filledToFull, setFilledToFull] = useState(log.filledToFull);
+  const [attachment, setAttachment] = useState<Attachment | null>(log.attachments?.[0] ?? null);
   const { submit, submitting, error } = useTrackerFormSubmit(
     `/api/tracker/fuel/${encodeURIComponent(log.id)}`
   );
@@ -46,7 +50,7 @@ export function FuelLogCard({
     const mileageInMiles = Math.round(convertDisplayToMiles(Number(mileageDisplay), distanceUnit));
     const costInGbp = convertDisplayToGbp(Number(costDisplay), currency, rates);
     const ok = await submit(
-      { litres: Number(litres), cost: costInGbp, mileage: mileageInMiles, date, filledToFull },
+      { litres: Number(litres), cost: costInGbp, mileage: mileageInMiles, date, filledToFull, attachments: attachment ? [attachment] : [] },
       'PATCH'
     );
     if (ok) setIsEditing(false);
@@ -83,6 +87,7 @@ export function FuelLogCard({
               Filled the tank completely full
             </label>
           </div>
+          <AttachmentUploader value={attachment} onChange={setAttachment} idSuffix={`-fuel-${log.id}`} />
         </div>
         <hr className="ticket__divider" />
         <div className="ticket__section" style={{ display: 'flex', gap: '0.6rem', alignItems: 'center' }}>
@@ -107,6 +112,7 @@ export function FuelLogCard({
       <div className={styles.jobCardMeta}>
         {fmtDate(log.date)} · {formatDistance(log.mileage, distanceUnit)} · {symbol}{convertGbpToDisplay(perLitreGbp, currency, rates).toFixed(2)}/litre
       </div>
+      {log.attachments?.[0] && <AttachmentThumb attachment={log.attachments[0]} />}
       <div className={styles.cardActions}>
         <button type="button" className={styles.iconBtn} onClick={() => setIsEditing(true)}>Edit</button>
         <button type="button" className={styles.iconBtn} onClick={handleDelete} disabled={submitting}>

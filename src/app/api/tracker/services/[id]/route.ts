@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/session";
 import { updateServiceRecord, deleteServiceRecord } from "@/lib/tracker/serviceRecord";
 import { getPrimaryBike, updateBikeMileage } from "@/lib/tracker/bike";
+import type { Attachment } from "@/lib/tracker/cosmosHelpers";
 
 export const dynamic = "force-dynamic";
 
@@ -24,12 +25,13 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
   }
 
-  const { jobType, cost, mileage, date, notes } = body as {
+  const { jobType, cost, mileage, date, notes, attachments } = body as {
     jobType?: string;
     cost?: number;
     mileage?: number;
     date?: string;
     notes?: string;
+    attachments?: Attachment[];
   };
 
   if (!jobType || cost == null || mileage == null || !date) {
@@ -42,6 +44,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     mileage,
     date,
     notes: notes ?? "",
+    attachments,
   });
   if (!record) {
     return NextResponse.json({ error: "Record not found." }, { status: 404 });

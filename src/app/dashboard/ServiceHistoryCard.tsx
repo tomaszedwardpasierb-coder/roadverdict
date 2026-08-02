@@ -6,6 +6,9 @@ import { JOB_GROUPS, JOB_LABELS, AFFILIATE_LINKS, isBenchmarkedJob } from '@/lib
 import { getAdjustedBenchmark, type BikeClass, type Region } from '@/lib/priceData';
 import type { ServiceRecordDoc } from '@/lib/tracker/serviceRecord';
 import { useTrackerFormSubmit } from './useTrackerFormSubmit';
+import { AttachmentUploader } from './AttachmentUploader';
+import { AttachmentThumb } from './AttachmentThumb';
+import type { Attachment } from '@/lib/tracker/cosmosHelpers';
 import { formatDistance, convertMilesToDisplay, convertDisplayToMiles, distanceUnitLabel, type DistanceUnit } from '@/lib/tracker/unitFormat';
 import { convertGbpToDisplay, convertDisplayToGbp, formatCurrency, CURRENCY_SYMBOLS, type Currency, type ExchangeRates } from '@/lib/tracker/currency';
 import styles from './dashboard.module.css';
@@ -56,6 +59,7 @@ export function ServiceHistoryCard({ record, bikeClass, brandValue, region, dist
   );
   const [date, setDate] = useState(record.date);
   const [notes, setNotes] = useState(record.notes);
+  const [attachment, setAttachment] = useState<Attachment | null>(record.attachments?.[0] ?? null);
   const { submit, submitting, error } = useTrackerFormSubmit(
     `/api/tracker/services/${encodeURIComponent(record.id)}`
   );
@@ -72,7 +76,7 @@ export function ServiceHistoryCard({ record, bikeClass, brandValue, region, dist
     e.preventDefault();
     const mileageInMiles = Math.round(convertDisplayToMiles(Number(mileageDisplay), distanceUnit));
     const costInGbp = convertDisplayToGbp(Number(costDisplay), currency, rates);
-    const ok = await submit({ jobType, cost: costInGbp, mileage: mileageInMiles, date, notes }, 'PATCH');
+    const ok = await submit({ jobType, cost: costInGbp, mileage: mileageInMiles, date, notes, attachments: attachment ? [attachment] : [] }, 'PATCH');
     if (ok) setIsEditing(false);
   }
 
@@ -113,6 +117,7 @@ export function ServiceHistoryCard({ record, bikeClass, brandValue, region, dist
             <label htmlFor={`edit-notes-${record.id}`}>Notes</label>
             <textarea id={`edit-notes-${record.id}`} rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} />
           </div>
+          <AttachmentUploader value={attachment} onChange={setAttachment} idSuffix={`-service-${record.id}`} />
         </div>
         <hr className="ticket__divider" />
         <div className="ticket__section" style={{ display: 'flex', gap: '0.6rem', alignItems: 'center' }}>
@@ -138,6 +143,7 @@ export function ServiceHistoryCard({ record, bikeClass, brandValue, region, dist
         {fmtDate(record.date)} · {formatDistance(record.mileage, distanceUnit)}
       </div>
       {record.notes && <div className={styles.jobCardNotes}>{record.notes}</div>}
+      {record.attachments?.[0] && <AttachmentThumb attachment={record.attachments[0]} />}
       {verdict && (
         <span className={`${styles.tag} ${tagClass}`}>
           {verdict.label} (typical {formatCurrency(verdict.low, currency, rates)}-{formatCurrency(verdict.high, currency, rates)})

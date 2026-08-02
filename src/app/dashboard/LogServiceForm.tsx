@@ -8,6 +8,8 @@ import { convertMilesToDisplay, convertDisplayToMiles, distanceUnitLabel, type D
 import { convertDisplayToGbp, CURRENCY_SYMBOLS, type Currency, type ExchangeRates } from '@/lib/tracker/currency';
 import { useTrackerFormSubmit } from './useTrackerFormSubmit';
 import { MileageWarning } from './MileageWarning';
+import { AttachmentUploader } from './AttachmentUploader';
+import type { Attachment } from '@/lib/tracker/cosmosHelpers';
 
 type RemindType = 'mileage' | 'months' | 'date';
 
@@ -36,6 +38,7 @@ export function LogServiceForm({
   const [remindType, setRemindType] = useState<RemindType>('mileage');
   const [remindValue, setRemindValue] = useState('');
   const [remindDate, setRemindDate] = useState('');
+  const [attachment, setAttachment] = useState<Attachment | null>(null);
   const { submit, submitting, error } = useTrackerFormSubmit('/api/tracker/services');
 
   const mileageInMiles = convertDisplayToMiles(Number(mileageDisplay), distanceUnit);
@@ -72,8 +75,9 @@ export function LogServiceForm({
       mileage: number;
       date: string;
       notes: string;
+      attachments?: Attachment[];
       reminder?: { intervalType: RemindType; intervalValue?: number; exactDate?: string };
-    } = { jobType, cost: costInGbp, mileage: Math.round(mileageInMiles), date, notes };
+    } = { jobType, cost: costInGbp, mileage: Math.round(mileageInMiles), date, notes, attachments: attachment ? [attachment] : undefined };
 
     if (remindChecked) {
       body.reminder =
@@ -87,6 +91,7 @@ export function LogServiceForm({
       setCostDisplay('');
       setNotes('');
       setMileageAcknowledged(false);
+      setAttachment(null);
     }
   }
 
@@ -127,6 +132,7 @@ export function LogServiceForm({
           <label htmlFor="job-notes">Notes (optional)</label>
           <textarea id="job-notes" rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="e.g. front only, done at Halfords Autocentre" />
         </div>
+        <AttachmentUploader value={attachment} onChange={setAttachment} idSuffix="-service" />
 
         <div className="field-checkbox">
           <label>

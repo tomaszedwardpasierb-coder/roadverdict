@@ -5,6 +5,9 @@ import { useState } from 'react';
 import { BILL_LABELS } from '@/lib/tracker/billTypes';
 import type { BillDoc } from '@/lib/tracker/bill';
 import { useTrackerFormSubmit } from './useTrackerFormSubmit';
+import { AttachmentUploader } from './AttachmentUploader';
+import { AttachmentThumb } from './AttachmentThumb';
+import type { Attachment } from '@/lib/tracker/cosmosHelpers';
 import { convertGbpToDisplay, convertDisplayToGbp, formatCurrency, CURRENCY_SYMBOLS, type Currency, type ExchangeRates } from '@/lib/tracker/currency';
 import styles from './dashboard.module.css';
 
@@ -28,6 +31,7 @@ export function BillCard({
   );
   const [date, setDate] = useState(bill.date);
   const [notes, setNotes] = useState(bill.notes);
+  const [attachment, setAttachment] = useState<Attachment | null>(bill.attachments?.[0] ?? null);
   const { submit, submitting, error } = useTrackerFormSubmit(`/api/tracker/bills/${encodeURIComponent(bill.id)}`);
 
   const symbol = CURRENCY_SYMBOLS[currency];
@@ -35,7 +39,7 @@ export function BillCard({
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
     const costInGbp = convertDisplayToGbp(Number(costDisplay), currency, rates);
-    const ok = await submit({ billType, cost: costInGbp, date, notes }, 'PATCH');
+    const ok = await submit({ billType, cost: costInGbp, date, notes, attachments: attachment ? [attachment] : [] }, 'PATCH');
     if (ok) setIsEditing(false);
   }
 
@@ -68,6 +72,7 @@ export function BillCard({
             <label htmlFor={`edit-bill-notes-${bill.id}`}>Notes</label>
             <textarea id={`edit-bill-notes-${bill.id}`} rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} />
           </div>
+          <AttachmentUploader value={attachment} onChange={setAttachment} idSuffix={`-bill-${bill.id}`} />
         </div>
         <hr className="ticket__divider" />
         <div className="ticket__section" style={{ display: 'flex', gap: '0.6rem', alignItems: 'center' }}>
@@ -91,6 +96,7 @@ export function BillCard({
       </div>
       <div className={styles.jobCardMeta}>{fmtDate(bill.date)}</div>
       {bill.notes && <div className={styles.jobCardNotes}>{bill.notes}</div>}
+      {bill.attachments?.[0] && <AttachmentThumb attachment={bill.attachments[0]} />}
       <div className={styles.cardActions}>
         <button type="button" className={styles.iconBtn} onClick={() => setIsEditing(true)}>Edit</button>
         <button type="button" className={styles.iconBtn} onClick={handleDelete} disabled={submitting}>

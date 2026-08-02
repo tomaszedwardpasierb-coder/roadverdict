@@ -5,6 +5,8 @@ import { useState } from 'react';
 import { BILL_LABELS, BILL_REMINDER_DEFAULTS } from '@/lib/tracker/billTypes';
 import { convertDisplayToGbp, CURRENCY_SYMBOLS, type Currency, type ExchangeRates } from '@/lib/tracker/currency';
 import { useTrackerFormSubmit } from './useTrackerFormSubmit';
+import { AttachmentUploader } from './AttachmentUploader';
+import type { Attachment } from '@/lib/tracker/cosmosHelpers';
 
 type RemindType = 'mileage' | 'months' | 'date';
 
@@ -17,6 +19,7 @@ export function LogBillForm({ currency, rates }: { currency: Currency; rates: Ex
   const [remindType, setRemindType] = useState<RemindType>('months');
   const [remindValue, setRemindValue] = useState('12');
   const [remindDate, setRemindDate] = useState('');
+  const [attachment, setAttachment] = useState<Attachment | null>(null);
   const { submit, submitting, error } = useTrackerFormSubmit('/api/tracker/bills');
 
   function handleBillTypeChange(newType: string) {
@@ -36,8 +39,9 @@ export function LogBillForm({ currency, rates }: { currency: Currency; rates: Ex
       cost: number;
       date: string;
       notes: string;
+      attachments?: Attachment[];
       reminder?: { intervalType: RemindType; intervalValue?: number; exactDate?: string };
-    } = { billType, cost: costInGbp, date, notes };
+    } = { billType, cost: costInGbp, date, notes, attachments: attachment ? [attachment] : undefined };
 
     if (remindChecked) {
       body.reminder =
@@ -50,6 +54,7 @@ export function LogBillForm({ currency, rates }: { currency: Currency; rates: Ex
     if (ok) {
       setCostDisplay('');
       setNotes('');
+      setAttachment(null);
     }
   }
 
@@ -79,6 +84,7 @@ export function LogBillForm({ currency, rates }: { currency: Currency; rates: Ex
           <label htmlFor="bill-notes">Notes (optional)</label>
           <textarea id="bill-notes" rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="e.g. fully comprehensive, Bennetts" />
         </div>
+        <AttachmentUploader value={attachment} onChange={setAttachment} idSuffix="-bill" />
 
         <div className="field-checkbox">
           <label>

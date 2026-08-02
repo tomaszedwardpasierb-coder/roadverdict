@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/session";
 import { updateMod, deleteMod } from "@/lib/tracker/mod";
 import { getPrimaryBike, updateBikeMileage } from "@/lib/tracker/bike";
+import type { Attachment } from "@/lib/tracker/cosmosHelpers";
 
 export const dynamic = "force-dynamic";
 
@@ -24,20 +25,21 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
   }
 
-  const { category, name, cost, mileage, date, notes } = body as {
+  const { category, name, cost, mileage, date, notes, attachments } = body as {
     category?: string;
     name?: string;
     cost?: number;
     mileage?: number;
     date?: string;
     notes?: string;
+    attachments?: Attachment[];
   };
 
   if (!category || !name || cost == null || mileage == null || !date) {
     return NextResponse.json({ error: "Please fill in all required fields." }, { status: 400 });
   }
 
-  const mod = await updateMod(session.email, id, { category, name, cost, mileage, date, notes: notes ?? "" });
+  const mod = await updateMod(session.email, id, { category, name, cost, mileage, date, notes: notes ?? "", attachments });
   if (!mod) {
     return NextResponse.json({ error: "Entry not found." }, { status: 404 });
   }

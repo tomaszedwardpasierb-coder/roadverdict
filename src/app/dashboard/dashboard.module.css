@@ -100,6 +100,37 @@
 .jobCardCost { font-family: var(--font-mono); font-weight: 500; }
 .jobCardMeta { font-family: var(--font-mono); font-size: 0.8rem; color: var(--ink-soft); margin-top: 0.2rem; }
 .jobCardNotes { font-size: 0.85rem; color: var(--ink-soft); margin-top: 0.4rem; }
+
+.attachmentThumb {
+  display: inline-flex;
+  width: 44px;
+  height: 44px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  overflow: hidden;
+  margin-top: 0.5rem;
+  background: var(--stone);
+  align-items: center;
+  justify-content: center;
+}
+.attachmentThumbImg { width: 100%; height: 100%; object-fit: cover; display: block; }
+.attachmentThumbPdf {
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  font-weight: 700;
+  color: var(--ink-soft);
+}
+.attachmentChip {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  background: var(--paper);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 0.5rem 0.6rem;
+}
+.attachmentChip .attachmentThumb { margin-top: 0; flex-shrink: 0; }
+.attachmentFileName { flex: 1; font-size: 0.82rem; color: var(--ink-soft); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tag {
   display: inline-block;
   font-family: var(--font-mono);

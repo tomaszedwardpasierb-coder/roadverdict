@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/session";
 import { updateBill, deleteBill } from "@/lib/tracker/bill";
+import type { Attachment } from "@/lib/tracker/cosmosHelpers";
 
 export const dynamic = "force-dynamic";
 
@@ -23,18 +24,19 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
   }
 
-  const { billType, cost, date, notes } = body as {
+  const { billType, cost, date, notes, attachments } = body as {
     billType?: string;
     cost?: number;
     date?: string;
     notes?: string;
+    attachments?: Attachment[];
   };
 
   if (!billType || cost == null || !date) {
     return NextResponse.json({ error: "Please fill in all required fields." }, { status: 400 });
   }
 
-  const bill = await updateBill(session.email, id, { billType, cost, date, notes: notes ?? "" });
+  const bill = await updateBill(session.email, id, { billType, cost, date, notes: notes ?? "", attachments });
   if (!bill) {
     return NextResponse.json({ error: "Entry not found." }, { status: 404 });
   }

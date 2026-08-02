@@ -5,6 +5,7 @@ import { createServiceRecord } from "@/lib/tracker/serviceRecord";
 import { getPrimaryBike, updateBikeMileage } from "@/lib/tracker/bike";
 import { createReminder, deleteRemindersBySourceKey } from "@/lib/tracker/reminder";
 import { JOB_LABELS } from "@/lib/tracker/jobTypes";
+import type { Attachment } from "@/lib/tracker/cosmosHelpers";
 
 export const dynamic = "force-dynamic";
 
@@ -21,13 +22,14 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
   }
 
-  const { jobType, cost, mileage, date, notes, reminder } = body as {
+  const { jobType, cost, mileage, date, notes, reminder, attachments } = body as {
     jobType?: string;
     cost?: number;
     mileage?: number;
     date?: string;
     notes?: string;
     reminder?: { intervalType: "mileage" | "months" | "date"; intervalValue?: number; exactDate?: string };
+    attachments?: Attachment[];
   };
 
   if (!jobType || cost == null || mileage == null || !date) {
@@ -39,7 +41,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "No bike found for this account." }, { status: 404 });
   }
 
-  const record = await createServiceRecord(session.email, { bikeId: bike.id, jobType, cost, mileage, date, notes: notes ?? "" });
+  const record = await createServiceRecord(session.email, { bikeId: bike.id, jobType, cost, mileage, date, notes: notes ?? "", attachments });
 
   if (mileage > bike.currentMileage) {
     await updateBikeMileage(session.email, bike.id, mileage);

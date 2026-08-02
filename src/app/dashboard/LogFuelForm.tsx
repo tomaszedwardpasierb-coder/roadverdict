@@ -7,6 +7,8 @@ import { convertMilesToDisplay, convertDisplayToMiles, distanceUnitLabel, type D
 import { convertDisplayToGbp, CURRENCY_SYMBOLS, type Currency, type ExchangeRates } from '@/lib/tracker/currency';
 import { useTrackerFormSubmit } from './useTrackerFormSubmit';
 import { MileageWarning } from './MileageWarning';
+import { AttachmentUploader } from './AttachmentUploader';
+import type { Attachment } from '@/lib/tracker/cosmosHelpers';
 
 export function LogFuelForm({
   initialMileage,
@@ -29,6 +31,7 @@ export function LogFuelForm({
   );
   const [filledToFull, setFilledToFull] = useState(true);
   const [mileageAcknowledged, setMileageAcknowledged] = useState(false);
+  const [attachment, setAttachment] = useState<Attachment | null>(null);
   const { submit, submitting, error } = useTrackerFormSubmit('/api/tracker/fuel');
 
   const mileageInMiles = convertDisplayToMiles(Number(mileageDisplay), distanceUnit);
@@ -49,11 +52,13 @@ export function LogFuelForm({
       mileage: Math.round(mileageInMiles),
       date,
       filledToFull,
+      attachments: attachment ? [attachment] : undefined,
     });
     if (ok) {
       setLitres('');
       setCostDisplay('');
       setMileageAcknowledged(false);
+      setAttachment(null);
     }
   }
 
@@ -90,6 +95,7 @@ export function LogFuelForm({
         <div className="field-note">
           Tick this whenever true - it&apos;s what lets us calculate your bike&apos;s real MPG from consecutive fill-ups, rather than a general assumption.
         </div>
+        <AttachmentUploader value={attachment} onChange={setAttachment} idSuffix="-fuel" />
       </div>
       <hr className="ticket__divider" />
       <div className="ticket__section">

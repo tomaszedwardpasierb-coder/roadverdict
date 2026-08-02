@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/session";
 import { createMod } from "@/lib/tracker/mod";
 import { getPrimaryBike, updateBikeMileage } from "@/lib/tracker/bike";
+import type { Attachment } from "@/lib/tracker/cosmosHelpers";
 
 export const dynamic = "force-dynamic";
 
@@ -19,13 +20,14 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
   }
 
-  const { category, name, cost, mileage, date, notes } = body as {
+  const { category, name, cost, mileage, date, notes, attachments } = body as {
     category?: string;
     name?: string;
     cost?: number;
     mileage?: number;
     date?: string;
     notes?: string;
+    attachments?: Attachment[];
   };
 
   if (!category || !name || cost == null || mileage == null || !date) {
@@ -37,7 +39,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "No bike found for this account." }, { status: 404 });
   }
 
-  const mod = await createMod(session.email, { bikeId: bike.id, category, name, cost, mileage, date, notes: notes ?? "" });
+  const mod = await createMod(session.email, { bikeId: bike.id, category, name, cost, mileage, date, notes: notes ?? "", attachments });
 
   if (mileage > bike.currentMileage) {
     await updateBikeMileage(session.email, bike.id, mileage);

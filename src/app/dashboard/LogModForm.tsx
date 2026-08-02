@@ -8,6 +8,8 @@ import { convertMilesToDisplay, convertDisplayToMiles, distanceUnitLabel, type D
 import { convertDisplayToGbp, CURRENCY_SYMBOLS, type Currency, type ExchangeRates } from '@/lib/tracker/currency';
 import { useTrackerFormSubmit } from './useTrackerFormSubmit';
 import { MileageWarning } from './MileageWarning';
+import { AttachmentUploader } from './AttachmentUploader';
+import type { Attachment } from '@/lib/tracker/cosmosHelpers';
 
 export function LogModForm({
   initialMileage,
@@ -33,6 +35,7 @@ export function LogModForm({
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
   const [notes, setNotes] = useState('');
   const [mileageAcknowledged, setMileageAcknowledged] = useState(false);
+  const [attachment, setAttachment] = useState<Attachment | null>(null);
   const { submit, submitting, error } = useTrackerFormSubmit('/api/tracker/mods');
 
   function handleGroupChange(newGroup: string) {
@@ -67,12 +70,13 @@ export function LogModForm({
     e.preventDefault();
     if (isBlocked) return;
     const costInGbp = convertDisplayToGbp(Number(costDisplay), currency, rates);
-    const ok = await submit({ category, name, cost: costInGbp, mileage: Math.round(mileageInMiles), date, notes });
+    const ok = await submit({ category, name, cost: costInGbp, mileage: Math.round(mileageInMiles), date, notes, attachments: attachment ? [attachment] : undefined });
     if (ok) {
       setName('');
       setCostDisplay('');
       setNotes('');
       setMileageAcknowledged(false);
+      setAttachment(null);
     }
   }
 
@@ -141,6 +145,7 @@ export function LogModForm({
           <label htmlFor="mod-notes">Notes (optional)</label>
           <textarea id="mod-notes" rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="e.g. fitted by Bob's Motorcycles" />
         </div>
+        <AttachmentUploader value={attachment} onChange={setAttachment} idSuffix="-mod" />
         <div className="field-note" style={{ marginTop: '0.9rem' }}>
           Worth knowing: significant modifications (exhaust, suspension, bodywork) can affect your insurance - some insurers require these to be declared. Not price-benchmarked here, since aftermarket part cost varies hugely by brand and quality.
         </div>

@@ -5,6 +5,9 @@ import { useState } from 'react';
 import { MOD_GROUPS, MOD_LABELS, MOD_LABEL_TO_KEY, findGroupForCategory } from '@/lib/tracker/modTypes';
 import type { ModDoc } from '@/lib/tracker/mod';
 import { useTrackerFormSubmit } from './useTrackerFormSubmit';
+import { AttachmentUploader } from './AttachmentUploader';
+import { AttachmentThumb } from './AttachmentThumb';
+import type { Attachment } from '@/lib/tracker/cosmosHelpers';
 import { formatDistance, convertMilesToDisplay, convertDisplayToMiles, distanceUnitLabel, type DistanceUnit } from '@/lib/tracker/unitFormat';
 import { convertGbpToDisplay, convertDisplayToGbp, formatCurrency, CURRENCY_SYMBOLS, type Currency, type ExchangeRates } from '@/lib/tracker/currency';
 import styles from './dashboard.module.css';
@@ -37,6 +40,7 @@ export function ModCard({
   );
   const [date, setDate] = useState(mod.date);
   const [notes, setNotes] = useState(mod.notes);
+  const [attachment, setAttachment] = useState<Attachment | null>(mod.attachments?.[0] ?? null);
   const { submit, submitting, error } = useTrackerFormSubmit(`/api/tracker/mods/${encodeURIComponent(mod.id)}`);
 
   function handleGroupChange(newGroup: string) {
@@ -63,7 +67,7 @@ export function ModCard({
     e.preventDefault();
     const mileageInMiles = Math.round(convertDisplayToMiles(Number(mileageDisplay), distanceUnit));
     const costInGbp = convertDisplayToGbp(Number(costDisplay), currency, rates);
-    const ok = await submit({ category, name, cost: costInGbp, mileage: mileageInMiles, date, notes }, 'PATCH');
+    const ok = await submit({ category, name, cost: costInGbp, mileage: mileageInMiles, date, notes, attachments: attachment ? [attachment] : [] }, 'PATCH');
     if (ok) setIsEditing(false);
   }
 
@@ -132,6 +136,7 @@ export function ModCard({
             <label htmlFor={`edit-mod-notes-${mod.id}`}>Notes</label>
             <textarea id={`edit-mod-notes-${mod.id}`} rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} />
           </div>
+          <AttachmentUploader value={attachment} onChange={setAttachment} idSuffix={`-mod-${mod.id}`} />
         </div>
         <hr className="ticket__divider" />
         <div className="ticket__section" style={{ display: 'flex', gap: '0.6rem', alignItems: 'center' }}>
@@ -157,6 +162,7 @@ export function ModCard({
         {MOD_LABELS[mod.category]} · {fmtDate(mod.date)} · {formatDistance(mod.mileage, distanceUnit)}
       </div>
       {mod.notes && <div className={styles.jobCardNotes}>{mod.notes}</div>}
+      {mod.attachments?.[0] && <AttachmentThumb attachment={mod.attachments[0]} />}
       <div className={styles.cardActions}>
         <button type="button" className={styles.iconBtn} onClick={() => setIsEditing(true)}>Edit</button>
         <button type="button" className={styles.iconBtn} onClick={handleDelete} disabled={submitting}>
