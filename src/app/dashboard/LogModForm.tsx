@@ -2,7 +2,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { MOD_GROUPS, MOD_LABELS } from '@/lib/tracker/modTypes';
+import { MOD_GROUPS, MOD_LABELS, MOD_LABEL_TO_KEY, findGroupForCategory } from '@/lib/tracker/modTypes';
 import { checkMileageConsistency, type HistoryPoint } from '@/lib/tracker/mileageCheck';
 import { convertMilesToDisplay, convertDisplayToMiles, distanceUnitLabel, type DistanceUnit } from '@/lib/tracker/unitFormat';
 import { convertDisplayToGbp, CURRENCY_SYMBOLS, type Currency, type ExchangeRates } from '@/lib/tracker/currency';
@@ -24,6 +24,7 @@ export function LogModForm({
 }) {
   const [group, setGroup] = useState(MOD_GROUPS[0].group);
   const [category, setCategory] = useState(MOD_GROUPS[0].subgroups[0].mods[0]);
+  const [categorySearch, setCategorySearch] = useState('');
   const [name, setName] = useState('');
   const [costDisplay, setCostDisplay] = useState('');
   const [mileageDisplay, setMileageDisplay] = useState(
@@ -38,6 +39,18 @@ export function LogModForm({
     setGroup(newGroup);
     const groupData = MOD_GROUPS.find((g) => g.group === newGroup);
     setCategory(groupData?.subgroups[0]?.mods[0] ?? '');
+  }
+
+  // Only acts once the typed text exactly matches a real catalog label
+  // (i.e. the person picked a datalist suggestion, not just typing free
+  // text) - jumps both dropdowns straight to that item.
+  function handleCategorySearch(value: string) {
+    setCategorySearch(value);
+    const matchedKey = MOD_LABEL_TO_KEY[value];
+    if (matchedKey) {
+      setCategory(matchedKey);
+      setGroup(findGroupForCategory(matchedKey));
+    }
   }
 
   const selectedGroupData = MOD_GROUPS.find((g) => g.group === group);
@@ -73,6 +86,23 @@ export function LogModForm({
         <div className="field">
           <label htmlFor="mod-date">Date</label>
           <input id="mod-date" type="date" value={date} onChange={(e) => setDate(e.target.value)} required />
+        </div>
+        <div className="field" style={{ marginTop: '0.9rem' }}>
+          <label htmlFor="mod-category-search">Search for an item</label>
+          <input
+            id="mod-category-search"
+            type="text"
+            list="mod-catalog-datalist"
+            value={categorySearch}
+            onChange={(e) => handleCategorySearch(e.target.value)}
+            placeholder="e.g. chain guide, tank bag, disc lock..."
+          />
+          <datalist id="mod-catalog-datalist">
+            {Object.keys(MOD_LABEL_TO_KEY).map((label) => (
+              <option key={label} value={label} />
+            ))}
+          </datalist>
+          <div className="field-note">Not sure which group it's under? Start typing here instead.</div>
         </div>
         <div className="field" style={{ marginTop: '0.9rem' }}>
           <label htmlFor="mod-group">Group</label>

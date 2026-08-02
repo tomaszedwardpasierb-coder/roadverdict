@@ -429,3 +429,10 @@ export function findGroupForCategory(category: string): string {
   }
   return MOD_GROUPS[0].group;
 }
+
+// Reverse lookup for the search box - given the exact label text (as
+// chosen from the datalist), finds its key. Labels are unique 1:1 with
+// keys by construction, so this is always unambiguous.
+export const MOD_LABEL_TO_KEY: Record<string, string> = Object.fromEntries(
+  Object.entries(MOD_LABELS).map(([key, label]) => [label, key])
+);

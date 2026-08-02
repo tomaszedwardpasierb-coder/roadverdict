@@ -2,7 +2,7 @@
 'use client';
 
 import { useState } from 'react';
-import { MOD_GROUPS, MOD_LABELS, findGroupForCategory } from '@/lib/tracker/modTypes';
+import { MOD_GROUPS, MOD_LABELS, MOD_LABEL_TO_KEY, findGroupForCategory } from '@/lib/tracker/modTypes';
 import type { ModDoc } from '@/lib/tracker/mod';
 import { useTrackerFormSubmit } from './useTrackerFormSubmit';
 import { formatDistance, convertMilesToDisplay, convertDisplayToMiles, distanceUnitLabel, type DistanceUnit } from '@/lib/tracker/unitFormat';
@@ -27,6 +27,7 @@ export function ModCard({
   const [isEditing, setIsEditing] = useState(false);
   const [group, setGroup] = useState(() => findGroupForCategory(mod.category));
   const [category, setCategory] = useState(mod.category);
+  const [categorySearch, setCategorySearch] = useState('');
   const [name, setName] = useState(mod.name);
   const [costDisplay, setCostDisplay] = useState(
     convertGbpToDisplay(mod.cost, currency, rates).toFixed(2)
@@ -42,6 +43,15 @@ export function ModCard({
     setGroup(newGroup);
     const groupData = MOD_GROUPS.find((g) => g.group === newGroup);
     setCategory(groupData?.subgroups[0]?.mods[0] ?? '');
+  }
+
+  function handleCategorySearch(value: string) {
+    setCategorySearch(value);
+    const matchedKey = MOD_LABEL_TO_KEY[value];
+    if (matchedKey) {
+      setCategory(matchedKey);
+      setGroup(findGroupForCategory(matchedKey));
+    }
   }
 
   const selectedGroupData = MOD_GROUPS.find((g) => g.group === group);
@@ -69,6 +79,22 @@ export function ModCard({
           <div className="field">
             <label htmlFor={`edit-mod-date-${mod.id}`}>Date</label>
             <input id={`edit-mod-date-${mod.id}`} type="date" value={date} onChange={(e) => setDate(e.target.value)} required />
+          </div>
+          <div className="field" style={{ marginTop: '0.9rem' }}>
+            <label htmlFor={`edit-mod-search-${mod.id}`}>Search for an item</label>
+            <input
+              id={`edit-mod-search-${mod.id}`}
+              type="text"
+              list={`edit-mod-catalog-datalist-${mod.id}`}
+              value={categorySearch}
+              onChange={(e) => handleCategorySearch(e.target.value)}
+              placeholder="e.g. chain guide, tank bag, disc lock..."
+            />
+            <datalist id={`edit-mod-catalog-datalist-${mod.id}`}>
+              {Object.keys(MOD_LABEL_TO_KEY).map((label) => (
+                <option key={label} value={label} />
+              ))}
+            </datalist>
           </div>
           <div className="field" style={{ marginTop: '0.9rem' }}>
             <label htmlFor={`edit-mod-group-${mod.id}`}>Group</label>
