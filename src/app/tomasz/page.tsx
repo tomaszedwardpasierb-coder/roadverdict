@@ -12,6 +12,7 @@ import {
   getServerHealth,
   getCosmosContainerInfo,
   getDetailedCounts,
+  getBikeIdBackfillStatus,
 } from '@/lib/admin/stats';
 import styles from './tomasz.module.css';
 import { RunCronButton } from './RunCronButton';
@@ -52,6 +53,7 @@ export default async function AdminDashboardPage() {
     recentSessions,
     cosmosInfo,
     detailedCounts,
+    bikeIdBackfillStatus,
   ] = await Promise.all([
     getDbStats(),
     getActiveSessionCount(),
@@ -62,6 +64,7 @@ export default async function AdminDashboardPage() {
     getRecentSessions(50),
     getCosmosContainerInfo(),
     getDetailedCounts(),
+    getBikeIdBackfillStatus(),
   ]);
   const health = getServerHealth();
 
@@ -113,6 +116,26 @@ export default async function AdminDashboardPage() {
             <p className={styles.warn}>No record found - has this ever run successfully?</p>
           )}
           <RunCronButton name="check-reminders" label="Run now" />
+        </div>
+      </div>
+
+      <h2 className={styles.sectionHeading}>Migrations (one-time, safe to re-run)</h2>
+      <div className={styles.statusGrid}>
+        <div className={styles.statusCard}>
+          <div className={styles.statusTitle}>Bike-ID backfill</div>
+          <p className={styles.warn} style={{ marginBottom: '0.4rem' }}>
+            Tags every existing service/fuel/mods/bills/reminder record with its bike&apos;s ID, ahead of multi-bike
+            support. Does nothing to records already tagged - safe to click more than once.
+          </p>
+          {bikeIdBackfillStatus ? (
+            <p>
+              Last run {fmtDate(bikeIdBackfillStatus.lastRunAt)} · {bikeIdBackfillStatus.bikesProcessed} bike(s) ·{' '}
+              {bikeIdBackfillStatus.docsPatched} record(s) patched
+            </p>
+          ) : (
+            <p className={styles.warn}>Not run yet.</p>
+          )}
+          <RunCronButton name="backfill-bike-id" label="Run backfill" />
         </div>
       </div>
 

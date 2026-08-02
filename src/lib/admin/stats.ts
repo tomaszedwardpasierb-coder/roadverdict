@@ -66,6 +66,22 @@ export async function getReminderCronStatus(): Promise<ReminderCronStatus | null
   }
 }
 
+export interface BikeIdBackfillStatus {
+  lastRunAt: string;
+  bikesProcessed: number;
+  docsPatched: number;
+}
+
+export async function getBikeIdBackfillStatus(): Promise<BikeIdBackfillStatus | null> {
+  const container = getContainer();
+  try {
+    const { resource } = await container.item("cronStatus::backfillBikeId", "system").read<BikeIdBackfillStatus>();
+    return resource ?? null;
+  } catch {
+    return null;
+  }
+}
+
 export interface MagicLinkRequestSummary {
   email: string;
   requestCount: number;

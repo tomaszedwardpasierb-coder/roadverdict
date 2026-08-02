@@ -10,6 +10,12 @@ export interface TrackerDocBase {
   type: string;
   date: string;
   createdAt: string;
+  // Optional for now, deliberately: existing docs predate this field and
+  // won't have it until the one-time backfill (see
+  // src/app/api/cron/backfill-bike-id/route.ts) runs. Every doc-type
+  // create-call site starts passing this once multi-bike support is
+  // actually wired up (a later step) - until then this is inert.
+  bikeId?: string;
 }
 
 // Creates and upserts a new tracker doc. id is auto-generated as

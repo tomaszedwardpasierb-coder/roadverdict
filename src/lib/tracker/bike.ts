@@ -39,6 +39,26 @@ export async function getBike(email: string): Promise<BikeDoc | null> {
   }
 }
 
+// New, additive - not called anywhere yet. Lists every bike doc in a
+// user's partition (there's only ever one today, since createBike still
+// writes the single deterministic id). This is groundwork for multi-bike
+// support: once createBike is changed to generate a unique id per bike
+// (a later step, deployed together with every call site that needs it),
+// this becomes the way the garage page and bike switcher list a user's
+// bikes. Safe to add now since it's a pure read, scoped to one partition.
+export async function getBikesForUser(email: string): Promise<BikeDoc[]> {
+  const container = getContainer();
+  const { resources } = await container.items
+    .query<BikeDoc>(
+      {
+        query: "SELECT * FROM c WHERE c.type = 'bike' ORDER BY c.dateAdded ASC",
+      },
+      { partitionKey: email }
+    )
+    .fetchAll();
+  return resources;
+}
+
 export async function createBike(
   email: string,
   data: {
