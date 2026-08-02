@@ -45,6 +45,8 @@ import { UnitSettings } from "./UnitSettings";
 import { ExportShareSection } from "./ExportShareSection";
 import { RecentActivity, type RecentActivityItem } from "./RecentActivity";
 import { DashboardShell } from "./DashboardShell";
+import { ChartFilterProvider } from "./ChartFilterContext";
+import { ChartFilterBar } from "./ChartFilterBar";
 
 export const dynamic = "force-dynamic";
 
@@ -135,7 +137,7 @@ export default async function DashboardPage() {
   const bikeName = bike.nickname ? `${bike.nickname} — ${bike.make} ${bike.model}` : `${bike.make} ${bike.model}`;
 
   const dashboardContent = (
-    <>
+    <ChartFilterProvider>
       {overBudget && (
         <div className={styles.budgetWarningBanner}>
           ⚠️ <strong>You&apos;re over your {currentYear} budget</strong> - {formatCurrency(yearSpend, currency, rates)} spent against a{" "}
@@ -144,6 +146,8 @@ export default async function DashboardPage() {
       )}
       <h1 className={styles.heading}>Dashboard</h1>
       <p className={styles.subtext} style={{ marginBottom: "1rem" }}>Here&apos;s how your bike looks today.</p>
+
+      <ChartFilterBar />
 
       <div style={{ marginBottom: "1rem" }}>
         <UnitSettings distanceUnit={distanceUnit} fuelEconomyUnit={fuelEconomyUnit} currency={currency} />
@@ -206,7 +210,7 @@ export default async function DashboardPage() {
       </div>
 
       <ExportShareSection />
-    </>
+    </ChartFilterProvider>
   );
 
   const serviceContent = (
@@ -282,9 +286,10 @@ export default async function DashboardPage() {
   );
 
   const reportsContent = (
-    <>
+    <ChartFilterProvider>
       <h1 className={styles.heading}>Reports</h1>
       <p className={styles.subtext} style={{ marginBottom: "1rem" }}>Every chart in one place.</p>
+      <ChartFilterBar />
       <div className={styles.reportsGrid}>
         <div className={styles.chartCard}>
           {mpgSeries.length > 0 ? (
@@ -337,7 +342,7 @@ export default async function DashboardPage() {
           )}
         </div>
       </div>
-    </>
+    </ChartFilterProvider>
   );
 
   const switcherBikes = bikes.map((b) => ({

@@ -1,14 +1,14 @@
 // Place at: src/app/dashboard/FuelCostChart.tsx
 'use client';
 
-import { useState } from 'react';
 import { Line, Bar } from 'react-chartjs-2';
 import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, BarElement, Tooltip, Legend } from 'chart.js';
-import { RANGE_OPTIONS, filterByDateRange, type RangeValue } from '@/lib/tracker/dateRange';
+import { filterByDateRange } from '@/lib/tracker/dateRange';
 import { convertGbpToDisplay, CURRENCY_SYMBOLS, type Currency, type ExchangeRates } from '@/lib/tracker/currency';
 import { useChartTypePreference } from './useChartTypePreference';
 import { ChartTypeToggle } from './ChartTypeToggle';
 import { barGradient, BAR_BORDER_RADIUS } from './chartStyle';
+import { useChartFilter } from './ChartFilterContext';
 import styles from './dashboard.module.css';
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, BarElement, Tooltip, Legend);
@@ -35,7 +35,7 @@ export function FuelCostChart({
   rates: ExchangeRates | null;
   initialChartType?: 'line' | 'bar';
 }) {
-  const [range, setRange] = useState<RangeValue>('all');
+  const { range } = useChartFilter();
   const { kind, changeKind } = useChartTypePreference(CHART_ID, initialChartType ?? 'line');
   const filtered = filterByDateRange(points, range).sort(
     (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
@@ -49,18 +49,6 @@ export function FuelCostChart({
       <div className={styles.chartCardHeader}>
         <span className={styles.chartCardTitle}>Fuel cost over time</span>
         <ChartTypeToggle value={kind} onChange={changeKind} options={['line', 'bar']} />
-      </div>
-      <div className={styles.rangeTabs}>
-        {RANGE_OPTIONS.map((o) => (
-          <button
-            key={o.value}
-            type="button"
-            className={`${styles.rangeTab} ${range === o.value ? styles.rangeTabActive : ''}`}
-            onClick={() => setRange(o.value)}
-          >
-            {o.label}
-          </button>
-        ))}
       </div>
       {filtered.length === 0 ? (
         <p className={styles.emptyNote}>No fuel fill-ups logged in this time range.</p>

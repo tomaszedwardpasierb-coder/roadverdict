@@ -1,15 +1,15 @@
 // Place at: src/app/dashboard/MileageChart.tsx
 'use client';
 
-import { useState } from 'react';
 import { Line, Bar } from 'react-chartjs-2';
 import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, BarElement, Tooltip, Legend } from 'chart.js';
-import { RANGE_OPTIONS, filterByDateRange, type RangeValue } from '@/lib/tracker/dateRange';
+import { filterByDateRange } from '@/lib/tracker/dateRange';
 import type { MileagePoint } from '@/lib/tracker/summary';
 import { convertMilesToDisplay, distanceUnitLabel, type DistanceUnit } from '@/lib/tracker/unitFormat';
 import { useChartTypePreference } from './useChartTypePreference';
 import { ChartTypeToggle } from './ChartTypeToggle';
 import { barGradient, BAR_BORDER_RADIUS } from './chartStyle';
+import { useChartFilter } from './ChartFilterContext';
 import styles from './dashboard.module.css';
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, BarElement, Tooltip, Legend);
@@ -29,7 +29,7 @@ export function MileageChart({
   distanceUnit: DistanceUnit;
   initialChartType?: 'line' | 'bar';
 }) {
-  const [range, setRange] = useState<RangeValue>('all');
+  const { range } = useChartFilter();
   const { kind, changeKind } = useChartTypePreference(CHART_ID, initialChartType ?? 'line');
   const filtered = filterByDateRange(points, range);
   const title = `${distanceUnit === 'km' ? 'Kilometres' : 'Mileage'} over time`;
@@ -42,18 +42,6 @@ export function MileageChart({
       <div className={styles.chartCardHeader}>
         <span className={styles.chartCardTitle}>{title}</span>
         <ChartTypeToggle value={kind} onChange={changeKind} options={['line', 'bar']} />
-      </div>
-      <div className={styles.rangeTabs}>
-        {RANGE_OPTIONS.map((o) => (
-          <button
-            key={o.value}
-            type="button"
-            className={`${styles.rangeTab} ${range === o.value ? styles.rangeTabActive : ''}`}
-            onClick={() => setRange(o.value)}
-          >
-            {o.label}
-          </button>
-        ))}
       </div>
       {filtered.length < 2 ? (
         <p className={styles.emptyNote}>No entries logged in this time range.</p>
