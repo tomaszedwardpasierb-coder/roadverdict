@@ -5,18 +5,35 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import styles from './garage.module.css';
 
+type RegistrationChangeReason = 'private-plate-assigned' | 'private-plate-removed' | 'correction' | 'other';
+
+const REASON_OPTIONS: { value: RegistrationChangeReason; label: string }[] = [
+  { value: 'private-plate-assigned', label: 'Private plate assigned' },
+  { value: 'private-plate-removed', label: 'Private plate removed (reverted)' },
+  { value: 'correction', label: 'Correcting an entry error' },
+  { value: 'other', label: 'Other' },
+];
+
 interface Props {
   bikeId: string;
   name: string;
-  year: number;
+  year?: number;
+  isCustomBuild?: boolean;
   currentMileage: number;
   isActive: boolean;
+  currentRegistration?: string;
+  registrationChangeCount: number;
 }
 
-export function BikeCard({ bikeId, name, year, currentMileage, isActive }: Props) {
+export function BikeCard({ bikeId, name, year, isCustomBuild, currentMileage, isActive, currentRegistration, registrationChangeCount }: Props) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [showChangeForm, setShowChangeForm] = useState(false);
+  const [newPlate, setNewPlate] = useState('');
+  const [reason, setReason] = useState<RegistrationChangeReason>('private-plate-assigned');
+  const [changing, setChanging] = useState(false);
+  const [changeError, setChangeError] = useState<string | null>(null);
 
   async function handleViewDashboard() {
     if (isActive) {
@@ -57,21 +74,92 @@ export function BikeCard({ bikeId, name, year, currentMileage, isActive }: Props
     }
   }
 
+  async function handleChangeRegistration(e: React.FormEvent) {
+    e.preventDefault();
+    if (!newPlate.trim()) return;
+    if (!confirm(`Record "${newPlate.trim().toUpperCase()}" as this bike's new registration? The old one stays on permanent record - this can't be undone or edited afterward.`)) {
+      return;
+    }
+    setChanging(true);
+    setChangeError(null);
+    try {
+      const res = await fetch('/api/tracker/bike/registration-change', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ bikeId, plate: newPlate, reason }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setChangeError(data.error ?? 'Something went wrong.');
+        return;
+      }
+      setShowChangeForm(false);
+      setNewPlate('');
+      router.refresh();
+    } catch {
+      setChangeError('Could not reach the server.');
+    } finally {
+      setChanging(false);
+    }
+  }
+
   return (
     <div className={styles.card}>
       {isActive && <div className={styles.activeBadge}>Currently viewing</div>}
       <div className={styles.cardName}>{name}</div>
       <div className={styles.cardMeta}>
-        {year} · {currentMileage.toLocaleString()} miles
+        {isCustomBuild ? 'Custom build' : year} · {currentMileage.toLocaleString()} miles
       </div>
-      <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+      {currentRegistration && (
+        <div className={styles.cardRegistration}>
+          {currentRegistration}
+          {registrationChangeCount > 0 && <span className={styles.cardRegistrationNote}> ({registrationChangeCount} change{registrationChangeCount === 1 ? '' : 's'} on record)</span>}
+        </div>
+      )}
+      <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
         <button type="button" className="submit-button" onClick={handleViewDashboard} disabled={loading || deleting}>
           {loading ? 'Switching…' : 'View dashboard'}
         </button>
+        {currentRegistration && (
+          <button type="button" className={styles.deleteBtn} onClick={() => setShowChangeForm((s) => !s)} disabled={loading || deleting}>
+            {showChangeForm ? 'Cancel' : 'Change registration'}
+          </button>
+        )}
         <button type="button" className={styles.deleteBtn} onClick={handleDelete} disabled={loading || deleting}>
           {deleting ? 'Deleting…' : 'Delete'}
         </button>
       </div>
+
+      {showChangeForm && (
+        <form onSubmit={handleChangeRegistration} className={styles.registrationChangeForm}>
+          <p className="field-note">
+            The current registration stays on permanent record - this adds a new one, it doesn&apos;t remove the old.
+          </p>
+          <div className="field" style={{ marginTop: '0.6rem' }}>
+            <label htmlFor={`new-plate-${bikeId}`}>New registration</label>
+            <input
+              id={`new-plate-${bikeId}`}
+              type="text"
+              value={newPlate}
+              onChange={(e) => setNewPlate(e.target.value)}
+              style={{ textTransform: 'uppercase' }}
+              required
+            />
+          </div>
+          <div className="field" style={{ marginTop: '0.6rem' }}>
+            <label htmlFor={`reason-${bikeId}`}>Reason</label>
+            <select id={`reason-${bikeId}`} value={reason} onChange={(e) => setReason(e.target.value as RegistrationChangeReason)}>
+              {REASON_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>{o.label}</option>
+              ))}
+            </select>
+          </div>
+          <button type="submit" className="submit-button" disabled={changing} style={{ marginTop: '0.7rem', width: 'auto' }}>
+            {changing ? 'Saving…' : 'Record change'}
+          </button>
+          {changeError && <p className="error-text" role="alert">{changeError}</p>}
+        </form>
+      )}
     </div>
   );
 }

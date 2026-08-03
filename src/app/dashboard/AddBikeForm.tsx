@@ -1,4 +1,4 @@
-﻿// Place at: src/app/dashboard/AddBikeForm.tsx
+// Place at: src/app/dashboard/AddBikeForm.tsx
 'use client';
 
 import { useState } from 'react';
@@ -13,6 +13,8 @@ export function AddBikeForm() {
   const modelsForBrand = MOTORCYCLE_MODELS.filter((m) => m.make === make);
   const [model, setModel] = useState(modelsForBrand[0]?.model ?? '');
   const [year, setYear] = useState('');
+  const [isCustomBuild, setIsCustomBuild] = useState(false);
+  const [registration, setRegistration] = useState('');
   const [mileage, setMileage] = useState('');
   const [nickname, setNickname] = useState('');
   const [region, setRegion] = useState<Region>('rest-england-wales');
@@ -33,7 +35,9 @@ export function AddBikeForm() {
       make,
       model,
       engineCC: selectedModelData.engineCC,
-      year: Number(year),
+      year: isCustomBuild ? undefined : Number(year),
+      isCustomBuild,
+      registration,
       currentMileage: Number(mileage),
       nickname,
       region,
@@ -65,9 +69,35 @@ export function AddBikeForm() {
             Engine size: {selectedModelData.engineCC}cc ({getBikeClassForCC(selectedModelData.engineCC)})
           </div>
         )}
+        <div className="field-checkbox" style={{ marginTop: '0.9rem' }}>
+          <label>
+            <input type="checkbox" checked={isCustomBuild} onChange={(e) => setIsCustomBuild(e.target.checked)} />
+            This is a custom build (no single production year applies)
+          </label>
+        </div>
+        {!isCustomBuild && (
+          <div className="field" style={{ marginTop: '0.9rem' }}>
+            <label htmlFor="bike-year">Year</label>
+            <input id="bike-year" type="number" min="1990" max="2026" value={year} onChange={(e) => setYear(e.target.value)} required />
+          </div>
+        )}
         <div className="field" style={{ marginTop: '0.9rem' }}>
-          <label htmlFor="bike-year">Year</label>
-          <input id="bike-year" type="number" min="1990" max="2026" value={year} onChange={(e) => setYear(e.target.value)} required />
+          <label htmlFor="bike-registration">Registration number</label>
+          <input
+            id="bike-registration"
+            type="text"
+            placeholder="e.g. AB12 CDE"
+            value={registration}
+            onChange={(e) => setRegistration(e.target.value)}
+            required
+            style={{ textTransform: 'uppercase' }}
+          />
+          <p className="field-note" style={{ marginTop: '0.4rem' }}>
+            This is recorded permanently as this bike&apos;s original registration and can&apos;t be removed later - only
+            added to, if the plate genuinely changes (e.g. a private plate). It&apos;s what lets a future buyer trust that
+            a report&apos;s history really belongs to the bike in front of them, so please enter the real one rather than
+            a placeholder.
+          </p>
         </div>
         <div className="field" style={{ marginTop: '0.9rem' }}>
           <label htmlFor="bike-mileage">Current mileage</label>

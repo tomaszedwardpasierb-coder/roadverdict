@@ -10,7 +10,7 @@ import styles from './dashboard.module.css';
 export interface SwitcherBike {
   id: string;
   name: string;
-  year: number;
+  year?: number;
   currentMileage: number;
 }
 
@@ -59,7 +59,7 @@ export function BikeSwitcher({ bikes, activeBikeId, distanceUnit }: Props) {
         <div className={styles.sidebarBikeLabel}>My bike</div>
         <div className={styles.sidebarBikeName}>{active.name}</div>
         <div className={styles.sidebarBikeMeta}>
-          {active.year} · {formatDistance(active.currentMileage, distanceUnit)}
+          {active.year ?? 'Custom build'} · {formatDistance(active.currentMileage, distanceUnit)}
         </div>
         <Link href="/garage" className={styles.bikeSwitcherManageLinkInline}>
           + Add another bike
@@ -81,7 +81,7 @@ export function BikeSwitcher({ bikes, activeBikeId, distanceUnit }: Props) {
           {active.name} <span aria-hidden="true">{open ? '▴' : '▾'}</span>
         </div>
         <div className={styles.sidebarBikeMeta}>
-          {active.year} · {formatDistance(active.currentMileage, distanceUnit)}
+          {active.year ?? 'Custom build'} · {formatDistance(active.currentMileage, distanceUnit)}
         </div>
       </button>
 
@@ -95,7 +95,7 @@ export function BikeSwitcher({ bikes, activeBikeId, distanceUnit }: Props) {
               className={`${styles.bikeSwitcherRow} ${b.id === activeBikeId ? styles.bikeSwitcherRowActive : ''}`}
               onClick={() => switchTo(b.id)}
             >
-              {b.name} <span className={styles.bikeSwitcherRowMeta}>({b.year})</span>
+              {b.name} <span className={styles.bikeSwitcherRowMeta}>({b.year ?? 'Custom build'})</span>
             </button>
           ))}
           <Link href="/garage" className={styles.bikeSwitcherManageLink} onClick={() => setOpen(false)}>

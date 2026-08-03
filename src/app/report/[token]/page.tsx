@@ -1,7 +1,7 @@
 // Place at: src/app/report/[token]/page.tsx
 import { notFound } from "next/navigation";
 import { resolveShareToken } from "@/lib/tracker/shareLink";
-import { getBike } from "@/lib/tracker/bike";
+import { getBike, getCurrentRegistration } from "@/lib/tracker/bike";
 import { getServiceRecords } from "@/lib/tracker/serviceRecord";
 import { getMods } from "@/lib/tracker/mod";
 import { getBills } from "@/lib/tracker/bill";
@@ -64,6 +64,17 @@ export default async function SaleReportPage({ params }: { params: { token: stri
   const realTimeCount = rows.length - backdatedCount;
   const receiptCount = rows.filter((r) => r.attachment).length;
 
+  // Same tamper-resistant idea as the backdate detection above: a
+  // registration change's timestamp is set server-side and can't be
+  // edited, so "how recently did this change, relative to right now" is
+  // a meaningful, unfakeable fact to hand a buyer.
+  const registrationChanges = bike.registrationChanges ?? [];
+  const currentRegistration = getCurrentRegistration(bike);
+  const mostRecentChange = registrationChanges[registrationChanges.length - 1];
+  const daysSinceLastChange = mostRecentChange
+    ? Math.round((Date.now() - new Date(mostRecentChange.changedAt).getTime()) / 86400000)
+    : null;
+
   return (
     <div className={styles.wrapper}>
       <div className={styles.noPrint} style={{ marginBottom: "1.2rem" }}>
@@ -73,8 +84,38 @@ export default async function SaleReportPage({ params }: { params: { token: stri
         {bike.nickname ? `${bike.nickname} — ${bike.make} ${bike.model}` : `${bike.make} ${bike.model}`}
       </h1>
       <p className={styles.subtext}>
-        {bike.year} · {bike.engineCC}cc · {bike.currentMileage.toLocaleString()} miles
+        {bike.isCustomBuild ? "Custom build" : bike.year} · {bike.engineCC}cc · {bike.currentMileage.toLocaleString()} miles
       </p>
+
+      <div className={styles.registrationBlock}>
+        {currentRegistration ? (
+          <>
+            <p>
+              {registrationChanges.length === 0 ? (
+                <>Registered as <strong>{currentRegistration}</strong> since being added to RoadVerdict on {fmtDate(bike.dateAdded)}.</>
+              ) : (
+                <>
+                  Originally registered as <strong>{bike.originalRegistration}</strong> (added to RoadVerdict {fmtDate(bike.dateAdded)}),
+                  currently <strong>{currentRegistration}</strong> (since {fmtDate(mostRecentChange!.changedAt)}).
+                </>
+              )}
+            </p>
+            {registrationChanges.length >= 2 && (
+              <p className={styles.registrationNote}>
+                This bike&apos;s registration has been changed {registrationChanges.length} times since being added to RoadVerdict.
+              </p>
+            )}
+            {daysSinceLastChange !== null && daysSinceLastChange <= 30 && (
+              <p className={styles.registrationWarning}>
+                ⚠️ Registration changed to {currentRegistration} on {fmtDate(mostRecentChange!.changedAt)} - just {daysSinceLastChange}{" "}
+                day{daysSinceLastChange === 1 ? "" : "s"} before this report was generated.
+              </p>
+            )}
+          </>
+        ) : (
+          <p className={styles.registrationNote}>No registration number is on record for this bike.</p>
+        )}
+      </div>
 
       {clusters.length > 0 && (
         <div className={styles.clusterWarning}>

@@ -49,6 +49,7 @@ import { ChartFilterProvider } from "./ChartFilterContext";
 import { ChartFilterBar } from "./ChartFilterBar";
 import { CustomFilterPanel } from "./CustomFilterPanel";
 import { ScanReceiptButton } from "./ScanReceiptButton";
+import { RegistrationBackfillBanner } from "./RegistrationBackfillBanner";
 
 export const dynamic = "force-dynamic";
 
@@ -137,6 +138,9 @@ export default async function DashboardPage() {
 
   const dashboardContent = (
     <ChartFilterProvider>
+      {!bike.originalRegistration && (
+        <RegistrationBackfillBanner bikeName={bike.nickname ? `${bike.nickname} (${bike.make} ${bike.model})` : `${bike.make} ${bike.model}`} />
+      )}
       {overBudget && (
         <div className={styles.budgetWarningBanner}>
           ⚠️ <strong>You&apos;re over your {currentYear} budget</strong> - {formatCurrency(yearSpend, currency, rates)} spent against a{" "}

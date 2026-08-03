@@ -2,7 +2,7 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { getSession } from "@/lib/auth/session";
-import { getBikesForUser, pickActiveBike, MAX_FREE_BIKES } from "@/lib/tracker/bike";
+import { getBikesForUser, pickActiveBike, getCurrentRegistration, MAX_FREE_BIKES } from "@/lib/tracker/bike";
 import LogoutButton from "@/app/dashboard/LogoutButton";
 import dashboardStyles from "@/app/dashboard/dashboard.module.css";
 import styles from "./garage.module.css";
@@ -42,8 +42,11 @@ export default async function GaragePage() {
             bikeId={bike.id}
             name={bike.nickname ? `${bike.nickname} — ${bike.make} ${bike.model}` : `${bike.make} ${bike.model}`}
             year={bike.year}
+            isCustomBuild={bike.isCustomBuild}
             currentMileage={bike.currentMileage}
             isActive={bike.id === activeBike?.id}
+            currentRegistration={getCurrentRegistration(bike)}
+            registrationChangeCount={bike.registrationChanges?.length ?? 0}
           />
         ))}
       </div>

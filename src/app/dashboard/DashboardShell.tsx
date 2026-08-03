@@ -36,7 +36,7 @@ const MORE_ITEMS: { key: Section; label: string; icon: string }[] = [
 
 interface Props {
   bikeName: string;
-  bikeYear: number;
+  bikeYear?: number;
   currentMileage: number;
   distanceUnit: DistanceUnit;
   userEmail: string;
@@ -123,7 +123,7 @@ export function DashboardShell({
         <div className={styles.mobileTopBarBike}>
           <strong>{bikeName}</strong>
           <span>
-            {bikeYear} · {formatDistance(currentMileage, distanceUnit)}
+            {bikeYear ?? 'Custom build'} · {formatDistance(currentMileage, distanceUnit)}
           </span>
         </div>
         <UpdateMileageButton currentMileage={currentMileage} distanceUnit={distanceUnit} />

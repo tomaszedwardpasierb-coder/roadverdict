@@ -21,6 +21,26 @@ export const ACTIVE_BIKE_COOKIE = "activeBikeId";
 // instead of being lost if browser data is cleared.
 export type ChartKind = "line" | "bar" | "pie";
 
+export type RegistrationChangeReason = "private-plate-assigned" | "private-plate-removed" | "correction" | "other";
+
+export const REGISTRATION_CHANGE_REASON_LABELS: Record<RegistrationChangeReason, string> = {
+  "private-plate-assigned": "Private plate assigned",
+  "private-plate-removed": "Private plate removed (reverted)",
+  correction: "Correcting an entry error",
+  other: "Other",
+};
+
+// Append-only, forever - never edited or removed. A single change is
+// completely normal (private plates exist); a long list of them, or one
+// that landed suspiciously close to generating a sale report, is exactly
+// the kind of fact a buyer should see plainly rather than have hidden
+// behind whatever plate happens to be showing today.
+export interface RegistrationChangeEntry {
+  plate: string;
+  reason: RegistrationChangeReason;
+  changedAt: string;
+}
+
 // Unique per bike, unlike the old `${email}::bike` scheme this replaces.
 // The old scheme meant a second createBike() call would silently
 // overwrite the first bike's document (same id, upsert just replaces) -
@@ -38,7 +58,12 @@ export interface BikeDoc {
   model: string;
   engineCC: number;
   bikeClass: BikeClass;
-  year: number;
+  // Optional now - a genuine custom/kit build often has no single clean
+  // answer (frame from one year, engine from another, built much later
+  // than either) - isCustomBuild is what makes year optional instead of
+  // required, not the absence of a value on its own.
+  year?: number;
+  isCustomBuild?: boolean;
   currentMileage: number;
   startingMileage: number;
   nickname: string;
@@ -49,7 +74,23 @@ export interface BikeDoc {
   fuelEconomyUnit?: FuelEconomyUnit;
   currency?: Currency;
   chartTypes?: Record<string, ChartKind>;
+  // Set once, at creation (or backfilled once for bikes added before this
+  // existed) - never editable after that through any normal flow, not
+  // even "edit bike". Optional on the type only because bikes created
+  // before this feature existed don't have one yet until backfilled.
+  originalRegistration?: string;
+  // Every plate AFTER the original - append-only, see
+  // RegistrationChangeEntry. The current plate is whichever is last here,
+  // or originalRegistration itself if this is empty.
+  registrationChanges?: RegistrationChangeEntry[];
   dateAdded: string;
+}
+
+// The plate a report/UI should actually display "as current" - the most
+// recent change, or the original if it's never changed.
+export function getCurrentRegistration(bike: BikeDoc): string | undefined {
+  const changes = bike.registrationChanges ?? [];
+  return changes.length > 0 ? changes[changes.length - 1].plate : bike.originalRegistration;
 }
 
 // Lists every bike doc in a user's partition, oldest first. There's only
@@ -116,7 +157,9 @@ export async function createBike(
     model: string;
     engineCC: number;
     bikeClass: BikeClass;
-    year: number;
+    year?: number;
+    isCustomBuild?: boolean;
+    registration: string;
     currentMileage: number;
     nickname: string;
     region: Region;
@@ -137,6 +180,8 @@ export async function createBike(
     engineCC: data.engineCC,
     bikeClass: data.bikeClass,
     year: data.year,
+    isCustomBuild: data.isCustomBuild,
+    originalRegistration: data.registration,
     currentMileage: data.currentMileage,
     startingMileage: data.currentMileage,
     nickname: data.nickname,
@@ -203,6 +248,47 @@ export async function updateBikeCurrency(email: string, bikeId: string, currency
   const { resource } = await container.item(bikeId, email).read<BikeDoc>();
   if (!resource) return null;
   resource.currency = currency;
+  await container.items.upsert(resource);
+  return resource;
+}
+
+export type SetOriginalRegistrationResult =
+  | { ok: true; bike: BikeDoc }
+  | { ok: false; reason: "not_found" | "already_set" };
+
+// One-time only, for bikes that existed before this feature did. Refuses
+// outright if originalRegistration is already set - defense in depth on
+// top of the API route's own check, so this can never be called twice to
+// quietly overwrite what's meant to be permanent.
+export async function setOriginalRegistration(
+  email: string,
+  bikeId: string,
+  registration: string
+): Promise<SetOriginalRegistrationResult> {
+  const container = getContainer();
+  const { resource } = await container.item(bikeId, email).read<BikeDoc>();
+  if (!resource) return { ok: false, reason: "not_found" };
+  if (resource.originalRegistration) return { ok: false, reason: "already_set" };
+  resource.originalRegistration = registration;
+  await container.items.upsert(resource);
+  return { ok: true, bike: resource };
+}
+
+// Appends to the permanent history - never overwrites originalRegistration
+// or any prior change. This is the only sanctioned way a bike's current
+// plate can change after creation; there is deliberately no plain "edit"
+// path for it.
+export async function addRegistrationChange(
+  email: string,
+  bikeId: string,
+  plate: string,
+  reason: RegistrationChangeReason
+): Promise<BikeDoc | null> {
+  const container = getContainer();
+  const { resource } = await container.item(bikeId, email).read<BikeDoc>();
+  if (!resource) return null;
+  const entry: RegistrationChangeEntry = { plate, reason, changedAt: new Date().toISOString() };
+  resource.registrationChanges = [...(resource.registrationChanges ?? []), entry];
   await container.items.upsert(resource);
   return resource;
 }

@@ -236,6 +236,29 @@
 .globalFilterBar { display: flex; align-items: center; gap: 0.7rem; flex-wrap: wrap; background: var(--paper); border: 1px solid var(--border); border-radius: 8px; padding: 0.6rem 0.9rem; margin-bottom: 1rem; }
 
 .scanReceiptWrap { margin-bottom: 1rem; }
+
+.registrationBanner {
+  background: #fff8ec;
+  border: 1px solid var(--amber);
+  border-radius: 8px;
+  padding: 1rem 1.2rem;
+  margin-bottom: 1.2rem;
+  font-size: 0.88rem;
+  color: var(--ink);
+}
+.registrationBanner p { margin: 0; }
+.registrationBannerTitle {
+  font-family: var(--font-display);
+  font-size: 1rem;
+  color: var(--amber-ink);
+  margin-bottom: 0.5rem !important;
+}
+.registrationBanner input[type="text"] {
+  font-family: var(--font-mono);
+  padding: 0.5rem 0.7rem;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+}
 .scanReceiptBtn {
   font-family: var(--font-mono);
   font-size: 0.85rem;

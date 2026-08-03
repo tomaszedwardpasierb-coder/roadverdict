@@ -32,18 +32,26 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
   }
 
-  const { make, model, engineCC, year, currentMileage, nickname, region } = body as {
+  const { make, model, engineCC, year, isCustomBuild, registration, currentMileage, nickname, region } = body as {
     make?: string;
     model?: string;
     engineCC?: number;
     year?: number;
+    isCustomBuild?: boolean;
+    registration?: string;
     currentMileage?: number;
     nickname?: string;
     region?: Region;
   };
 
-  if (!make || !model || !engineCC || !year || currentMileage == null || !region) {
+  if (!make || !model || !engineCC || currentMileage == null || !region) {
     return NextResponse.json({ error: "Please fill in all required fields." }, { status: 400 });
+  }
+  if (!isCustomBuild && !year) {
+    return NextResponse.json({ error: "Production year is required, unless this is a custom build." }, { status: 400 });
+  }
+  if (!registration || !registration.trim()) {
+    return NextResponse.json({ error: "Registration number is required." }, { status: 400 });
   }
 
   const bikeClass = getBikeClassForCC(engineCC);
@@ -52,7 +60,9 @@ export async function POST(request: NextRequest) {
     model,
     engineCC,
     bikeClass,
-    year,
+    year: isCustomBuild ? undefined : year,
+    isCustomBuild,
+    registration: registration.trim().toUpperCase(),
     currentMileage,
     nickname: nickname ?? "",
     region,

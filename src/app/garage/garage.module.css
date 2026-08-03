@@ -76,3 +76,20 @@
   opacity: 0.6;
   cursor: default;
 }
+
+.cardRegistration {
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  color: var(--ink-soft);
+  margin-bottom: 0.7rem;
+  letter-spacing: 0.03em;
+}
+.cardRegistrationNote {
+  font-family: var(--font-sans);
+  letter-spacing: normal;
+}
+.registrationChangeForm {
+  margin-top: 0.9rem;
+  padding-top: 0.9rem;
+  border-top: 1px solid var(--border);
+}
