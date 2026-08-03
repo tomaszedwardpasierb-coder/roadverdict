@@ -44,6 +44,38 @@
   color: var(--ink-soft);
   margin-top: 0.15rem;
 }
+
+.receiptLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  text-decoration: none;
+  color: var(--amber-ink);
+}
+.receiptThumb {
+  width: 32px;
+  height: 32px;
+  object-fit: cover;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  display: block;
+}
+.receiptThumbPdf {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--stone);
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  font-weight: 700;
+  color: var(--ink-soft);
+}
+.receiptLabel { font-size: 0.78rem; }
+.noReceipt { font-size: 0.78rem; color: var(--ink-soft); }
 @media print {
   .noPrint { display: none; }
 }

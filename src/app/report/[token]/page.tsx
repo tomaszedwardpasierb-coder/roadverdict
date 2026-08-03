@@ -9,6 +9,7 @@ import { JOB_LABELS } from "@/lib/tracker/jobTypes";
 import { MOD_LABELS } from "@/lib/tracker/modTypes";
 import { BILL_LABELS } from "@/lib/tracker/billTypes";
 import { isBackdated, backdateNotice, detectBulkBackdating, type BackdateCheckItem } from "@/lib/tracker/backdateCheck";
+import type { Attachment } from "@/lib/tracker/cosmosHelpers";
 import styles from "./report.module.css";
 import { PrintButton } from "./PrintButton";
 
@@ -42,13 +43,13 @@ export default async function SaleReportPage({ params }: { params: { token: stri
     category: string;
     description: string;
     cost: number;
-    hasAttachment: boolean;
+    attachment: Attachment | null;
   }
 
   const rows: Row[] = [
-    ...records.map((r) => ({ id: r.id, date: r.date, createdAt: r.createdAt, category: "Service", description: JOB_LABELS[r.jobType] ?? r.jobType, cost: r.cost, hasAttachment: !!r.attachments?.[0] })),
-    ...mods.map((m) => ({ id: m.id, date: m.date, createdAt: m.createdAt, category: "Modification", description: `${MOD_LABELS[m.category] ?? m.category}: ${m.name}`, cost: m.cost, hasAttachment: !!m.attachments?.[0] })),
-    ...bills.map((b) => ({ id: b.id, date: b.date, createdAt: b.createdAt, category: "Bill", description: BILL_LABELS[b.billType] ?? b.billType, cost: b.cost, hasAttachment: !!b.attachments?.[0] })),
+    ...records.map((r) => ({ id: r.id, date: r.date, createdAt: r.createdAt, category: "Service", description: JOB_LABELS[r.jobType] ?? r.jobType, cost: r.cost, attachment: r.attachments?.[0] ?? null })),
+    ...mods.map((m) => ({ id: m.id, date: m.date, createdAt: m.createdAt, category: "Modification", description: `${MOD_LABELS[m.category] ?? m.category}: ${m.name}`, cost: m.cost, attachment: m.attachments?.[0] ?? null })),
+    ...bills.map((b) => ({ id: b.id, date: b.date, createdAt: b.createdAt, category: "Bill", description: BILL_LABELS[b.billType] ?? b.billType, cost: b.cost, attachment: b.attachments?.[0] ?? null })),
   ].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
   const total = rows.reduce((sum, r) => sum + r.cost, 0);
@@ -57,10 +58,11 @@ export default async function SaleReportPage({ params }: { params: { token: stri
   // server-side at creation and can never be edited by the client, so
   // comparing it against the user-claimed `date` is meaningful in a way
   // that neither field alone would be.
-  const backdateItems: BackdateCheckItem[] = rows.map((r) => ({ id: r.id, date: r.date, createdAt: r.createdAt, hasAttachment: r.hasAttachment }));
+  const backdateItems: BackdateCheckItem[] = rows.map((r) => ({ id: r.id, date: r.date, createdAt: r.createdAt, hasAttachment: !!r.attachment }));
   const clusters = detectBulkBackdating(backdateItems);
   const backdatedCount = rows.filter((r) => isBackdated(r.date, r.createdAt)).length;
   const realTimeCount = rows.length - backdatedCount;
+  const receiptCount = rows.filter((r) => r.attachment).length;
 
   return (
     <div className={styles.wrapper}>
@@ -90,11 +92,11 @@ export default async function SaleReportPage({ params }: { params: { token: stri
         <p>No service, modification, or bill history has been logged for this bike yet.</p>
       ) : (
         <>
-          {backdatedCount > 0 && (
+          {(backdatedCount > 0 || receiptCount > 0) && (
             <p className={styles.backdateSummary}>
-              {realTimeCount} of {rows.length} entries were logged close to when the work was done. {backdatedCount}{" "}
-              {backdatedCount === 1 ? "was" : "were"} added to RoadVerdict later than the date claimed - see the notes below
-              each one.
+              {realTimeCount} of {rows.length} entries were logged close to when the work was done
+              {backdatedCount > 0 && <> - {backdatedCount} {backdatedCount === 1 ? "was" : "were"} added later, see the notes below</>}.{" "}
+              {receiptCount} of {rows.length} {receiptCount === 1 ? "has" : "have"} a receipt or invoice attached.
             </p>
           )}
           <table className={styles.table}>
@@ -104,33 +106,51 @@ export default async function SaleReportPage({ params }: { params: { token: stri
                 <th>Category</th>
                 <th>Description</th>
                 <th>Cost</th>
+                <th>Receipt</th>
               </tr>
             </thead>
             <tbody>
               {rows.map((r) => {
                 const backdated = isBackdated(r.date, r.createdAt);
                 const notice = backdated ? backdateNotice(r.date, r.createdAt) : "";
+                const isImage = r.attachment?.fileType === "image/jpeg" || r.attachment?.fileType === "image/png";
+                const attachmentUrl = r.attachment ? `/api/tracker/report-attachment/${params.token}/${encodeURIComponent(r.attachment.blobName)}` : null;
                 return (
                   <tr key={r.id}>
                     <td>
                       {fmtDate(r.date)}
                       {backdated && (
-                        <div className={r.hasAttachment ? styles.backdateNoteSoft : styles.backdateNote}>
+                        <div className={r.attachment ? styles.backdateNoteSoft : styles.backdateNote}>
                           {notice}
-                          {r.hasAttachment && " (receipt attached)"}
+                          {r.attachment && " (receipt attached)"}
                         </div>
                       )}
                     </td>
                     <td>{r.category}</td>
                     <td>{r.description}</td>
                     <td>{fmtMoney(r.cost)}</td>
+                    <td>
+                      {attachmentUrl ? (
+                        <a href={attachmentUrl} target="_blank" rel="noopener" className={styles.receiptLink} title={r.attachment?.fileName}>
+                          {isImage ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img src={attachmentUrl} alt="" className={styles.receiptThumb} />
+                          ) : (
+                            <span className={styles.receiptThumbPdf}>PDF</span>
+                          )}
+                          <span className={styles.receiptLabel}>View</span>
+                        </a>
+                      ) : (
+                        <span className={styles.noReceipt}>— none provided</span>
+                      )}
+                    </td>
                   </tr>
                 );
               })}
             </tbody>
             <tfoot>
               <tr>
-                <td colSpan={3}>Total logged spend</td>
+                <td colSpan={4}>Total logged spend</td>
                 <td>{fmtMoney(total)}</td>
               </tr>
             </tfoot>
