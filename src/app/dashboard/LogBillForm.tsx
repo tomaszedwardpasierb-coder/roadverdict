@@ -35,19 +35,22 @@ export function LogBillForm({
   ]);
   const [attachment, setAttachment] = useState<Attachment | null>(null);
   const { submit, submitting, error } = useTrackerFormSubmit('/api/tracker/bills');
-  const { scanned, setScanned } = useScannedReceipt();
+  const { queue, removeItem, goToNextPending } = useScannedReceipt();
+  const [fromScan, setFromScan] = useState(false);
 
   useEffect(() => {
-    if (scanned?.category !== 'bills') return;
-    setDate(scanned.date);
-    setCostDisplay(String(scanned.cost));
-    setNotes(scanned.description);
-    setAttachment(scanned.attachment);
-    const guessedType = guessBillType(scanned.description);
+    const match = queue.find((item) => item.category === 'bills');
+    if (!match) return;
+    setDate(match.date);
+    setCostDisplay(String(match.cost));
+    setNotes(match.description);
+    setAttachment(match.attachment);
+    const guessedType = guessBillType(match.description);
     if (guessedType) setBillType(guessedType);
-    setScanned(null);
+    setFromScan(true);
+    removeItem(match.id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [scanned]);
+  }, [queue]);
 
   function handleBillTypeChange(newType: string) {
     setBillType(newType);
@@ -86,6 +89,10 @@ export function LogBillForm({
       setCostDisplay('');
       setNotes('');
       setAttachment(null);
+      if (fromScan) {
+        setFromScan(false);
+        goToNextPending();
+      }
     }
   }
 
@@ -95,6 +102,12 @@ export function LogBillForm({
     <form className="ticket" onSubmit={handleSubmit}>
       <div className="ticket__section">
         <span className="ticket__label">Log insurance, tax, or an MOT</span>
+        {fromScan && (
+          <p className="field-note" style={{ color: 'var(--amber-ink)' }}>
+            🧠 This was filled in automatically from a scanned receipt - please double-check everything below
+            before saving.
+          </p>
+        )}
         <div className="field">
           <label htmlFor="bill-date">Date</label>
           <input id="bill-date" type="date" value={date} onChange={(e) => setDate(e.target.value)} required />

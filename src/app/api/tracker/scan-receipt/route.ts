@@ -19,30 +19,39 @@ const ALLOWED_TYPES = new Set(["image/jpeg", "image/png"]);
 // PDFs aren't scanned in this first version - Gemini can technically read
 // them, but the dominant real case is someone photographing a paper
 // receipt, so keeping scope to photos keeps this first version simple.
-// A PDF can still be attached manually exactly as before.
+// A PDF can still be attached manually as before.
 
-const PROMPT = `You are extracting structured data from a photo of a UK motorcycle-related receipt or invoice. Read the image and respond with ONLY a JSON object (no markdown, no explanation) matching this exact shape:
+// Always asks for an array, even for a single-item receipt - one
+// consistent shape for the caller to handle, rather than two different
+// response shapes depending on what was on the receipt.
+const PROMPT = `You are extracting structured data from a photo of a UK motorcycle-related receipt or invoice. This receipt may contain ONE purchase, or it may contain SEVERAL distinct items that belong to different categories (for example, an oil change AND a padlock bought at the same garage visit, or fuel AND a snack). Read the image and respond with ONLY a JSON object (no markdown, no explanation) matching this exact shape:
 {
-  "category": one of "service", "fuel", "mods", "bills",
-  "date": the transaction date as YYYY-MM-DD (your best reading of the receipt; if genuinely illegible, use today's date),
-  "cost": the total amount paid, as a plain number with no currency symbol,
-  "description": a short (max 6 words) plain-English description of what this receipt is for,
-  "litres": if category is "fuel", the number of litres as a plain number, otherwise null
+  "items": [
+    {
+      "category": one of "service", "fuel", "mods", "bills",
+      "date": the transaction date as YYYY-MM-DD (your best reading of the receipt; if genuinely illegible, use today's date),
+      "cost": the cost of just THIS item, as a plain number with no currency symbol - not the receipt's grand total, unless there is genuinely only one item,
+      "description": a short (max 6 words) plain-English description of this specific item,
+      "litres": if category is "fuel", the number of litres for this item as a plain number, otherwise null
+    }
+  ]
 }
 Category guide:
 - "service": motorcycle servicing, repairs, or parts fitted as a labour job (oil change, brake pads, tyres, chain, valve clearance, etc.)
 - "fuel": a petrol or diesel fill-up
 - "mods": accessories, gear, luggage, or electronics bought (not fitted as a labour job)
 - "bills": insurance, road tax (VED), or an MOT test
-If you cannot confidently read a value, make your best reasonable estimate rather than leaving it out - every field must have a value.`;
+If the receipt only really contains one purchase, return a single-item array rather than trying to invent a split. If you cannot confidently read a value, make your best reasonable estimate rather than leaving it out - every field on every item must have a value.`;
 
-interface GeminiExtraction {
+interface GeminiItem {
   category?: string;
   date?: string;
   cost?: number;
   description?: string;
   litres?: number | null;
 }
+
+const VALID_CATEGORIES = new Set(["service", "fuel", "mods", "bills"]);
 
 export async function POST(request: NextRequest) {
   const session = await getSession();
@@ -106,21 +115,22 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Could not read the receipt. Please try again or enter it manually." }, { status: 502 });
     }
 
-    let extracted: GeminiExtraction;
+    let parsed: { items?: GeminiItem[] };
     try {
-      extracted = JSON.parse(rawText);
+      parsed = JSON.parse(rawText);
     } catch {
       return NextResponse.json({ error: "Could not read the receipt. Please try again or enter it manually." }, { status: 502 });
     }
 
-    const validCategories = ["service", "fuel", "mods", "bills"];
-    if (!extracted.category || !validCategories.includes(extracted.category)) {
+    const rawItems = Array.isArray(parsed.items) ? parsed.items : [];
+    const validItems = rawItems.filter((item) => item.category && VALID_CATEGORIES.has(item.category));
+    if (validItems.length === 0) {
       return NextResponse.json({ error: "Could not work out what kind of expense this is. Please enter it manually." }, { status: 502 });
     }
 
-    // Upload the same compressed image as this record's attachment, so
-    // scanning a receipt and manually uploading one end up in exactly the
-    // same storage path with the same proof attached either way.
+    // Upload the same compressed image once - it's shared as the
+    // attachment across every item split out of this one receipt, since
+    // they're all proof of the same physical piece of paper.
     const blobName = `${randomBytes(24).toString("base64url")}.jpg`;
     const container = await getAttachmentContainer();
     const blockBlobClient = container.getBlockBlobClient(blobName);
@@ -133,14 +143,15 @@ export async function POST(request: NextRequest) {
       uploadedAt: new Date().toISOString(),
     };
 
-    return NextResponse.json({
-      category: extracted.category,
-      date: extracted.date ?? new Date().toISOString().slice(0, 10),
-      cost: typeof extracted.cost === "number" ? extracted.cost : 0,
-      description: extracted.description ?? "",
-      litres: typeof extracted.litres === "number" ? extracted.litres : null,
-      attachment,
-    });
+    const items = validItems.map((item) => ({
+      category: item.category as "service" | "fuel" | "mods" | "bills",
+      date: item.date ?? new Date().toISOString().slice(0, 10),
+      cost: typeof item.cost === "number" ? item.cost : 0,
+      description: item.description ?? "",
+      litres: typeof item.litres === "number" ? item.litres : null,
+    }));
+
+    return NextResponse.json({ items, attachment });
   } catch (err) {
     return NextResponse.json(
       { error: "Something went wrong scanning the receipt. Please try again or enter it manually.", detail: err instanceof Error ? err.message : String(err) },

@@ -46,22 +46,25 @@ export function LogModForm({
   const [mileageAcknowledged, setMileageAcknowledged] = useState(false);
   const [attachment, setAttachment] = useState<Attachment | null>(null);
   const { submit, submitting, error } = useTrackerFormSubmit('/api/tracker/mods');
-  const { scanned, setScanned } = useScannedReceipt();
+  const { queue, removeItem, goToNextPending } = useScannedReceipt();
+  const [fromScan, setFromScan] = useState(false);
 
   useEffect(() => {
-    if (scanned?.category !== 'mods') return;
-    setDate(scanned.date);
-    setCostDisplay(String(scanned.cost));
-    setName(scanned.description);
-    setAttachment(scanned.attachment);
-    const guessedCategory = guessModCategory(scanned.description);
+    const match = queue.find((item) => item.category === 'mods');
+    if (!match) return;
+    setDate(match.date);
+    setCostDisplay(String(match.cost));
+    setName(match.description);
+    setAttachment(match.attachment);
+    const guessedCategory = guessModCategory(match.description);
     if (guessedCategory) {
       setCategory(guessedCategory);
       setGroup(findGroupForCategory(guessedCategory));
     }
-    setScanned(null);
+    setFromScan(true);
+    removeItem(match.id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [scanned]);
+  }, [queue]);
 
   function handleGroupChange(newGroup: string) {
     setGroup(newGroup);
@@ -101,6 +104,10 @@ export function LogModForm({
       setNotes('');
       setMileageAcknowledged(false);
       setAttachment(null);
+      if (fromScan) {
+        setFromScan(false);
+        goToNextPending();
+      }
     }
   }
 
@@ -111,6 +118,12 @@ export function LogModForm({
     <form className="ticket" onSubmit={handleSubmit}>
       <div className="ticket__section">
         <span className="ticket__label">Log a part or accessory</span>
+        {fromScan && (
+          <p className="field-note" style={{ color: 'var(--amber-ink)' }}>
+            🧠 This was filled in automatically from a scanned receipt - please double-check everything below
+            before saving, especially the mileage.
+          </p>
+        )}
         <div className="field">
           <label htmlFor="mod-date">Date</label>
           <input id="mod-date" type="date" value={date} onChange={(e) => setDate(e.target.value)} required />

@@ -48,23 +48,29 @@ export function LogServiceForm({
   ]);
   const [attachment, setAttachment] = useState<Attachment | null>(null);
   const { submit, submitting, error } = useTrackerFormSubmit('/api/tracker/services');
-  const { scanned, setScanned } = useScannedReceipt();
+  const { queue, removeItem, goToNextPending } = useScannedReceipt();
+  const [scanItemId, setScanItemId] = useState<string | null>(null);
+  const [fromScan, setFromScan] = useState(false);
 
-  // Consumes a matching scan exactly once - the moment this tab is
-  // opened after a service receipt was scanned elsewhere, it pre-fills
-  // and immediately clears the shared value so it can't reapply itself
-  // again if the person navigates back here later.
+  // Consumes the first matching item in the shared queue, exactly once -
+  // pre-fills from it and removes it, so it can't reapply itself again if
+  // the person navigates back here later. Tracks which item this was
+  // (scanItemId), so a successful save afterward knows to advance to
+  // whatever's next in the queue rather than just sitting here.
   useEffect(() => {
-    if (scanned?.category !== 'service') return;
-    setDate(scanned.date);
-    setCostDisplay(String(scanned.cost));
-    setNotes(scanned.description);
-    setAttachment(scanned.attachment);
-    const guessedJob = guessJobType(scanned.description);
+    const match = queue.find((item) => item.category === 'service');
+    if (!match) return;
+    setDate(match.date);
+    setCostDisplay(String(match.cost));
+    setNotes(match.description);
+    setAttachment(match.attachment);
+    const guessedJob = guessJobType(match.description);
     if (guessedJob) setJobType(guessedJob);
-    setScanned(null);
+    setScanItemId(match.id);
+    setFromScan(true);
+    removeItem(match.id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [scanned]);
+  }, [queue]);
 
   const mileageInMiles = convertDisplayToMiles(Number(mileageDisplay), distanceUnit);
 
@@ -120,6 +126,11 @@ export function LogServiceForm({
       setNotes('');
       setMileageAcknowledged(false);
       setAttachment(null);
+      if (fromScan) {
+        setFromScan(false);
+        setScanItemId(null);
+        goToNextPending();
+      }
     }
   }
 
@@ -131,6 +142,12 @@ export function LogServiceForm({
     <form className="ticket" onSubmit={handleSubmit}>
       <div className="ticket__section">
         <span className="ticket__label">Log a service</span>
+        {fromScan && (
+          <p className="field-note" style={{ color: 'var(--amber-ink)' }}>
+            🧠 This was filled in automatically from a scanned receipt - please double-check everything below
+            before saving, especially the mileage.
+          </p>
+        )}
         <div className="field">
           <label htmlFor="job-date">Date</label>
           <input id="job-date" type="date" value={date} onChange={(e) => setDate(e.target.value)} required />
