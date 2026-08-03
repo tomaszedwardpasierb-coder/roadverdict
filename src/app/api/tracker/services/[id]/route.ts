@@ -34,7 +34,12 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     date?: string;
     notes?: string;
     attachments?: Attachment[];
-    reminder?: { intervalType: "mileage" | "months" | "date"; intervalValue?: number; exactDate?: string };
+    reminder?: {
+      intervalType: "mileage" | "months" | "date";
+      intervalValue?: number;
+      exactDate?: string;
+      additionalTriggers?: { intervalType: "mileage" | "months" | "date"; intervalValue?: number; exactDate?: string }[];
+    };
   };
 
   if (!jobType || cost == null || mileage == null || !date) {
@@ -70,6 +75,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
       intervalType: reminder.intervalType,
       intervalValue: reminder.intervalValue,
       exactDate: reminder.exactDate,
+      additionalTriggers: reminder.additionalTriggers,
       baseMileage: mileage,
       date,
       sourceKey,

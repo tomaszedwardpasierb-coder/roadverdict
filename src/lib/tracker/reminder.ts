@@ -2,6 +2,12 @@
 import { getContainer } from "@/lib/cosmos";
 import { createTrackerDoc, queryTrackerDocs, updateTrackerDoc, deleteTrackerDoc, type TrackerDocBase } from "./cosmosHelpers";
 
+export interface ReminderTrigger {
+  intervalType: "mileage" | "months" | "date";
+  intervalValue?: number;
+  exactDate?: string;
+}
+
 export interface ReminderDoc extends TrackerDocBase {
   type: "reminder";
   name: string;
@@ -11,6 +17,11 @@ export interface ReminderDoc extends TrackerDocBase {
   exactDate?: string;
   sourceKey?: string;
   notifiedAt?: string | null;
+  // Optional, additive - existing reminders simply have none. When
+  // present, the reminder fires the moment ANY ONE of the primary
+  // trigger (above) or these extra ones is reached - "whichever comes
+  // first", e.g. "12,000 miles or 12 months".
+  additionalTriggers?: ReminderTrigger[];
 }
 
 export async function createReminder(
@@ -24,6 +35,7 @@ export async function createReminder(
     exactDate?: string;
     date: string;
     sourceKey?: string;
+    additionalTriggers?: ReminderTrigger[];
   }
 ): Promise<ReminderDoc> {
   return createTrackerDoc<ReminderDoc>(email, "reminder", "reminder", { ...data, notifiedAt: null });
@@ -79,41 +91,9 @@ export async function markReminderNotified(email: string, id: string): Promise<v
   await container.items.upsert(resource);
 }
 
-export function monthsBetween(d1: Date, d2: Date): number {
-  return (d2.getFullYear() - d1.getFullYear()) * 12 + (d2.getMonth() - d1.getMonth());
-}
-
-export function computeReminderStatus(r: ReminderDoc, currentMileage: number): "ok" | "due-soon" | "overdue" {
-  if (r.intervalType === "date" && r.exactDate) {
-    const daysRemaining = (new Date(r.exactDate).getTime() - Date.now()) / 86400000;
-    if (daysRemaining <= 0) return "overdue";
-    if (daysRemaining <= 14) return "due-soon";
-    return "ok";
-  }
-  let pct = 0;
-  if (r.intervalType === "mileage" && r.intervalValue) {
-    pct = (currentMileage - (r.baseMileage ?? 0)) / r.intervalValue;
-  } else if (r.intervalType === "months" && r.intervalValue) {
-    const months = monthsBetween(new Date(r.date), new Date());
-    pct = months / r.intervalValue;
-  }
-  if (pct >= 1) return "overdue";
-  if (pct >= 0.85) return "due-soon";
-  return "ok";
-}
-
-export function reminderDetailLabel(r: ReminderDoc): string {
-  if (r.intervalType === "date" && r.exactDate) {
-    return `due on ${new Date(r.exactDate).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}`;
-  }
-  if (r.intervalType === "mileage" && r.intervalValue) {
-    const due = (r.baseMileage ?? 0) + r.intervalValue;
-    return `due around ${due.toLocaleString()} miles (every ${r.intervalValue.toLocaleString()} mi)`;
-  }
-  if (r.intervalType === "months" && r.intervalValue) {
-    const base = new Date(r.date);
-    const due = new Date(base.getFullYear(), base.getMonth() + r.intervalValue, base.getDate());
-    return `due around ${due.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })} (every ${r.intervalValue} months)`;
-  }
-  return "";
-}
+// Re-exported from reminderStatus.ts so existing server-side imports (the
+// cron, dashboard/page.tsx) don't need to change. Any CLIENT component
+// should import these directly from reminderStatus.ts instead - that file
+// has zero Cosmos dependency, this one does, and importing a value from
+// this file pulls the whole SDK into a browser bundle for no reason.
+export { monthsBetween, computeReminderStatus, reminderDetailLabel } from "./reminderStatus";

@@ -1,4 +1,4 @@
-﻿// Place at: src/app/dashboard/LogBillForm.tsx
+// Place at: src/app/dashboard/LogBillForm.tsx
 'use client';
 
 import { useState } from 'react';
@@ -6,9 +6,9 @@ import { BILL_LABELS, BILL_REMINDER_DEFAULTS } from '@/lib/tracker/billTypes';
 import { convertDisplayToGbp, CURRENCY_SYMBOLS, type Currency, type ExchangeRates } from '@/lib/tracker/currency';
 import { useTrackerFormSubmit } from './useTrackerFormSubmit';
 import { AttachmentUploader } from './AttachmentUploader';
+import { ReminderFields, type ReminderTriggerRow } from './ReminderFields';
 import type { Attachment } from '@/lib/tracker/cosmosHelpers';
-
-type RemindType = 'mileage' | 'months' | 'date';
+import type { ReminderTrigger } from '@/lib/tracker/reminder';
 
 export function LogBillForm({ currency, rates }: { currency: Currency; rates: ExchangeRates | null }) {
   const [billType, setBillType] = useState('insurance');
@@ -16,9 +16,9 @@ export function LogBillForm({ currency, rates }: { currency: Currency; rates: Ex
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
   const [notes, setNotes] = useState('');
   const [remindChecked, setRemindChecked] = useState(true);
-  const [remindType, setRemindType] = useState<RemindType>('months');
-  const [remindValue, setRemindValue] = useState('12');
-  const [remindDate, setRemindDate] = useState('');
+  const [remindTriggers, setRemindTriggers] = useState<ReminderTriggerRow[]>([
+    { intervalType: 'months', intervalValue: '12', exactDate: '' },
+  ]);
   const [attachment, setAttachment] = useState<Attachment | null>(null);
   const { submit, submitting, error } = useTrackerFormSubmit('/api/tracker/bills');
 
@@ -26,9 +26,14 @@ export function LogBillForm({ currency, rates }: { currency: Currency; rates: Ex
     setBillType(newType);
     if (remindChecked) {
       const def = BILL_REMINDER_DEFAULTS[newType];
-      setRemindType(def ? def.type : 'months');
-      setRemindValue(def ? String(def.value) : '12');
+      setRemindTriggers([{ intervalType: def ? def.type : 'months', intervalValue: def ? String(def.value) : '12', exactDate: '' }]);
     }
+  }
+
+  function rowToTrigger(row: ReminderTriggerRow): ReminderTrigger {
+    return row.intervalType === 'date'
+      ? { intervalType: 'date', exactDate: row.exactDate }
+      : { intervalType: row.intervalType, intervalValue: Number(row.intervalValue) };
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -40,14 +45,12 @@ export function LogBillForm({ currency, rates }: { currency: Currency; rates: Ex
       date: string;
       notes: string;
       attachments?: Attachment[];
-      reminder?: { intervalType: RemindType; intervalValue?: number; exactDate?: string };
+      reminder?: ReminderTrigger & { additionalTriggers?: ReminderTrigger[] };
     } = { billType, cost: costInGbp, date, notes, attachments: attachment ? [attachment] : undefined };
 
-    if (remindChecked) {
-      body.reminder =
-        remindType === 'date'
-          ? { intervalType: 'date', exactDate: remindDate }
-          : { intervalType: remindType, intervalValue: Number(remindValue) };
+    if (remindChecked && remindTriggers.length > 0) {
+      const [primary, ...rest] = remindTriggers.map(rowToTrigger);
+      body.reminder = rest.length > 0 ? { ...primary, additionalTriggers: rest } : primary;
     }
 
     const ok = await submit(body);
@@ -86,36 +89,14 @@ export function LogBillForm({ currency, rates }: { currency: Currency; rates: Ex
         </div>
         <AttachmentUploader value={attachment} onChange={setAttachment} idSuffix="-bill" />
 
-        <div className="field-checkbox">
-          <label>
-            <input type="checkbox" checked={remindChecked} onChange={(e) => setRemindChecked(e.target.checked)} />
-            🔔 Remind me when this is due for renewal
-          </label>
-        </div>
-
-        {remindChecked && (
-          <div style={{ marginTop: '0.6rem', paddingLeft: '1.4rem', borderLeft: '2px solid var(--amber)' }}>
-            <div className="field">
-              <label htmlFor="bill-remind-type">Track by</label>
-              <select id="bill-remind-type" value={remindType} onChange={(e) => setRemindType(e.target.value as RemindType)}>
-                <option value="months">Time (months)</option>
-                <option value="mileage">Mileage</option>
-                <option value="date">Exact date</option>
-              </select>
-            </div>
-            {remindType === 'date' ? (
-              <div className="field" style={{ marginTop: '0.9rem' }}>
-                <label htmlFor="bill-remind-date">Date</label>
-                <input id="bill-remind-date" type="date" value={remindDate} onChange={(e) => setRemindDate(e.target.value)} required />
-              </div>
-            ) : (
-              <div className="field" style={{ marginTop: '0.9rem' }}>
-                <label htmlFor="bill-remind-value">Interval</label>
-                <input id="bill-remind-value" type="number" min="1" value={remindValue} onChange={(e) => setRemindValue(e.target.value)} required />
-              </div>
-            )}
-          </div>
-        )}
+        <ReminderFields
+          checked={remindChecked}
+          onCheckedChange={setRemindChecked}
+          triggers={remindTriggers}
+          onTriggersChange={setRemindTriggers}
+          idPrefix="remind-bill"
+          checkboxLabel="🔔 Remind me when this is due for renewal"
+        />
       </div>
       <hr className="ticket__divider" />
       <div className="ticket__section">

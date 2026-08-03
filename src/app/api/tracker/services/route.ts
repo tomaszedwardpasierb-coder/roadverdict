@@ -28,7 +28,12 @@ export async function POST(request: NextRequest) {
     mileage?: number;
     date?: string;
     notes?: string;
-    reminder?: { intervalType: "mileage" | "months" | "date"; intervalValue?: number; exactDate?: string };
+    reminder?: {
+      intervalType: "mileage" | "months" | "date";
+      intervalValue?: number;
+      exactDate?: string;
+      additionalTriggers?: { intervalType: "mileage" | "months" | "date"; intervalValue?: number; exactDate?: string }[];
+    };
     attachments?: Attachment[];
   };
 
@@ -56,6 +61,7 @@ export async function POST(request: NextRequest) {
       intervalType: reminder.intervalType,
       intervalValue: reminder.intervalValue,
       exactDate: reminder.exactDate,
+      additionalTriggers: reminder.additionalTriggers,
       baseMileage: mileage,
       date,
       sourceKey,
