@@ -1,14 +1,16 @@
 // Place at: src/app/dashboard/LogBillForm.tsx
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { BILL_LABELS, BILL_REMINDER_DEFAULTS } from '@/lib/tracker/billTypes';
+import { guessBillType } from '@/lib/tracker/guessCategory';
 import { convertDisplayToGbp, CURRENCY_SYMBOLS, type Currency, type ExchangeRates } from '@/lib/tracker/currency';
 import { useTrackerFormSubmit } from './useTrackerFormSubmit';
 import { AttachmentUploader } from './AttachmentUploader';
 import { ReminderFields, type ReminderTriggerRow } from './ReminderFields';
 import { isBackdated, backdateNotice } from '@/lib/tracker/backdateCheck';
 import { isBeforeProduction } from '@/lib/tracker/productionYearCheck';
+import { useScannedReceipt } from './ScannedReceiptContext';
 import type { Attachment } from '@/lib/tracker/cosmosHelpers';
 import type { ReminderTrigger } from '@/lib/tracker/reminder';
 
@@ -33,6 +35,19 @@ export function LogBillForm({
   ]);
   const [attachment, setAttachment] = useState<Attachment | null>(null);
   const { submit, submitting, error } = useTrackerFormSubmit('/api/tracker/bills');
+  const { scanned, setScanned } = useScannedReceipt();
+
+  useEffect(() => {
+    if (scanned?.category !== 'bills') return;
+    setDate(scanned.date);
+    setCostDisplay(String(scanned.cost));
+    setNotes(scanned.description);
+    setAttachment(scanned.attachment);
+    const guessedType = guessBillType(scanned.description);
+    if (guessedType) setBillType(guessedType);
+    setScanned(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scanned]);
 
   function handleBillTypeChange(newType: string) {
     setBillType(newType);

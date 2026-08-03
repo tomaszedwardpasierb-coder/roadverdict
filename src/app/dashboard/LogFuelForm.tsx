@@ -1,7 +1,7 @@
 ﻿// Place at: src/app/dashboard/LogFuelForm.tsx
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { checkMileageConsistency, type HistoryPoint } from '@/lib/tracker/mileageCheck';
 import { convertMilesToDisplay, convertDisplayToMiles, distanceUnitLabel, type DistanceUnit } from '@/lib/tracker/unitFormat';
 import { convertDisplayToGbp, CURRENCY_SYMBOLS, type Currency, type ExchangeRates } from '@/lib/tracker/currency';
@@ -9,6 +9,7 @@ import { useTrackerFormSubmit } from './useTrackerFormSubmit';
 import { MileageWarning } from './MileageWarning';
 import { AttachmentUploader } from './AttachmentUploader';
 import { isBeforeProduction } from '@/lib/tracker/productionYearCheck';
+import { useScannedReceipt } from './ScannedReceiptContext';
 import type { Attachment } from '@/lib/tracker/cosmosHelpers';
 
 export function LogFuelForm({
@@ -38,6 +39,17 @@ export function LogFuelForm({
   const [mileageAcknowledged, setMileageAcknowledged] = useState(false);
   const [attachment, setAttachment] = useState<Attachment | null>(null);
   const { submit, submitting, error } = useTrackerFormSubmit('/api/tracker/fuel');
+  const { scanned, setScanned } = useScannedReceipt();
+
+  useEffect(() => {
+    if (scanned?.category !== 'fuel') return;
+    setDate(scanned.date);
+    setCostDisplay(String(scanned.cost));
+    if (scanned.litres != null) setLitres(String(scanned.litres));
+    setAttachment(scanned.attachment);
+    setScanned(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scanned]);
 
   const mileageInMiles = convertDisplayToMiles(Number(mileageDisplay), distanceUnit);
 

@@ -7,6 +7,7 @@ import { UpdateMileageButton } from './UpdateMileageButton';
 import { BikeSwitcher, type SwitcherBike } from './BikeSwitcher';
 import LogoutButton from './LogoutButton';
 import { formatDistance, type DistanceUnit } from '@/lib/tracker/unitFormat';
+import { ScannedReceiptProvider } from './ScannedReceiptContext';
 import styles from './dashboard.module.css';
 
 type Section = 'dashboard' | 'service' | 'fuel' | 'mods' | 'bills' | 'reminders' | 'reports' | 'shareLinks';
@@ -134,7 +135,7 @@ export function DashboardShell({
         <UpdateMileageButton currentMileage={currentMileage} distanceUnit={distanceUnit} />
       </div>
 
-      <div className={styles.content}>{contentMap[active]}</div>
+      <div className={styles.content}><ScannedReceiptProvider>{contentMap[active]}</ScannedReceiptProvider></div>
 
       <nav className={styles.mobileBottomNav}>
         {MOBILE_NAV_ITEMS.map((item) => (

@@ -1,8 +1,9 @@
 ﻿// Place at: src/app/dashboard/LogModForm.tsx
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { MOD_GROUPS, MOD_LABELS, MOD_LABEL_TO_KEY, findGroupForCategory } from '@/lib/tracker/modTypes';
+import { guessModCategory } from '@/lib/tracker/guessCategory';
 import { checkMileageConsistency, type HistoryPoint } from '@/lib/tracker/mileageCheck';
 import { convertMilesToDisplay, convertDisplayToMiles, distanceUnitLabel, type DistanceUnit } from '@/lib/tracker/unitFormat';
 import { convertDisplayToGbp, CURRENCY_SYMBOLS, type Currency, type ExchangeRates } from '@/lib/tracker/currency';
@@ -12,6 +13,7 @@ import { AttachmentUploader } from './AttachmentUploader';
 import { ModSearchAutocomplete } from './ModSearchAutocomplete';
 import { isBackdated, backdateNotice } from '@/lib/tracker/backdateCheck';
 import { isBeforeProduction } from '@/lib/tracker/productionYearCheck';
+import { useScannedReceipt } from './ScannedReceiptContext';
 import type { Attachment } from '@/lib/tracker/cosmosHelpers';
 
 export function LogModForm({
@@ -44,6 +46,22 @@ export function LogModForm({
   const [mileageAcknowledged, setMileageAcknowledged] = useState(false);
   const [attachment, setAttachment] = useState<Attachment | null>(null);
   const { submit, submitting, error } = useTrackerFormSubmit('/api/tracker/mods');
+  const { scanned, setScanned } = useScannedReceipt();
+
+  useEffect(() => {
+    if (scanned?.category !== 'mods') return;
+    setDate(scanned.date);
+    setCostDisplay(String(scanned.cost));
+    setName(scanned.description);
+    setAttachment(scanned.attachment);
+    const guessedCategory = guessModCategory(scanned.description);
+    if (guessedCategory) {
+      setCategory(guessedCategory);
+      setGroup(findGroupForCategory(guessedCategory));
+    }
+    setScanned(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scanned]);
 
   function handleGroupChange(newGroup: string) {
     setGroup(newGroup);

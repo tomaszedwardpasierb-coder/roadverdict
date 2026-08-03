@@ -1,8 +1,9 @@
 // Place at: src/app/dashboard/LogServiceForm.tsx
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { JOB_GROUPS, JOB_LABELS, JOB_REMINDER_DEFAULTS } from '@/lib/tracker/jobTypes';
+import { guessJobType } from '@/lib/tracker/guessCategory';
 import { checkMileageConsistency, type HistoryPoint } from '@/lib/tracker/mileageCheck';
 import { convertMilesToDisplay, convertDisplayToMiles, distanceUnitLabel, type DistanceUnit } from '@/lib/tracker/unitFormat';
 import { convertDisplayToGbp, CURRENCY_SYMBOLS, type Currency, type ExchangeRates } from '@/lib/tracker/currency';
@@ -12,6 +13,7 @@ import { AttachmentUploader } from './AttachmentUploader';
 import { ReminderFields, type ReminderTriggerRow, type RemindType } from './ReminderFields';
 import { isBackdated, backdateNotice } from '@/lib/tracker/backdateCheck';
 import { isBeforeProduction } from '@/lib/tracker/productionYearCheck';
+import { useScannedReceipt } from './ScannedReceiptContext';
 import type { Attachment } from '@/lib/tracker/cosmosHelpers';
 import type { ReminderTrigger } from '@/lib/tracker/reminder';
 
@@ -46,6 +48,23 @@ export function LogServiceForm({
   ]);
   const [attachment, setAttachment] = useState<Attachment | null>(null);
   const { submit, submitting, error } = useTrackerFormSubmit('/api/tracker/services');
+  const { scanned, setScanned } = useScannedReceipt();
+
+  // Consumes a matching scan exactly once - the moment this tab is
+  // opened after a service receipt was scanned elsewhere, it pre-fills
+  // and immediately clears the shared value so it can't reapply itself
+  // again if the person navigates back here later.
+  useEffect(() => {
+    if (scanned?.category !== 'service') return;
+    setDate(scanned.date);
+    setCostDisplay(String(scanned.cost));
+    setNotes(scanned.description);
+    setAttachment(scanned.attachment);
+    const guessedJob = guessJobType(scanned.description);
+    if (guessedJob) setJobType(guessedJob);
+    setScanned(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scanned]);
 
   const mileageInMiles = convertDisplayToMiles(Number(mileageDisplay), distanceUnit);
 

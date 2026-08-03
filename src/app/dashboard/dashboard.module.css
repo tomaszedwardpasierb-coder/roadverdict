@@ -321,6 +321,7 @@
 }
 .scanReceiptPanel p { margin: 0 0 0.6rem; }
 .scanReceiptConstruction { color: var(--ink-soft); font-family: var(--font-mono); font-size: 0.78rem; margin-bottom: 0 !important; }
+.scanReceiptSuccess { color: var(--verdict-green); font-size: 0.85rem; margin-top: 0.6rem !important; }
 .globalFilterLabel { font-family: var(--font-mono); font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--ink-soft); }
 
 .lookupResult { display: flex; align-items: baseline; gap: 0.7rem; margin-top: 1.1rem; padding-top: 0.9rem; border-top: 1px solid var(--border); }
