@@ -15,7 +15,7 @@ const NAV_ITEMS: { key: Section; label: string; icon: string }[] = [
   { key: 'dashboard', label: 'Dashboard', icon: '🏠' },
   { key: 'service', label: 'Service', icon: '🔧' },
   { key: 'fuel', label: 'Fuel', icon: '⛽' },
-  { key: 'mods', label: 'Mods', icon: '⚙️' },
+  { key: 'mods', label: 'Parts & Accessories', icon: '⚙️' },
   { key: 'bills', label: 'Bills', icon: '📄' },
   { key: 'reminders', label: 'Reminders', icon: '🔔' },
   { key: 'reports', label: 'Reports', icon: '📊' },
@@ -25,7 +25,7 @@ const MOBILE_NAV_ITEMS: { key: Section; label: string; icon: string }[] = [
   { key: 'dashboard', label: 'Dashboard', icon: '🏠' },
   { key: 'service', label: 'Service', icon: '🔧' },
   { key: 'fuel', label: 'Fuel', icon: '⛽' },
-  { key: 'mods', label: 'Mods', icon: '⚙️' },
+  { key: 'mods', label: 'Parts', icon: '⚙️' },
 ];
 
 const MORE_ITEMS: { key: Section; label: string; icon: string }[] = [

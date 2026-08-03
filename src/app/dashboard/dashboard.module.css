@@ -234,6 +234,33 @@
 
 .rangeTabs { display: flex; gap: 0.3rem; flex-wrap: wrap; margin-bottom: 0.7rem; }
 .globalFilterBar { display: flex; align-items: center; gap: 0.7rem; flex-wrap: wrap; background: var(--paper); border: 1px solid var(--border); border-radius: 8px; padding: 0.6rem 0.9rem; margin-bottom: 1rem; }
+
+.scanReceiptWrap { margin-bottom: 1rem; }
+.scanReceiptBtn {
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  padding: 0.6rem 1rem;
+  border: 1px solid var(--amber);
+  border-radius: 8px;
+  background: #fff8ec;
+  color: var(--amber-ink);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.scanReceiptBtn:hover { background: var(--amber); color: #fff; }
+.scanReceiptPanel {
+  margin-top: 0.6rem;
+  background: var(--paper);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.9rem 1.1rem;
+  font-size: 0.88rem;
+  max-width: 560px;
+}
+.scanReceiptPanel p { margin: 0 0 0.6rem; }
+.scanReceiptConstruction { color: var(--ink-soft); font-family: var(--font-mono); font-size: 0.78rem; margin-bottom: 0 !important; }
 .globalFilterLabel { font-family: var(--font-mono); font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--ink-soft); }
 
 .lookupResult { display: flex; align-items: baseline; gap: 0.7rem; margin-top: 1.1rem; padding-top: 0.9rem; border-top: 1px solid var(--border); }

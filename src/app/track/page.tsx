@@ -64,7 +64,7 @@ export default async function TrackLandingPage() {
           <p>17 job types from oil changes to valve clearances. The five most common jobs get checked against the same real UK price data as our Quote Checker.</p>
         </div>
         <div className="info-card">
-          <h3>Modifications & accessories</h3>
+          <h3>Parts & Accessories</h3>
           <p>Exhausts, tank pads, crash protection, custom work - tracked separately from maintenance, since it&apos;s spend, not upkeep.</p>
         </div>
         <div className="info-card">

@@ -126,7 +126,7 @@ export function CustomFilterPanel({ records, mods, bills, fuelLogs, currency, ra
         <label htmlFor="lookup-category">Category</label>
         <select id="lookup-category" value={category} onChange={(e) => handleCategoryChange(e.target.value as Category)}>
           <option value="service">Service</option>
-          <option value="mods">Modifications & accessories</option>
+          <option value="mods">Parts & Accessories</option>
           <option value="bills">Insurance, tax & MOT</option>
           <option value="fuel">Fuel</option>
         </select>

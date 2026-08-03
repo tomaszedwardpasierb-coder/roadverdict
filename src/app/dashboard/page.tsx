@@ -48,6 +48,7 @@ import { DashboardShell } from "./DashboardShell";
 import { ChartFilterProvider } from "./ChartFilterContext";
 import { ChartFilterBar } from "./ChartFilterBar";
 import { CustomFilterPanel } from "./CustomFilterPanel";
+import { ScanReceiptButton } from "./ScanReceiptButton";
 
 export const dynamic = "force-dynamic";
 
@@ -120,8 +121,8 @@ export default async function DashboardPage() {
       category: "Fuel", cost: f.cost, mileage: f.mileage,
     })),
     ...mods.map((m) => ({
-      date: m.date, icon: "⚙️", type: "Modification",
-      description: m.name, category: "Modifications", cost: m.cost, mileage: m.mileage,
+      date: m.date, icon: "⚙️", type: "Part",
+      description: m.name, category: "Parts & Accessories", cost: m.cost, mileage: m.mileage,
     })),
     ...bills.map((b) => ({
       date: b.date, icon: "📄", type: "Bill",
@@ -144,6 +145,8 @@ export default async function DashboardPage() {
       )}
       <h1 className={styles.heading}>Dashboard</h1>
       <p className={styles.subtext} style={{ marginBottom: "1rem" }}>Here&apos;s how your bike looks today.</p>
+
+      <ScanReceiptButton />
 
       <ChartFilterBar />
 
@@ -248,7 +251,7 @@ export default async function DashboardPage() {
 
   const modsContent = (
     <>
-      <h1 className={styles.heading}>Modifications & accessories</h1>
+      <h1 className={styles.heading}>Parts & Accessories</h1>
       <LogModForm initialMileage={bike.currentMileage} mileageHistory={mileagePoints} distanceUnit={distanceUnit} currency={currency} rates={rates} />
       <h2 className={styles.sectionHeading}>History</h2>
       {mods.length === 0 ? (
@@ -321,10 +324,10 @@ export default async function DashboardPage() {
         </div>
         <div className={styles.chartCard}>
           {mods.length > 0 ? (
-            <CategorySpendChart chartId="mods-spend" title="Modifications spend over time" items={mods} color="#e8a33d" currency={currency} rates={rates} distanceUnit={distanceUnit} initialChartType={bike.chartTypes?.["mods-spend"] === "line" ? "line" : "bar"} />
+            <CategorySpendChart chartId="mods-spend" title="Parts & Accessories spend over time" items={mods} color="#e8a33d" currency={currency} rates={rates} distanceUnit={distanceUnit} initialChartType={bike.chartTypes?.["mods-spend"] === "line" ? "line" : "bar"} />
           ) : (
             <>
-              <div className={styles.chartCardTitle}>Modifications spend over time</div>
+              <div className={styles.chartCardTitle}>Parts & Accessories spend over time</div>
               <p className={styles.emptyNote}>No modifications logged yet.</p>
             </>
           )}

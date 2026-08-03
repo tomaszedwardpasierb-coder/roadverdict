@@ -86,7 +86,7 @@ export function LogModForm({
   return (
     <form className="ticket" onSubmit={handleSubmit}>
       <div className="ticket__section">
-        <span className="ticket__label">Log a modification or accessory</span>
+        <span className="ticket__label">Log a part or accessory</span>
         <div className="field">
           <label htmlFor="mod-date">Date</label>
           <input id="mod-date" type="date" value={date} onChange={(e) => setDate(e.target.value)} required />
