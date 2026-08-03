@@ -11,6 +11,39 @@
 .table th { font-family: var(--font-mono); font-size: 0.72rem; text-transform: uppercase; color: var(--ink-soft); }
 .table tfoot td { font-weight: 600; border-top: 2px solid var(--asphalt); border-bottom: none; }
 .caveat { font-size: 0.82rem; color: var(--ink-soft); border-top: 1px solid var(--border); padding-top: 1rem; }
+
+.clusterWarning {
+  background: #f8e2dd;
+  border: 2px solid var(--verdict-red);
+  border-radius: 6px;
+  padding: 0.9rem 1.1rem;
+  margin-bottom: 1.2rem;
+  font-size: 0.88rem;
+  color: #7a251b;
+}
+.clusterWarning p { margin: 0; }
+.clusterWarning p + p { margin-top: 0.5rem; }
+
+.backdateSummary {
+  font-size: 0.85rem;
+  color: var(--ink-soft);
+  background: var(--paper);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.7rem 0.9rem;
+  margin-bottom: 1rem;
+}
+
+.backdateNote {
+  font-size: 0.72rem;
+  color: var(--verdict-red);
+  margin-top: 0.15rem;
+}
+.backdateNoteSoft {
+  font-size: 0.72rem;
+  color: var(--ink-soft);
+  margin-top: 0.15rem;
+}
 @media print {
   .noPrint { display: none; }
 }

@@ -10,6 +10,7 @@ import { useTrackerFormSubmit } from './useTrackerFormSubmit';
 import { MileageWarning } from './MileageWarning';
 import { AttachmentUploader } from './AttachmentUploader';
 import { ReminderFields, type ReminderTriggerRow, type RemindType } from './ReminderFields';
+import { isBackdated, backdateNotice } from '@/lib/tracker/backdateCheck';
 import type { Attachment } from '@/lib/tracker/cosmosHelpers';
 import type { ReminderTrigger } from '@/lib/tracker/reminder';
 
@@ -109,6 +110,12 @@ export function LogServiceForm({
         <div className="field">
           <label htmlFor="job-date">Date</label>
           <input id="job-date" type="date" value={date} onChange={(e) => setDate(e.target.value)} required />
+          {date && isBackdated(date, new Date().toISOString()) && (
+            <p className="field-note" style={{ color: 'var(--amber-ink)' }}>
+              {backdateNotice(date, new Date().toISOString())} - this will be flagged in your buyer report
+              (softened if you attach a receipt) to help build trust in your history, not hide it.
+            </p>
+          )}
         </div>
         <div className="field" style={{ marginTop: '0.9rem' }}>
           <label htmlFor="job-type">Job</label>

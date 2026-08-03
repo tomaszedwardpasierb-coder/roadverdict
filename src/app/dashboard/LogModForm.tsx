@@ -9,6 +9,7 @@ import { convertDisplayToGbp, CURRENCY_SYMBOLS, type Currency, type ExchangeRate
 import { useTrackerFormSubmit } from './useTrackerFormSubmit';
 import { MileageWarning } from './MileageWarning';
 import { AttachmentUploader } from './AttachmentUploader';
+import { isBackdated, backdateNotice } from '@/lib/tracker/backdateCheck';
 import type { Attachment } from '@/lib/tracker/cosmosHelpers';
 
 export function LogModForm({
@@ -90,6 +91,12 @@ export function LogModForm({
         <div className="field">
           <label htmlFor="mod-date">Date</label>
           <input id="mod-date" type="date" value={date} onChange={(e) => setDate(e.target.value)} required />
+          {date && isBackdated(date, new Date().toISOString()) && (
+            <p className="field-note" style={{ color: 'var(--amber-ink)' }}>
+              {backdateNotice(date, new Date().toISOString())} - this will be flagged in your buyer report
+              (softened if you attach a receipt) to help build trust in your history, not hide it.
+            </p>
+          )}
         </div>
         <div className="field" style={{ marginTop: '0.9rem' }}>
           <label htmlFor="mod-category-search">Search for an item</label>
