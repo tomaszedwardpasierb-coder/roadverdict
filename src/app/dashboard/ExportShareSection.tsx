@@ -1,20 +1,40 @@
-﻿// Place at: src/app/dashboard/ExportShareSection.tsx
+// Place at: src/app/dashboard/ExportShareSection.tsx
 'use client';
 
 import { useState } from 'react';
 import styles from './dashboard.module.css';
 
+type ShareLinkDuration = '1week' | '1month' | '6months';
+
+const DURATION_OPTIONS: { value: ShareLinkDuration; label: string }[] = [
+  { value: '1week', label: '1 week' },
+  { value: '1month', label: '1 month' },
+  { value: '6months', label: '6 months' },
+];
+
 export function ExportShareSection() {
+  const [duration, setDuration] = useState<ShareLinkDuration>('1month');
   const [shareUrl, setShareUrl] = useState<string | null>(null);
+  const [expiresAt, setExpiresAt] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [emailTo, setEmailTo] = useState('');
+  const [sendingEmail, setSendingEmail] = useState(false);
+  const [emailStatus, setEmailStatus] = useState<string | null>(null);
 
   async function handleGetLink() {
     setLoading(true);
     try {
-      const res = await fetch('/api/tracker/share-link', { method: 'POST' });
+      const res = await fetch('/api/tracker/share-link', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ duration }),
+      });
       const data = await res.json();
-      if (res.ok) setShareUrl(data.url);
+      if (res.ok) {
+        setShareUrl(data.url);
+        setExpiresAt(data.expiresAt ?? null);
+      }
     } finally {
       setLoading(false);
     }
@@ -27,6 +47,32 @@ export function ExportShareSection() {
     setTimeout(() => setCopied(false), 2000);
   }
 
+  async function handleSendEmail(e: React.FormEvent) {
+    e.preventDefault();
+    if (!shareUrl || !emailTo.trim()) return;
+    const token = shareUrl.split('/report/')[1];
+    setSendingEmail(true);
+    setEmailStatus(null);
+    try {
+      const res = await fetch(`/api/tracker/share-link/${token}/send-email`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ toEmail: emailTo.trim() }),
+      });
+      const data = await res.json();
+      setEmailStatus(res.ok ? `Sent to ${emailTo.trim()}.` : data.error ?? 'Could not send the email.');
+      if (res.ok) setEmailTo('');
+    } catch {
+      setEmailStatus('Could not reach the server.');
+    } finally {
+      setSendingEmail(false);
+    }
+  }
+
+  const expiresAtLabel = expiresAt
+    ? new Date(expiresAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
+    : null;
+
   return (
     <div className={styles.chartCard} style={{ marginBottom: '1.6rem' }}>
       <div className={styles.chartCardTitle}>Export & share</div>
@@ -34,12 +80,29 @@ export function ExportShareSection() {
         <a href="/api/tracker/export/csv" className="submit-button" style={{ textDecoration: 'none' }}>
           Download CSV
         </a>
-        {!shareUrl ? (
-          <button type="button" className="submit-button" onClick={handleGetLink} disabled={loading}>
+      </div>
+
+      {!shareUrl ? (
+        <div style={{ marginTop: '1rem' }}>
+          <div className="field" style={{ marginTop: 0, maxWidth: '220px' }}>
+            <label htmlFor="share-duration">Link stays valid for</label>
+            <select id="share-duration" value={duration} onChange={(e) => setDuration(e.target.value as ShareLinkDuration)}>
+              {DURATION_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>{o.label}</option>
+              ))}
+            </select>
+          </div>
+          <p className="field-note" style={{ marginTop: '0.5rem' }}>
+            After this, the link stops working and is permanently deleted - it can be extended any time before then
+            from the Shareable Links tab.
+          </p>
+          <button type="button" className="submit-button" onClick={handleGetLink} disabled={loading} style={{ marginTop: '0.7rem' }}>
             {loading ? 'Generating…' : 'Get shareable report link'}
           </button>
-        ) : (
-          <>
+        </div>
+      ) : (
+        <div style={{ marginTop: '1rem' }}>
+          <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap', alignItems: 'center' }}>
             <input
               readOnly
               value={shareUrl}
@@ -56,13 +119,29 @@ export function ExportShareSection() {
             <button type="button" className={styles.iconBtn} onClick={handleCopy}>
               {copied ? 'Copied!' : 'Copy'}
             </button>
-          </>
-        )}
-      </div>
-      <p className={styles.emptyNote} style={{ marginTop: '0.6rem' }}>
-        The report link doesn&apos;t require signing in - safe to share with a buyer. It never
-        includes your email or fuel spending.
-      </p>
+          </div>
+          {expiresAtLabel && (
+            <p className="field-note" style={{ marginTop: '0.5rem' }}>
+              Valid until {expiresAtLabel}, then permanently deleted. Manage this and any other links from the
+              Shareable Links tab.
+            </p>
+          )}
+          <form onSubmit={handleSendEmail} style={{ display: 'flex', gap: '0.5rem', marginTop: '0.8rem', flexWrap: 'wrap' }}>
+            <input
+              type="email"
+              placeholder="Send to an email address"
+              value={emailTo}
+              onChange={(e) => setEmailTo(e.target.value)}
+              style={{ flex: 1, minWidth: '200px', padding: '0.5rem', border: '1px solid var(--border)', borderRadius: '4px' }}
+              required
+            />
+            <button type="submit" className={styles.iconBtn} disabled={sendingEmail}>
+              {sendingEmail ? 'Sending…' : 'Send by email'}
+            </button>
+          </form>
+          {emailStatus && <p className="field-note" style={{ marginTop: '0.4rem' }}>{emailStatus}</p>}
+        </div>
+      )}
     </div>
   );
 }

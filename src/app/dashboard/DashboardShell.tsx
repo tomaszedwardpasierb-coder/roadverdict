@@ -9,7 +9,7 @@ import LogoutButton from './LogoutButton';
 import { formatDistance, type DistanceUnit } from '@/lib/tracker/unitFormat';
 import styles from './dashboard.module.css';
 
-type Section = 'dashboard' | 'service' | 'fuel' | 'mods' | 'bills' | 'reminders' | 'reports';
+type Section = 'dashboard' | 'service' | 'fuel' | 'mods' | 'bills' | 'reminders' | 'reports' | 'shareLinks';
 
 const NAV_ITEMS: { key: Section; label: string; icon: string }[] = [
   { key: 'dashboard', label: 'Dashboard', icon: '🏠' },
@@ -19,6 +19,7 @@ const NAV_ITEMS: { key: Section; label: string; icon: string }[] = [
   { key: 'bills', label: 'Tax & Insurance', icon: '📄' },
   { key: 'reminders', label: 'Reminders', icon: '🔔' },
   { key: 'reports', label: 'Reports', icon: '📊' },
+  { key: 'shareLinks', label: 'Shareable Links', icon: '🔗' },
 ];
 
 const MOBILE_NAV_ITEMS: { key: Section; label: string; icon: string }[] = [
@@ -32,6 +33,7 @@ const MORE_ITEMS: { key: Section; label: string; icon: string }[] = [
   { key: 'bills', label: 'Tax & Insurance', icon: '📄' },
   { key: 'reminders', label: 'Reminders', icon: '🔔' },
   { key: 'reports', label: 'Reports', icon: '📊' },
+  { key: 'shareLinks', label: 'Shareable Links', icon: '🔗' },
 ];
 
 interface Props {
@@ -49,6 +51,7 @@ interface Props {
   billsContent: ReactNode;
   remindersContent: ReactNode;
   reportsContent: ReactNode;
+  shareLinksContent: ReactNode;
 }
 
 export function DashboardShell({
@@ -66,6 +69,7 @@ export function DashboardShell({
   billsContent,
   remindersContent,
   reportsContent,
+  shareLinksContent,
 }: Props) {
   const [active, setActive] = useState<Section>('dashboard');
   const [showMore, setShowMore] = useState(false);
@@ -78,9 +82,10 @@ export function DashboardShell({
     bills: billsContent,
     reminders: remindersContent,
     reports: reportsContent,
+    shareLinks: shareLinksContent,
   };
 
-  const isMoreActive = active === 'bills' || active === 'reminders' || active === 'reports';
+  const isMoreActive = active === 'bills' || active === 'reminders' || active === 'reports' || active === 'shareLinks';
 
   return (
     <div className={styles.shell}>

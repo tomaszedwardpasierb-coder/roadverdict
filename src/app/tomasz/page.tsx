@@ -117,6 +117,11 @@ export default async function AdminDashboardPage() {
           )}
           <RunCronButton name="check-reminders" label="Run now" />
         </div>
+        <div className={styles.statusCard}>
+          <div className={styles.statusTitle}>Delete expired share links (daily)</div>
+          <p>Permanently removes any shareable report link past its expiry date.</p>
+          <RunCronButton name="delete-expired-share-links" label="Run now" />
+        </div>
       </div>
 
       <h2 className={styles.sectionHeading}>Migrations (one-time, safe to re-run)</h2>

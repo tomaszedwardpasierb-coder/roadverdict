@@ -9,6 +9,8 @@ import { getFuelLogs, computeActualMPG, computeMPGSeries } from "@/lib/tracker/f
 import { getMods } from "@/lib/tracker/mod";
 import { getBills } from "@/lib/tracker/bill";
 import { getReminders, computeReminderStatus } from "@/lib/tracker/reminder";
+import { getShareLinksForUser } from "@/lib/tracker/shareLink";
+import { ShareLinksList } from "./ShareLinksList";
 import { computeSpendSummary, computeYearSpend, gatherMileagePoints } from "@/lib/tracker/summary";
 import { slugifyMake } from "@/lib/motorcycleModels";
 import type { Region } from "@/lib/priceData";
@@ -47,6 +49,7 @@ import { RecentActivity, type RecentActivityItem } from "./RecentActivity";
 import { DashboardShell } from "./DashboardShell";
 import { ChartFilterProvider } from "./ChartFilterContext";
 import { ChartFilterBar } from "./ChartFilterBar";
+import { DashboardStatCards } from "./DashboardStatCards";
 import { CustomFilterPanel } from "./CustomFilterPanel";
 import { ScanReceiptButton } from "./ScanReceiptButton";
 import { RegistrationBackfillBanner } from "./RegistrationBackfillBanner";
@@ -59,6 +62,11 @@ export default async function DashboardPage() {
 
   const bikes = await getBikesForUser(session.email);
   const bike = await pickActiveBike(bikes);
+  const shareLinks = await getShareLinksForUser(session.email);
+  const bikeNames: Record<string, string> = {};
+  for (const b of bikes) {
+    bikeNames[b.id] = b.nickname ? `${b.nickname} (${b.make} ${b.model})` : `${b.make} ${b.model}`;
+  }
 
   if (!bike) {
     return (
@@ -107,7 +115,6 @@ export default async function DashboardPage() {
   const summary = computeSpendSummary(records, mods, fuelLogs, bills);
   const currentYear = new Date().getFullYear();
   const yearSpend = computeYearSpend(records, mods, fuelLogs, bills, currentYear);
-  const milesTracked = bike.currentMileage - bike.startingMileage;
   const overBudget = bike.annualBudget != null && yearSpend >= bike.annualBudget;
 
   const recentActivity: RecentActivityItem[] = [
@@ -168,20 +175,18 @@ export default async function DashboardPage() {
       </div>
 
       <div className={styles.dashboardStatsGrid}>
-        <div className={styles.statCard}>
-          <div className={styles.statCardValue}>{formatCurrency(summary.grandTotal, currency, rates)}</div>
-          <div className={styles.statCardLabel}>Total spend</div>
-        </div>
-        <div className={styles.statCard}>
-          <div className={styles.statCardValue}>{actualMpg ? formatFuelEconomy(actualMpg, fuelEconomyUnit) : "—"}</div>
-          <div className={styles.statCardLabel}>Actual economy</div>
-        </div>
-        <div className={styles.statCard}>
-          <div className={styles.statCardValue}>
-            {milesTracked > 0 ? formatCostPerDistance((summary.grandTotal / milesTracked) * 100, distanceUnit) : "—"}
-          </div>
-          <div className={styles.statCardLabel}>Per {distanceUnit === "km" ? "km" : "mile"}</div>
-        </div>
+        <DashboardStatCards
+          records={records}
+          mods={mods}
+          bills={bills}
+          fuelLogs={fuelLogs}
+          currentMileage={bike.currentMileage}
+          startingMileage={bike.startingMileage}
+          currency={currency}
+          rates={rates}
+          distanceUnit={distanceUnit}
+          fuelEconomyUnit={fuelEconomyUnit}
+        />
         <div className={styles.statCard}>
           <div className={styles.statCardValue}>{Math.round(convertMilesToDisplay(bike.currentMileage, distanceUnit)).toLocaleString()}</div>
           <div className={styles.statCardLabel}>Current {distanceUnit === "km" ? "km" : "miles"}</div>
@@ -360,6 +365,16 @@ export default async function DashboardPage() {
     </ChartFilterProvider>
   );
 
+  const shareLinksContent = (
+    <>
+      <h1 className={styles.heading}>Shareable Links</h1>
+      <p className={styles.subtext} style={{ marginBottom: "1rem" }}>
+        Every report link you&apos;ve generated, across all your bikes - extend or delete any of them here.
+      </p>
+      <ShareLinksList links={shareLinks} bikeNames={bikeNames} appUrl={process.env.APP_URL ?? "https://roadverdict.co.uk"} />
+    </>
+  );
+
   const switcherBikes = bikes.map((b) => ({
     id: b.id,
     name: b.nickname ? `${b.nickname} — ${b.make} ${b.model}` : `${b.make} ${b.model}`,
@@ -383,6 +398,7 @@ export default async function DashboardPage() {
       billsContent={billsContent}
       remindersContent={remindersContent}
       reportsContent={reportsContent}
+      shareLinksContent={shareLinksContent}
     />
   );
 }

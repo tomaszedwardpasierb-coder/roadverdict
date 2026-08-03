@@ -42,3 +42,18 @@ export async function sendReminderEmail(email: string, reminderName: string, det
     `,
   });
 }
+export async function sendShareLinkEmail(toEmail: string, bikeName: string, reportUrl: string, expiresAtLabel: string) {
+  const resend = getResend();
+  await resend.emails.send({
+    from: FROM,
+    to: toEmail,
+    subject: `Ownership report for ${bikeName}`,
+    html: `
+      <p>Hi,</p>
+      <p>You've been sent a RoadVerdict ownership report for <strong>${bikeName}</strong> - a logged history of service,
+      modifications, and bills, shared by the seller.</p>
+      <p><a href="${reportUrl}">View the report</a></p>
+      <p>This link is valid until ${expiresAtLabel}, after which it will be permanently deleted.</p>
+    `,
+  });
+}
