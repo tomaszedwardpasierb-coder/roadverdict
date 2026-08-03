@@ -47,6 +47,7 @@ import { RecentActivity, type RecentActivityItem } from "./RecentActivity";
 import { DashboardShell } from "./DashboardShell";
 import { ChartFilterProvider } from "./ChartFilterContext";
 import { ChartFilterBar } from "./ChartFilterBar";
+import { CustomFilterPanel } from "./CustomFilterPanel";
 
 export const dynamic = "force-dynamic";
 
@@ -338,6 +339,7 @@ export default async function DashboardPage() {
             </>
           )}
         </div>
+        <CustomFilterPanel records={records} mods={mods} bills={bills} fuelLogs={fuelLogs} currency={currency} rates={rates} />
       </div>
     </ChartFilterProvider>
   );
