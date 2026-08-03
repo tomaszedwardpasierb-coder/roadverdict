@@ -3,6 +3,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/session";
 import { updateServiceRecord, deleteServiceRecord } from "@/lib/tracker/serviceRecord";
 import { getPrimaryBike, updateBikeMileage } from "@/lib/tracker/bike";
+import { createReminder, deleteRemindersBySourceKey } from "@/lib/tracker/reminder";
+import { JOB_LABELS } from "@/lib/tracker/jobTypes";
 import type { Attachment } from "@/lib/tracker/cosmosHelpers";
 
 export const dynamic = "force-dynamic";
@@ -25,13 +27,14 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
   }
 
-  const { jobType, cost, mileage, date, notes, attachments } = body as {
+  const { jobType, cost, mileage, date, notes, attachments, reminder } = body as {
     jobType?: string;
     cost?: number;
     mileage?: number;
     date?: string;
     notes?: string;
     attachments?: Attachment[];
+    reminder?: { intervalType: "mileage" | "months" | "date"; intervalValue?: number; exactDate?: string };
   };
 
   if (!jobType || cost == null || mileage == null || !date) {
@@ -53,6 +56,24 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
   const bike = await getPrimaryBike(session.email);
   if (bike && mileage > bike.currentMileage) {
     await updateBikeMileage(session.email, bike.id, mileage);
+  }
+
+  // Setting a reminder while editing works the same way it does when
+  // first logging the job - same sourceKey convention, so it replaces
+  // any existing reminder for this job type rather than duplicating one.
+  if (reminder && bike) {
+    const sourceKey = `service:${jobType}`;
+    await deleteRemindersBySourceKey(session.email, bike.id, sourceKey);
+    await createReminder(session.email, {
+      bikeId: bike.id,
+      name: JOB_LABELS[jobType] ?? jobType,
+      intervalType: reminder.intervalType,
+      intervalValue: reminder.intervalValue,
+      exactDate: reminder.exactDate,
+      baseMileage: mileage,
+      date,
+      sourceKey,
+    });
   }
 
   return NextResponse.json({ record });

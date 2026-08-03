@@ -57,3 +57,22 @@
 .addFormWrapper {
   max-width: 420px;
 }
+
+.deleteBtn {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  padding: 0.45rem 0.7rem;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: #fff;
+  color: var(--ink-soft);
+  cursor: pointer;
+}
+.deleteBtn:hover:not(:disabled) {
+  border-color: var(--verdict-red);
+  color: var(--verdict-red);
+}
+.deleteBtn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}

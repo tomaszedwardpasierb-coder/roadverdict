@@ -2,6 +2,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/session";
 import { updateBill, deleteBill } from "@/lib/tracker/bill";
+import { getPrimaryBike } from "@/lib/tracker/bike";
+import { createReminder, deleteRemindersBySourceKey } from "@/lib/tracker/reminder";
+import { BILL_LABELS } from "@/lib/tracker/billTypes";
 import type { Attachment } from "@/lib/tracker/cosmosHelpers";
 
 export const dynamic = "force-dynamic";
@@ -24,12 +27,13 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
   }
 
-  const { billType, cost, date, notes, attachments } = body as {
+  const { billType, cost, date, notes, attachments, reminder } = body as {
     billType?: string;
     cost?: number;
     date?: string;
     notes?: string;
     attachments?: Attachment[];
+    reminder?: { intervalType: "mileage" | "months" | "date"; intervalValue?: number; exactDate?: string };
   };
 
   if (!billType || cost == null || !date) {
@@ -39,6 +43,24 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
   const bill = await updateBill(session.email, id, { billType, cost, date, notes: notes ?? "", attachments });
   if (!bill) {
     return NextResponse.json({ error: "Entry not found." }, { status: 404 });
+  }
+
+  if (reminder) {
+    const bike = await getPrimaryBike(session.email);
+    if (bike) {
+      const sourceKey = `bill:${billType}`;
+      await deleteRemindersBySourceKey(session.email, bike.id, sourceKey);
+      await createReminder(session.email, {
+        bikeId: bike.id,
+        name: `${BILL_LABELS[billType] ?? billType} renewal`,
+        intervalType: reminder.intervalType,
+        intervalValue: reminder.intervalValue,
+        exactDate: reminder.exactDate,
+        baseMileage: bike.currentMileage,
+        date,
+        sourceKey,
+      });
+    }
   }
 
   return NextResponse.json({ bill });

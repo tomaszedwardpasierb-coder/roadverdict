@@ -207,6 +207,47 @@ export async function updateBikeCurrency(email: string, bikeId: string, currency
   return resource;
 }
 
+// Permanently deletes a bike and every record that belongs to it - there
+// is no "undo" here by design, matched by a confirmation dialog on the
+// client before this is ever called. Deletes the bike's share-link doc
+// too if it has one (that lives in a different partition, keyed by
+// token, so it needs its own explicit delete - it wouldn't be caught by
+// deleting the bike's own partition).
+export async function deleteBike(email: string, bikeId: string): Promise<void> {
+  const container = getContainer();
+
+  const { resource: bike } = await container.item(bikeId, email).read<BikeDoc>();
+
+  const recordTypes = ["serviceRecord", "fuelLog", "mod", "bill", "reminder"];
+  for (const type of recordTypes) {
+    const { resources } = await container.items
+      .query<{ id: string }>(
+        {
+          query: "SELECT c.id FROM c WHERE c.type = @type AND c.bikeId = @bikeId",
+          parameters: [
+            { name: "@type", value: type },
+            { name: "@bikeId", value: bikeId },
+          ],
+        },
+        { partitionKey: email }
+      )
+      .fetchAll();
+    for (const r of resources) {
+      await container.item(r.id, email).delete();
+    }
+  }
+
+  if (bike?.shareToken) {
+    try {
+      await container.item(bike.shareToken, bike.shareToken).delete();
+    } catch {
+      // Already gone or never existed - not a reason to fail the whole deletion.
+    }
+  }
+
+  await container.item(bikeId, email).delete();
+}
+
 // Updates a single chart's type preference without disturbing any other
 // chart's saved preference - reads the existing map, sets one key, merges
 // back in, rather than replacing the whole map each time.

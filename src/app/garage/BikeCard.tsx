@@ -16,6 +16,7 @@ interface Props {
 export function BikeCard({ bikeId, name, year, currentMileage, isActive }: Props) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   async function handleViewDashboard() {
     if (isActive) {
@@ -37,6 +38,25 @@ export function BikeCard({ bikeId, name, year, currentMileage, isActive }: Props
     }
   }
 
+  async function handleDelete() {
+    if (
+      !confirm(
+        `Delete "${name}"? This permanently deletes this bike AND every service, fuel, mods, bills, and reminder entry logged against it. This cannot be undone.`
+      )
+    ) {
+      return;
+    }
+    setDeleting(true);
+    try {
+      const res = await fetch(`/api/tracker/bike/${encodeURIComponent(bikeId)}`, { method: 'DELETE' });
+      if (res.ok) {
+        router.refresh();
+      }
+    } finally {
+      setDeleting(false);
+    }
+  }
+
   return (
     <div className={styles.card}>
       {isActive && <div className={styles.activeBadge}>Currently viewing</div>}
@@ -44,9 +64,14 @@ export function BikeCard({ bikeId, name, year, currentMileage, isActive }: Props
       <div className={styles.cardMeta}>
         {year} · {currentMileage.toLocaleString()} miles
       </div>
-      <button type="button" className="submit-button" onClick={handleViewDashboard} disabled={loading}>
-        {loading ? 'Switching…' : 'View dashboard'}
-      </button>
+      <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+        <button type="button" className="submit-button" onClick={handleViewDashboard} disabled={loading || deleting}>
+          {loading ? 'Switching…' : 'View dashboard'}
+        </button>
+        <button type="button" className={styles.deleteBtn} onClick={handleDelete} disabled={loading || deleting}>
+          {deleting ? 'Deleting…' : 'Delete'}
+        </button>
+      </div>
     </div>
   );
 }

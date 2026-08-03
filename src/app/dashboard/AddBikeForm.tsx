@@ -12,8 +12,8 @@ export function AddBikeForm() {
   const [make, setMake] = useState(ALL_BRANDS[0]);
   const modelsForBrand = MOTORCYCLE_MODELS.filter((m) => m.make === make);
   const [model, setModel] = useState(modelsForBrand[0]?.model ?? '');
-  const [year, setYear] = useState('2020');
-  const [mileage, setMileage] = useState('12000');
+  const [year, setYear] = useState('');
+  const [mileage, setMileage] = useState('');
   const [nickname, setNickname] = useState('');
   const [region, setRegion] = useState<Region>('rest-england-wales');
   const { submit, submitting, error } = useTrackerFormSubmit('/api/tracker/bike');
