@@ -26,6 +26,7 @@ const ALLOWED_TYPES = new Set(["image/jpeg", "image/png"]);
 // response shapes depending on what was on the receipt.
 const PROMPT = `You are extracting structured data from a photo of a UK motorcycle-related receipt or invoice. This receipt may contain ONE purchase, or it may contain SEVERAL distinct items that belong to different categories (for example, an oil change AND a padlock bought at the same garage visit, or fuel AND a snack). Read the image and respond with ONLY a JSON object (no markdown, no explanation) matching this exact shape:
 {
+  "summary": a single brief sentence (max ~20 words) confirming what this receipt/invoice actually is - the business or petrol station name if visible, the country if you can tell, and the date. Written for a human to quickly confirm "yes, that's the right receipt", e.g. "Fuel receipt from Shell, Manchester, UK, dated 12 Jul 2026." If something isn't legible, say so briefly rather than guessing confidently.,
   "items": [
     {
       "category": one of "service", "fuel", "mods", "bills",
@@ -115,7 +116,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Could not read the receipt. Please try again or enter it manually." }, { status: 502 });
     }
 
-    let parsed: { items?: GeminiItem[] };
+    let parsed: { summary?: string; items?: GeminiItem[] };
     try {
       parsed = JSON.parse(rawText);
     } catch {
@@ -127,6 +128,7 @@ export async function POST(request: NextRequest) {
     if (validItems.length === 0) {
       return NextResponse.json({ error: "Could not work out what kind of expense this is. Please enter it manually." }, { status: 502 });
     }
+    const summary = typeof parsed.summary === "string" && parsed.summary.trim() ? parsed.summary.trim() : null;
 
     // Upload the same compressed image once - it's shared as the
     // attachment across every item split out of this one receipt, since
@@ -151,7 +153,7 @@ export async function POST(request: NextRequest) {
       litres: typeof item.litres === "number" ? item.litres : null,
     }));
 
-    return NextResponse.json({ items, attachment });
+    return NextResponse.json({ items, attachment, summary });
   } catch (err) {
     return NextResponse.json(
       { error: "Something went wrong scanning the receipt. Please try again or enter it manually.", detail: err instanceof Error ? err.message : String(err) },

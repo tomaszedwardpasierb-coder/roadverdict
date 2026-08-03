@@ -17,6 +17,7 @@ export function ScanReceiptButton() {
   const [scanning, setScanning] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [justScannedTabs, setJustScannedTabs] = useState<string[] | null>(null);
+  const [aiSummary, setAiSummary] = useState<string | null>(null);
   const { addItems } = useScannedReceipt();
 
   async function handleFileSelected(e: React.ChangeEvent<HTMLInputElement>) {
@@ -24,6 +25,7 @@ export function ScanReceiptButton() {
     if (!file) return;
     setError(null);
     setJustScannedTabs(null);
+    setAiSummary(null);
     setScanning(true);
     try {
       const formData = new FormData();
@@ -42,6 +44,7 @@ export function ScanReceiptButton() {
       );
       const tabNames = [...new Set(data.items.map((i: { category: string }) => CATEGORY_TAB_NAMES[i.category] ?? i.category))] as string[];
       setJustScannedTabs(tabNames);
+      setAiSummary(typeof data.summary === 'string' ? data.summary : null);
     } catch {
       setError('Could not reach the server. Please try again or enter it manually.');
     } finally {
@@ -75,6 +78,7 @@ export function ScanReceiptButton() {
               {error}
             </p>
           )}
+          {aiSummary && !scanning && !error && <p className={styles.scanReceiptSummary}>🧠 &quot;{aiSummary}&quot;</p>}
           {justScannedTabs && !scanning && !error && (
             <p className={styles.scanReceiptSuccess}>
               ✓ Found {justScannedTabs.length} item{justScannedTabs.length === 1 ? '' : 's'} - switch to{' '}
