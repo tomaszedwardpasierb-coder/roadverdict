@@ -8,10 +8,21 @@ import { useTrackerFormSubmit } from './useTrackerFormSubmit';
 import { AttachmentUploader } from './AttachmentUploader';
 import { ReminderFields, type ReminderTriggerRow } from './ReminderFields';
 import { isBackdated, backdateNotice } from '@/lib/tracker/backdateCheck';
+import { isBeforeProduction } from '@/lib/tracker/productionYearCheck';
 import type { Attachment } from '@/lib/tracker/cosmosHelpers';
 import type { ReminderTrigger } from '@/lib/tracker/reminder';
 
-export function LogBillForm({ currency, rates }: { currency: Currency; rates: ExchangeRates | null }) {
+export function LogBillForm({
+  currency,
+  rates,
+  bikeYear,
+  isCustomBuild,
+}: {
+  currency: Currency;
+  rates: ExchangeRates | null;
+  bikeYear?: number;
+  isCustomBuild?: boolean;
+}) {
   const [billType, setBillType] = useState('insurance');
   const [costDisplay, setCostDisplay] = useState('');
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
@@ -39,6 +50,7 @@ export function LogBillForm({ currency, rates }: { currency: Currency; rates: Ex
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (date && isBeforeProduction(date, { year: bikeYear, isCustomBuild })) return;
     const costInGbp = convertDisplayToGbp(Number(costDisplay), currency, rates);
     const body: {
       billType: string;
@@ -71,6 +83,12 @@ export function LogBillForm({ currency, rates }: { currency: Currency; rates: Ex
         <div className="field">
           <label htmlFor="bill-date">Date</label>
           <input id="bill-date" type="date" value={date} onChange={(e) => setDate(e.target.value)} required />
+          {date && isBeforeProduction(date, { year: bikeYear, isCustomBuild }) && (
+            <p className="error-text" role="alert">
+              This date is before {bikeYear}, when this bike was made - it couldn&apos;t have been insured, taxed, or
+              tested before it existed. Double-check the date.
+            </p>
+          )}
           {date && isBackdated(date, new Date().toISOString()) && (
             <p className="field-note" style={{ color: 'var(--amber-ink)' }}>
               {backdateNotice(date, new Date().toISOString())} - this will be flagged in your buyer report
@@ -107,7 +125,7 @@ export function LogBillForm({ currency, rates }: { currency: Currency; rates: Ex
       </div>
       <hr className="ticket__divider" />
       <div className="ticket__section">
-        <button className="submit-button" type="submit" disabled={submitting}>
+        <button className="submit-button" type="submit" disabled={submitting || (date ? isBeforeProduction(date, { year: bikeYear, isCustomBuild }) : false)}>
           {submitting ? 'Logging…' : 'Log it'}
         </button>
         {error && <p className="error-text" role="alert">{error}</p>}

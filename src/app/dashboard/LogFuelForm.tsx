@@ -8,6 +8,7 @@ import { convertDisplayToGbp, CURRENCY_SYMBOLS, type Currency, type ExchangeRate
 import { useTrackerFormSubmit } from './useTrackerFormSubmit';
 import { MileageWarning } from './MileageWarning';
 import { AttachmentUploader } from './AttachmentUploader';
+import { isBeforeProduction } from '@/lib/tracker/productionYearCheck';
 import type { Attachment } from '@/lib/tracker/cosmosHelpers';
 
 export function LogFuelForm({
@@ -16,12 +17,16 @@ export function LogFuelForm({
   distanceUnit,
   currency,
   rates,
+  bikeYear,
+  isCustomBuild,
 }: {
   initialMileage: number;
   mileageHistory: HistoryPoint[];
   distanceUnit: DistanceUnit;
   currency: Currency;
   rates: ExchangeRates | null;
+  bikeYear?: number;
+  isCustomBuild?: boolean;
 }) {
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
   const [litres, setLitres] = useState('');
@@ -40,7 +45,7 @@ export function LogFuelForm({
     () => checkMileageConsistency(mileageInMiles, date, mileageHistory, initialMileage),
     [mileageInMiles, date, mileageHistory, initialMileage]
   );
-  const isBlocked = mileageResult.status === 'blocked' || (mileageResult.status === 'warning' && !mileageAcknowledged);
+  const isBlocked = mileageResult.status === 'blocked' || (mileageResult.status === 'warning' && !mileageAcknowledged) || Boolean(date && isBeforeProduction(date, { year: bikeYear, isCustomBuild }));
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -72,6 +77,12 @@ export function LogFuelForm({
         <div className="field">
           <label htmlFor="fuel-date">Date</label>
           <input id="fuel-date" type="date" value={date} onChange={(e) => setDate(e.target.value)} required />
+          {date && isBeforeProduction(date, { year: bikeYear, isCustomBuild }) && (
+            <p className="error-text" role="alert">
+              This date is before {bikeYear}, when this bike was made - it couldn&apos;t have been fuelled before it existed.
+              Double-check the date.
+            </p>
+          )}
         </div>
         <div className="field" style={{ marginTop: '0.9rem' }}>
           <label htmlFor="fuel-litres">Litres added</label>

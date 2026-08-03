@@ -9,6 +9,7 @@ import { JOB_LABELS } from "@/lib/tracker/jobTypes";
 import { MOD_LABELS } from "@/lib/tracker/modTypes";
 import { BILL_LABELS } from "@/lib/tracker/billTypes";
 import { isBackdated, backdateNotice, detectBulkBackdating, type BackdateCheckItem } from "@/lib/tracker/backdateCheck";
+import { isBeforeProduction } from "@/lib/tracker/productionYearCheck";
 import type { Attachment } from "@/lib/tracker/cosmosHelpers";
 import styles from "./report.module.css";
 import { PrintButton } from "./PrintButton";
@@ -154,12 +155,16 @@ export default async function SaleReportPage({ params }: { params: { token: stri
               {rows.map((r) => {
                 const backdated = isBackdated(r.date, r.createdAt);
                 const notice = backdated ? backdateNotice(r.date, r.createdAt) : "";
+                const isPrePurchase = r.category === "Modification" && isBeforeProduction(r.date, bike);
                 const isImage = r.attachment?.fileType === "image/jpeg" || r.attachment?.fileType === "image/png";
                 const attachmentUrl = r.attachment ? `/api/tracker/report-attachment/${params.token}/${encodeURIComponent(r.attachment.blobName)}` : null;
                 return (
                   <tr key={r.id}>
                     <td>
                       {fmtDate(r.date)}
+                      {isPrePurchase && (
+                        <div className={styles.backdateNoteSoft}>Pre-purchase expense (bought before {bike.year})</div>
+                      )}
                       {backdated && (
                         <div className={r.attachment ? styles.backdateNoteSoft : styles.backdateNote}>
                           {notice}

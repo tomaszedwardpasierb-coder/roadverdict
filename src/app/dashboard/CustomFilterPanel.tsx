@@ -6,6 +6,7 @@ import { JOB_LABELS, JOB_GROUPS } from '@/lib/tracker/jobTypes';
 import { MOD_LABELS, MOD_GROUPS, MOD_LABEL_TO_KEY, findGroupForCategory } from '@/lib/tracker/modTypes';
 import { BILL_LABELS } from '@/lib/tracker/billTypes';
 import { formatCurrency, type Currency, type ExchangeRates } from '@/lib/tracker/currency';
+import { ModSearchAutocomplete } from './ModSearchAutocomplete';
 import styles from './dashboard.module.css';
 
 type Category = 'service' | 'mods' | 'bills' | 'fuel';
@@ -62,9 +63,9 @@ export function CustomFilterPanel({ records, mods, bills, fuelLogs, currency, ra
     setModItem('all');
   }
 
-  function handleModSearch(value: string) {
-    setModSearch(value);
-    const matchedKey = MOD_LABEL_TO_KEY[value];
+  function handleModSearch(label: string) {
+    setModSearch(label);
+    const matchedKey = MOD_LABEL_TO_KEY[label];
     if (matchedKey) {
       setModGroup(findGroupForCategory(matchedKey));
       setModItem(matchedKey);
@@ -152,19 +153,13 @@ export function CustomFilterPanel({ records, mods, bills, fuelLogs, currency, ra
         <>
           <div className="field" style={{ marginTop: '0.7rem' }}>
             <label htmlFor="lookup-mod-search">Search for an item</label>
-            <input
+            <ModSearchAutocomplete
               id="lookup-mod-search"
-              type="text"
-              list="lookup-mod-datalist"
               value={modSearch}
-              onChange={(e) => handleModSearch(e.target.value)}
+              onChange={setModSearch}
+              onSelect={handleModSearch}
               placeholder="e.g. tank bag, disc lock..."
             />
-            <datalist id="lookup-mod-datalist">
-              {Object.keys(MOD_LABEL_TO_KEY).map((label) => (
-                <option key={label} value={label} />
-              ))}
-            </datalist>
           </div>
           <div className="field" style={{ marginTop: '0.7rem' }}>
             <label htmlFor="lookup-mod-group">Group</label>

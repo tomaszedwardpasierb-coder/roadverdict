@@ -9,7 +9,9 @@ import { convertDisplayToGbp, CURRENCY_SYMBOLS, type Currency, type ExchangeRate
 import { useTrackerFormSubmit } from './useTrackerFormSubmit';
 import { MileageWarning } from './MileageWarning';
 import { AttachmentUploader } from './AttachmentUploader';
+import { ModSearchAutocomplete } from './ModSearchAutocomplete';
 import { isBackdated, backdateNotice } from '@/lib/tracker/backdateCheck';
+import { isBeforeProduction } from '@/lib/tracker/productionYearCheck';
 import type { Attachment } from '@/lib/tracker/cosmosHelpers';
 
 export function LogModForm({
@@ -18,12 +20,16 @@ export function LogModForm({
   distanceUnit,
   currency,
   rates,
+  bikeYear,
+  isCustomBuild,
 }: {
   initialMileage: number;
   mileageHistory: HistoryPoint[];
   distanceUnit: DistanceUnit;
   currency: Currency;
   rates: ExchangeRates | null;
+  bikeYear?: number;
+  isCustomBuild?: boolean;
 }) {
   const [group, setGroup] = useState(MOD_GROUPS[0].group);
   const [category, setCategory] = useState(MOD_GROUPS[0].subgroups[0].mods[0]);
@@ -45,12 +51,11 @@ export function LogModForm({
     setCategory(groupData?.subgroups[0]?.mods[0] ?? '');
   }
 
-  // Only acts once the typed text exactly matches a real catalog label
-  // (i.e. the person picked a datalist suggestion, not just typing free
-  // text) - jumps both dropdowns straight to that item.
-  function handleCategorySearch(value: string) {
-    setCategorySearch(value);
-    const matchedKey = MOD_LABEL_TO_KEY[value];
+  // Called only when a suggestion is actually clicked (typing itself is
+  // handled separately) - jumps both dropdowns straight to that item.
+  function handleCategorySearch(label: string) {
+    setCategorySearch(label);
+    const matchedKey = MOD_LABEL_TO_KEY[label];
     if (matchedKey) {
       setCategory(matchedKey);
       setGroup(findGroupForCategory(matchedKey));
@@ -91,6 +96,13 @@ export function LogModForm({
         <div className="field">
           <label htmlFor="mod-date">Date</label>
           <input id="mod-date" type="date" value={date} onChange={(e) => setDate(e.target.value)} required />
+          {date && isBeforeProduction(date, { year: bikeYear, isCustomBuild }) && (
+            <p className="field-note" style={{ color: 'var(--amber-ink)' }}>
+              This date is before {bikeYear}, when this bike was made - that&apos;s fine if this was bought in advance
+              (riders sometimes buy gear, luggage, or accessories ahead of a bike&apos;s delivery, or while planning a
+              build). It&apos;ll be marked as a pre-purchase expense in your buyer report.
+            </p>
+          )}
           {date && isBackdated(date, new Date().toISOString()) && (
             <p className="field-note" style={{ color: 'var(--amber-ink)' }}>
               {backdateNotice(date, new Date().toISOString())} - this will be flagged in your buyer report
@@ -100,19 +112,13 @@ export function LogModForm({
         </div>
         <div className="field" style={{ marginTop: '0.9rem' }}>
           <label htmlFor="mod-category-search">Search for an item</label>
-          <input
+          <ModSearchAutocomplete
             id="mod-category-search"
-            type="text"
-            list="mod-catalog-datalist"
             value={categorySearch}
-            onChange={(e) => handleCategorySearch(e.target.value)}
+            onChange={setCategorySearch}
+            onSelect={handleCategorySearch}
             placeholder="e.g. chain guide, tank bag, disc lock..."
           />
-          <datalist id="mod-catalog-datalist">
-            {Object.keys(MOD_LABEL_TO_KEY).map((label) => (
-              <option key={label} value={label} />
-            ))}
-          </datalist>
           <div className="field-note">Not sure which group it's under? Start typing here instead.</div>
         </div>
         <div className="field" style={{ marginTop: '0.9rem' }}>

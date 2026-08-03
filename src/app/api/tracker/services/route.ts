@@ -5,6 +5,7 @@ import { createServiceRecord } from "@/lib/tracker/serviceRecord";
 import { getPrimaryBike, updateBikeMileage } from "@/lib/tracker/bike";
 import { createReminder, deleteRemindersBySourceKey } from "@/lib/tracker/reminder";
 import { JOB_LABELS } from "@/lib/tracker/jobTypes";
+import { isBeforeProduction } from "@/lib/tracker/productionYearCheck";
 import type { Attachment } from "@/lib/tracker/cosmosHelpers";
 
 export const dynamic = "force-dynamic";
@@ -44,6 +45,10 @@ export async function POST(request: NextRequest) {
   const bike = await getPrimaryBike(session.email);
   if (!bike) {
     return NextResponse.json({ error: "No bike found for this account." }, { status: 404 });
+  }
+
+  if (isBeforeProduction(date, bike)) {
+    return NextResponse.json({ error: `This date is before ${bike.year}, when this bike was made.` }, { status: 400 });
   }
 
   const record = await createServiceRecord(session.email, { bikeId: bike.id, jobType, cost, mileage, date, notes: notes ?? "", attachments });

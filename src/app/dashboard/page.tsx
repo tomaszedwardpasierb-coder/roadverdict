@@ -3,7 +3,7 @@ import { getSession } from "@/lib/auth/session";
 import { redirect } from "next/navigation";
 import styles from "./dashboard.module.css";
 import LogoutButton from "./LogoutButton";
-import { getBikesForUser, pickActiveBike } from "@/lib/tracker/bike";
+import { getBikesForUser, pickActiveBike, getCurrentRegistration } from "@/lib/tracker/bike";
 import { getServiceRecords } from "@/lib/tracker/serviceRecord";
 import { getFuelLogs, computeActualMPG, computeMPGSeries } from "@/lib/tracker/fuelLog";
 import { getMods } from "@/lib/tracker/mod";
@@ -147,7 +147,16 @@ export default async function DashboardPage() {
           {formatCurrency(bike.annualBudget as number, currency, rates)} budget, {formatCurrency(yearSpend - (bike.annualBudget as number), currency, rates)} over.
         </div>
       )}
-      <h1 className={styles.heading}>Dashboard</h1>
+      <h1 className={styles.heading}>
+        Dashboard
+        {(bike.nickname || getCurrentRegistration(bike)) && (
+          <span className={styles.headingBikeTag}>
+            {bike.nickname}
+            {bike.nickname && getCurrentRegistration(bike) && " · "}
+            {getCurrentRegistration(bike)}
+          </span>
+        )}
+      </h1>
       <p className={styles.subtext} style={{ marginBottom: "1rem" }}>Here&apos;s how your bike looks today.</p>
 
       <ScanReceiptButton />
@@ -221,7 +230,7 @@ export default async function DashboardPage() {
   const serviceContent = (
     <>
       <h1 className={styles.heading}>Service</h1>
-      <LogServiceForm initialMileage={bike.currentMileage} mileageHistory={mileagePoints} distanceUnit={distanceUnit} currency={currency} rates={rates} />
+      <LogServiceForm initialMileage={bike.currentMileage} mileageHistory={mileagePoints} distanceUnit={distanceUnit} currency={currency} rates={rates} bikeYear={bike.year} isCustomBuild={bike.isCustomBuild} />
       <h2 className={styles.sectionHeading}>Service history</h2>
       {records.length === 0 ? (
         <div className={styles.card}><p className={styles.cardBody}>No service records logged yet. Log your first one above.</p></div>
@@ -236,7 +245,7 @@ export default async function DashboardPage() {
   const fuelContent = (
     <>
       <h1 className={styles.heading}>Fuel</h1>
-      <LogFuelForm initialMileage={bike.currentMileage} mileageHistory={mileagePoints} distanceUnit={distanceUnit} currency={currency} rates={rates} />
+      <LogFuelForm initialMileage={bike.currentMileage} mileageHistory={mileagePoints} distanceUnit={distanceUnit} currency={currency} rates={rates} bikeYear={bike.year} isCustomBuild={bike.isCustomBuild} />
       {actualMpg ? (
         <p className={styles.subtext} style={{ marginBottom: "0.9rem" }}>
           Your actual average from logged fill-ups: <strong>{formatFuelEconomy(actualMpg, fuelEconomyUnit)}</strong> (the Cost Calculator assumes 57 mpg generally - this is specific to your bike and riding).
@@ -256,7 +265,7 @@ export default async function DashboardPage() {
   const modsContent = (
     <>
       <h1 className={styles.heading}>Parts & Accessories</h1>
-      <LogModForm initialMileage={bike.currentMileage} mileageHistory={mileagePoints} distanceUnit={distanceUnit} currency={currency} rates={rates} />
+      <LogModForm initialMileage={bike.currentMileage} mileageHistory={mileagePoints} distanceUnit={distanceUnit} currency={currency} rates={rates} bikeYear={bike.year} isCustomBuild={bike.isCustomBuild} />
       <h2 className={styles.sectionHeading}>History</h2>
       {mods.length === 0 ? (
         <div className={styles.card}><p className={styles.cardBody}>No modifications or accessories logged yet.</p></div>
@@ -269,7 +278,7 @@ export default async function DashboardPage() {
   const billsContent = (
     <>
       <h1 className={styles.heading}>Insurance, tax & MOT</h1>
-      <LogBillForm currency={currency} rates={rates} />
+      <LogBillForm currency={currency} rates={rates} bikeYear={bike.year} isCustomBuild={bike.isCustomBuild} />
       <h2 className={styles.sectionHeading}>History</h2>
       {bills.length === 0 ? (
         <div className={styles.card}><p className={styles.cardBody}>No insurance, tax, or MOT payments logged yet.</p></div>

@@ -11,6 +11,7 @@ import { MileageWarning } from './MileageWarning';
 import { AttachmentUploader } from './AttachmentUploader';
 import { ReminderFields, type ReminderTriggerRow, type RemindType } from './ReminderFields';
 import { isBackdated, backdateNotice } from '@/lib/tracker/backdateCheck';
+import { isBeforeProduction } from '@/lib/tracker/productionYearCheck';
 import type { Attachment } from '@/lib/tracker/cosmosHelpers';
 import type { ReminderTrigger } from '@/lib/tracker/reminder';
 
@@ -20,12 +21,16 @@ export function LogServiceForm({
   distanceUnit,
   currency,
   rates,
+  bikeYear,
+  isCustomBuild,
 }: {
   initialMileage: number;
   mileageHistory: HistoryPoint[];
   distanceUnit: DistanceUnit;
   currency: Currency;
   rates: ExchangeRates | null;
+  bikeYear?: number;
+  isCustomBuild?: boolean;
 }) {
   const [jobType, setJobType] = useState('basic-service');
   const [costDisplay, setCostDisplay] = useState('');
@@ -48,7 +53,7 @@ export function LogServiceForm({
     () => checkMileageConsistency(mileageInMiles, date, mileageHistory, initialMileage),
     [mileageInMiles, date, mileageHistory, initialMileage]
   );
-  const isBlocked = mileageResult.status === 'blocked' || (mileageResult.status === 'warning' && !mileageAcknowledged);
+  const isBlocked = mileageResult.status === 'blocked' || (mileageResult.status === 'warning' && !mileageAcknowledged) || Boolean(date && isBeforeProduction(date, { year: bikeYear, isCustomBuild }));
 
   function applyDefaults(forJobType: string) {
     const def = JOB_REMINDER_DEFAULTS[forJobType];
@@ -110,6 +115,13 @@ export function LogServiceForm({
         <div className="field">
           <label htmlFor="job-date">Date</label>
           <input id="job-date" type="date" value={date} onChange={(e) => setDate(e.target.value)} required />
+          {date && isBeforeProduction(date, { year: bikeYear, isCustomBuild }) && (
+            <p className="error-text" role="alert">
+              This date is before {bikeYear}, when this bike was made - servicing work can&apos;t have happened before
+              the bike existed. Double-check the date, or use the Modifications category if this is a genuine
+              pre-purchase expense (e.g. gear bought in advance).
+            </p>
+          )}
           {date && isBackdated(date, new Date().toISOString()) && (
             <p className="field-note" style={{ color: 'var(--amber-ink)' }}>
               {backdateNotice(date, new Date().toISOString())} - this will be flagged in your buyer report
