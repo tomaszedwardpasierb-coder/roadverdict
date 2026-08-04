@@ -53,7 +53,13 @@ export interface TrackerDocBase {
   // directly off the receipt - "how sure is this mileage, really".
   // Absent entirely on every manually-logged record, since those are
   // always exact by definition (the owner typed the real number).
-  mileageConfidence?: "interpolated" | "estimated";
+  // 'confirmed' means the record originated from AI-scanning with an
+  // estimated/interpolated mileage, and a human has since reviewed and
+  // saved it - kept distinct from leaving the tag absent entirely
+  // (which would erase useful provenance) and distinct from
+  // 'estimated'/'interpolated' (which would wrongly keep implying the
+  // figure still hasn't been looked at).
+  mileageConfidence?: "interpolated" | "estimated" | "confirmed";
 }
 
 // Creates and upserts a new tracker doc. id is auto-generated as
@@ -126,4 +132,13 @@ export async function updateTrackerDoc<TDoc extends TrackerDocBase>(
 export async function deleteTrackerDoc(email: string, id: string): Promise<void> {
   const container = getContainer();
   await container.item(id, email).delete();
+}
+
+// Plain point-read, no merge/write - used when a route needs to check a
+// record's existing state (e.g. its current mileageConfidence) before
+// deciding what an update should actually write, rather than assuming.
+export async function getTrackerDocById<TDoc extends TrackerDocBase>(email: string, id: string): Promise<TDoc | null> {
+  const container = getContainer();
+  const { resource } = await container.item(id, email).read<TDoc>();
+  return resource ?? null;
 }

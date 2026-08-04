@@ -106,7 +106,7 @@ export function LogFuelForm({
         <div className="field-note">
           Tick this whenever true - it&apos;s what lets us calculate your bike&apos;s real MPG from consecutive fill-ups, rather than a general assumption.
         </div>
-        <AttachmentUploader value={attachment} onChange={setAttachment} idSuffix="-fuel" />
+        <AttachmentUploader value={attachment} onChange={setAttachment} idSuffix="-fuel" compareValues={{ cost: convertDisplayToGbp(Number(costDisplay), currency, rates), date }} />
       </div>
       <hr className="ticket__divider" />
       <div className="ticket__section">

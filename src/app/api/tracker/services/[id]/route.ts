@@ -1,11 +1,11 @@
 ﻿// Place at: src/app/api/tracker/services/[id]/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/session";
-import { updateServiceRecord, deleteServiceRecord } from "@/lib/tracker/serviceRecord";
+import { updateServiceRecord, deleteServiceRecord, type ServiceRecordDoc } from "@/lib/tracker/serviceRecord";
 import { getPrimaryBike, updateBikeMileage } from "@/lib/tracker/bike";
 import { createReminder, deleteRemindersBySourceKey } from "@/lib/tracker/reminder";
 import { JOB_LABELS } from "@/lib/tracker/jobTypes";
-import type { Attachment } from "@/lib/tracker/cosmosHelpers";
+import { getTrackerDocById, type Attachment } from "@/lib/tracker/cosmosHelpers";
 
 export const dynamic = "force-dynamic";
 
@@ -46,6 +46,17 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     return NextResponse.json({ error: "Please fill in all required fields." }, { status: 400 });
   }
 
+  // Read the existing record first so an estimated/interpolated mileage
+  // can be correctly transitioned to "confirmed" (reviewed by a human),
+  // rather than silently surviving forever - which is exactly the bug
+  // that was happening before this check existed, since the update below
+  // would otherwise never mention this field at all.
+  const existing = await getTrackerDocById<ServiceRecordDoc>(session.email, id);
+  const nextMileageConfidence =
+    existing?.mileageConfidence === "estimated" || existing?.mileageConfidence === "interpolated"
+      ? "confirmed"
+      : existing?.mileageConfidence;
+
   const record = await updateServiceRecord(session.email, id, {
     jobType,
     cost,
@@ -54,6 +65,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     notes: notes ?? "",
     attachments,
     needsReview: false,
+    mileageConfidence: nextMileageConfidence,
   });
   if (!record) {
     return NextResponse.json({ error: "Record not found." }, { status: 404 });

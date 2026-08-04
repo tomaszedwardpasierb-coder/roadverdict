@@ -14,6 +14,7 @@ import { convertGbpToDisplay, convertDisplayToGbp, formatCurrency, CURRENCY_SYMB
 import { ReminderFields, type ReminderTriggerRow } from './ReminderFields';
 import type { ReminderTrigger } from '@/lib/tracker/reminder';
 import { useTabSwitch, offerNextReview, type ReviewCategory } from './TabSwitchContext';
+import { mileageConfidenceLabel } from '@/lib/tracker/mileageEstimate';
 import styles from './dashboard.module.css';
 
 function fmtDate(d: string): string {
@@ -197,8 +198,8 @@ export function ServiceHistoryCard({ record, bikeClass, brandValue, region, dist
       <div className={styles.jobCardMeta}>
         {fmtDate(record.date)} · {formatDistance(record.mileage, distanceUnit)}
         {record.mileageConfidence && (
-          <span className={styles.mileageConfidenceTag}>
-            {record.mileageConfidence === 'estimated' ? ' (mileage estimated)' : ' (mileage interpolated)'}
+          <span className={record.mileageConfidence === 'confirmed' ? styles.mileageConfirmedTag : styles.mileageConfidenceTag}>
+            {mileageConfidenceLabel(record.mileageConfidence)}
           </span>
         )}
       </div>

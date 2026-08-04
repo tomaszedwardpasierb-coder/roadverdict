@@ -158,7 +158,7 @@ export function LogModForm({
           <label htmlFor="mod-notes">Notes (optional)</label>
           <textarea id="mod-notes" rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="e.g. fitted by Bob's Motorcycles" />
         </div>
-        <AttachmentUploader value={attachment} onChange={setAttachment} idSuffix="-mod" />
+        <AttachmentUploader value={attachment} onChange={setAttachment} idSuffix="-mod" compareValues={{ cost: convertDisplayToGbp(Number(costDisplay), currency, rates), date }} />
         <div className="field-note" style={{ marginTop: '0.9rem' }}>
           Worth knowing: significant modifications (exhaust, suspension, bodywork) can affect your insurance - some insurers require these to be declared. Not price-benchmarked here, since aftermarket part cost varies hugely by brand and quality.
         </div>

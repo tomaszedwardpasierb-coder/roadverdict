@@ -11,6 +11,7 @@ import type { Attachment } from '@/lib/tracker/cosmosHelpers';
 import { formatDistance, convertMilesToDisplay, convertDisplayToMiles, distanceUnitLabel, type DistanceUnit } from '@/lib/tracker/unitFormat';
 import { convertGbpToDisplay, convertDisplayToGbp, formatCurrency, CURRENCY_SYMBOLS, type Currency, type ExchangeRates } from '@/lib/tracker/currency';
 import { useTabSwitch, offerNextReview, type ReviewCategory } from './TabSwitchContext';
+import { mileageConfidenceLabel } from '@/lib/tracker/mileageEstimate';
 import styles from './dashboard.module.css';
 
 function fmtDate(d: string): string {
@@ -173,8 +174,8 @@ export function ModCard({
       <div className={styles.jobCardMeta}>
         {MOD_LABELS[mod.category]} · {fmtDate(mod.date)} · {formatDistance(mod.mileage, distanceUnit)}
         {mod.mileageConfidence && (
-          <span className={styles.mileageConfidenceTag}>
-            {mod.mileageConfidence === 'estimated' ? ' (mileage estimated)' : ' (mileage interpolated)'}
+          <span className={mod.mileageConfidence === 'confirmed' ? styles.mileageConfirmedTag : styles.mileageConfidenceTag}>
+            {mileageConfidenceLabel(mod.mileageConfidence)}
           </span>
         )}
       </div>

@@ -318,7 +318,17 @@ export default async function DashboardPage() {
       <div className={styles.reportsGrid}>
         <div className={styles.chartCard}>
           {mpgSeries.length > 0 ? (
-            <MpgChart series={mpgSeries} fuelEconomyUnit={fuelEconomyUnit} distanceUnit={distanceUnit} initialChartType={bike.chartTypes?.["mpg"] === "bar" ? "bar" : "line"} />
+            <MpgChart
+              series={mpgSeries}
+              fuelEconomyUnit={fuelEconomyUnit}
+              distanceUnit={distanceUnit}
+              initialChartType={bike.chartTypes?.["mpg"] === "bar" ? "bar" : "line"}
+              currency={currency}
+              rates={rates}
+              excludedFuelEntries={fuelLogs
+                .filter((f) => f.mileageConfidence === "estimated" || f.mileageConfidence === "interpolated")
+                .map((f) => ({ date: f.date, cost: f.cost }))}
+            />
           ) : (
             <>
               <div className={styles.chartCardTitle}>{fuelEconomyUnit === "l100km" ? "Fuel economy" : "MPG"} over time</div>

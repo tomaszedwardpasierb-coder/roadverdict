@@ -19,6 +19,7 @@ export function ScanReceiptButton() {
   const [error, setError] = useState<string | null>(null);
   const [resultTabs, setResultTabs] = useState<string[] | null>(null);
   const [aiSummary, setAiSummary] = useState<string | null>(null);
+  const [skippedCount, setSkippedCount] = useState(0);
 
   async function handleFileSelected(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -26,6 +27,7 @@ export function ScanReceiptButton() {
     setError(null);
     setResultTabs(null);
     setAiSummary(null);
+    setSkippedCount(0);
     setScanning(true);
     try {
       const formData = new FormData();
@@ -39,6 +41,7 @@ export function ScanReceiptButton() {
       const tabNames = [...new Set((data.categories as string[]).map((c) => CATEGORY_TAB_NAMES[c] ?? c))];
       setResultTabs(tabNames);
       setAiSummary(typeof data.summary === 'string' ? data.summary : null);
+      setSkippedCount(typeof data.skippedBeforeProduction === 'number' ? data.skippedBeforeProduction : 0);
       // The new entries were created server-side just now - refresh so
       // they actually show up in the relevant history list and the
       // sidebar's pending-review dots update immediately.
@@ -82,6 +85,12 @@ export function ScanReceiptButton() {
             <p className={styles.scanReceiptSuccess}>
               ✓ Created {resultTabs.length} entr{resultTabs.length === 1 ? 'y' : 'ies'} in <strong>{resultTabs.join(', ')}</strong> -
               look for the pulsing dot in the sidebar and click the flagged entry to review it.
+            </p>
+          )}
+          {skippedCount > 0 && !scanning && !error && (
+            <p className="field-note" style={{ color: 'var(--amber-ink)', marginTop: '0.4rem' }}>
+              {skippedCount} item{skippedCount === 1 ? '' : 's'} on this receipt were dated before your bike was made,
+              so {skippedCount === 1 ? "it wasn't" : "they weren't"} logged.
             </p>
           )}
           <p className={styles.scanReceiptConstruction}>PDF receipts aren&apos;t scanned yet - attach those manually as before.</p>

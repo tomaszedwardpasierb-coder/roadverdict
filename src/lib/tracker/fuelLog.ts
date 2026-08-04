@@ -34,7 +34,16 @@ export async function getFuelLogs(email: string, bikeId: string): Promise<FuelLo
 export async function updateFuelLog(
   email: string,
   id: string,
-  data: { litres: number; cost: number; mileage: number; date: string; filledToFull: boolean; attachments?: Attachment[]; needsReview?: boolean }
+  data: {
+    litres: number;
+    cost: number;
+    mileage: number;
+    date: string;
+    filledToFull: boolean;
+    attachments?: Attachment[];
+    needsReview?: boolean;
+    mileageConfidence?: "interpolated" | "estimated" | "confirmed";
+  }
 ): Promise<FuelLogDoc | null> {
   return updateTrackerDoc<FuelLogDoc>(email, id, data);
 }

@@ -112,7 +112,7 @@ export function LogBillForm({
           <label htmlFor="bill-notes">Notes (optional)</label>
           <textarea id="bill-notes" rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="e.g. fully comprehensive, Bennetts" />
         </div>
-        <AttachmentUploader value={attachment} onChange={setAttachment} idSuffix="-bill" />
+        <AttachmentUploader value={attachment} onChange={setAttachment} idSuffix="-bill" compareValues={{ cost: convertDisplayToGbp(Number(costDisplay), currency, rates), date }} />
 
         <ReminderFields
           checked={remindChecked}

@@ -37,7 +37,16 @@ function overallRatePerDay(sorted: MileagePoint[], bike: BikeLifetime): number {
   return FALLBACK_MILES_PER_YEAR / 365;
 }
 
-// Priority order:
+// Shared display wording for the three confidence states, used by every
+// history card that shows mileage. "confirmed" specifically means the
+// record originated from AI-scanning but a human has since reviewed and
+// saved it - kept distinct from still-unreviewed, since the figure isn't
+// merely "estimated" any more once someone's actually looked at it.
+export function mileageConfidenceLabel(confidence: "interpolated" | "estimated" | "confirmed"): string {
+  if (confidence === "confirmed") return " (mileage confirmed - AI-assisted entry)";
+  if (confidence === "interpolated") return " (mileage interpolated)";
+  return " (mileage estimated)";
+}
 // 1. (Handled by the caller, before this runs) - mileage read directly off the receipt.
 // 2. Interpolate between two real logged points that bracket the target date.
 // 3. Extrapolate from whichever real points exist, using the bike's own overall rate.

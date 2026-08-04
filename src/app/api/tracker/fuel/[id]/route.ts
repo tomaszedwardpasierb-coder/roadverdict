@@ -1,9 +1,9 @@
 ﻿// Place at: src/app/api/tracker/fuel/[id]/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/session";
-import { updateFuelLog, deleteFuelLog } from "@/lib/tracker/fuelLog";
+import { updateFuelLog, deleteFuelLog, type FuelLogDoc } from "@/lib/tracker/fuelLog";
 import { getPrimaryBike, updateBikeMileage } from "@/lib/tracker/bike";
-import type { Attachment } from "@/lib/tracker/cosmosHelpers";
+import { getTrackerDocById, type Attachment } from "@/lib/tracker/cosmosHelpers";
 
 export const dynamic = "force-dynamic";
 
@@ -38,6 +38,12 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     return NextResponse.json({ error: "Please fill in all required fields." }, { status: 400 });
   }
 
+  const existing = await getTrackerDocById<FuelLogDoc>(session.email, id);
+  const nextMileageConfidence =
+    existing?.mileageConfidence === "estimated" || existing?.mileageConfidence === "interpolated"
+      ? "confirmed"
+      : existing?.mileageConfidence;
+
   const log = await updateFuelLog(session.email, id, {
     litres,
     cost,
@@ -46,6 +52,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     filledToFull: Boolean(filledToFull),
     attachments,
     needsReview: false,
+    mileageConfidence: nextMileageConfidence,
   });
   if (!log) {
     return NextResponse.json({ error: "Entry not found." }, { status: 404 });

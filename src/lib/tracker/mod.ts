@@ -36,7 +36,17 @@ export async function getMods(email: string, bikeId: string): Promise<ModDoc[]> 
 export async function updateMod(
   email: string,
   id: string,
-  data: { category: string; name: string; cost: number; mileage: number; date: string; notes: string; attachments?: Attachment[]; needsReview?: boolean }
+  data: {
+    category: string;
+    name: string;
+    cost: number;
+    mileage: number;
+    date: string;
+    notes: string;
+    attachments?: Attachment[];
+    needsReview?: boolean;
+    mileageConfidence?: "interpolated" | "estimated" | "confirmed";
+  }
 ): Promise<ModDoc | null> {
   return updateTrackerDoc<ModDoc>(email, id, data);
 }

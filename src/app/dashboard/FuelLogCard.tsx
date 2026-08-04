@@ -10,6 +10,7 @@ import type { Attachment } from '@/lib/tracker/cosmosHelpers';
 import { formatDistance, convertMilesToDisplay, convertDisplayToMiles, distanceUnitLabel, type DistanceUnit } from '@/lib/tracker/unitFormat';
 import { convertGbpToDisplay, convertDisplayToGbp, formatCurrency, CURRENCY_SYMBOLS, type Currency, type ExchangeRates } from '@/lib/tracker/currency';
 import { useTabSwitch, offerNextReview, type ReviewCategory } from './TabSwitchContext';
+import { mileageConfidenceLabel } from '@/lib/tracker/mileageEstimate';
 import styles from './dashboard.module.css';
 
 function fmtDate(d: string): string {
@@ -124,8 +125,8 @@ export function FuelLogCard({
       <div className={styles.jobCardMeta}>
         {fmtDate(log.date)} · {formatDistance(log.mileage, distanceUnit)} · {symbol}{convertGbpToDisplay(perLitreGbp, currency, rates).toFixed(2)}/litre
         {log.mileageConfidence && (
-          <span className={styles.mileageConfidenceTag}>
-            {log.mileageConfidence === 'estimated' ? ' (mileage estimated)' : ' (mileage interpolated)'}
+          <span className={log.mileageConfidence === 'confirmed' ? styles.mileageConfirmedTag : styles.mileageConfidenceTag}>
+            {mileageConfidenceLabel(log.mileageConfidence)}
           </span>
         )}
       </div>

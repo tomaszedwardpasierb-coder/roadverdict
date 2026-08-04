@@ -156,6 +156,8 @@
   margin-bottom: 0.6rem;
 }
 .mileageConfidenceTag { color: var(--amber-ink); }
+.mileageConfirmedTag { color: var(--ink-soft); font-style: italic; }
+.mpgExcludedNote { font-size: 0.78rem; color: var(--ink-soft); margin-top: 0.5rem; font-style: italic; }
 .currencyConversionNote { font-size: 0.78rem; color: var(--ink-soft); margin-top: 0.3rem; font-style: italic; }
 
 .attachmentThumb {

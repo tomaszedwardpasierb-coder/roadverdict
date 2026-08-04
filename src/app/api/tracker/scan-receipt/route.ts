@@ -13,6 +13,7 @@ import { createReminder } from "@/lib/tracker/reminder";
 import { getExchangeRates } from "@/lib/tracker/currencyRates";
 import { convertDisplayToGbp, ALL_CURRENCIES, type Currency } from "@/lib/tracker/currency";
 import { estimateMileage, type MileagePoint } from "@/lib/tracker/mileageEstimate";
+import { isBeforeProduction } from "@/lib/tracker/productionYearCheck";
 import { guessJobType, guessModCategory, guessBillType } from "@/lib/tracker/guessCategory";
 import { JOB_LABELS, JOB_REMINDER_DEFAULTS } from "@/lib/tracker/jobTypes";
 import { BILL_LABELS, BILL_REMINDER_DEFAULTS } from "@/lib/tracker/billTypes";
@@ -202,8 +203,19 @@ export async function POST(request: NextRequest) {
     const currencySupported = (ALL_CURRENCIES as string[]).includes(detectedCurrency);
 
     const createdCategories: string[] = [];
+    let skippedBeforeProduction = 0;
 
     for (const item of validItems) {
+      // Same rule already enforced on the manual forms: servicing, fuel,
+      // and bills all require the bike to physically exist, so a date
+      // before its production year is refused outright rather than
+      // creating a nonsensical record. Mods are exempt, same as
+      // everywhere else - buying gear ahead of a bike's delivery is a
+      // genuine, normal thing people do.
+      if (item.category !== "mods" && isBeforeProduction(item.date ?? "", bike)) {
+        skippedBeforeProduction++;
+        continue;
+      }
       const date = item.date ?? new Date().toISOString().slice(0, 10);
       const rawCost = typeof item.cost === "number" ? item.cost : 0;
       const description = item.description ?? "";
@@ -343,7 +355,19 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    return NextResponse.json({ createdCount: validItems.length, categories: [...new Set(createdCategories)], summary });
+    if (createdCategories.length === 0) {
+      return NextResponse.json(
+        { error: `This receipt is dated before ${bike.year}, when this bike was made - it couldn't have happened yet, so nothing was logged.` },
+        { status: 422 }
+      );
+    }
+
+    return NextResponse.json({
+      createdCount: validItems.length - skippedBeforeProduction,
+      categories: [...new Set(createdCategories)],
+      summary,
+      skippedBeforeProduction,
+    });
   } catch (err) {
     return NextResponse.json(
       { error: "Something went wrong scanning the receipt. Please try again or enter it manually.", detail: err instanceof Error ? err.message : String(err) },

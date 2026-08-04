@@ -34,7 +34,16 @@ export async function getServiceRecords(email: string, bikeId: string): Promise<
 export async function updateServiceRecord(
   email: string,
   id: string,
-  data: { jobType: string; cost: number; mileage: number; date: string; notes: string; attachments?: Attachment[]; needsReview?: boolean }
+  data: {
+    jobType: string;
+    cost: number;
+    mileage: number;
+    date: string;
+    notes: string;
+    attachments?: Attachment[];
+    needsReview?: boolean;
+    mileageConfidence?: "interpolated" | "estimated" | "confirmed";
+  }
 ): Promise<ServiceRecordDoc | null> {
   return updateTrackerDoc<ServiceRecordDoc>(email, id, data);
 }

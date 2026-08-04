@@ -154,7 +154,7 @@ export function LogServiceForm({
           <label htmlFor="job-notes">Notes (optional)</label>
           <textarea id="job-notes" rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="e.g. front only, done at Halfords Autocentre" />
         </div>
-        <AttachmentUploader value={attachment} onChange={setAttachment} idSuffix="-service" />
+        <AttachmentUploader value={attachment} onChange={setAttachment} idSuffix="-service" compareValues={{ cost: convertDisplayToGbp(Number(costDisplay), currency, rates), date }} />
 
         <ReminderFields
           checked={remindChecked}

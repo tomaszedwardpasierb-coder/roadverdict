@@ -113,7 +113,7 @@ export function BillCard({
             <label htmlFor={`edit-bill-notes-${bill.id}`}>Notes</label>
             <textarea id={`edit-bill-notes-${bill.id}`} rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} />
           </div>
-          <AttachmentUploader value={attachment} onChange={setAttachment} idSuffix={`-bill-${bill.id}`} />
+          <AttachmentUploader value={attachment} onChange={setAttachment} idSuffix={`-bill-${bill.id}`} compareValues={{ cost: convertDisplayToGbp(Number(costDisplay), currency, rates), date }} />
 
           <ReminderFields
             checked={remindChecked}

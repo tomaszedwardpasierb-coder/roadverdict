@@ -6,6 +6,7 @@ import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement
 import { filterByDateRange } from '@/lib/tracker/dateRange';
 import type { MpgSegment } from '@/lib/tracker/fuelLog';
 import { formatDistance, type FuelEconomyUnit, type DistanceUnit } from '@/lib/tracker/unitFormat';
+import { formatCurrency, type Currency, type ExchangeRates } from '@/lib/tracker/currency';
 import { useChartTypePreference } from './useChartTypePreference';
 import { ChartTypeToggle } from './ChartTypeToggle';
 import { barGradient, BAR_BORDER_RADIUS } from './chartStyle';
@@ -34,15 +35,27 @@ export function MpgChart({
   fuelEconomyUnit,
   distanceUnit,
   initialChartType,
+  currency,
+  rates,
+  excludedFuelEntries,
 }: {
   series: MpgSegment[];
   fuelEconomyUnit: FuelEconomyUnit;
   distanceUnit: DistanceUnit;
   initialChartType?: 'line' | 'bar';
+  currency: Currency;
+  rates: ExchangeRates | null;
+  excludedFuelEntries: { date: string; cost: number }[];
 }) {
   const { range, viewBy } = useChartFilter();
   const { kind, changeKind } = useChartTypePreference(CHART_ID, initialChartType ?? 'line');
   const dateFiltered = filterByDateRange(series, range);
+  // Same range the chart itself is currently showing, applied to the
+  // excluded entries too - so the note below always reflects "how much
+  // of what you're looking at right now was left out", not a lifetime
+  // total that wouldn't match the chart on screen.
+  const excludedInRange = filterByDateRange(excludedFuelEntries, range);
+  const excludedSpend = excludedInRange.reduce((sum, e) => sum + e.cost, 0);
   // "series" arrives already sorted by mileage (computeMPGSeries's own
   // sort order) - for the Time view, re-sort by date instead, since the
   // two orders aren't guaranteed to match (a backdated entry, for
@@ -105,6 +118,13 @@ export function MpgChart({
             maintainAspectRatio: true,
           }}
         />
+      )}
+      {excludedSpend > 0 && (
+        <p className={styles.mpgExcludedNote}>
+          {formatCurrency(excludedSpend, currency, rates)} of fuel spend excluded from this calculation because the
+          mileage on those entries hasn&apos;t been verified yet - edit them to confirm the mileage and they&apos;ll
+          count from then on.
+        </p>
       )}
     </div>
   );
