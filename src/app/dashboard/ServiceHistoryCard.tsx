@@ -13,6 +13,7 @@ import { formatDistance, convertMilesToDisplay, convertDisplayToMiles, distanceU
 import { convertGbpToDisplay, convertDisplayToGbp, formatCurrency, CURRENCY_SYMBOLS, type Currency, type ExchangeRates } from '@/lib/tracker/currency';
 import { ReminderFields, type ReminderTriggerRow } from './ReminderFields';
 import type { ReminderTrigger } from '@/lib/tracker/reminder';
+import { useTabSwitch, offerNextReview, type ReviewCategory } from './TabSwitchContext';
 import styles from './dashboard.module.css';
 
 function fmtDate(d: string): string {
@@ -48,9 +49,11 @@ interface Props {
   distanceUnit: DistanceUnit;
   currency: Currency;
   rates: ExchangeRates | null;
+  pendingReviewCounts: Record<ReviewCategory, number>;
 }
 
-export function ServiceHistoryCard({ record, bikeClass, brandValue, region, distanceUnit, currency, rates }: Props) {
+export function ServiceHistoryCard({ record, bikeClass, brandValue, region, distanceUnit, currency, rates, pendingReviewCounts }: Props) {
+  const { switchTo } = useTabSwitch();
   const [isEditing, setIsEditing] = useState(false);
   const [jobType, setJobType] = useState(record.jobType);
   const [costDisplay, setCostDisplay] = useState(
@@ -112,7 +115,10 @@ export function ServiceHistoryCard({ record, bikeClass, brandValue, region, dist
     }
 
     const ok = await submit(body, 'PATCH');
-    if (ok) setIsEditing(false);
+    if (ok) {
+      setIsEditing(false);
+      if (record.needsReview) offerNextReview(pendingReviewCounts, 'service', switchTo);
+    }
   }
 
   async function handleDelete() {
@@ -178,14 +184,30 @@ export function ServiceHistoryCard({ record, bikeClass, brandValue, region, dist
   }
 
   return (
-    <div className={styles.jobCard}>
+    <div className={`${styles.jobCard} ${record.needsReview ? styles.jobCardNeedsReview : ''}`}>
+      {record.needsReview && (
+        <div className={styles.needsReviewNote}>
+          🧠 Auto-created from a scanned receipt - click Edit to review, especially the mileage, before it's done.
+        </div>
+      )}
       <div className={styles.jobCardTop}>
         <span className={styles.jobCardJob}>{jobLabel}</span>
         <span className={styles.jobCardCost}>{formatCurrency(record.cost, currency, rates)}</span>
       </div>
       <div className={styles.jobCardMeta}>
         {fmtDate(record.date)} · {formatDistance(record.mileage, distanceUnit)}
+        {record.mileageConfidence && (
+          <span className={styles.mileageConfidenceTag}>
+            {record.mileageConfidence === 'estimated' ? ' (mileage estimated)' : ' (mileage interpolated)'}
+          </span>
+        )}
       </div>
+      {record.currencyConversion && (
+        <div className={styles.currencyConversionNote}>
+          Originally {record.currencyConversion.originalAmount.toFixed(2)} {record.currencyConversion.originalCurrency},
+          converted at the {fmtDate(record.currencyConversion.ratedAt)} rate.
+        </div>
+      )}
       {record.notes && <div className={styles.jobCardNotes}>{record.notes}</div>}
       {record.attachments?.[0] && <AttachmentThumb attachment={record.attachments[0]} />}
       {verdict && (

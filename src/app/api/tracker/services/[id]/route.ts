@@ -53,6 +53,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     date,
     notes: notes ?? "",
     attachments,
+    needsReview: false,
   });
   if (!record) {
     return NextResponse.json({ error: "Record not found." }, { status: 404 });

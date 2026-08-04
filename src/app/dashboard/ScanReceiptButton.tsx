@@ -2,7 +2,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useScannedReceipt } from './ScannedReceiptContext';
+import { useRouter } from 'next/navigation';
 import styles from './dashboard.module.css';
 
 const CATEGORY_TAB_NAMES: Record<string, string> = {
@@ -13,18 +13,18 @@ const CATEGORY_TAB_NAMES: Record<string, string> = {
 };
 
 export function ScanReceiptButton() {
+  const router = useRouter();
   const [open, setOpen] = useState(false);
   const [scanning, setScanning] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [justScannedTabs, setJustScannedTabs] = useState<string[] | null>(null);
+  const [resultTabs, setResultTabs] = useState<string[] | null>(null);
   const [aiSummary, setAiSummary] = useState<string | null>(null);
-  const { addItems } = useScannedReceipt();
 
   async function handleFileSelected(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
     setError(null);
-    setJustScannedTabs(null);
+    setResultTabs(null);
     setAiSummary(null);
     setScanning(true);
     try {
@@ -36,15 +36,13 @@ export function ScanReceiptButton() {
         setError(data.error ?? 'Could not read the receipt. Please try again or enter it manually.');
         return;
       }
-      addItems(
-        data.items.map((item: { category: 'service' | 'fuel' | 'mods' | 'bills'; date: string; cost: number; description: string; litres: number | null }) => ({
-          ...item,
-          attachment: data.attachment,
-        }))
-      );
-      const tabNames = [...new Set(data.items.map((i: { category: string }) => CATEGORY_TAB_NAMES[i.category] ?? i.category))] as string[];
-      setJustScannedTabs(tabNames);
+      const tabNames = [...new Set((data.categories as string[]).map((c) => CATEGORY_TAB_NAMES[c] ?? c))];
+      setResultTabs(tabNames);
       setAiSummary(typeof data.summary === 'string' ? data.summary : null);
+      // The new entries were created server-side just now - refresh so
+      // they actually show up in the relevant history list and the
+      // sidebar's pending-review dots update immediately.
+      router.refresh();
     } catch {
       setError('Could not reach the server. Please try again or enter it manually.');
     } finally {
@@ -62,8 +60,9 @@ export function ScanReceiptButton() {
         <div className={styles.scanReceiptPanel}>
           <p>
             Snap or upload a photo of a receipt or invoice. RoadVerdict&apos;s AI will read it - splitting it into
-            separate items first if it covers more than one thing - and pre-fill each entry for you. You&apos;ll just
-            need to review each one, confirm the mileage, and add a reminder if it&apos;s due again.
+            separate entries first if it covers more than one thing - and create each one automatically, with your
+            mileage estimated for now. You&apos;ll see it flagged for review in the relevant tab, where you can
+            correct anything (especially the mileage) before it's done.
           </p>
           <input
             type="file"
@@ -79,12 +78,10 @@ export function ScanReceiptButton() {
             </p>
           )}
           {aiSummary && !scanning && !error && <p className={styles.scanReceiptSummary}>🧠 &quot;{aiSummary}&quot;</p>}
-          {justScannedTabs && !scanning && !error && (
+          {resultTabs && !scanning && !error && (
             <p className={styles.scanReceiptSuccess}>
-              ✓ Found {justScannedTabs.length} item{justScannedTabs.length === 1 ? '' : 's'} - switch to{' '}
-              {justScannedTabs.length === 1 ? 'the' : ''} <strong>{justScannedTabs.join(', ')}</strong> tab
-              {justScannedTabs.length === 1 ? '' : 's'} (look for the pulsing dot) to review each one. This was
-              automatically detected, so please double-check the details before saving.
+              ✓ Created {resultTabs.length} entr{resultTabs.length === 1 ? 'y' : 'ies'} in <strong>{resultTabs.join(', ')}</strong> -
+              look for the pulsing dot in the sidebar and click the flagged entry to review it.
             </p>
           )}
           <p className={styles.scanReceiptConstruction}>PDF receipts aren&apos;t scanned yet - attach those manually as before.</p>

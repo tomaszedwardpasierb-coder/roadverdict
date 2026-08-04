@@ -1,5 +1,5 @@
 ﻿// Place at: src/lib/tracker/serviceRecord.ts
-import { createTrackerDoc, queryTrackerDocs, updateTrackerDoc, deleteTrackerDoc, type TrackerDocBase, type Attachment } from "./cosmosHelpers";
+import { createTrackerDoc, queryTrackerDocs, updateTrackerDoc, deleteTrackerDoc, type TrackerDocBase, type Attachment, type CurrencyConversionInfo } from "./cosmosHelpers";
 
 export interface ServiceRecordDoc extends TrackerDocBase {
   type: "serviceRecord";
@@ -11,7 +11,18 @@ export interface ServiceRecordDoc extends TrackerDocBase {
 
 export async function createServiceRecord(
   email: string,
-  data: { bikeId: string; jobType: string; cost: number; mileage: number; date: string; notes: string; attachments?: Attachment[] }
+  data: {
+    bikeId: string;
+    jobType: string;
+    cost: number;
+    mileage: number;
+    date: string;
+    notes: string;
+    attachments?: Attachment[];
+    needsReview?: boolean;
+    currencyConversion?: CurrencyConversionInfo;
+    mileageConfidence?: "interpolated" | "estimated";
+  }
 ): Promise<ServiceRecordDoc> {
   return createTrackerDoc<ServiceRecordDoc>(email, "service", "serviceRecord", data);
 }
@@ -23,7 +34,7 @@ export async function getServiceRecords(email: string, bikeId: string): Promise<
 export async function updateServiceRecord(
   email: string,
   id: string,
-  data: { jobType: string; cost: number; mileage: number; date: string; notes: string; attachments?: Attachment[] }
+  data: { jobType: string; cost: number; mileage: number; date: string; notes: string; attachments?: Attachment[]; needsReview?: boolean }
 ): Promise<ServiceRecordDoc | null> {
   return updateTrackerDoc<ServiceRecordDoc>(email, id, data);
 }

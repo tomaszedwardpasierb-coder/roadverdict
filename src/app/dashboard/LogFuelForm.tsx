@@ -1,7 +1,7 @@
 ﻿// Place at: src/app/dashboard/LogFuelForm.tsx
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo } from 'react';
 import { checkMileageConsistency, type HistoryPoint } from '@/lib/tracker/mileageCheck';
 import { convertMilesToDisplay, convertDisplayToMiles, distanceUnitLabel, type DistanceUnit } from '@/lib/tracker/unitFormat';
 import { convertDisplayToGbp, CURRENCY_SYMBOLS, type Currency, type ExchangeRates } from '@/lib/tracker/currency';
@@ -9,7 +9,6 @@ import { useTrackerFormSubmit } from './useTrackerFormSubmit';
 import { MileageWarning } from './MileageWarning';
 import { AttachmentUploader } from './AttachmentUploader';
 import { isBeforeProduction } from '@/lib/tracker/productionYearCheck';
-import { useScannedReceipt } from './ScannedReceiptContext';
 import type { Attachment } from '@/lib/tracker/cosmosHelpers';
 
 export function LogFuelForm({
@@ -39,20 +38,6 @@ export function LogFuelForm({
   const [mileageAcknowledged, setMileageAcknowledged] = useState(false);
   const [attachment, setAttachment] = useState<Attachment | null>(null);
   const { submit, submitting, error } = useTrackerFormSubmit('/api/tracker/fuel');
-  const { queue, removeItem, goToNextPending } = useScannedReceipt();
-  const [fromScan, setFromScan] = useState(false);
-
-  useEffect(() => {
-    const match = queue.find((item) => item.category === 'fuel');
-    if (!match) return;
-    setDate(match.date);
-    setCostDisplay(String(match.cost));
-    if (match.litres != null) setLitres(String(match.litres));
-    setAttachment(match.attachment);
-    setFromScan(true);
-    removeItem(match.id);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [queue]);
 
   const mileageInMiles = convertDisplayToMiles(Number(mileageDisplay), distanceUnit);
 
@@ -79,10 +64,6 @@ export function LogFuelForm({
       setCostDisplay('');
       setMileageAcknowledged(false);
       setAttachment(null);
-      if (fromScan) {
-        setFromScan(false);
-        goToNextPending();
-      }
     }
   }
 
@@ -93,12 +74,6 @@ export function LogFuelForm({
     <form className="ticket" onSubmit={handleSubmit}>
       <div className="ticket__section">
         <span className="ticket__label">Log a fuel fill-up</span>
-        {fromScan && (
-          <p className="field-note" style={{ color: 'var(--amber-ink)' }}>
-            🧠 This was filled in automatically from a scanned receipt - please double-check everything below
-            before saving, especially the mileage.
-          </p>
-        )}
         <div className="field">
           <label htmlFor="fuel-date">Date</label>
           <input id="fuel-date" type="date" value={date} onChange={(e) => setDate(e.target.value)} required />

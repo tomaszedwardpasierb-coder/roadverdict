@@ -138,6 +138,26 @@
 .jobCardMeta { font-family: var(--font-mono); font-size: 0.8rem; color: var(--ink-soft); margin-top: 0.2rem; }
 .jobCardNotes { font-size: 0.85rem; color: var(--ink-soft); margin-top: 0.4rem; }
 
+.jobCardNeedsReview {
+  border-left: 4px solid var(--verdict-red);
+  animation: jobCardReviewPulse 1.8s ease-in-out infinite;
+}
+@keyframes jobCardReviewPulse {
+  0%, 100% { border-left-color: var(--verdict-red); }
+  50% { border-left-color: #f0a898; }
+}
+.needsReviewNote {
+  background: #fdeceb;
+  border: 1px solid var(--verdict-red);
+  border-radius: 4px;
+  padding: 0.5rem 0.7rem;
+  font-size: 0.8rem;
+  color: #7a251b;
+  margin-bottom: 0.6rem;
+}
+.mileageConfidenceTag { color: var(--amber-ink); }
+.currencyConversionNote { font-size: 0.78rem; color: var(--ink-soft); margin-top: 0.3rem; font-style: italic; }
+
 .attachmentThumb {
   display: inline-flex;
   width: 44px;

@@ -1,9 +1,8 @@
 // Place at: src/app/dashboard/LogServiceForm.tsx
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo } from 'react';
 import { JOB_GROUPS, JOB_LABELS, JOB_REMINDER_DEFAULTS } from '@/lib/tracker/jobTypes';
-import { guessJobType } from '@/lib/tracker/guessCategory';
 import { checkMileageConsistency, type HistoryPoint } from '@/lib/tracker/mileageCheck';
 import { convertMilesToDisplay, convertDisplayToMiles, distanceUnitLabel, type DistanceUnit } from '@/lib/tracker/unitFormat';
 import { convertDisplayToGbp, CURRENCY_SYMBOLS, type Currency, type ExchangeRates } from '@/lib/tracker/currency';
@@ -13,7 +12,6 @@ import { AttachmentUploader } from './AttachmentUploader';
 import { ReminderFields, type ReminderTriggerRow, type RemindType } from './ReminderFields';
 import { isBackdated, backdateNotice } from '@/lib/tracker/backdateCheck';
 import { isBeforeProduction } from '@/lib/tracker/productionYearCheck';
-import { useScannedReceipt } from './ScannedReceiptContext';
 import type { Attachment } from '@/lib/tracker/cosmosHelpers';
 import type { ReminderTrigger } from '@/lib/tracker/reminder';
 
@@ -48,29 +46,6 @@ export function LogServiceForm({
   ]);
   const [attachment, setAttachment] = useState<Attachment | null>(null);
   const { submit, submitting, error } = useTrackerFormSubmit('/api/tracker/services');
-  const { queue, removeItem, goToNextPending } = useScannedReceipt();
-  const [scanItemId, setScanItemId] = useState<string | null>(null);
-  const [fromScan, setFromScan] = useState(false);
-
-  // Consumes the first matching item in the shared queue, exactly once -
-  // pre-fills from it and removes it, so it can't reapply itself again if
-  // the person navigates back here later. Tracks which item this was
-  // (scanItemId), so a successful save afterward knows to advance to
-  // whatever's next in the queue rather than just sitting here.
-  useEffect(() => {
-    const match = queue.find((item) => item.category === 'service');
-    if (!match) return;
-    setDate(match.date);
-    setCostDisplay(String(match.cost));
-    setNotes(match.description);
-    setAttachment(match.attachment);
-    const guessedJob = guessJobType(match.description);
-    if (guessedJob) setJobType(guessedJob);
-    setScanItemId(match.id);
-    setFromScan(true);
-    removeItem(match.id);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [queue]);
 
   const mileageInMiles = convertDisplayToMiles(Number(mileageDisplay), distanceUnit);
 
@@ -126,11 +101,6 @@ export function LogServiceForm({
       setNotes('');
       setMileageAcknowledged(false);
       setAttachment(null);
-      if (fromScan) {
-        setFromScan(false);
-        setScanItemId(null);
-        goToNextPending();
-      }
     }
   }
 
@@ -142,12 +112,6 @@ export function LogServiceForm({
     <form className="ticket" onSubmit={handleSubmit}>
       <div className="ticket__section">
         <span className="ticket__label">Log a service</span>
-        {fromScan && (
-          <p className="field-note" style={{ color: 'var(--amber-ink)' }}>
-            🧠 This was filled in automatically from a scanned receipt - please double-check everything below
-            before saving, especially the mileage.
-          </p>
-        )}
         <div className="field">
           <label htmlFor="job-date">Date</label>
           <input id="job-date" type="date" value={date} onChange={(e) => setDate(e.target.value)} required />

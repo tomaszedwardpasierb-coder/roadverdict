@@ -1,16 +1,14 @@
 // Place at: src/app/dashboard/LogBillForm.tsx
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { BILL_LABELS, BILL_REMINDER_DEFAULTS } from '@/lib/tracker/billTypes';
-import { guessBillType } from '@/lib/tracker/guessCategory';
 import { convertDisplayToGbp, CURRENCY_SYMBOLS, type Currency, type ExchangeRates } from '@/lib/tracker/currency';
 import { useTrackerFormSubmit } from './useTrackerFormSubmit';
 import { AttachmentUploader } from './AttachmentUploader';
 import { ReminderFields, type ReminderTriggerRow } from './ReminderFields';
 import { isBackdated, backdateNotice } from '@/lib/tracker/backdateCheck';
 import { isBeforeProduction } from '@/lib/tracker/productionYearCheck';
-import { useScannedReceipt } from './ScannedReceiptContext';
 import type { Attachment } from '@/lib/tracker/cosmosHelpers';
 import type { ReminderTrigger } from '@/lib/tracker/reminder';
 
@@ -35,22 +33,6 @@ export function LogBillForm({
   ]);
   const [attachment, setAttachment] = useState<Attachment | null>(null);
   const { submit, submitting, error } = useTrackerFormSubmit('/api/tracker/bills');
-  const { queue, removeItem, goToNextPending } = useScannedReceipt();
-  const [fromScan, setFromScan] = useState(false);
-
-  useEffect(() => {
-    const match = queue.find((item) => item.category === 'bills');
-    if (!match) return;
-    setDate(match.date);
-    setCostDisplay(String(match.cost));
-    setNotes(match.description);
-    setAttachment(match.attachment);
-    const guessedType = guessBillType(match.description);
-    if (guessedType) setBillType(guessedType);
-    setFromScan(true);
-    removeItem(match.id);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [queue]);
 
   function handleBillTypeChange(newType: string) {
     setBillType(newType);
@@ -89,10 +71,6 @@ export function LogBillForm({
       setCostDisplay('');
       setNotes('');
       setAttachment(null);
-      if (fromScan) {
-        setFromScan(false);
-        goToNextPending();
-      }
     }
   }
 
@@ -102,12 +80,6 @@ export function LogBillForm({
     <form className="ticket" onSubmit={handleSubmit}>
       <div className="ticket__section">
         <span className="ticket__label">Log insurance, tax, or an MOT</span>
-        {fromScan && (
-          <p className="field-note" style={{ color: 'var(--amber-ink)' }}>
-            🧠 This was filled in automatically from a scanned receipt - please double-check everything below
-            before saving.
-          </p>
-        )}
         <div className="field">
           <label htmlFor="bill-date">Date</label>
           <input id="bill-date" type="date" value={date} onChange={(e) => setDate(e.target.value)} required />

@@ -39,7 +39,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     return NextResponse.json({ error: "Please fill in all required fields." }, { status: 400 });
   }
 
-  const mod = await updateMod(session.email, id, { category, name, cost, mileage, date, notes: notes ?? "", attachments });
+  const mod = await updateMod(session.email, id, { category, name, cost, mileage, date, notes: notes ?? "", attachments, needsReview: false });
   if (!mod) {
     return NextResponse.json({ error: "Entry not found." }, { status: 404 });
   }

@@ -1,4 +1,4 @@
-﻿// Place at: src/app/dashboard/DashboardShell.tsx
+// Place at: src/app/dashboard/DashboardShell.tsx
 'use client';
 
 import { useState, type ReactNode } from 'react';
@@ -7,16 +7,15 @@ import { UpdateMileageButton } from './UpdateMileageButton';
 import { BikeSwitcher, type SwitcherBike } from './BikeSwitcher';
 import LogoutButton from './LogoutButton';
 import { formatDistance, type DistanceUnit } from '@/lib/tracker/unitFormat';
-import { ScannedReceiptProvider, type ScanCategory } from './ScannedReceiptContext';
-import { NavPendingBadge } from './NavPendingBadge';
+import { TabSwitchProvider, type ReviewCategory } from './TabSwitchContext';
 import styles from './dashboard.module.css';
 
-const SCAN_CATEGORIES: ScanCategory[] = ['service', 'fuel', 'mods', 'bills'];
-function asScanCategory(key: string): ScanCategory | null {
-  return (SCAN_CATEGORIES as string[]).includes(key) ? (key as ScanCategory) : null;
-}
-
 type Section = 'dashboard' | 'service' | 'fuel' | 'mods' | 'bills' | 'reminders' | 'reports' | 'shareLinks';
+
+const REVIEW_CATEGORIES: ReviewCategory[] = ['service', 'fuel', 'mods', 'bills'];
+function asReviewCategory(key: string): ReviewCategory | null {
+  return (REVIEW_CATEGORIES as string[]).includes(key) ? (key as ReviewCategory) : null;
+}
 
 const NAV_ITEMS: { key: Section; label: string; icon: string }[] = [
   { key: 'dashboard', label: 'Dashboard', icon: '🏠' },
@@ -51,6 +50,10 @@ interface Props {
   userEmail: string;
   bikes: SwitcherBike[];
   activeBikeId: string;
+  // Real, server-computed counts of needsReview records per category -
+  // drives the pulsing nav dots directly from actual data, not an
+  // in-memory queue that could disagree with what's really been saved.
+  pendingReviewCounts: Record<ReviewCategory, number>;
   dashboardContent: ReactNode;
   serviceContent: ReactNode;
   fuelContent: ReactNode;
@@ -61,6 +64,10 @@ interface Props {
   shareLinksContent: ReactNode;
 }
 
+function PendingDot() {
+  return <span className={styles.navPendingBadge} aria-label="An entry here needs review" />;
+}
+
 export function DashboardShell({
   bikeName,
   bikeYear,
@@ -69,6 +76,7 @@ export function DashboardShell({
   userEmail,
   bikes,
   activeBikeId,
+  pendingReviewCounts,
   dashboardContent,
   serviceContent,
   fuelContent,
@@ -95,7 +103,7 @@ export function DashboardShell({
   const isMoreActive = active === 'bills' || active === 'reminders' || active === 'reports' || active === 'shareLinks';
 
   return (
-    <ScannedReceiptProvider onSwitchTab={(cat) => setActive(cat)}>
+    <TabSwitchProvider onSwitchTab={(cat) => setActive(cat)}>
       <div className={styles.shell}>
         <aside className={styles.sidebar}>
           <div className={styles.sidebarLogo}>
@@ -106,7 +114,8 @@ export function DashboardShell({
 
           <nav className={styles.sidebarNav}>
             {NAV_ITEMS.map((item) => {
-              const scanCategory = asScanCategory(item.key);
+              const reviewCategory = asReviewCategory(item.key);
+              const hasPending = reviewCategory ? pendingReviewCounts[reviewCategory] > 0 : false;
               return (
                 <button
                   key={item.key}
@@ -116,7 +125,7 @@ export function DashboardShell({
                 >
                   <span aria-hidden="true">{item.icon}</span>
                   <span>{item.label}</span>
-                  {scanCategory && <NavPendingBadge category={scanCategory} />}
+                  {hasPending && <PendingDot />}
                 </button>
               );
             })}
@@ -150,7 +159,8 @@ export function DashboardShell({
 
         <nav className={styles.mobileBottomNav}>
           {MOBILE_NAV_ITEMS.map((item) => {
-            const scanCategory = asScanCategory(item.key);
+            const reviewCategory = asReviewCategory(item.key);
+            const hasPending = reviewCategory ? pendingReviewCounts[reviewCategory] > 0 : false;
             return (
               <button
                 key={item.key}
@@ -168,9 +178,9 @@ export function DashboardShell({
               >
                 <span style={{ fontSize: '1.1rem' }} aria-hidden="true">{item.icon}</span>
                 {item.label}
-                {scanCategory && (
+                {hasPending && (
                   <span style={{ position: 'absolute', top: 0, right: '30%' }}>
-                    <NavPendingBadge category={scanCategory} />
+                    <PendingDot />
                   </span>
                 )}
               </button>
@@ -195,7 +205,8 @@ export function DashboardShell({
             <div className={styles.mobileMoreSheetBackdrop} onClick={() => setShowMore(false)} />
             <div className={styles.mobileMoreSheet}>
               {MORE_ITEMS.map((item) => {
-                const scanCategory = asScanCategory(item.key);
+                const reviewCategory = asReviewCategory(item.key);
+                const hasPending = reviewCategory ? pendingReviewCounts[reviewCategory] > 0 : false;
                 return (
                   <button
                     key={item.key}
@@ -207,7 +218,7 @@ export function DashboardShell({
                     }}
                   >
                     <span aria-hidden="true">{item.icon}</span> {item.label}
-                    {scanCategory && <NavPendingBadge category={scanCategory} />}
+                    {hasPending && <PendingDot />}
                   </button>
                 );
               })}
@@ -224,6 +235,6 @@ export function DashboardShell({
           </>
         )}
       </div>
-    </ScannedReceiptProvider>
+    </TabSwitchProvider>
   );
 }

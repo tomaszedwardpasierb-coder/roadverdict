@@ -11,6 +11,7 @@ import type { Attachment } from '@/lib/tracker/cosmosHelpers';
 import { convertGbpToDisplay, convertDisplayToGbp, formatCurrency, CURRENCY_SYMBOLS, type Currency, type ExchangeRates } from '@/lib/tracker/currency';
 import { ReminderFields, type ReminderTriggerRow } from './ReminderFields';
 import type { ReminderTrigger } from '@/lib/tracker/reminder';
+import { useTabSwitch, offerNextReview, type ReviewCategory } from './TabSwitchContext';
 import styles from './dashboard.module.css';
 
 function fmtDate(d: string): string {
@@ -21,11 +22,14 @@ export function BillCard({
   bill,
   currency,
   rates,
+  pendingReviewCounts,
 }: {
   bill: BillDoc;
   currency: Currency;
   rates: ExchangeRates | null;
+  pendingReviewCounts: Record<ReviewCategory, number>;
 }) {
+  const { switchTo } = useTabSwitch();
   const [isEditing, setIsEditing] = useState(false);
   const [billType, setBillType] = useState(bill.billType);
   const [costDisplay, setCostDisplay] = useState(
@@ -74,7 +78,10 @@ export function BillCard({
     }
 
     const ok = await submit(body, 'PATCH');
-    if (ok) setIsEditing(false);
+    if (ok) {
+      setIsEditing(false);
+      if (bill.needsReview) offerNextReview(pendingReviewCounts, 'bills', switchTo);
+    }
   }
 
   async function handleDelete() {
@@ -132,12 +139,23 @@ export function BillCard({
   }
 
   return (
-    <div className={styles.jobCard}>
+    <div className={`${styles.jobCard} ${bill.needsReview ? styles.jobCardNeedsReview : ''}`}>
+      {bill.needsReview && (
+        <div className={styles.needsReviewNote}>
+          🧠 Auto-created from a scanned receipt - click Edit to review before it's done.
+        </div>
+      )}
       <div className={styles.jobCardTop}>
         <span className={styles.jobCardJob}>{BILL_LABELS[bill.billType] ?? bill.billType}</span>
         <span className={styles.jobCardCost}>{formatCurrency(bill.cost, currency, rates)}</span>
       </div>
       <div className={styles.jobCardMeta}>{fmtDate(bill.date)}</div>
+      {bill.currencyConversion && (
+        <div className={styles.currencyConversionNote}>
+          Originally {bill.currencyConversion.originalAmount.toFixed(2)} {bill.currencyConversion.originalCurrency},
+          converted at the {fmtDate(bill.currencyConversion.ratedAt)} rate.
+        </div>
+      )}
       {bill.notes && <div className={styles.jobCardNotes}>{bill.notes}</div>}
       {bill.attachments?.[0] && <AttachmentThumb attachment={bill.attachments[0]} />}
       <div className={styles.cardActions}>

@@ -10,6 +10,7 @@ import { AttachmentThumb } from './AttachmentThumb';
 import type { Attachment } from '@/lib/tracker/cosmosHelpers';
 import { formatDistance, convertMilesToDisplay, convertDisplayToMiles, distanceUnitLabel, type DistanceUnit } from '@/lib/tracker/unitFormat';
 import { convertGbpToDisplay, convertDisplayToGbp, formatCurrency, CURRENCY_SYMBOLS, type Currency, type ExchangeRates } from '@/lib/tracker/currency';
+import { useTabSwitch, offerNextReview, type ReviewCategory } from './TabSwitchContext';
 import styles from './dashboard.module.css';
 
 function fmtDate(d: string): string {
@@ -21,12 +22,15 @@ export function ModCard({
   distanceUnit,
   currency,
   rates,
+  pendingReviewCounts,
 }: {
   mod: ModDoc;
   distanceUnit: DistanceUnit;
   currency: Currency;
   rates: ExchangeRates | null;
+  pendingReviewCounts: Record<ReviewCategory, number>;
 }) {
+  const { switchTo } = useTabSwitch();
   const [isEditing, setIsEditing] = useState(false);
   const [group, setGroup] = useState(() => findGroupForCategory(mod.category));
   const [category, setCategory] = useState(mod.category);
@@ -68,7 +72,10 @@ export function ModCard({
     const mileageInMiles = Math.round(convertDisplayToMiles(Number(mileageDisplay), distanceUnit));
     const costInGbp = convertDisplayToGbp(Number(costDisplay), currency, rates);
     const ok = await submit({ category, name, cost: costInGbp, mileage: mileageInMiles, date, notes, attachments: attachment ? [attachment] : [] }, 'PATCH');
-    if (ok) setIsEditing(false);
+    if (ok) {
+      setIsEditing(false);
+      if (mod.needsReview) offerNextReview(pendingReviewCounts, 'mods', switchTo);
+    }
   }
 
   async function handleDelete() {
@@ -153,14 +160,30 @@ export function ModCard({
   }
 
   return (
-    <div className={styles.jobCard}>
+    <div className={`${styles.jobCard} ${mod.needsReview ? styles.jobCardNeedsReview : ''}`}>
+      {mod.needsReview && (
+        <div className={styles.needsReviewNote}>
+          🧠 Auto-created from a scanned receipt - click Edit to review, especially the mileage, before it's done.
+        </div>
+      )}
       <div className={styles.jobCardTop}>
         <span className={styles.jobCardJob}>{mod.name}</span>
         <span className={styles.jobCardCost}>{formatCurrency(mod.cost, currency, rates)}</span>
       </div>
       <div className={styles.jobCardMeta}>
         {MOD_LABELS[mod.category]} · {fmtDate(mod.date)} · {formatDistance(mod.mileage, distanceUnit)}
+        {mod.mileageConfidence && (
+          <span className={styles.mileageConfidenceTag}>
+            {mod.mileageConfidence === 'estimated' ? ' (mileage estimated)' : ' (mileage interpolated)'}
+          </span>
+        )}
       </div>
+      {mod.currencyConversion && (
+        <div className={styles.currencyConversionNote}>
+          Originally {mod.currencyConversion.originalAmount.toFixed(2)} {mod.currencyConversion.originalCurrency},
+          converted at the {fmtDate(mod.currencyConversion.ratedAt)} rate.
+        </div>
+      )}
       {mod.notes && <div className={styles.jobCardNotes}>{mod.notes}</div>}
       {mod.attachments?.[0] && <AttachmentThumb attachment={mod.attachments[0]} />}
       <div className={styles.cardActions}>

@@ -15,6 +15,19 @@ export interface Attachment {
 // Shared shape every tracker doc type has in common. Individual doc
 // interfaces (ServiceRecordDoc, FuelLogDoc, and future mod/bill docs)
 // extend this rather than repeating id/pk/date/createdAt each time.
+// Info kept on a record whose cost was originally in a different
+// currency and got auto-converted at scan time. Purely informational -
+// the stored `cost` is always GBP regardless, this is just a record of
+// what the conversion actually was, at the day it happened, so nobody
+// has to wonder later why a number looks slightly off from what the
+// receipt itself said.
+export interface CurrencyConversionInfo {
+  originalCurrency: string;
+  originalAmount: number;
+  rate: number;
+  ratedAt: string;
+}
+
 export interface TrackerDocBase {
   id: string;
   pk: string;
@@ -30,6 +43,17 @@ export interface TrackerDocBase {
   // Optional, additive - existing records simply have none until someone
   // uploads a receipt/invoice against them.
   attachments?: Attachment[];
+  // Set true only on records auto-created by the receipt scanner -
+  // never set by a normal manual "Log it" submission. Cleared the moment
+  // the record is successfully saved through its own edit form, since
+  // that save IS the review - there's no separate "mark reviewed" step.
+  needsReview?: boolean;
+  currencyConversion?: CurrencyConversionInfo;
+  // Set only on scanner-created records whose mileage wasn't read
+  // directly off the receipt - "how sure is this mileage, really".
+  // Absent entirely on every manually-logged record, since those are
+  // always exact by definition (the owner typed the real number).
+  mileageConfidence?: "interpolated" | "estimated";
 }
 
 // Creates and upserts a new tracker doc. id is auto-generated as

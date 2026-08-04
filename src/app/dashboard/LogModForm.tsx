@@ -1,9 +1,8 @@
 ﻿// Place at: src/app/dashboard/LogModForm.tsx
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo } from 'react';
 import { MOD_GROUPS, MOD_LABELS, MOD_LABEL_TO_KEY, findGroupForCategory } from '@/lib/tracker/modTypes';
-import { guessModCategory } from '@/lib/tracker/guessCategory';
 import { checkMileageConsistency, type HistoryPoint } from '@/lib/tracker/mileageCheck';
 import { convertMilesToDisplay, convertDisplayToMiles, distanceUnitLabel, type DistanceUnit } from '@/lib/tracker/unitFormat';
 import { convertDisplayToGbp, CURRENCY_SYMBOLS, type Currency, type ExchangeRates } from '@/lib/tracker/currency';
@@ -13,7 +12,6 @@ import { AttachmentUploader } from './AttachmentUploader';
 import { ModSearchAutocomplete } from './ModSearchAutocomplete';
 import { isBackdated, backdateNotice } from '@/lib/tracker/backdateCheck';
 import { isBeforeProduction } from '@/lib/tracker/productionYearCheck';
-import { useScannedReceipt } from './ScannedReceiptContext';
 import type { Attachment } from '@/lib/tracker/cosmosHelpers';
 
 export function LogModForm({
@@ -46,25 +44,6 @@ export function LogModForm({
   const [mileageAcknowledged, setMileageAcknowledged] = useState(false);
   const [attachment, setAttachment] = useState<Attachment | null>(null);
   const { submit, submitting, error } = useTrackerFormSubmit('/api/tracker/mods');
-  const { queue, removeItem, goToNextPending } = useScannedReceipt();
-  const [fromScan, setFromScan] = useState(false);
-
-  useEffect(() => {
-    const match = queue.find((item) => item.category === 'mods');
-    if (!match) return;
-    setDate(match.date);
-    setCostDisplay(String(match.cost));
-    setName(match.description);
-    setAttachment(match.attachment);
-    const guessedCategory = guessModCategory(match.description);
-    if (guessedCategory) {
-      setCategory(guessedCategory);
-      setGroup(findGroupForCategory(guessedCategory));
-    }
-    setFromScan(true);
-    removeItem(match.id);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [queue]);
 
   function handleGroupChange(newGroup: string) {
     setGroup(newGroup);
@@ -104,10 +83,6 @@ export function LogModForm({
       setNotes('');
       setMileageAcknowledged(false);
       setAttachment(null);
-      if (fromScan) {
-        setFromScan(false);
-        goToNextPending();
-      }
     }
   }
 
@@ -118,12 +93,6 @@ export function LogModForm({
     <form className="ticket" onSubmit={handleSubmit}>
       <div className="ticket__section">
         <span className="ticket__label">Log a part or accessory</span>
-        {fromScan && (
-          <p className="field-note" style={{ color: 'var(--amber-ink)' }}>
-            🧠 This was filled in automatically from a scanned receipt - please double-check everything below
-            before saving, especially the mileage.
-          </p>
-        )}
         <div className="field">
           <label htmlFor="mod-date">Date</label>
           <input id="mod-date" type="date" value={date} onChange={(e) => setDate(e.target.value)} required />

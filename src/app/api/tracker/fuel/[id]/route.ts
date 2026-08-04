@@ -45,6 +45,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     date,
     filledToFull: Boolean(filledToFull),
     attachments,
+    needsReview: false,
   });
   if (!log) {
     return NextResponse.json({ error: "Entry not found." }, { status: 404 });

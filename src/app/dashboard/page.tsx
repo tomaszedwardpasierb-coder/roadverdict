@@ -108,6 +108,12 @@ export default async function DashboardPage() {
     getExchangeRates(),
   ]);
   const brandValue = slugifyMake(bike.make);
+  const pendingReviewCounts = {
+    service: records.filter((r) => r.needsReview).length,
+    fuel: fuelLogs.filter((f) => f.needsReview).length,
+    mods: mods.filter((m) => m.needsReview).length,
+    bills: bills.filter((b) => b.needsReview).length,
+  };
   const actualMpg = computeActualMPG(fuelLogs);
   const mpgSeries = computeMPGSeries(fuelLogs);
   const mileagePoints = gatherMileagePoints(records, mods, fuelLogs);
@@ -241,7 +247,7 @@ export default async function DashboardPage() {
         <div className={styles.card}><p className={styles.cardBody}>No service records logged yet. Log your first one above.</p></div>
       ) : (
         records.map((r) => (
-          <ServiceHistoryCard key={r.id} record={r} bikeClass={bike.bikeClass} brandValue={brandValue} region={bike.region as Region} distanceUnit={distanceUnit} currency={currency} rates={rates} />
+          <ServiceHistoryCard key={r.id} record={r} bikeClass={bike.bikeClass} brandValue={brandValue} region={bike.region as Region} distanceUnit={distanceUnit} currency={currency} rates={rates} pendingReviewCounts={pendingReviewCounts} />
         ))
       )}
     </>
@@ -262,7 +268,7 @@ export default async function DashboardPage() {
       {fuelLogs.length === 0 ? (
         <div className={styles.card}><p className={styles.cardBody}>No fuel fill-ups logged yet. Log your first one above.</p></div>
       ) : (
-        fuelLogs.map((f) => <FuelLogCard key={f.id} log={f} distanceUnit={distanceUnit} currency={currency} rates={rates} />)
+        fuelLogs.map((f) => <FuelLogCard key={f.id} log={f} distanceUnit={distanceUnit} currency={currency} rates={rates} pendingReviewCounts={pendingReviewCounts} />)
       )}
     </>
   );
@@ -275,7 +281,7 @@ export default async function DashboardPage() {
       {mods.length === 0 ? (
         <div className={styles.card}><p className={styles.cardBody}>No modifications or accessories logged yet.</p></div>
       ) : (
-        mods.map((m) => <ModCard key={m.id} mod={m} distanceUnit={distanceUnit} currency={currency} rates={rates} />)
+        mods.map((m) => <ModCard key={m.id} mod={m} distanceUnit={distanceUnit} currency={currency} rates={rates} pendingReviewCounts={pendingReviewCounts} />)
       )}
     </>
   );
@@ -288,7 +294,7 @@ export default async function DashboardPage() {
       {bills.length === 0 ? (
         <div className={styles.card}><p className={styles.cardBody}>No insurance, tax, or MOT payments logged yet.</p></div>
       ) : (
-        bills.map((b) => <BillCard key={b.id} bill={b} currency={currency} rates={rates} />)
+        bills.map((b) => <BillCard key={b.id} bill={b} currency={currency} rates={rates} pendingReviewCounts={pendingReviewCounts} />)
       )}
     </>
   );
@@ -391,6 +397,7 @@ export default async function DashboardPage() {
       userEmail={session.email}
       bikes={switcherBikes}
       activeBikeId={bike.id}
+      pendingReviewCounts={pendingReviewCounts}
       dashboardContent={dashboardContent}
       serviceContent={serviceContent}
       fuelContent={fuelContent}

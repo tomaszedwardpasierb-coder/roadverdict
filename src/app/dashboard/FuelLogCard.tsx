@@ -9,6 +9,7 @@ import { AttachmentThumb } from './AttachmentThumb';
 import type { Attachment } from '@/lib/tracker/cosmosHelpers';
 import { formatDistance, convertMilesToDisplay, convertDisplayToMiles, distanceUnitLabel, type DistanceUnit } from '@/lib/tracker/unitFormat';
 import { convertGbpToDisplay, convertDisplayToGbp, formatCurrency, CURRENCY_SYMBOLS, type Currency, type ExchangeRates } from '@/lib/tracker/currency';
+import { useTabSwitch, offerNextReview, type ReviewCategory } from './TabSwitchContext';
 import styles from './dashboard.module.css';
 
 function fmtDate(d: string): string {
@@ -20,12 +21,15 @@ export function FuelLogCard({
   distanceUnit,
   currency,
   rates,
+  pendingReviewCounts,
 }: {
   log: FuelLogDoc;
   distanceUnit: DistanceUnit;
   currency: Currency;
   rates: ExchangeRates | null;
+  pendingReviewCounts: Record<ReviewCategory, number>;
 }) {
+  const { switchTo } = useTabSwitch();
   const [isEditing, setIsEditing] = useState(false);
   const [litres, setLitres] = useState(String(log.litres));
   const [costDisplay, setCostDisplay] = useState(
@@ -53,7 +57,10 @@ export function FuelLogCard({
       { litres: Number(litres), cost: costInGbp, mileage: mileageInMiles, date, filledToFull, attachments: attachment ? [attachment] : [] },
       'PATCH'
     );
-    if (ok) setIsEditing(false);
+    if (ok) {
+      setIsEditing(false);
+      if (log.needsReview) offerNextReview(pendingReviewCounts, 'fuel', switchTo);
+    }
   }
 
   async function handleDelete() {
@@ -104,14 +111,30 @@ export function FuelLogCard({
   }
 
   return (
-    <div className={styles.jobCard}>
+    <div className={`${styles.jobCard} ${log.needsReview ? styles.jobCardNeedsReview : ''}`}>
+      {log.needsReview && (
+        <div className={styles.needsReviewNote}>
+          🧠 Auto-created from a scanned receipt - click Edit to review, especially the mileage, before it's done.
+        </div>
+      )}
       <div className={styles.jobCardTop}>
         <span className={styles.jobCardJob}>{log.litres.toFixed(1)} L{log.filledToFull ? ' (full tank)' : ''}</span>
         <span className={styles.jobCardCost}>{formatCurrency(log.cost, currency, rates)}</span>
       </div>
       <div className={styles.jobCardMeta}>
         {fmtDate(log.date)} · {formatDistance(log.mileage, distanceUnit)} · {symbol}{convertGbpToDisplay(perLitreGbp, currency, rates).toFixed(2)}/litre
+        {log.mileageConfidence && (
+          <span className={styles.mileageConfidenceTag}>
+            {log.mileageConfidence === 'estimated' ? ' (mileage estimated)' : ' (mileage interpolated)'}
+          </span>
+        )}
       </div>
+      {log.currencyConversion && (
+        <div className={styles.currencyConversionNote}>
+          Originally {log.currencyConversion.originalAmount.toFixed(2)} {log.currencyConversion.originalCurrency},
+          converted at the {fmtDate(log.currencyConversion.ratedAt)} rate.
+        </div>
+      )}
       {log.attachments?.[0] && <AttachmentThumb attachment={log.attachments[0]} />}
       <div className={styles.cardActions}>
         <button type="button" className={styles.iconBtn} onClick={() => setIsEditing(true)}>Edit</button>

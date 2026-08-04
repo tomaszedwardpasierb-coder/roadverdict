@@ -1,5 +1,5 @@
 ﻿// Place at: src/lib/tracker/fuelLog.ts
-import { createTrackerDoc, queryTrackerDocs, updateTrackerDoc, deleteTrackerDoc, type TrackerDocBase, type Attachment } from "./cosmosHelpers";
+import { createTrackerDoc, queryTrackerDocs, updateTrackerDoc, deleteTrackerDoc, type TrackerDocBase, type Attachment, type CurrencyConversionInfo } from "./cosmosHelpers";
 
 export interface FuelLogDoc extends TrackerDocBase {
   type: "fuelLog";
@@ -11,7 +11,18 @@ export interface FuelLogDoc extends TrackerDocBase {
 
 export async function createFuelLog(
   email: string,
-  data: { bikeId: string; litres: number; cost: number; mileage: number; date: string; filledToFull: boolean; attachments?: Attachment[] }
+  data: {
+    bikeId: string;
+    litres: number;
+    cost: number;
+    mileage: number;
+    date: string;
+    filledToFull: boolean;
+    attachments?: Attachment[];
+    needsReview?: boolean;
+    currencyConversion?: CurrencyConversionInfo;
+    mileageConfidence?: "interpolated" | "estimated";
+  }
 ): Promise<FuelLogDoc> {
   return createTrackerDoc<FuelLogDoc>(email, "fuel", "fuelLog", data);
 }
@@ -23,7 +34,7 @@ export async function getFuelLogs(email: string, bikeId: string): Promise<FuelLo
 export async function updateFuelLog(
   email: string,
   id: string,
-  data: { litres: number; cost: number; mileage: number; date: string; filledToFull: boolean; attachments?: Attachment[] }
+  data: { litres: number; cost: number; mileage: number; date: string; filledToFull: boolean; attachments?: Attachment[]; needsReview?: boolean }
 ): Promise<FuelLogDoc | null> {
   return updateTrackerDoc<FuelLogDoc>(email, id, data);
 }
