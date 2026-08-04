@@ -52,6 +52,8 @@ export function MpgChart({
   const { range, viewBy } = useChartFilter();
   const { kind, changeKind } = useChartTypePreference(CHART_ID, initialChartType ?? 'line');
   const dateFiltered = filterByDateRange(series, range);
+  const plottable = dateFiltered.filter((s) => !s.likelyMissedFillUps);
+  const missedFillUpCount = dateFiltered.length - plottable.length;
   // Same range the chart itself is currently showing, applied to the
   // excluded entries too - so the note below always reflects "how much
   // of what you're looking at right now was left out", not a lifetime
@@ -63,7 +65,7 @@ export function MpgChart({
   // two orders aren't guaranteed to match (a backdated entry, for
   // example).
   const filtered =
-    viewBy === 'time' ? [...dateFiltered].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()) : dateFiltered;
+    viewBy === 'time' ? [...plottable].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()) : plottable;
   const title = `${fuelEconomyUnit === 'l100km' ? 'Fuel economy' : 'MPG'} over time`;
   const yLabel = fuelEconomyUnit === 'l100km' ? 'L/100km' : 'mpg';
 
@@ -141,6 +143,13 @@ export function MpgChart({
           {formatCurrency(excludedSpend, currency, rates)} of fuel spend excluded from this calculation because the
           mileage on those entries hasn&apos;t been verified yet - edit them to confirm the mileage and they&apos;ll
           count from then on.
+        </p>
+      )}
+      {missedFillUpCount > 0 && (
+        <p className={styles.mpgExcludedNote}>
+          {missedFillUpCount} {missedFillUpCount === 1 ? 'reading looks' : 'readings look'} far enough outside your
+          usual range that a fill-up in between probably wasn&apos;t logged, so {missedFillUpCount === 1 ? "it's" : "they're"} left
+          out of the chart and the average rather than skewing both.
         </p>
       )}
     </div>

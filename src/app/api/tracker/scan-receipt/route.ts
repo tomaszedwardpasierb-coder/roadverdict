@@ -52,7 +52,7 @@ const PROMPT = `You are extracting structured data from a photo that is claimed 
       "cost": the cost of just THIS item, in whatever currency you identified above, as a plain number with no currency symbol - not the receipt's grand total, unless there is genuinely only one item,
       "description": a short (max 6 words) plain-English description of this specific item,
       "litres": if category is "fuel", the number of litres for this item as a plain number, otherwise null,
-      "mileageOnReceipt": if an odometer/mileage reading is printed anywhere on the receipt for this item, that number, otherwise null - do not guess or estimate this, only report a mileage that is actually printed on the receipt
+      "mileageOnReceipt": an odometer/mileage reading, ONLY if you are genuinely confident a specific number on this receipt represents the bike's mileage - e.g. explicit wording like "mileage:", "odometer:", "miles:", or a number clearly logged against a service/inspection for that reason. Do NOT return a number just because it looks plausible as a mileage - order numbers, invoice numbers, part/SKU codes, phone numbers, postcodes, prices, and quantities all commonly appear on receipts and are NOT mileage readings even when they happen to be a few digits long. If there is no clearly-labelled mileage/odometer figure, or if you are not confident, return null rather than guessing - a missing value is far better than a wrong one, since a fallback estimate is used instead when this is null.
     }
   ]
 }
@@ -282,6 +282,7 @@ export async function POST(request: NextRequest) {
       // rather than ever being presented as if it were exact.
       let mileage: number | undefined;
       let mileageConfidence: "interpolated" | "estimated" | undefined;
+      let mileageWarning: string | undefined;
       if (item.category !== "bills") {
         if (typeof item.mileageOnReceipt === "number" && item.mileageOnReceipt > 0) {
           mileage = Math.round(item.mileageOnReceipt);
@@ -293,12 +294,16 @@ export async function POST(request: NextRequest) {
           });
           mileage = estimate.mileage;
           mileageConfidence = estimate.confidence;
+          mileageWarning = estimate.warning;
         }
       }
 
       if (item.category === "service") {
         const jobType = guessJobType(description) ?? "other";
-        const notes = forceReview ? `${description} (currency could not be auto-converted - please check the amount)` : description;
+        const notes = [
+          forceReview ? `${description} (currency could not be auto-converted - please check the amount)` : description,
+          mileageWarning ? `⚠️ ${mileageWarning}` : null,
+        ].filter(Boolean).join(" - ");
         const jobLabel = JOB_LABELS[jobType] ?? jobType;
         const aiDescription = buildAiDescription({ description: jobLabel, merchantName, address: receiptAddress, city: receiptCity, categoryLabel: "Service" });
         const duplicate = findPossibleDuplicate(
@@ -364,7 +369,10 @@ export async function POST(request: NextRequest) {
         createdCategories.push("fuel");
       } else if (item.category === "mods") {
         const modCategory = guessModCategory(description) ?? "other-accessory";
-        const modNotes = forceReview ? "Currency could not be auto-converted - please check the amount" : "";
+        const modNotes = [
+          forceReview ? "Currency could not be auto-converted - please check the amount" : null,
+          mileageWarning ? `⚠️ ${mileageWarning}` : null,
+        ].filter(Boolean).join(" - ");
         const aiDescription = buildAiDescription({ description, merchantName, address: receiptAddress, city: receiptCity, categoryLabel: "Parts & Accessories" });
         const duplicate = findPossibleDuplicate(
           date,
