@@ -37,6 +37,11 @@ function LoginForm() {
         return;
       }
 
+      if (data.demo) {
+        window.location.href = "/dashboard";
+        return;
+      }
+
       setStatus("sent");
     } catch {
       setStatus("error");

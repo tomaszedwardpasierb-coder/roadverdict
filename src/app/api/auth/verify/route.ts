@@ -1,11 +1,10 @@
-﻿// Place at: src/app/api/auth/verify/route.ts
+// Place at: src/app/api/auth/verify/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { getContainer } from "@/lib/cosmos";
-import { generateToken, hashToken, decodeEmail, encodeEmail } from "@/lib/auth/crypto";
+import { hashToken, decodeEmail } from "@/lib/auth/crypto";
+import { createSessionForEmail } from "@/lib/auth/session";
 
 export const dynamic = "force-dynamic";
-
-const SESSION_TTL_SECONDS = 30 * 24 * 60 * 60;
 
 const APP_URL = process.env.APP_URL;
 
@@ -53,40 +52,16 @@ export async function GET(req: NextRequest) {
     { op: "replace", path: "/used", value: true },
   ]);
 
-  try {
-    await container.item(email, email).read();
-  } catch {
-    await container.items.create({
-      id: email,
-      pk: email,
-      type: "user",
-      email,
-      createdAt: new Date().toISOString(),
-    });
-  }
-
-  const { raw: sessionRaw, hash: sessionHash } = generateToken();
-  const now = new Date();
-  const expiresAt = new Date(now.getTime() + SESSION_TTL_SECONDS * 1000);
-
-  await container.items.create({
-    id: sessionHash,
-    pk: email,
-    type: "session",
-    createdAt: now.toISOString(),
-    expiresAt: expiresAt.toISOString(),
-    ttl: SESSION_TTL_SECONDS,
-    ip: getClientIp(req),
-  });
+  const { cookieValue, maxAge } = await createSessionForEmail(email, getClientIp(req));
 
   const response = NextResponse.redirect(`${APP_URL}/dashboard`);
 
-  response.cookies.set("session", `${encodeEmail(email)}.${sessionRaw}`, {
+  response.cookies.set("session", cookieValue, {
     httpOnly: true,
     secure: true,
     sameSite: "lax",
     path: "/",
-    maxAge: SESSION_TTL_SECONDS,
+    maxAge,
   });
 
   return response;

@@ -8,6 +8,8 @@ import { BikeSwitcher, type SwitcherBike } from './BikeSwitcher';
 import LogoutButton from './LogoutButton';
 import { formatDistance, type DistanceUnit } from '@/lib/tracker/unitFormat';
 import { TabSwitchProvider, type ReviewCategory } from './TabSwitchContext';
+import { ResetDemoButton } from './ResetDemoButton';
+import { DEMO_EMAIL } from '@/lib/tracker/demoSeed';
 import styles from './dashboard.module.css';
 
 type Section = 'dashboard' | 'service' | 'fuel' | 'mods' | 'bills' | 'reminders' | 'reports' | 'shareLinks';
@@ -140,6 +142,11 @@ export function DashboardShell({
             <div className={styles.sidebarUserAvatar}>{userEmail.slice(0, 2).toUpperCase()}</div>
             <div className={styles.sidebarUserEmail}>{userEmail}</div>
           </div>
+          {userEmail === DEMO_EMAIL && (
+            <div style={{ marginTop: '0.6rem' }}>
+              <ResetDemoButton />
+            </div>
+          )}
           <div style={{ marginTop: '0.6rem' }}>
             <LogoutButton />
           </div>
@@ -228,6 +235,11 @@ export function DashboardShell({
               <div style={{ marginTop: '0.5rem' }}>
                 <Link href="/garage" onClick={() => setShowMore(false)}>Manage bikes →</Link>
               </div>
+              {userEmail === DEMO_EMAIL && (
+                <div style={{ marginTop: '0.5rem' }}>
+                  <ResetDemoButton />
+                </div>
+              )}
               <div style={{ marginTop: '0.5rem' }}>
                 <LogoutButton />
               </div>
