@@ -23,6 +23,7 @@ export async function createServiceRecord(
     currencyConversion?: CurrencyConversionInfo;
     mileageConfidence?: "interpolated" | "estimated";
     aiDescription?: string;
+    mileageConflictWarning?: string;
   }
 ): Promise<ServiceRecordDoc> {
   return createTrackerDoc<ServiceRecordDoc>(email, "service", "serviceRecord", data);
@@ -44,6 +45,9 @@ export async function updateServiceRecord(
     attachments?: Attachment[];
     needsReview?: boolean;
     mileageConfidence?: "interpolated" | "estimated" | "confirmed";
+    // string | null (not just optional) so a fixed conflict can be
+    // explicitly cleared on save, not just left stale from before.
+    mileageConflictWarning?: string | null;
   }
 ): Promise<ServiceRecordDoc | null> {
   return updateTrackerDoc<ServiceRecordDoc>(email, id, data);

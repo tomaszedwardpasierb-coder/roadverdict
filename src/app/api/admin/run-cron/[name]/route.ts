@@ -4,7 +4,7 @@ import { getAdminSession } from "@/lib/admin/session";
 
 export const dynamic = "force-dynamic";
 
-const VALID_NAMES = new Set(["update-fuel-price", "check-reminders", "backfill-bike-id", "delete-expired-share-links"]);
+const VALID_NAMES = new Set(["update-fuel-price", "check-reminders", "backfill-bike-id", "delete-expired-share-links", "audit-mileage"]);
 
 export async function POST(request: Request, { params }: { params: { name: string } }) {
   const isAdmin = await getAdminSession();

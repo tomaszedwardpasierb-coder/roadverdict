@@ -188,7 +188,11 @@ export function ModCard({
     >
       {mod.needsReview && (
         <div className={styles.needsReviewNote}>
-          🧠 Auto-created from a scanned receipt - click Edit to review, especially the mileage, before it's done.
+          {mod.mileageConflictWarning ? (
+            <>⚠️ {mod.mileageConflictWarning}</>
+          ) : (
+            <>🧠 Auto-created from a scanned receipt - click Edit to review, especially the mileage, before it&apos;s done.</>
+          )}
           {mod.aiDescription && <div className={styles.aiDescriptionNote}>{mod.aiDescription}</div>}
         </div>
       )}

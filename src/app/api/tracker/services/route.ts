@@ -1,11 +1,14 @@
 ﻿// Place at: src/app/api/tracker/services/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/session";
-import { createServiceRecord } from "@/lib/tracker/serviceRecord";
+import { createServiceRecord, getServiceRecords } from "@/lib/tracker/serviceRecord";
 import { getPrimaryBike, updateBikeMileage } from "@/lib/tracker/bike";
 import { createReminder, deleteRemindersBySourceKey } from "@/lib/tracker/reminder";
 import { JOB_LABELS } from "@/lib/tracker/jobTypes";
 import { isBeforeProduction } from "@/lib/tracker/productionYearCheck";
+import { getFuelLogs } from "@/lib/tracker/fuelLog";
+import { getMods } from "@/lib/tracker/mod";
+import { findMileageConflict, describeMileageConflict } from "@/lib/tracker/mileageConflict";
 import type { Attachment } from "@/lib/tracker/cosmosHelpers";
 
 export const dynamic = "force-dynamic";
@@ -51,7 +54,32 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: `This date is before ${bike.year}, when this bike was made.` }, { status: 400 });
   }
 
-  const record = await createServiceRecord(session.email, { bikeId: bike.id, jobType, cost, mileage, date, notes: notes ?? "", attachments });
+  // Catch a chronologically-inconsistent mileage the moment it's saved
+  // rather than waiting for the periodic audit tool to find it later -
+  // never blocks the save (a rare genuine case, like an odometer
+  // replacement, is still allowed), just flags it immediately through
+  // the same review mechanism AI-scanned entries already use.
+  const [otherRecords, otherFuelLogs, otherMods] = await Promise.all([
+    getServiceRecords(session.email, bike.id),
+    getFuelLogs(session.email, bike.id),
+    getMods(session.email, bike.id),
+  ]);
+  const conflict = findMileageConflict(date, mileage, null, [
+    ...otherRecords.map((r) => ({ id: r.id, date: r.date, mileage: r.mileage })),
+    ...otherFuelLogs.map((f) => ({ id: f.id, date: f.date, mileage: f.mileage })),
+    ...otherMods.map((m) => ({ id: m.id, date: m.date, mileage: m.mileage })),
+  ]);
+
+  const record = await createServiceRecord(session.email, {
+    bikeId: bike.id,
+    jobType,
+    cost,
+    mileage,
+    date,
+    notes: notes ?? "",
+    attachments,
+    ...(conflict ? { needsReview: true, mileageConflictWarning: describeMileageConflict(conflict) } : {}),
+  });
 
   if (mileage > bike.currentMileage) {
     await updateBikeMileage(session.email, bike.id, mileage);

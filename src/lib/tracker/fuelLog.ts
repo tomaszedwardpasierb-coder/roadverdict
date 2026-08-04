@@ -23,6 +23,7 @@ export async function createFuelLog(
     currencyConversion?: CurrencyConversionInfo;
     mileageConfidence?: "interpolated" | "estimated";
     aiDescription?: string;
+    mileageConflictWarning?: string;
   }
 ): Promise<FuelLogDoc> {
   return createTrackerDoc<FuelLogDoc>(email, "fuel", "fuelLog", data);
@@ -44,6 +45,9 @@ export async function updateFuelLog(
     attachments?: Attachment[];
     needsReview?: boolean;
     mileageConfidence?: "interpolated" | "estimated" | "confirmed";
+    // string | null (not just optional) so a fixed conflict can be
+    // explicitly cleared on save, not just left stale from before.
+    mileageConflictWarning?: string | null;
   }
 ): Promise<FuelLogDoc | null> {
   return updateTrackerDoc<FuelLogDoc>(email, id, data);

@@ -1,8 +1,11 @@
 ﻿// Place at: src/app/api/tracker/fuel/[id]/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/session";
-import { updateFuelLog, deleteFuelLog, type FuelLogDoc } from "@/lib/tracker/fuelLog";
+import { updateFuelLog, deleteFuelLog, getFuelLogs, type FuelLogDoc } from "@/lib/tracker/fuelLog";
 import { getPrimaryBike, updateBikeMileage } from "@/lib/tracker/bike";
+import { getServiceRecords } from "@/lib/tracker/serviceRecord";
+import { getMods } from "@/lib/tracker/mod";
+import { findMileageConflict, describeMileageConflict } from "@/lib/tracker/mileageConflict";
 import { getTrackerDocById, type Attachment } from "@/lib/tracker/cosmosHelpers";
 
 export const dynamic = "force-dynamic";
@@ -44,6 +47,16 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
       ? "confirmed"
       : existing?.mileageConfidence;
 
+  const bikeId = existing?.bikeId;
+  const [otherRecords, otherFuelLogs, otherMods] = bikeId
+    ? await Promise.all([getServiceRecords(session.email, bikeId), getFuelLogs(session.email, bikeId), getMods(session.email, bikeId)])
+    : [[], [], []];
+  const conflict = findMileageConflict(date, mileage, id, [
+    ...otherRecords.map((r) => ({ id: r.id, date: r.date, mileage: r.mileage })),
+    ...otherFuelLogs.map((f) => ({ id: f.id, date: f.date, mileage: f.mileage })),
+    ...otherMods.map((m) => ({ id: m.id, date: m.date, mileage: m.mileage })),
+  ]);
+
   const log = await updateFuelLog(session.email, id, {
     litres,
     cost,
@@ -51,8 +64,9 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     date,
     filledToFull: Boolean(filledToFull),
     attachments,
-    needsReview: false,
+    needsReview: Boolean(conflict),
     mileageConfidence: nextMileageConfidence,
+    mileageConflictWarning: conflict ? describeMileageConflict(conflict) : null,
   });
   if (!log) {
     return NextResponse.json({ error: "Entry not found." }, { status: 404 });

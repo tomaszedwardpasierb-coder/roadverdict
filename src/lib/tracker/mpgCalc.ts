@@ -11,15 +11,7 @@ export interface MpgSegment {
   mileage: number;
   mpg: number;
   date: string;
-  // The fuel log that closed this segment (the later of the two
-  // fill-ups the mpg was computed between) - lets the chart link a
-  // point back to a specific record instead of just displaying it.
   fuelLogId: string;
-  // True when this segment's fuel-per-mile figure is so far from the
-  // rider's own baseline that a missed, unlogged fill-up in between is
-  // a far more likely explanation than a genuine efficiency change. Kept
-  // in the series (not silently dropped) so the caller can show what
-  // was excluded and why - but never counted toward any average.
   likelyMissedFillUps: boolean;
 }
 
@@ -32,16 +24,38 @@ export interface MpgCalcInput {
   mileageConfidence?: "interpolated" | "estimated" | "confirmed";
 }
 
-// A segment whose mpg is more than this fraction away from the rider's
-// own baseline is flagged. 75% is generous on purpose - genuine week-to-
-// week variation (motorway vs town, cold starts, a pillion, a full
-// pannier) is real and shouldn't get flagged; a fill-up quietly covering
-// three unlogged tanks' worth of distance is a much bigger jump than that.
-const ANOMALY_THRESHOLD_RATIO = 0.75;
-// Need at least this many trustworthy segments before there's a baseline
-// worth comparing anything against - the first one or two segments a
-// bike ever logs have nothing reliable to be judged against yet.
+// Modified z-score outlier detection (Iglewicz & Hoaglin, "How to
+// Detect and Handle Outliers", ASQC Quality Press, 1993) - a standard,
+// widely-cited robust-statistics method, used here instead of a single
+// fixed percentage-of-baseline threshold. The reason: a fixed percentage
+// treats every rider identically regardless of how naturally consistent
+// or scattered their own readings are. A rider who always rides the
+// same commute has a tight baseline and a genuine missed fill-up stands
+// out clearly even at a modest deviation; a rider who mixes motorway,
+// town, and the occasional loaded touring trip has real month-to-month
+// swings that a single generous threshold either misses for the first
+// rider or false-flags for the second. The modified z-score adapts to
+// each rider's OWN observed spread (via the median absolute deviation,
+// MAD - the robust equivalent of standard deviation) instead of using
+// one number for everyone. 3.5 is Iglewicz & Hoaglin's own recommended
+// threshold for "likely outlier".
+const MODIFIED_ZSCORE_THRESHOLD = 3.5;
+const MAD_SCALE_CONSTANT = 0.6745; // makes the modified z-score comparable to a standard z-score under normality
+// If this rider's own baseline is unusually tight, a MAD near zero
+// would make the z-score hypersensitive to completely normal tiny
+// variation - fall back to a plain percentage check in that case instead.
+const MIN_MAD_TO_BASELINE_RATIO = 0.03;
+// MAD itself needs a reasonably-sized sample to be a stable estimate -
+// with only 2-3 points, the median and MAD are themselves noisy, and
+// the modified z-score can false-flag genuine variation (verified
+// against a synthetic mixed-riding scenario: with fewer than 5 points,
+// two real, non-anomalous ~25% swings were wrongly flagged). Below this
+// count, fall back to a deliberately conservative fixed ratio instead -
+// less sensitive, but safe while there simply isn't enough of this
+// rider's own history yet to know what their normal spread looks like.
+const MIN_SEGMENTS_FOR_ADAPTIVE_METHOD = 5;
 const MIN_VALID_SEGMENTS_FOR_BASELINE = 2;
+const EARLY_FALLBACK_DEVIATION_RATIO = 0.75;
 // Two flagged segments in a row, both off in roughly the same direction
 // from the SAME stale baseline, reads as a genuine sustained change
 // (different bike, new commute, different riding style) rather than a
@@ -55,6 +69,26 @@ function median(values: number[]): number {
   const sorted = [...values].sort((a, b) => a - b);
   const mid = Math.floor(sorted.length / 2);
   return sorted.length % 2 === 0 ? (sorted[mid - 1] + sorted[mid]) / 2 : sorted[mid];
+}
+
+function medianAbsoluteDeviation(values: number[], med: number): number {
+  return median(values.map((v) => Math.abs(v - med)));
+}
+
+function isAnomalous(candidate: number, baselineValues: number[]): boolean {
+  const baseline = median(baselineValues);
+  if (baseline <= 0) return false;
+
+  if (baselineValues.length < MIN_SEGMENTS_FOR_ADAPTIVE_METHOD) {
+    return Math.abs(candidate - baseline) / baseline > EARLY_FALLBACK_DEVIATION_RATIO;
+  }
+
+  const mad = medianAbsoluteDeviation(baselineValues, baseline);
+  if (mad > baseline * MIN_MAD_TO_BASELINE_RATIO) {
+    const modifiedZ = (MAD_SCALE_CONSTANT * (candidate - baseline)) / mad;
+    return Math.abs(modifiedZ) > MODIFIED_ZSCORE_THRESHOLD;
+  }
+  return Math.abs(candidate - baseline) / baseline > EARLY_FALLBACK_DEVIATION_RATIO;
 }
 
 // A fill-up whose mileage hasn't been human-verified breaks the chain
@@ -94,19 +128,14 @@ export function computeMPGSeries(fuelLogs: MpgCalcInput[]): MpgSegment[] {
   // makes the segment that follows look far more fuel-efficient than
   // it really was - the litres logged only cover what actually got
   // logged, not the real fuel burned over that whole distance. Flag
-  // segments whose mpg is wildly out of line with the rider's own
-  // baseline instead of taking every logged segment at face value.
+  // segments whose mpg is a statistical outlier against the rider's own
+  // history instead of taking every logged segment at face value.
   const validMpgsSoFar: number[] = [];
   let consecutiveAnomalies = 0;
   const result: MpgSegment[] = [];
 
   for (const seg of raw) {
-    let flagged = false;
-    if (validMpgsSoFar.length >= MIN_VALID_SEGMENTS_FOR_BASELINE) {
-      const baseline = median(validMpgsSoFar);
-      const deviation = baseline > 0 ? Math.abs(seg.mpg - baseline) / baseline : 0;
-      flagged = deviation > ANOMALY_THRESHOLD_RATIO;
-    }
+    let flagged = validMpgsSoFar.length >= MIN_VALID_SEGMENTS_FOR_BASELINE && isAnomalous(seg.mpg, validMpgsSoFar);
 
     if (flagged) {
       consecutiveAnomalies++;

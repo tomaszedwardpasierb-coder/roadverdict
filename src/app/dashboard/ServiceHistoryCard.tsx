@@ -219,7 +219,11 @@ export function ServiceHistoryCard({ record, bikeClass, brandValue, region, dist
     >
       {record.needsReview && (
         <div className={styles.needsReviewNote}>
-          🧠 Auto-created from a scanned receipt - click Edit to review, especially the mileage, before it's done.
+          {record.mileageConflictWarning ? (
+            <>⚠️ {record.mileageConflictWarning}</>
+          ) : (
+            <>🧠 Auto-created from a scanned receipt - click Edit to review, especially the mileage, before it&apos;s done.</>
+          )}
           {record.aiDescription && <div className={styles.aiDescriptionNote}>{record.aiDescription}</div>}
         </div>
       )}

@@ -1,10 +1,13 @@
 ﻿// Place at: src/app/api/tracker/services/[id]/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/session";
-import { updateServiceRecord, deleteServiceRecord, type ServiceRecordDoc } from "@/lib/tracker/serviceRecord";
+import { updateServiceRecord, deleteServiceRecord, getServiceRecords, type ServiceRecordDoc } from "@/lib/tracker/serviceRecord";
 import { getPrimaryBike, updateBikeMileage } from "@/lib/tracker/bike";
 import { createReminder, deleteRemindersBySourceKey } from "@/lib/tracker/reminder";
 import { JOB_LABELS } from "@/lib/tracker/jobTypes";
+import { getFuelLogs } from "@/lib/tracker/fuelLog";
+import { getMods } from "@/lib/tracker/mod";
+import { findMileageConflict, describeMileageConflict } from "@/lib/tracker/mileageConflict";
 import { getTrackerDocById, type Attachment } from "@/lib/tracker/cosmosHelpers";
 
 export const dynamic = "force-dynamic";
@@ -57,6 +60,20 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
       ? "confirmed"
       : existing?.mileageConfidence;
 
+  // Same immediate check as creating a new record - an edit can just as
+  // easily introduce a chronological inconsistency as a fresh entry can.
+  // Skips gracefully (no conflict check, not a failure) if this record
+  // somehow predates the bikeId backfill and has none yet.
+  const bikeId = existing?.bikeId;
+  const [otherRecords, otherFuelLogs, otherMods] = bikeId
+    ? await Promise.all([getServiceRecords(session.email, bikeId), getFuelLogs(session.email, bikeId), getMods(session.email, bikeId)])
+    : [[], [], []];
+  const conflict = findMileageConflict(date, mileage, id, [
+    ...otherRecords.map((r) => ({ id: r.id, date: r.date, mileage: r.mileage })),
+    ...otherFuelLogs.map((f) => ({ id: f.id, date: f.date, mileage: f.mileage })),
+    ...otherMods.map((m) => ({ id: m.id, date: m.date, mileage: m.mileage })),
+  ]);
+
   const record = await updateServiceRecord(session.email, id, {
     jobType,
     cost,
@@ -64,8 +81,9 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     date,
     notes: notes ?? "",
     attachments,
-    needsReview: false,
+    needsReview: Boolean(conflict),
     mileageConfidence: nextMileageConfidence,
+    mileageConflictWarning: conflict ? describeMileageConflict(conflict) : null,
   });
   if (!record) {
     return NextResponse.json({ error: "Record not found." }, { status: 404 });

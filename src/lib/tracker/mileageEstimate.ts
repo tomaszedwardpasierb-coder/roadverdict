@@ -16,9 +16,17 @@ export interface MileageEstimateResult {
   mileage: number;
   confidence: MileageConfidence;
   // Set whenever this specific estimate is on shakier ground than its
-  // confidence tier alone conveys. Purely informational: never blocks
-  // anything, just gives a human reviewing it a reason to look twice.
+  // confidence tier alone conveys.
   warning?: string;
+  // True when there's no real anchor close enough to trust ANY computed
+  // number, in either direction - rather than silently showing a
+  // fallback figure a busy reviewer might wave through unread, the
+  // caller should present this as a genuinely blank, required field
+  // instead of a pre-filled suggestion. `mileage` still carries a
+  // provisional placeholder (the nearest real anchor) so callers that
+  // must write a number immediately - the record schema requires one -
+  // have something to store until a human actually fills it in.
+  requiresManualEntry: boolean;
 }
 
 interface BikeLifetime {
@@ -37,6 +45,7 @@ const NEARBY_POINT_DAYS = 90; // "close enough to trust an extrapolation without
 // a receipt from three years earlier. Cap how far a computed rate is
 // allowed to speak: at most a multiple of its own observed window, and
 // never more than an absolute ceiling regardless of how long that window is.
+// Past that point, don't guess at all - ask instead.
 const MAX_EXTRAPOLATION_MULTIPLE = 3;
 const MAX_EXTRAPOLATION_DAYS_HARD_CAP = 730;
 
@@ -80,12 +89,15 @@ export function mileageConfidenceLabel(confidence: "interpolated" | "estimated" 
 }
 
 // 1. (Handled by the caller, before this runs) - mileage read directly off the receipt.
-// 2. Interpolate between two real logged points that bracket the target date.
-// 3. Extrapolate from whichever real point exists, using the bike's own actual pace -
-//    but only as far as that pace's own observed window can reasonably be trusted;
-//    beyond that, return the anchor unchanged rather than a fabricated number.
-// 4. No real points at all - interpolate across the bike's whole known lifetime.
-// 5. Target date is even before the bike was added - same trust-distance rule applies.
+// 2. Interpolate between two real logged points that bracket the target date - always
+//    automatic, since it's bounded and can't produce an implausible number by construction.
+// 3. Extrapolate from whichever single real point exists, using the bike's own actual
+//    pace - but only within that pace's own trusted distance. Beyond it, don't guess:
+//    require a human to provide the real figure.
+// 4. No real points at all, date within the bike's time on RoadVerdict - interpolate
+//    across its whole known lifetime (bounded by two real numbers the owner themselves
+//    provided when adding the bike, so this stays automatic).
+// 5. Target date is before the bike was even added - same trust-distance rule as (3).
 export function estimateMileage(targetDate: string, knownPoints: MileagePoint[], bike: BikeLifetime): MileageEstimateResult {
   const target = new Date(targetDate).getTime();
   const sorted = [...knownPoints].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
@@ -103,7 +115,7 @@ export function estimateMileage(targetDate: string, knownPoints: MileagePoint[],
       gapDays > WIDE_GAP_DAYS
         ? `The nearest logged records either side of this date are ${Math.round(gapDays)} days apart - this is a straight-line guess across a wide gap, worth checking if you can.`
         : undefined;
-    return { mileage, confidence: "interpolated", warning };
+    return { mileage, confidence: "interpolated", warning, requiresManualEntry: false };
   }
 
   if (before) {
@@ -114,7 +126,8 @@ export function estimateMileage(targetDate: string, knownPoints: MileagePoint[],
       return {
         mileage: before.mileage,
         confidence: "estimated",
-        warning: `${Math.round(daysSince)} days on from the nearest earlier record - too far past the ${Math.round(observedWindowDays)}-day span this bike's pace was actually measured over to trust a trend that far. Showing the nearest known figure instead of guessing - please correct this if you know the real number.`,
+        warning: `${Math.round(daysSince)} days on from the nearest earlier record - too far past the ${Math.round(observedWindowDays)}-day span this bike's pace was actually measured over to trust a guess. Please enter the real mileage if you know it.`,
+        requiresManualEntry: true,
       };
     }
     const mileage = clampToPlausible(Math.max(before.mileage, before.mileage + rate * daysSince), bike);
@@ -122,7 +135,7 @@ export function estimateMileage(targetDate: string, knownPoints: MileagePoint[],
       daysSince > NEARBY_POINT_DAYS
         ? `${Math.round(daysSince)} days on from the nearest earlier record, extrapolated at ${isBikeSpecific ? "this bike's own average pace" : "a generic UK average (no bike-specific pace to go on yet)"}.`
         : undefined;
-    return { mileage, confidence: "estimated", warning };
+    return { mileage, confidence: "estimated", warning, requiresManualEntry: false };
   }
 
   if (after) {
@@ -133,7 +146,8 @@ export function estimateMileage(targetDate: string, knownPoints: MileagePoint[],
       return {
         mileage: after.mileage,
         confidence: "estimated",
-        warning: `${Math.round(daysBefore)} days before the nearest later record - too far past the ${Math.round(observedWindowDays)}-day span this bike's pace was actually measured over to trust a trend that far. Showing the nearest known figure instead of guessing - please correct this if you know the real number.`,
+        warning: `${Math.round(daysBefore)} days before the nearest later record - too far past the ${Math.round(observedWindowDays)}-day span this bike's pace was actually measured over to trust a guess. This looks like the oldest record for this bike so far - please enter the real mileage if you know it.`,
+        requiresManualEntry: true,
       };
     }
     const mileage = clampToPlausible(after.mileage - rate * daysBefore, bike);
@@ -141,7 +155,7 @@ export function estimateMileage(targetDate: string, knownPoints: MileagePoint[],
       daysBefore > NEARBY_POINT_DAYS
         ? `${Math.round(daysBefore)} days before the nearest later record, extrapolated backward at ${isBikeSpecific ? "this bike's own average pace" : "a generic UK average (no bike-specific pace to go on yet)"}.`
         : undefined;
-    return { mileage, confidence: "estimated", warning };
+    return { mileage, confidence: "estimated", warning, requiresManualEntry: false };
   }
 
   const addedTime = new Date(bike.dateAdded).getTime();
@@ -154,12 +168,15 @@ export function estimateMileage(targetDate: string, knownPoints: MileagePoint[],
       mileage,
       confidence: "estimated",
       warning: "No logged records at all yet to anchor this - spread evenly across the bike's whole time on RoadVerdict.",
+      requiresManualEntry: false,
     };
   }
 
-  // Target date is before the bike was even added to RoadVerdict. Same
+  // Target date is before the bike was even added to RoadVerdict - this
+  // is very often the genuinely oldest record for this bike. Same
   // trust-distance rule: only extrapolate backward from startingMileage
-  // as far as the bike's own observed pace can reasonably be trusted.
+  // as far as the bike's own observed pace can reasonably be trusted;
+  // beyond that, or with no bike-specific pace at all yet, ask instead.
   const { rate, isBikeSpecific, observedWindowDays } = overallRatePerDay(sorted, bike);
   const daysBeforeAdded = daysBetween(addedTime, target);
   const trustedDays = trustedExtrapolationDays(observedWindowDays);
@@ -168,11 +185,12 @@ export function estimateMileage(targetDate: string, knownPoints: MileagePoint[],
       mileage: bike.startingMileage,
       confidence: "estimated",
       warning: isBikeSpecific
-        ? `From before this bike was added to RoadVerdict, and ${Math.round(daysBeforeAdded)} days further back than the ${Math.round(observedWindowDays)}-day span its pace was actually measured over - too far to trust a trend. Showing the bike's starting mileage as a placeholder - please correct this if you know the real number.`
-        : `From before this bike was added to RoadVerdict, and there's no bike-specific pace yet to extrapolate from. Showing the bike's starting mileage as a placeholder rather than guessing with a generic average - please correct this if you know the real number.`,
+        ? `From before this bike was added to RoadVerdict, and ${Math.round(daysBeforeAdded)} days further back than the ${Math.round(observedWindowDays)}-day span its pace was actually measured over - too far to trust a guess. This looks like the oldest record for this bike so far - please enter the real mileage if you know it.`
+        : `From before this bike was added to RoadVerdict, with no bike-specific pace yet to go on. This looks like the oldest record for this bike so far - please enter the real mileage if you know it.`,
+      requiresManualEntry: true,
     };
   }
   const mileage = clampToPlausible(bike.startingMileage - rate * daysBeforeAdded, bike);
   const warning = `From before this bike was added to RoadVerdict - extrapolated backward ${Math.round(daysBeforeAdded)} days at this bike's own average pace.`;
-  return { mileage, confidence: "estimated", warning };
+  return { mileage, confidence: "estimated", warning, requiresManualEntry: false };
 }

@@ -1,9 +1,12 @@
 ﻿// Place at: src/app/api/tracker/fuel/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/session";
-import { createFuelLog } from "@/lib/tracker/fuelLog";
+import { createFuelLog, getFuelLogs } from "@/lib/tracker/fuelLog";
 import { getPrimaryBike, updateBikeMileage } from "@/lib/tracker/bike";
 import { isBeforeProduction } from "@/lib/tracker/productionYearCheck";
+import { getServiceRecords } from "@/lib/tracker/serviceRecord";
+import { getMods } from "@/lib/tracker/mod";
+import { findMileageConflict, describeMileageConflict } from "@/lib/tracker/mileageConflict";
 import type { Attachment } from "@/lib/tracker/cosmosHelpers";
 
 export const dynamic = "force-dynamic";
@@ -43,6 +46,17 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: `This date is before ${bike.year}, when this bike was made.` }, { status: 400 });
   }
 
+  const [otherRecords, otherFuelLogs, otherMods] = await Promise.all([
+    getServiceRecords(session.email, bike.id),
+    getFuelLogs(session.email, bike.id),
+    getMods(session.email, bike.id),
+  ]);
+  const conflict = findMileageConflict(date, mileage, null, [
+    ...otherRecords.map((r) => ({ id: r.id, date: r.date, mileage: r.mileage })),
+    ...otherFuelLogs.map((f) => ({ id: f.id, date: f.date, mileage: f.mileage })),
+    ...otherMods.map((m) => ({ id: m.id, date: m.date, mileage: m.mileage })),
+  ]);
+
   const log = await createFuelLog(session.email, {
     bikeId: bike.id,
     litres,
@@ -51,6 +65,7 @@ export async function POST(request: NextRequest) {
     date,
     filledToFull: Boolean(filledToFull),
     attachments,
+    ...(conflict ? { needsReview: true, mileageConflictWarning: describeMileageConflict(conflict) } : {}),
   });
 
   if (mileage > bike.currentMileage) {

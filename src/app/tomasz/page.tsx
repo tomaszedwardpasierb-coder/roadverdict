@@ -143,6 +143,16 @@ export default async function AdminDashboardPage() {
           )}
           <RunCronButton name="backfill-bike-id" label="Run backfill" />
         </div>
+        <div className={styles.statusCard}>
+          <div className={styles.statusTitle}>Mileage audit</div>
+          <p className={styles.warn} style={{ marginBottom: '0.4rem' }}>
+            Re-flags any AI-derived mileage that breaks chronological ordering against its own neighbouring records
+            (mileage can only go up over time) - catches records damaged by earlier estimator bugs, including ones
+            already marked &quot;confirmed&quot;. Never changes the mileage value itself, only re-flags it for review.
+            Safe to click more than once.
+          </p>
+          <RunCronButton name="audit-mileage" label="Run audit" />
+        </div>
       </div>
 
       <h2 className={styles.sectionHeading}>Accounts</h2>

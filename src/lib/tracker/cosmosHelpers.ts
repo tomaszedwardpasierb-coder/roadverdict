@@ -68,6 +68,12 @@ export interface TrackerDocBase {
   // exists so a record still makes sense to the owner weeks later
   // without them having to remember which physical receipt it came from.
   aiDescription?: string;
+  // Set only when a write was flagged because it's chronologically
+  // inconsistent with another existing record (mileage going backward
+  // over time) - lets the UI show an accurate reason instead of the
+  // generic "auto-created from a scanned receipt" banner, which would
+  // be wrong for a manually-typed entry flagged this way.
+  mileageConflictWarning?: string | null;
 }
 
 // Creates and upserts a new tracker doc. id is auto-generated as

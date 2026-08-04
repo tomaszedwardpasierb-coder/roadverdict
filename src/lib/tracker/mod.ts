@@ -25,6 +25,7 @@ export async function createMod(
     currencyConversion?: CurrencyConversionInfo;
     mileageConfidence?: "interpolated" | "estimated";
     aiDescription?: string;
+    mileageConflictWarning?: string;
   }
 ): Promise<ModDoc> {
   return createTrackerDoc<ModDoc>(email, "mod", "mod", data);
@@ -47,6 +48,9 @@ export async function updateMod(
     attachments?: Attachment[];
     needsReview?: boolean;
     mileageConfidence?: "interpolated" | "estimated" | "confirmed";
+    // string | null (not just optional) so a fixed conflict can be
+    // explicitly cleared on save, not just left stale from before.
+    mileageConflictWarning?: string | null;
   }
 ): Promise<ModDoc | null> {
   return updateTrackerDoc<ModDoc>(email, id, data);

@@ -139,7 +139,11 @@ export function FuelLogCard({
     >
       {log.needsReview && (
         <div className={styles.needsReviewNote}>
-          🧠 Auto-created from a scanned receipt - click Edit to review, especially the mileage, before it's done.
+          {log.mileageConflictWarning ? (
+            <>⚠️ {log.mileageConflictWarning}</>
+          ) : (
+            <>🧠 Auto-created from a scanned receipt - click Edit to review, especially the mileage, before it&apos;s done.</>
+          )}
           {log.aiDescription && <div className={styles.aiDescriptionNote}>{log.aiDescription}</div>}
         </div>
       )}

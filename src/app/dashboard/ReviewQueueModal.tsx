@@ -71,7 +71,9 @@ function QueueItemForm({
 
   const [cost, setCost] = useState(entry.cost.toFixed(2));
   const [date, setDate] = useState(entry.date);
-  const [mileage, setMileage] = useState(entry.category !== 'bills' ? String(entry.mileage) : '');
+  const [mileage, setMileage] = useState(
+    entry.category !== 'bills' && !entry.mileageNeedsManualEntry ? String(entry.mileage) : ''
+  );
   const [notes, setNotes] = useState(entry.category === 'bills' || entry.category === 'service' || entry.category === 'mods' ? entry.notes : '');
   const [jobType, setJobType] = useState(entry.category === 'service' ? entry.jobType : '');
   const [litres, setLitres] = useState(entry.category === 'fuel' ? String(entry.litres) : '');
@@ -188,7 +190,21 @@ function QueueItemForm({
       {entry.category !== 'bills' && (
         <div className="field" style={{ marginTop: '0.7rem' }}>
           <label htmlFor="rq-mileage">Mileage</label>
-          <input id="rq-mileage" type="number" min="0" value={mileage} onChange={(e) => setMileage(e.target.value)} required />
+          {entry.mileageNeedsManualEntry && (
+            <p className={styles.reviewQueueDuplicateWarning} style={{ marginBottom: '0.4rem' }}>
+              There&apos;s nothing nearby to estimate this from reliably - please enter the real mileage from the
+              receipt, or your best own memory of it.
+            </p>
+          )}
+          <input
+            id="rq-mileage"
+            type="number"
+            min="0"
+            value={mileage}
+            onChange={(e) => setMileage(e.target.value)}
+            placeholder={entry.mileageNeedsManualEntry ? 'Enter the real mileage' : undefined}
+            required
+          />
         </div>
       )}
 

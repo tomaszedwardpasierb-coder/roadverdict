@@ -90,9 +90,9 @@ const VALID_CATEGORIES = new Set(["service", "fuel", "mods", "bills"]);
 // one, not the raw Cosmos doc. A discriminated union on `category` so
 // the client can narrow which fields it expects without extra checks.
 export type ReviewQueueEntry =
-  | { id: string; category: "service"; aiDescription: string; duplicate: DuplicateMatch | null; jobType: string; cost: number; mileage: number; date: string; notes: string }
-  | { id: string; category: "fuel"; aiDescription: string; duplicate: DuplicateMatch | null; litres: number; cost: number; mileage: number; date: string; filledToFull: boolean }
-  | { id: string; category: "mods"; aiDescription: string; duplicate: DuplicateMatch | null; name: string; modCategory: string; cost: number; mileage: number; date: string; notes: string }
+  | { id: string; category: "service"; aiDescription: string; duplicate: DuplicateMatch | null; jobType: string; cost: number; mileage: number; mileageNeedsManualEntry: boolean; date: string; notes: string }
+  | { id: string; category: "fuel"; aiDescription: string; duplicate: DuplicateMatch | null; litres: number; cost: number; mileage: number; mileageNeedsManualEntry: boolean; date: string; filledToFull: boolean }
+  | { id: string; category: "mods"; aiDescription: string; duplicate: DuplicateMatch | null; name: string; modCategory: string; cost: number; mileage: number; mileageNeedsManualEntry: boolean; date: string; notes: string }
   | { id: string; category: "bills"; aiDescription: string; duplicate: DuplicateMatch | null; billType: string; cost: number; date: string; notes: string };
 
 export async function POST(request: NextRequest) {
@@ -283,6 +283,7 @@ export async function POST(request: NextRequest) {
       let mileage: number | undefined;
       let mileageConfidence: "interpolated" | "estimated" | undefined;
       let mileageWarning: string | undefined;
+      let mileageNeedsManualEntry = false;
       if (item.category !== "bills") {
         if (typeof item.mileageOnReceipt === "number" && item.mileageOnReceipt > 0) {
           mileage = Math.round(item.mileageOnReceipt);
@@ -295,6 +296,7 @@ export async function POST(request: NextRequest) {
           mileage = estimate.mileage;
           mileageConfidence = estimate.confidence;
           mileageWarning = estimate.warning;
+          mileageNeedsManualEntry = estimate.requiresManualEntry;
         }
       }
 
@@ -326,7 +328,7 @@ export async function POST(request: NextRequest) {
         });
         createdEntries.push({
           id: record.id, category: "service", aiDescription, duplicate,
-          jobType, cost: costGbp, mileage: mileage ?? bike.currentMileage, date, notes,
+          jobType, cost: costGbp, mileage: mileage ?? bike.currentMileage, mileageNeedsManualEntry, date, notes,
         });
         const reminderDefault = JOB_REMINDER_DEFAULTS[jobType];
         if (reminderDefault) {
@@ -364,7 +366,7 @@ export async function POST(request: NextRequest) {
         createdEntries.push({
           id: record.id, category: "fuel", aiDescription, duplicate,
           litres: typeof item.litres === "number" ? item.litres : 0,
-          cost: costGbp, mileage: mileage ?? bike.currentMileage, date, filledToFull: true,
+          cost: costGbp, mileage: mileage ?? bike.currentMileage, mileageNeedsManualEntry, date, filledToFull: true,
         });
         createdCategories.push("fuel");
       } else if (item.category === "mods") {
@@ -395,7 +397,7 @@ export async function POST(request: NextRequest) {
         });
         createdEntries.push({
           id: record.id, category: "mods", aiDescription, duplicate,
-          name: description, modCategory, cost: costGbp, mileage: mileage ?? bike.currentMileage, date, notes: modNotes,
+          name: description, modCategory, cost: costGbp, mileage: mileage ?? bike.currentMileage, mileageNeedsManualEntry, date, notes: modNotes,
         });
         createdCategories.push("mods");
       } else {
