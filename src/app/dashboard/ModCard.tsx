@@ -1,7 +1,7 @@
 ﻿// Place at: src/app/dashboard/ModCard.tsx
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { MOD_GROUPS, MOD_LABELS, MOD_LABEL_TO_KEY, findGroupForCategory } from '@/lib/tracker/modTypes';
 import type { ModDoc } from '@/lib/tracker/mod';
 import { useTrackerFormSubmit } from './useTrackerFormSubmit';
@@ -10,7 +10,7 @@ import { AttachmentThumb } from './AttachmentThumb';
 import type { Attachment } from '@/lib/tracker/cosmosHelpers';
 import { formatDistance, convertMilesToDisplay, convertDisplayToMiles, distanceUnitLabel, type DistanceUnit } from '@/lib/tracker/unitFormat';
 import { convertGbpToDisplay, convertDisplayToGbp, formatCurrency, CURRENCY_SYMBOLS, type Currency, type ExchangeRates } from '@/lib/tracker/currency';
-import { useTabSwitch, offerNextReview, type ReviewCategory } from './TabSwitchContext';
+import { useTabSwitch, goToNextReview, type ReviewCategory } from './TabSwitchContext';
 import { mileageConfidenceLabel } from '@/lib/tracker/mileageEstimate';
 import styles from './dashboard.module.css';
 
@@ -23,15 +23,15 @@ export function ModCard({
   distanceUnit,
   currency,
   rates,
-  pendingReviewCounts,
+  pendingReviewIds,
 }: {
   mod: ModDoc;
   distanceUnit: DistanceUnit;
   currency: Currency;
   rates: ExchangeRates | null;
-  pendingReviewCounts: Record<ReviewCategory, number>;
+  pendingReviewIds: Record<ReviewCategory, string[]>;
 }) {
-  const { switchTo } = useTabSwitch();
+  const { switchTo, focusId, setFocusId } = useTabSwitch();
   const [isEditing, setIsEditing] = useState(false);
   const [group, setGroup] = useState(() => findGroupForCategory(mod.category));
   const [category, setCategory] = useState(mod.category);
@@ -47,6 +47,14 @@ export function ModCard({
   const [notes, setNotes] = useState(mod.notes);
   const [attachment, setAttachment] = useState<Attachment | null>(mod.attachments?.[0] ?? null);
   const { submit, submitting, error } = useTrackerFormSubmit(`/api/tracker/mods/${encodeURIComponent(mod.id)}`);
+
+  useEffect(() => {
+    if (focusId === mod.id) {
+      setIsEditing(true);
+      setFocusId(null);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusId]);
 
   function handleGroupChange(newGroup: string) {
     setGroup(newGroup);
@@ -75,7 +83,7 @@ export function ModCard({
     const ok = await submit({ category, name, cost: costInGbp, mileage: mileageInMiles, date, notes, attachments: attachment ? [attachment] : [] }, 'PATCH');
     if (ok) {
       setIsEditing(false);
-      if (mod.needsReview) offerNextReview(pendingReviewCounts, 'mods', switchTo);
+      if (mod.needsReview) goToNextReview(pendingReviewIds, 'mods', mod.id, switchTo, setFocusId);
     }
   }
 
@@ -144,7 +152,7 @@ export function ModCard({
             <label htmlFor={`edit-mod-notes-${mod.id}`}>Notes</label>
             <textarea id={`edit-mod-notes-${mod.id}`} rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} />
           </div>
-          <AttachmentUploader value={attachment} onChange={setAttachment} idSuffix={`-mod-${mod.id}`} />
+          <AttachmentUploader value={attachment} onChange={setAttachment} idSuffix={`-mod-${mod.id}`} compareValues={{ cost: convertDisplayToGbp(Number(costDisplay), currency, rates), date }} />
         </div>
         <hr className="ticket__divider" />
         <div className="ticket__section" style={{ display: 'flex', gap: '0.6rem', alignItems: 'center' }}>

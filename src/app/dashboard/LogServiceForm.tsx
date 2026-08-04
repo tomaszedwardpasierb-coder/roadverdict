@@ -40,10 +40,11 @@ export function LogServiceForm({
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
   const [notes, setNotes] = useState('');
   const [mileageAcknowledged, setMileageAcknowledged] = useState(false);
-  const [remindChecked, setRemindChecked] = useState(false);
-  const [remindTriggers, setRemindTriggers] = useState<ReminderTriggerRow[]>([
-    { intervalType: 'mileage', intervalValue: '', exactDate: '' },
-  ]);
+  const [remindChecked, setRemindChecked] = useState(Boolean(JOB_REMINDER_DEFAULTS['basic-service']));
+  const [remindTriggers, setRemindTriggers] = useState<ReminderTriggerRow[]>(() => {
+    const def = JOB_REMINDER_DEFAULTS['basic-service'];
+    return [{ intervalType: def ? def.type : 'mileage', intervalValue: def ? String(def.value) : '', exactDate: '' }];
+  });
   const [attachment, setAttachment] = useState<Attachment | null>(null);
   const { submit, submitting, error } = useTrackerFormSubmit('/api/tracker/services');
 
@@ -65,9 +66,15 @@ export function LogServiceForm({
     if (checked) applyDefaults(jobType);
   }
 
+  // A sensible reminder default exists for every job type except the
+  // genuinely-too-vague "other" - reflecting that automatically here
+  // means switching between job types keeps "remind me" correctly on or
+  // off without the person having to think about it each time.
   function handleJobChange(newJobType: string) {
     setJobType(newJobType);
-    if (remindChecked) applyDefaults(newJobType);
+    const hasDefault = Boolean(JOB_REMINDER_DEFAULTS[newJobType]);
+    setRemindChecked(hasDefault);
+    if (hasDefault) applyDefaults(newJobType);
   }
 
   function rowToTrigger(row: ReminderTriggerRow): ReminderTrigger {

@@ -1,7 +1,7 @@
 // Place at: src/app/dashboard/ServiceHistoryCard.tsx
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { JOB_GROUPS, JOB_LABELS, JOB_REMINDER_DEFAULTS, AFFILIATE_LINKS, isBenchmarkedJob } from '@/lib/tracker/jobTypes';
 import { getAdjustedBenchmark, type BikeClass, type Region } from '@/lib/priceData';
 import type { ServiceRecordDoc } from '@/lib/tracker/serviceRecord';
@@ -13,7 +13,7 @@ import { formatDistance, convertMilesToDisplay, convertDisplayToMiles, distanceU
 import { convertGbpToDisplay, convertDisplayToGbp, formatCurrency, CURRENCY_SYMBOLS, type Currency, type ExchangeRates } from '@/lib/tracker/currency';
 import { ReminderFields, type ReminderTriggerRow } from './ReminderFields';
 import type { ReminderTrigger } from '@/lib/tracker/reminder';
-import { useTabSwitch, offerNextReview, type ReviewCategory } from './TabSwitchContext';
+import { useTabSwitch, goToNextReview, type ReviewCategory } from './TabSwitchContext';
 import { mileageConfidenceLabel } from '@/lib/tracker/mileageEstimate';
 import styles from './dashboard.module.css';
 
@@ -50,11 +50,11 @@ interface Props {
   distanceUnit: DistanceUnit;
   currency: Currency;
   rates: ExchangeRates | null;
-  pendingReviewCounts: Record<ReviewCategory, number>;
+  pendingReviewIds: Record<ReviewCategory, string[]>;
 }
 
-export function ServiceHistoryCard({ record, bikeClass, brandValue, region, distanceUnit, currency, rates, pendingReviewCounts }: Props) {
-  const { switchTo } = useTabSwitch();
+export function ServiceHistoryCard({ record, bikeClass, brandValue, region, distanceUnit, currency, rates, pendingReviewIds }: Props) {
+  const { switchTo, focusId, setFocusId } = useTabSwitch();
   const [isEditing, setIsEditing] = useState(false);
   const [jobType, setJobType] = useState(record.jobType);
   const [costDisplay, setCostDisplay] = useState(
@@ -66,13 +66,26 @@ export function ServiceHistoryCard({ record, bikeClass, brandValue, region, dist
   const [date, setDate] = useState(record.date);
   const [notes, setNotes] = useState(record.notes);
   const [attachment, setAttachment] = useState<Attachment | null>(record.attachments?.[0] ?? null);
-  const [remindChecked, setRemindChecked] = useState(false);
-  const [remindTriggers, setRemindTriggers] = useState<ReminderTriggerRow[]>([
-    { intervalType: 'mileage', intervalValue: '', exactDate: '' },
-  ]);
+  const [remindChecked, setRemindChecked] = useState(Boolean(JOB_REMINDER_DEFAULTS[record.jobType]));
+  const [remindTriggers, setRemindTriggers] = useState<ReminderTriggerRow[]>(() => {
+    const def = JOB_REMINDER_DEFAULTS[record.jobType];
+    return [{ intervalType: def ? def.type : 'mileage', intervalValue: def ? String(def.value) : '', exactDate: '' }];
+  });
   const { submit, submitting, error } = useTrackerFormSubmit(
     `/api/tracker/services/${encodeURIComponent(record.id)}`
   );
+
+  // The moment this specific record is named as the next one to review -
+  // whether because it was already on screen, or because a tab switch
+  // just brought this list into view - open its edit mode automatically,
+  // then clear the flag so it doesn't try to reopen itself later.
+  useEffect(() => {
+    if (focusId === record.id) {
+      setIsEditing(true);
+      setFocusId(null);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusId]);
 
   const verdict = computeVerdict(record.jobType, bikeClass, brandValue, region, record.cost);
   const jobLabel = JOB_LABELS[record.jobType] ?? record.jobType;
@@ -118,7 +131,7 @@ export function ServiceHistoryCard({ record, bikeClass, brandValue, region, dist
     const ok = await submit(body, 'PATCH');
     if (ok) {
       setIsEditing(false);
-      if (record.needsReview) offerNextReview(pendingReviewCounts, 'service', switchTo);
+      if (record.needsReview) goToNextReview(pendingReviewIds, 'service', record.id, switchTo, setFocusId);
     }
   }
 
@@ -159,7 +172,7 @@ export function ServiceHistoryCard({ record, bikeClass, brandValue, region, dist
             <label htmlFor={`edit-notes-${record.id}`}>Notes</label>
             <textarea id={`edit-notes-${record.id}`} rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} />
           </div>
-          <AttachmentUploader value={attachment} onChange={setAttachment} idSuffix={`-service-${record.id}`} />
+          <AttachmentUploader value={attachment} onChange={setAttachment} idSuffix={`-service-${record.id}`} compareValues={{ cost: convertDisplayToGbp(Number(costDisplay), currency, rates), date }} />
 
           <ReminderFields
             checked={remindChecked}

@@ -1,51 +1,68 @@
 // Place at: src/app/dashboard/TabSwitchContext.tsx
 'use client';
 
-import { createContext, useContext, type ReactNode } from 'react';
+import { createContext, useContext, useState, type ReactNode } from 'react';
 
 export type ReviewCategory = 'service' | 'fuel' | 'mods' | 'bills';
 
 interface ContextValue {
   switchTo: (category: ReviewCategory) => void;
+  // The single record a card should automatically open into edit mode
+  // the moment it sees itself named here - lives above the point where
+  // individual tab content mounts/unmounts (same reason the queue-based
+  // scanner state used to live here), so it survives a tab switch
+  // between "save this one" and "the next one showing up".
+  focusId: string | null;
+  setFocusId: (id: string | null) => void;
 }
 
 const TabSwitchContext = createContext<ContextValue | null>(null);
 
 export function TabSwitchProvider({ children, onSwitchTab }: { children: ReactNode; onSwitchTab: (category: ReviewCategory) => void }) {
-  return <TabSwitchContext.Provider value={{ switchTo: onSwitchTab }}>{children}</TabSwitchContext.Provider>;
+  const [focusId, setFocusId] = useState<string | null>(null);
+  return (
+    <TabSwitchContext.Provider value={{ switchTo: onSwitchTab, focusId, setFocusId }}>
+      {children}
+    </TabSwitchContext.Provider>
+  );
 }
 
 export function useTabSwitch(): ContextValue {
   const ctx = useContext(TabSwitchContext);
-  if (!ctx) return { switchTo: () => {} };
+  if (!ctx) return { switchTo: () => {}, focusId: null, setFocusId: () => {} };
   return ctx;
 }
 
-const CATEGORY_LABELS: Record<ReviewCategory, string> = {
-  service: 'Service',
-  fuel: 'Fuel',
-  mods: 'Parts & Accessories',
-  bills: 'Tax & Insurance',
-};
+const CATEGORY_ORDER: ReviewCategory[] = ['service', 'fuel', 'mods', 'bills'];
 
 // Shared by all 4 history cards - after saving a record that needed
-// review, checks whether anything else is still waiting elsewhere (any
-// OTHER category, since something in the SAME category needs no prompt
-// at all - the page refresh already surfaces it right there on the same
-// tab) and offers to jump straight there. Uses the page-load snapshot of
-// counts, not a live re-fetch - accurate enough for this decision, and
-// avoids needing a server round-trip before deciding.
-export function offerNextReview(
-  pendingReviewCounts: Record<ReviewCategory, number>,
+// review, moves straight to whatever's next with zero confirmation:
+// something else in the SAME category first (stays on this tab, just
+// tells that next card to open its own edit mode), otherwise the first
+// pending item in another category (switches tabs, then does the same).
+// Uses the page-load snapshot of ids, not a live re-fetch - myId is
+// explicitly excluded since the snapshot still includes the record that
+// was just saved.
+export function goToNextReview(
+  pendingReviewIds: Record<ReviewCategory, string[]>,
   myCategory: ReviewCategory,
-  switchTo: (category: ReviewCategory) => void
+  myId: string,
+  switchTo: (category: ReviewCategory) => void,
+  setFocusId: (id: string | null) => void
 ) {
-  const remainingHere = pendingReviewCounts[myCategory] - 1;
-  if (remainingHere > 0) return;
-  const otherCategory = (['service', 'fuel', 'mods', 'bills'] as ReviewCategory[]).find(
-    (c) => c !== myCategory && pendingReviewCounts[c] > 0
-  );
-  if (otherCategory && confirm(`Saved. Open the next record waiting for review in ${CATEGORY_LABELS[otherCategory]}?`)) {
-    switchTo(otherCategory);
+  const remainingHere = pendingReviewIds[myCategory].filter((id) => id !== myId);
+  if (remainingHere.length > 0) {
+    setFocusId(remainingHere[0]);
+    return;
   }
+  for (const category of CATEGORY_ORDER) {
+    if (category === myCategory) continue;
+    const ids = pendingReviewIds[category];
+    if (ids.length > 0) {
+      switchTo(category);
+      setFocusId(ids[0]);
+      return;
+    }
+  }
+  setFocusId(null);
 }

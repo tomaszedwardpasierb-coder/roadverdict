@@ -1,7 +1,7 @@
 // Place at: src/app/dashboard/BillCard.tsx
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { BILL_LABELS, BILL_REMINDER_DEFAULTS } from '@/lib/tracker/billTypes';
 import type { BillDoc } from '@/lib/tracker/bill';
 import { useTrackerFormSubmit } from './useTrackerFormSubmit';
@@ -11,7 +11,7 @@ import type { Attachment } from '@/lib/tracker/cosmosHelpers';
 import { convertGbpToDisplay, convertDisplayToGbp, formatCurrency, CURRENCY_SYMBOLS, type Currency, type ExchangeRates } from '@/lib/tracker/currency';
 import { ReminderFields, type ReminderTriggerRow } from './ReminderFields';
 import type { ReminderTrigger } from '@/lib/tracker/reminder';
-import { useTabSwitch, offerNextReview, type ReviewCategory } from './TabSwitchContext';
+import { useTabSwitch, goToNextReview, type ReviewCategory } from './TabSwitchContext';
 import styles from './dashboard.module.css';
 
 function fmtDate(d: string): string {
@@ -22,14 +22,14 @@ export function BillCard({
   bill,
   currency,
   rates,
-  pendingReviewCounts,
+  pendingReviewIds,
 }: {
   bill: BillDoc;
   currency: Currency;
   rates: ExchangeRates | null;
-  pendingReviewCounts: Record<ReviewCategory, number>;
+  pendingReviewIds: Record<ReviewCategory, string[]>;
 }) {
-  const { switchTo } = useTabSwitch();
+  const { switchTo, focusId, setFocusId } = useTabSwitch();
   const [isEditing, setIsEditing] = useState(false);
   const [billType, setBillType] = useState(bill.billType);
   const [costDisplay, setCostDisplay] = useState(
@@ -38,11 +38,20 @@ export function BillCard({
   const [date, setDate] = useState(bill.date);
   const [notes, setNotes] = useState(bill.notes);
   const [attachment, setAttachment] = useState<Attachment | null>(bill.attachments?.[0] ?? null);
-  const [remindChecked, setRemindChecked] = useState(false);
-  const [remindTriggers, setRemindTriggers] = useState<ReminderTriggerRow[]>([
-    { intervalType: 'months', intervalValue: '12', exactDate: '' },
-  ]);
+  const [remindChecked, setRemindChecked] = useState(Boolean(BILL_REMINDER_DEFAULTS[bill.billType]));
+  const [remindTriggers, setRemindTriggers] = useState<ReminderTriggerRow[]>(() => {
+    const def = BILL_REMINDER_DEFAULTS[bill.billType];
+    return [{ intervalType: def ? def.type : 'months', intervalValue: def ? String(def.value) : '12', exactDate: '' }];
+  });
   const { submit, submitting, error } = useTrackerFormSubmit(`/api/tracker/bills/${encodeURIComponent(bill.id)}`);
+
+  useEffect(() => {
+    if (focusId === bill.id) {
+      setIsEditing(true);
+      setFocusId(null);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusId]);
 
   const symbol = CURRENCY_SYMBOLS[currency];
 
@@ -80,7 +89,7 @@ export function BillCard({
     const ok = await submit(body, 'PATCH');
     if (ok) {
       setIsEditing(false);
-      if (bill.needsReview) offerNextReview(pendingReviewCounts, 'bills', switchTo);
+      if (bill.needsReview) goToNextReview(pendingReviewIds, 'bills', bill.id, switchTo, setFocusId);
     }
   }
 

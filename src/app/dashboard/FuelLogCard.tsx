@@ -1,7 +1,7 @@
 ﻿// Place at: src/app/dashboard/FuelLogCard.tsx
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import type { FuelLogDoc } from '@/lib/tracker/fuelLog';
 import { useTrackerFormSubmit } from './useTrackerFormSubmit';
 import { AttachmentUploader } from './AttachmentUploader';
@@ -9,7 +9,7 @@ import { AttachmentThumb } from './AttachmentThumb';
 import type { Attachment } from '@/lib/tracker/cosmosHelpers';
 import { formatDistance, convertMilesToDisplay, convertDisplayToMiles, distanceUnitLabel, type DistanceUnit } from '@/lib/tracker/unitFormat';
 import { convertGbpToDisplay, convertDisplayToGbp, formatCurrency, CURRENCY_SYMBOLS, type Currency, type ExchangeRates } from '@/lib/tracker/currency';
-import { useTabSwitch, offerNextReview, type ReviewCategory } from './TabSwitchContext';
+import { useTabSwitch, goToNextReview, type ReviewCategory } from './TabSwitchContext';
 import { mileageConfidenceLabel } from '@/lib/tracker/mileageEstimate';
 import styles from './dashboard.module.css';
 
@@ -22,15 +22,15 @@ export function FuelLogCard({
   distanceUnit,
   currency,
   rates,
-  pendingReviewCounts,
+  pendingReviewIds,
 }: {
   log: FuelLogDoc;
   distanceUnit: DistanceUnit;
   currency: Currency;
   rates: ExchangeRates | null;
-  pendingReviewCounts: Record<ReviewCategory, number>;
+  pendingReviewIds: Record<ReviewCategory, string[]>;
 }) {
-  const { switchTo } = useTabSwitch();
+  const { switchTo, focusId, setFocusId } = useTabSwitch();
   const [isEditing, setIsEditing] = useState(false);
   const [litres, setLitres] = useState(String(log.litres));
   const [costDisplay, setCostDisplay] = useState(
@@ -46,6 +46,14 @@ export function FuelLogCard({
     `/api/tracker/fuel/${encodeURIComponent(log.id)}`
   );
 
+  useEffect(() => {
+    if (focusId === log.id) {
+      setIsEditing(true);
+      setFocusId(null);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusId]);
+
   const perLitreGbp = log.cost / log.litres;
   const unitLabel = distanceUnitLabel(distanceUnit);
   const symbol = CURRENCY_SYMBOLS[currency];
@@ -60,7 +68,7 @@ export function FuelLogCard({
     );
     if (ok) {
       setIsEditing(false);
-      if (log.needsReview) offerNextReview(pendingReviewCounts, 'fuel', switchTo);
+      if (log.needsReview) goToNextReview(pendingReviewIds, 'fuel', log.id, switchTo, setFocusId);
     }
   }
 
@@ -95,7 +103,7 @@ export function FuelLogCard({
               Filled the tank completely full
             </label>
           </div>
-          <AttachmentUploader value={attachment} onChange={setAttachment} idSuffix={`-fuel-${log.id}`} />
+          <AttachmentUploader value={attachment} onChange={setAttachment} idSuffix={`-fuel-${log.id}`} compareValues={{ cost: convertDisplayToGbp(Number(costDisplay), currency, rates), date }} />
         </div>
         <hr className="ticket__divider" />
         <div className="ticket__section" style={{ display: 'flex', gap: '0.6rem', alignItems: 'center' }}>

@@ -55,7 +55,7 @@ interface Props {
   // Real, server-computed counts of needsReview records per category -
   // drives the pulsing nav dots directly from actual data, not an
   // in-memory queue that could disagree with what's really been saved.
-  pendingReviewCounts: Record<ReviewCategory, number>;
+  pendingReviewIds: Record<ReviewCategory, string[]>;
   dashboardContent: ReactNode;
   serviceContent: ReactNode;
   fuelContent: ReactNode;
@@ -78,7 +78,7 @@ export function DashboardShell({
   userEmail,
   bikes,
   activeBikeId,
-  pendingReviewCounts,
+  pendingReviewIds,
   dashboardContent,
   serviceContent,
   fuelContent,
@@ -117,7 +117,7 @@ export function DashboardShell({
           <nav className={styles.sidebarNav}>
             {NAV_ITEMS.map((item) => {
               const reviewCategory = asReviewCategory(item.key);
-              const hasPending = reviewCategory ? pendingReviewCounts[reviewCategory] > 0 : false;
+              const hasPending = reviewCategory ? pendingReviewIds[reviewCategory].length > 0 : false;
               return (
                 <button
                   key={item.key}
@@ -167,7 +167,7 @@ export function DashboardShell({
         <nav className={styles.mobileBottomNav}>
           {MOBILE_NAV_ITEMS.map((item) => {
             const reviewCategory = asReviewCategory(item.key);
-            const hasPending = reviewCategory ? pendingReviewCounts[reviewCategory] > 0 : false;
+            const hasPending = reviewCategory ? pendingReviewIds[reviewCategory].length > 0 : false;
             return (
               <button
                 key={item.key}
@@ -213,7 +213,7 @@ export function DashboardShell({
             <div className={styles.mobileMoreSheet}>
               {MORE_ITEMS.map((item) => {
                 const reviewCategory = asReviewCategory(item.key);
-                const hasPending = reviewCategory ? pendingReviewCounts[reviewCategory] > 0 : false;
+                const hasPending = reviewCategory ? pendingReviewIds[reviewCategory].length > 0 : false;
                 return (
                   <button
                     key={item.key}
