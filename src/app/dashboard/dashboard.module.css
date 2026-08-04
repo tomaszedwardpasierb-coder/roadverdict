@@ -155,6 +155,25 @@
   color: #7a251b;
   margin-bottom: 0.6rem;
 }
+.aiDescriptionNote {
+  margin-top: 0.35rem;
+  padding-top: 0.35rem;
+  border-top: 1px dashed #e3b3ac;
+  font-style: italic;
+  color: #7a251b;
+}
+/* Navigated here from a chart point or Recent Activity row - a
+   different colour and a finite pulse count (not infinite, unlike the
+   needs-review animation) so it reads as "look here for a moment", not
+   as an outstanding task. */
+.cardHighlight {
+  border-left: 4px solid var(--amber);
+  animation: cardHighlightPulse 0.8s ease-in-out 2;
+}
+@keyframes cardHighlightPulse {
+  0%, 100% { background: var(--paper); }
+  50% { background: #fbf1e0; }
+}
 .mileageConfidenceTag { color: var(--amber-ink); }
 .mileageConfirmedTag { color: var(--ink-soft); font-style: italic; }
 .mpgExcludedNote { font-size: 0.78rem; color: var(--ink-soft); margin-top: 0.5rem; font-style: italic; }
@@ -484,6 +503,8 @@
 .recentActivityTable { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
 .recentActivityTable th, .recentActivityTable td { text-align: left; padding: 0.5rem 0.6rem; border-bottom: 1px solid var(--border); }
 .recentActivityTable th { font-family: var(--font-mono); font-size: 0.65rem; text-transform: uppercase; color: var(--ink-soft); }
+.recentActivityRow { cursor: pointer; }
+.recentActivityRow:hover { background: var(--stone); }
 
 .reportsGrid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
 @media (max-width: 1100px) { .reportsGrid { grid-template-columns: 1fr; } }
@@ -581,6 +602,125 @@
 .dashboardTwoCol > .chartCard {
   max-height: 460px;
   overflow-y: auto;
+}
+
+/* --- Review queue modal (scan receipt follow-up) --- */
+.reviewQueueOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+}
+.reviewQueueModal {
+  width: 100%;
+  max-width: 480px;
+  max-height: 90vh;
+  overflow-y: auto;
+  background: var(--paper);
+  border: 1px solid var(--asphalt);
+  border-radius: 8px;
+  padding: 1.4rem 1.5rem;
+}
+.reviewQueueFilmstrip {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 0.8rem;
+}
+.reviewQueueFilmstripItem {
+  flex: 1;
+  height: 5px;
+  border-radius: 3px;
+  background: var(--stone);
+}
+.reviewQueueFilmstripItem.reviewQueueFilmstripActive {
+  background: var(--amber);
+}
+.reviewQueueFilmstripItem.reviewQueueFilmstripDone {
+  background: var(--verdict-green);
+}
+.reviewQueueProgress {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-family: var(--font-display);
+  font-size: 0.95rem;
+  margin-bottom: 1rem;
+}
+.reviewQueueReceipt {
+  display: flex;
+  gap: 0.8rem;
+  align-items: flex-start;
+  margin-bottom: 0.9rem;
+}
+.reviewQueueThumb {
+  width: 52px;
+  height: 52px;
+  flex-shrink: 0;
+  border-radius: 6px;
+  background: var(--stone);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.4rem;
+}
+.reviewQueueCategoryBadge {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  background: var(--stone);
+  color: var(--asphalt);
+  padding: 0.15rem 0.5rem;
+  border-radius: 3px;
+  margin-bottom: 0.3rem;
+}
+.reviewQueueAiDescription {
+  font-size: 0.88rem;
+  color: var(--ink-soft);
+  margin: 0;
+}
+.reviewQueueDuplicateWarning {
+  background: #fdeceb;
+  border: 1px solid var(--verdict-red);
+  border-radius: 4px;
+  padding: 0.6rem 0.75rem;
+  font-size: 0.85rem;
+  color: #7a251b;
+  margin-bottom: 1rem;
+}
+.reviewQueueDuplicateWarning p {
+  margin: 0 0 0.5rem;
+}
+.reviewQueueFooterRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 1.2rem;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+.reviewQueueFinishLater {
+  background: none;
+  border: none;
+  font-size: 0.85rem;
+  color: var(--ink-soft);
+  text-decoration: underline;
+  cursor: pointer;
+  padding: 0;
+}
+.reviewQueueDoneWrap {
+  text-align: center;
+  padding: 1.5rem 0;
+}
+.reviewQueueDoneTitle {
+  font-family: var(--font-display);
+  font-size: 1.2rem;
+  margin: 0 0 0.4rem;
 }
 
 

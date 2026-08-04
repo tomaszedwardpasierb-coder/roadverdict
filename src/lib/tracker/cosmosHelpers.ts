@@ -60,6 +60,14 @@ export interface TrackerDocBase {
   // 'estimated'/'interpolated' (which would wrongly keep implying the
   // figure still hasn't been looked at).
   mileageConfidence?: "interpolated" | "estimated" | "confirmed";
+  // Set only on scanner-created records - a fuller, human-written
+  // description than the short per-item `description`/`notes` field:
+  // what the receipt looks like it's for, its location if the receipt
+  // showed one, and the category, composed in aiDescription.ts. Purely
+  // informational, never required, never touched by a manual edit -
+  // exists so a record still makes sense to the owner weeks later
+  // without them having to remember which physical receipt it came from.
+  aiDescription?: string;
 }
 
 // Creates and upserts a new tracker doc. id is auto-generated as

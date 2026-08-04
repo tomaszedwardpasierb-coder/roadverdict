@@ -3,14 +3,9 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { ReviewQueueModal } from './ReviewQueueModal';
+import type { ReviewQueueEntry } from '@/app/api/tracker/scan-receipt/route';
 import styles from './dashboard.module.css';
-
-const CATEGORY_TAB_NAMES: Record<string, string> = {
-  service: 'Service',
-  fuel: 'Fuel',
-  mods: 'Parts & Accessories',
-  bills: 'Tax & Insurance',
-};
 
 interface FileOutcome {
   fileName: string;
@@ -18,6 +13,7 @@ interface FileOutcome {
   summary?: string | null;
   categories?: string[];
   skippedBeforeProduction?: number;
+  createdEntries?: ReviewQueueEntry[];
   error?: string;
 }
 
@@ -27,6 +23,12 @@ export function ScanReceiptButton() {
   const [scanning, setScanning] = useState(false);
   const [progress, setProgress] = useState<{ current: number; total: number } | null>(null);
   const [outcomes, setOutcomes] = useState<FileOutcome[] | null>(null);
+  // The review queue is scoped to exactly what THIS scan created - never
+  // the app-wide needsReview snapshot - so a leftover unreviewed item
+  // from an earlier, abandoned session never gets mixed into it. Those
+  // leftovers are still reachable the normal way, via the pulsing tab
+  // dot and clicking Edit on the flagged card.
+  const [queueEntries, setQueueEntries] = useState<ReviewQueueEntry[] | null>(null);
 
   async function scanOneFile(file: File): Promise<FileOutcome> {
     try {
@@ -43,6 +45,7 @@ export function ScanReceiptButton() {
         summary: typeof data.summary === 'string' ? data.summary : null,
         categories: data.categories ?? [],
         skippedBeforeProduction: typeof data.skippedBeforeProduction === 'number' ? data.skippedBeforeProduction : 0,
+        createdEntries: Array.isArray(data.createdEntries) ? data.createdEntries : [],
       };
     } catch {
       return { fileName: file.name, ok: false, error: 'Could not reach the server.' };
@@ -59,7 +62,10 @@ export function ScanReceiptButton() {
     // honest, and avoids firing a burst of simultaneous requests at the
     // AI API for what's often a whole stack of old paper receipts at
     // once. One bad photo in the stack doesn't stop the rest - each
-    // file's own outcome is tracked and shown independently.
+    // file's own outcome is tracked and shown independently. This also
+    // means duplicate-detection on file 3 correctly sees files 1 and 2's
+    // records, since each request only starts once the previous one has
+    // fully finished and committed.
     const results: FileOutcome[] = [];
     for (let i = 0; i < files.length; i++) {
       setProgress({ current: i + 1, total: files.length });
@@ -70,12 +76,22 @@ export function ScanReceiptButton() {
     setProgress(null);
     setScanning(false);
     e.target.value = '';
-    // At least one file may have created real records - refresh so they
-    // show up and the sidebar's pending-review dots update.
     if (results.some((r) => r.ok)) router.refresh();
+
+    const allCreated = results.flatMap((r) => r.createdEntries ?? []);
+    if (allCreated.length > 0) setQueueEntries(allCreated);
   }
 
-  const totalCreatedCategories = outcomes ? [...new Set(outcomes.flatMap((o) => o.categories ?? []))] : [];
+  function handleQueueFinished() {
+    setQueueEntries(null);
+    // Individual saves/deletes inside the queue call the API directly,
+    // not useTrackerFormSubmit, so nothing has refreshed the underlying
+    // server-rendered lists and pending-review dots yet - this is that
+    // refresh, once, when the user is actually done rather than after
+    // every single item.
+    router.refresh();
+  }
+
   const successCount = outcomes?.filter((o) => o.ok).length ?? 0;
   const failCount = outcomes?.filter((o) => !o.ok).length ?? 0;
   const totalSkipped = outcomes?.reduce((sum, o) => sum + (o.skippedBeforeProduction ?? 0), 0) ?? 0;
@@ -90,9 +106,8 @@ export function ScanReceiptButton() {
           <p>
             Snap or upload one photo, or a whole stack at once - a drawer full of old paper receipts works fine.
             RoadVerdict&apos;s AI reads each one, splits it into separate entries first if it covers more than one
-            thing, and creates each automatically with your mileage estimated for now. You&apos;ll see everything
-            flagged for review in the relevant tab, where you can correct anything (especially the mileage) before
-            it&apos;s done.
+            thing, checks it against what you&apos;ve already logged in case it&apos;s a duplicate, and opens a
+            quick review for anything it created so you can check the mileage and details before it&apos;s done.
           </p>
           <input
             type="file"
@@ -111,9 +126,7 @@ export function ScanReceiptButton() {
             <div style={{ marginTop: '0.6rem' }}>
               {successCount > 0 && (
                 <p className={styles.scanReceiptSuccess}>
-                  ✓ Read {successCount} receipt{successCount === 1 ? '' : 's'}, created entries in{' '}
-                  <strong>{totalCreatedCategories.map((c) => CATEGORY_TAB_NAMES[c] ?? c).join(', ')}</strong> - look
-                  for the pulsing dot in the sidebar and click each flagged entry to review it.
+                  ✓ Read {successCount} receipt{successCount === 1 ? '' : 's'}.
                 </p>
               )}
               {totalSkipped > 0 && (
@@ -136,16 +149,12 @@ export function ScanReceiptButton() {
                   </ul>
                 </div>
               )}
-              {outcomes.filter((o) => o.ok && o.summary).map((o, i) => (
-                <p key={i} className={styles.scanReceiptSummary}>
-                  🧠 &quot;{o.summary}&quot;
-                </p>
-              ))}
             </div>
           )}
           <p className={styles.scanReceiptConstruction}>PDF receipts aren&apos;t scanned yet - attach those manually as before.</p>
         </div>
       )}
+      {queueEntries && <ReviewQueueModal entries={queueEntries} onFinished={handleQueueFinished} />}
     </div>
   );
 }

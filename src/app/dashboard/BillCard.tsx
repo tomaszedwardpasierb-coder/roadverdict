@@ -1,7 +1,7 @@
 // Place at: src/app/dashboard/BillCard.tsx
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { BILL_LABELS, BILL_REMINDER_DEFAULTS } from '@/lib/tracker/billTypes';
 import type { BillDoc } from '@/lib/tracker/bill';
 import { useTrackerFormSubmit } from './useTrackerFormSubmit';
@@ -29,8 +29,10 @@ export function BillCard({
   rates: ExchangeRates | null;
   pendingReviewIds: Record<ReviewCategory, string[]>;
 }) {
-  const { switchTo, focusId, setFocusId } = useTabSwitch();
+  const { switchTo, focusId, setFocusId, highlightIds } = useTabSwitch();
   const [isEditing, setIsEditing] = useState(false);
+  const [isHighlighted, setIsHighlighted] = useState(false);
+  const cardRef = useRef<HTMLDivElement>(null);
   const [billType, setBillType] = useState(bill.billType);
   const [costDisplay, setCostDisplay] = useState(
     convertGbpToDisplay(bill.cost, currency, rates).toFixed(2)
@@ -52,6 +54,17 @@ export function BillCard({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focusId]);
+
+  useEffect(() => {
+    if (!highlightIds.includes(bill.id)) return;
+    setIsHighlighted(true);
+    if (highlightIds[0] === bill.id) {
+      cardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+    const timer = setTimeout(() => setIsHighlighted(false), 2500);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [highlightIds]);
 
   const symbol = CURRENCY_SYMBOLS[currency];
 
@@ -148,10 +161,14 @@ export function BillCard({
   }
 
   return (
-    <div className={`${styles.jobCard} ${bill.needsReview ? styles.jobCardNeedsReview : ''}`}>
+    <div
+      ref={cardRef}
+      className={`${styles.jobCard} ${bill.needsReview ? styles.jobCardNeedsReview : ''} ${isHighlighted ? styles.cardHighlight : ''}`}
+    >
       {bill.needsReview && (
         <div className={styles.needsReviewNote}>
           🧠 Auto-created from a scanned receipt - click Edit to review before it's done.
+          {bill.aiDescription && <div className={styles.aiDescriptionNote}>{bill.aiDescription}</div>}
         </div>
       )}
       <div className={styles.jobCardTop}>

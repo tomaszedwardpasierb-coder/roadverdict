@@ -1,7 +1,7 @@
 ﻿// Place at: src/app/dashboard/FuelLogCard.tsx
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import type { FuelLogDoc } from '@/lib/tracker/fuelLog';
 import { useTrackerFormSubmit } from './useTrackerFormSubmit';
 import { AttachmentUploader } from './AttachmentUploader';
@@ -30,8 +30,10 @@ export function FuelLogCard({
   rates: ExchangeRates | null;
   pendingReviewIds: Record<ReviewCategory, string[]>;
 }) {
-  const { switchTo, focusId, setFocusId } = useTabSwitch();
+  const { switchTo, focusId, setFocusId, highlightIds } = useTabSwitch();
   const [isEditing, setIsEditing] = useState(false);
+  const [isHighlighted, setIsHighlighted] = useState(false);
+  const cardRef = useRef<HTMLDivElement>(null);
   const [litres, setLitres] = useState(String(log.litres));
   const [costDisplay, setCostDisplay] = useState(
     convertGbpToDisplay(log.cost, currency, rates).toFixed(2)
@@ -53,6 +55,17 @@ export function FuelLogCard({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focusId]);
+
+  useEffect(() => {
+    if (!highlightIds.includes(log.id)) return;
+    setIsHighlighted(true);
+    if (highlightIds[0] === log.id) {
+      cardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+    const timer = setTimeout(() => setIsHighlighted(false), 2500);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [highlightIds]);
 
   const perLitreGbp = log.cost / log.litres;
   const unitLabel = distanceUnitLabel(distanceUnit);
@@ -120,10 +133,14 @@ export function FuelLogCard({
   }
 
   return (
-    <div className={`${styles.jobCard} ${log.needsReview ? styles.jobCardNeedsReview : ''}`}>
+    <div
+      ref={cardRef}
+      className={`${styles.jobCard} ${log.needsReview ? styles.jobCardNeedsReview : ''} ${isHighlighted ? styles.cardHighlight : ''}`}
+    >
       {log.needsReview && (
         <div className={styles.needsReviewNote}>
           🧠 Auto-created from a scanned receipt - click Edit to review, especially the mileage, before it's done.
+          {log.aiDescription && <div className={styles.aiDescriptionNote}>{log.aiDescription}</div>}
         </div>
       )}
       <div className={styles.jobCardTop}>

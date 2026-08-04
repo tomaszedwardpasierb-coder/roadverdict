@@ -24,6 +24,7 @@ export async function createMod(
     needsReview?: boolean;
     currencyConversion?: CurrencyConversionInfo;
     mileageConfidence?: "interpolated" | "estimated";
+    aiDescription?: string;
   }
 ): Promise<ModDoc> {
   return createTrackerDoc<ModDoc>(email, "mod", "mod", data);

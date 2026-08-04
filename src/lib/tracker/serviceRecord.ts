@@ -22,6 +22,7 @@ export async function createServiceRecord(
     needsReview?: boolean;
     currencyConversion?: CurrencyConversionInfo;
     mileageConfidence?: "interpolated" | "estimated";
+    aiDescription?: string;
   }
 ): Promise<ServiceRecordDoc> {
   return createTrackerDoc<ServiceRecordDoc>(email, "service", "serviceRecord", data);

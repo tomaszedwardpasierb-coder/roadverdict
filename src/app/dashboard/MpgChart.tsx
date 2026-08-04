@@ -11,6 +11,7 @@ import { useChartTypePreference } from './useChartTypePreference';
 import { ChartTypeToggle } from './ChartTypeToggle';
 import { barGradient, BAR_BORDER_RADIUS } from './chartStyle';
 import { useChartFilter } from './ChartFilterContext';
+import { useTabSwitch, viewRecords } from './TabSwitchContext';
 import styles from './dashboard.module.css';
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, BarElement, Tooltip, Legend);
@@ -47,6 +48,7 @@ export function MpgChart({
   rates: ExchangeRates | null;
   excludedFuelEntries: { date: string; cost: number }[];
 }) {
+  const { switchTo, setHighlightIds } = useTabSwitch();
   const { range, viewBy } = useChartFilter();
   const { kind, changeKind } = useChartTypePreference(CHART_ID, initialChartType ?? 'line');
   const dateFiltered = filterByDateRange(series, range);
@@ -68,6 +70,17 @@ export function MpgChart({
   const labels = viewBy === 'time' ? filtered.map((s) => fmtDate(s.date)) : filtered.map((s) => formatDistance(s.mileage, distanceUnit));
   const dataValues = filtered.map((s) => Number(convertMpgValue(s.mpg, fuelEconomyUnit).toFixed(1)));
 
+  function handlePointClick(elements: { index: number }[]) {
+    if (elements.length === 0) return;
+    const point = filtered[elements[0].index];
+    if (point?.fuelLogId) viewRecords('fuel', [point.fuelLogId], switchTo, setHighlightIds);
+  }
+
+  function handleHover(event: { native: Event | null }, elements: unknown[]) {
+    const target = event.native?.target as HTMLElement | undefined;
+    if (target) target.style.cursor = elements.length > 0 ? 'pointer' : 'default';
+  }
+
   return (
     <div>
       <div className={styles.chartCardHeader}>
@@ -88,6 +101,8 @@ export function MpgChart({
               y: { title: { display: true, text: yLabel }, grid: { color: '#00000012' } },
               x: { grid: { display: false } },
             },
+            onClick: (_evt, elements) => handlePointClick(elements),
+            onHover: handleHover,
             maintainAspectRatio: true,
           }}
         />
@@ -115,6 +130,8 @@ export function MpgChart({
               y: { title: { display: true, text: yLabel }, grid: { color: '#00000012' } },
               x: { grid: { display: false } },
             },
+            onClick: (_evt, elements) => handlePointClick(elements),
+            onHover: handleHover,
             maintainAspectRatio: true,
           }}
         />

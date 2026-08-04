@@ -10,6 +10,7 @@ import { useChartTypePreference } from './useChartTypePreference';
 import { ChartTypeToggle } from './ChartTypeToggle';
 import { barGradient, BAR_BORDER_RADIUS } from './chartStyle';
 import { useChartFilter } from './ChartFilterContext';
+import { useTabSwitch, viewRecords } from './TabSwitchContext';
 import styles from './dashboard.module.css';
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, BarElement, Tooltip, Legend);
@@ -17,6 +18,7 @@ ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, BarEleme
 const CHART_ID = 'fuel-cost';
 
 interface FuelPoint {
+  id: string;
   date: string;
   cost: number;
   mileage: number;
@@ -39,6 +41,7 @@ export function FuelCostChart({
   distanceUnit: DistanceUnit;
   initialChartType?: 'line' | 'bar';
 }) {
+  const { switchTo, setHighlightIds } = useTabSwitch();
   const { range, viewBy } = useChartFilter();
   const { kind, changeKind } = useChartTypePreference(CHART_ID, initialChartType ?? 'line');
   const dateFiltered = filterByDateRange(points, range);
@@ -49,6 +52,17 @@ export function FuelCostChart({
   const symbol = CURRENCY_SYMBOLS[currency];
   const labels = viewBy === 'mileage' ? filtered.map((p) => formatDistance(p.mileage, distanceUnit)) : filtered.map((p) => fmtDate(p.date));
   const dataValues = filtered.map((p) => convertGbpToDisplay(p.cost, currency, rates));
+
+  function handlePointClick(elements: { index: number }[]) {
+    if (elements.length === 0) return;
+    const point = filtered[elements[0].index];
+    if (point?.id) viewRecords('fuel', [point.id], switchTo, setHighlightIds);
+  }
+
+  function handleHover(event: { native: Event | null }, elements: unknown[]) {
+    const target = event.native?.target as HTMLElement | undefined;
+    if (target) target.style.cursor = elements.length > 0 ? 'pointer' : 'default';
+  }
 
   return (
     <div>
@@ -73,6 +87,8 @@ export function FuelCostChart({
               y: { grid: { color: '#00000012' }, ticks: { callback: (value) => `${symbol}${value}` } },
               x: { grid: { display: false } },
             },
+            onClick: (_evt, elements) => handlePointClick(elements),
+            onHover: handleHover,
             maintainAspectRatio: true,
           }}
         />
@@ -103,6 +119,8 @@ export function FuelCostChart({
               y: { grid: { color: '#00000012' }, ticks: { callback: (value) => `${symbol}${value}` } },
               x: { grid: { display: false } },
             },
+            onClick: (_evt, elements) => handlePointClick(elements),
+            onHover: handleHover,
             maintainAspectRatio: true,
           }}
         />

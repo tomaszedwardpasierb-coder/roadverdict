@@ -8,7 +8,7 @@ import { getPrimaryBike } from "@/lib/tracker/bike";
 import { getServiceRecords, createServiceRecord } from "@/lib/tracker/serviceRecord";
 import { getFuelLogs, createFuelLog } from "@/lib/tracker/fuelLog";
 import { getMods, createMod } from "@/lib/tracker/mod";
-import { createBill } from "@/lib/tracker/bill";
+import { getBills, createBill } from "@/lib/tracker/bill";
 import { createReminder } from "@/lib/tracker/reminder";
 import { getExchangeRates } from "@/lib/tracker/currencyRates";
 import { convertDisplayToGbp, ALL_CURRENCIES, type Currency } from "@/lib/tracker/currency";
@@ -17,6 +17,8 @@ import { isBeforeProduction } from "@/lib/tracker/productionYearCheck";
 import { guessJobType, guessModCategory, guessBillType } from "@/lib/tracker/guessCategory";
 import { JOB_LABELS, JOB_REMINDER_DEFAULTS } from "@/lib/tracker/jobTypes";
 import { BILL_LABELS, BILL_REMINDER_DEFAULTS } from "@/lib/tracker/billTypes";
+import { buildAiDescription } from "@/lib/tracker/aiDescription";
+import { findPossibleDuplicate, type DuplicateMatch } from "@/lib/tracker/duplicateCheck";
 import type { Attachment, CurrencyConversionInfo } from "@/lib/tracker/cosmosHelpers";
 
 export const dynamic = "force-dynamic";
@@ -40,6 +42,9 @@ const PROMPT = `You are extracting structured data from a photo that is claimed 
   "rejectionReason": if isReceipt is false, a short (max 15 words) plain explanation of why (e.g. "This looks like a photo of a motorcycle, not a receipt."), otherwise null,
   "summary": a single brief sentence (max ~20 words) confirming what this receipt/invoice actually is - the business or petrol station name if visible, the country if you can tell, and the date. Written for a human to quickly confirm "yes, that's the right receipt". If something isn't legible, say so briefly rather than guessing confidently. Only relevant if isReceipt is true, otherwise null.,
   "currency": the ISO currency code this receipt is priced in (e.g. "GBP", "EUR", "PLN"), based on symbols or text visible on the receipt - your best guess, default to "GBP" only if there is genuinely no clue at all. Only relevant if isReceipt is true, otherwise null.,
+  "merchantName": the name of the business/garage/petrol station this receipt is from, if visible - otherwise null. Only relevant if isReceipt is true.,
+  "address": the street address printed on the receipt, if visible (e.g. "14 High Street") - otherwise null. Only relevant if isReceipt is true.,
+  "city": the town or city printed on the receipt, if visible - otherwise null. Only relevant if isReceipt is true.,
   "items": [
     {
       "category": one of "service", "fuel", "mods", "bills",
@@ -56,7 +61,7 @@ Category guide:
 - "fuel": a petrol or diesel fill-up
 - "mods": accessories, gear, luggage, or electronics bought (not fitted as a labour job)
 - "bills": insurance, road tax (VED), or an MOT test
-If isReceipt is false, return an empty items array. If the receipt only really contains one purchase, return a single-item array rather than trying to invent a split. If you cannot confidently read a value on a genuine receipt, make your best reasonable estimate rather than leaving it out - every field on every item must have a value.`;
+If isReceipt is false, return an empty items array. If the receipt only really contains one purchase, return a single-item array rather than trying to invent a split. If you cannot confidently read a value on a genuine receipt, make your best reasonable estimate rather than leaving it out - every field on every item must have a value, except merchantName/address/city, which should genuinely be null rather than guessed if not visible on the receipt.`;
 
 interface GeminiItem {
   category?: string;
@@ -72,10 +77,23 @@ interface GeminiResponse {
   rejectionReason?: string;
   summary?: string;
   currency?: string;
+  merchantName?: string | null;
+  address?: string | null;
+  city?: string | null;
   items?: GeminiItem[];
 }
 
 const VALID_CATEGORIES = new Set(["service", "fuel", "mods", "bills"]);
+
+// The shape returned to the client for every record this scan created -
+// exactly the fields the review queue needs to render and PATCH each
+// one, not the raw Cosmos doc. A discriminated union on `category` so
+// the client can narrow which fields it expects without extra checks.
+export type ReviewQueueEntry =
+  | { id: string; category: "service"; aiDescription: string; duplicate: DuplicateMatch | null; jobType: string; cost: number; mileage: number; date: string; notes: string }
+  | { id: string; category: "fuel"; aiDescription: string; duplicate: DuplicateMatch | null; litres: number; cost: number; mileage: number; date: string; filledToFull: boolean }
+  | { id: string; category: "mods"; aiDescription: string; duplicate: DuplicateMatch | null; name: string; modCategory: string; cost: number; mileage: number; date: string; notes: string }
+  | { id: string; category: "bills"; aiDescription: string; duplicate: DuplicateMatch | null; billType: string; cost: number; date: string; notes: string };
 
 export async function POST(request: NextRequest) {
   const session = await getSession();
@@ -167,6 +185,9 @@ export async function POST(request: NextRequest) {
     }
     const summary = typeof parsed.summary === "string" && parsed.summary.trim() ? parsed.summary.trim() : null;
     const detectedCurrency = typeof parsed.currency === "string" ? parsed.currency.toUpperCase() : "GBP";
+    const merchantName = typeof parsed.merchantName === "string" && parsed.merchantName.trim() ? parsed.merchantName.trim() : null;
+    const receiptAddress = typeof parsed.address === "string" && parsed.address.trim() ? parsed.address.trim() : null;
+    const receiptCity = typeof parsed.city === "string" && parsed.city.trim() ? parsed.city.trim() : null;
 
     // Upload the same compressed image once - it's shared as the
     // attachment across every item split out of this one receipt, since
@@ -187,11 +208,14 @@ export async function POST(request: NextRequest) {
     // across Service, Fuel, and Mods (Bills never carry mileage) - as
     // the input to the deterministic interpolation/extrapolation in
     // mileageEstimate.ts. Only fetched once per scan, reused for every
-    // item on the receipt.
-    const [existingRecords, existingFuelLogs, existingMods] = await Promise.all([
+    // item on the receipt. The same four arrays double as the duplicate-
+    // detection candidate pool below - fetched once, not re-queried per
+    // item.
+    const [existingRecords, existingFuelLogs, existingMods, existingBills] = await Promise.all([
       getServiceRecords(session.email, bike.id),
       getFuelLogs(session.email, bike.id),
       getMods(session.email, bike.id),
+      getBills(session.email, bike.id),
     ]);
     const knownMileagePoints: MileagePoint[] = [
       ...existingRecords.map((r) => ({ date: r.date, mileage: r.mileage })),
@@ -204,6 +228,12 @@ export async function POST(request: NextRequest) {
 
     const createdCategories: string[] = [];
     let skippedBeforeProduction = 0;
+    // Full detail on every record actually created by this file, for the
+    // review queue on the client - not just counts, and not a second
+    // fetch (there's no GET-by-id route for these), so this response IS
+    // the queue's only data source. duplicate is filled in when this
+    // item looks like it might already be logged.
+    const createdEntries: ReviewQueueEntry[] = [];
 
     for (const item of validItems) {
       // Same rule already enforced on the manual forms: servicing, fuel,
@@ -269,6 +299,13 @@ export async function POST(request: NextRequest) {
       if (item.category === "service") {
         const jobType = guessJobType(description) ?? "other";
         const notes = forceReview ? `${description} (currency could not be auto-converted - please check the amount)` : description;
+        const jobLabel = JOB_LABELS[jobType] ?? jobType;
+        const aiDescription = buildAiDescription({ description: jobLabel, merchantName, address: receiptAddress, city: receiptCity, categoryLabel: "Service" });
+        const duplicate = findPossibleDuplicate(
+          date,
+          costGbp,
+          existingRecords.map((r) => ({ id: r.id, date: r.date, cost: r.cost, description: JOB_LABELS[r.jobType] ?? r.jobType }))
+        );
         const record = await createServiceRecord(session.email, {
           bikeId: bike.id,
           jobType,
@@ -280,8 +317,12 @@ export async function POST(request: NextRequest) {
           needsReview: true,
           currencyConversion,
           mileageConfidence,
+          aiDescription,
         });
-        void record;
+        createdEntries.push({
+          id: record.id, category: "service", aiDescription, duplicate,
+          jobType, cost: costGbp, mileage: mileage ?? bike.currentMileage, date, notes,
+        });
         const reminderDefault = JOB_REMINDER_DEFAULTS[jobType];
         if (reminderDefault) {
           await createReminder(session.email, {
@@ -296,7 +337,13 @@ export async function POST(request: NextRequest) {
         }
         createdCategories.push("service");
       } else if (item.category === "fuel") {
-        await createFuelLog(session.email, {
+        const aiDescription = buildAiDescription({ description: description || "Fuel", merchantName, address: receiptAddress, city: receiptCity, categoryLabel: "Fuel" });
+        const duplicate = findPossibleDuplicate(
+          date,
+          costGbp,
+          existingFuelLogs.map((f) => ({ id: f.id, date: f.date, cost: f.cost, description: `${f.litres.toFixed(1)}L fill-up` }))
+        );
+        const record = await createFuelLog(session.email, {
           bikeId: bike.id,
           litres: typeof item.litres === "number" ? item.litres : 0,
           cost: costGbp,
@@ -307,12 +354,24 @@ export async function POST(request: NextRequest) {
           needsReview: true,
           currencyConversion,
           mileageConfidence,
+          aiDescription,
+        });
+        createdEntries.push({
+          id: record.id, category: "fuel", aiDescription, duplicate,
+          litres: typeof item.litres === "number" ? item.litres : 0,
+          cost: costGbp, mileage: mileage ?? bike.currentMileage, date, filledToFull: true,
         });
         createdCategories.push("fuel");
       } else if (item.category === "mods") {
         const modCategory = guessModCategory(description) ?? "other-accessory";
         const modNotes = forceReview ? "Currency could not be auto-converted - please check the amount" : "";
-        await createMod(session.email, {
+        const aiDescription = buildAiDescription({ description, merchantName, address: receiptAddress, city: receiptCity, categoryLabel: "Parts & Accessories" });
+        const duplicate = findPossibleDuplicate(
+          date,
+          costGbp,
+          existingMods.map((m) => ({ id: m.id, date: m.date, cost: m.cost, description: m.name }))
+        );
+        const record = await createMod(session.email, {
           bikeId: bike.id,
           category: modCategory,
           name: description,
@@ -324,12 +383,24 @@ export async function POST(request: NextRequest) {
           needsReview: true,
           currencyConversion,
           mileageConfidence,
+          aiDescription,
+        });
+        createdEntries.push({
+          id: record.id, category: "mods", aiDescription, duplicate,
+          name: description, modCategory, cost: costGbp, mileage: mileage ?? bike.currentMileage, date, notes: modNotes,
         });
         createdCategories.push("mods");
       } else {
         const billType = guessBillType(description) ?? "insurance";
         const billNotes = forceReview ? `${description} (currency could not be auto-converted - please check the amount)` : description;
-        await createBill(session.email, {
+        const billLabel = BILL_LABELS[billType] ?? billType;
+        const aiDescription = buildAiDescription({ description: billLabel, merchantName, address: receiptAddress, city: receiptCity, categoryLabel: "Insurance, tax & MOT" });
+        const duplicate = findPossibleDuplicate(
+          date,
+          costGbp,
+          existingBills.map((b) => ({ id: b.id, date: b.date, cost: b.cost, description: BILL_LABELS[b.billType] ?? b.billType }))
+        );
+        const record = await createBill(session.email, {
           bikeId: bike.id,
           billType,
           cost: costGbp,
@@ -338,6 +409,11 @@ export async function POST(request: NextRequest) {
           attachments: [attachment],
           needsReview: true,
           currencyConversion,
+          aiDescription,
+        });
+        createdEntries.push({
+          id: record.id, category: "bills", aiDescription, duplicate,
+          billType, cost: costGbp, date, notes: billNotes,
         });
         const reminderDefault = BILL_REMINDER_DEFAULTS[billType];
         if (reminderDefault) {
@@ -367,6 +443,7 @@ export async function POST(request: NextRequest) {
       categories: [...new Set(createdCategories)],
       summary,
       skippedBeforeProduction,
+      createdEntries,
     });
   } catch (err) {
     return NextResponse.json(

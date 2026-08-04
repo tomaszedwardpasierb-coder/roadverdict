@@ -11,9 +11,14 @@ export interface MpgSegment {
   mileage: number;
   mpg: number;
   date: string;
+  // The fuel log that closed this segment (the later of the two
+  // fill-ups the mpg was computed between) - lets the chart link a
+  // point back to a specific record instead of just displaying it.
+  fuelLogId: string;
 }
 
 export interface MpgCalcInput {
+  id: string;
   mileage: number;
   litres: number;
   filledToFull: boolean;
@@ -46,7 +51,7 @@ export function computeMPGSeries(fuelLogs: MpgCalcInput[]): MpgSegment[] {
         const miles = log.mileage - lastFullMileage;
         if (miles > 0 && litresSinceLastFull > 0) {
           const gallons = litresSinceLastFull / 4.546;
-          segments.push({ mileage: log.mileage, mpg: miles / gallons, date: log.date });
+          segments.push({ mileage: log.mileage, mpg: miles / gallons, date: log.date, fuelLogId: log.id });
         }
       }
       lastFullMileage = log.mileage;

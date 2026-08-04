@@ -1,7 +1,7 @@
 ﻿// Place at: src/app/dashboard/ModCard.tsx
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { MOD_GROUPS, MOD_LABELS, MOD_LABEL_TO_KEY, findGroupForCategory } from '@/lib/tracker/modTypes';
 import type { ModDoc } from '@/lib/tracker/mod';
 import { useTrackerFormSubmit } from './useTrackerFormSubmit';
@@ -31,8 +31,10 @@ export function ModCard({
   rates: ExchangeRates | null;
   pendingReviewIds: Record<ReviewCategory, string[]>;
 }) {
-  const { switchTo, focusId, setFocusId } = useTabSwitch();
+  const { switchTo, focusId, setFocusId, highlightIds } = useTabSwitch();
   const [isEditing, setIsEditing] = useState(false);
+  const [isHighlighted, setIsHighlighted] = useState(false);
+  const cardRef = useRef<HTMLDivElement>(null);
   const [group, setGroup] = useState(() => findGroupForCategory(mod.category));
   const [category, setCategory] = useState(mod.category);
   const [categorySearch, setCategorySearch] = useState('');
@@ -55,6 +57,17 @@ export function ModCard({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focusId]);
+
+  useEffect(() => {
+    if (!highlightIds.includes(mod.id)) return;
+    setIsHighlighted(true);
+    if (highlightIds[0] === mod.id) {
+      cardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+    const timer = setTimeout(() => setIsHighlighted(false), 2500);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [highlightIds]);
 
   function handleGroupChange(newGroup: string) {
     setGroup(newGroup);
@@ -169,10 +182,14 @@ export function ModCard({
   }
 
   return (
-    <div className={`${styles.jobCard} ${mod.needsReview ? styles.jobCardNeedsReview : ''}`}>
+    <div
+      ref={cardRef}
+      className={`${styles.jobCard} ${mod.needsReview ? styles.jobCardNeedsReview : ''} ${isHighlighted ? styles.cardHighlight : ''}`}
+    >
       {mod.needsReview && (
         <div className={styles.needsReviewNote}>
           🧠 Auto-created from a scanned receipt - click Edit to review, especially the mileage, before it's done.
+          {mod.aiDescription && <div className={styles.aiDescriptionNote}>{mod.aiDescription}</div>}
         </div>
       )}
       <div className={styles.jobCardTop}>

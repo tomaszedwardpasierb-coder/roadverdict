@@ -14,14 +14,24 @@ interface ContextValue {
   // between "save this one" and "the next one showing up".
   focusId: string | null;
   setFocusId: (id: string | null) => void;
+  // Deliberately separate from focusId - this is "scroll to and briefly
+  // highlight", used when a chart point or a Recent Activity row is
+  // clicked. Unlike focusId it never forces edit mode open: clicking a
+  // chart is "show me this", not "please correct this". A plain array
+  // rather than a single id because a bucketed spend-over-time bar can
+  // represent several records at once - every id here gets highlighted,
+  // but only the first is scrolled into view.
+  highlightIds: string[];
+  setHighlightIds: (ids: string[]) => void;
 }
 
 const TabSwitchContext = createContext<ContextValue | null>(null);
 
 export function TabSwitchProvider({ children, onSwitchTab }: { children: ReactNode; onSwitchTab: (category: ReviewCategory) => void }) {
   const [focusId, setFocusId] = useState<string | null>(null);
+  const [highlightIds, setHighlightIds] = useState<string[]>([]);
   return (
-    <TabSwitchContext.Provider value={{ switchTo: onSwitchTab, focusId, setFocusId }}>
+    <TabSwitchContext.Provider value={{ switchTo: onSwitchTab, focusId, setFocusId, highlightIds, setHighlightIds }}>
       {children}
     </TabSwitchContext.Provider>
   );
@@ -29,8 +39,23 @@ export function TabSwitchProvider({ children, onSwitchTab }: { children: ReactNo
 
 export function useTabSwitch(): ContextValue {
   const ctx = useContext(TabSwitchContext);
-  if (!ctx) return { switchTo: () => {}, focusId: null, setFocusId: () => {} };
+  if (!ctx) return { switchTo: () => {}, focusId: null, setFocusId: () => {}, highlightIds: [], setHighlightIds: () => {} };
   return ctx;
+}
+
+// Shared by every chart and by Recent Activity - switches to the record's
+// tab and marks it (or, for a bucketed bar, all of them) to be scrolled
+// to and briefly highlighted. No confirmation, no forced edit mode -
+// this is navigation, not a review workflow.
+export function viewRecords(
+  category: ReviewCategory,
+  ids: string[],
+  switchTo: (category: ReviewCategory) => void,
+  setHighlightIds: (ids: string[]) => void
+) {
+  if (ids.length === 0) return;
+  switchTo(category);
+  setHighlightIds(ids);
 }
 
 const CATEGORY_ORDER: ReviewCategory[] = ['service', 'fuel', 'mods', 'bills'];

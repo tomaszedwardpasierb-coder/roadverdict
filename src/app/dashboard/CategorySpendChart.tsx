@@ -11,11 +11,13 @@ import { useChartTypePreference } from './useChartTypePreference';
 import { ChartTypeToggle } from './ChartTypeToggle';
 import { barGradient, BAR_BORDER_RADIUS } from './chartStyle';
 import { useChartFilter } from './ChartFilterContext';
+import { useTabSwitch, viewRecords, type ReviewCategory } from './TabSwitchContext';
 import styles from './dashboard.module.css';
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, PointElement, LineElement, Tooltip);
 
 interface CostItem {
+  id: string;
   date: string;
   cost: number;
   mileage?: number;
@@ -25,6 +27,7 @@ export function CategorySpendChart({
   chartId,
   title,
   items,
+  category,
   color,
   currency,
   rates,
@@ -35,6 +38,10 @@ export function CategorySpendChart({
   chartId: string;
   title: string;
   items: CostItem[];
+  // Which tab a click should jump to. A separate explicit prop rather
+  // than parsing it out of chartId, so this never silently breaks if
+  // chartId's naming convention ever changes.
+  category: ReviewCategory;
   color: string;
   currency: Currency;
   rates: ExchangeRates | null;
@@ -45,6 +52,7 @@ export function CategorySpendChart({
   supportsMileageView?: boolean;
   initialChartType?: 'bar' | 'line';
 }) {
+  const { switchTo, setHighlightIds } = useTabSwitch();
   const { range, viewBy } = useChartFilter();
   const { kind, changeKind } = useChartTypePreference(chartId, initialChartType ?? 'bar');
   const symbol = CURRENCY_SYMBOLS[currency];
@@ -54,6 +62,7 @@ export function CategorySpendChart({
 
   let labels: string[];
   let dataValues: number[];
+  let bucketIds: string[][];
 
   if (usingMileageView) {
     const withMileage = filteredItems.filter((i): i is CostItem & { mileage: number } => i.mileage != null);
@@ -62,10 +71,26 @@ export function CategorySpendChart({
       (b) => `${Math.round(convertMilesToDisplay(b.bandStart, distanceUnit))}-${Math.round(convertMilesToDisplay(b.bandEnd, distanceUnit))} ${distanceUnitLabel(distanceUnit)}`
     );
     dataValues = bands.map((b) => convertGbpToDisplay(b.total, currency, rates));
+    bucketIds = bands.map((b) => b.ids);
   } else {
     const months = bucketByMonth(filteredItems);
     labels = months.map((m) => m.month);
     dataValues = months.map((m) => convertGbpToDisplay(m.total, currency, rates));
+    bucketIds = months.map((m) => m.ids);
+  }
+
+  // A bucket here can be several records summed together, so a click
+  // switches tabs and highlights every one of them (scrolling to the
+  // first) rather than pretending there's a single record to jump to.
+  function handleBarClick(elements: { index: number }[]) {
+    if (elements.length === 0) return;
+    const ids = bucketIds[elements[0].index];
+    if (ids?.length) viewRecords(category, ids, switchTo, setHighlightIds);
+  }
+
+  function handleHover(event: { native: Event | null }, elements: unknown[]) {
+    const target = event.native?.target as HTMLElement | undefined;
+    if (target) target.style.cursor = elements.length > 0 ? 'pointer' : 'default';
   }
 
   return (
@@ -108,6 +133,8 @@ export function CategorySpendChart({
               x: { grid: { display: false }, ticks: { font: { size: 10 } } },
               y: { grid: { color: '#00000012' }, ticks: { font: { size: 10 }, callback: (value) => `${symbol}${value}` } },
             },
+            onClick: (_evt, elements) => handleBarClick(elements),
+            onHover: handleHover,
           }}
         />
       ) : (
@@ -126,6 +153,8 @@ export function CategorySpendChart({
               x: { grid: { display: false }, ticks: { font: { size: 10 } } },
               y: { grid: { color: '#00000012' }, ticks: { font: { size: 10 }, callback: (value) => `${symbol}${value}` } },
             },
+            onClick: (_evt, elements) => handleBarClick(elements),
+            onHover: handleHover,
           }}
         />
       )}

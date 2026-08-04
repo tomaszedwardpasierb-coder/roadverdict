@@ -19,6 +19,7 @@ export async function createBill(
     attachments?: Attachment[];
     needsReview?: boolean;
     currencyConversion?: CurrencyConversionInfo;
+    aiDescription?: string;
   }
 ): Promise<BillDoc> {
   return createTrackerDoc<BillDoc>(email, "bill", "bill", data);

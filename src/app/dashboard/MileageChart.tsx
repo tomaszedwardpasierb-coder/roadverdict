@@ -10,6 +10,7 @@ import { useChartTypePreference } from './useChartTypePreference';
 import { ChartTypeToggle } from './ChartTypeToggle';
 import { barGradient, BAR_BORDER_RADIUS } from './chartStyle';
 import { useChartFilter } from './ChartFilterContext';
+import { useTabSwitch, viewRecords } from './TabSwitchContext';
 import styles from './dashboard.module.css';
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, BarElement, Tooltip, Legend);
@@ -29,6 +30,7 @@ export function MileageChart({
   distanceUnit: DistanceUnit;
   initialChartType?: 'line' | 'bar';
 }) {
+  const { switchTo, setHighlightIds } = useTabSwitch();
   const { range } = useChartFilter();
   const { kind, changeKind } = useChartTypePreference(CHART_ID, initialChartType ?? 'line');
   const filtered = filterByDateRange(points, range);
@@ -36,6 +38,17 @@ export function MileageChart({
 
   const dataValues = filtered.map((p) => Math.round(convertMilesToDisplay(p.mileage, distanceUnit)));
   const labels = filtered.map((p) => fmtDate(p.date));
+
+  function handlePointClick(elements: { index: number }[]) {
+    if (elements.length === 0) return;
+    const point = filtered[elements[0].index];
+    if (point?.id && point.category) viewRecords(point.category, [point.id], switchTo, setHighlightIds);
+  }
+
+  function handleHover(event: { native: Event | null }, elements: unknown[]) {
+    const target = event.native?.target as HTMLElement | undefined;
+    if (target) target.style.cursor = elements.length > 0 ? 'pointer' : 'default';
+  }
 
   return (
     <div>
@@ -57,6 +70,8 @@ export function MileageChart({
               y: { title: { display: true, text: distanceUnitLabel(distanceUnit) }, grid: { color: '#00000012' } },
               x: { grid: { display: false } },
             },
+            onClick: (_evt, elements) => handlePointClick(elements),
+            onHover: handleHover,
             maintainAspectRatio: true,
           }}
         />
@@ -84,6 +99,8 @@ export function MileageChart({
               y: { title: { display: true, text: distanceUnitLabel(distanceUnit) }, grid: { color: '#00000012' } },
               x: { grid: { display: false } },
             },
+            onClick: (_evt, elements) => handlePointClick(elements),
+            onHover: handleHover,
             maintainAspectRatio: true,
           }}
         />

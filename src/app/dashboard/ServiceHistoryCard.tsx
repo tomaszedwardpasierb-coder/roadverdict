@@ -1,7 +1,7 @@
 // Place at: src/app/dashboard/ServiceHistoryCard.tsx
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { JOB_GROUPS, JOB_LABELS, JOB_REMINDER_DEFAULTS, AFFILIATE_LINKS, isBenchmarkedJob } from '@/lib/tracker/jobTypes';
 import { getAdjustedBenchmark, type BikeClass, type Region } from '@/lib/priceData';
 import type { ServiceRecordDoc } from '@/lib/tracker/serviceRecord';
@@ -54,8 +54,10 @@ interface Props {
 }
 
 export function ServiceHistoryCard({ record, bikeClass, brandValue, region, distanceUnit, currency, rates, pendingReviewIds }: Props) {
-  const { switchTo, focusId, setFocusId } = useTabSwitch();
+  const { switchTo, focusId, setFocusId, highlightIds } = useTabSwitch();
   const [isEditing, setIsEditing] = useState(false);
+  const [isHighlighted, setIsHighlighted] = useState(false);
+  const cardRef = useRef<HTMLDivElement>(null);
   const [jobType, setJobType] = useState(record.jobType);
   const [costDisplay, setCostDisplay] = useState(
     convertGbpToDisplay(record.cost, currency, rates).toFixed(2)
@@ -86,6 +88,19 @@ export function ServiceHistoryCard({ record, bikeClass, brandValue, region, dist
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focusId]);
+
+  // Navigation from a chart point or Recent Activity row, not a review
+  // step - scroll into view and pulse briefly, never force edit mode.
+  useEffect(() => {
+    if (!highlightIds.includes(record.id)) return;
+    setIsHighlighted(true);
+    if (highlightIds[0] === record.id) {
+      cardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+    const timer = setTimeout(() => setIsHighlighted(false), 2500);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [highlightIds]);
 
   const verdict = computeVerdict(record.jobType, bikeClass, brandValue, region, record.cost);
   const jobLabel = JOB_LABELS[record.jobType] ?? record.jobType;
@@ -198,10 +213,14 @@ export function ServiceHistoryCard({ record, bikeClass, brandValue, region, dist
   }
 
   return (
-    <div className={`${styles.jobCard} ${record.needsReview ? styles.jobCardNeedsReview : ''}`}>
+    <div
+      ref={cardRef}
+      className={`${styles.jobCard} ${record.needsReview ? styles.jobCardNeedsReview : ''} ${isHighlighted ? styles.cardHighlight : ''}`}
+    >
       {record.needsReview && (
         <div className={styles.needsReviewNote}>
           🧠 Auto-created from a scanned receipt - click Edit to review, especially the mileage, before it's done.
+          {record.aiDescription && <div className={styles.aiDescriptionNote}>{record.aiDescription}</div>}
         </div>
       )}
       <div className={styles.jobCardTop}>

@@ -22,6 +22,7 @@ export async function createFuelLog(
     needsReview?: boolean;
     currencyConversion?: CurrencyConversionInfo;
     mileageConfidence?: "interpolated" | "estimated";
+    aiDescription?: string;
   }
 ): Promise<FuelLogDoc> {
   return createTrackerDoc<FuelLogDoc>(email, "fuel", "fuelLog", data);
