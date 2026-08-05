@@ -256,7 +256,7 @@ export function CustomFilterPanel({ records, mods, bills, fuelLogs, currency, ra
           {entries.length} {entries.length === 1 ? 'entry' : 'entries'}
         </div>
         {category === 'fuel' && rangeAverageMpg !== null && (
-          <div className={styles.lookupResultCount}>{formatFuelEconomy(rangeAverageMpg, fuelEconomyUnit)} average for this range</div>
+          <div className={styles.lookupResultTotal}>{formatFuelEconomy(rangeAverageMpg, fuelEconomyUnit)} average for this range</div>
         )}
       </div>
 
