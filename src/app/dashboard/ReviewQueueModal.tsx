@@ -5,6 +5,7 @@ import { useState, useEffect, useRef } from 'react';
 import { JOB_GROUPS, JOB_LABELS } from '@/lib/tracker/jobTypes';
 import { BILL_LABELS } from '@/lib/tracker/billTypes';
 import { MOD_LABELS } from '@/lib/tracker/modTypes';
+import { AttachmentThumb } from './AttachmentThumb';
 import type { ReviewQueueEntry } from '@/lib/tracker/commitReceiptItem';
 import type { ParsedReceiptItem } from '@/lib/tracker/receiptParse';
 import styles from './dashboard.module.css';
@@ -122,7 +123,7 @@ function QueueItemForm({
   return (
     <form onSubmit={handleSave}>
       <div className={styles.reviewQueueReceipt}>
-        <div className={styles.reviewQueueThumb} aria-hidden="true">🧾</div>
+        <AttachmentThumb attachment={entry.attachment} />
         <div>
           <span className={styles.reviewQueueCategoryBadge}>{CATEGORY_LABEL[entry.category]}</span>
           <p className={styles.reviewQueueAiDescription}>{entry.aiDescription}</p>
