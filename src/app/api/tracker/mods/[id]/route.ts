@@ -28,7 +28,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
   }
 
-  const { category, name, cost, mileage, date, notes, attachments, batchHints } = body as {
+  const { category, name, cost, mileage, date, notes, attachments, batchHints, mileageAcknowledged } = body as {
     category?: string;
     name?: string;
     cost?: number;
@@ -37,6 +37,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     notes?: string;
     attachments?: Attachment[];
     batchHints?: { date: string; mileage: number }[];
+    mileageAcknowledged?: boolean;
   };
 
   if (!category || !name || cost == null || mileage == null || !date) {
@@ -59,7 +60,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     ...otherMods.map((m) => ({ id: m.id, date: m.date, mileage: m.mileage })),
     ...(batchHints ?? []),
   ]);
-  if (conflict) {
+  if (conflict && !mileageAcknowledged) {
     return NextResponse.json({ error: describeMileageConflict(conflict) }, { status: 409 });
   }
 

@@ -15,6 +15,8 @@ import { ReminderFields, type ReminderTriggerRow } from './ReminderFields';
 import type { ReminderTrigger } from '@/lib/tracker/reminder';
 import { useTabSwitch, goToNextReview, type ReviewCategory } from './TabSwitchContext';
 import { mileageConfidenceLabel } from '@/lib/tracker/mileageEstimate';
+import { checkMileageConsistency, type HistoryPoint } from '@/lib/tracker/mileageCheck';
+import { MileageWarning } from './MileageWarning';
 import styles from './dashboard.module.css';
 
 function fmtDate(d: string): string {
@@ -51,9 +53,11 @@ interface Props {
   currency: Currency;
   rates: ExchangeRates | null;
   pendingReviewIds: Record<ReviewCategory, string[]>;
+  mileageHistory: HistoryPoint[];
+  currentMileage: number;
 }
 
-export function ServiceHistoryCard({ record, bikeClass, brandValue, region, distanceUnit, currency, rates, pendingReviewIds }: Props) {
+export function ServiceHistoryCard({ record, bikeClass, brandValue, region, distanceUnit, currency, rates, pendingReviewIds, mileageHistory, currentMileage }: Props) {
   const { switchTo, focusId, setFocusId, highlightIds } = useTabSwitch();
   const [isEditing, setIsEditing] = useState(false);
   const [isHighlighted, setIsHighlighted] = useState(false);
@@ -68,6 +72,10 @@ export function ServiceHistoryCard({ record, bikeClass, brandValue, region, dist
   const [date, setDate] = useState(record.date);
   const [notes, setNotes] = useState(record.notes);
   const [attachment, setAttachment] = useState<Attachment | null>(record.attachments?.[0] ?? null);
+  const [mileageAcknowledged, setMileageAcknowledged] = useState(false);
+  const mileageInMilesForCheck = Math.round(convertDisplayToMiles(Number(mileageDisplay), distanceUnit));
+  const mileageResult = checkMileageConsistency(mileageInMilesForCheck, date, mileageHistory, currentMileage);
+  const isBlocked = mileageResult.status === 'blocked' || (mileageResult.status === 'warning' && !mileageAcknowledged);
   const [remindChecked, setRemindChecked] = useState(Boolean(JOB_REMINDER_DEFAULTS[record.jobType]));
   const [remindTriggers, setRemindTriggers] = useState<ReminderTriggerRow[]>(() => {
     const def = JOB_REMINDER_DEFAULTS[record.jobType];
@@ -126,7 +134,7 @@ export function ServiceHistoryCard({ record, bikeClass, brandValue, region, dist
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
-    const mileageInMiles = Math.round(convertDisplayToMiles(Number(mileageDisplay), distanceUnit));
+    if (isBlocked) return;
     const costInGbp = convertDisplayToGbp(Number(costDisplay), currency, rates);
     const body: {
       jobType: string;
@@ -136,7 +144,8 @@ export function ServiceHistoryCard({ record, bikeClass, brandValue, region, dist
       notes: string;
       attachments?: Attachment[];
       reminder?: ReminderTrigger & { additionalTriggers?: ReminderTrigger[] };
-    } = { jobType, cost: costInGbp, mileage: mileageInMiles, date, notes, attachments: attachment ? [attachment] : [] };
+      mileageAcknowledged?: boolean;
+    } = { jobType, cost: costInGbp, mileage: mileageInMilesForCheck, date, notes, attachments: attachment ? [attachment] : [], mileageAcknowledged };
 
     if (remindChecked && remindTriggers.length > 0) {
       const [primary, ...rest] = remindTriggers.map(rowToTrigger);
@@ -182,6 +191,7 @@ export function ServiceHistoryCard({ record, bikeClass, brandValue, region, dist
           <div className="field" style={{ marginTop: '0.9rem' }}>
             <label htmlFor={`edit-mileage-${record.id}`}>Mileage ({unitLabel})</label>
             <input id={`edit-mileage-${record.id}`} type="number" min="0" value={mileageDisplay} onChange={(e) => setMileageDisplay(e.target.value)} required />
+            <MileageWarning result={mileageResult} distanceUnit={distanceUnit} acknowledged={mileageAcknowledged} onAcknowledgeChange={setMileageAcknowledged} />
           </div>
           <div className="field" style={{ marginTop: '0.9rem' }}>
             <label htmlFor={`edit-notes-${record.id}`}>Notes</label>
@@ -200,7 +210,7 @@ export function ServiceHistoryCard({ record, bikeClass, brandValue, region, dist
         </div>
         <hr className="ticket__divider" />
         <div className="ticket__section" style={{ display: 'flex', gap: '0.6rem', alignItems: 'center' }}>
-          <button className="submit-button" type="submit" disabled={submitting}>
+          <button className="submit-button" type="submit" disabled={submitting || isBlocked}>
             {submitting ? 'Saving…' : 'Save'}
           </button>
           <button type="button" className={styles.iconBtn} onClick={() => setIsEditing(false)} disabled={submitting}>

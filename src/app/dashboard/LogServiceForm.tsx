@@ -95,7 +95,8 @@ export function LogServiceForm({
       notes: string;
       attachments?: Attachment[];
       reminder?: ReminderTrigger & { additionalTriggers?: ReminderTrigger[] };
-    } = { jobType, cost: costInGbp, mileage: Math.round(mileageInMiles), date, notes, attachments: attachment ? [attachment] : undefined };
+      mileageAcknowledged?: boolean;
+    } = { jobType, cost: costInGbp, mileage: Math.round(mileageInMiles), date, notes, attachments: attachment ? [attachment] : undefined, mileageAcknowledged };
 
     if (remindChecked && remindTriggers.length > 0) {
       const [primary, ...rest] = remindTriggers.map(rowToTrigger);

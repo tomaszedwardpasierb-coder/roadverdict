@@ -58,6 +58,7 @@ export function LogFuelForm({
       date,
       filledToFull,
       attachments: attachment ? [attachment] : undefined,
+      mileageAcknowledged,
     });
     if (ok) {
       setLitres('');

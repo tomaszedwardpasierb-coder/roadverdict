@@ -30,7 +30,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
   }
 
-  const { jobType, cost, mileage, date, notes, attachments, reminder, batchHints } = body as {
+  const { jobType, cost, mileage, date, notes, attachments, reminder, batchHints, mileageAcknowledged } = body as {
     jobType?: string;
     cost?: number;
     mileage?: number;
@@ -49,6 +49,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     // is trustworthy regardless of processing order, so it's included in
     // this check the same as anything already in the database.
     batchHints?: { date: string; mileage: number }[];
+    mileageAcknowledged?: boolean;
   };
 
   if (!jobType || cost == null || mileage == null || !date) {
@@ -81,7 +82,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     ...otherMods.map((m) => ({ id: m.id, date: m.date, mileage: m.mileage })),
     ...(batchHints ?? []),
   ]);
-  if (conflict) {
+  if (conflict && !mileageAcknowledged) {
     return NextResponse.json({ error: describeMileageConflict(conflict) }, { status: 409 });
   }
 

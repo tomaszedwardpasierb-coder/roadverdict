@@ -11,6 +11,8 @@ import { formatDistance, convertMilesToDisplay, convertDisplayToMiles, distanceU
 import { convertGbpToDisplay, convertDisplayToGbp, formatCurrency, CURRENCY_SYMBOLS, type Currency, type ExchangeRates } from '@/lib/tracker/currency';
 import { useTabSwitch, goToNextReview, type ReviewCategory } from './TabSwitchContext';
 import { mileageConfidenceLabel } from '@/lib/tracker/mileageEstimate';
+import { checkMileageConsistency, type HistoryPoint } from '@/lib/tracker/mileageCheck';
+import { MileageWarning } from './MileageWarning';
 import styles from './dashboard.module.css';
 
 function fmtDate(d: string): string {
@@ -23,12 +25,16 @@ export function FuelLogCard({
   currency,
   rates,
   pendingReviewIds,
+  mileageHistory,
+  currentMileage,
 }: {
   log: FuelLogDoc;
   distanceUnit: DistanceUnit;
   currency: Currency;
   rates: ExchangeRates | null;
   pendingReviewIds: Record<ReviewCategory, string[]>;
+  mileageHistory: HistoryPoint[];
+  currentMileage: number;
 }) {
   const { switchTo, focusId, setFocusId, highlightIds } = useTabSwitch();
   const [isEditing, setIsEditing] = useState(false);
@@ -44,6 +50,10 @@ export function FuelLogCard({
   const [date, setDate] = useState(log.date);
   const [filledToFull, setFilledToFull] = useState(log.filledToFull);
   const [attachment, setAttachment] = useState<Attachment | null>(log.attachments?.[0] ?? null);
+  const [mileageAcknowledged, setMileageAcknowledged] = useState(false);
+  const mileageInMilesForCheck = Math.round(convertDisplayToMiles(Number(mileageDisplay), distanceUnit));
+  const mileageResult = checkMileageConsistency(mileageInMilesForCheck, date, mileageHistory, currentMileage);
+  const isBlocked = mileageResult.status === 'blocked' || (mileageResult.status === 'warning' && !mileageAcknowledged);
   const { submit, submitting, error } = useTrackerFormSubmit(
     `/api/tracker/fuel/${encodeURIComponent(log.id)}`
   );
@@ -73,10 +83,10 @@ export function FuelLogCard({
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
-    const mileageInMiles = Math.round(convertDisplayToMiles(Number(mileageDisplay), distanceUnit));
+    if (isBlocked) return;
     const costInGbp = convertDisplayToGbp(Number(costDisplay), currency, rates);
     const ok = await submit(
-      { litres: Number(litres), cost: costInGbp, mileage: mileageInMiles, date, filledToFull, attachments: attachment ? [attachment] : [] },
+      { litres: Number(litres), cost: costInGbp, mileage: mileageInMilesForCheck, date, filledToFull, attachments: attachment ? [attachment] : [], mileageAcknowledged },
       'PATCH'
     );
     if (ok) {
@@ -109,6 +119,7 @@ export function FuelLogCard({
           <div className="field" style={{ marginTop: '0.9rem' }}>
             <label htmlFor={`edit-fuel-mileage-${log.id}`}>Mileage ({unitLabel})</label>
             <input id={`edit-fuel-mileage-${log.id}`} type="number" min="0" value={mileageDisplay} onChange={(e) => setMileageDisplay(e.target.value)} required />
+            <MileageWarning result={mileageResult} distanceUnit={distanceUnit} acknowledged={mileageAcknowledged} onAcknowledgeChange={setMileageAcknowledged} />
           </div>
           <div className="field-checkbox">
             <label>
@@ -120,7 +131,7 @@ export function FuelLogCard({
         </div>
         <hr className="ticket__divider" />
         <div className="ticket__section" style={{ display: 'flex', gap: '0.6rem', alignItems: 'center' }}>
-          <button className="submit-button" type="submit" disabled={submitting}>
+          <button className="submit-button" type="submit" disabled={submitting || isBlocked}>
             {submitting ? 'Saving…' : 'Save'}
           </button>
           <button type="button" className={styles.iconBtn} onClick={() => setIsEditing(false)} disabled={submitting}>

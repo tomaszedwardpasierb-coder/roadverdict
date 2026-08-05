@@ -251,7 +251,7 @@ export default async function DashboardPage() {
         <div className={styles.card}><p className={styles.cardBody}>No service records logged yet. Log your first one above.</p></div>
       ) : (
         records.map((r) => (
-          <ServiceHistoryCard key={r.id} record={r} bikeClass={bike.bikeClass} brandValue={brandValue} region={bike.region as Region} distanceUnit={distanceUnit} currency={currency} rates={rates} pendingReviewIds={pendingReviewIds} />
+          <ServiceHistoryCard key={r.id} record={r} bikeClass={bike.bikeClass} brandValue={brandValue} region={bike.region as Region} distanceUnit={distanceUnit} currency={currency} rates={rates} pendingReviewIds={pendingReviewIds} mileageHistory={mileagePoints} currentMileage={bike.currentMileage} />
         ))
       )}
     </>
@@ -272,7 +272,7 @@ export default async function DashboardPage() {
       {fuelLogs.length === 0 ? (
         <div className={styles.card}><p className={styles.cardBody}>No fuel fill-ups logged yet. Log your first one above.</p></div>
       ) : (
-        fuelLogs.map((f) => <FuelLogCard key={f.id} log={f} distanceUnit={distanceUnit} currency={currency} rates={rates} pendingReviewIds={pendingReviewIds} />)
+        fuelLogs.map((f) => <FuelLogCard key={f.id} log={f} distanceUnit={distanceUnit} currency={currency} rates={rates} pendingReviewIds={pendingReviewIds} mileageHistory={mileagePoints} currentMileage={bike.currentMileage} />)
       )}
     </>
   );
@@ -285,7 +285,7 @@ export default async function DashboardPage() {
       {mods.length === 0 ? (
         <div className={styles.card}><p className={styles.cardBody}>No modifications or accessories logged yet.</p></div>
       ) : (
-        mods.map((m) => <ModCard key={m.id} mod={m} distanceUnit={distanceUnit} currency={currency} rates={rates} pendingReviewIds={pendingReviewIds} />)
+        mods.map((m) => <ModCard key={m.id} mod={m} distanceUnit={distanceUnit} currency={currency} rates={rates} pendingReviewIds={pendingReviewIds} mileageHistory={mileagePoints} currentMileage={bike.currentMileage} />)
       )}
     </>
   );

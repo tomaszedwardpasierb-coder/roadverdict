@@ -76,7 +76,7 @@ export function LogModForm({
     e.preventDefault();
     if (isBlocked) return;
     const costInGbp = convertDisplayToGbp(Number(costDisplay), currency, rates);
-    const ok = await submit({ category, name, cost: costInGbp, mileage: Math.round(mileageInMiles), date, notes, attachments: attachment ? [attachment] : undefined });
+    const ok = await submit({ category, name, cost: costInGbp, mileage: Math.round(mileageInMiles), date, notes, attachments: attachment ? [attachment] : undefined, mileageAcknowledged });
     if (ok) {
       setName('');
       setCostDisplay('');

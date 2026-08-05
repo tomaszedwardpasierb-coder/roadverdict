@@ -23,7 +23,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
   }
 
-  const { category, name, cost, mileage, date, notes, attachments } = body as {
+  const { category, name, cost, mileage, date, notes, attachments, mileageAcknowledged } = body as {
     category?: string;
     name?: string;
     cost?: number;
@@ -31,6 +31,7 @@ export async function POST(request: NextRequest) {
     date?: string;
     notes?: string;
     attachments?: Attachment[];
+    mileageAcknowledged?: boolean;
   };
 
   if (!category || !name || cost == null || mileage == null || !date) {
@@ -52,7 +53,7 @@ export async function POST(request: NextRequest) {
     ...otherFuelLogs.map((f) => ({ id: f.id, date: f.date, mileage: f.mileage })),
     ...otherMods.map((m) => ({ id: m.id, date: m.date, mileage: m.mileage })),
   ]);
-  if (conflict) {
+  if (conflict && !mileageAcknowledged) {
     return NextResponse.json({ error: describeMileageConflict(conflict) }, { status: 409 });
   }
 
