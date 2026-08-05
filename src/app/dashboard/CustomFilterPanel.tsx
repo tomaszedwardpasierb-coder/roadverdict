@@ -6,6 +6,8 @@ import { JOB_LABELS, JOB_GROUPS } from '@/lib/tracker/jobTypes';
 import { MOD_LABELS, MOD_GROUPS, MOD_LABEL_TO_KEY, findGroupForCategory } from '@/lib/tracker/modTypes';
 import { BILL_LABELS } from '@/lib/tracker/billTypes';
 import { formatCurrency, type Currency, type ExchangeRates } from '@/lib/tracker/currency';
+import { formatFuelEconomy, type FuelEconomyUnit } from '@/lib/tracker/unitFormat';
+import { computeMPGSeries } from '@/lib/tracker/mpgCalc';
 import { ModSearchAutocomplete } from './ModSearchAutocomplete';
 import styles from './dashboard.module.css';
 
@@ -14,7 +16,15 @@ type Category = 'service' | 'mods' | 'bills' | 'fuel';
 interface ServiceItem { jobType: string; date: string; cost: number }
 interface ModItem { category: string; name: string; date: string; cost: number }
 interface BillItem { billType: string; date: string; cost: number }
-interface FuelItem { date: string; cost: number }
+interface FuelItem {
+  id: string;
+  date: string;
+  cost: number;
+  mileage: number;
+  litres: number;
+  filledToFull: boolean;
+  mileageConfidence?: 'interpolated' | 'estimated' | 'confirmed';
+}
 
 interface Props {
   records: ServiceItem[];
@@ -23,6 +33,7 @@ interface Props {
   fuelLogs: FuelItem[];
   currency: Currency;
   rates: ExchangeRates | null;
+  fuelEconomyUnit: FuelEconomyUnit;
 }
 
 interface ResultEntry {
@@ -37,7 +48,7 @@ function fmtDate(d: string): string {
 
 const ALL_MODS_GROUP = '__all__';
 
-export function CustomFilterPanel({ records, mods, bills, fuelLogs, currency, rates }: Props) {
+export function CustomFilterPanel({ records, mods, bills, fuelLogs, currency, rates, fuelEconomyUnit }: Props) {
   const [category, setCategory] = useState<Category>('service');
   const [serviceJob, setServiceJob] = useState('all');
   const [modGroup, setModGroup] = useState(ALL_MODS_GROUP);
@@ -110,6 +121,19 @@ export function CustomFilterPanel({ records, mods, bills, fuelLogs, currency, ra
       .map((b) => ({ date: b.date, description: BILL_LABELS[b.billType] ?? b.billType, cost: b.cost }));
   } else {
     entries = fuelLogs.filter((f) => inDateFilter(f.date)).map((f) => ({ date: f.date, description: 'Fuel fill-up', cost: f.cost }));
+  }
+
+  // Computed on the FULL, unfiltered fuel log first - filtering the raw
+  // logs by date before computing segments would break the
+  // mileage-consecutive relationship a segment depends on (the same
+  // lesson already applied to the dashboard stat cards and the MPG
+  // chart itself). Only the resulting SEGMENTS get filtered by date,
+  // and only the trusted ones count toward the average, matching
+  // computeActualMPG's own philosophy.
+  let rangeAverageMpg: number | null = null;
+  if (category === 'fuel') {
+    const trustedInRange = computeMPGSeries(fuelLogs).filter((s) => !s.likelyMissedFillUps && inDateFilter(s.date));
+    rangeAverageMpg = trustedInRange.length > 0 ? trustedInRange.reduce((sum, s) => sum + s.mpg, 0) / trustedInRange.length : null;
   }
 
   entries.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
@@ -231,6 +255,9 @@ export function CustomFilterPanel({ records, mods, bills, fuelLogs, currency, ra
         <div className={styles.lookupResultCount}>
           {entries.length} {entries.length === 1 ? 'entry' : 'entries'}
         </div>
+        {category === 'fuel' && rangeAverageMpg !== null && (
+          <div className={styles.lookupResultCount}>{formatFuelEconomy(rangeAverageMpg, fuelEconomyUnit)} average for this range</div>
+        )}
       </div>
 
       {entries.length > 0 && (

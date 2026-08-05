@@ -380,7 +380,7 @@ export default async function DashboardPage() {
             </>
           )}
         </div>
-        <CustomFilterPanel records={records} mods={mods} bills={bills} fuelLogs={fuelLogs} currency={currency} rates={rates} />
+        <CustomFilterPanel records={records} mods={mods} bills={bills} fuelLogs={fuelLogs} currency={currency} rates={rates} fuelEconomyUnit={fuelEconomyUnit} />
       </div>
     </ChartFilterProvider>
   );

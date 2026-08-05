@@ -5,7 +5,7 @@ import { Line, Bar } from 'react-chartjs-2';
 import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, BarElement, Tooltip, Legend, type ScriptableContext } from 'chart.js';
 import { filterByDateRange } from '@/lib/tracker/dateRange';
 import type { MpgSegment } from '@/lib/tracker/fuelLog';
-import { formatDistance, type FuelEconomyUnit, type DistanceUnit } from '@/lib/tracker/unitFormat';
+import { formatDistance, formatFuelEconomy, type FuelEconomyUnit, type DistanceUnit } from '@/lib/tracker/unitFormat';
 import { formatCurrency, type Currency, type ExchangeRates } from '@/lib/tracker/currency';
 import { useChartTypePreference } from './useChartTypePreference';
 import { ChartTypeToggle } from './ChartTypeToggle';
@@ -87,8 +87,16 @@ export function MpgChart({
   // the gap or anomaly actually falls, not just that something's missing.
   const filtered =
     viewBy === 'time' ? [...dateFiltered].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()) : dateFiltered;
-  const title = `${fuelEconomyUnit === 'l100km' ? 'Fuel economy' : 'MPG'} over time`;
   const yLabel = fuelEconomyUnit === 'l100km' ? 'L/100km' : 'mpg';
+  // Same trusted-only philosophy as computeActualMPG - a flagged reading
+  // shouldn't get to drag the number shown in the title, matching the
+  // fact that it's already excluded from the line itself.
+  const trustedInView = dateFiltered.filter((s) => !s.likelyMissedFillUps);
+  const rangeAverageMpg =
+    trustedInView.length > 0 ? trustedInView.reduce((sum, s) => sum + s.mpg, 0) / trustedInView.length : null;
+  const title = `${fuelEconomyUnit === 'l100km' ? 'Fuel economy' : 'MPG'} over time${
+    rangeAverageMpg !== null ? ` — ${formatFuelEconomy(rangeAverageMpg, fuelEconomyUnit)} average` : ''
+  }`;
 
   const labels = viewBy === 'time' ? filtered.map((s) => fmtDate(s.date)) : filtered.map((s) => formatDistance(s.mileage, distanceUnit));
   const allValues = filtered.map((s) => Number(convertMpgValue(s.mpg, fuelEconomyUnit).toFixed(1)));
