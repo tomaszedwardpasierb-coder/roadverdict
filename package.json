@@ -11,21 +11,23 @@
   "dependencies": {
     "@azure/cosmos": "^4.9.3",
     "@azure/storage-blob": "^12.33.0",
-    "sharp": "^0.35.3",
     "bcryptjs": "^3.0.3",
     "better-sqlite3": "^11.3.0",
     "chart.js": "^4.5.1",
     "next": "^14.2.5",
     "otpauth": "^9.5.1",
+    "qrcode": "^1.5.4",
     "react": "^18.3.1",
     "react-chartjs-2": "^5.3.1",
     "react-dom": "^18.3.1",
     "resend": "^6.17.2",
+    "sharp": "^0.35.3",
     "zod": "^3.23.8"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.11",
     "@types/node": "^20.14.0",
+    "@types/qrcode": "^1.5.6",
     "@types/react": "^18.3.3",
     "@types/react-dom": "^18.3.0",
     "typescript": "^5.5.4"

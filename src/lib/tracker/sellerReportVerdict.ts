@@ -33,13 +33,13 @@ export interface SellerVerdictResult {
   reasons: string[];
 }
 
-const RECEIPT_COVERAGE_GOOD = 0.7;
-const RECEIPT_COVERAGE_POOR = 0.3;
-const PROGRESSIVE_LOGGING_GOOD = 0.7;
-const LARGE_CLUSTER_SPAN_DAYS = 180;
-const RECENT_REGISTRATION_CHANGE_DAYS = 30;
+export const RECEIPT_COVERAGE_GOOD = 0.7;
+export const RECEIPT_COVERAGE_POOR = 0.3;
+export const PROGRESSIVE_LOGGING_GOOD = 0.7;
+export const LARGE_CLUSTER_SPAN_DAYS = 180;
+export const RECENT_REGISTRATION_CHANGE_DAYS = 30;
 
-function pct(n: number, total: number): number {
+export function pct(n: number, total: number): number {
   return total > 0 ? n / total : 1;
 }
 

@@ -7,9 +7,12 @@ import { getMods } from "@/lib/tracker/mod";
 import { getBills } from "@/lib/tracker/bill";
 import { getFuelLogs } from "@/lib/tracker/fuelLog";
 import { getReminders } from "@/lib/tracker/reminder";
-import { computeReminderStatus } from "@/lib/tracker/reminderStatus";
+import { computeReminderStatus, reminderDetailLabel } from "@/lib/tracker/reminderStatus";
 import { findMileageMonotonicityViolations } from "@/lib/tracker/mileageAudit";
-import { computeSellerVerdict } from "@/lib/tracker/sellerReportVerdict";
+import { computeSellerVerdict, type SellerVerdictMetrics } from "@/lib/tracker/sellerReportVerdict";
+import { generateBuyerQuestions } from "@/lib/tracker/reportQuestions";
+import { findConsumablesDueSoon } from "@/lib/tracker/consumablesDueSoon";
+import QRCode from "qrcode";
 import { JOB_LABELS } from "@/lib/tracker/jobTypes";
 import { MOD_LABELS } from "@/lib/tracker/modTypes";
 import { BILL_LABELS } from "@/lib/tracker/billTypes";
@@ -108,7 +111,30 @@ export default async function SaleReportPage({ params }: { params: { token: stri
 
   const overdueReminderCount = reminders.filter((r) => computeReminderStatus(r, bike.currentMileage) === "overdue").length;
 
-  const verdict = computeSellerVerdict({
+  // #1 - upcoming costs. Same reminder data already shown elsewhere in
+  // the app, just surfaced here for a buyer's benefit: not just what's
+  // overdue, but what's coming, so this reads as a budgeting aid rather
+  // than only a history document.
+  const upcomingReminders = reminders
+    .map((r) => ({ reminder: r, status: computeReminderStatus(r, bike.currentMileage) }))
+    .filter(({ status }) => status === "due-soon" || status === "overdue")
+    .sort((a, b) => (a.status === b.status ? 0 : a.status === "overdue" ? -1 : 1));
+
+  // #4 - consumables likely due soon, inferred directly from service
+  // history rather than the reminder system - catches items that would
+  // otherwise be missed if a reminder was never created (common for
+  // old, backfilled history) or was deleted since. Skips anything
+  // already covered by an active reminder above, so nothing shows twice.
+  const activeReminderJobTypes = new Set(
+    reminders.map((r) => r.sourceKey).filter((k): k is string => Boolean(k?.startsWith("service:"))).map((k) => k.slice("service:".length))
+  );
+  const consumablesDueSoon = findConsumablesDueSoon(
+    records.map((r) => ({ jobType: r.jobType, mileage: r.mileage, date: r.date })),
+    bike.currentMileage,
+    activeReminderJobTypes
+  );
+
+  const verdictMetrics: SellerVerdictMetrics = {
     totalEntries: rows.length,
     receiptCount,
     entriesInBulkClusters,
@@ -119,10 +145,29 @@ export default async function SaleReportPage({ params }: { params: { token: stri
     overdueReminderCount,
     totalReminderCount: reminders.length,
     recentRegistrationChangeDays: daysSinceLastChange,
-  });
+  };
+  const verdict = computeSellerVerdict(verdictMetrics);
+  // #3 - same metrics, turned into specific questions instead of prose.
+  const buyerQuestions = generateBuyerQuestions(verdictMetrics);
 
   const verdictBadgeClass =
     verdict.tier === "well-documented" ? styles.verdictGood : verdict.tier === "partially-documented" ? styles.verdictMid : styles.verdictPoor;
+
+  // #2 - DVSA link. Deliberately the safe, definitely-correct starting
+  // point rather than a guessed pre-fill parameter - the service itself
+  // blocks automated verification of its form, so I'm not shipping an
+  // unconfirmed query parameter on something this public-facing. Still
+  // removes almost all the friction: the buyer has the plate right here
+  // and one click away from the government's own record.
+  const motCheckUrl = "https://www.check-mot.service.gov.uk/";
+
+  // #5 - anti-tamper QR code. Generated server-side as a data URL, no
+  // client JS needed - points at this exact report's own live URL, so a
+  // printed copy handed over at an in-person viewing can be scanned to
+  // confirm it matches what's actually hosted, not something edited
+  // after printing.
+  const canonicalReportUrl = `${process.env.APP_URL ?? "https://roadverdict.co.uk"}/report/${params.token}`;
+  const qrDataUrl = await QRCode.toDataURL(canonicalReportUrl, { margin: 1, width: 160 });
 
   return (
     <div className={styles.wrapper}>
@@ -143,6 +188,57 @@ export default async function SaleReportPage({ params }: { params: { token: stri
             <li key={i}>{reason}</li>
           ))}
         </ul>
+      </div>
+
+      <div className={styles.verifyBlock}>
+        <div>
+          <p className={styles.verifyText}>
+            Cross-check this against the government&apos;s own record - independent of anything RoadVerdict shows.
+          </p>
+          <a href={motCheckUrl} target="_blank" rel="noopener" className={styles.motLink}>
+            Check MOT history on GOV.UK ↗
+          </a>
+          {currentRegistration && <p className={styles.verifyPlate}>Registration: <strong>{currentRegistration}</strong></p>}
+        </div>
+        <div className={styles.qrBlock}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={qrDataUrl} alt="Scan to open the live version of this report" width={110} height={110} />
+          <p className={styles.qrCaption}>Scan to confirm this is the live report, not an edited copy</p>
+        </div>
+      </div>
+
+      {(upcomingReminders.length > 0 || consumablesDueSoon.length > 0) && (
+        <div className={styles.upcomingBlock}>
+          <p className={styles.upcomingTitle}>What a new owner should budget for soon</p>
+          <ul className={styles.upcomingList}>
+            {upcomingReminders.map(({ reminder, status }) => (
+              <li key={reminder.id} className={status === "overdue" ? styles.upcomingOverdue : styles.upcomingSoon}>
+                {reminder.name} - {reminderDetailLabel(reminder)}
+                {status === "overdue" ? " (overdue)" : ""}
+              </li>
+            ))}
+            {consumablesDueSoon.map((c) => (
+              <li key={c.jobType} className={c.status === "overdue" ? styles.upcomingOverdue : styles.upcomingSoon}>
+                {c.label} - last done at {c.lastDoneMileage.toLocaleString()} mi
+                {c.intervalMiles ? `, typically due again every ${c.intervalMiles.toLocaleString()} mi` : ""}
+                {c.status === "overdue" ? " (likely overdue by now)" : " (likely due soon)"}
+              </li>
+            ))}
+          </ul>
+          <p className={styles.upcomingNote}>
+            Based on this bike&apos;s own logged intervals, not a generic assumption - inferred from what&apos;s
+            actually been recorded, so treat it as a helpful estimate rather than a guarantee.
+          </p>
+        </div>
+      )}
+
+      <div className={styles.questionsBlock}>
+        <p className={styles.questionsTitle}>Questions worth asking before you buy</p>
+        <ol className={styles.questionsList}>
+          {buyerQuestions.map((q, i) => (
+            <li key={i}>{q}</li>
+          ))}
+        </ol>
       </div>
 
       <div className={styles.registrationBlock}>

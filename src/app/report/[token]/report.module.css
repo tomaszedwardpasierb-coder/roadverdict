@@ -29,6 +29,53 @@
 .verdictReasons { margin: 0; padding-left: 1.2rem; font-size: 0.85rem; color: var(--ink-soft); }
 .verdictReasons li { margin-bottom: 0.2rem; }
 
+.verifyBlock {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1.2rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 1rem 1.2rem;
+  margin-bottom: 1.5rem;
+}
+.verifyText { margin: 0 0 0.5rem; font-size: 0.85rem; color: var(--ink-soft); max-width: 42ch; }
+.motLink {
+  display: inline-block;
+  font-weight: 600;
+  color: var(--amber-ink);
+  text-decoration: none;
+  border-bottom: 2px solid var(--amber);
+}
+.verifyPlate { margin: 0.5rem 0 0; font-size: 0.8rem; color: var(--ink-soft); }
+.verifyPlate strong { font-family: var(--font-mono); color: var(--ink); }
+.qrBlock { text-align: center; flex-shrink: 0; }
+.qrBlock img { display: block; margin: 0 auto 0.4rem; border: 1px solid var(--border); border-radius: 4px; }
+.qrCaption { margin: 0; font-size: 0.68rem; color: var(--ink-soft); max-width: 130px; }
+
+.upcomingBlock {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 1rem 1.2rem;
+  margin-bottom: 1.5rem;
+}
+.upcomingTitle { font-family: var(--font-display); font-size: 1rem; margin: 0 0 0.6rem; }
+.upcomingList { margin: 0; padding-left: 1.2rem; font-size: 0.87rem; }
+.upcomingList li { margin-bottom: 0.3rem; }
+.upcomingOverdue { color: var(--verdict-red); }
+.upcomingSoon { color: var(--amber-ink); }
+.upcomingNote { margin: 0.7rem 0 0; font-size: 0.75rem; color: var(--ink-soft); font-style: italic; }
+
+.questionsBlock {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 1rem 1.2rem;
+  margin-bottom: 1.5rem;
+}
+.questionsTitle { font-family: var(--font-display); font-size: 1rem; margin: 0 0 0.6rem; }
+.questionsList { margin: 0; padding-left: 1.2rem; font-size: 0.87rem; color: var(--ink-soft); }
+.questionsList li { margin-bottom: 0.4rem; }
+
 .registrationBlock {
   font-size: 0.85rem;
   color: var(--ink-soft);
