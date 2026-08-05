@@ -91,7 +91,13 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     mileage,
     date,
     notes: notes ?? "",
-    attachments,
+    // Only included when the caller actually sent one - an explicit
+    // `attachments: undefined` here would still overwrite the existing
+    // value during the database merge (a present key beats an absent
+    // one, even when its value is undefined), which is exactly the bug
+    // that was silently wiping every attachment saved through the
+    // review queue, which deliberately omits this field.
+    ...(attachments !== undefined ? { attachments } : {}),
     needsReview: false,
     mileageConfidence: nextMileageConfidence,
     mileageConflictWarning: null,

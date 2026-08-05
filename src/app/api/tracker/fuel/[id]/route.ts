@@ -80,7 +80,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     mileage,
     date,
     filledToFull: Boolean(filledToFull),
-    attachments,
+    ...(attachments !== undefined ? { attachments } : {}),
     needsReview: false,
     mileageConfidence: nextMileageConfidence,
     mileageConflictWarning: null,

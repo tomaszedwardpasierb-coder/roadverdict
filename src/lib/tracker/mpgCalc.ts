@@ -13,6 +13,15 @@ export interface MpgSegment {
   date: string;
   fuelLogId: string;
   likelyMissedFillUps: boolean;
+  // Only meaningful when likelyMissedFillUps is true. Two genuinely
+  // different problems get the same exclude-from-average treatment, but
+  // deserve different explanations: "unusual-gap" means the dates and
+  // mileages themselves are direct, structural evidence something broke
+  // continuity, independent of what mpg it happens to produce.
+  // "anomalous-value" means the dates/mileages look perfectly ordinary,
+  // but the resulting mpg is a statistical outlier against this rider's
+  // own history - the softer, inferred case.
+  exclusionReason?: "unusual-gap" | "anomalous-value";
 }
 
 export interface MpgCalcInput {
@@ -56,12 +65,14 @@ const MIN_MAD_TO_BASELINE_RATIO = 0.03;
 const MIN_SEGMENTS_FOR_ADAPTIVE_METHOD = 5;
 const MIN_VALID_SEGMENTS_FOR_BASELINE = 2;
 const EARLY_FALLBACK_DEVIATION_RATIO = 0.75;
-// Two flagged segments in a row, both off in roughly the same direction
-// from the SAME stale baseline, reads as a genuine sustained change
-// (different bike, new commute, different riding style) rather than a
-// one-off missed fill-up - a real missed fill-up is a single blip, not
-// a run of them. When this happens, stop treating them as errors and
-// let the baseline restart from here.
+// Two flagged VALUE anomalies in a row, both off in roughly the same
+// direction from the SAME stale baseline, reads as a genuine sustained
+// change rather than a one-off - a real missed fill-up is a single
+// blip, not a run of them. A GAP anomaly doesn't need this same
+// caution: an unusually large gap is direct structural evidence (the
+// dates/mileages themselves prove it), not an inference from a single
+// number, so it resets the baseline immediately rather than waiting
+// for a second occurrence to confirm.
 const CONSECUTIVE_ANOMALIES_RESET_BASELINE = 2;
 
 function median(values: number[]): number {
@@ -75,20 +86,36 @@ function medianAbsoluteDeviation(values: number[], med: number): number {
   return median(values.map((v) => Math.abs(v - med)));
 }
 
-function isAnomalous(candidate: number, baselineValues: number[]): boolean {
+// Signed modified z-score - callers decide direction. The MPG-value
+// check cares about deviation in either direction (too good OR too
+// bad); the gap check only cares about "much bigger than usual".
+function modifiedZScore(candidate: number, baselineValues: number[]): number | null {
+  const baseline = median(baselineValues);
+  if (baseline <= 0) return null;
+  if (baselineValues.length < MIN_SEGMENTS_FOR_ADAPTIVE_METHOD) return null;
+  const mad = medianAbsoluteDeviation(baselineValues, baseline);
+  if (mad <= baseline * MIN_MAD_TO_BASELINE_RATIO) return null;
+  return (MAD_SCALE_CONSTANT * (candidate - baseline)) / mad;
+}
+
+function isAnomalousValue(candidate: number, baselineValues: number[]): boolean {
   const baseline = median(baselineValues);
   if (baseline <= 0) return false;
-
-  if (baselineValues.length < MIN_SEGMENTS_FOR_ADAPTIVE_METHOD) {
-    return Math.abs(candidate - baseline) / baseline > EARLY_FALLBACK_DEVIATION_RATIO;
-  }
-
-  const mad = medianAbsoluteDeviation(baselineValues, baseline);
-  if (mad > baseline * MIN_MAD_TO_BASELINE_RATIO) {
-    const modifiedZ = (MAD_SCALE_CONSTANT * (candidate - baseline)) / mad;
-    return Math.abs(modifiedZ) > MODIFIED_ZSCORE_THRESHOLD;
-  }
+  const z = modifiedZScore(candidate, baselineValues);
+  if (z !== null) return Math.abs(z) > MODIFIED_ZSCORE_THRESHOLD;
   return Math.abs(candidate - baseline) / baseline > EARLY_FALLBACK_DEVIATION_RATIO;
+}
+
+// One-directional on purpose - a SHORTER than normal gap between
+// fill-ups isn't a red flag on its own (topping up more often than
+// usual just happens); only a much LARGER gap suggests either a long
+// trip or, far more often, an unlogged fill-up hiding inside it.
+function isUnusuallyLargeGap(candidateMiles: number, baselineGaps: number[]): boolean {
+  const baseline = median(baselineGaps);
+  if (baseline <= 0) return false;
+  const z = modifiedZScore(candidateMiles, baselineGaps);
+  if (z !== null) return z > MODIFIED_ZSCORE_THRESHOLD;
+  return candidateMiles > baseline * (1 + EARLY_FALLBACK_DEVIATION_RATIO);
 }
 
 // A fill-up whose mileage hasn't been human-verified breaks the chain
@@ -100,7 +127,7 @@ function isAnomalous(candidate: number, baselineValues: number[]): boolean {
 // verified full-tank fill-up simply starts a fresh chain.
 export function computeMPGSeries(fuelLogs: MpgCalcInput[]): MpgSegment[] {
   const sorted = [...fuelLogs].sort((a, b) => a.mileage - b.mileage);
-  const raw: { mileage: number; mpg: number; date: string; fuelLogId: string }[] = [];
+  const raw: { mileage: number; mpg: number; date: string; fuelLogId: string; miles: number }[] = [];
   let litresSinceLastFull = 0;
   let lastFullMileage: number | null = null;
   for (const log of sorted) {
@@ -116,7 +143,7 @@ export function computeMPGSeries(fuelLogs: MpgCalcInput[]): MpgSegment[] {
         const miles = log.mileage - lastFullMileage;
         if (miles > 0 && litresSinceLastFull > 0) {
           const gallons = litresSinceLastFull / 4.546;
-          raw.push({ mileage: log.mileage, mpg: miles / gallons, date: log.date, fuelLogId: log.id });
+          raw.push({ mileage: log.mileage, mpg: miles / gallons, date: log.date, fuelLogId: log.id, miles });
         }
       }
       lastFullMileage = log.mileage;
@@ -124,34 +151,57 @@ export function computeMPGSeries(fuelLogs: MpgCalcInput[]): MpgSegment[] {
     }
   }
 
-  // Second pass: a missed, unlogged fill-up between two logged ones
-  // makes the segment that follows look far more fuel-efficient than
-  // it really was - the litres logged only cover what actually got
-  // logged, not the real fuel burned over that whole distance. Flag
-  // segments whose mpg is a statistical outlier against the rider's own
-  // history instead of taking every logged segment at face value.
+  // Second pass: two independent checks decide whether to trust a
+  // segment. A gap much larger than this rider's normal fill-up rhythm
+  // is checked FIRST and, unlike the value check, is trusted on its own
+  // structural evidence - it doesn't matter what mpg it happens to
+  // produce, a gap this size means the segment isn't a reliable single
+  // measurement, so it's excluded and the baseline restarts immediately
+  // from the next fill-up. Only once a segment clears the gap check
+  // does its mpg VALUE get compared to the rider's baseline, the same
+  // adaptive statistical check as before.
   const validMpgsSoFar: number[] = [];
-  let consecutiveAnomalies = 0;
+  const validGapsSoFar: number[] = [];
+  let consecutiveValueAnomalies = 0;
   const result: MpgSegment[] = [];
 
   for (const seg of raw) {
-    let flagged = validMpgsSoFar.length >= MIN_VALID_SEGMENTS_FOR_BASELINE && isAnomalous(seg.mpg, validMpgsSoFar);
+    const gapFlagged = validGapsSoFar.length >= MIN_VALID_SEGMENTS_FOR_BASELINE && isUnusuallyLargeGap(seg.miles, validGapsSoFar);
 
-    if (flagged) {
-      consecutiveAnomalies++;
-      if (consecutiveAnomalies >= CONSECUTIVE_ANOMALIES_RESET_BASELINE) {
-        // Looks sustained, not a one-off - stop excluding these and
-        // start a fresh baseline from this segment onward.
-        flagged = false;
-        validMpgsSoFar.length = 0;
-        consecutiveAnomalies = 0;
-      }
-    } else {
-      consecutiveAnomalies = 0;
+    if (gapFlagged) {
+      validMpgsSoFar.length = 0;
+      validGapsSoFar.length = 0;
+      consecutiveValueAnomalies = 0;
+      result.push({ mileage: seg.mileage, mpg: seg.mpg, date: seg.date, fuelLogId: seg.fuelLogId, likelyMissedFillUps: true, exclusionReason: "unusual-gap" });
+      continue;
     }
 
-    if (!flagged) validMpgsSoFar.push(seg.mpg);
-    result.push({ ...seg, likelyMissedFillUps: flagged });
+    let valueFlagged = validMpgsSoFar.length >= MIN_VALID_SEGMENTS_FOR_BASELINE && isAnomalousValue(seg.mpg, validMpgsSoFar);
+
+    if (valueFlagged) {
+      consecutiveValueAnomalies++;
+      if (consecutiveValueAnomalies >= CONSECUTIVE_ANOMALIES_RESET_BASELINE) {
+        valueFlagged = false;
+        validMpgsSoFar.length = 0;
+        validGapsSoFar.length = 0;
+        consecutiveValueAnomalies = 0;
+      }
+    } else {
+      consecutiveValueAnomalies = 0;
+    }
+
+    if (!valueFlagged) {
+      validMpgsSoFar.push(seg.mpg);
+      validGapsSoFar.push(seg.miles);
+    }
+    result.push({
+      mileage: seg.mileage,
+      mpg: seg.mpg,
+      date: seg.date,
+      fuelLogId: seg.fuelLogId,
+      likelyMissedFillUps: valueFlagged,
+      exclusionReason: valueFlagged ? "anomalous-value" : undefined,
+    });
   }
 
   return result;

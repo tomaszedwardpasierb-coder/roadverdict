@@ -45,7 +45,14 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     return NextResponse.json({ error: "Please fill in all required fields." }, { status: 400 });
   }
 
-  const bill = await updateBill(session.email, id, { billType, cost, date, notes: notes ?? "", attachments, needsReview: false });
+  const bill = await updateBill(session.email, id, {
+    billType,
+    cost,
+    date,
+    notes: notes ?? "",
+    ...(attachments !== undefined ? { attachments } : {}),
+    needsReview: false,
+  });
   if (!bill) {
     return NextResponse.json({ error: "Entry not found." }, { status: 404 });
   }

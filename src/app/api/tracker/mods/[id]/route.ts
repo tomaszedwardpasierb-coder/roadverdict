@@ -70,7 +70,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     mileage,
     date,
     notes: notes ?? "",
-    attachments,
+    ...(attachments !== undefined ? { attachments } : {}),
     needsReview: false,
     mileageConfidence: nextMileageConfidence,
     mileageConflictWarning: null,

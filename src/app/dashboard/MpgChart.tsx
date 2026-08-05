@@ -2,7 +2,7 @@
 'use client';
 
 import { Line, Bar } from 'react-chartjs-2';
-import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, BarElement, Tooltip, Legend } from 'chart.js';
+import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, BarElement, Tooltip, Legend, type ScriptableContext } from 'chart.js';
 import { filterByDateRange } from '@/lib/tracker/dateRange';
 import type { MpgSegment } from '@/lib/tracker/fuelLog';
 import { formatDistance, type FuelEconomyUnit, type DistanceUnit } from '@/lib/tracker/unitFormat';
@@ -19,6 +19,7 @@ ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, BarEleme
 const CHART_ID = 'mpg';
 const LITRES_PER_UK_GALLON = 4.546;
 const KM_PER_MILE = 1.60934;
+const EXCLUDED_COLOR = '#b5432e'; // matches --verdict-red
 
 function convertMpgValue(mpg: number, unit: FuelEconomyUnit): number {
   if (unit === 'l100km') {
@@ -29,6 +30,13 @@ function convertMpgValue(mpg: number, unit: FuelEconomyUnit): number {
 
 function fmtDate(d: string): string {
   return new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+function exclusionReasonText(point: MpgSegment | undefined): string | null {
+  if (!point?.likelyMissedFillUps) return null;
+  return point.exclusionReason === 'unusual-gap'
+    ? 'Excluded - the gap since the last fill-up is much bigger than usual, so a fill-up in between was probably missed.'
+    : 'Excluded - this reading is far outside your usual range, so a fill-up in between was probably missed.';
 }
 
 export function MpgChart({
@@ -52,25 +60,26 @@ export function MpgChart({
   const { range, viewBy } = useChartFilter();
   const { kind, changeKind } = useChartTypePreference(CHART_ID, initialChartType ?? 'line');
   const dateFiltered = filterByDateRange(series, range);
-  const plottable = dateFiltered.filter((s) => !s.likelyMissedFillUps);
-  const missedFillUpCount = dateFiltered.length - plottable.length;
+  const missedFillUpCount = dateFiltered.filter((s) => s.likelyMissedFillUps).length;
   // Same range the chart itself is currently showing, applied to the
   // excluded entries too - so the note below always reflects "how much
   // of what you're looking at right now was left out", not a lifetime
   // total that wouldn't match the chart on screen.
   const excludedInRange = filterByDateRange(excludedFuelEntries, range);
   const excludedSpend = excludedInRange.reduce((sum, e) => sum + e.cost, 0);
-  // "series" arrives already sorted by mileage (computeMPGSeries's own
-  // sort order) - for the Time view, re-sort by date instead, since the
-  // two orders aren't guaranteed to match (a backdated entry, for
-  // example).
+  // Kept together, not split apart - an excluded point still needs to
+  // sit in its correct chronological/mileage position on the x-axis,
+  // shown differently rather than removed, so the reader can see WHERE
+  // the gap or anomaly actually falls, not just that something's missing.
   const filtered =
-    viewBy === 'time' ? [...plottable].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()) : plottable;
+    viewBy === 'time' ? [...dateFiltered].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()) : dateFiltered;
   const title = `${fuelEconomyUnit === 'l100km' ? 'Fuel economy' : 'MPG'} over time`;
   const yLabel = fuelEconomyUnit === 'l100km' ? 'L/100km' : 'mpg';
 
   const labels = viewBy === 'time' ? filtered.map((s) => fmtDate(s.date)) : filtered.map((s) => formatDistance(s.mileage, distanceUnit));
-  const dataValues = filtered.map((s) => Number(convertMpgValue(s.mpg, fuelEconomyUnit).toFixed(1)));
+  const allValues = filtered.map((s) => Number(convertMpgValue(s.mpg, fuelEconomyUnit).toFixed(1)));
+  const trustedValues = filtered.map((s, i) => (s.likelyMissedFillUps ? null : allValues[i]));
+  const excludedValues = filtered.map((s, i) => (s.likelyMissedFillUps ? allValues[i] : null));
 
   function handlePointClick(elements: { index: number }[]) {
     if (elements.length === 0) return;
@@ -81,6 +90,13 @@ export function MpgChart({
   function handleHover(event: { native: Event | null }, elements: unknown[]) {
     const target = event.native?.target as HTMLElement | undefined;
     if (target) target.style.cursor = elements.length > 0 ? 'pointer' : 'default';
+  }
+
+  function tooltipLabel(dataIndex: number, yValue: number | null): string | string[] {
+    const point = filtered[dataIndex];
+    const value = `${yValue ?? '—'} ${yLabel}`;
+    const reason = exclusionReasonText(point);
+    return reason ? [value, reason] : value;
   }
 
   return (
@@ -95,10 +111,21 @@ export function MpgChart({
         <Bar
           data={{
             labels,
-            datasets: [{ label: fuelEconomyUnit === 'l100km' ? 'L/100km' : 'MPG', data: dataValues, backgroundColor: barGradient('#e8a33d'), borderRadius: BAR_BORDER_RADIUS }],
+            datasets: [
+              {
+                label: fuelEconomyUnit === 'l100km' ? 'L/100km' : 'MPG',
+                data: allValues,
+                backgroundColor: (context: ScriptableContext<'bar'>) =>
+                  filtered[context.dataIndex]?.likelyMissedFillUps ? EXCLUDED_COLOR : barGradient('#e8a33d')(context),
+                borderRadius: BAR_BORDER_RADIUS,
+              },
+            ],
           }}
           options={{
-            plugins: { legend: { display: false } },
+            plugins: {
+              legend: { display: false },
+              tooltip: { callbacks: { label: (ctx) => tooltipLabel(ctx.dataIndex, ctx.parsed.y) } },
+            },
             scales: {
               y: { title: { display: true, text: yLabel }, grid: { color: '#00000012' } },
               x: { grid: { display: false } },
@@ -115,7 +142,7 @@ export function MpgChart({
             datasets: [
               {
                 label: fuelEconomyUnit === 'l100km' ? 'L/100km' : 'MPG',
-                data: dataValues,
+                data: trustedValues,
                 borderColor: '#e8a33d',
                 backgroundColor: 'transparent',
                 borderWidth: 1.25,
@@ -123,11 +150,23 @@ export function MpgChart({
                 fill: false,
                 pointRadius: 2,
                 pointBackgroundColor: '#e8a33d',
+                spanGaps: false,
+              },
+              {
+                label: 'Excluded',
+                data: excludedValues,
+                showLine: false,
+                pointRadius: 4,
+                pointBackgroundColor: EXCLUDED_COLOR,
+                pointBorderColor: EXCLUDED_COLOR,
               },
             ],
           }}
           options={{
-            plugins: { legend: { display: false } },
+            plugins: {
+              legend: { display: false },
+              tooltip: { callbacks: { label: (ctx) => tooltipLabel(ctx.dataIndex, ctx.parsed.y) } },
+            },
             scales: {
               y: { title: { display: true, text: yLabel }, grid: { color: '#00000012' } },
               x: { grid: { display: false } },
@@ -148,8 +187,8 @@ export function MpgChart({
       {missedFillUpCount > 0 && (
         <p className={styles.mpgExcludedNote}>
           {missedFillUpCount} {missedFillUpCount === 1 ? 'reading looks' : 'readings look'} far enough outside your
-          usual range that a fill-up in between probably wasn&apos;t logged, so {missedFillUpCount === 1 ? "it's" : "they're"} left
-          out of the chart and the average rather than skewing both.
+          usual range that a fill-up in between probably wasn&apos;t logged (shown in red above) - hover one for why
+          it&apos;s left out of the average.
         </p>
       )}
     </div>
