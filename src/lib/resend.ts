@@ -42,6 +42,42 @@ export async function sendReminderEmail(email: string, reminderName: string, det
     `,
   });
 }
+export async function sendReceiptRequestEmail(params: {
+  ownerEmail: string;
+  bikeName: string;
+  items: { description: string }[];
+  buyerMessage?: string;
+  decisionToken: string;
+}) {
+  const resend = getResend();
+  const appUrl = process.env.APP_URL ?? "https://roadverdict.co.uk";
+  const itemList = params.items.map((i) => `<li>${i.description}</li>`).join("");
+  const approveAllUrl = `${appUrl}/report/receipt-request/decide?token=${params.decisionToken}&action=approve`;
+  const declineAllUrl = `${appUrl}/report/receipt-request/decide?token=${params.decisionToken}&action=decline`;
+  const reviewUrl = `${appUrl}/report/receipt-request/decide?token=${params.decisionToken}`;
+
+  await resend.emails.send({
+    from: FROM,
+    to: params.ownerEmail,
+    subject: `Receipt request for ${params.bikeName}`,
+    html: `
+      <p>Hi,</p>
+      <p>Someone viewing your RoadVerdict report for <strong>${params.bikeName}</strong> has requested to see the
+      receipts/invoices for:</p>
+      <ul>${itemList}</ul>
+      ${params.buyerMessage ? `<p>They added a note: "${params.buyerMessage}"</p>` : ""}
+      <p>These may contain personal details (your name, address, or part of a card number) - only share what
+      you're comfortable with.</p>
+      <p>
+        <a href="${approveAllUrl}">Approve all</a> &nbsp;|&nbsp;
+        <a href="${declineAllUrl}">Decline all</a> &nbsp;|&nbsp;
+        <a href="${reviewUrl}">Choose individually</a>
+      </p>
+      <p>No sign-in needed - just one more click on the page that opens to confirm.</p>
+    `,
+  });
+}
+
 export async function sendShareLinkEmail(toEmail: string, bikeName: string, reportUrl: string, expiresAtLabel: string) {
   const resend = getResend();
   await resend.emails.send({

@@ -57,6 +57,46 @@
 .backLink { font-size: 0.85rem; color: var(--ink-soft); text-decoration: none; }
 .backLink:hover { text-decoration: underline; }
 
+.gateBlock { max-width: 420px; margin: 3rem auto; text-align: center; }
+.gateForm { display: flex; flex-direction: column; gap: 0.7rem; margin-top: 1.2rem; }
+.gateInput {
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  font-size: 1.1rem;
+  text-align: center;
+  letter-spacing: 0.08em;
+  padding: 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+}
+
+.receiptAvailableTag {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.78rem;
+  color: var(--verdict-green);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.receiptRequestedTag { font-size: 0.78rem; color: var(--amber-ink); white-space: nowrap; }
+
+.requestBar {
+  position: sticky;
+  bottom: 0;
+  background: var(--paper);
+  border: 2px solid var(--amber);
+  border-radius: 6px;
+  padding: 0.8rem 1rem;
+  margin: 1rem 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  box-shadow: 0 -2px 8px rgba(0,0,0,0.08);
+}
+.requestForm { width: 100%; }
+
 .verifyBlock {
   display: flex;
   justify-content: space-between;

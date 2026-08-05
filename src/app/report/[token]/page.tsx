@@ -1,6 +1,10 @@
 // Place at: src/app/report/[token]/page.tsx
 import Link from "next/link";
+import { notFound } from "next/navigation";
+import { resolveShareToken } from "@/lib/tracker/shareLink";
 import { getSellerReportData } from "@/lib/tracker/sellerReportData";
+import { hasReportAccess } from "@/lib/tracker/reportAccess";
+import { PlateGate } from "./PlateGate";
 import { ReportHistoryTable } from "./ReportHistoryTable";
 import styles from "./report.module.css";
 import { PrintButton } from "./PrintButton";
@@ -16,6 +20,14 @@ function fmtDate(d: string): string {
 // own separate route) is the paid upsell: a distinct destination, not a
 // toggle on this page, so gating it later never means touching this one.
 export default async function SaleReportPage({ params }: { params: { token: string } }) {
+  // Checked before deciding whether to show the plate gate, so a bogus
+  // or expired token gets a real 404 immediately rather than a gate
+  // form that would only fail later, once someone bothers to guess a plate.
+  if (!(await resolveShareToken(params.token))) notFound();
+
+  const verified = await hasReportAccess(params.token);
+  if (!verified) return <PlateGate token={params.token} />;
+
   const data = await getSellerReportData(params.token);
   const { bike, rows, total, clusters, backdatedCount, realTimeCount, receiptCount, currentRegistration, registrationChangesCount, originalRegistration, mostRecentChangeDate, daysSinceLastChange, dateAdded } = data;
 
@@ -94,6 +106,7 @@ export default async function SaleReportPage({ params }: { params: { token: stri
         backdatedCount={backdatedCount}
         realTimeCount={realTimeCount}
         receiptCount={receiptCount}
+        approvedEntryIds={data.approvedEntryIds}
       />
 
       <p className={styles.caveat}>

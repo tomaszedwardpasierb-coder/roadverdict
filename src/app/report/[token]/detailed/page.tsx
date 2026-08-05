@@ -1,6 +1,10 @@
 // Place at: src/app/report/[token]/detailed/page.tsx
 import Link from "next/link";
+import { notFound } from "next/navigation";
+import { resolveShareToken } from "@/lib/tracker/shareLink";
 import { getSellerReportData } from "@/lib/tracker/sellerReportData";
+import { hasReportAccess } from "@/lib/tracker/reportAccess";
+import { PlateGate } from "../PlateGate";
 import { reminderDetailLabel } from "@/lib/tracker/reminderStatus";
 import { ReportHistoryTable } from "../ReportHistoryTable";
 import QRCode from "qrcode";
@@ -18,6 +22,11 @@ function fmtDate(d: string): string {
 // to this one file, not a rework of the free page everyone lands on
 // first. Free while in beta; the boundary is already drawn.
 export default async function DetailedReportPage({ params }: { params: { token: string } }) {
+  if (!(await resolveShareToken(params.token))) notFound();
+
+  const verified = await hasReportAccess(params.token);
+  if (!verified) return <PlateGate token={params.token} />;
+
   const data = await getSellerReportData(params.token);
   const {
     bike, rows, total, backdatedCount, realTimeCount, receiptCount,
@@ -117,6 +126,7 @@ export default async function DetailedReportPage({ params }: { params: { token: 
         backdatedCount={backdatedCount}
         realTimeCount={realTimeCount}
         receiptCount={receiptCount}
+        approvedEntryIds={data.approvedEntryIds}
       />
 
       <p className={styles.caveat}>

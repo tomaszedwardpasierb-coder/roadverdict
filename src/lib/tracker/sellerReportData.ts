@@ -12,6 +12,7 @@ import { findMileageMonotonicityViolations } from "@/lib/tracker/mileageAudit";
 import { computeSellerVerdict, type SellerVerdictMetrics, type SellerVerdictResult } from "@/lib/tracker/sellerReportVerdict";
 import { generateBuyerQuestions } from "@/lib/tracker/reportQuestions";
 import { findConsumablesDueSoon, type ConsumableDueSoon } from "@/lib/tracker/consumablesDueSoon";
+import { getReceiptRequestsForShareToken } from "@/lib/tracker/receiptRequest";
 import { JOB_LABELS } from "@/lib/tracker/jobTypes";
 import { MOD_LABELS } from "@/lib/tracker/modTypes";
 import { BILL_LABELS } from "@/lib/tracker/billTypes";
@@ -49,6 +50,11 @@ export interface SellerReportData {
   upcomingReminders: { reminder: ReminderDoc; status: "due-soon" | "overdue" }[];
   consumablesDueSoon: ConsumableDueSoon[];
   motCheckUrl: string;
+  // Entries this specific report link already has permission to show
+  // the real receipt for - re-checked fresh on every page load, so a
+  // decision the owner just made shows up the next time this same link
+  // is visited, no caching to go stale.
+  approvedEntryIds: string[];
 }
 
 export async function getSellerReportData(token: string): Promise<SellerReportData> {
@@ -136,6 +142,9 @@ export async function getSellerReportData(token: string): Promise<SellerReportDa
   const verdict = computeSellerVerdict(verdictMetrics);
   const buyerQuestions = generateBuyerQuestions(verdictMetrics);
 
+  const requests = await getReceiptRequestsForShareToken(email, token);
+  const approvedEntryIds = requests.flatMap((r) => r.items.filter((i) => i.status === "approved").map((i) => i.entryId));
+
   return {
     token,
     bike,
@@ -156,5 +165,6 @@ export async function getSellerReportData(token: string): Promise<SellerReportDa
     upcomingReminders,
     consumablesDueSoon,
     motCheckUrl: "https://www.check-mot.service.gov.uk/",
+    approvedEntryIds,
   };
 }
