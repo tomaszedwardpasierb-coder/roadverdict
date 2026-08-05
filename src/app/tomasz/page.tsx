@@ -147,7 +147,8 @@ export default async function AdminDashboardPage() {
           <div className={styles.statusTitle}>Mileage audit</div>
           <p className={styles.warn} style={{ marginBottom: '0.4rem' }}>
             Re-flags any AI-derived mileage that breaks chronological ordering against its own neighbouring records
-            (mileage can only go up over time) - catches records damaged by earlier estimator bugs, including ones
+            (mileage can only go up over time), or where a full-tank fill-up&apos;s litres imply an impossible mpg
+            against the fill before it - catches records damaged by earlier estimator bugs, including ones
             already marked &quot;confirmed&quot;. Never changes the mileage value itself, only re-flags it for review.
             Safe to click more than once.
           </p>

@@ -6,6 +6,7 @@ import { getPrimaryBike, updateBikeMileage } from "@/lib/tracker/bike";
 import { getServiceRecords } from "@/lib/tracker/serviceRecord";
 import { getMods } from "@/lib/tracker/mod";
 import { findMileageConflict, describeMileageConflict } from "@/lib/tracker/mileageConflict";
+import { checkFullTankPlausibility, describeImplausibleFill } from "@/lib/tracker/fuelPlausibility";
 import { getTrackerDocById, type Attachment } from "@/lib/tracker/cosmosHelpers";
 
 export const dynamic = "force-dynamic";
@@ -60,6 +61,17 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
   ]);
   if (conflict) {
     return NextResponse.json({ error: describeMileageConflict(conflict) }, { status: 409 });
+  }
+
+  if (filledToFull) {
+    const trustedFuelLogs = otherFuelLogs
+      .filter((f) => f.id !== id)
+      .filter((f) => !f.mileageConfidence || f.mileageConfidence === "confirmed")
+      .map((f) => ({ mileage: f.mileage }));
+    const fillCheck = checkFullTankPlausibility(litres, mileage, trustedFuelLogs);
+    if (fillCheck && !fillCheck.plausible) {
+      return NextResponse.json({ error: describeImplausibleFill(fillCheck, litres) }, { status: 409 });
+    }
   }
 
   const log = await updateFuelLog(session.email, id, {

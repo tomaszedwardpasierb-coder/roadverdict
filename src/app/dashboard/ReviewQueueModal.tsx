@@ -199,9 +199,9 @@ function QueueItemForm({
           <label htmlFor="rq-mileage">Mileage</label>
           {entry.mileageNeedsManualEntry && (
             <p className={styles.reviewQueueDuplicateWarning} style={{ marginBottom: '0.4rem' }}>
-              There&apos;s nothing nearby to estimate this from reliably - please enter the real mileage from the
-              receipt, or your best own memory of it. Once saved, this becomes a real anchor the next entries in
-              this batch can use.
+              {entry.mileageWarningText ??
+                "There's nothing nearby to estimate this from reliably - please enter the real mileage from the receipt, or your best own memory of it."}{' '}
+              Once saved, this becomes a real anchor the next entries in this batch can use.
             </p>
           )}
           <input

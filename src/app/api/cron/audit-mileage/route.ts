@@ -6,7 +6,7 @@ import type { BikeDoc } from "@/lib/tracker/bike";
 import { getServiceRecords, type ServiceRecordDoc } from "@/lib/tracker/serviceRecord";
 import { getFuelLogs, type FuelLogDoc } from "@/lib/tracker/fuelLog";
 import { getMods, type ModDoc } from "@/lib/tracker/mod";
-import { findMileageMonotonicityViolations, type AuditableRecord } from "@/lib/tracker/mileageAudit";
+import { findMileageMonotonicityViolations, findImplausibleFuelFills, type AuditableRecord, type AuditableFuelLog } from "@/lib/tracker/mileageAudit";
 
 export const dynamic = "force-dynamic";
 
@@ -51,6 +51,16 @@ export async function POST(req: NextRequest) {
       ];
 
       const violatingIds = new Set(findMileageMonotonicityViolations(combined));
+
+      // Second pass: full-tank fuel entries whose litres imply an
+      // impossible mpg against the fill immediately before them - a
+      // different kind of inconsistency to the chronological one above,
+      // so checked separately, but flagged into the same set.
+      const fuelForPlausibilityCheck: AuditableFuelLog[] = fuelLogs.map((f) => ({
+        id: f.id, date: f.date, mileage: f.mileage, mileageConfidence: f.mileageConfidence, litres: f.litres, filledToFull: f.filledToFull,
+      }));
+      for (const id of findImplausibleFuelFills(fuelForPlausibilityCheck)) violatingIds.add(id);
+
       let flaggedForThisBike = 0;
 
       for (const item of combined) {

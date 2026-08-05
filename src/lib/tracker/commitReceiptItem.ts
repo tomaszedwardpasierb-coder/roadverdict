@@ -21,13 +21,14 @@ import { buildAiDescription } from "@/lib/tracker/aiDescription";
 import { findPossibleDuplicate, type DuplicateMatch } from "@/lib/tracker/duplicateCheck";
 import { findMileageConflict } from "@/lib/tracker/mileageConflict";
 import { guessFilledToFull } from "@/lib/tracker/tankGuess";
+import { checkFullTankPlausibility, describeImplausibleFill } from "@/lib/tracker/fuelPlausibility";
 import type { ParsedReceiptItem } from "@/lib/tracker/receiptParse";
 import type { BikeDoc } from "@/lib/tracker/bike";
 
 export type ReviewQueueEntry =
-  | { id: string; category: "service"; aiDescription: string; duplicate: DuplicateMatch | null; jobType: string; cost: number; mileage: number; mileageNeedsManualEntry: boolean; date: string; notes: string }
-  | { id: string; category: "fuel"; aiDescription: string; duplicate: DuplicateMatch | null; litres: number; cost: number; mileage: number; mileageNeedsManualEntry: boolean; date: string; filledToFull: boolean }
-  | { id: string; category: "mods"; aiDescription: string; duplicate: DuplicateMatch | null; name: string; modCategory: string; cost: number; mileage: number; mileageNeedsManualEntry: boolean; date: string; notes: string }
+  | { id: string; category: "service"; aiDescription: string; duplicate: DuplicateMatch | null; jobType: string; cost: number; mileage: number; mileageNeedsManualEntry: boolean; mileageWarningText?: string; date: string; notes: string }
+  | { id: string; category: "fuel"; aiDescription: string; duplicate: DuplicateMatch | null; litres: number; cost: number; mileage: number; mileageNeedsManualEntry: boolean; mileageWarningText?: string; date: string; filledToFull: boolean }
+  | { id: string; category: "mods"; aiDescription: string; duplicate: DuplicateMatch | null; name: string; modCategory: string; cost: number; mileage: number; mileageNeedsManualEntry: boolean; mileageWarningText?: string; date: string; notes: string }
   | { id: string; category: "bills"; aiDescription: string; duplicate: DuplicateMatch | null; billType: string; cost: number; date: string; notes: string };
 
 export async function commitReceiptItem(
@@ -125,7 +126,7 @@ export async function commitReceiptItem(
         baseMileage: mileage ?? bike.currentMileage, date, sourceKey: `service:${jobType}`,
       });
     }
-    return { id: record.id, category: "service", aiDescription, duplicate, jobType, cost: costGbp, mileage: mileage ?? bike.currentMileage, mileageNeedsManualEntry, date, notes };
+    return { id: record.id, category: "service", aiDescription, duplicate, jobType, cost: costGbp, mileage: mileage ?? bike.currentMileage, mileageNeedsManualEntry, mileageWarningText: mileageNeedsManualEntry ? mileageWarning : undefined, date, notes };
   }
 
   if (category === "fuel") {
@@ -133,11 +134,34 @@ export async function commitReceiptItem(
     const duplicate = findPossibleDuplicate(date, costGbp, fuelCandidates);
     const litresValue = litres ?? 0;
     const filledToFullGuess = guessFilledToFull(litresValue, bike.tankCapacityLitres);
+    const resolvedMileage = mileage ?? bike.currentMileage;
+
+    // A full tank that implies an impossible mpg against the nearest
+    // earlier trusted fuel entry means the mileage itself is wrong, not
+    // just "worth flagging" - same principle as the chronological check,
+    // applied to a different kind of impossibility. Downgrades to
+    // manual entry rather than silently saving a number that can't be
+    // right, exactly like every other case where this pipeline isn't
+    // confident.
+    let finalMileageNeedsManualEntry = mileageNeedsManualEntry;
+    let finalMileageWarning = mileageWarning;
+    if (filledToFullGuess) {
+      const fillCheck = checkFullTankPlausibility(
+        litresValue,
+        resolvedMileage,
+        fuelLogs.filter((f) => isTrustworthy(f.mileageConfidence)).map((f) => ({ mileage: f.mileage }))
+      );
+      if (fillCheck && !fillCheck.plausible) {
+        finalMileageNeedsManualEntry = true;
+        finalMileageWarning = describeImplausibleFill(fillCheck, litresValue);
+      }
+    }
+
     const record = await createFuelLog(email, {
-      bikeId: bike.id, litres: litresValue, cost: costGbp, mileage: mileage ?? bike.currentMileage, date,
+      bikeId: bike.id, litres: litresValue, cost: costGbp, mileage: resolvedMileage, date,
       filledToFull: filledToFullGuess, attachments: [attachment], needsReview: true, currencyConversion, mileageConfidence, aiDescription,
     });
-    return { id: record.id, category: "fuel", aiDescription, duplicate, litres: litresValue, cost: costGbp, mileage: mileage ?? bike.currentMileage, mileageNeedsManualEntry, date, filledToFull: filledToFullGuess };
+    return { id: record.id, category: "fuel", aiDescription, duplicate, litres: litresValue, cost: costGbp, mileage: resolvedMileage, mileageNeedsManualEntry: finalMileageNeedsManualEntry, mileageWarningText: finalMileageNeedsManualEntry ? finalMileageWarning : undefined, date, filledToFull: filledToFullGuess };
   }
 
   if (category === "mods") {
@@ -152,7 +176,7 @@ export async function commitReceiptItem(
       bikeId: bike.id, category: modCategory, name: description, cost: costGbp, mileage: mileage ?? bike.currentMileage, date,
       notes: modNotes, attachments: [attachment], needsReview: true, currencyConversion, mileageConfidence, aiDescription,
     });
-    return { id: record.id, category: "mods", aiDescription, duplicate, name: description, modCategory, cost: costGbp, mileage: mileage ?? bike.currentMileage, mileageNeedsManualEntry, date, notes: modNotes };
+    return { id: record.id, category: "mods", aiDescription, duplicate, name: description, modCategory, cost: costGbp, mileage: mileage ?? bike.currentMileage, mileageNeedsManualEntry, mileageWarningText: mileageNeedsManualEntry ? mileageWarning : undefined, date, notes: modNotes };
   }
 
   const billType = guessBillType(description) ?? "insurance";

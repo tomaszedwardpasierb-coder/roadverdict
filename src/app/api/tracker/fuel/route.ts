@@ -7,6 +7,7 @@ import { isBeforeProduction } from "@/lib/tracker/productionYearCheck";
 import { getServiceRecords } from "@/lib/tracker/serviceRecord";
 import { getMods } from "@/lib/tracker/mod";
 import { findMileageConflict, describeMileageConflict } from "@/lib/tracker/mileageConflict";
+import { checkFullTankPlausibility, describeImplausibleFill } from "@/lib/tracker/fuelPlausibility";
 import type { Attachment } from "@/lib/tracker/cosmosHelpers";
 
 export const dynamic = "force-dynamic";
@@ -58,6 +59,20 @@ export async function POST(request: NextRequest) {
   ]);
   if (conflict) {
     return NextResponse.json({ error: describeMileageConflict(conflict) }, { status: 409 });
+  }
+
+  // Same principle as the chronological check, for a different kind of
+  // impossibility - a full tank that implies an unrealistic mpg against
+  // the nearest earlier trusted fill means the mileage is wrong, not
+  // just worth a soft warning.
+  if (filledToFull) {
+    const trustedFuelLogs = otherFuelLogs
+      .filter((f) => !f.mileageConfidence || f.mileageConfidence === "confirmed")
+      .map((f) => ({ mileage: f.mileage }));
+    const fillCheck = checkFullTankPlausibility(litres, mileage, trustedFuelLogs);
+    if (fillCheck && !fillCheck.plausible) {
+      return NextResponse.json({ error: describeImplausibleFill(fillCheck, litres) }, { status: 409 });
+    }
   }
 
   const log = await createFuelLog(session.email, {
