@@ -5,7 +5,7 @@ import { useState } from 'react';
 import { JOB_GROUPS, JOB_LABELS } from '@/lib/tracker/jobTypes';
 import { BILL_LABELS } from '@/lib/tracker/billTypes';
 import { MOD_LABELS } from '@/lib/tracker/modTypes';
-import type { ReviewQueueEntry } from '@/app/api/tracker/scan-receipt/route';
+import type { ReviewQueueEntry } from '@/app/api/tracker/commit-receipt-items/route';
 import styles from './dashboard.module.css';
 
 const CATEGORY_ROUTE: Record<ReviewQueueEntry['category'], string> = {
