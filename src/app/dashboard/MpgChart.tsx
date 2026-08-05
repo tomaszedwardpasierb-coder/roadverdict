@@ -32,11 +32,25 @@ function fmtDate(d: string): string {
   return new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
+// A line SEGMENT is the piece between two adjacent points - flagging it
+// whenever EITHER endpoint is excluded means the dashed styling below
+// covers the approach into an excluded point and the way back out of it,
+// not just the point itself, which is what actually reads as "a broken
+// stretch" rather than two unrelated solid lines that happen to meet at
+// a red dot.
+function isSegmentFlagged(filtered: MpgSegment[], ctx: { p0DataIndex: number; p1DataIndex: number }): boolean {
+  return Boolean(filtered[ctx.p0DataIndex]?.likelyMissedFillUps || filtered[ctx.p1DataIndex]?.likelyMissedFillUps);
+}
+
 function exclusionReasonText(point: MpgSegment | undefined): string | null {
   if (!point?.likelyMissedFillUps) return null;
-  return point.exclusionReason === 'unusual-gap'
-    ? 'Excluded - the gap since the last fill-up is much bigger than usual, so a fill-up in between was probably missed.'
-    : 'Excluded - this reading is far outside your usual range, so a fill-up in between was probably missed.';
+  if (point.exclusionReason === 'unusual-gap') {
+    return 'Excluded - the gap since the last fill-up is much bigger than usual, so a fill-up in between was probably missed.';
+  }
+  if (point.exclusionReason === 'anomalous-vs-lifetime') {
+    return "Excluded - this reading is far outside your longer-term average, so a fill-up in between was probably missed. There isn't quite enough recent history yet to judge it against your most recent riding alone.";
+  }
+  return 'Excluded - this reading is far outside your usual range, so a fill-up in between was probably missed.';
 }
 
 export function MpgChart({
@@ -78,7 +92,6 @@ export function MpgChart({
 
   const labels = viewBy === 'time' ? filtered.map((s) => fmtDate(s.date)) : filtered.map((s) => formatDistance(s.mileage, distanceUnit));
   const allValues = filtered.map((s) => Number(convertMpgValue(s.mpg, fuelEconomyUnit).toFixed(1)));
-  const trustedValues = filtered.map((s, i) => (s.likelyMissedFillUps ? null : allValues[i]));
   const excludedValues = filtered.map((s, i) => (s.likelyMissedFillUps ? allValues[i] : null));
 
   function handlePointClick(elements: { index: number }[]) {
@@ -142,15 +155,24 @@ export function MpgChart({
             datasets: [
               {
                 label: fuelEconomyUnit === 'l100km' ? 'L/100km' : 'MPG',
-                data: trustedValues,
+                data: allValues,
                 borderColor: '#e8a33d',
                 backgroundColor: 'transparent',
                 borderWidth: 1.25,
                 tension: 0.25,
                 fill: false,
                 pointRadius: 2,
-                pointBackgroundColor: '#e8a33d',
-                spanGaps: false,
+                pointBackgroundColor: (ctx: ScriptableContext<'line'>) =>
+                  filtered[ctx.dataIndex]?.likelyMissedFillUps ? EXCLUDED_COLOR : '#e8a33d',
+                // One continuous line across the whole range now, rather
+                // than two separate series with a bare gap between them -
+                // the segment styling below is what shows an excluded
+                // stretch differently, without ever breaking the path
+                // itself.
+                segment: {
+                  borderColor: (ctx) => (isSegmentFlagged(filtered, ctx) ? EXCLUDED_COLOR : undefined),
+                  borderDash: (ctx) => (isSegmentFlagged(filtered, ctx) ? [6, 4] : undefined),
+                },
               },
               {
                 label: 'Excluded',

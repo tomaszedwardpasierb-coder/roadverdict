@@ -13,7 +13,8 @@ import { getFuelLogs, createFuelLog } from "@/lib/tracker/fuelLog";
 import { getMods, createMod } from "@/lib/tracker/mod";
 import { getBills, createBill } from "@/lib/tracker/bill";
 import { createReminder } from "@/lib/tracker/reminder";
-import { estimateMileage, type MileagePoint } from "@/lib/tracker/mileageEstimate";
+import { estimateMileage, estimateFuelMileageFromLitres, type MileagePoint } from "@/lib/tracker/mileageEstimate";
+import { computeActualMPG } from "@/lib/tracker/mpgCalc";
 import { guessJobType, guessModCategory, guessBillType } from "@/lib/tracker/guessCategory";
 import { JOB_LABELS, JOB_REMINDER_DEFAULTS } from "@/lib/tracker/jobTypes";
 import { BILL_LABELS, BILL_REMINDER_DEFAULTS } from "@/lib/tracker/billTypes";
@@ -81,6 +82,25 @@ export async function commitReceiptItem(
   let mileageConfidence: "interpolated" | "estimated" | undefined;
   let mileageWarning: string | undefined;
   let mileageNeedsManualEntry = false;
+
+  // Needed earlier than before this change - the fuel-specific
+  // litres-based estimate below has to know up front whether this
+  // fill-up is a full tank, since that's the only case litres cleanly
+  // implies "distance since the last full tank".
+  const filledToFullGuess = category === "fuel" ? guessFilledToFull(litres ?? 0, bike.tankCapacityLitres) : false;
+
+  function applyGenericMileageEstimate(conflictWarning?: string) {
+    const estimate = estimateMileage(date, trustedMileagePoints, {
+      startingMileage: bike.startingMileage,
+      currentMileage: bike.currentMileage,
+      dateAdded: bike.dateAdded,
+    });
+    mileage = estimate.mileage;
+    mileageConfidence = estimate.confidence;
+    mileageWarning = conflictWarning ?? estimate.warning;
+    mileageNeedsManualEntry = conflictWarning ? true : estimate.requiresManualEntry;
+  }
+
   if (category !== "bills") {
     // A figure printed on the receipt is normally trusted outright - but
     // if it's inconsistent with everything else already known (a
@@ -89,21 +109,42 @@ export async function commitReceiptItem(
     // instead of trusting an OCR reading that doesn't add up.
     const receiptConflict =
       typeof mileageOnReceipt === "number" ? findMileageConflict(date, mileageOnReceipt, null, trustedMileagePoints) : null;
+    const conflictWarning = receiptConflict
+      ? `The receipt appears to show ${mileageOnReceipt!.toLocaleString()} mi, but that conflicts with another record - please check and enter the real figure.`
+      : undefined;
 
     if (typeof mileageOnReceipt === "number" && !receiptConflict) {
       mileage = mileageOnReceipt;
-    } else {
-      const estimate = estimateMileage(date, trustedMileagePoints, {
+    } else if (conflictWarning) {
+      applyGenericMileageEstimate(conflictWarning);
+    } else if (category === "fuel" && filledToFullGuess && litres) {
+      // Litres-informed estimate first, for fuel specifically - see
+      // mileageEstimate.ts for why. Falls through to the generic
+      // date-based estimate if there's no trusted full-tank fill-up to
+      // project forward from at all (e.g. this bike's very first
+      // logged fill-up).
+      const trustedFuelLogs = fuelLogs.filter((f) => isTrustworthy(f.mileageConfidence));
+      const precedingFullTankMileage =
+        trustedFuelLogs
+          .filter((f) => f.filledToFull && new Date(f.date).getTime() < new Date(date).getTime())
+          .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0]?.mileage ?? null;
+      const bikeOwnAverageMpg = computeActualMPG(
+        trustedFuelLogs.map((f) => ({ id: f.id, mileage: f.mileage, litres: f.litres, filledToFull: f.filledToFull, date: f.date, mileageConfidence: f.mileageConfidence }))
+      );
+      const litresEstimate = estimateFuelMileageFromLitres(litres, precedingFullTankMileage, bikeOwnAverageMpg, {
         startingMileage: bike.startingMileage,
         currentMileage: bike.currentMileage,
         dateAdded: bike.dateAdded,
       });
-      mileage = estimate.mileage;
-      mileageConfidence = estimate.confidence;
-      mileageWarning = receiptConflict
-        ? `The receipt appears to show ${mileageOnReceipt!.toLocaleString()} mi, but that conflicts with another record - please check and enter the real figure.`
-        : estimate.warning;
-      mileageNeedsManualEntry = receiptConflict ? true : estimate.requiresManualEntry;
+      if (litresEstimate) {
+        mileage = litresEstimate.mileage;
+        mileageConfidence = litresEstimate.confidence;
+        mileageWarning = litresEstimate.warning;
+      } else {
+        applyGenericMileageEstimate();
+      }
+    } else {
+      applyGenericMileageEstimate();
     }
   }
 
@@ -134,7 +175,6 @@ export async function commitReceiptItem(
     const aiDescription = buildAiDescription({ description: description || "Fuel", merchantName, address, city, categoryLabel: "Fuel" });
     const duplicate = findPossibleDuplicate(date, costGbp, fuelCandidates);
     const litresValue = litres ?? 0;
-    const filledToFullGuess = guessFilledToFull(litresValue, bike.tankCapacityLitres);
     const resolvedMileage = mileage ?? bike.currentMileage;
 
     // A full tank that implies an impossible mpg against the nearest

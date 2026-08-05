@@ -88,6 +88,50 @@ export function mileageConfidenceLabel(confidence: "interpolated" | "estimated" 
   return " (mileage estimated)";
 }
 
+// Matches costCalculator.ts's AVERAGE_MOTORCYCLE_MPG exactly - kept as a
+// separate local constant rather than importing it, since that file's
+// own dependency chain touches Cosmos (via fuelPrice.ts), and importing
+// from it here would drag the Cosmos SDK into every client component
+// that currently safely imports mileageConfidenceLabel from this same
+// file. If the Cost Calculator's figure is ever revised, update both.
+const GENERIC_MPG_FALLBACK = 57;
+
+export interface FuelMileageEstimateResult {
+  mileage: number;
+  confidence: "estimated";
+  warning: string;
+  requiresManualEntry: false;
+}
+
+// Litres-informed estimate for a fuel receipt with no mileage printed -
+// a materially better guess than pure date-based interpolation, since
+// fuel consumed and distance travelled are causally linked in a way
+// "how many days have passed" simply isn't. Only valid for a genuine
+// FULL TANK fill-up, and only with a real full-tank fill-up to project
+// forward from - same restriction as fuelPlausibility.ts's plausibility
+// check, and for the same reason: a partial top-up doesn't cleanly
+// correspond to "this many litres = this much distance since the last
+// full tank", and there's nothing to measure forward FROM without one.
+// Returns null in either case, so the caller falls back to the generic
+// date-based estimate instead.
+export function estimateFuelMileageFromLitres(
+  litres: number,
+  precedingFullTankMileage: number | null,
+  bikeOwnAverageMpg: number | null,
+  bike: BikeLifetime
+): FuelMileageEstimateResult | null {
+  if (precedingFullTankMileage === null || litres <= 0) return null;
+  const usedGenericMpg = bikeOwnAverageMpg === null || bikeOwnAverageMpg <= 0;
+  const mpgToUse = usedGenericMpg ? GENERIC_MPG_FALLBACK : (bikeOwnAverageMpg as number);
+  const gallons = litres / 4.546;
+  const estimatedMiles = gallons * mpgToUse;
+  const mileage = clampToPlausible(precedingFullTankMileage + estimatedMiles, bike);
+  const warning = usedGenericMpg
+    ? `Estimated from ${litres.toFixed(1)}L at a generic ${GENERIC_MPG_FALLBACK}mpg UK average (no fuel history yet to use this bike's own figure instead) - please check this is close to right.`
+    : `Estimated from ${litres.toFixed(1)}L at this bike's own average of ${Math.round(mpgToUse)}mpg - please check this is close to right.`;
+  return { mileage, confidence: "estimated", warning, requiresManualEntry: false };
+}
+
 // 1. (Handled by the caller, before this runs) - mileage read directly off the receipt.
 // 2. Interpolate between two real logged points that bracket the target date - always
 //    automatic, since it's bounded and can't produce an implausible number by construction.

@@ -21,7 +21,7 @@ export interface MpgSegment {
   // "anomalous-value" means the dates/mileages look perfectly ordinary,
   // but the resulting mpg is a statistical outlier against this rider's
   // own history - the softer, inferred case.
-  exclusionReason?: "unusual-gap" | "anomalous-value";
+  exclusionReason?: "unusual-gap" | "anomalous-value" | "anomalous-vs-lifetime";
 }
 
 export interface MpgCalcInput {
@@ -162,7 +162,23 @@ export function computeMPGSeries(fuelLogs: MpgCalcInput[]): MpgSegment[] {
   // adaptive statistical check as before.
   const validMpgsSoFar: number[] = [];
   const validGapsSoFar: number[] = [];
+  // Never reset, unlike the two arrays above - grows across the WHOLE
+  // fuel history. Exists specifically to cover the blind window right
+  // after a reset: the local baseline has nothing to compare a fresh
+  // point against yet, so without this, that point (and the next one,
+  // and the next) would pass through completely unchecked until enough
+  // local history rebuilds. A genuine second missed fill-up landing
+  // exactly in that window would slip through silently, and worse,
+  // would seed the new "normal" everything after it gets judged against.
+  const lifetimeTrustedMpgs: number[] = [];
   let consecutiveValueAnomalies = 0;
+  // Tracked separately from consecutiveValueAnomalies - this counts
+  // disagreements with the LIFETIME reference specifically, so a
+  // genuine sustained change (new rider, new commute) still gets to
+  // establish itself as the new normal after a couple of "misses",
+  // exactly like the local check already allows, rather than the old
+  // lifetime average vetoing every fresh point indefinitely.
+  let consecutiveLifetimeAnomalies = 0;
   const result: MpgSegment[] = [];
 
   for (const seg of raw) {
@@ -172,16 +188,21 @@ export function computeMPGSeries(fuelLogs: MpgCalcInput[]): MpgSegment[] {
       validMpgsSoFar.length = 0;
       validGapsSoFar.length = 0;
       consecutiveValueAnomalies = 0;
+      consecutiveLifetimeAnomalies = 0;
       result.push({ mileage: seg.mileage, mpg: seg.mpg, date: seg.date, fuelLogId: seg.fuelLogId, likelyMissedFillUps: true, exclusionReason: "unusual-gap" });
       continue;
     }
 
-    let valueFlagged = validMpgsSoFar.length >= MIN_VALID_SEGMENTS_FOR_BASELINE && isAnomalousValue(seg.mpg, validMpgsSoFar);
+    const inBlindWindow = validMpgsSoFar.length < MIN_VALID_SEGMENTS_FOR_BASELINE;
+    let valueFlagged = !inBlindWindow && isAnomalousValue(seg.mpg, validMpgsSoFar);
+    let exclusionReason: MpgSegment["exclusionReason"];
 
     if (valueFlagged) {
+      exclusionReason = "anomalous-value";
       consecutiveValueAnomalies++;
       if (consecutiveValueAnomalies >= CONSECUTIVE_ANOMALIES_RESET_BASELINE) {
         valueFlagged = false;
+        exclusionReason = undefined;
         validMpgsSoFar.length = 0;
         validGapsSoFar.length = 0;
         consecutiveValueAnomalies = 0;
@@ -190,9 +211,30 @@ export function computeMPGSeries(fuelLogs: MpgCalcInput[]): MpgSegment[] {
       consecutiveValueAnomalies = 0;
     }
 
+    // The blind-window soft check - only runs when the local check
+    // above had nothing to compare against at all, and only once the
+    // lifetime pool itself has enough points to be a meaningful
+    // reference (if this is genuinely the bike's first few ever
+    // fill-ups, there's nothing to fall back to either, and that's
+    // fine - same as today).
+    if (!valueFlagged && inBlindWindow && lifetimeTrustedMpgs.length >= MIN_VALID_SEGMENTS_FOR_BASELINE) {
+      if (isAnomalousValue(seg.mpg, lifetimeTrustedMpgs)) {
+        consecutiveLifetimeAnomalies++;
+        if (consecutiveLifetimeAnomalies < CONSECUTIVE_ANOMALIES_RESET_BASELINE) {
+          valueFlagged = true;
+          exclusionReason = "anomalous-vs-lifetime";
+        } else {
+          consecutiveLifetimeAnomalies = 0;
+        }
+      } else {
+        consecutiveLifetimeAnomalies = 0;
+      }
+    }
+
     if (!valueFlagged) {
       validMpgsSoFar.push(seg.mpg);
       validGapsSoFar.push(seg.miles);
+      lifetimeTrustedMpgs.push(seg.mpg);
     }
     result.push({
       mileage: seg.mileage,
@@ -200,7 +242,7 @@ export function computeMPGSeries(fuelLogs: MpgCalcInput[]): MpgSegment[] {
       date: seg.date,
       fuelLogId: seg.fuelLogId,
       likelyMissedFillUps: valueFlagged,
-      exclusionReason: valueFlagged ? "anomalous-value" : undefined,
+      exclusionReason,
     });
   }
 
