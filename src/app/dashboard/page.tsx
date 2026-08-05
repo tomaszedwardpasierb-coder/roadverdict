@@ -47,6 +47,7 @@ import { UnitSettings } from "./UnitSettings";
 import { ExportShareSection } from "./ExportShareSection";
 import { RecentActivity, type RecentActivityItem } from "./RecentActivity";
 import { DashboardShell } from "./DashboardShell";
+import { StorySoFarTab } from "./StorySoFarTab";
 import { ChartFilterProvider } from "./ChartFilterContext";
 import { ChartFilterBar } from "./ChartFilterBar";
 import { DashboardStatCards } from "./DashboardStatCards";
@@ -419,6 +420,7 @@ export default async function DashboardPage() {
       billsContent={billsContent}
       remindersContent={remindersContent}
       reportsContent={reportsContent}
+      storyContent={<StorySoFarTab />}
       shareLinksContent={shareLinksContent}
     />
   );

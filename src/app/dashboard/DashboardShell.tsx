@@ -12,7 +12,7 @@ import { ResetDemoButton } from './ResetDemoButton';
 import { DEMO_EMAIL } from '@/lib/tracker/demoSeed';
 import styles from './dashboard.module.css';
 
-type Section = 'dashboard' | 'service' | 'fuel' | 'mods' | 'bills' | 'reminders' | 'reports' | 'shareLinks';
+type Section = 'dashboard' | 'service' | 'fuel' | 'mods' | 'bills' | 'reminders' | 'reports' | 'shareLinks' | 'story';
 
 const REVIEW_CATEGORIES: ReviewCategory[] = ['service', 'fuel', 'mods', 'bills'];
 function asReviewCategory(key: string): ReviewCategory | null {
@@ -27,6 +27,7 @@ const NAV_ITEMS: { key: Section; label: string; icon: string }[] = [
   { key: 'bills', label: 'Tax & Insurance', icon: '📄' },
   { key: 'reminders', label: 'Reminders', icon: '🔔' },
   { key: 'reports', label: 'Reports', icon: '📊' },
+  { key: 'story', label: 'The Story So Far', icon: '📖' },
   { key: 'shareLinks', label: 'Shareable Links', icon: '🔗' },
 ];
 
@@ -41,6 +42,7 @@ const MORE_ITEMS: { key: Section; label: string; icon: string }[] = [
   { key: 'bills', label: 'Tax & Insurance', icon: '📄' },
   { key: 'reminders', label: 'Reminders', icon: '🔔' },
   { key: 'reports', label: 'Reports', icon: '📊' },
+  { key: 'story', label: 'The Story So Far', icon: '📖' },
   { key: 'shareLinks', label: 'Shareable Links', icon: '🔗' },
 ];
 
@@ -63,6 +65,7 @@ interface Props {
   billsContent: ReactNode;
   remindersContent: ReactNode;
   reportsContent: ReactNode;
+  storyContent: ReactNode;
   shareLinksContent: ReactNode;
 }
 
@@ -86,6 +89,7 @@ export function DashboardShell({
   billsContent,
   remindersContent,
   reportsContent,
+  storyContent,
   shareLinksContent,
 }: Props) {
   const [active, setActive] = useState<Section>('dashboard');
@@ -99,10 +103,11 @@ export function DashboardShell({
     bills: billsContent,
     reminders: remindersContent,
     reports: reportsContent,
+    story: storyContent,
     shareLinks: shareLinksContent,
   };
 
-  const isMoreActive = active === 'bills' || active === 'reminders' || active === 'reports' || active === 'shareLinks';
+  const isMoreActive = active === 'bills' || active === 'reminders' || active === 'reports' || active === 'story' || active === 'shareLinks';
 
   return (
     <TabSwitchProvider onSwitchTab={(cat) => setActive(cat)}>
