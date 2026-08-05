@@ -28,7 +28,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
   }
 
-  const { category, name, cost, mileage, date, notes, attachments } = body as {
+  const { category, name, cost, mileage, date, notes, attachments, batchHints } = body as {
     category?: string;
     name?: string;
     cost?: number;
@@ -36,6 +36,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     date?: string;
     notes?: string;
     attachments?: Attachment[];
+    batchHints?: { date: string; mileage: number }[];
   };
 
   if (!category || !name || cost == null || mileage == null || !date) {
@@ -56,7 +57,11 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     ...otherRecords.map((r) => ({ id: r.id, date: r.date, mileage: r.mileage })),
     ...otherFuelLogs.map((f) => ({ id: f.id, date: f.date, mileage: f.mileage })),
     ...otherMods.map((m) => ({ id: m.id, date: m.date, mileage: m.mileage })),
+    ...(batchHints ?? []),
   ]);
+  if (conflict) {
+    return NextResponse.json({ error: describeMileageConflict(conflict) }, { status: 409 });
+  }
 
   const mod = await updateMod(session.email, id, {
     category,
@@ -66,9 +71,9 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     date,
     notes: notes ?? "",
     attachments,
-    needsReview: Boolean(conflict),
+    needsReview: false,
     mileageConfidence: nextMileageConfidence,
-    mileageConflictWarning: conflict ? describeMileageConflict(conflict) : null,
+    mileageConflictWarning: null,
   });
   if (!mod) {
     return NextResponse.json({ error: "Entry not found." }, { status: 404 });

@@ -30,7 +30,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
   }
 
-  const { jobType, cost, mileage, date, notes, attachments, reminder } = body as {
+  const { jobType, cost, mileage, date, notes, attachments, reminder, batchHints } = body as {
     jobType?: string;
     cost?: number;
     mileage?: number;
@@ -43,6 +43,12 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
       exactDate?: string;
       additionalTriggers?: { intervalType: "mileage" | "months" | "date"; intervalValue?: number; exactDate?: string }[];
     };
+    // Optional - only ever sent by the review queue: other receipts in
+    // the same scan batch that have a mileage actually printed on them,
+    // even if they haven't been reached/committed yet. An exact reading
+    // is trustworthy regardless of processing order, so it's included in
+    // this check the same as anything already in the database.
+    batchHints?: { date: string; mileage: number }[];
   };
 
   if (!jobType || cost == null || mileage == null || !date) {
@@ -60,10 +66,11 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
       ? "confirmed"
       : existing?.mileageConfidence;
 
-  // Same immediate check as creating a new record - an edit can just as
-  // easily introduce a chronological inconsistency as a fresh entry can.
-  // Skips gracefully (no conflict check, not a failure) if this record
-  // somehow predates the bikeId backfill and has none yet.
+  // Same check as creating a new record, run again here - an edit can
+  // just as easily introduce a chronological inconsistency as a fresh
+  // entry can. Hard rejection, not a soft flag: a human is right here
+  // to fix it immediately, so there's no reason to let an inconsistent
+  // save through and hope it gets noticed later.
   const bikeId = existing?.bikeId;
   const [otherRecords, otherFuelLogs, otherMods] = bikeId
     ? await Promise.all([getServiceRecords(session.email, bikeId), getFuelLogs(session.email, bikeId), getMods(session.email, bikeId)])
@@ -72,7 +79,11 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     ...otherRecords.map((r) => ({ id: r.id, date: r.date, mileage: r.mileage })),
     ...otherFuelLogs.map((f) => ({ id: f.id, date: f.date, mileage: f.mileage })),
     ...otherMods.map((m) => ({ id: m.id, date: m.date, mileage: m.mileage })),
+    ...(batchHints ?? []),
   ]);
+  if (conflict) {
+    return NextResponse.json({ error: describeMileageConflict(conflict) }, { status: 409 });
+  }
 
   const record = await updateServiceRecord(session.email, id, {
     jobType,
@@ -81,9 +92,9 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     date,
     notes: notes ?? "",
     attachments,
-    needsReview: Boolean(conflict),
+    needsReview: false,
     mileageConfidence: nextMileageConfidence,
-    mileageConflictWarning: conflict ? describeMileageConflict(conflict) : null,
+    mileageConflictWarning: null,
   });
   if (!record) {
     return NextResponse.json({ error: "Record not found." }, { status: 404 });

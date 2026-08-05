@@ -1,11 +1,12 @@
 // Place at: src/app/dashboard/ReviewQueueModal.tsx
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { JOB_GROUPS, JOB_LABELS } from '@/lib/tracker/jobTypes';
 import { BILL_LABELS } from '@/lib/tracker/billTypes';
 import { MOD_LABELS } from '@/lib/tracker/modTypes';
-import type { ReviewQueueEntry } from '@/app/api/tracker/commit-receipt-items/route';
+import type { ReviewQueueEntry } from '@/lib/tracker/commitReceiptItem';
+import type { ParsedReceiptItem } from '@/lib/tracker/receiptParse';
 import styles from './dashboard.module.css';
 
 const CATEGORY_ROUTE: Record<ReviewQueueEntry['category'], string> = {
@@ -22,16 +23,18 @@ const CATEGORY_LABEL: Record<ReviewQueueEntry['category'], string> = {
   bills: 'Tax & Insurance',
 };
 
-async function patchEntry(entry: ReviewQueueEntry, body: Record<string, unknown>): Promise<boolean> {
+async function patchEntry(entry: ReviewQueueEntry, body: Record<string, unknown>): Promise<{ ok: boolean; error?: string }> {
   try {
     const res = await fetch(`/api/tracker/${CATEGORY_ROUTE[entry.category]}/${encodeURIComponent(entry.id)}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     });
-    return res.ok;
+    if (res.ok) return { ok: true };
+    const data = await res.json().catch(() => null);
+    return { ok: false, error: data?.error };
   } catch {
-    return false;
+    return { ok: false };
   }
 }
 
@@ -50,20 +53,24 @@ async function deleteEntry(entry: ReviewQueueEntry): Promise<boolean> {
 // attachment set at creation rather than risking clearing it.
 function QueueItemForm({
   entry,
+  batchHints,
   onSaved,
   onSkip,
   onDeleteDuplicate,
   onPrev,
   onFinishLater,
   canGoPrev,
+  finishing,
 }: {
   entry: ReviewQueueEntry;
+  batchHints: { date: string; mileage: number }[];
   onSaved: () => void;
   onSkip: () => void;
   onDeleteDuplicate: () => void;
   onPrev: () => void;
   onFinishLater: () => void;
   canGoPrev: boolean;
+  finishing: boolean;
 }) {
   const [submitting, setSubmitting] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -88,19 +95,19 @@ function QueueItemForm({
 
     let body: Record<string, unknown>;
     if (entry.category === 'service') {
-      body = { jobType, cost: Number(cost), mileage: Number(mileage), date, notes };
+      body = { jobType, cost: Number(cost), mileage: Number(mileage), date, notes, batchHints };
     } else if (entry.category === 'fuel') {
-      body = { litres: Number(litres), cost: Number(cost), mileage: Number(mileage), date, filledToFull };
+      body = { litres: Number(litres), cost: Number(cost), mileage: Number(mileage), date, filledToFull, batchHints };
     } else if (entry.category === 'mods') {
-      body = { category: entry.modCategory, name, cost: Number(cost), mileage: Number(mileage), date, notes };
+      body = { category: entry.modCategory, name, cost: Number(cost), mileage: Number(mileage), date, notes, batchHints };
     } else {
       body = { billType, cost: Number(cost), date, notes };
     }
 
-    const ok = await patchEntry(entry, body);
+    const result = await patchEntry(entry, body);
     setSubmitting(false);
-    if (ok) onSaved();
-    else setError('Could not save. Try again.');
+    if (result.ok) onSaved();
+    else setError(result.error ?? 'Could not save. Try again.');
   }
 
   async function handleDelete() {
@@ -193,7 +200,8 @@ function QueueItemForm({
           {entry.mileageNeedsManualEntry && (
             <p className={styles.reviewQueueDuplicateWarning} style={{ marginBottom: '0.4rem' }}>
               There&apos;s nothing nearby to estimate this from reliably - please enter the real mileage from the
-              receipt, or your best own memory of it.
+              receipt, or your best own memory of it. Once saved, this becomes a real anchor the next entries in
+              this batch can use.
             </p>
           )}
           <input
@@ -227,17 +235,17 @@ function QueueItemForm({
       {error && <p className="error-text" role="alert">{error}</p>}
 
       <div className={styles.reviewQueueFooterRow}>
-        <button type="button" className={styles.iconBtn} onClick={onPrev} disabled={!canGoPrev || submitting}>
+        <button type="button" className={styles.iconBtn} onClick={onPrev} disabled={!canGoPrev || submitting || finishing}>
           ← Prev
         </button>
         <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center' }}>
-          <button type="button" className={styles.reviewQueueFinishLater} onClick={onFinishLater} disabled={submitting}>
-            Finish later
+          <button type="button" className={styles.reviewQueueFinishLater} onClick={onFinishLater} disabled={submitting || finishing}>
+            {finishing ? 'Saving the rest…' : 'Finish later'}
           </button>
-          <button type="button" className={styles.iconBtn} onClick={onSkip} disabled={submitting}>
+          <button type="button" className={styles.iconBtn} onClick={onSkip} disabled={submitting || finishing}>
             Skip
           </button>
-          <button type="submit" className="submit-button" disabled={submitting}>
+          <button type="submit" className="submit-button" disabled={submitting || finishing}>
             {submitting ? 'Saving…' : 'Save and next'}
           </button>
         </div>
@@ -246,18 +254,110 @@ function QueueItemForm({
   );
 }
 
-export function ReviewQueueModal({ entries, onFinished }: { entries: ReviewQueueEntry[]; onFinished: () => void }) {
-  const [items, setItems] = useState(entries);
+// Commits one record at a time, right as the human reaches it - not the
+// whole batch upfront. That's the whole point: a correction to item #1
+// is a real, saved database row by the time item #2 is being estimated,
+// so it genuinely becomes a better anchor for #2 rather than #2 having
+// already been guessed from stale, pre-review context.
+export function ReviewQueueModal({ parsedItems, onFinished }: { parsedItems: ParsedReceiptItem[]; onFinished: () => void }) {
+  const [items, setItems] = useState(parsedItems);
+  const [committed, setCommitted] = useState<(ReviewQueueEntry | null)[]>(() => parsedItems.map(() => null));
   const [index, setIndex] = useState(0);
+  const [committing, setCommitting] = useState(false);
+  const [commitError, setCommitError] = useState<string | null>(null);
+  const [retryTick, setRetryTick] = useState(0);
+  const [finishing, setFinishing] = useState(false);
+  const attemptedRef = useRef<Set<number>>(new Set());
+
+  useEffect(() => {
+    if (index >= items.length) return;
+    if (committed[index] !== null) return;
+    if (attemptedRef.current.has(index)) return;
+    attemptedRef.current.add(index);
+
+    // Every OTHER receipt in this same batch that has a mileage actually
+    // printed on it - whether or not it's been reached yet. An exact
+    // reading is trustworthy regardless of processing order, so item #90
+    // can use item #95's printed mileage even before #95 is opened.
+    const batchHints = items
+      .filter((_, i) => i !== index)
+      .filter((it) => typeof it.mileageOnReceipt === 'number')
+      .map((it) => ({ date: it.date, mileage: it.mileageOnReceipt as number }));
+
+    let cancelled = false;
+    setCommitting(true);
+    setCommitError(null);
+
+    (async () => {
+      try {
+        const res = await fetch('/api/tracker/commit-receipt-item', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ item: items[index], batchHints }),
+        });
+        const data = await res.json();
+        if (cancelled) return;
+        if (res.ok && data.entry) {
+          setCommitted((prev) => {
+            const next = [...prev];
+            next[index] = data.entry;
+            return next;
+          });
+        } else {
+          attemptedRef.current.delete(index);
+          setCommitError(data.error ?? 'Could not save this entry.');
+        }
+      } catch {
+        if (!cancelled) {
+          attemptedRef.current.delete(index);
+          setCommitError('Could not reach the server.');
+        }
+      } finally {
+        if (!cancelled) setCommitting(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [index, items.length, retryTick]);
 
   function goNext() {
     setIndex((i) => i + 1);
   }
 
   function handleDeleteDuplicate() {
-    // Deliberately does not touch `index` - the array shifts left, so
-    // whatever was next is now sitting at this same index already.
+    attemptedRef.current.clear();
     setItems((prev) => prev.filter((_, i) => i !== index));
+    setCommitted((prev) => prev.filter((_, i) => i !== index));
+  }
+
+  // Anything not yet reached is only sitting in browser memory as parsed
+  // data, not a database record - closing without saving it would lose
+  // it for good (the original photos aren't kept to re-scan). This
+  // commits the remainder in one background pass before actually
+  // closing, so nothing from this scan is ever silently lost, even if
+  // it isn't individually reviewed.
+  async function handleFinishLater() {
+    const remaining = items.filter((_, i) => committed[i] === null);
+    if (remaining.length === 0) {
+      onFinished();
+      return;
+    }
+    setFinishing(true);
+    try {
+      await fetch('/api/tracker/commit-receipt-items', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ items: remaining }),
+      });
+    } catch {
+      // Best-effort - if this fails, those items simply stay unscanned;
+      // nothing already reviewed is at risk either way.
+    }
+    setFinishing(false);
+    onFinished();
   }
 
   if (items.length === 0 || index >= items.length) {
@@ -277,7 +377,7 @@ export function ReviewQueueModal({ entries, onFinished }: { entries: ReviewQueue
     );
   }
 
-  const current = items[index];
+  const current = committed[index];
 
   return (
     <div className={styles.reviewQueueOverlay}>
@@ -294,16 +394,36 @@ export function ReviewQueueModal({ entries, onFinished }: { entries: ReviewQueue
           <span>Reviewing {index + 1} of {items.length}</span>
           <span className="field-note">{Math.round(((index + 1) / items.length) * 100)}%</span>
         </div>
-        <QueueItemForm
-          key={current.id}
-          entry={current}
-          onSaved={goNext}
-          onSkip={goNext}
-          onDeleteDuplicate={handleDeleteDuplicate}
-          onPrev={() => setIndex((i) => Math.max(0, i - 1))}
-          onFinishLater={onFinished}
-          canGoPrev={index > 0}
-        />
+
+        {current === null ? (
+          <div className={styles.reviewQueueDoneWrap}>
+            {committing && <p className={styles.subtext}>Saving this entry…</p>}
+            {commitError && (
+              <>
+                <p className="error-text" role="alert">{commitError}</p>
+                <button type="button" className="submit-button" onClick={() => setRetryTick((t) => t + 1)}>
+                  Retry
+                </button>
+              </>
+            )}
+          </div>
+        ) : (
+          <QueueItemForm
+            key={current.id}
+            entry={current}
+            batchHints={items
+              .filter((_, i) => i !== index)
+              .filter((it) => typeof it.mileageOnReceipt === 'number')
+              .map((it) => ({ date: it.date, mileage: it.mileageOnReceipt as number }))}
+            onSaved={goNext}
+            onSkip={goNext}
+            onDeleteDuplicate={handleDeleteDuplicate}
+            onPrev={() => setIndex((i) => Math.max(0, i - 1))}
+            onFinishLater={handleFinishLater}
+            canGoPrev={index > 0}
+            finishing={finishing}
+          />
+        )}
       </div>
     </div>
   );

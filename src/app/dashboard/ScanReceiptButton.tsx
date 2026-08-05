@@ -5,7 +5,6 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ReviewQueueModal } from './ReviewQueueModal';
 import type { ParsedReceiptItem } from '@/lib/tracker/receiptParse';
-import type { ReviewQueueEntry } from '@/app/api/tracker/commit-receipt-items/route';
 import styles from './dashboard.module.css';
 
 interface FileParseOutcome {
@@ -23,15 +22,15 @@ export function ScanReceiptButton() {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [scanning, setScanning] = useState(false);
-  const [progress, setProgress] = useState<{ current: number; total: number; stage: 'reading' | 'saving' } | null>(null);
+  const [progress, setProgress] = useState<{ current: number; total: number } | null>(null);
   const [outcomes, setOutcomes] = useState<FileParseOutcome[] | null>(null);
-  const [commitError, setCommitError] = useState<string | null>(null);
-  // Scoped to exactly what THIS scan created, in true chronological
-  // order - never the app-wide needsReview snapshot, so a leftover
-  // unreviewed item from an earlier, abandoned session never gets mixed
-  // into it. Those leftovers are still reachable the normal way, via the
+  // Scoped to exactly what THIS scan read, sorted into true chronological
+  // order, not yet saved anywhere - the review queue commits each one
+  // lazily as it's reached. Never the app-wide needsReview snapshot, so
+  // a leftover unreviewed item from an earlier, abandoned session never
+  // gets mixed into it - those stay reachable the normal way, via the
   // pulsing tab dot and clicking Edit on the flagged card.
-  const [queueEntries, setQueueEntries] = useState<ReviewQueueEntry[] | null>(null);
+  const [queueItems, setQueueItems] = useState<ParsedReceiptItem[] | null>(null);
 
   async function parseOneFile(file: File): Promise<FileParseOutcome> {
     try {
@@ -60,54 +59,36 @@ export function ScanReceiptButton() {
     const files = Array.from(e.target.files ?? []);
     if (files.length === 0) return;
     setOutcomes(null);
-    setCommitError(null);
     setScanning(true);
 
-    // Phase 1: read every file first. Sequential, not parallel - keeps
-    // progress reporting honest and avoids a burst of simultaneous
-    // requests at the AI API. Nothing is saved yet at this point.
+    // Read every file first. Sequential, not parallel - keeps progress
+    // reporting honest and avoids a burst of simultaneous requests at
+    // the AI API. Nothing is saved anywhere yet at this point.
     const results: FileParseOutcome[] = [];
     for (let i = 0; i < files.length; i++) {
-      setProgress({ current: i + 1, total: files.length, stage: 'reading' });
+      setProgress({ current: i + 1, total: files.length });
       results.push(await parseOneFile(files[i]));
     }
     setOutcomes(results);
 
-    // Phase 2: combine everything read across every file, and sort into
-    // TRUE chronological order - not upload order, not file-selection
-    // order. This is what lets each item, once committed, see genuinely
-    // earlier ones as real anchors instead of a handful of unrelated
-    // receipts years apart all collapsing onto the same guess.
+    // Combine everything read across every file, and sort into TRUE
+    // chronological order - not upload order, not file-selection order.
+    // The review queue commits each one lazily, right as it's reached,
+    // so a correction to an early item can genuinely improve the
+    // estimate for a later one instead of every item being guessed from
+    // the same stale, pre-review snapshot.
     const allItems = results.flatMap((r) => r.items ?? []);
     allItems.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-
-    if (allItems.length > 0) {
-      setProgress({ current: 1, total: 1, stage: 'saving' });
-      try {
-        const res = await fetch('/api/tracker/commit-receipt-items', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ items: allItems }),
-        });
-        const data = await res.json();
-        if (res.ok && Array.isArray(data.createdEntries) && data.createdEntries.length > 0) {
-          router.refresh();
-          setQueueEntries(data.createdEntries);
-        } else {
-          setCommitError(data.error ?? 'Could not save these entries. Please try again.');
-        }
-      } catch {
-        setCommitError('Could not reach the server to save these entries.');
-      }
-    }
 
     setProgress(null);
     setScanning(false);
     e.target.value = '';
+
+    if (allItems.length > 0) setQueueItems(allItems);
   }
 
   function handleQueueFinished() {
-    setQueueEntries(null);
+    setQueueItems(null);
     router.refresh();
   }
 
@@ -141,20 +122,15 @@ export function ScanReceiptButton() {
           />
           {progress && (
             <p className="field-note">
-              {progress.stage === 'reading'
-                ? `Reading receipt ${progress.current} of ${progress.total}…`
-                : 'Sorting into date order and saving…'}
+              Reading receipt {progress.current} of {progress.total}…
             </p>
           )}
           {outcomes && !scanning && (
             <div style={{ marginTop: '0.6rem' }}>
-              {successCount > 0 && !commitError && (
+              {successCount > 0 && (
                 <p className={styles.scanReceiptSuccess}>
                   ✓ Read {successCount} receipt{successCount === 1 ? '' : 's'}.
                 </p>
-              )}
-              {commitError && (
-                <p className="error-text" role="alert">{commitError}</p>
               )}
               {totalSkippedBeforeProduction > 0 && (
                 <p className="field-note" style={{ color: 'var(--amber-ink)', marginTop: '0.4rem' }}>
@@ -194,7 +170,7 @@ export function ScanReceiptButton() {
           <p className={styles.scanReceiptConstruction}>PDF receipts aren&apos;t scanned yet - attach those manually as before.</p>
         </div>
       )}
-      {queueEntries && <ReviewQueueModal entries={queueEntries} onFinished={handleQueueFinished} />}
+      {queueItems && <ReviewQueueModal parsedItems={queueItems} onFinished={handleQueueFinished} />}
     </div>
   );
 }

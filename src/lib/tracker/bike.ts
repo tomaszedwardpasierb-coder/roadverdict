@@ -69,6 +69,11 @@ export interface BikeDoc {
   nickname: string;
   region?: Region;
   annualBudget?: number;
+  // Optional - most people won't set this, so this stays a pure bonus
+  // signal used only for guessing whether a fuel purchase was a full
+  // tank. tankGuess.ts falls back to a sensible generic default when
+  // it's unset, rather than requiring it before the feature works at all.
+  tankCapacityLitres?: number;
   shareToken?: string;
   distanceUnit?: DistanceUnit;
   fuelEconomyUnit?: FuelEconomyUnit;

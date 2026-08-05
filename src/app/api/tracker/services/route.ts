@@ -69,6 +69,9 @@ export async function POST(request: NextRequest) {
     ...otherFuelLogs.map((f) => ({ id: f.id, date: f.date, mileage: f.mileage })),
     ...otherMods.map((m) => ({ id: m.id, date: m.date, mileage: m.mileage })),
   ]);
+  if (conflict) {
+    return NextResponse.json({ error: describeMileageConflict(conflict) }, { status: 409 });
+  }
 
   const record = await createServiceRecord(session.email, {
     bikeId: bike.id,
@@ -78,7 +81,6 @@ export async function POST(request: NextRequest) {
     date,
     notes: notes ?? "",
     attachments,
-    ...(conflict ? { needsReview: true, mileageConflictWarning: describeMileageConflict(conflict) } : {}),
   });
 
   if (mileage > bike.currentMileage) {

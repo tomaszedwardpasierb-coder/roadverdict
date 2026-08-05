@@ -10,7 +10,11 @@
 // mileage" is the correct, complete question, not an approximation.
 
 export interface MileageConflictCandidate {
-  id: string;
+  // Optional - a batch hint (a not-yet-committed receipt elsewhere in
+  // the same scan, known only by its date and a mileage actually
+  // printed on it) has no database id yet. Only real records need one,
+  // so excludeId can skip past the record currently being edited.
+  id?: string;
   date: string;
   mileage: number;
 }
@@ -34,7 +38,7 @@ export function findMileageConflict(
   let closestGapMs = Infinity;
 
   for (const r of existing) {
-    if (r.id === excludeId) continue;
+    if (excludeId && r.id === excludeId) continue;
     const rTime = new Date(r.date).getTime();
     const gap = Math.abs(rTime - candidateTime);
 
@@ -51,9 +55,14 @@ export function findMileageConflict(
   return closest;
 }
 
+// Used to hard-reject a human-submitted save (the manual log forms, any
+// edit, the review queue) - names the exact bound the number needs to
+// respect, not just that something's wrong, so the person can fix it in
+// one try rather than guessing again.
 export function describeMileageConflict(conflict: MileageConflict): string {
   const d = new Date(conflict.date).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+  const m = conflict.mileage.toLocaleString();
   return conflict.direction === "earlier-but-higher"
-    ? `This is lower than a record from ${d} (${conflict.mileage.toLocaleString()} mi) - mileage can't go down over time. Please check the figure.`
-    : `This is higher than a record from ${d} (${conflict.mileage.toLocaleString()} mi) - mileage can't go down over time. Please check the figure.`;
+    ? `This mileage can't be saved because it would make the mileage go down over time. A record from ${d} already shows ${m} miles, and that's earlier than this one. Enter ${m} miles or more to keep the timeline consistent.`
+    : `This mileage can't be saved because it would make the mileage go down over time. A record from ${d} already shows ${m} miles, and that's later than this one. Enter ${m} miles or fewer to keep the timeline consistent.`;
 }
