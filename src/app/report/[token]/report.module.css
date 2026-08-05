@@ -7,6 +7,28 @@
 .title { font-family: var(--font-display); font-size: 1.8rem; margin: 0 0 0.3rem; }
 .subtext { color: var(--ink-soft); margin: 0 0 1.5rem; }
 
+.verdictBlock {
+  border-radius: 6px;
+  padding: 1rem 1.2rem;
+  margin-bottom: 1.5rem;
+  border: 2px solid var(--border);
+}
+.verdictGood { border-color: var(--verdict-green); background: #eaf3ea; }
+.verdictMid { border-color: var(--amber); background: #fbf1e0; }
+.verdictPoor { border-color: var(--verdict-red); background: #f8e2dd; }
+.verdictBadge {
+  display: inline-block;
+  font-family: var(--font-display);
+  font-size: 1.1rem;
+  font-weight: 700;
+  margin-bottom: 0.5rem;
+}
+.verdictGood .verdictBadge { color: var(--verdict-green); }
+.verdictMid .verdictBadge { color: var(--amber-ink); }
+.verdictPoor .verdictBadge { color: var(--verdict-red); }
+.verdictReasons { margin: 0; padding-left: 1.2rem; font-size: 0.85rem; color: var(--ink-soft); }
+.verdictReasons li { margin-bottom: 0.2rem; }
+
 .registrationBlock {
   font-size: 0.85rem;
   color: var(--ink-soft);

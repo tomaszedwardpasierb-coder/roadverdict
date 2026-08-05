@@ -5,6 +5,11 @@ import { getBike, getCurrentRegistration } from "@/lib/tracker/bike";
 import { getServiceRecords } from "@/lib/tracker/serviceRecord";
 import { getMods } from "@/lib/tracker/mod";
 import { getBills } from "@/lib/tracker/bill";
+import { getFuelLogs } from "@/lib/tracker/fuelLog";
+import { getReminders } from "@/lib/tracker/reminder";
+import { computeReminderStatus } from "@/lib/tracker/reminderStatus";
+import { findMileageMonotonicityViolations } from "@/lib/tracker/mileageAudit";
+import { computeSellerVerdict } from "@/lib/tracker/sellerReportVerdict";
 import { JOB_LABELS } from "@/lib/tracker/jobTypes";
 import { MOD_LABELS } from "@/lib/tracker/modTypes";
 import { BILL_LABELS } from "@/lib/tracker/billTypes";
@@ -31,10 +36,12 @@ export default async function SaleReportPage({ params }: { params: { token: stri
   const bike = await getBike(email, bikeId);
   if (!bike) notFound();
 
-  const [records, mods, bills] = await Promise.all([
+  const [records, mods, bills, fuelLogs, reminders] = await Promise.all([
     getServiceRecords(email, bikeId),
     getMods(email, bikeId),
     getBills(email, bikeId),
+    getFuelLogs(email, bikeId),
+    getReminders(email, bikeId),
   ]);
 
   interface Row {
@@ -76,6 +83,47 @@ export default async function SaleReportPage({ params }: { params: { token: stri
     ? Math.round((Date.now() - new Date(mostRecentChange.changedAt).getTime()) / 86400000)
     : null;
 
+  // Verdict metrics - every number here is computed by the same
+  // deterministic checks already used elsewhere in the app (the
+  // mileage audit, the backdate detector, the reminder-status logic),
+  // never a fresh judgement invented for this page. Fuel logs are
+  // fetched only for their mileage points, not shown as spend rows -
+  // that existing decision (see the caveat text below) is unchanged.
+  const entriesInBulkClusters = clusters.reduce((sum, c) => sum + c.count, 0);
+  const largestClusterSpanDays = clusters.reduce((max, c) => Math.max(max, c.spanDays), 0);
+
+  const mileagePoints = [
+    ...records.map((r) => ({ id: r.id, date: r.date, mileage: r.mileage, mileageConfidence: r.mileageConfidence })),
+    ...fuelLogs.map((f) => ({ id: f.id, date: f.date, mileage: f.mileage, mileageConfidence: f.mileageConfidence })),
+    ...mods.map((m) => ({ id: m.id, date: m.date, mileage: m.mileage, mileageConfidence: m.mileageConfidence })),
+  ];
+  const mileageViolationCount = findMileageMonotonicityViolations(mileagePoints).length;
+
+  const sortedRowDates = rows.map((r) => new Date(r.date).getTime()).sort((a, b) => a - b);
+  let longestGapDays = 0;
+  for (let i = 1; i < sortedRowDates.length; i++) {
+    longestGapDays = Math.max(longestGapDays, Math.round((sortedRowDates[i] - sortedRowDates[i - 1]) / 86400000));
+  }
+  const spanYears = sortedRowDates.length >= 2 ? (sortedRowDates[sortedRowDates.length - 1] - sortedRowDates[0]) / (86400000 * 365) : 0;
+
+  const overdueReminderCount = reminders.filter((r) => computeReminderStatus(r, bike.currentMileage) === "overdue").length;
+
+  const verdict = computeSellerVerdict({
+    totalEntries: rows.length,
+    receiptCount,
+    entriesInBulkClusters,
+    largestClusterSpanDays,
+    mileageViolationCount,
+    longestGapDays,
+    spanYears,
+    overdueReminderCount,
+    totalReminderCount: reminders.length,
+    recentRegistrationChangeDays: daysSinceLastChange,
+  });
+
+  const verdictBadgeClass =
+    verdict.tier === "well-documented" ? styles.verdictGood : verdict.tier === "partially-documented" ? styles.verdictMid : styles.verdictPoor;
+
   return (
     <div className={styles.wrapper}>
       <div className={styles.noPrint} style={{ marginBottom: "1.2rem" }}>
@@ -87,6 +135,15 @@ export default async function SaleReportPage({ params }: { params: { token: stri
       <p className={styles.subtext}>
         {bike.isCustomBuild ? "Custom build" : bike.year} · {bike.engineCC}cc · {bike.currentMileage.toLocaleString()} miles
       </p>
+
+      <div className={`${styles.verdictBlock} ${verdictBadgeClass}`}>
+        <span className={styles.verdictBadge}>{verdict.label}</span>
+        <ul className={styles.verdictReasons}>
+          {verdict.reasons.map((reason, i) => (
+            <li key={i}>{reason}</li>
+          ))}
+        </ul>
+      </div>
 
       <div className={styles.registrationBlock}>
         {currentRegistration ? (
@@ -205,8 +262,9 @@ export default async function SaleReportPage({ params }: { params: { token: stri
       )}
 
       <p className={styles.caveat}>
-        This history is self-reported by the bike&apos;s owner via RoadVerdict and has not been
-        independently verified against DVSA MOT records. "Logged after the claimed date" notes reflect
+        The badge above reflects how completely this bike&apos;s history has been documented on RoadVerdict - it is
+        not a judgement of the owner. This history is self-reported by the bike&apos;s owner and has not been
+        independently verified against DVSA MOT records. &quot;Logged after the claimed date&quot; notes reflect
         when an entry was actually added to RoadVerdict, compared with the date the owner said the work
         was done - a gap here isn&apos;t necessarily dishonest (people digitise old paper receipts all
         the time), but it&apos;s a fact worth knowing before you rely on this history. Fuel spend is not
