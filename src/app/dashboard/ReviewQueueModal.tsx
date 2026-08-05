@@ -6,6 +6,7 @@ import { JOB_GROUPS, JOB_LABELS } from '@/lib/tracker/jobTypes';
 import { BILL_LABELS } from '@/lib/tracker/billTypes';
 import { MOD_LABELS } from '@/lib/tracker/modTypes';
 import { AttachmentThumb } from './AttachmentThumb';
+import { checkFullTankPlausibility } from '@/lib/tracker/fuelPlausibility';
 import type { ReviewQueueEntry } from '@/lib/tracker/commitReceiptItem';
 import type { ParsedReceiptItem } from '@/lib/tracker/receiptParse';
 import styles from './dashboard.module.css';
@@ -88,6 +89,11 @@ function QueueItemForm({
   const [filledToFull, setFilledToFull] = useState(entry.category === 'fuel' ? entry.filledToFull : true);
   const [name, setName] = useState(entry.category === 'mods' ? entry.name : '');
   const [billType, setBillType] = useState(entry.category === 'bills' ? entry.billType : '');
+
+  const liveFuelCheck =
+    entry.category === 'fuel' && entry.precedingFuelMileage !== undefined && filledToFull && litres
+      ? checkFullTankPlausibility(Number(litres) || 0, Number(mileage) || 0, [{ mileage: entry.precedingFuelMileage }])
+      : null;
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
@@ -214,6 +220,17 @@ function QueueItemForm({
             placeholder={entry.mileageNeedsManualEntry ? 'Enter the real mileage' : undefined}
             required
           />
+          {liveFuelCheck && (
+            <p
+              className="field-note"
+              style={{ marginTop: '0.3rem', color: liveFuelCheck.plausible ? 'var(--verdict-green)' : 'var(--verdict-red)' }}
+            >
+              → works out to about <strong>{Math.round(liveFuelCheck.impliedMpg)} mpg</strong> for this tank
+              {liveFuelCheck.plausible
+                ? ' - looks reasonable.'
+                : ` - still too low to be realistic (needs to be at least ${Math.round(liveFuelCheck.precedingMileage + liveFuelCheck.minPlausibleMiles).toLocaleString()}).`}
+            </p>
+          )}
         </div>
       )}
 

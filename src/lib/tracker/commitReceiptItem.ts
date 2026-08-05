@@ -28,7 +28,7 @@ import type { Attachment } from "@/lib/tracker/cosmosHelpers";
 
 export type ReviewQueueEntry =
   | { id: string; category: "service"; aiDescription: string; duplicate: DuplicateMatch | null; jobType: string; cost: number; mileage: number; mileageNeedsManualEntry: boolean; mileageWarningText?: string; date: string; notes: string; attachment: Attachment }
-  | { id: string; category: "fuel"; aiDescription: string; duplicate: DuplicateMatch | null; litres: number; cost: number; mileage: number; mileageNeedsManualEntry: boolean; mileageWarningText?: string; date: string; filledToFull: boolean; attachment: Attachment }
+  | { id: string; category: "fuel"; aiDescription: string; duplicate: DuplicateMatch | null; litres: number; cost: number; mileage: number; mileageNeedsManualEntry: boolean; mileageWarningText?: string; date: string; filledToFull: boolean; attachment: Attachment; precedingFuelMileage?: number }
   | { id: string; category: "mods"; aiDescription: string; duplicate: DuplicateMatch | null; name: string; modCategory: string; cost: number; mileage: number; mileageNeedsManualEntry: boolean; mileageWarningText?: string; date: string; notes: string; attachment: Attachment }
   | { id: string; category: "bills"; aiDescription: string; duplicate: DuplicateMatch | null; billType: string; cost: number; date: string; notes: string; attachment: Attachment };
 
@@ -158,11 +158,24 @@ export async function commitReceiptItem(
       }
     }
 
+    // Found by date, not mileage - unlike the plausibility check above,
+    // this needs to work even when there's no trustworthy mileage
+    // resolved yet at all (that's exactly the case a human is about to
+    // fix), so it can't sort by the very number that's in question. Sent
+    // to the client purely so the review queue can show a live "this
+    // would work out to about X mpg" as the person types, using the
+    // same maths the server-side check uses - a live aid for judgement,
+    // not a second source of truth.
+    const precedingFuelMileage = fuelLogs
+      .filter((f) => isTrustworthy(f.mileageConfidence))
+      .filter((f) => new Date(f.date).getTime() < new Date(date).getTime())
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0]?.mileage;
+
     const record = await createFuelLog(email, {
       bikeId: bike.id, litres: litresValue, cost: costGbp, mileage: resolvedMileage, date,
       filledToFull: filledToFullGuess, attachments: [attachment], needsReview: true, currencyConversion, mileageConfidence, aiDescription,
     });
-    return { id: record.id, category: "fuel", aiDescription, duplicate, litres: litresValue, cost: costGbp, mileage: resolvedMileage, mileageNeedsManualEntry: finalMileageNeedsManualEntry, mileageWarningText: finalMileageNeedsManualEntry ? finalMileageWarning : undefined, date, filledToFull: filledToFullGuess, attachment };
+    return { id: record.id, category: "fuel", aiDescription, duplicate, litres: litresValue, cost: costGbp, mileage: resolvedMileage, mileageNeedsManualEntry: finalMileageNeedsManualEntry, mileageWarningText: finalMileageNeedsManualEntry ? finalMileageWarning : undefined, date, filledToFull: filledToFullGuess, attachment, precedingFuelMileage };
   }
 
   if (category === "mods") {
