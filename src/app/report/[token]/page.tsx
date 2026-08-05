@@ -45,10 +45,10 @@ export default async function SaleReportPage({ params }: { params: { token: stri
 
       <div className={styles.upsellBlock}>
         <div>
-          <p className={styles.upsellTitle}>Buyer Verdict Report</p>
+          <p className={styles.upsellTitle}>What story does this data tell?</p>
           <p className={styles.upsellText}>
-            A documentation-quality verdict, what a new owner should budget for soon, and specific questions worth
-            asking - all drawn from the same history below.
+            A full breakdown of what&apos;s in this history, item by item, what&apos;s well supported and what
+            isn&apos;t, and specific questions worth asking the seller - all drawn from the same records below.
           </p>
         </div>
         <Link href={`/report/${params.token}/detailed`} className="submit-button" style={{ textDecoration: "none", flexShrink: 0 }}>

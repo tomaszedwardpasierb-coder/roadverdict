@@ -6,6 +6,7 @@ import { getSellerReportData } from "@/lib/tracker/sellerReportData";
 import { hasReportAccess } from "@/lib/tracker/reportAccess";
 import { PlateGate } from "../PlateGate";
 import { reminderDetailLabel } from "@/lib/tracker/reminderStatus";
+import { describeJobTypeGroup } from "@/lib/tracker/reportNarrative";
 import { ReportHistoryTable } from "../ReportHistoryTable";
 import QRCode from "qrcode";
 import styles from "../report.module.css";
@@ -17,10 +18,6 @@ function fmtDate(d: string): string {
   return new Date(d).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
 }
 
-// The paid upsell - a genuinely separate route on purpose, not a toggle
-// on the basic report, so gating this behind payment later is a change
-// to this one file, not a rework of the free page everyone lands on
-// first. Free while in beta; the boundary is already drawn.
 export default async function DetailedReportPage({ params }: { params: { token: string } }) {
   if (!(await resolveShareToken(params.token))) notFound();
 
@@ -30,18 +27,13 @@ export default async function DetailedReportPage({ params }: { params: { token: 
   const data = await getSellerReportData(params.token);
   const {
     bike, rows, total, backdatedCount, realTimeCount, receiptCount,
-    currentRegistration, verdict, buyerQuestions, upcomingReminders,
-    consumablesDueSoon, motCheckUrl,
+    currentRegistration, upcomingReminders, consumablesDueSoon, motCheckUrl,
+    mileageCheck, storyParagraphs, jobTypeGroups, supportedFindings,
+    unconfirmedFindings, detailedQuestions,
   } = data;
 
-  const verdictBadgeClass =
-    verdict.tier === "well-documented" ? styles.verdictGood : verdict.tier === "partially-documented" ? styles.verdictMid : styles.verdictPoor;
-
-  // Points at this exact page's own live URL - a printed copy handed
-  // over at an in-person viewing can be scanned to confirm it matches
-  // what's actually hosted, not something edited after printing.
   const canonicalReportUrl = `${process.env.APP_URL ?? "https://roadverdict.co.uk"}/report/${params.token}/detailed`;
-  const qrDataUrl = await QRCode.toDataURL(canonicalReportUrl, { margin: 1, width: 160 });
+  const qrDataUrl = await QRCode.toDataURL(canonicalReportUrl, { margin: 1, width: 150 });
 
   return (
     <div className={styles.wrapper}>
@@ -50,21 +42,64 @@ export default async function DetailedReportPage({ params }: { params: { token: 
         <PrintButton />
       </div>
 
-      <h1 className={styles.title}>
-        {bike.nickname ? `${bike.nickname} — ${bike.make} ${bike.model}` : `${bike.make} ${bike.model}`}
-      </h1>
-      <p className={styles.subtext}>
-        {bike.isCustomBuild ? "Custom build" : bike.year} · {bike.engineCC}cc · {bike.currentMileage.toLocaleString()} miles
-      </p>
-      <p className={styles.upsellFlag}>Buyer Verdict Report</p>
+      <div className={styles.docPage}>
+        <p className={styles.upsellFlag}>Buyer Verdict Report</p>
+        <h1 className={styles.title}>What this data says about {bike.nickname ? bike.nickname : `this ${bike.make} ${bike.model}`}</h1>
+        <p className={styles.subtext}>
+          {bike.make} {bike.model} · {bike.isCustomBuild ? "Custom build" : bike.year} · {bike.engineCC}cc ·{" "}
+          {bike.currentMileage.toLocaleString()} miles
+        </p>
 
-      <div className={`${styles.verdictBlock} ${verdictBadgeClass}`}>
-        <span className={styles.verdictBadge}>{verdict.label}</span>
-        <ul className={styles.verdictReasons}>
-          {verdict.reasons.map((reason, i) => (
-            <li key={i}>{reason}</li>
-          ))}
-        </ul>
+        {mileageCheck.implausible && (
+          <div className={styles.warnBlock}>
+            <p className={styles.warnTitle}>Before anything else</p>
+            <p style={{ margin: 0 }}>{mileageCheck.reason}</p>
+          </div>
+        )}
+
+        <h2 className={styles.docHeading}>The story this data tells</h2>
+        {storyParagraphs.map((p, i) => <p key={i} className={styles.docParagraph}>{p}</p>)}
+        <p className={styles.docParagraph} style={{ fontStyle: "italic", color: "var(--ink-soft)" }}>
+          None of this says what actually happened with this bike - it says what the record looks like. What it means is worth asking the seller directly.
+        </p>
+
+        {jobTypeGroups.length > 0 && (
+          <>
+            <h2 className={styles.docHeading}>Item by item</h2>
+            <dl className={styles.itemByItemList}>
+              {jobTypeGroups.map((g) => (
+                <div key={g.jobType} className={styles.itemByItemRow}>
+                  <dt>{g.label}</dt>
+                  <dd>{describeJobTypeGroup(g)}</dd>
+                </div>
+              ))}
+            </dl>
+          </>
+        )}
+
+        <div className={styles.twoColumn}>
+          <div>
+            <h2 className={styles.docHeading}>What the record supports well</h2>
+            {supportedFindings.length > 0 ? (
+              <ul className={styles.findingsList}>
+                {supportedFindings.map((f, i) => <li key={i} className={styles.findingGood}>{f}</li>)}
+              </ul>
+            ) : (
+              <p className={styles.subtext}>No category currently has a complete receipt trail.</p>
+            )}
+          </div>
+          <div>
+            <h2 className={styles.docHeading}>What the record can&apos;t yet confirm</h2>
+            <ul className={styles.findingsList}>
+              {unconfirmedFindings.map((f, i) => <li key={i} className={styles.findingGap}>{f}</li>)}
+            </ul>
+          </div>
+        </div>
+
+        <h2 className={styles.docHeading}>Questions worth asking the seller</h2>
+        <ol className={styles.questionsList}>
+          {detailedQuestions.map((q, i) => <li key={i}>{q}</li>)}
+        </ol>
       </div>
 
       <div className={styles.verifyBlock}>
@@ -109,15 +144,7 @@ export default async function DetailedReportPage({ params }: { params: { token: 
         </div>
       )}
 
-      <div className={styles.questionsBlock}>
-        <p className={styles.questionsTitle}>Questions worth asking before you buy</p>
-        <ol className={styles.questionsList}>
-          {buyerQuestions.map((q, i) => (
-            <li key={i}>{q}</li>
-          ))}
-        </ol>
-      </div>
-
+      <h2 className={styles.docHeading}>Full logged history</h2>
       <ReportHistoryTable
         rows={rows}
         total={total}
@@ -130,10 +157,10 @@ export default async function DetailedReportPage({ params }: { params: { token: 
       />
 
       <p className={styles.caveat}>
-        The badge above reflects how completely this bike&apos;s history has been documented on RoadVerdict - it is
-        not a judgement of the owner. This history is self-reported and has not been independently verified against
-        DVSA MOT records. Fuel spend is not included, since it isn&apos;t relevant to a buyer.
-        Generated {fmtDate(new Date().toISOString())}.
+        This report describes patterns in the logged record - what was entered, when, and how completely - not a
+        judgement of the owner or an inspection of the bike itself. This history is self-reported and has not been
+        independently verified against DVSA MOT records. Fuel spend is not included, since it isn&apos;t relevant to
+        a buyer. Generated {fmtDate(new Date().toISOString())}.
       </p>
     </div>
   );

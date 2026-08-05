@@ -57,6 +57,46 @@
 .backLink { font-size: 0.85rem; color: var(--ink-soft); text-decoration: none; }
 .backLink:hover { text-decoration: underline; }
 
+.docPage {
+  background: var(--paper);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 2rem 2.2rem;
+  margin-bottom: 1.5rem;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+}
+.docHeading {
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  margin: 1.6rem 0 0.7rem;
+  padding-bottom: 0.35rem;
+  border-bottom: 1px solid var(--border);
+}
+.docHeading:first-of-type { margin-top: 0.4rem; }
+.docParagraph { font-size: 0.92rem; line-height: 1.6; margin: 0 0 0.8rem; }
+
+.warnBlock {
+  border: 2px solid var(--verdict-red);
+  background: #f8e2dd;
+  border-radius: 6px;
+  padding: 0.8rem 1rem;
+  margin: 1rem 0 1.4rem;
+}
+.warnTitle { font-family: var(--font-display); font-weight: 700; color: var(--verdict-red); margin: 0 0 0.3rem; }
+
+.itemByItemList { margin: 0; }
+.itemByItemRow { margin-bottom: 0.7rem; }
+.itemByItemRow dt { font-weight: 700; font-size: 0.88rem; margin-bottom: 0.15rem; }
+.itemByItemRow dd { margin: 0; font-size: 0.87rem; color: var(--ink-soft); line-height: 1.5; }
+
+.twoColumn { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-top: 0.4rem; }
+.findingsList { margin: 0; padding-left: 1.1rem; font-size: 0.85rem; line-height: 1.6; }
+.findingGood { color: var(--verdict-green); }
+.findingGap { color: var(--ink-soft); }
+@media (max-width: 640px) {
+  .twoColumn { grid-template-columns: 1fr; }
+}
+
 .gateBlock { max-width: 420px; margin: 3rem auto; text-align: center; }
 .gateForm { display: flex; flex-direction: column; gap: 0.7rem; margin-top: 1.2rem; }
 .gateInput {

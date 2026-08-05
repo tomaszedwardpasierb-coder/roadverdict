@@ -36,7 +36,16 @@ export async function POST(req: NextRequest, { params }: { params: { token: stri
     secure: true,
     sameSite: "lax",
     maxAge,
-    path: `/report/${params.token}`,
+    // Root path, not scoped to /report/{token} - that narrower scope
+    // was the actual bug: it meant the browser attached the cookie to
+    // page loads under /report/{token} but never to API calls under
+    // /api/report/{token}/..., which is a different path prefix
+    // entirely. The cookie's own name is already uniquely scoped per
+    // report (via the hash in its name) and its validity is checked
+    // against the database regardless, so a broader path costs nothing
+    // in security - it's sent on more requests than strictly needed,
+    // never grants access to a different report.
+    path: "/",
   });
   return response;
 }

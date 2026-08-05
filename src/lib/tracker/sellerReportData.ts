@@ -13,6 +13,15 @@ import { computeSellerVerdict, type SellerVerdictMetrics, type SellerVerdictResu
 import { generateBuyerQuestions } from "@/lib/tracker/reportQuestions";
 import { findConsumablesDueSoon, type ConsumableDueSoon } from "@/lib/tracker/consumablesDueSoon";
 import { getReceiptRequestsForShareToken } from "@/lib/tracker/receiptRequest";
+import {
+  checkCurrentMileagePlausibility,
+  groupServiceHistoryByJobType,
+  generateStoryParagraphs,
+  generateSupportedAndUnconfirmed,
+  generateDetailedQuestions,
+  type JobTypeGroup,
+  type MileagePlausibilityCheck,
+} from "@/lib/tracker/reportNarrative";
 import { JOB_LABELS } from "@/lib/tracker/jobTypes";
 import { MOD_LABELS } from "@/lib/tracker/modTypes";
 import { BILL_LABELS } from "@/lib/tracker/billTypes";
@@ -55,6 +64,15 @@ export interface SellerReportData {
   // decision the owner just made shows up the next time this same link
   // is visited, no caching to go stale.
   approvedEntryIds: string[];
+  // Narrative report content - see reportNarrative.ts for how each
+  // piece is derived; nothing here is free text, every sentence traces
+  // to a specific computed fact.
+  mileageCheck: MileagePlausibilityCheck;
+  storyParagraphs: string[];
+  jobTypeGroups: JobTypeGroup[];
+  supportedFindings: string[];
+  unconfirmedFindings: string[];
+  detailedQuestions: string[];
 }
 
 export async function getSellerReportData(token: string): Promise<SellerReportData> {
@@ -145,6 +163,39 @@ export async function getSellerReportData(token: string): Promise<SellerReportDa
   const requests = await getReceiptRequestsForShareToken(email, token);
   const approvedEntryIds = requests.flatMap((r) => r.items.filter((i) => i.status === "approved").map((i) => i.entryId));
 
+  // Narrative report - built from the same raw records, never a second,
+  // separately-fetched dataset that could drift from what the itemized
+  // table below actually shows.
+  const mileageCheck = checkCurrentMileagePlausibility(bike.currentMileage, bike);
+  const jobTypeGroups = groupServiceHistoryByJobType(
+    records.map((r) => ({ id: r.id, jobType: r.jobType, date: r.date, cost: r.cost, hasReceipt: !!r.attachments?.[0] }))
+  );
+  const totalExactDuplicates = jobTypeGroups.reduce((sum, g) => sum + g.exactDuplicateCount, 0);
+  const otherGroup = jobTypeGroups.find((g) => g.jobType === "other");
+  const largestCluster = clusters.reduce<(typeof clusters)[number] | null>(
+    (max, c) => (!max || c.count > max.count ? c : max),
+    null
+  );
+  const storyParagraphs = generateStoryParagraphs({
+    totalEntries: rows.length,
+    totalSpend: total,
+    backdatedCount,
+    receiptCount,
+    largestClusterCount: largestCluster?.count ?? 0,
+    largestClusterDate: largestCluster?.loggedAt ?? null,
+    totalExactDuplicates,
+    otherCount: otherGroup?.count ?? 0,
+    otherMinCost: otherGroup?.minCost ?? 0,
+    otherMaxCost: otherGroup?.maxCost ?? 0,
+  });
+  const hasTyreEntries = jobTypeGroups.some((g) => g.jobType.startsWith("tyres-"));
+  const { supported: supportedFindings, unconfirmed: unconfirmedFindings } = generateSupportedAndUnconfirmed(
+    jobTypeGroups,
+    mileageCheck,
+    hasTyreEntries
+  );
+  const detailedQuestions = generateDetailedQuestions(jobTypeGroups, Boolean(otherGroup), hasTyreEntries);
+
   return {
     token,
     bike,
@@ -166,5 +217,11 @@ export async function getSellerReportData(token: string): Promise<SellerReportDa
     consumablesDueSoon,
     motCheckUrl: "https://www.check-mot.service.gov.uk/",
     approvedEntryIds,
+    mileageCheck,
+    storyParagraphs,
+    jobTypeGroups,
+    supportedFindings,
+    unconfirmedFindings,
+    detailedQuestions,
   };
 }
