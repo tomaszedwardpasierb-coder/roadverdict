@@ -106,7 +106,7 @@ export default async function SaleReportPage({ params }: { params: { token: stri
         backdatedCount={backdatedCount}
         realTimeCount={realTimeCount}
         receiptCount={receiptCount}
-        approvedEntryIds={data.approvedEntryIds}
+        entryRequestStatus={data.entryRequestStatus}
       />
 
       <p className={styles.caveat}>

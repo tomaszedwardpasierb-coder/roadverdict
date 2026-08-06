@@ -11,6 +11,12 @@ export interface ReceiptRequestItem {
   // the entry's own description is edited afterward.
   description: string;
   status: "pending" | "approved" | "declined";
+  // Only meaningful when status is "declined" - either the owner's own
+  // words, or a sensible default they never had to type. Buyers see
+  // this instead of a bare "declined", which is exactly what makes
+  // "ask again anyway" feel reasonable rather than pushy - they know
+  // why, not just that.
+  reason?: string;
   // Also a snapshot, for the same reason, and for a more important one:
   // the owner needs to actually SEE the receipt to decide whether to
   // share it - a text description alone doesn't show whether it has
@@ -33,6 +39,10 @@ export interface ReceiptRequestDoc {
   // decision links and nowhere else.
   decisionTokenHash: string;
   createdAt: string;
+  // Rate-limits the buyer's Remind button - without this, nothing stops
+  // a reminder being sent every few minutes, which turns a helpful
+  // nudge into something that feels like harassment.
+  lastReminderSentAt?: string;
   ttl: number;
 }
 
@@ -116,19 +126,60 @@ export async function getReceiptRequestByDecisionToken(rawToken: string): Promis
   return resources[0] ?? null;
 }
 
+export const DEFAULT_DECLINE_REASON = "The seller chose not to share this - it may contain personal details.";
+
 export async function decideReceiptRequestItems(
   requestId: string,
   ownerEmail: string,
   entryIds: string[] | "all",
-  decision: "approved" | "declined"
+  decision: "approved" | "declined" | "pending",
+  reason?: string
 ): Promise<ReceiptRequestDoc | null> {
   const container = getContainer();
   const { resource } = await container.item(requestId, ownerEmail).read<ReceiptRequestDoc>();
   if (!resource) return null;
 
-  resource.items = resource.items.map((item) =>
-    entryIds === "all" || entryIds.includes(item.entryId) ? { ...item, status: decision } : item
-  );
+  resource.items = resource.items.map((item) => {
+    if (entryIds !== "all" && !entryIds.includes(item.entryId)) return item;
+    if (decision === "declined") {
+      return { ...item, status: decision, reason: reason?.trim() || DEFAULT_DECLINE_REASON };
+    }
+    // Approving or reverting to pending both clear any previous decline
+    // reason - it's only meaningful alongside an active decline.
+    const { reason: _drop, ...rest } = item;
+    return { ...rest, status: decision };
+  });
   await container.items.upsert(resource);
   return resource;
+}
+
+const REMINDER_COOLDOWN_MS = 12 * 60 * 60 * 1000;
+
+export function canSendReminder(request: ReceiptRequestDoc): boolean {
+  if (!request.lastReminderSentAt) return true;
+  return Date.now() - new Date(request.lastReminderSentAt).getTime() > REMINDER_COOLDOWN_MS;
+}
+
+export async function recordReminderSent(requestId: string, ownerEmail: string): Promise<void> {
+  const container = getContainer();
+  const { resource } = await container.item(requestId, ownerEmail).read<ReceiptRequestDoc>();
+  if (!resource) return;
+  resource.lastReminderSentAt = new Date().toISOString();
+  await container.items.upsert(resource);
+}
+
+// A reminder email needs a working decision link, but only the ORIGINAL
+// token's hash was ever stored - the raw value was discarded right
+// after hashing, by design. Generating a fresh one and rotating the
+// stored hash is the correct fix, not a workaround: if the owner hasn't
+// acted yet (which is exactly why a reminder is being sent), the old
+// link was never used, so nothing is lost by replacing it.
+export async function regenerateDecisionToken(requestId: string, ownerEmail: string): Promise<string | null> {
+  const container = getContainer();
+  const { resource } = await container.item(requestId, ownerEmail).read<ReceiptRequestDoc>();
+  if (!resource) return null;
+  const { raw, hash } = generateToken();
+  resource.decisionTokenHash = hash;
+  await container.items.upsert(resource);
+  return raw;
 }

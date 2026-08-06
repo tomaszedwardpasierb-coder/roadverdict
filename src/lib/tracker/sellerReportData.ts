@@ -12,7 +12,7 @@ import { findMileageMonotonicityViolations } from "@/lib/tracker/mileageAudit";
 import { computeSellerVerdict, type SellerVerdictMetrics, type SellerVerdictResult } from "@/lib/tracker/sellerReportVerdict";
 import { generateBuyerQuestions } from "@/lib/tracker/reportQuestions";
 import { findConsumablesDueSoon, type ConsumableDueSoon } from "@/lib/tracker/consumablesDueSoon";
-import { getReceiptRequestsForShareToken } from "@/lib/tracker/receiptRequest";
+import { getReceiptRequestsForShareToken, canSendReminder } from "@/lib/tracker/receiptRequest";
 import {
   checkCurrentMileagePlausibility,
   groupServiceHistoryByJobType,
@@ -39,6 +39,13 @@ export interface ReportRow {
   attachment: Attachment | null;
 }
 
+export interface EntryRequestStatus {
+  status: "pending" | "approved" | "declined";
+  reason?: string;
+  requestCreatedAt: string;
+  canRemind: boolean;
+}
+
 export interface SellerReportData {
   token: string;
   bike: BikeDoc;
@@ -63,7 +70,7 @@ export interface SellerReportData {
   // the real receipt for - re-checked fresh on every page load, so a
   // decision the owner just made shows up the next time this same link
   // is visited, no caching to go stale.
-  approvedEntryIds: string[];
+  entryRequestStatus: Record<string, EntryRequestStatus>;
   // Narrative report content - see reportNarrative.ts for how each
   // piece is derived; nothing here is free text, every sentence traces
   // to a specific computed fact.
@@ -161,7 +168,20 @@ export async function getSellerReportData(token: string): Promise<SellerReportDa
   const buyerQuestions = generateBuyerQuestions(verdictMetrics);
 
   const requests = await getReceiptRequestsForShareToken(email, token);
-  const approvedEntryIds = requests.flatMap((r) => r.items.filter((i) => i.status === "approved").map((i) => i.entryId));
+  // Most recent request wins per entry - handles "declined, then asked
+  // again" correctly, since the newer request's pending status should
+  // take precedence over an older decline for display purposes.
+  const entryRequestStatus: Record<string, EntryRequestStatus> = {};
+  for (const r of [...requests].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())) {
+    for (const item of r.items) {
+      entryRequestStatus[item.entryId] = {
+        status: item.status,
+        reason: item.reason,
+        requestCreatedAt: r.createdAt,
+        canRemind: canSendReminder(r),
+      };
+    }
+  }
 
   // Narrative report - built from the same raw records, never a second,
   // separately-fetched dataset that could drift from what the itemized
@@ -216,7 +236,7 @@ export async function getSellerReportData(token: string): Promise<SellerReportDa
     upcomingReminders,
     consumablesDueSoon,
     motCheckUrl: "https://www.check-mot.service.gov.uk/",
-    approvedEntryIds,
+    entryRequestStatus,
     mileageCheck,
     storyParagraphs,
     jobTypeGroups,

@@ -153,7 +153,7 @@ export default async function DetailedReportPage({ params }: { params: { token: 
         backdatedCount={backdatedCount}
         realTimeCount={realTimeCount}
         receiptCount={receiptCount}
-        approvedEntryIds={data.approvedEntryIds}
+        entryRequestStatus={data.entryRequestStatus}
       />
 
       <p className={styles.caveat}>

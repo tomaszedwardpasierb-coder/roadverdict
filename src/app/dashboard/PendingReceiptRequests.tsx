@@ -13,6 +13,7 @@ function RequestCard({ request, onDecided }: { request: ReceiptRequestDoc; onDec
   const [decisions, setDecisions] = useState<Record<string, ItemDecision>>(() =>
     Object.fromEntries(request.items.map((i) => [i.entryId, i.status]))
   );
+  const [reasons, setReasons] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -29,11 +30,14 @@ function RequestCard({ request, onDecided }: { request: ReceiptRequestDoc; onDec
           body: JSON.stringify({ entryIds: approvedIds, decision: 'approved' }),
         });
       }
-      if (declinedIds.length > 0) {
+      // Sent one at a time, since each can carry its own reason - the
+      // small extra number of calls costs nothing at this scale and
+      // avoids trying to group items by matching reason text.
+      for (const id of declinedIds) {
         await fetch(`/api/tracker/receipt-request/${request.id}/decide`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ entryIds: declinedIds, decision: 'declined' }),
+          body: JSON.stringify({ entryIds: [id], decision: 'declined', reason: reasons[id] }),
         });
       }
       onDecided();
@@ -68,6 +72,15 @@ function RequestCard({ request, onDecided }: { request: ReceiptRequestDoc; onDec
               </label>
             ))}
           </div>
+          {decisions[item.entryId] === 'declined' && (
+            <input
+              type="text"
+              placeholder="Reason (optional) - shown to the buyer instead of the default message"
+              value={reasons[item.entryId] ?? ''}
+              onChange={(e) => setReasons((prev) => ({ ...prev, [item.entryId]: e.target.value }))}
+              className={styles.declineReasonInput}
+            />
+          )}
         </div>
       ))}
       {error && <p className="error-text" role="alert">{error}</p>}

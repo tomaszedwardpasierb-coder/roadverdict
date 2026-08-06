@@ -4,7 +4,7 @@
 import { useState } from 'react';
 import { isBackdated, backdateNotice } from '@/lib/tracker/backdateCheck';
 import { isBeforeProduction } from '@/lib/tracker/productionYearCheck';
-import type { ReportRow } from '@/lib/tracker/sellerReportData';
+import type { ReportRow, EntryRequestStatus } from '@/lib/tracker/sellerReportData';
 import type { BikeDoc } from '@/lib/tracker/bike';
 import styles from './report.module.css';
 
@@ -13,6 +13,13 @@ function fmtMoney(n: number): string {
 }
 function fmtDate(d: string): string {
   return new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+function formatElapsed(isoDate: string): string {
+  const hours = Math.floor((Date.now() - new Date(isoDate).getTime()) / 3600000);
+  if (hours < 1) return 'less than an hour ago';
+  if (hours < 48) return `${hours} hour${hours === 1 ? '' : 's'} ago`;
+  const days = Math.floor(hours / 24);
+  return `${days} day${days === 1 ? '' : 's'} ago`;
 }
 
 export function ReportHistoryTable({
@@ -23,7 +30,7 @@ export function ReportHistoryTable({
   backdatedCount,
   realTimeCount,
   receiptCount,
-  approvedEntryIds,
+  entryRequestStatus,
 }: {
   rows: ReportRow[];
   total: number;
@@ -32,17 +39,29 @@ export function ReportHistoryTable({
   backdatedCount: number;
   realTimeCount: number;
   receiptCount: number;
-  approvedEntryIds: string[];
+  entryRequestStatus: Record<string, EntryRequestStatus>;
 }) {
-  const approved = new Set(approvedEntryIds);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [justRequested, setJustRequested] = useState<Set<string>>(new Set());
+  const [askAgain, setAskAgain] = useState<Set<string>>(new Set());
+  const [remindedNow, setRemindedNow] = useState<Set<string>>(new Set());
+  const [remindingId, setRemindingId] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [buyerEmail, setBuyerEmail] = useState('');
   const [buyerMessage, setBuyerMessage] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [done, setDone] = useState(false);
+
+  // A row is selectable (checkbox, counts toward bulk-select) when it
+  // has a receipt and isn't already approved, currently pending, or a
+  // still-standing decline the buyer hasn't chosen to re-ask about yet.
+  function isSelectable(r: ReportRow): boolean {
+    if (!r.attachment || justRequested.has(r.id)) return false;
+    const status = entryRequestStatus[r.id];
+    if (!status) return true;
+    if (status.status === 'declined') return askAgain.has(r.id);
+    return false; // pending or approved
+  }
 
   function toggle(id: string) {
     setSelected((prev) => {
@@ -51,6 +70,25 @@ export function ReportHistoryTable({
       else next.add(id);
       return next;
     });
+  }
+
+  function selectAll(filterCategory?: string) {
+    const ids = rows.filter((r) => isSelectable(r) && (!filterCategory || r.category === filterCategory)).map((r) => r.id);
+    setSelected((prev) => new Set([...prev, ...ids]));
+  }
+
+  async function handleRemind(entryId: string) {
+    setRemindingId(entryId);
+    try {
+      const res = await fetch(`/api/report/${token}/remind`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ entryId }),
+      });
+      if (res.ok) setRemindedNow((prev) => new Set([...prev, entryId]));
+    } finally {
+      setRemindingId(null);
+    }
   }
 
   async function handleSubmit() {
@@ -68,9 +106,13 @@ export function ReportHistoryTable({
       });
       if (res.ok) {
         setJustRequested((prev) => new Set([...prev, ...selected]));
+        setAskAgain((prev) => {
+          const next = new Set(prev);
+          selected.forEach((id) => next.delete(id));
+          return next;
+        });
         setSelected(new Set());
         setShowForm(false);
-        setDone(true);
       } else {
         const data = await res.json().catch(() => null);
         setError(data?.error ?? 'Could not send the request. Please try again.');
@@ -86,6 +128,9 @@ export function ReportHistoryTable({
     return <p>No service, modification, or bill history has been logged for this bike yet.</p>;
   }
 
+  const selectableCategories = [...new Set(rows.filter(isSelectable).map((r) => r.category))];
+  const selectableCount = rows.filter(isSelectable).length;
+
   return (
     <>
       {(backdatedCount > 0 || receiptCount > 0) && (
@@ -95,6 +140,21 @@ export function ReportHistoryTable({
           {receiptCount} of {rows.length} {receiptCount === 1 ? 'has' : 'have'} a receipt or invoice attached.
         </p>
       )}
+
+      {selectableCount > 1 && (
+        <div className={styles.bulkSelectBar}>
+          <span>Requesting multiple? </span>
+          <button type="button" className={styles.bulkSelectBtn} onClick={() => selectAll()}>
+            Select all ({selectableCount})
+          </button>
+          {selectableCategories.map((cat) => (
+            <button key={cat} type="button" className={styles.bulkSelectBtn} onClick={() => selectAll(cat)}>
+              {cat} ({rows.filter((r) => isSelectable(r) && r.category === cat).length})
+            </button>
+          ))}
+        </div>
+      )}
+
       <table className={styles.table}>
         <thead>
           <tr>
@@ -112,7 +172,7 @@ export function ReportHistoryTable({
             const isPrePurchase = r.category === 'Modification' && isBeforeProduction(r.date, bike);
             const isImage = r.attachment?.fileType === 'image/jpeg' || r.attachment?.fileType === 'image/png';
             const attachmentUrl = r.attachment ? `/api/tracker/report-attachment/${token}/${encodeURIComponent(r.attachment.blobName)}` : null;
-            const isApproved = approved.has(r.id);
+            const status = entryRequestStatus[r.id];
             const isJustRequested = justRequested.has(r.id);
 
             return (
@@ -135,7 +195,7 @@ export function ReportHistoryTable({
                 <td>
                   {!r.attachment ? (
                     <span className={styles.noReceipt}>— none provided</span>
-                  ) : isApproved && attachmentUrl ? (
+                  ) : status?.status === 'approved' && attachmentUrl ? (
                     <a href={attachmentUrl} target="_blank" rel="noopener" className={styles.receiptLink} title={r.attachment.fileName}>
                       {isImage ? (
                         // eslint-disable-next-line @next/next/no-img-element
@@ -145,6 +205,25 @@ export function ReportHistoryTable({
                       )}
                       <span className={styles.receiptLabel}>View</span>
                     </a>
+                  ) : status?.status === 'declined' && !askAgain.has(r.id) ? (
+                    <div className={styles.declinedTag}>
+                      <p>{status.reason}</p>
+                      <button type="button" className={styles.askAgainLink} onClick={() => setAskAgain((prev) => new Set([...prev, r.id]))}>
+                        Ask again anyway
+                      </button>
+                    </div>
+                  ) : (status?.status === 'pending' && !isJustRequested) ? (
+                    <div className={styles.pendingTag}>
+                      <span>⏳ Requested {formatElapsed(status.requestCreatedAt)}</span>
+                      <button
+                        type="button"
+                        className={styles.remindBtn}
+                        disabled={(!status.canRemind && !remindedNow.has(r.id)) || remindedNow.has(r.id) || remindingId === r.id}
+                        onClick={() => handleRemind(r.id)}
+                      >
+                        {remindedNow.has(r.id) ? 'Reminded' : remindingId === r.id ? 'Sending…' : 'Remind'}
+                      </button>
+                    </div>
                   ) : isJustRequested ? (
                     <span className={styles.receiptRequestedTag}>⏳ Requested</span>
                   ) : (
@@ -165,10 +244,6 @@ export function ReportHistoryTable({
           </tr>
         </tfoot>
       </table>
-
-      {done && !showForm && selected.size === 0 && (
-        <p className={styles.backdateSummary}>Request sent - the seller has been notified and can approve it directly from their email.</p>
-      )}
 
       {selected.size > 0 && (
         <div className={styles.requestBar}>

@@ -99,6 +99,8 @@ export function DecideRequestForm({
     );
   }
 
+  const [reasons, setReasons] = useState<Record<string, string>>({});
+
   async function handleIndividualSubmit() {
     const approvedIds = Object.entries(decisions).filter(([, v]) => v === 'approved').map(([id]) => id);
     const declinedIds = Object.entries(decisions).filter(([, v]) => v === 'declined').map(([id]) => id);
@@ -112,11 +114,11 @@ export function DecideRequestForm({
           body: JSON.stringify({ token, entryIds: approvedIds, decision: 'approved' }),
         });
       }
-      if (declinedIds.length > 0) {
+      for (const id of declinedIds) {
         await fetch('/api/report/receipt-request/decide', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ token, entryIds: declinedIds, decision: 'declined' }),
+          body: JSON.stringify({ token, entryIds: [id], decision: 'declined', reason: reasons[id] }),
         });
       }
       setDone(true);
@@ -149,6 +151,15 @@ export function DecideRequestForm({
               </label>
             ))}
           </div>
+          {decisions[item.entryId] === 'declined' && (
+            <input
+              type="text"
+              placeholder="Reason (optional) - shown to the buyer instead of the default message"
+              value={reasons[item.entryId] ?? ''}
+              onChange={(e) => setReasons((prev) => ({ ...prev, [item.entryId]: e.target.value }))}
+              style={{ width: '100%', marginTop: '0.5rem', fontSize: '0.85rem' }}
+            />
+          )}
         </div>
       ))}
       {error && <p className="error-text" role="alert">{error}</p>}

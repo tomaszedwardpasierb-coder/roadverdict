@@ -48,6 +48,7 @@ export async function sendReceiptRequestEmail(params: {
   items: { description: string }[];
   buyerMessage?: string;
   decisionToken: string;
+  isReminder?: boolean;
 }) {
   const resend = getResend();
   const appUrl = process.env.APP_URL ?? "https://roadverdict.co.uk";
@@ -59,10 +60,10 @@ export async function sendReceiptRequestEmail(params: {
   await resend.emails.send({
     from: FROM,
     to: params.ownerEmail,
-    subject: `Receipt request for ${params.bikeName}`,
+    subject: params.isReminder ? `Reminder: receipt request for ${params.bikeName}` : `Receipt request for ${params.bikeName}`,
     html: `
       <p>Hi,</p>
-      <p>Someone viewing your RoadVerdict report for <strong>${params.bikeName}</strong> has requested to see the
+      <p>${params.isReminder ? "A reminder that someone" : "Someone"} viewing your RoadVerdict report for <strong>${params.bikeName}</strong> has requested to see the
       receipts/invoices for:</p>
       <ul>${itemList}</ul>
       ${params.buyerMessage ? `<p>They added a note: "${params.buyerMessage}"</p>` : ""}

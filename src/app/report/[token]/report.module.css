@@ -137,6 +137,51 @@
 }
 .requestForm { width: 100%; }
 
+.bulkSelectBar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.82rem;
+  color: var(--ink-soft);
+  margin-bottom: 0.6rem;
+}
+.bulkSelectBtn {
+  background: var(--stone);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 0.25rem 0.6rem;
+  font-size: 0.78rem;
+  cursor: pointer;
+  color: var(--ink);
+}
+.bulkSelectBtn:hover { background: var(--border); }
+
+.pendingTag { display: flex; flex-direction: column; gap: 0.3rem; font-size: 0.78rem; color: var(--amber-ink); white-space: nowrap; }
+.remindBtn {
+  background: none;
+  border: 1px solid var(--amber);
+  color: var(--amber-ink);
+  border-radius: 4px;
+  padding: 0.15rem 0.5rem;
+  font-size: 0.75rem;
+  cursor: pointer;
+  align-self: flex-start;
+}
+.remindBtn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.declinedTag { font-size: 0.78rem; color: var(--ink-soft); max-width: 220px; }
+.declinedTag p { margin: 0 0 0.3rem; }
+.askAgainLink {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--amber-ink);
+  text-decoration: underline;
+  cursor: pointer;
+  font-size: 0.78rem;
+}
+
 .verifyBlock {
   display: flex;
   justify-content: space-between;

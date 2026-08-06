@@ -354,6 +354,14 @@
 .requestItemDesc { flex: 1; min-width: 160px; font-size: 0.88rem; }
 .requestItemChoices { display: flex; gap: 0.8rem; font-size: 0.82rem; }
 .requestItemChoices label { display: flex; align-items: center; gap: 0.3rem; }
+.declineReasonInput {
+  width: 100%;
+  margin-top: 0.4rem;
+  padding: 0.35rem 0.5rem;
+  font-size: 0.82rem;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+}
 
 .rangeTabs { display: flex; gap: 0.3rem; flex-wrap: wrap; margin-bottom: 0.7rem; }
 .globalFilterBar { display: flex; align-items: center; gap: 0.7rem; flex-wrap: wrap; background: var(--paper); border: 1px solid var(--border); border-radius: 8px; padding: 0.6rem 0.9rem; margin-bottom: 1rem; }

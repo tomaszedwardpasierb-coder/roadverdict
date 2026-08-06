@@ -5,13 +5,13 @@ import { getReceiptRequestByDecisionToken, decideReceiptRequestItems } from "@/l
 export const dynamic = "force-dynamic";
 
 export async function POST(req: NextRequest) {
-  let body: { token?: string; entryIds?: string[] | "all"; decision?: "approved" | "declined" };
+  let body: { token?: string; entryIds?: string[] | "all"; decision?: "approved" | "declined" | "pending"; reason?: string };
   try {
     body = await req.json();
   } catch {
     return NextResponse.json({ error: "Invalid request." }, { status: 400 });
   }
-  if (!body.token || !body.decision || (body.decision !== "approved" && body.decision !== "declined")) {
+  if (!body.token || !body.decision || !["approved", "declined", "pending"].includes(body.decision)) {
     return NextResponse.json({ error: "Invalid request." }, { status: 400 });
   }
 
@@ -20,6 +20,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "This request link is no longer valid." }, { status: 404 });
   }
 
-  const updated = await decideReceiptRequestItems(request.id, request.pk, body.entryIds ?? "all", body.decision);
+  const updated = await decideReceiptRequestItems(request.id, request.pk, body.entryIds ?? "all", body.decision, body.reason);
   return NextResponse.json({ ok: true, items: updated?.items ?? [] });
 }

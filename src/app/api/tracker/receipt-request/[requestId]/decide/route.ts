@@ -16,17 +16,17 @@ export async function POST(req: NextRequest, { params }: { params: { requestId: 
     return NextResponse.json({ error: "Not signed in." }, { status: 401 });
   }
 
-  let body: { entryIds?: string[] | "all"; decision?: "approved" | "declined" };
+  let body: { entryIds?: string[] | "all"; decision?: "approved" | "declined" | "pending"; reason?: string };
   try {
     body = await req.json();
   } catch {
     return NextResponse.json({ error: "Invalid request." }, { status: 400 });
   }
-  if (!body.decision || (body.decision !== "approved" && body.decision !== "declined")) {
+  if (!body.decision || !["approved", "declined", "pending"].includes(body.decision)) {
     return NextResponse.json({ error: "Invalid request." }, { status: 400 });
   }
 
-  const updated = await decideReceiptRequestItems(params.requestId, session.email, body.entryIds ?? "all", body.decision);
+  const updated = await decideReceiptRequestItems(params.requestId, session.email, body.entryIds ?? "all", body.decision, body.reason);
   if (!updated) {
     return NextResponse.json({ error: "Request not found." }, { status: 404 });
   }
