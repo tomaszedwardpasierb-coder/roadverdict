@@ -57,7 +57,11 @@ function RequestCard({ request, onDecided }: { request: ReceiptRequestDoc; onDec
       {request.buyerMessage && <p className={styles.requestCardNote}>&quot;{request.buyerMessage}&quot;</p>}
       {request.items.map((item) => (
         <div key={item.entryId} className={styles.requestItemRow}>
-          <AttachmentThumb attachment={item.attachment} />
+          {item.attachment ? (
+            <AttachmentThumb attachment={item.attachment} />
+          ) : (
+            <span className={styles.noPreviewTag} title="This request was made before previews were added">📄 No preview</span>
+          )}
           <span className={styles.requestItemDesc}>{item.description}</span>
           <div className={styles.requestItemChoices}>
             {(['approved', 'declined', 'pending'] as const).map((option) => (

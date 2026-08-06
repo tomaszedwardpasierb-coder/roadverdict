@@ -12,6 +12,9 @@ function attachmentUrl(token: string, blobName: string): string {
 }
 
 function ItemPreview({ token, item }: { token: string; item: ReceiptRequestItem }) {
+  if (!item.attachment) {
+    return <span className={styles.noReceipt} title="This request was made before previews were added">No preview</span>;
+  }
   const isImage = item.attachment.fileType === 'image/jpeg' || item.attachment.fileType === 'image/png';
   const url = attachmentUrl(token, item.attachment.blobName);
   return (

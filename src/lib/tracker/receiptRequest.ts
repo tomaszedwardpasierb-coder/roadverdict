@@ -22,7 +22,13 @@ export interface ReceiptRequestItem {
   // share it - a text description alone doesn't show whether it has
   // personal details on it. This is what makes that preview possible
   // without a new fetch back to the live record.
-  attachment: Attachment;
+  //
+  // Optional, not required - this field was added after receipt
+  // requests already existed in production. Cosmos is schemaless, so
+  // any request created before that change genuinely has no attachment
+  // property at runtime, no matter what an older version of this type
+  // claimed. Every caller must handle its absence.
+  attachment?: Attachment;
 }
 
 export interface ReceiptRequestDoc {
@@ -58,7 +64,7 @@ export async function createReceiptRequest(params: {
   bikeId: string;
   buyerEmail?: string;
   buyerMessage?: string;
-  items: { entryId: string; category: "service" | "mods" | "bills"; description: string; attachment: Attachment }[];
+  items: { entryId: string; category: "service" | "mods" | "bills"; description: string; attachment?: Attachment }[];
 }): Promise<{ doc: ReceiptRequestDoc; decisionToken: string }> {
   const container = getContainer();
   const { raw: decisionToken, hash: decisionTokenHash } = generateToken();

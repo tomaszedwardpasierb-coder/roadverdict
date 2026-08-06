@@ -26,8 +26,8 @@ export async function GET(request: NextRequest, { params }: { params: { decision
   }
 
   const blobName = decodeURIComponent(params.blobName);
-  const item = requestDoc.items.find((i) => i.attachment.blobName === blobName);
-  if (!item) {
+  const item = requestDoc.items.find((i) => i.attachment?.blobName === blobName);
+  if (!item || !item.attachment) {
     return NextResponse.json({ error: "Attachment not found." }, { status: 404 });
   }
 
