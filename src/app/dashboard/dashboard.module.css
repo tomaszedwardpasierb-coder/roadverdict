@@ -552,6 +552,14 @@
 .sidebarNavItemActive { background: var(--amber); color: var(--asphalt); font-weight: 600; }
 .sidebarNavItemActive:hover { background: var(--amber); }
 
+.navIcon {
+  width: 22px;
+  height: 22px;
+  object-fit: contain;
+  vertical-align: middle;
+  flex-shrink: 0;
+}
+
 .sidebarBikeCard { border-top: 1px solid var(--border); padding-top: 1rem; margin-top: 1rem; font-size: 0.85rem; position: relative; }
 .sidebarBikeLabel { font-family: var(--font-mono); font-size: 0.65rem; text-transform: uppercase; color: var(--ink-soft); margin-bottom: 0.3rem; }
 .sidebarBikeName { font-weight: 600; }

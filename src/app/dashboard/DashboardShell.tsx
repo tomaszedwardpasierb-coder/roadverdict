@@ -20,30 +20,30 @@ function asReviewCategory(key: string): ReviewCategory | null {
 }
 
 const NAV_ITEMS: { key: Section; label: string; icon: string }[] = [
-  { key: 'dashboard', label: 'Dashboard', icon: '🏠' },
-  { key: 'service', label: 'Service', icon: '🔧' },
-  { key: 'fuel', label: 'Fuel', icon: '⛽' },
-  { key: 'mods', label: 'Parts & Accessories', icon: '⚙️' },
-  { key: 'bills', label: 'Tax & Insurance', icon: '📄' },
-  { key: 'reminders', label: 'Reminders', icon: '🔔' },
-  { key: 'reports', label: 'Reports', icon: '📊' },
-  { key: 'story', label: 'The Story So Far', icon: '📖' },
-  { key: 'shareLinks', label: 'Shareable Links', icon: '🔗' },
+  { key: 'dashboard', label: 'Dashboard', icon: '/icons/dashboard.png' },
+  { key: 'service', label: 'Service', icon: '/icons/service.png' },
+  { key: 'fuel', label: 'Fuel', icon: '/icons/fuel.png' },
+  { key: 'mods', label: 'Parts & Accessories', icon: '/icons/parts.png' },
+  { key: 'bills', label: 'Tax & Insurance', icon: '/icons/tax-insurance.png' },
+  { key: 'reminders', label: 'Reminders', icon: '/icons/reminders.png' },
+  { key: 'reports', label: 'Reports', icon: '/icons/reports.png' },
+  { key: 'story', label: 'The Story So Far', icon: '/icons/story.png' },
+  { key: 'shareLinks', label: 'Shareable Links', icon: '/icons/share-links.png' },
 ];
 
 const MOBILE_NAV_ITEMS: { key: Section; label: string; icon: string }[] = [
-  { key: 'dashboard', label: 'Dashboard', icon: '🏠' },
-  { key: 'service', label: 'Service', icon: '🔧' },
-  { key: 'fuel', label: 'Fuel', icon: '⛽' },
-  { key: 'mods', label: 'Parts', icon: '⚙️' },
+  { key: 'dashboard', label: 'Dashboard', icon: '/icons/dashboard.png' },
+  { key: 'service', label: 'Service', icon: '/icons/service.png' },
+  { key: 'fuel', label: 'Fuel', icon: '/icons/fuel.png' },
+  { key: 'mods', label: 'Parts', icon: '/icons/parts.png' },
 ];
 
 const MORE_ITEMS: { key: Section; label: string; icon: string }[] = [
-  { key: 'bills', label: 'Tax & Insurance', icon: '📄' },
-  { key: 'reminders', label: 'Reminders', icon: '🔔' },
-  { key: 'reports', label: 'Reports', icon: '📊' },
-  { key: 'story', label: 'The Story So Far', icon: '📖' },
-  { key: 'shareLinks', label: 'Shareable Links', icon: '🔗' },
+  { key: 'bills', label: 'Tax & Insurance', icon: '/icons/tax-insurance.png' },
+  { key: 'reminders', label: 'Reminders', icon: '/icons/reminders.png' },
+  { key: 'reports', label: 'Reports', icon: '/icons/reports.png' },
+  { key: 'story', label: 'The Story So Far', icon: '/icons/story.png' },
+  { key: 'shareLinks', label: 'Shareable Links', icon: '/icons/share-links.png' },
 ];
 
 interface Props {
@@ -132,7 +132,7 @@ export function DashboardShell({
                   className={`${styles.sidebarNavItem} ${active === item.key ? styles.sidebarNavItemActive : ''}`}
                   onClick={() => setActive(item.key)}
                 >
-                  <span aria-hidden="true">{item.icon}</span>
+                  <img src={item.icon} alt="" className={styles.navIcon} />
                   <span>{item.label}</span>
                   {hasPending && <PendingDot />}
                 </button>
@@ -190,7 +190,7 @@ export function DashboardShell({
                   position: 'relative',
                 }}
               >
-                <span style={{ fontSize: '1.1rem' }} aria-hidden="true">{item.icon}</span>
+                <img src={item.icon} alt="" className={styles.navIcon} />
                 {item.label}
                 {hasPending && (
                   <span style={{ position: 'absolute', top: 0, right: '30%' }}>
@@ -237,7 +237,7 @@ export function DashboardShell({
                       setShowMore(false);
                     }}
                   >
-                    <span aria-hidden="true">{item.icon}</span> {item.label}
+                    <img src={item.icon} alt="" className={styles.navIcon} /> {item.label}
                     {hasPending && <PendingDot />}
                   </button>
                 );
