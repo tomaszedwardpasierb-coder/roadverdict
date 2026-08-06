@@ -364,6 +364,46 @@
   border-radius: 4px;
 }
 
+.requesterLine {
+  display: block;
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--asphalt);
+  margin: 0 0 0.5rem;
+}
+.requestCardCollapsed {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.8rem;
+  width: 100%;
+  text-align: left;
+  font-family: inherit;
+  cursor: pointer;
+}
+.requestCardCollapsed:hover { background: #f5e6c8; }
+.requestCollapsedTally { font-size: 0.82rem; color: var(--ink-soft); margin: 0; }
+.requestExpandChevron { font-size: 0.8rem; color: var(--ink-soft); flex-shrink: 0; white-space: nowrap; }
+
+.decisionGroupLabel {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--ink-soft);
+  margin: 0.9rem 0 0.2rem;
+}
+.decidedItemRow { opacity: 0.72; }
+
+.priorDeclineFlag {
+  display: block;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--verdict-red);
+  margin-top: 0.2rem;
+}
+
 .rangeTabs { display: flex; gap: 0.3rem; flex-wrap: wrap; margin-bottom: 0.7rem; }
 .globalFilterBar { display: flex; align-items: center; gap: 0.7rem; flex-wrap: wrap; background: var(--paper); border: 1px solid var(--border); border-radius: 8px; padding: 0.6rem 0.9rem; margin-bottom: 1rem; }
 

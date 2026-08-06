@@ -29,6 +29,15 @@ export interface ReceiptRequestItem {
   // property at runtime, no matter what an older version of this type
   // claimed. Every caller must handle its absence.
   attachment?: Attachment;
+  // When this item's status last changed away from "pending" - set
+  // alongside status on every approve/decline, cleared if reverted
+  // back to "pending". Powers two things: separating "still needs a
+  // decision" from "already decided" within one request that's been
+  // worked on across more than one sitting, and dating the "you
+  // declined this on [date]" flag shown when a buyer asks again.
+  // Optional for the same schemaless reason as attachment - items
+  // decided before this field existed have no value for it.
+  decidedAt?: string;
 }
 
 export interface ReceiptRequestDoc {
@@ -155,11 +164,47 @@ export async function purgeOrphanedReceiptRequests(): Promise<number> {
   return deletedCount;
 }
 
+// Render-ready shape, augmented with cross-request context the raw
+// persisted document doesn't carry on its own.
+export interface ReceiptRequestItemView extends ReceiptRequestItem {
+  // Set when an earlier, separate request already declined this exact
+  // entry (any share link, not just the one this request came through)
+  // - lets the owner see they're being asked again on something they
+  // already said no to, instead of deciding on it cold a second time.
+  priorDecline?: { decidedAt: string; reason?: string };
+}
+
+export interface ReceiptRequestDocView extends Omit<ReceiptRequestDoc, "items"> {
+  items: ReceiptRequestItemView[];
+}
+
+// Looks across every one of the owner's other requests (any share
+// link) for the most recent declined decision on this same entry.
+// Takes the already-fetched full list rather than querying again -
+// getPendingReceiptRequestsForOwner has it in hand either way.
+function findPriorDecline(
+  allRequests: ReceiptRequestDoc[],
+  currentRequestId: string,
+  entryId: string
+): { decidedAt: string; reason?: string } | null {
+  const declines = allRequests
+    .filter((r) => r.id !== currentRequestId)
+    .flatMap((r) =>
+      r.items
+        .filter((i) => i.entryId === entryId && i.status === "declined")
+        // Falls back to the request's own createdAt for declines made
+        // before decidedAt existed - a rough date is better than none.
+        .map((i) => ({ decidedAt: i.decidedAt ?? r.createdAt, reason: i.reason }))
+    )
+    .sort((a, b) => new Date(b.decidedAt).getTime() - new Date(a.decidedAt).getTime());
+  return declines[0] ?? null;
+}
+
 // For the dashboard notification - single-partition (the owner is
 // already authenticated, so their own email is always known), filtered
 // in code rather than with a Cosmos EXISTS subquery since the realistic
 // volume here (a handful of requests, ever) makes that simplicity free.
-export async function getPendingReceiptRequestsForOwner(ownerEmail: string): Promise<ReceiptRequestDoc[]> {
+export async function getPendingReceiptRequestsForOwner(ownerEmail: string): Promise<ReceiptRequestDocView[]> {
   const container = getContainer();
   const { resources } = await container.items
     .query<ReceiptRequestDoc>(
@@ -167,7 +212,16 @@ export async function getPendingReceiptRequestsForOwner(ownerEmail: string): Pro
       { partitionKey: ownerEmail }
     )
     .fetchAll();
-  return resources.filter((r) => r.items.some((i) => i.status === "pending"));
+
+  const pending = resources.filter((r) => r.items.some((i) => i.status === "pending"));
+
+  return pending.map((r) => ({
+    ...r,
+    items: r.items.map((item) => ({
+      ...item,
+      priorDecline: findPriorDecline(resources, r.id, item.entryId) ?? undefined,
+    })),
+  }));
 }
 
 // Cross-partition - a decision link only carries the raw token, not the
@@ -199,14 +253,20 @@ export async function decideReceiptRequestItems(
   const { resource } = await container.item(requestId, ownerEmail).read<ReceiptRequestDoc>();
   if (!resource) return null;
 
+  const now = new Date().toISOString();
   resource.items = resource.items.map((item) => {
     if (entryIds !== "all" && !entryIds.includes(item.entryId)) return item;
     if (decision === "declined") {
-      return { ...item, status: decision, reason: reason?.trim() || DEFAULT_DECLINE_REASON };
+      return { ...item, status: decision, reason: reason?.trim() || DEFAULT_DECLINE_REASON, decidedAt: now };
     }
-    // Approving or reverting to pending both clear any previous decline
-    // reason - it's only meaningful alongside an active decline.
-    const { reason: _drop, ...rest } = item;
+    if (decision === "approved") {
+      const { reason: _drop, ...rest } = item;
+      return { ...rest, status: decision, decidedAt: now };
+    }
+    // Reverting to pending clears both the decline reason and the
+    // decision timestamp - neither means anything once it's not
+    // actually decided anymore.
+    const { reason: _drop, decidedAt: _dropDate, ...rest } = item;
     return { ...rest, status: decision };
   });
   await container.items.upsert(resource);
