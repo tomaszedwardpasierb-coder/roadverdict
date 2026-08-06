@@ -154,6 +154,16 @@ export default async function AdminDashboardPage() {
           </p>
           <RunCronButton name="audit-mileage" label="Run audit" />
         </div>
+        <div className={styles.statusCard}>
+          <div className={styles.statusTitle}>Purge orphaned receipt requests</div>
+          <p className={styles.warn} style={{ marginBottom: '0.4rem' }}>
+            Deletes any receipt request left behind by a shareable link that no longer exists - this backlog only
+            exists because deleting or expiring a link didn&apos;t used to take its requests with it. New deletes
+            and expiries now cascade automatically, so this is a one-off catch-up, not something to schedule.
+            Safe to click more than once - finds nothing once the backlog is clear.
+          </p>
+          <RunCronButton name="purge-orphaned-receipt-requests" label="Run purge" />
+        </div>
       </div>
 
       <h2 className={styles.sectionHeading}>Accounts</h2>

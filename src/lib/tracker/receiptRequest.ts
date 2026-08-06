@@ -117,6 +117,44 @@ export async function deleteReceiptRequestsForShareToken(ownerEmail: string, sha
   return requests.length;
 }
 
+// One-time backlog cleanup, not an ongoing scheduled job - links
+// deleted or expired before the cascade above existed left their
+// requests behind with nothing that will ever resolve them again.
+// Deliberately doesn't reuse resolveShareToken/getShareLink from
+// shareLink.ts (that would be a circular import, since shareLink.ts
+// itself calls deleteReceiptRequestsForShareToken above); this does
+// the same raw existence check directly against the container instead.
+// An orphan here means the link document itself is gone entirely, not
+// merely expired - an expired-but-still-present link's requests are
+// already handled by deleteExpiredShareLinks' own cascade once that
+// cron runs. Cross-partition and rare (an admin-triggered one-off),
+// same accepted trade-off as deleteExpiredShareLinks. Safe to re-run -
+// once the backlog is clear, it just finds nothing.
+export async function purgeOrphanedReceiptRequests(): Promise<number> {
+  const container = getContainer();
+  const { resources } = await container.items
+    .query<{ id: string; pk: string; shareToken: string }>({
+      query: "SELECT c.id, c.pk, c.shareToken FROM c WHERE c.type = 'receiptRequest'",
+    })
+    .fetchAll();
+
+  let deletedCount = 0;
+  for (const r of resources) {
+    let linkExists = true;
+    try {
+      const { resource } = await container.item(r.shareToken, r.shareToken).read();
+      linkExists = !!resource;
+    } catch {
+      linkExists = false;
+    }
+    if (!linkExists) {
+      await container.item(r.id, r.pk).delete();
+      deletedCount++;
+    }
+  }
+  return deletedCount;
+}
+
 // For the dashboard notification - single-partition (the owner is
 // already authenticated, so their own email is always known), filtered
 // in code rather than with a Cosmos EXISTS subquery since the realistic
