@@ -1,13 +1,16 @@
-// Place at: src/app/dashboard/PendingReceiptRequests.tsx
+// Place at: src/app/dashboard/ShareLinksSection.tsx
 'use client';
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { AttachmentThumb } from './AttachmentThumb';
+import { ShareLinksList } from './ShareLinksList';
+import type { ShareLinkDoc } from '@/lib/tracker/shareLink';
 import type { ReceiptRequestDoc } from '@/lib/tracker/receiptRequest';
 import styles from './dashboard.module.css';
 
 type ItemDecision = 'approved' | 'declined' | 'pending';
+type SubTab = 'links' | 'requests';
 
 function RequestCard({ request, onDecided }: { request: ReceiptRequestDoc; onDecided: () => void }) {
   const [decisions, setDecisions] = useState<Record<string, ItemDecision>>(() =>
@@ -95,28 +98,74 @@ function RequestCard({ request, onDecided }: { request: ReceiptRequestDoc; onDec
   );
 }
 
-export function PendingReceiptRequests({ requests }: { requests: ReceiptRequestDoc[] }) {
-  const router = useRouter();
-  const [dismissed, setDismissed] = useState<Set<string>>(new Set());
+interface Props {
+  links: ShareLinkDoc[];
+  bikeNames: Record<string, string>;
+  appUrl: string;
+  requests: ReceiptRequestDoc[];
+}
 
-  const visible = requests.filter((r) => !dismissed.has(r.id));
-  if (visible.length === 0) return null;
+export function ShareLinksSection({ links, bikeNames, appUrl, requests }: Props) {
+  const router = useRouter();
+  // Requests still awaiting at least one decision - this is what the
+  // tab's own existence and the sidebar's orange dot both key off, so
+  // the two stay in sync automatically rather than tracked separately.
+  const [dismissed, setDismissed] = useState<Set<string>>(new Set());
+  const pending = requests.filter((r) => !dismissed.has(r.id) && r.items.some((i) => i.status === 'pending'));
+  const [tab, setTab] = useState<SubTab>('links');
+
+  // If the last pending request gets handled while "Request for
+  // receipt access" is the active tab, fall back to the links tab
+  // rather than leaving the person looking at a now-hidden tab.
+  const activeTab: SubTab = tab === 'requests' && pending.length === 0 ? 'links' : tab;
 
   return (
-    <div className={styles.pendingRequestsBlock}>
-      <p className={styles.pendingRequestsTitle}>
-        {visible.length} receipt request{visible.length === 1 ? '' : 's'} waiting on you
+    <>
+      <h1 className={styles.heading}>Shareable Links</h1>
+      <p className={styles.subtext} style={{ marginBottom: '1rem' }}>
+        Every report link you&apos;ve generated, across all your bikes - and any requests to see a receipt that have
+        come in through them.
       </p>
-      {visible.map((r) => (
-        <RequestCard
-          key={r.id}
-          request={r}
-          onDecided={() => {
-            setDismissed((prev) => new Set([...prev, r.id]));
-            router.refresh();
-          }}
-        />
-      ))}
-    </div>
+
+      <div className={styles.tabBar}>
+        <button
+          type="button"
+          className={`${styles.tab} ${activeTab === 'links' ? styles.tabActive : ''}`}
+          onClick={() => setTab('links')}
+        >
+          Shareable links generated
+        </button>
+        {pending.length > 0 && (
+          <button
+            type="button"
+            className={`${styles.tab} ${activeTab === 'requests' ? styles.tabActive : ''}`}
+            onClick={() => setTab('requests')}
+          >
+            Request for receipt access
+            <span className={styles.navPendingBadge} aria-label={`${pending.length} request${pending.length === 1 ? '' : 's'} waiting on you`} />
+          </button>
+        )}
+      </div>
+
+      {activeTab === 'links' ? (
+        <ShareLinksList links={links} bikeNames={bikeNames} appUrl={appUrl} />
+      ) : (
+        <div>
+          <p className={styles.pendingRequestsTitle}>
+            {pending.length} receipt request{pending.length === 1 ? '' : 's'} waiting on you
+          </p>
+          {pending.map((r) => (
+            <RequestCard
+              key={r.id}
+              request={r}
+              onDecided={() => {
+                setDismissed((prev) => new Set([...prev, r.id]));
+                router.refresh();
+              }}
+            />
+          ))}
+        </div>
+      )}
+    </>
   );
 }

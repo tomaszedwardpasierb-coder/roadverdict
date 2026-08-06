@@ -31,7 +31,7 @@ export function ShareLinksList({ links, bikeNames, appUrl }: Props) {
   const [extendDuration, setExtendDuration] = useState<Duration>('1month');
 
   async function handleDelete(token: string) {
-    if (!confirm('Delete this link? It will stop working immediately and cannot be undone.')) return;
+    if (!confirm('Delete this link? It will stop working immediately, remove any pending receipt requests made through it, and cannot be undone.')) return;
     setBusyToken(token);
     try {
       const res = await fetch(`/api/tracker/share-link/${token}`, { method: 'DELETE' });
@@ -73,6 +73,9 @@ export function ShareLinksList({ links, bikeNames, appUrl }: Props) {
               <span className={styles.jobCardJob}>{bikeNames[link.bikeId] ?? 'Unknown bike'}</span>
               {expired && <span className={styles.tagHigh}>Expired</span>}
             </div>
+            {link.recipientEmail && (
+              <div className={styles.jobCardMeta}>Shared with {link.recipientEmail}</div>
+            )}
             <div className={styles.jobCardMeta} style={{ wordBreak: 'break-all' }}>{url}</div>
             <div className={styles.jobCardMeta}>
               Created {fmtDate(link.createdAt)} ·{' '}

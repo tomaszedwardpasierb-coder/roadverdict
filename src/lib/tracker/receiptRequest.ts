@@ -101,6 +101,22 @@ export async function getReceiptRequestsForShareToken(ownerEmail: string, shareT
   return resources;
 }
 
+// Cascade for shareLink deletion - a receipt request only ever makes
+// sense in the context of the link a buyer viewed to make it, so once
+// that link is gone, any requests tied to it are deleted too rather
+// than left as orphaned records nobody can ever act on again.
+// Single-partition (the owner's email is already known by every caller
+// - either the authenticated session deleting their own link, or the
+// cleanup cron reading the link's own `email` field first).
+export async function deleteReceiptRequestsForShareToken(ownerEmail: string, shareToken: string): Promise<number> {
+  const requests = await getReceiptRequestsForShareToken(ownerEmail, shareToken);
+  const container = getContainer();
+  for (const r of requests) {
+    await container.item(r.id, ownerEmail).delete();
+  }
+  return requests.length;
+}
+
 // For the dashboard notification - single-partition (the owner is
 // already authenticated, so their own email is always known), filtered
 // in code rather than with a Cosmos EXISTS subquery since the realistic

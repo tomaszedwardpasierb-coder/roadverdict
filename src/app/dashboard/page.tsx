@@ -11,8 +11,7 @@ import { getBills } from "@/lib/tracker/bill";
 import { getReminders, computeReminderStatus } from "@/lib/tracker/reminder";
 import { getShareLinksForUser } from "@/lib/tracker/shareLink";
 import { getPendingReceiptRequestsForOwner } from "@/lib/tracker/receiptRequest";
-import { PendingReceiptRequests } from "./PendingReceiptRequests";
-import { ShareLinksList } from "./ShareLinksList";
+import { ShareLinksSection } from "./ShareLinksSection";
 import { computeSpendSummary, computeYearSpend, gatherMileagePoints } from "@/lib/tracker/summary";
 import { slugifyMake } from "@/lib/motorcycleModels";
 import type { Region } from "@/lib/priceData";
@@ -159,7 +158,6 @@ export default async function DashboardPage() {
 
   const dashboardContent = (
     <ChartFilterProvider>
-      <PendingReceiptRequests requests={pendingReceiptRequests} />
       {!bike.originalRegistration && (
         <RegistrationBackfillBanner bikeName={bike.nickname ? `${bike.nickname} (${bike.make} ${bike.model})` : `${bike.make} ${bike.model}`} />
       )}
@@ -391,13 +389,12 @@ export default async function DashboardPage() {
   );
 
   const shareLinksContent = (
-    <>
-      <h1 className={styles.heading}>Shareable Links</h1>
-      <p className={styles.subtext} style={{ marginBottom: "1rem" }}>
-        Every report link you&apos;ve generated, across all your bikes - extend or delete any of them here.
-      </p>
-      <ShareLinksList links={shareLinks} bikeNames={bikeNames} appUrl={process.env.APP_URL ?? "https://roadverdict.co.uk"} />
-    </>
+    <ShareLinksSection
+      links={shareLinks}
+      bikeNames={bikeNames}
+      appUrl={process.env.APP_URL ?? "https://roadverdict.co.uk"}
+      requests={pendingReceiptRequests}
+    />
   );
 
   const switcherBikes = bikes.map((b) => ({

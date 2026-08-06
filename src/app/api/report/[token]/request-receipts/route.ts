@@ -21,7 +21,7 @@ export async function POST(req: NextRequest, { params }: { params: { token: stri
     return NextResponse.json({ error: "This link is no longer valid." }, { status: 404 });
   }
 
-  let body: { entryIds?: string[]; buyerEmail?: string; buyerMessage?: string };
+  let body: { entryIds?: string[]; buyerMessage?: string };
   try {
     body = await req.json();
   } catch {
@@ -61,7 +61,11 @@ export async function POST(req: NextRequest, { params }: { params: { token: stri
     ownerEmail: resolved.email,
     shareToken: params.token,
     bikeId: resolved.bikeId,
-    buyerEmail: typeof body.buyerEmail === "string" && body.buyerEmail.includes("@") ? body.buyerEmail.trim().toLowerCase() : undefined,
+    // Identified by the email the owner set when they created this
+    // specific link, not by anything the viewer types in - a link
+    // created before this field existed has no recipientEmail, so
+    // this can genuinely be undefined for older links.
+    buyerEmail: resolved.recipientEmail,
     buyerMessage: typeof body.buyerMessage === "string" ? body.buyerMessage.slice(0, 500) : undefined,
     items,
   });

@@ -47,7 +47,6 @@ export function ReportHistoryTable({
   const [remindedNow, setRemindedNow] = useState<Set<string>>(new Set());
   const [remindingId, setRemindingId] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
-  const [buyerEmail, setBuyerEmail] = useState('');
   const [buyerMessage, setBuyerMessage] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -100,7 +99,6 @@ export function ReportHistoryTable({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           entryIds: [...selected],
-          buyerEmail: buyerEmail || undefined,
           buyerMessage: buyerMessage || undefined,
         }),
       });
@@ -258,15 +256,9 @@ export function ReportHistoryTable({
             <div className={styles.requestForm}>
               <p className={styles.subtext} style={{ margin: '0 0 0.5rem' }}>
                 The seller will be asked to share {selected.size} receipt{selected.size === 1 ? '' : 's'}. These may
-                contain personal details, so it's their choice.
+                contain personal details, so it's their choice. They'll see this request came in through the link
+                you were sent.
               </p>
-              <input
-                type="email"
-                placeholder="Your email (optional, so you know when it's decided)"
-                value={buyerEmail}
-                onChange={(e) => setBuyerEmail(e.target.value)}
-                style={{ width: '100%', marginBottom: '0.5rem' }}
-              />
               <textarea
                 placeholder="A short note for the seller (optional)"
                 value={buyerMessage}

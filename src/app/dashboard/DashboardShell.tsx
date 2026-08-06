@@ -124,7 +124,7 @@ export function DashboardShell({
           <nav className={styles.sidebarNav}>
             {NAV_ITEMS.map((item) => {
               const reviewCategory = asReviewCategory(item.key);
-              const hasPending = reviewCategory ? pendingReviewIds[reviewCategory].length > 0 : (item.key === 'dashboard' && hasPendingReceiptRequests);
+              const hasPending = reviewCategory ? pendingReviewIds[reviewCategory].length > 0 : (item.key === 'shareLinks' && hasPendingReceiptRequests);
               return (
                 <button
                   key={item.key}
@@ -174,7 +174,7 @@ export function DashboardShell({
         <nav className={styles.mobileBottomNav}>
           {MOBILE_NAV_ITEMS.map((item) => {
             const reviewCategory = asReviewCategory(item.key);
-            const hasPending = reviewCategory ? pendingReviewIds[reviewCategory].length > 0 : (item.key === 'dashboard' && hasPendingReceiptRequests);
+            const hasPending = reviewCategory ? pendingReviewIds[reviewCategory].length > 0 : (item.key === 'shareLinks' && hasPendingReceiptRequests);
             return (
               <button
                 key={item.key}
@@ -207,10 +207,16 @@ export function DashboardShell({
               display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.2rem',
               background: 'none', border: 'none', fontSize: '0.65rem',
               color: isMoreActive || showMore ? 'var(--amber-ink)' : 'var(--ink-soft)',
+              position: 'relative',
             }}
           >
             <span style={{ fontSize: '1.1rem' }} aria-hidden="true">⋯</span>
             More
+            {hasPendingReceiptRequests && (
+              <span style={{ position: 'absolute', top: 0, right: '30%' }}>
+                <PendingDot />
+              </span>
+            )}
           </button>
         </nav>
 
@@ -220,7 +226,7 @@ export function DashboardShell({
             <div className={styles.mobileMoreSheet}>
               {MORE_ITEMS.map((item) => {
                 const reviewCategory = asReviewCategory(item.key);
-                const hasPending = reviewCategory ? pendingReviewIds[reviewCategory].length > 0 : (item.key === 'dashboard' && hasPendingReceiptRequests);
+                const hasPending = reviewCategory ? pendingReviewIds[reviewCategory].length > 0 : (item.key === 'shareLinks' && hasPendingReceiptRequests);
                 return (
                   <button
                     key={item.key}

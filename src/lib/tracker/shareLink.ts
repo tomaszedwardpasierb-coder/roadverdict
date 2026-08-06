@@ -1,6 +1,7 @@
 // Place at: src/lib/tracker/shareLink.ts
 import crypto from "crypto";
 import { getContainer } from "@/lib/cosmos";
+import { deleteReceiptRequestsForShareToken } from "@/lib/tracker/receiptRequest";
 
 export interface ShareLinkDoc {
   id: string;
@@ -13,6 +14,16 @@ export interface ShareLinkDoc {
   // grandfathered as never-expiring rather than retroactively cut off.
   // Every link created from here on always has one.
   expiresAt?: string;
+  // Who this specific link was generated for. Required for every link
+  // created from here on - it's both a courtesy (so the owner can see
+  // who a link belongs to) and the source of truth for who's asking
+  // when a receipt request comes in through it, rather than trusting
+  // whatever email an anonymous report viewer types into a form.
+  // Optional only because links created before this field existed
+  // genuinely don't have it - Cosmos is schemaless, so those older
+  // documents have no recipientEmail property at runtime no matter
+  // what this type claims.
+  recipientEmail?: string;
 }
 
 export type ShareLinkDuration = "1week" | "1month" | "6months";
@@ -43,7 +54,12 @@ function computeExpiresAt(duration: ShareLinkDuration): string {
 // have several live links at once (e.g. different durations sent to
 // different people), each independently manageable from the Shareable
 // Links tab.
-export async function createShareLink(email: string, bikeId: string, duration: ShareLinkDuration): Promise<ShareLinkDoc> {
+export async function createShareLink(
+  email: string,
+  bikeId: string,
+  duration: ShareLinkDuration,
+  recipientEmail: string
+): Promise<ShareLinkDoc> {
   const token = generateToken();
   const container = getContainer();
   const doc: ShareLinkDoc = {
@@ -54,6 +70,7 @@ export async function createShareLink(email: string, bikeId: string, duration: S
     bikeId,
     createdAt: new Date().toISOString(),
     expiresAt: computeExpiresAt(duration),
+    recipientEmail: recipientEmail.trim().toLowerCase(),
   };
   await container.items.upsert(doc);
   return doc;
@@ -64,13 +81,13 @@ export async function createShareLink(email: string, bikeId: string, duration: S
 // An expired link resolves as if it doesn't exist at all, even if the
 // cleanup cron hasn't physically deleted it yet - expiry is enforced the
 // moment it's checked, not just eventually.
-export async function resolveShareToken(token: string): Promise<{ email: string; bikeId: string } | null> {
+export async function resolveShareToken(token: string): Promise<{ email: string; bikeId: string; recipientEmail?: string } | null> {
   try {
     const container = getContainer();
     const { resource } = await container.item(token, token).read<ShareLinkDoc>();
     if (!resource) return null;
     if (resource.expiresAt && new Date(resource.expiresAt) < new Date()) return null;
-    return { email: resource.email, bikeId: resource.bikeId };
+    return { email: resource.email, bikeId: resource.bikeId, recipientEmail: resource.recipientEmail };
   } catch {
     return null;
   }
@@ -110,8 +127,17 @@ export async function extendShareLink(token: string, duration: ShareLinkDuration
   return resource;
 }
 
+// Deletes the link and cascades to every receipt request made through
+// it - the link's own `email` field is the owner, which is exactly the
+// partition key those requests are stored under. Cascading here, not
+// just in the API route, means every current and future caller gets
+// the correct behaviour automatically rather than having to remember it.
 export async function deleteShareLink(token: string): Promise<void> {
   const container = getContainer();
+  const { resource } = await container.item(token, token).read<ShareLinkDoc>();
+  if (resource) {
+    await deleteReceiptRequestsForShareToken(resource.email, token);
+  }
   await container.item(token, token).delete();
 }
 
@@ -123,12 +149,16 @@ export async function deleteExpiredShareLinks(): Promise<number> {
   const container = getContainer();
   const nowIso = new Date().toISOString();
   const { resources } = await container.items
-    .query<{ id: string }>({
-      query: "SELECT c.id FROM c WHERE c.type = 'shareLink' AND IS_DEFINED(c.expiresAt) AND c.expiresAt < @now",
+    .query<{ id: string; email: string }>({
+      query: "SELECT c.id, c.email FROM c WHERE c.type = 'shareLink' AND IS_DEFINED(c.expiresAt) AND c.expiresAt < @now",
       parameters: [{ name: "@now", value: nowIso }],
     })
     .fetchAll();
   for (const r of resources) {
+    // Same cascade as a manual delete - an expired link's outstanding
+    // receipt requests have nowhere left to be decided from, so they
+    // shouldn't survive the link either.
+    await deleteReceiptRequestsForShareToken(r.email, r.id);
     await container.item(r.id, r.id).delete();
   }
   return resources.length;

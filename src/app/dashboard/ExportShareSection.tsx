@@ -14,26 +14,39 @@ const DURATION_OPTIONS: { value: ShareLinkDuration; label: string }[] = [
 
 export function ExportShareSection() {
   const [duration, setDuration] = useState<ShareLinkDuration>('1month');
+  const [recipientEmail, setRecipientEmail] = useState('');
   const [shareUrl, setShareUrl] = useState<string | null>(null);
   const [expiresAt, setExpiresAt] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
   const [emailTo, setEmailTo] = useState('');
   const [sendingEmail, setSendingEmail] = useState(false);
   const [emailStatus, setEmailStatus] = useState<string | null>(null);
 
   async function handleGetLink() {
+    if (!recipientEmail.trim() || !recipientEmail.includes('@')) {
+      setCreateError('Please enter the email address you\u2019re sharing this link with.');
+      return;
+    }
+    setCreateError(null);
     setLoading(true);
     try {
       const res = await fetch('/api/tracker/share-link', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ duration }),
+        body: JSON.stringify({ duration, recipientEmail: recipientEmail.trim() }),
       });
       const data = await res.json();
       if (res.ok) {
         setShareUrl(data.url);
         setExpiresAt(data.expiresAt ?? null);
+        // Pre-fill the optional "send by email" step with the same
+        // address - it's already known, so there's no reason to make
+        // the owner type it twice.
+        setEmailTo(recipientEmail.trim());
+      } else {
+        setCreateError(data.error ?? 'Could not create the link. Please try again.');
       }
     } finally {
       setLoading(false);
@@ -84,7 +97,22 @@ export function ExportShareSection() {
 
       {!shareUrl ? (
         <div style={{ marginTop: '1rem' }}>
-          <div className="field" style={{ marginTop: 0, maxWidth: '220px' }}>
+          <div className="field" style={{ marginTop: 0, maxWidth: '320px' }}>
+            <label htmlFor="share-recipient-email">Sharing with (email address)</label>
+            <input
+              id="share-recipient-email"
+              type="email"
+              placeholder="buyer@example.com"
+              value={recipientEmail}
+              onChange={(e) => setRecipientEmail(e.target.value)}
+              required
+              style={{ width: '100%', padding: '0.5rem', border: '1px solid var(--border)', borderRadius: '4px' }}
+            />
+          </div>
+          <p className="field-note" style={{ marginTop: '0.4rem' }}>
+            Required - this is who the link identifies if they ask you for a receipt through it.
+          </p>
+          <div className="field" style={{ marginTop: '0.8rem', maxWidth: '220px' }}>
             <label htmlFor="share-duration">Link stays valid for</label>
             <select id="share-duration" value={duration} onChange={(e) => setDuration(e.target.value as ShareLinkDuration)}>
               {DURATION_OPTIONS.map((o) => (
@@ -96,6 +124,7 @@ export function ExportShareSection() {
             After this, the link stops working and is permanently deleted - it can be extended any time before then
             from the Shareable Links tab.
           </p>
+          {createError && <p className="error-text" role="alert">{createError}</p>}
           <button type="button" className="submit-button" onClick={handleGetLink} disabled={loading} style={{ marginTop: '0.7rem' }}>
             {loading ? 'Generating…' : 'Get shareable report link'}
           </button>
