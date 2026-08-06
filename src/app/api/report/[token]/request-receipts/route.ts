@@ -36,9 +36,17 @@ export async function POST(req: NextRequest, { params }: { params: { token: stri
   // sends - the request and the eventual email should describe exactly
   // what's really being asked for.
   const data = await getSellerReportData(params.token);
-  const selected = data.rows.filter((r) => body.entryIds!.includes(r.id) && r.attachment);
+  // Defense in depth against duplicate active requests, matching the
+  // client's own isSelectable() check - an entry already pending
+  // elsewhere is silently skipped rather than creating an overlapping
+  // second request for the same thing (which is exactly what produced
+  // the radio-button collision bug: two separate request documents
+  // both using the same entryId).
+  const selected = data.rows.filter(
+    (r) => body.entryIds!.includes(r.id) && r.attachment && data.entryRequestStatus[r.id]?.status !== "pending"
+  );
   if (selected.length === 0) {
-    return NextResponse.json({ error: "None of the selected entries have a receipt attached." }, { status: 400 });
+    return NextResponse.json({ error: "None of the selected entries have a receipt attached, or they're already pending a decision." }, { status: 400 });
   }
 
   const categoryMap: Record<string, "service" | "mods" | "bills"> = { Service: "service", Modification: "mods", Bill: "bills" };

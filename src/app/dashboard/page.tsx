@@ -159,6 +159,7 @@ export default async function DashboardPage() {
 
   const dashboardContent = (
     <ChartFilterProvider>
+      <PendingReceiptRequests requests={pendingReceiptRequests} />
       {!bike.originalRegistration && (
         <RegistrationBackfillBanner bikeName={bike.nickname ? `${bike.nickname} (${bike.make} ${bike.model})` : `${bike.make} ${bike.model}`} />
       )}
@@ -395,7 +396,6 @@ export default async function DashboardPage() {
       <p className={styles.subtext} style={{ marginBottom: "1rem" }}>
         Every report link you&apos;ve generated, across all your bikes - extend or delete any of them here.
       </p>
-      <PendingReceiptRequests requests={pendingReceiptRequests} />
       <ShareLinksList links={shareLinks} bikeNames={bikeNames} appUrl={process.env.APP_URL ?? "https://roadverdict.co.uk"} />
     </>
   );

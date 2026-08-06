@@ -146,7 +146,7 @@ export function DecideRequestForm({
               <label key={option} style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.85rem' }}>
                 <input
                   type="radio"
-                  name={item.entryId}
+                  name={`${token}::${item.entryId}`}
                   checked={decisions[item.entryId] === option}
                   onChange={() => setDecisions((prev) => ({ ...prev, [item.entryId]: option }))}
                 />

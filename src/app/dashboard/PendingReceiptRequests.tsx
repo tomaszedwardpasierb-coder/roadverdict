@@ -68,7 +68,7 @@ function RequestCard({ request, onDecided }: { request: ReceiptRequestDoc; onDec
               <label key={option}>
                 <input
                   type="radio"
-                  name={item.entryId}
+                  name={`${request.id}::${item.entryId}`}
                   checked={decisions[item.entryId] === option}
                   onChange={() => setDecisions((prev) => ({ ...prev, [item.entryId]: option }))}
                 />

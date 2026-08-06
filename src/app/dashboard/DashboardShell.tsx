@@ -124,7 +124,7 @@ export function DashboardShell({
           <nav className={styles.sidebarNav}>
             {NAV_ITEMS.map((item) => {
               const reviewCategory = asReviewCategory(item.key);
-              const hasPending = reviewCategory ? pendingReviewIds[reviewCategory].length > 0 : (item.key === 'shareLinks' && hasPendingReceiptRequests);
+              const hasPending = reviewCategory ? pendingReviewIds[reviewCategory].length > 0 : (item.key === 'dashboard' && hasPendingReceiptRequests);
               return (
                 <button
                   key={item.key}
@@ -174,7 +174,7 @@ export function DashboardShell({
         <nav className={styles.mobileBottomNav}>
           {MOBILE_NAV_ITEMS.map((item) => {
             const reviewCategory = asReviewCategory(item.key);
-            const hasPending = reviewCategory ? pendingReviewIds[reviewCategory].length > 0 : (item.key === 'shareLinks' && hasPendingReceiptRequests);
+            const hasPending = reviewCategory ? pendingReviewIds[reviewCategory].length > 0 : (item.key === 'dashboard' && hasPendingReceiptRequests);
             return (
               <button
                 key={item.key}
@@ -220,7 +220,7 @@ export function DashboardShell({
             <div className={styles.mobileMoreSheet}>
               {MORE_ITEMS.map((item) => {
                 const reviewCategory = asReviewCategory(item.key);
-                const hasPending = reviewCategory ? pendingReviewIds[reviewCategory].length > 0 : (item.key === 'shareLinks' && hasPendingReceiptRequests);
+                const hasPending = reviewCategory ? pendingReviewIds[reviewCategory].length > 0 : (item.key === 'dashboard' && hasPendingReceiptRequests);
                 return (
                   <button
                     key={item.key}
