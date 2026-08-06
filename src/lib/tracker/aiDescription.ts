@@ -21,7 +21,7 @@ export interface AiDescriptionInput {
 }
 
 // Composes something like:
-// "Front brake pads at Dave's Motorcycles — 14 High Street, Colchester (Service)"
+// "Front brake pads at Dave's Motorcycles - 14 High Street, Colchester (Service)"
 // Any missing piece is simply omitted rather than leaving a stray "at" or
 // empty parentheses.
 export function buildAiDescription(input: AiDescriptionInput): string {
@@ -29,6 +29,6 @@ export function buildAiDescription(input: AiDescriptionInput): string {
   const place = [input.address, input.city].filter((p): p is string => Boolean(p && p.trim())).join(", ");
   const parts = [whatFor];
   if (place) parts.push(place);
-  const withPlace = parts.join(" — ");
+  const withPlace = parts.join(" - ");
   return `${withPlace} (${input.categoryLabel})`;
 }

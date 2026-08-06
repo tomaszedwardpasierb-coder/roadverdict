@@ -36,11 +36,11 @@ export interface Checklist {
 export const CHECKLISTS: Record<AgeBand, Checklist> = {
   modern: {
     emphasis:
-      "On a modern bike, the paperwork and price matter more than the mechanical inspection — the mechanicals are usually sound if it's been serviced.",
+      "On a modern bike, the paperwork and price matter more than the mechanical inspection - the mechanicals are usually sound if it's been serviced.",
     inspectionPoints: [
       'Outstanding recalls or unresolved manufacturer service bulletins',
       'Full digital service history, not just a stamped book',
-      'Tyre date codes, not just tread depth — modern tyres perish before they wear out',
+      'Tyre date codes, not just tread depth - modern tyres perish before they wear out',
       'Dash for fault codes, and test ABS/traction control/quickshifter if fitted',
     ],
     questionsForSeller: [
@@ -52,7 +52,7 @@ export const CHECKLISTS: Record<AgeBand, Checklist> = {
   },
   used: {
     emphasis:
-      "This is the middle ground — check both the mechanicals and the price. Neither can be assumed from the other.",
+      "This is the middle ground - check both the mechanicals and the price. Neither can be assumed from the other.",
     inspectionPoints: [
       'Fork seals for weeping oil',
       'Chain and sprockets for wear, even if recently "adjusted"',
@@ -69,30 +69,30 @@ export const CHECKLISTS: Record<AgeBand, Checklist> = {
   },
   classic: {
     emphasis:
-      "On a classic, the inspection matters far more than any price benchmark — a sound original bike is worth paying above 'typical' for, and a rough one isn't worth the 'typical' price at all.",
+      "On a classic, the inspection matters far more than any price benchmark - a sound original bike is worth paying above 'typical' for, and a rough one isn't worth the 'typical' price at all.",
     inspectionPoints: [
       'Oil weeping around gaskets and pushrod tubes',
       'Carburettors for fuel staining, and whether they match the original listed type',
       'Rust in the frame and fuel tank, not just surface cosmetic rust',
-      'Corrosion in electrical connectors — old looms fail more often than engines do',
+      'Corrosion in electrical connectors - old looms fail more often than engines do',
       'Frame and engine numbers matching the paperwork',
     ],
     questionsForSeller: [
       'Is this the original engine and frame, matching the paperwork?',
       "What's been restored versus original?",
       'Who last rode it regularly, and how long has it been static?',
-      'Is there a paper trail — old MOTs, invoices, club registration?',
+      'Is there a paper trail - old MOTs, invoices, club registration?',
     ],
   },
 };
 
 export const BIKE_CLASS_ADDENDUM: Record<BikeClass, string> = {
   small:
-    'Small bikes are commonly used for CBT training or as a first bike — check for accident damage disproportionate to the age or mileage shown.',
+    'Small bikes are commonly used for CBT training or as a first bike - check for accident damage disproportionate to the age or mileage shown.',
   medium:
-    "Check the service costs the seller mentions against RoadVerdict's own cost calculator — a suspiciously low running-cost claim is worth double-checking.",
+    "Check the service costs the seller mentions against RoadVerdict's own cost calculator - a suspiciously low running-cost claim is worth double-checking.",
   large:
-    'Bigger bikes wear differently under low, short-journey mileage than high-mileage touring use — ask about riding style, not just the odometer figure.',
+    'Bigger bikes wear differently under low, short-journey mileage than high-mileage touring use - ask about riding style, not just the odometer figure.',
 };
 
 /**
@@ -109,7 +109,7 @@ export const BIKE_CLASS_ADDENDUM: Record<BikeClass, string> = {
  */
 export const BRAND_SPECIFIC_NOTES: Partial<Record<string, string[]>> = {
   'royal-enfield': [
-    'Owner reports point to electronics (spark plug, throttle position sensor, O2 sensor, crank position sensor) as more failure-prone than the engine internals — worth a quick check even though these are cheap, easy fixes if needed.',
-    'Some owners report instrument cluster water ingress after washing, and surface rust on the brake rotor — cosmetic more often than structural, but worth a look.',
+    'Owner reports point to electronics (spark plug, throttle position sensor, O2 sensor, crank position sensor) as more failure-prone than the engine internals - worth a quick check even though these are cheap, easy fixes if needed.',
+    'Some owners report instrument cluster water ingress after washing, and surface rust on the brake rotor - cosmetic more often than structural, but worth a look.',
   ],
 };

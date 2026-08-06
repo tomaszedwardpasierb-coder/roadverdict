@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { AttachmentThumb } from './AttachmentThumb';
 import { ShareLinksList } from './ShareLinksList';
+import { ExportShareSection } from './ExportShareSection';
 import type { ShareLinkDoc } from '@/lib/tracker/shareLink';
 import type { ReceiptRequestDocView, ReceiptRequestItemView } from '@/lib/tracker/receiptRequest';
 import styles from './dashboard.module.css';
@@ -49,7 +50,7 @@ function ItemRow({
         {item.description}
         {item.priorDecline && (
           <span className={styles.priorDeclineFlag}>
-            🔁 Asked again — you declined this on {fmtDateTime(item.priorDecline.decidedAt)}
+            🔁 Asked again - you declined this on {fmtDateTime(item.priorDecline.decidedAt)}
           </span>
         )}
       </span>
@@ -237,8 +238,9 @@ export function ShareLinksSection({ links, bikeNames, appUrl, requests }: Props)
     <>
       <h1 className={styles.heading}>Shareable Links</h1>
       <p className={styles.subtext} style={{ marginBottom: '1rem' }}>
-        Every report link you&apos;ve generated, across all your bikes - and any requests to see a receipt that have
-        come in through them.
+        Every link you&apos;ve created, and everything it&apos;s proven. Generate a new one any time you&apos;re
+        ready to show what this bike&apos;s really worth, and review any requests to see a receipt that have come
+        in through them.
       </p>
 
       <div className={styles.tabBar}>
@@ -262,7 +264,10 @@ export function ShareLinksSection({ links, bikeNames, appUrl, requests }: Props)
       </div>
 
       {activeTab === 'links' ? (
-        <ShareLinksList links={links} bikeNames={bikeNames} appUrl={appUrl} />
+        <>
+          <ExportShareSection />
+          <ShareLinksList links={links} bikeNames={bikeNames} appUrl={appUrl} />
+        </>
       ) : (
         <div>
           <p className={styles.pendingRequestsTitle}>

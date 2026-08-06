@@ -40,7 +40,7 @@ export default async function GaragePage() {
           <BikeCard
             key={bike.id}
             bikeId={bike.id}
-            name={bike.nickname ? `${bike.nickname} — ${bike.make} ${bike.model}` : `${bike.make} ${bike.model}`}
+            name={bike.nickname ? `${bike.nickname} - ${bike.make} ${bike.model}` : `${bike.make} ${bike.model}`}
             year={bike.year}
             isCustomBuild={bike.isCustomBuild}
             currentMileage={bike.currentMileage}

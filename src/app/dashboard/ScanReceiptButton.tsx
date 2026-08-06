@@ -103,14 +103,16 @@ export function ScanReceiptButton() {
       <button type="button" className={styles.scanReceiptBtn} onClick={() => setOpen((o) => !o)}>
         <span aria-hidden="true">🧠</span> Scan a receipt
       </button>
+      <p className={styles.scanReceiptCaption}>Turn a shoebox of receipts into a proper history, in minutes, not hours.</p>
       {open && (
         <div className={styles.scanReceiptPanel}>
           <p>
-            Snap or upload one photo, or a whole stack at once - a drawer full of old paper receipts works fine.
-            RoadVerdict&apos;s AI reads every one first, then sorts them all into the right chronological order
-            before saving anything, so old and new receipts don&apos;t get mixed up. Each one is checked against
-            what you&apos;ve already logged in case it&apos;s a duplicate, and a quick review opens for anything
-            created so you can check the details before it&apos;s done.
+            Upload everything you&apos;ve got, old paper receipts, screenshots, a whole stack at once. Our AI reads
+            each one, works out what it is and when it happened, and sorts it all into the right order automatically,
+            so old and new receipts don&apos;t get mixed up. Effortless, mostly, occasionally it&apos;ll ask you to
+            confirm a mileage it can&apos;t be sure of, but that&apos;s the exception, not the rule. Each one is
+            checked against what you&apos;ve already logged in case it&apos;s a duplicate, and a quick review opens
+            for anything created so you can check the details before it&apos;s done.
           </p>
           <input
             type="file"

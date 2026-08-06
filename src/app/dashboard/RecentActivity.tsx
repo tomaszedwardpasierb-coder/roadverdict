@@ -63,7 +63,7 @@ export function RecentActivity({
             <td>{item.description}</td>
             <td>{item.category}</td>
             <td>{formatCurrency(item.cost, currency, rates)}</td>
-            <td>{item.mileage != null ? Math.round(convertMilesToDisplay(item.mileage, distanceUnit)).toLocaleString() : '—'}</td>
+            <td>{item.mileage != null ? Math.round(convertMilesToDisplay(item.mileage, distanceUnit)).toLocaleString() : '-'}</td>
           </tr>
         ))}
       </tbody>

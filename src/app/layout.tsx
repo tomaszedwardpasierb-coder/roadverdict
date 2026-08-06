@@ -23,7 +23,7 @@ const plexMono = IBM_Plex_Mono({
 export const metadata: Metadata = {
   metadataBase: new URL('https://roadverdict.co.uk'),
   title: {
-    default: 'RoadVerdict — is your motorcycle quote fair?',
+    default: 'RoadVerdict - is your motorcycle quote fair?',
     template: '%s | RoadVerdict',
   },
   description:

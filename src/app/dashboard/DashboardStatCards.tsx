@@ -83,11 +83,11 @@ export function DashboardStatCards({
         <div className={styles.statCardLabel}>Total spend</div>
       </div>
       <div className={styles.statCard}>
-        <div className={styles.statCardValue}>{actualMpg ? formatFuelEconomy(actualMpg, fuelEconomyUnit) : '—'}</div>
+        <div className={styles.statCardValue}>{actualMpg ? formatFuelEconomy(actualMpg, fuelEconomyUnit) : '-'}</div>
         <div className={styles.statCardLabel}>Actual economy</div>
       </div>
       <div className={styles.statCard}>
-        <div className={styles.statCardValue}>{costPerMile != null ? formatCostPerDistance(costPerMile, distanceUnit) : '—'}</div>
+        <div className={styles.statCardValue}>{costPerMile != null ? formatCostPerDistance(costPerMile, distanceUnit) : '-'}</div>
         <div className={styles.statCardLabel}>Per {distanceUnit === 'km' ? 'km' : 'mile'}</div>
       </div>
     </>

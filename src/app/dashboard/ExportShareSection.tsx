@@ -12,6 +12,11 @@ const DURATION_OPTIONS: { value: ShareLinkDuration; label: string }[] = [
   { value: '6months', label: '6 months' },
 ];
 
+// Used in two places, deliberately the same component rather than two
+// copies: the Dashboard tab (for a quick export or a link while you're
+// already there) and the Shareable Links tab (where creating and
+// managing links belong together). A copy or logic fix here only ever
+// needs making once.
 export function ExportShareSection() {
   const [duration, setDuration] = useState<ShareLinkDuration>('1month');
   const [recipientEmail, setRecipientEmail] = useState('');
@@ -42,7 +47,7 @@ export function ExportShareSection() {
         setShareUrl(data.url);
         setExpiresAt(data.expiresAt ?? null);
         // Pre-fill the optional "send by email" step with the same
-        // address - it's already known, so there's no reason to make
+        // address, it's already known, so there's no reason to make
         // the owner type it twice.
         setEmailTo(recipientEmail.trim());
       } else {
@@ -88,7 +93,12 @@ export function ExportShareSection() {
 
   return (
     <div className={styles.chartCard} style={{ marginBottom: '1.6rem' }}>
-      <div className={styles.chartCardTitle}>Export & share</div>
+      <div className={styles.chartCardTitle}>Get a shareable report link</div>
+      <p className={styles.subtext} style={{ marginBottom: '0.9rem' }}>
+        Thinking of selling? This is how you prove it. Generate a link that shows a buyer exactly how this bike&apos;s
+        been looked after, dates, costs, a real history, not just your word for it. Your personal details stay
+        yours, receipts and invoices only appear if you specifically approve sharing them when someone asks.
+      </p>
       <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap', alignItems: 'center' }}>
         <a href="/api/tracker/export/csv" className="submit-button" style={{ textDecoration: 'none' }}>
           Download CSV
@@ -110,7 +120,7 @@ export function ExportShareSection() {
             />
           </div>
           <p className="field-note" style={{ marginTop: '0.4rem' }}>
-            Required - this is who the link identifies if they ask you for a receipt through it.
+            Required, this is who the link identifies if they ask you for a receipt through it.
           </p>
           <div className="field" style={{ marginTop: '0.8rem', maxWidth: '220px' }}>
             <label htmlFor="share-duration">Link stays valid for</label>
@@ -121,7 +131,7 @@ export function ExportShareSection() {
             </select>
           </div>
           <p className="field-note" style={{ marginTop: '0.5rem' }}>
-            After this, the link stops working and is permanently deleted - it can be extended any time before then
+            After this, the link stops working and is permanently deleted, it can be extended any time before then
             from the Shareable Links tab.
           </p>
           {createError && <p className="error-text" role="alert">{createError}</p>}

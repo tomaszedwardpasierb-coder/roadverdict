@@ -37,7 +37,7 @@ export default async function SaleReportPage({ params }: { params: { token: stri
         <PrintButton />
       </div>
       <h1 className={styles.title}>
-        {bike.nickname ? `${bike.nickname} — ${bike.make} ${bike.model}` : `${bike.make} ${bike.model}`}
+        {bike.nickname ? `${bike.nickname} - ${bike.make} ${bike.model}` : `${bike.make} ${bike.model}`}
       </h1>
       <p className={styles.subtext}>
         {bike.isCustomBuild ? "Custom build" : bike.year} · {bike.engineCC}cc · {bike.currentMileage.toLocaleString()} miles

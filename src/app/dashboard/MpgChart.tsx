@@ -95,7 +95,7 @@ export function MpgChart({
   const rangeAverageMpg =
     trustedInView.length > 0 ? trustedInView.reduce((sum, s) => sum + s.mpg, 0) / trustedInView.length : null;
   const title = `${fuelEconomyUnit === 'l100km' ? 'Fuel economy' : 'MPG'} over time${
-    rangeAverageMpg !== null ? ` — ${formatFuelEconomy(rangeAverageMpg, fuelEconomyUnit)} average` : ''
+    rangeAverageMpg !== null ? ` - ${formatFuelEconomy(rangeAverageMpg, fuelEconomyUnit)} average` : ''
   }`;
 
   const labels = viewBy === 'time' ? filtered.map((s) => fmtDate(s.date)) : filtered.map((s) => formatDistance(s.mileage, distanceUnit));
@@ -115,7 +115,7 @@ export function MpgChart({
 
   function tooltipLabel(dataIndex: number, yValue: number | null): string | string[] {
     const point = filtered[dataIndex];
-    const value = `${yValue ?? '—'} ${yLabel}`;
+    const value = `${yValue ?? '-'} ${yLabel}`;
     const reason = exclusionReasonText(point);
     return reason ? [value, reason] : value;
   }

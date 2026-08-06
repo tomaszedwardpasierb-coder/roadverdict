@@ -22,7 +22,7 @@ export const VERDICT_LABELS: Record<Verdict, string> = {
 
 export const VERDICT_SUMMARIES: Record<Verdict, string> = {
   fair: 'This is within the typical range for this job on this size of bike.',
-  high: "This is above the typical range — not necessarily unfair, but it's worth asking what's included.",
+  high: "This is above the typical range, not necessarily unfair, but it's worth asking what's included.",
   'second-opinion':
     "This is well above the typical range for this job. Worth getting a second quote before you book it in.",
 };

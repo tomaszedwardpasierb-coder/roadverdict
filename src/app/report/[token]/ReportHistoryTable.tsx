@@ -192,7 +192,7 @@ export function ReportHistoryTable({
                 <td>{fmtMoney(r.cost)}</td>
                 <td>
                   {!r.attachment ? (
-                    <span className={styles.noReceipt}>— none provided</span>
+                    <span className={styles.noReceipt}>- none provided</span>
                   ) : status?.status === 'approved' && attachmentUrl ? (
                     <a href={attachmentUrl} target="_blank" rel="noopener" className={styles.receiptLink} title={r.attachment.fileName}>
                       {isImage ? (

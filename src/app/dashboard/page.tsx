@@ -91,7 +91,7 @@ export default async function DashboardPage() {
           <LogoutButton />
         </div>
         <h1 className={styles.heading}>
-          {bike.nickname ? `${bike.nickname} — ${bike.make} ${bike.model}` : `${bike.make} ${bike.model}`}
+          {bike.nickname ? `${bike.nickname} - ${bike.make} ${bike.model}` : `${bike.make} ${bike.model}`}
         </h1>
         <SetRegionForm />
       </main>
@@ -154,7 +154,7 @@ export default async function DashboardPage() {
     .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
     .slice(0, 8);
 
-  const bikeName = bike.nickname ? `${bike.nickname} — ${bike.make} ${bike.model}` : `${bike.make} ${bike.model}`;
+  const bikeName = bike.nickname ? `${bike.nickname} - ${bike.make} ${bike.model}` : `${bike.make} ${bike.model}`;
 
   const dashboardContent = (
     <ChartFilterProvider>
@@ -248,6 +248,7 @@ export default async function DashboardPage() {
   const serviceContent = (
     <>
       <h1 className={styles.heading}>Service</h1>
+      <p className={styles.subtext}>Every oil change, every brake job - a real maintenance record, not a hazy memory of &quot;I think I did it.&quot;</p>
       <LogServiceForm initialMileage={bike.currentMileage} mileageHistory={mileagePoints} distanceUnit={distanceUnit} currency={currency} rates={rates} bikeYear={bike.year} isCustomBuild={bike.isCustomBuild} />
       <h2 className={styles.sectionHeading}>Service history</h2>
       {records.length === 0 ? (
@@ -263,6 +264,7 @@ export default async function DashboardPage() {
   const fuelContent = (
     <>
       <h1 className={styles.heading}>Fuel</h1>
+      <p className={styles.subtext}>Log a fill-up in seconds, and watch your actual mpg emerge - not the manufacturer&apos;s claim, yours.</p>
       <LogFuelForm initialMileage={bike.currentMileage} mileageHistory={mileagePoints} distanceUnit={distanceUnit} currency={currency} rates={rates} bikeYear={bike.year} isCustomBuild={bike.isCustomBuild} />
       {actualMpg ? (
         <p className={styles.subtext} style={{ marginBottom: "0.9rem" }}>
@@ -283,6 +285,7 @@ export default async function DashboardPage() {
   const modsContent = (
     <>
       <h1 className={styles.heading}>Parts & Accessories</h1>
+      <p className={styles.subtext}>Every upgrade, with the receipt to prove it wasn&apos;t a bodge job.</p>
       <LogModForm initialMileage={bike.currentMileage} mileageHistory={mileagePoints} distanceUnit={distanceUnit} currency={currency} rates={rates} bikeYear={bike.year} isCustomBuild={bike.isCustomBuild} />
       <h2 className={styles.sectionHeading}>History</h2>
       {mods.length === 0 ? (
@@ -296,6 +299,7 @@ export default async function DashboardPage() {
   const billsContent = (
     <>
       <h1 className={styles.heading}>Insurance, tax & MOT</h1>
+      <p className={styles.subtext}>The paperwork you genuinely can&apos;t afford to forget, tracked in one place, automatically.</p>
       <LogBillForm currency={currency} rates={rates} bikeYear={bike.year} isCustomBuild={bike.isCustomBuild} />
       <h2 className={styles.sectionHeading}>History</h2>
       {bills.length === 0 ? (
@@ -309,6 +313,7 @@ export default async function DashboardPage() {
   const remindersContent = (
     <>
       <h1 className={styles.heading}>Reminders</h1>
+      <p className={styles.subtext}>RoadVerdict remembers so you don&apos;t have to. Nothing missed, nothing lapsed.</p>
       {reminders.length === 0 ? (
         <div className={styles.card}><p className={styles.cardBody}>No reminders set yet. Tick &quot;Remind me&quot; when logging a service or a bill to add one.</p></div>
       ) : (
@@ -320,6 +325,7 @@ export default async function DashboardPage() {
   const reportsContent = (
     <ChartFilterProvider>
       <h1 className={styles.heading}>Reports</h1>
+      <p className={styles.subtext}>Every chart in one place - see where the money&apos;s really going, and whether your bike&apos;s getting thirstier with age.</p>
       <p className={styles.subtext} style={{ marginBottom: "1rem" }}>Every chart in one place.</p>
       <ChartFilterBar />
       <div className={styles.reportsGrid}>
@@ -399,7 +405,7 @@ export default async function DashboardPage() {
 
   const switcherBikes = bikes.map((b) => ({
     id: b.id,
-    name: b.nickname ? `${b.nickname} — ${b.make} ${b.model}` : `${b.make} ${b.model}`,
+    name: b.nickname ? `${b.nickname} - ${b.make} ${b.model}` : `${b.make} ${b.model}`,
     year: b.year,
     currentMileage: b.currentMileage,
   }));
