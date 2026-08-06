@@ -10,6 +10,8 @@ import { getMods } from "@/lib/tracker/mod";
 import { getBills } from "@/lib/tracker/bill";
 import { getReminders, computeReminderStatus } from "@/lib/tracker/reminder";
 import { getShareLinksForUser } from "@/lib/tracker/shareLink";
+import { getPendingReceiptRequestsForOwner } from "@/lib/tracker/receiptRequest";
+import { PendingReceiptRequests } from "./PendingReceiptRequests";
 import { ShareLinksList } from "./ShareLinksList";
 import { computeSpendSummary, computeYearSpend, gatherMileagePoints } from "@/lib/tracker/summary";
 import { slugifyMake } from "@/lib/motorcycleModels";
@@ -64,6 +66,7 @@ export default async function DashboardPage() {
   const bikes = await getBikesForUser(session.email);
   const bike = await pickActiveBike(bikes);
   const shareLinks = await getShareLinksForUser(session.email);
+  const pendingReceiptRequests = await getPendingReceiptRequestsForOwner(session.email);
   const bikeNames: Record<string, string> = {};
   for (const b of bikes) {
     bikeNames[b.id] = b.nickname ? `${b.nickname} (${b.make} ${b.model})` : `${b.make} ${b.model}`;
@@ -392,6 +395,7 @@ export default async function DashboardPage() {
       <p className={styles.subtext} style={{ marginBottom: "1rem" }}>
         Every report link you&apos;ve generated, across all your bikes - extend or delete any of them here.
       </p>
+      <PendingReceiptRequests requests={pendingReceiptRequests} />
       <ShareLinksList links={shareLinks} bikeNames={bikeNames} appUrl={process.env.APP_URL ?? "https://roadverdict.co.uk"} />
     </>
   );
@@ -413,6 +417,7 @@ export default async function DashboardPage() {
       bikes={switcherBikes}
       activeBikeId={bike.id}
       pendingReviewIds={pendingReviewIds}
+      hasPendingReceiptRequests={pendingReceiptRequests.length > 0}
       dashboardContent={dashboardContent}
       serviceContent={serviceContent}
       fuelContent={fuelContent}

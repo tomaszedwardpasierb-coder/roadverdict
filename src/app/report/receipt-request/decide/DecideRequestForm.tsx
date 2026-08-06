@@ -7,6 +7,26 @@ import styles from '../../[token]/report.module.css';
 
 type ItemDecision = 'approved' | 'declined' | 'pending';
 
+function attachmentUrl(token: string, blobName: string): string {
+  return `/api/report/receipt-request/attachment/${token}/${encodeURIComponent(blobName)}`;
+}
+
+function ItemPreview({ token, item }: { token: string; item: ReceiptRequestItem }) {
+  const isImage = item.attachment.fileType === 'image/jpeg' || item.attachment.fileType === 'image/png';
+  const url = attachmentUrl(token, item.attachment.blobName);
+  return (
+    <a href={url} target="_blank" rel="noopener" className={styles.receiptLink} title="View the full receipt">
+      {isImage ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={url} alt="" className={styles.receiptThumb} />
+      ) : (
+        <span className={styles.receiptThumbPdf}>PDF</span>
+      )}
+      <span className={styles.receiptLabel}>View receipt</span>
+    </a>
+  );
+}
+
 export function DecideRequestForm({
   token,
   items,
@@ -55,7 +75,12 @@ export function DecideRequestForm({
           You&apos;re about to <strong>{verb}</strong> sharing {items.length} receipt{items.length === 1 ? '' : 's'}:
         </p>
         <ul className={styles.questionsList} style={{ textAlign: 'left' }}>
-          {items.map((i) => <li key={i.entryId}>{i.description}</li>)}
+          {items.map((i) => (
+            <li key={i.entryId} style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '0.5rem' }}>
+              <ItemPreview token={token} item={i} />
+              <span>{i.description}</span>
+            </li>
+          ))}
         </ul>
         {buyerMessage && <p className={styles.subtext}>Their note: &quot;{buyerMessage}&quot;</p>}
         {error && <p className="error-text" role="alert">{error}</p>}
@@ -107,7 +132,10 @@ export function DecideRequestForm({
       {buyerMessage && <p className={styles.subtext}>Their note: &quot;{buyerMessage}&quot;</p>}
       {items.map((item) => (
         <div key={item.entryId} className={styles.upcomingBlock} style={{ marginBottom: '0.8rem' }}>
-          <p style={{ margin: '0 0 0.5rem' }}>{item.description}</p>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '0.5rem' }}>
+            <ItemPreview token={token} item={item} />
+            <p style={{ margin: 0 }}>{item.description}</p>
+          </div>
           <div style={{ display: 'flex', gap: '1rem' }}>
             {(['approved', 'declined', 'pending'] as const).map((option) => (
               <label key={option} style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.85rem' }}>

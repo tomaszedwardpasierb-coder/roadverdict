@@ -46,6 +46,7 @@ export async function POST(req: NextRequest, { params }: { params: { token: stri
     entryId: r.id,
     category: categoryMap[r.category] ?? "service",
     description: `${r.description} (${new Date(r.date).toLocaleDateString("en-GB")})`,
+    attachment: r.attachment!,
   }));
 
   const { decisionToken } = await createReceiptRequest({

@@ -1,6 +1,7 @@
 // Place at: src/lib/tracker/receiptRequest.ts
 import { getContainer } from "@/lib/cosmos";
 import { hashToken, generateToken } from "@/lib/auth/crypto";
+import type { Attachment } from "@/lib/tracker/cosmosHelpers";
 
 export interface ReceiptRequestItem {
   entryId: string;
@@ -10,6 +11,12 @@ export interface ReceiptRequestItem {
   // the entry's own description is edited afterward.
   description: string;
   status: "pending" | "approved" | "declined";
+  // Also a snapshot, for the same reason, and for a more important one:
+  // the owner needs to actually SEE the receipt to decide whether to
+  // share it - a text description alone doesn't show whether it has
+  // personal details on it. This is what makes that preview possible
+  // without a new fetch back to the live record.
+  attachment: Attachment;
 }
 
 export interface ReceiptRequestDoc {
@@ -41,7 +48,7 @@ export async function createReceiptRequest(params: {
   bikeId: string;
   buyerEmail?: string;
   buyerMessage?: string;
-  items: { entryId: string; category: "service" | "mods" | "bills"; description: string }[];
+  items: { entryId: string; category: "service" | "mods" | "bills"; description: string; attachment: Attachment }[];
 }): Promise<{ doc: ReceiptRequestDoc; decisionToken: string }> {
   const container = getContainer();
   const { raw: decisionToken, hash: decisionTokenHash } = generateToken();
@@ -76,6 +83,21 @@ export async function getReceiptRequestsForShareToken(ownerEmail: string, shareT
     }, { partitionKey: ownerEmail })
     .fetchAll();
   return resources;
+}
+
+// For the dashboard notification - single-partition (the owner is
+// already authenticated, so their own email is always known), filtered
+// in code rather than with a Cosmos EXISTS subquery since the realistic
+// volume here (a handful of requests, ever) makes that simplicity free.
+export async function getPendingReceiptRequestsForOwner(ownerEmail: string): Promise<ReceiptRequestDoc[]> {
+  const container = getContainer();
+  const { resources } = await container.items
+    .query<ReceiptRequestDoc>(
+      { query: "SELECT * FROM c WHERE c.type = 'receiptRequest'" },
+      { partitionKey: ownerEmail }
+    )
+    .fetchAll();
+  return resources.filter((r) => r.items.some((i) => i.status === "pending"));
 }
 
 // Cross-partition - a decision link only carries the raw token, not the

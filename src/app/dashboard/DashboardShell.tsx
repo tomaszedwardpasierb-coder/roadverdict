@@ -58,6 +58,7 @@ interface Props {
   // drives the pulsing nav dots directly from actual data, not an
   // in-memory queue that could disagree with what's really been saved.
   pendingReviewIds: Record<ReviewCategory, string[]>;
+  hasPendingReceiptRequests: boolean;
   dashboardContent: ReactNode;
   serviceContent: ReactNode;
   fuelContent: ReactNode;
@@ -82,6 +83,7 @@ export function DashboardShell({
   bikes,
   activeBikeId,
   pendingReviewIds,
+  hasPendingReceiptRequests,
   dashboardContent,
   serviceContent,
   fuelContent,
@@ -122,7 +124,7 @@ export function DashboardShell({
           <nav className={styles.sidebarNav}>
             {NAV_ITEMS.map((item) => {
               const reviewCategory = asReviewCategory(item.key);
-              const hasPending = reviewCategory ? pendingReviewIds[reviewCategory].length > 0 : false;
+              const hasPending = reviewCategory ? pendingReviewIds[reviewCategory].length > 0 : (item.key === 'shareLinks' && hasPendingReceiptRequests);
               return (
                 <button
                   key={item.key}
@@ -172,7 +174,7 @@ export function DashboardShell({
         <nav className={styles.mobileBottomNav}>
           {MOBILE_NAV_ITEMS.map((item) => {
             const reviewCategory = asReviewCategory(item.key);
-            const hasPending = reviewCategory ? pendingReviewIds[reviewCategory].length > 0 : false;
+            const hasPending = reviewCategory ? pendingReviewIds[reviewCategory].length > 0 : (item.key === 'shareLinks' && hasPendingReceiptRequests);
             return (
               <button
                 key={item.key}
@@ -218,7 +220,7 @@ export function DashboardShell({
             <div className={styles.mobileMoreSheet}>
               {MORE_ITEMS.map((item) => {
                 const reviewCategory = asReviewCategory(item.key);
-                const hasPending = reviewCategory ? pendingReviewIds[reviewCategory].length > 0 : false;
+                const hasPending = reviewCategory ? pendingReviewIds[reviewCategory].length > 0 : (item.key === 'shareLinks' && hasPendingReceiptRequests);
                 return (
                   <button
                     key={item.key}
