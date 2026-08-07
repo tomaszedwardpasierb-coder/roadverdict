@@ -17,6 +17,15 @@ interface ReferenceEntry {
   label: string;
   cost: number;
   attachment: Attachment | null;
+  // Category-specific fields, real values from the record - needed so
+  // correcting this entry's mileage doesn't overwrite everything else
+  // with a placeholder, since the PATCH routes require a complete body.
+  jobType?: string;
+  notes?: string;
+  litres?: number;
+  filledToFull?: boolean;
+  modCategory?: string;
+  name?: string;
 }
 
 interface Props {
@@ -109,16 +118,14 @@ export function MileageConflictModal({
 
   // The reference entry didn't come from this card, so there's no
   // caller-supplied builder for it - reconstruct its own complete body
-  // from what conflict-reference already returned. Category-specific
-  // required fields it doesn't otherwise have (jobType, litres, name)
-  // fall back to values the respective PATCH route will accept as a
-  // genuine, honest placeholder - "other" / 0 / "Unnamed" - rather than
-  // guessing at a specific answer.
+  // from what conflict-reference returned, using the record's own real
+  // values (now included in the response) rather than a placeholder
+  // that would silently overwrite them.
   async function patchReferenceEntry(ref: ReferenceEntry, mileage: number): Promise<boolean> {
     let body: Record<string, unknown>;
-    if (ref.category === 'service') body = { jobType: 'other', cost: ref.cost, mileage, date: ref.date, notes: ref.label, mileageAcknowledged: true };
-    else if (ref.category === 'fuel') body = { litres: 0, cost: ref.cost, mileage, date: ref.date, filledToFull: true, mileageAcknowledged: true };
-    else body = { category: 'other-accessory', name: ref.label, cost: ref.cost, mileage, date: ref.date, notes: '', mileageAcknowledged: true };
+    if (ref.category === 'service') body = { jobType: ref.jobType, cost: ref.cost, mileage, date: ref.date, notes: ref.notes, mileageAcknowledged: true };
+    else if (ref.category === 'fuel') body = { litres: ref.litres, cost: ref.cost, mileage, date: ref.date, filledToFull: ref.filledToFull, mileageAcknowledged: true };
+    else body = { category: ref.modCategory, name: ref.name, cost: ref.cost, mileage, date: ref.date, notes: ref.notes, mileageAcknowledged: true };
     const res = await fetch(`/api/tracker/${CATEGORY_ROUTE[ref.category]}/${encodeURIComponent(ref.id)}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
