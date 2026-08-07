@@ -105,23 +105,30 @@ export async function commitReceiptItem(
     mileageConfidence = estimate.confidence;
     mileageWarning = conflictWarning ?? estimate.warning;
     mileageNeedsManualEntry = conflictWarning ? true : estimate.requiresManualEntry;
+    if (!conflictWarning) crossCheckEstimateAgainstFullHistory();
+  }
 
-    // Cross-check the freshly computed estimate against EVERY logged
-    // point, not just the trustworthy subset it was computed from - this
-    // is what catches the case that used to slip through: an estimate
-    // that's internally reasonable given the anchors it trusted, but
-    // still contradicts an unconfirmed prior record sitting right there
-    // in the database. Only runs when this isn't already a
-    // printed-mileage conflict (conflictWarning set), which has its own
-    // reference already.
-    if (!conflictWarning && mileage !== undefined) {
-      const fullCheck = checkMileageConsistency(mileage, date, allMileagePoints, bike.currentMileage);
-      if (fullCheck.status !== "ok") {
-        mileageWarning = describeMileageCheck(fullCheck);
-        mileageNeedsManualEntry = true;
-        conflictReferenceId = fullCheck.referenceId;
-        conflictReferenceCategory = fullCheck.referenceCategory;
-      }
+  // Cross-checks whatever the current `mileage` value is against EVERY
+  // logged point, not just the trustworthy subset used to COMPUTE it -
+  // this is what catches an estimate that's internally reasonable given
+  // the anchors it trusted, but still contradicts an unconfirmed prior
+  // record sitting right there in the database. Deliberately its own
+  // function, not folded into applyGenericMileageEstimate alone -
+  // the litres-informed estimate below computes a DIFFERENT way and
+  // needs exactly the same check applied to its own result, which is
+  // exactly the gap that let this slip through the first time: fixing
+  // only the generic path left every litres-based estimate (the common
+  // case for a normal "filled to full" fuel receipt) completely
+  // unchecked.
+  function crossCheckEstimateAgainstFullHistory() {
+    if (mileage === undefined) return;
+    const fullCheck = checkMileageConsistency(mileage, date, allMileagePoints, bike.currentMileage);
+    if (fullCheck.status !== "ok") {
+      mileageWarning = describeMileageCheck(fullCheck);
+      mileageNeedsManualEntry = true;
+      conflictReferenceId = fullCheck.referenceId;
+      conflictReferenceCategory = fullCheck.referenceCategory;
+      conflictReferenceBatchIndex = fullCheck.referenceBatchIndex;
     }
   }
 
@@ -161,6 +168,7 @@ export async function commitReceiptItem(
         mileage = litresEstimate.mileage;
         mileageConfidence = litresEstimate.confidence;
         mileageWarning = litresEstimate.warning;
+        crossCheckEstimateAgainstFullHistory();
       } else {
         applyGenericMileageEstimate();
       }
