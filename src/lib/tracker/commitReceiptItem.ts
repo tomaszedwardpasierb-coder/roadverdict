@@ -1,12 +1,4 @@
-// Place at: src/lib/tracker/commitReceiptItem.ts
-//
-// One item in, one record created, using whatever's genuinely in the
-// database at the moment this runs - nothing cached across calls. That's
-// deliberate: called once per item as a human reaches it in the review
-// queue, a fresh fetch here is exactly what lets a correction to item #1
-// actually improve item #2's starting guess, rather than every item in a
-// batch being estimated from the same stale snapshot taken before any
-// human ever looked at any of it (the bug this replaces).
+﻿// Place at: src/lib/tracker/commitReceiptItem.ts
 
 import { getServiceRecords, createServiceRecord } from "@/lib/tracker/serviceRecord";
 import { getFuelLogs, createFuelLog } from "@/lib/tracker/fuelLog";
@@ -20,34 +12,42 @@ import { JOB_LABELS, JOB_REMINDER_DEFAULTS } from "@/lib/tracker/jobTypes";
 import { BILL_LABELS, BILL_REMINDER_DEFAULTS } from "@/lib/tracker/billTypes";
 import { buildAiDescription } from "@/lib/tracker/aiDescription";
 import { findPossibleDuplicate, type DuplicateMatch } from "@/lib/tracker/duplicateCheck";
-import { checkMileageConsistency } from "@/lib/tracker/mileageCheck";
+import { checkMileageConsistency, type HistoryPoint } from "@/lib/tracker/mileageCheck";
 import { guessFilledToFull } from "@/lib/tracker/tankGuess";
 import { checkFullTankPlausibility, describeImplausibleFill } from "@/lib/tracker/fuelPlausibility";
+import { normalizePlate, allKnownPlates } from "@/lib/tracker/reportAccess";
 import type { ParsedReceiptItem } from "@/lib/tracker/receiptParse";
 import type { BikeDoc } from "@/lib/tracker/bike";
 import type { Attachment } from "@/lib/tracker/cosmosHelpers";
 
+export interface PlateMismatch {
+  registrationOnReceipt: string;
+}
+
 export type ReviewQueueEntry =
-  | { id: string; category: "service"; aiDescription: string; duplicate: DuplicateMatch | null; jobType: string; cost: number; mileage: number; mileageNeedsManualEntry: boolean; mileageWarningText?: string; date: string; notes: string; attachment: Attachment }
-  | { id: string; category: "fuel"; aiDescription: string; duplicate: DuplicateMatch | null; litres: number; cost: number; mileage: number; mileageNeedsManualEntry: boolean; mileageWarningText?: string; date: string; filledToFull: boolean; attachment: Attachment; precedingFuelMileage?: number; tankCapacityLitres?: number }
-  | { id: string; category: "mods"; aiDescription: string; duplicate: DuplicateMatch | null; name: string; modCategory: string; cost: number; mileage: number; mileageNeedsManualEntry: boolean; mileageWarningText?: string; date: string; notes: string; attachment: Attachment }
-  | { id: string; category: "bills"; aiDescription: string; duplicate: DuplicateMatch | null; billType: string; cost: number; date: string; notes: string; attachment: Attachment };
+  | { id: string; category: "service"; aiDescription: string; duplicate: DuplicateMatch | null; jobType: string; cost: number; mileage: number; mileageNeedsManualEntry: boolean; mileageWarningText?: string; mileageConflictReferenceId?: string; mileageConflictReferenceCategory?: "service" | "fuel" | "mods"; plateMismatch: PlateMismatch | null; date: string; notes: string; attachment: Attachment }
+  | { id: string; category: "fuel"; aiDescription: string; duplicate: DuplicateMatch | null; litres: number; cost: number; mileage: number; mileageNeedsManualEntry: boolean; mileageWarningText?: string; mileageConflictReferenceId?: string; mileageConflictReferenceCategory?: "service" | "fuel" | "mods"; plateMismatch: PlateMismatch | null; date: string; filledToFull: boolean; attachment: Attachment; precedingFuelMileage?: number; tankCapacityLitres?: number }
+  | { id: string; category: "mods"; aiDescription: string; duplicate: DuplicateMatch | null; name: string; modCategory: string; cost: number; mileage: number; mileageNeedsManualEntry: boolean; mileageWarningText?: string; mileageConflictReferenceId?: string; mileageConflictReferenceCategory?: "service" | "fuel" | "mods"; plateMismatch: PlateMismatch | null; date: string; notes: string; attachment: Attachment }
+  | { id: string; category: "bills"; aiDescription: string; duplicate: DuplicateMatch | null; billType: string; cost: number; plateMismatch: PlateMismatch | null; date: string; notes: string; attachment: Attachment };
 
 export async function commitReceiptItem(
   email: string,
   bike: BikeDoc,
   item: ParsedReceiptItem,
-  // Other receipts in the same scan batch that have a mileage actually
-  // printed on them, whether or not they've been reached/committed yet -
-  // an exact reading is trustworthy regardless of processing order, so
-  // it's worth using both to estimate this item and to sanity-check it.
   batchHints: { date: string; mileage: number }[] = []
 ): Promise<ReviewQueueEntry> {
-  const { category, date, costGbp, description, litres, mileageOnReceipt, merchantName, address, city, attachment, currencyConversion, forceReview } = item;
+  const { category, date, costGbp, description, litres, mileageOnReceipt, registrationOnReceipt, merchantName, address, city, attachment, currencyConversion, forceReview } = item;
 
-  // Fresh, every call - includes anything committed or corrected earlier
-  // in this same review session, since those are real, already-persisted
-  // writes by the time this runs. No in-memory carry-over needed.
+  // A receipt showing a plate that's never been this bike's - now or
+  // historically - is a real, distinct signal worth surfacing on its
+  // own, independent of whatever else is or isn't wrong with the
+  // mileage. Checked once here rather than per-category below, since
+  // it doesn't depend on category at all.
+  const plateMismatch: PlateMismatch | null =
+    registrationOnReceipt && !allKnownPlates(bike).includes(normalizePlate(registrationOnReceipt))
+      ? { registrationOnReceipt }
+      : null;
+
   const [records, fuelLogs, mods, bills] = await Promise.all([
     getServiceRecords(email, bike.id),
     getFuelLogs(email, bike.id),
@@ -59,38 +59,29 @@ export async function commitReceiptItem(
   const modCandidates = mods.map((m) => ({ id: m.id, date: m.date, mileage: m.mileage, cost: m.cost, description: m.name }));
   const billCandidates = bills.map((b) => ({ id: b.id, date: b.date, cost: b.cost, description: BILL_LABELS[b.billType] ?? b.billType }));
 
-  // Trust criterion: an exact reading (mileageConfidence left unset,
-  // meaning it came straight off a receipt or was typed in directly) or
-  // one the human has actually confirmed by saving through its own edit
-  // form. Deliberately NOT "estimated" or "interpolated" alone - those
-  // are the AI's own guess, not yet reviewed by anyone, and the whole
-  // point of this fix is that an unreviewed guess shouldn't get to
-  // anchor another guess. Because the review queue only advances
-  // normally via Save (which the PATCH route already flips to
-  // "confirmed"), every item a human has actually looked at and moved
-  // past is exactly the set this correctly picks up - nothing extra to
-  // track, no new field needed.
   const isTrustworthy = (confidence: "interpolated" | "estimated" | "confirmed" | undefined) => !confidence || confidence === "confirmed";
-  const trustedMileagePoints: MileagePoint[] = [
-    ...records.filter((r) => isTrustworthy(r.mileageConfidence)).map((r) => ({ date: r.date, mileage: r.mileage })),
-    ...fuelLogs.filter((f) => isTrustworthy(f.mileageConfidence)).map((f) => ({ date: f.date, mileage: f.mileage })),
-    ...mods.filter((m) => isTrustworthy(m.mileageConfidence)).map((m) => ({ date: m.date, mileage: m.mileage })),
+  // Now carries id + category for every point, not just date/mileage -
+  // needed so a detected conflict can name the exact entry it clashes
+  // with, not just describe a number and a date.
+  const trustedMileagePoints: HistoryPoint[] = [
+    ...records.filter((r) => isTrustworthy(r.mileageConfidence)).map((r) => ({ id: r.id, category: "service" as const, date: r.date, mileage: r.mileage })),
+    ...fuelLogs.filter((f) => isTrustworthy(f.mileageConfidence)).map((f) => ({ id: f.id, category: "fuel" as const, date: f.date, mileage: f.mileage })),
+    ...mods.filter((m) => isTrustworthy(m.mileageConfidence)).map((m) => ({ id: m.id, category: "mods" as const, date: m.date, mileage: m.mileage })),
     ...batchHints,
   ];
+  const trustedMileagePointsForEstimate: MileagePoint[] = trustedMileagePoints.map((p) => ({ date: p.date, mileage: p.mileage }));
 
   let mileage: number | undefined;
   let mileageConfidence: "interpolated" | "estimated" | undefined;
   let mileageWarning: string | undefined;
   let mileageNeedsManualEntry = false;
+  let conflictReferenceId: string | undefined;
+  let conflictReferenceCategory: "service" | "fuel" | "mods" | undefined;
 
-  // Needed earlier than before this change - the fuel-specific
-  // litres-based estimate below has to know up front whether this
-  // fill-up is a full tank, since that's the only case litres cleanly
-  // implies "distance since the last full tank".
   const filledToFullGuess = category === "fuel" ? guessFilledToFull(litres ?? 0, bike.tankCapacityLitres) : false;
 
   function applyGenericMileageEstimate(conflictWarning?: string) {
-    const estimate = estimateMileage(date, trustedMileagePoints, {
+    const estimate = estimateMileage(date, trustedMileagePointsForEstimate, {
       startingMileage: bike.startingMileage,
       currentMileage: bike.currentMileage,
       dateAdded: bike.dateAdded,
@@ -102,29 +93,24 @@ export async function commitReceiptItem(
   }
 
   if (category !== "bills") {
-    // A figure printed on the receipt is normally trusted outright - but
-    // if it's inconsistent with everything else already known (a
-    // misread digit, or genuinely the wrong bike's receipt), don't
-    // silently create a broken timeline. Fall back to asking the human
-    // instead of trusting an OCR reading that doesn't add up.
-    const receiptConflict =
+    const consistency =
       typeof mileageOnReceipt === "number"
-        ? checkMileageConsistency(mileageOnReceipt, date, trustedMileagePoints, bike.currentMileage).status !== "ok"
-        : false;
+        ? checkMileageConsistency(mileageOnReceipt, date, trustedMileagePoints, bike.currentMileage)
+        : null;
+    const receiptConflict = consistency ? consistency.status !== "ok" : false;
     const conflictWarning = receiptConflict
       ? `The receipt appears to show ${mileageOnReceipt!.toLocaleString()} mi, but that conflicts with another record - please check and enter the real figure.`
       : undefined;
+    if (receiptConflict && consistency) {
+      conflictReferenceId = consistency.referenceId;
+      conflictReferenceCategory = consistency.referenceCategory;
+    }
 
     if (typeof mileageOnReceipt === "number" && !receiptConflict) {
       mileage = mileageOnReceipt;
     } else if (conflictWarning) {
       applyGenericMileageEstimate(conflictWarning);
     } else if (category === "fuel" && filledToFullGuess && litres) {
-      // Litres-informed estimate first, for fuel specifically - see
-      // mileageEstimate.ts for why. Falls through to the generic
-      // date-based estimate if there's no trusted full-tank fill-up to
-      // project forward from at all (e.g. this bike's very first
-      // logged fill-up).
       const trustedFuelLogs = fuelLogs.filter((f) => isTrustworthy(f.mileageConfidence));
       const precedingFullTankMileage =
         trustedFuelLogs
@@ -170,7 +156,7 @@ export async function commitReceiptItem(
         baseMileage: mileage ?? bike.currentMileage, date, sourceKey: `service:${jobType}`,
       });
     }
-    return { id: record.id, category: "service", aiDescription, duplicate, jobType, cost: costGbp, mileage: mileage ?? bike.currentMileage, mileageNeedsManualEntry, mileageWarningText: mileageNeedsManualEntry ? mileageWarning : undefined, date, notes, attachment };
+    return { id: record.id, category: "service", aiDescription, duplicate, jobType, cost: costGbp, mileage: mileage ?? bike.currentMileage, mileageNeedsManualEntry, mileageWarningText: mileageNeedsManualEntry ? mileageWarning : undefined, mileageConflictReferenceId: conflictReferenceId, mileageConflictReferenceCategory: conflictReferenceCategory, plateMismatch, date, notes, attachment };
   }
 
   if (category === "fuel") {
@@ -179,13 +165,6 @@ export async function commitReceiptItem(
     const litresValue = litres ?? 0;
     const resolvedMileage = mileage ?? bike.currentMileage;
 
-    // A full tank that implies an impossible mpg against the nearest
-    // earlier trusted fuel entry means the mileage itself is wrong, not
-    // just "worth flagging" - same principle as the chronological check,
-    // applied to a different kind of impossibility. Downgrades to
-    // manual entry rather than silently saving a number that can't be
-    // right, exactly like every other case where this pipeline isn't
-    // confident.
     let finalMileageNeedsManualEntry = mileageNeedsManualEntry;
     let finalMileageWarning = mileageWarning;
     if (filledToFullGuess) {
@@ -200,14 +179,6 @@ export async function commitReceiptItem(
       }
     }
 
-    // Found by date, not mileage - unlike the plausibility check above,
-    // this needs to work even when there's no trustworthy mileage
-    // resolved yet at all (that's exactly the case a human is about to
-    // fix), so it can't sort by the very number that's in question. Sent
-    // to the client purely so the review queue can show a live "this
-    // would work out to about X mpg" as the person types, using the
-    // same maths the server-side check uses - a live aid for judgement,
-    // not a second source of truth.
     const precedingFuelMileage = fuelLogs
       .filter((f) => isTrustworthy(f.mileageConfidence))
       .filter((f) => new Date(f.date).getTime() < new Date(date).getTime())
@@ -217,7 +188,7 @@ export async function commitReceiptItem(
       bikeId: bike.id, litres: litresValue, cost: costGbp, mileage: resolvedMileage, date,
       filledToFull: filledToFullGuess, attachments: [attachment], needsReview: true, currencyConversion, mileageConfidence, aiDescription,
     });
-    return { id: record.id, category: "fuel", aiDescription, duplicate, litres: litresValue, cost: costGbp, mileage: resolvedMileage, mileageNeedsManualEntry: finalMileageNeedsManualEntry, mileageWarningText: finalMileageNeedsManualEntry ? finalMileageWarning : undefined, date, filledToFull: filledToFullGuess, attachment, precedingFuelMileage, tankCapacityLitres: bike.tankCapacityLitres };
+    return { id: record.id, category: "fuel", aiDescription, duplicate, litres: litresValue, cost: costGbp, mileage: resolvedMileage, mileageNeedsManualEntry: finalMileageNeedsManualEntry, mileageWarningText: finalMileageNeedsManualEntry ? finalMileageWarning : undefined, mileageConflictReferenceId: conflictReferenceId, mileageConflictReferenceCategory: conflictReferenceCategory, plateMismatch, date, filledToFull: filledToFullGuess, attachment, precedingFuelMileage, tankCapacityLitres: bike.tankCapacityLitres };
   }
 
   if (category === "mods") {
@@ -232,7 +203,7 @@ export async function commitReceiptItem(
       bikeId: bike.id, category: modCategory, name: description, cost: costGbp, mileage: mileage ?? bike.currentMileage, date,
       notes: modNotes, attachments: [attachment], needsReview: true, currencyConversion, mileageConfidence, aiDescription,
     });
-    return { id: record.id, category: "mods", aiDescription, duplicate, name: description, modCategory, cost: costGbp, mileage: mileage ?? bike.currentMileage, mileageNeedsManualEntry, mileageWarningText: mileageNeedsManualEntry ? mileageWarning : undefined, date, notes: modNotes, attachment };
+    return { id: record.id, category: "mods", aiDescription, duplicate, name: description, modCategory, cost: costGbp, mileage: mileage ?? bike.currentMileage, mileageNeedsManualEntry, mileageWarningText: mileageNeedsManualEntry ? mileageWarning : undefined, mileageConflictReferenceId: conflictReferenceId, mileageConflictReferenceCategory: conflictReferenceCategory, plateMismatch, date, notes: modNotes, attachment };
   }
 
   const billType = guessBillType(description) ?? "insurance";
@@ -250,5 +221,5 @@ export async function commitReceiptItem(
       baseMileage: bike.currentMileage, date, sourceKey: `bill:${billType}`,
     });
   }
-  return { id: record.id, category: "bills", aiDescription, duplicate, billType, cost: costGbp, date, notes: billNotes, attachment };
+  return { id: record.id, category: "bills", aiDescription, duplicate, billType, cost: costGbp, plateMismatch, date, notes: billNotes, attachment };
 }

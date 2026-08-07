@@ -1,4 +1,4 @@
-// Place at: src/app/dashboard/ServiceHistoryCard.tsx
+﻿// Place at: src/app/dashboard/ServiceHistoryCard.tsx
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
@@ -17,6 +17,7 @@ import { useTabSwitch, goToNextReview, type ReviewCategory } from './TabSwitchCo
 import { mileageConfidenceLabel } from '@/lib/tracker/mileageEstimate';
 import { checkMileageConsistency, type HistoryPoint } from '@/lib/tracker/mileageCheck';
 import { MileageWarning } from './MileageWarning';
+import { MileageConflictModal } from './MileageConflictModal';
 import styles from './dashboard.module.css';
 
 function fmtDate(d: string): string {
@@ -61,6 +62,10 @@ export function ServiceHistoryCard({ record, bikeClass, brandValue, region, dist
   const { switchTo, focusId, setFocusId, highlightIds } = useTabSwitch();
   const [isEditing, setIsEditing] = useState(false);
   const [isHighlighted, setIsHighlighted] = useState(false);
+  const [showConflictModal, setShowConflictModal] = useState(false);
+  const [conflictReference, setConflictReference] = useState<{ id: string; category: "service" | "fuel" | "mods" } | null>(null);
+  const [findingConflict, setFindingConflict] = useState(false);
+  const [conflictLookupError, setConflictLookupError] = useState<string | null>(null);
   const cardRef = useRef<HTMLDivElement>(null);
   const [jobType, setJobType] = useState(record.jobType);
   const [costDisplay, setCostDisplay] = useState(
@@ -205,13 +210,13 @@ export function ServiceHistoryCard({ record, bikeClass, brandValue, region, dist
             triggers={remindTriggers}
             onTriggersChange={setRemindTriggers}
             idPrefix={`edit-remind-service-${record.id}`}
-            checkboxLabel="🔔 Remind me when this is due again"
+            checkboxLabel="ðŸ”” Remind me when this is due again"
           />
         </div>
         <hr className="ticket__divider" />
         <div className="ticket__section" style={{ display: 'flex', gap: '0.6rem', alignItems: 'center' }}>
           <button className="submit-button" type="submit" disabled={submitting || isBlocked}>
-            {submitting ? 'Saving…' : 'Save'}
+            {submitting ? 'Savingâ€¦' : 'Save'}
           </button>
           <button type="button" className={styles.iconBtn} onClick={() => setIsEditing(false)} disabled={submitting}>
             Cancel
@@ -230,9 +235,36 @@ export function ServiceHistoryCard({ record, bikeClass, brandValue, region, dist
       {record.needsReview && (
         <div className={styles.needsReviewNote}>
           {record.mileageConflictWarning ? (
-            <>⚠️ {record.mileageConflictWarning}</>
+            <>Warning: {record.mileageConflictWarning}
+            <button
+              type="button"
+              className={styles.iconBtn}
+              disabled={findingConflict}
+              onClick={async () => {
+                setFindingConflict(true);
+                setConflictLookupError(null);
+                try {
+                  const res = await fetch(`/api/tracker/mileage-conflict-lookup?category=service&id=${encodeURIComponent(record.id)}`);
+                  const data = await res.json();
+                  if (res.ok) {
+                    setConflictReference({ id: data.referenceId, category: data.referenceCategory });
+                    setShowConflictModal(true);
+                  } else {
+                    setConflictLookupError(data.error ?? "Could not find the conflicting entry.");
+                  }
+                } catch {
+                  setConflictLookupError("Could not reach the server.");
+                } finally {
+                  setFindingConflict(false);
+                }
+              }}
+            >
+              {findingConflict ? "Finding it..." : "Resolve"}
+            </button>
+            {conflictLookupError && <p className="error-text" role="alert">{conflictLookupError}</p>}
+            </>
           ) : (
-            <>🧠 Auto-created from a scanned receipt - click Edit to review, especially the mileage, before it&apos;s done.</>
+            <>Note: Auto-created from a scanned receipt - click Edit to review, especially the mileage, before it&apos;s done.</>
           )}
           {record.aiDescription && <div className={styles.aiDescriptionNote}>{record.aiDescription}</div>}
         </div>
@@ -242,7 +274,7 @@ export function ServiceHistoryCard({ record, bikeClass, brandValue, region, dist
         <span className={styles.jobCardCost}>{formatCurrency(record.cost, currency, rates)}</span>
       </div>
       <div className={styles.jobCardMeta}>
-        {fmtDate(record.date)} · {formatDistance(record.mileage, distanceUnit)}
+        {fmtDate(record.date)} Â· {formatDistance(record.mileage, distanceUnit)}
         {record.mileageConfidence && (
           <span className={record.mileageConfidence === 'confirmed' ? styles.mileageConfirmedTag : styles.mileageConfidenceTag}>
             {mileageConfidenceLabel(record.mileageConfidence)}
@@ -273,10 +305,36 @@ export function ServiceHistoryCard({ record, bikeClass, brandValue, region, dist
       <div className={styles.cardActions}>
         <button type="button" className={styles.iconBtn} onClick={() => setIsEditing(true)}>Edit</button>
         <button type="button" className={styles.iconBtn} onClick={handleDelete} disabled={submitting}>
-          {submitting ? 'Deleting…' : 'Delete'}
+          {submitting ? 'Deletingâ€¦' : 'Delete'}
         </button>
       </div>
       {error && <p className="error-text" role="alert">{error}</p>}
+      {showConflictModal && conflictReference && (
+        <MileageConflictModal
+          entryId={record.id}
+          entryCategory="service"
+          entryDate={record.date}
+          entryMileage={record.mileage}
+          entryLabel={JOB_LABELS[record.jobType] ?? record.jobType}
+          entryAttachment={record.attachments?.[0]}
+          referenceId={conflictReference.id}
+          referenceCategory={conflictReference.category}
+          buildPatchBody={(overrides) => ({
+            jobType: record.jobType,
+            cost: record.cost,
+            mileage: overrides.mileage ?? record.mileage,
+            date: record.date,
+            notes: record.notes,
+            mileageAcknowledged: overrides.mileageAcknowledged,
+            ...(overrides.mileageAnomaly !== undefined ? { mileageAnomaly: overrides.mileageAnomaly } : {}),
+          })}
+          onResolved={() => {
+            setShowConflictModal(false);
+            window.location.reload();
+          }}
+          onClose={() => setShowConflictModal(false)}
+        />
+      )}
     </div>
   );
 }

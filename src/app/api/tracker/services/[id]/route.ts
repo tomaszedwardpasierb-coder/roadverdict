@@ -30,7 +30,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
   }
 
-  const { jobType, cost, mileage, date, notes, attachments, reminder, batchHints, mileageAcknowledged } = body as {
+  const { jobType, cost, mileage, date, notes, attachments, reminder, batchHints, mileageAcknowledged, mileageAnomaly } = body as {
     jobType?: string;
     cost?: number;
     mileage?: number;
@@ -50,6 +50,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     // this check the same as anything already in the database.
     batchHints?: { date: string; mileage: number }[];
     mileageAcknowledged?: boolean;
+    mileageAnomaly?: boolean;
   };
 
   if (!jobType || cost == null || mileage == null || !date) {
@@ -157,3 +158,6 @@ export async function DELETE(request: NextRequest, { params }: { params: { id: s
   await deleteServiceRecord(session.email, id);
   return NextResponse.json({ ok: true });
 }
+
+
+

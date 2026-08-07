@@ -1,4 +1,4 @@
-// Place at: src/lib/tracker/reportAccess.ts
+﻿// Place at: src/lib/tracker/reportAccess.ts
 import { cookies } from "next/headers";
 import { getContainer } from "@/lib/cosmos";
 import { hashToken, generateToken } from "@/lib/auth/crypto";
@@ -14,14 +14,14 @@ function cookieName(shareToken: string): string {
   return `${COOKIE_PREFIX}${hashToken(shareToken).slice(0, 16)}`;
 }
 
-function normalizePlate(plate: string): string {
+export function normalizePlate(plate: string): string {
   return plate.toUpperCase().replace(/\s+/g, "");
 }
 
 // Every registration the bike has ever held, not just the current one -
 // a buyer told an older plate by mistake, or a listing photo showing a
 // plate from just before a change, shouldn't be locked out over it.
-function allKnownPlates(bike: BikeDoc): string[] {
+export function allKnownPlates(bike: BikeDoc): string[] {
   const plates = new Set<string>();
   if (bike.originalRegistration) plates.add(normalizePlate(bike.originalRegistration));
   for (const change of bike.registrationChanges ?? []) plates.add(normalizePlate(change.plate));
@@ -119,3 +119,5 @@ export async function verifyPlate(shareToken: string, submittedPlate: string): P
   if (known.length === 0) return false; // no registration on record at all - can't gate on something that doesn't exist
   return known.includes(normalizePlate(submittedPlate));
 }
+
+

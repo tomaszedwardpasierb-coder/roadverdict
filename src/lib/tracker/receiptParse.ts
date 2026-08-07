@@ -1,4 +1,4 @@
-// Place at: src/lib/tracker/receiptParse.ts
+﻿// Place at: src/lib/tracker/receiptParse.ts
 //
 // Phase 1 of scanning: read a receipt photo and turn it into structured
 // data. Deliberately touches the database for nothing except uploading
@@ -40,7 +40,8 @@ const PROMPT = `You are extracting structured data from a photo that is claimed 
       "description": a short (max 6 words) plain-English description of this specific item,
       "litres": if category is "fuel" AND you can genuinely read a litres figure, that number as a plain number - otherwise null. Do not guess a number here; a fuel entry with no readable litres is skipped entirely by the caller rather than logged with a made-up amount, so returning null when you're not confident is the correct, safe answer, not a failure.,
       "fuelType": if category is "fuel", your best read of the fuel type from wording on the receipt (e.g. "unleaded", "premium", "diesel", "super") - one of "petrol", "diesel", "other" (anything that isn't fuel for an engine, e.g. AdBlue). If there's truly no indication either way, use "petrol", since that's overwhelmingly the common case for a UK motorcycle receipt with no fuel-type wording at all. Otherwise null.,
-      "mileageOnReceipt": an odometer/mileage reading, ONLY if you are genuinely confident a specific number on this receipt represents the bike's mileage - e.g. explicit wording like "mileage:", "odometer:", "miles:", or a number clearly logged against a service/inspection for that reason. Do NOT return a number just because it looks plausible as a mileage - order numbers, invoice numbers, part/SKU codes, phone numbers, postcodes, prices, and quantities all commonly appear on receipts and are NOT mileage readings even when they happen to be a few digits long. If there is no clearly-labelled mileage/odometer figure, or if you are not confident, return null rather than guessing - a missing value is far better than a wrong one, since a fallback estimate is used instead when this is null.
+      "mileageOnReceipt": an odometer/mileage reading, ONLY if you are genuinely confident a specific number on this receipt represents the bike's mileage - e.g. explicit wording like "mileage:", "odometer:", "miles:", or a number clearly logged against a service/inspection for that reason. Do NOT return a number just because it looks plausible as a mileage - order numbers, invoice numbers, part/SKU codes, phone numbers, postcodes, prices, and quantities all commonly appear on receipts and are NOT mileage readings even when they happen to be a few digits long. If there is no clearly-labelled mileage/odometer figure, or if you are not confident, return null rather than guessing - a missing value is far better than a wrong one, since a fallback estimate is used instead when this is null.,
+      "registrationOnReceipt": a UK vehicle registration plate, ONLY if one is genuinely printed on this specific receipt or invoice (e.g. a garage work order listing the customer's reg, or a fuel receipt with a numberplate recognition line) - normalise to remove spaces (e.g. "AB12CDE" not "AB12 CDE"). This is genuinely rare on most receipts - only return a value when one is actually visible, never guess or infer one. Otherwise null.
     }
   ]
 }
@@ -59,6 +60,7 @@ interface GeminiItem {
   litres?: number | null;
   fuelType?: "petrol" | "diesel" | "other" | null;
   mileageOnReceipt?: number | null;
+  registrationOnReceipt?: string | null;
 }
 
 interface GeminiResponse {
@@ -82,6 +84,7 @@ export interface ParsedReceiptItem {
   description: string;
   litres: number | null;
   mileageOnReceipt: number | null;
+  registrationOnReceipt: string | null;
   merchantName: string | null;
   address: string | null;
   city: string | null;
@@ -241,6 +244,7 @@ export async function parseReceiptFile(file: File, apiKey: string, bike: BikeDoc
         description: item.description ?? "",
         litres: category === "fuel" ? (item.litres as number) : null,
         mileageOnReceipt: typeof item.mileageOnReceipt === "number" && item.mileageOnReceipt > 0 ? Math.round(item.mileageOnReceipt) : null,
+        registrationOnReceipt: typeof item.registrationOnReceipt === "string" && item.registrationOnReceipt.trim() ? item.registrationOnReceipt.toUpperCase().replace(/\s+/g, "") : null,
         merchantName,
         address,
         city,
@@ -260,3 +264,7 @@ export async function parseReceiptFile(file: File, apiKey: string, bike: BikeDoc
     };
   }
 }
+
+
+
+

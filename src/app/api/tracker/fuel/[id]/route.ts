@@ -29,7 +29,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
   }
 
-  const { litres, cost, mileage, date, filledToFull, attachments, batchHints, mileageAcknowledged } = body as {
+  const { litres, cost, mileage, date, filledToFull, attachments, batchHints, mileageAcknowledged, mileageAnomaly } = body as {
     litres?: number;
     cost?: number;
     mileage?: number;
@@ -38,6 +38,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     attachments?: Attachment[];
     batchHints?: { date: string; mileage: number }[];
     mileageAcknowledged?: boolean;
+    mileageAnomaly?: boolean;
   };
 
   if (litres == null || cost == null || mileage == null || !date) {
@@ -129,3 +130,6 @@ export async function DELETE(request: NextRequest, { params }: { params: { id: s
   await deleteFuelLog(session.email, id);
   return NextResponse.json({ ok: true });
 }
+
+
+

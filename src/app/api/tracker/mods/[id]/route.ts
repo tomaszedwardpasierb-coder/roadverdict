@@ -28,7 +28,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
   }
 
-  const { category, name, cost, mileage, date, notes, attachments, batchHints, mileageAcknowledged } = body as {
+  const { category, name, cost, mileage, date, notes, attachments, batchHints, mileageAcknowledged, mileageAnomaly } = body as {
     category?: string;
     name?: string;
     cost?: number;
@@ -38,6 +38,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     attachments?: Attachment[];
     batchHints?: { date: string; mileage: number }[];
     mileageAcknowledged?: boolean;
+    mileageAnomaly?: boolean;
   };
 
   if (!category || !name || cost == null || mileage == null || !date) {
@@ -82,6 +83,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     needsReview: false,
     mileageConfidence: nextMileageConfidence,
     mileageConflictWarning: null,
+    ...(mileageAnomaly !== undefined ? { mileageAnomaly } : {}),
   });
   if (!mod) {
     return NextResponse.json({ error: "Entry not found." }, { status: 404 });
@@ -108,3 +110,7 @@ export async function DELETE(request: NextRequest, { params }: { params: { id: s
   await deleteMod(session.email, id);
   return NextResponse.json({ ok: true });
 }
+
+
+
+

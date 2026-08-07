@@ -1,24 +1,12 @@
-// Place at: src/lib/tracker/mileageCheck.ts
+﻿// Place at: src/lib/tracker/mileageCheck.ts
 //
 // The single source of truth for mileage consistency, used both for
 // live, as-you-type client feedback and for the server-side hard
-// validation on save - previously these were two separate systems
-// (this file's own neighbour-only search, and a second, global-search
-// version in mileageConflict.ts) that could disagree with each other.
-// Unified onto the more robust algorithm (checks every other record for
-// the closest conflict in each direction, not just the immediate
-// neighbours - the neighbour-only version could theoretically miss a
-// conflict against a further-out record if the data around it was
-// itself already inconsistent), while keeping this file's own
-// three-tier status model, which the neighbour-only version got right
-// and the global-search version didn't have: "today or future, but
-// lower than the bike's actual current mileage" is a fact, not a
-// judgement call, and should never be overridable, unlike a historical
-// entry that conflicts with a neighbouring record, which genuinely can
-// have a rare legitimate explanation (an odometer replacement, say).
+// validation on save.
 
 export interface HistoryPoint {
   id?: string;
+  category?: "service" | "fuel" | "mods";
   date: string;
   mileage: number;
 }
@@ -30,6 +18,12 @@ export interface MileageCheckResult {
   reason?: MileageCheckReason;
   referenceMileage?: number;
   referenceDate?: string;
+  // The specific conflicting entry, when history points carry an id -
+  // lets the conflict-resolution screen fetch and show that exact
+  // record (including its own receipt image) side by side, rather than
+  // only knowing a number and a date.
+  referenceId?: string;
+  referenceCategory?: "service" | "fuel" | "mods";
 }
 
 function startOfToday(): number {
@@ -38,11 +32,6 @@ function startOfToday(): number {
   return d.getTime();
 }
 
-// Returns structured data, not a pre-built message - the display layer
-// formats the numbers in whatever distance unit the person prefers.
-// excludeId is optional and only relevant when editing an existing
-// record - omitting it is exactly how every current client caller
-// already uses this function, so nothing about their behaviour changes.
 export function checkMileageConsistency(
   enteredMileage: number,
   entryDate: string,
@@ -62,12 +51,7 @@ export function checkMileageConsistency(
     return { status: "ok" };
   }
 
-  // Closest conflict in each direction, across every record - not just
-  // the immediate neighbours - so a conflict against a further-out
-  // record is caught even in data that's already a little messy
-  // elsewhere, which is exactly the kind of history this app has had
-  // to handle throughout.
-  let closest: { direction: "below-earlier" | "above-later"; mileage: number; date: string } | null = null;
+  let closest: { direction: "below-earlier" | "above-later"; mileage: number; date: string; id?: string; category?: "service" | "fuel" | "mods" } | null = null;
   let closestGapMs = Infinity;
 
   for (const point of history) {
@@ -76,25 +60,29 @@ export function checkMileageConsistency(
     const gap = Math.abs(pointTime - entryTime);
 
     if (pointTime < entryTime && point.mileage > enteredMileage && gap < closestGapMs) {
-      closest = { direction: "below-earlier", mileage: point.mileage, date: point.date };
+      closest = { direction: "below-earlier", mileage: point.mileage, date: point.date, id: point.id, category: point.category };
       closestGapMs = gap;
     }
     if (pointTime > entryTime && point.mileage < enteredMileage && gap < closestGapMs) {
-      closest = { direction: "above-later", mileage: point.mileage, date: point.date };
+      closest = { direction: "above-later", mileage: point.mileage, date: point.date, id: point.id, category: point.category };
       closestGapMs = gap;
     }
   }
 
   if (closest) {
-    return { status: "warning", reason: closest.direction, referenceMileage: closest.mileage, referenceDate: closest.date };
+    return {
+      status: "warning",
+      reason: closest.direction,
+      referenceMileage: closest.mileage,
+      referenceDate: closest.date,
+      referenceId: closest.id,
+      referenceCategory: closest.category,
+    };
   }
 
   return { status: "ok" };
 }
 
-// Formats a MileageCheckResult into the same clear, actionable wording
-// the old hard-block message used - names the exact bound, not just
-// that something's wrong.
 export function describeMileageCheck(result: MileageCheckResult): string {
   if (result.status === "ok" || !result.reason) return "";
   const m = result.referenceMileage?.toLocaleString() ?? "";
