@@ -66,6 +66,8 @@ function QueueItemForm({
   canGoPrev,
   finishing,
   mileageOptional,
+  conflictPeer,
+  onJumpToPeer,
 }: {
   entry: ReviewQueueEntry;
   batchHints: { date: string; mileage: number }[];
@@ -77,6 +79,8 @@ function QueueItemForm({
   canGoPrev: boolean;
   finishing: boolean;
   mileageOptional: boolean;
+  conflictPeer: ParsedReceiptItem | null;
+  onJumpToPeer: () => void;
 }) {
   const [submitting, setSubmitting] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -235,30 +239,23 @@ function QueueItemForm({
                 Once saved, this becomes a real anchor the next entries in this batch can use.
               </p>
               {entry.mileageConflictReferenceId && entry.mileageConflictReferenceCategory && (
-                <button
-                  type="button"
-                  className={styles.iconBtn}
-                  disabled={findingConflict}
-                  onClick={async () => {
-                    setFindingConflict(true);
-                    setConflictLookupError(null);
-                    try {
-                      const res = await fetch(`/api/tracker/mileage-conflict-lookup?category=${entry.category}&id=${encodeURIComponent(entry.id)}`);
-                      const data = await res.json();
-                      if (res.ok) {
-                        setShowConflictModal(true);
-                      } else {
-                        setConflictLookupError(data.error ?? "Could not find the conflicting entry.");
-                      }
-                    } catch {
-                      setConflictLookupError("Could not reach the server.");
-                    } finally {
-                      setFindingConflict(false);
-                    }
-                  }}
-                >
-                  {findingConflict ? "Finding it..." : "Resolve"}
+                <button type="button" className={styles.iconBtn} onClick={() => setShowConflictModal(true)}>
+                  Resolve
                 </button>
+              )}
+              {entry.mileageConflictReferenceBatchIndex !== undefined && conflictPeer && (
+                <div className={styles.reviewQueueDuplicateWarning} style={{ marginTop: "0.4rem" }}>
+                  <p>
+                    This conflicts with another item still in this same batch:{" "}
+                    <strong>{conflictPeer.description}</strong>,{" "}
+                    {new Date(conflictPeer.date).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
+                    {typeof conflictPeer.mileageOnReceipt === "number" ? `, ${conflictPeer.mileageOnReceipt.toLocaleString()} mi` : ""}.
+                    {" "}Correcting that one, once you reach it, will often resolve this too.
+                  </p>
+                  <button type="button" className={styles.iconBtn} onClick={onJumpToPeer}>
+                    Review that item now
+                  </button>
+                </div>
               )}
               {conflictLookupError && <p className="error-text" role="alert">{conflictLookupError}</p>}
             </>
@@ -426,9 +423,10 @@ export function ReviewQueueModal({ parsedItems, onFinished }: { parsedItems: Par
     // reading is trustworthy regardless of processing order, so item #90
     // can use item #95's printed mileage even before #95 is opened.
     const batchHints = items
-      .filter((_, i) => i !== index)
-      .filter((it) => typeof it.mileageOnReceipt === 'number')
-      .map((it) => ({ date: it.date, mileage: it.mileageOnReceipt as number }));
+      .map((it, i) => ({ it, i }))
+      .filter(({ i }) => i !== index)
+      .filter(({ it }) => typeof it.mileageOnReceipt === "number")
+      .map(({ it, i }) => ({ date: it.date, mileage: it.mileageOnReceipt as number, batchIndex: i }));
 
     let cancelled = false;
     setCommitting(true);
@@ -602,6 +600,10 @@ export function ReviewQueueModal({ parsedItems, onFinished }: { parsedItems: Par
             key={current.id}
             entry={current}
             mileageOptional={currentTier === 2}
+            conflictPeer={current.category !== "bills" && current.mileageConflictReferenceBatchIndex !== undefined ? items[current.mileageConflictReferenceBatchIndex] ?? null : null}
+            onJumpToPeer={() => {
+              if (current.category !== "bills" && current.mileageConflictReferenceBatchIndex !== undefined) setIndex(current.mileageConflictReferenceBatchIndex);
+            }}
             batchHints={items
               .filter((_, i) => i !== index)
               .filter((it) => typeof it.mileageOnReceipt === 'number')

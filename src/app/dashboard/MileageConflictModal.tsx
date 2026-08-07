@@ -26,8 +26,9 @@ interface Props {
   entryMileage: number;
   entryLabel: string;
   entryAttachment?: Attachment;
-  referenceId: string;
-  referenceCategory: 'service' | 'fuel' | 'mods';
+  referenceId?: string;
+  referenceCategory?: 'service' | 'fuel' | 'mods';
+  preloadedReference?: ReferenceEntry;
   // Each card knows its OWN record's full shape (a service record needs
   // jobType/notes, fuel needs litres/filledToFull, mods needs
   // name/modCategory) - the PATCH routes require the complete field
@@ -48,6 +49,7 @@ export function MileageConflictModal({
   entryLabel,
   entryAttachment,
   referenceId,
+  preloadedReference,
   referenceCategory,
   buildPatchBody,
   onResolved,
@@ -62,6 +64,17 @@ export function MileageConflictModal({
   const [newMileageForReference, setNewMileageForReference] = useState('');
 
   useEffect(() => {
+    if (preloadedReference) {
+      setReference(preloadedReference);
+      setNewMileageForReference(String(preloadedReference.mileage));
+      setLoading(false);
+      return;
+    }
+    if (!referenceId || !referenceCategory) {
+      setError("No reference entry to compare against.");
+      setLoading(false);
+      return;
+    }
     let cancelled = false;
     (async () => {
       try {
@@ -72,10 +85,10 @@ export function MileageConflictModal({
           setReference(data);
           setNewMileageForReference(String(data.mileage));
         } else {
-          setError(data.error ?? 'Could not load the other entry.');
+          setError(data.error ?? "Could not load the other entry.");
         }
       } catch {
-        if (!cancelled) setError('Could not reach the server.');
+        if (!cancelled) setError("Could not reach the server.");
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -83,7 +96,7 @@ export function MileageConflictModal({
     return () => {
       cancelled = true;
     };
-  }, [referenceId, referenceCategory]);
+  }, [preloadedReference, referenceId, referenceCategory]);
 
   async function patchThisEntry(overrides: { mileage?: number; mileageAnomaly?: boolean; mileageAcknowledged?: boolean }): Promise<boolean> {
     const res = await fetch(`/api/tracker/${CATEGORY_ROUTE[entryCategory]}/${encodeURIComponent(entryId)}`, {

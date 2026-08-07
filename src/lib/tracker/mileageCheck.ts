@@ -7,6 +7,10 @@
 export interface HistoryPoint {
   id?: string;
   category?: "service" | "fuel" | "mods";
+  // Set when this point is another item in the SAME upload batch,
+  // not yet saved to the database - lets a conflict point at "item #N
+  // in this batch" when there is no real id to reference yet.
+  batchIndex?: number;
   date: string;
   mileage: number;
 }
@@ -24,6 +28,9 @@ export interface MileageCheckResult {
   // only knowing a number and a date.
   referenceId?: string;
   referenceCategory?: "service" | "fuel" | "mods";
+  // Set instead of referenceId when the conflict is against another
+  // item still pending in the same upload batch, not yet saved.
+  referenceBatchIndex?: number;
 }
 
 function startOfToday(): number {
@@ -51,7 +58,7 @@ export function checkMileageConsistency(
     return { status: "ok" };
   }
 
-  let closest: { direction: "below-earlier" | "above-later"; mileage: number; date: string; id?: string; category?: "service" | "fuel" | "mods" } | null = null;
+  let closest: { direction: "below-earlier" | "above-later"; mileage: number; date: string; id?: string; category?: "service" | "fuel" | "mods"; batchIndex?: number } | null = null;
   let closestGapMs = Infinity;
 
   for (const point of history) {
@@ -60,11 +67,11 @@ export function checkMileageConsistency(
     const gap = Math.abs(pointTime - entryTime);
 
     if (pointTime < entryTime && point.mileage > enteredMileage && gap < closestGapMs) {
-      closest = { direction: "below-earlier", mileage: point.mileage, date: point.date, id: point.id, category: point.category };
+      closest = { direction: "below-earlier", mileage: point.mileage, date: point.date, id: point.id, category: point.category, batchIndex: point.batchIndex };
       closestGapMs = gap;
     }
     if (pointTime > entryTime && point.mileage < enteredMileage && gap < closestGapMs) {
-      closest = { direction: "above-later", mileage: point.mileage, date: point.date, id: point.id, category: point.category };
+      closest = { direction: "above-later", mileage: point.mileage, date: point.date, id: point.id, category: point.category, batchIndex: point.batchIndex };
       closestGapMs = gap;
     }
   }
@@ -77,6 +84,7 @@ export function checkMileageConsistency(
       referenceDate: closest.date,
       referenceId: closest.id,
       referenceCategory: closest.category,
+      referenceBatchIndex: closest.batchIndex,
     };
   }
 

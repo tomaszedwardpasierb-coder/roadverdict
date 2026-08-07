@@ -25,16 +25,16 @@ export interface PlateMismatch {
 }
 
 export type ReviewQueueEntry =
-  | { id: string; category: "service"; aiDescription: string; duplicate: DuplicateMatch | null; jobType: string; cost: number; mileage: number; mileageNeedsManualEntry: boolean; mileageWarningText?: string; mileageConflictReferenceId?: string; mileageConflictReferenceCategory?: "service" | "fuel" | "mods"; plateMismatch: PlateMismatch | null; date: string; notes: string; attachment: Attachment }
-  | { id: string; category: "fuel"; aiDescription: string; duplicate: DuplicateMatch | null; litres: number; cost: number; mileage: number; mileageNeedsManualEntry: boolean; mileageWarningText?: string; mileageConflictReferenceId?: string; mileageConflictReferenceCategory?: "service" | "fuel" | "mods"; plateMismatch: PlateMismatch | null; date: string; filledToFull: boolean; attachment: Attachment; precedingFuelMileage?: number; tankCapacityLitres?: number }
-  | { id: string; category: "mods"; aiDescription: string; duplicate: DuplicateMatch | null; name: string; modCategory: string; cost: number; mileage: number; mileageNeedsManualEntry: boolean; mileageWarningText?: string; mileageConflictReferenceId?: string; mileageConflictReferenceCategory?: "service" | "fuel" | "mods"; plateMismatch: PlateMismatch | null; date: string; notes: string; attachment: Attachment }
+  | { id: string; category: "service"; aiDescription: string; duplicate: DuplicateMatch | null; jobType: string; cost: number; mileage: number; mileageNeedsManualEntry: boolean; mileageWarningText?: string; mileageConflictReferenceId?: string; mileageConflictReferenceCategory?: "service" | "fuel" | "mods"; mileageConflictReferenceBatchIndex?: number; plateMismatch: PlateMismatch | null; date: string; notes: string; attachment: Attachment }
+  | { id: string; category: "fuel"; aiDescription: string; duplicate: DuplicateMatch | null; litres: number; cost: number; mileage: number; mileageNeedsManualEntry: boolean; mileageWarningText?: string; mileageConflictReferenceId?: string; mileageConflictReferenceCategory?: "service" | "fuel" | "mods"; mileageConflictReferenceBatchIndex?: number; plateMismatch: PlateMismatch | null; date: string; filledToFull: boolean; attachment: Attachment; precedingFuelMileage?: number; tankCapacityLitres?: number }
+  | { id: string; category: "mods"; aiDescription: string; duplicate: DuplicateMatch | null; name: string; modCategory: string; cost: number; mileage: number; mileageNeedsManualEntry: boolean; mileageWarningText?: string; mileageConflictReferenceId?: string; mileageConflictReferenceCategory?: "service" | "fuel" | "mods"; mileageConflictReferenceBatchIndex?: number; plateMismatch: PlateMismatch | null; date: string; notes: string; attachment: Attachment }
   | { id: string; category: "bills"; aiDescription: string; duplicate: DuplicateMatch | null; billType: string; cost: number; plateMismatch: PlateMismatch | null; date: string; notes: string; attachment: Attachment };
 
 export async function commitReceiptItem(
   email: string,
   bike: BikeDoc,
   item: ParsedReceiptItem,
-  batchHints: { date: string; mileage: number }[] = []
+  batchHints: { date: string; mileage: number; batchIndex?: number }[] = []
 ): Promise<ReviewQueueEntry> {
   const { category, date, costGbp, description, litres, mileageOnReceipt, registrationOnReceipt, merchantName, address, city, attachment, currencyConversion, forceReview } = item;
 
@@ -77,6 +77,7 @@ export async function commitReceiptItem(
   let mileageNeedsManualEntry = false;
   let conflictReferenceId: string | undefined;
   let conflictReferenceCategory: "service" | "fuel" | "mods" | undefined;
+  let conflictReferenceBatchIndex: number | undefined;
 
   const filledToFullGuess = category === "fuel" ? guessFilledToFull(litres ?? 0, bike.tankCapacityLitres) : false;
 
@@ -156,7 +157,7 @@ export async function commitReceiptItem(
         baseMileage: mileage ?? bike.currentMileage, date, sourceKey: `service:${jobType}`,
       });
     }
-    return { id: record.id, category: "service", aiDescription, duplicate, jobType, cost: costGbp, mileage: mileage ?? bike.currentMileage, mileageNeedsManualEntry, mileageWarningText: mileageNeedsManualEntry ? mileageWarning : undefined, mileageConflictReferenceId: conflictReferenceId, mileageConflictReferenceCategory: conflictReferenceCategory, plateMismatch, date, notes, attachment };
+    return { id: record.id, category: "service", aiDescription, duplicate, jobType, cost: costGbp, mileage: mileage ?? bike.currentMileage, mileageNeedsManualEntry, mileageWarningText: mileageNeedsManualEntry ? mileageWarning : undefined, mileageConflictReferenceId: conflictReferenceId, mileageConflictReferenceCategory: conflictReferenceCategory, mileageConflictReferenceBatchIndex: conflictReferenceBatchIndex, plateMismatch, date, notes, attachment };
   }
 
   if (category === "fuel") {
@@ -188,7 +189,7 @@ export async function commitReceiptItem(
       bikeId: bike.id, litres: litresValue, cost: costGbp, mileage: resolvedMileage, date,
       filledToFull: filledToFullGuess, attachments: [attachment], needsReview: true, currencyConversion, mileageConfidence, aiDescription,
     });
-    return { id: record.id, category: "fuel", aiDescription, duplicate, litres: litresValue, cost: costGbp, mileage: resolvedMileage, mileageNeedsManualEntry: finalMileageNeedsManualEntry, mileageWarningText: finalMileageNeedsManualEntry ? finalMileageWarning : undefined, mileageConflictReferenceId: conflictReferenceId, mileageConflictReferenceCategory: conflictReferenceCategory, plateMismatch, date, filledToFull: filledToFullGuess, attachment, precedingFuelMileage, tankCapacityLitres: bike.tankCapacityLitres };
+    return { id: record.id, category: "fuel", aiDescription, duplicate, litres: litresValue, cost: costGbp, mileage: resolvedMileage, mileageNeedsManualEntry: finalMileageNeedsManualEntry, mileageWarningText: finalMileageNeedsManualEntry ? finalMileageWarning : undefined, mileageConflictReferenceId: conflictReferenceId, mileageConflictReferenceCategory: conflictReferenceCategory, mileageConflictReferenceBatchIndex: conflictReferenceBatchIndex, plateMismatch, date, filledToFull: filledToFullGuess, attachment, precedingFuelMileage, tankCapacityLitres: bike.tankCapacityLitres };
   }
 
   if (category === "mods") {
@@ -203,7 +204,7 @@ export async function commitReceiptItem(
       bikeId: bike.id, category: modCategory, name: description, cost: costGbp, mileage: mileage ?? bike.currentMileage, date,
       notes: modNotes, attachments: [attachment], needsReview: true, currencyConversion, mileageConfidence, aiDescription,
     });
-    return { id: record.id, category: "mods", aiDescription, duplicate, name: description, modCategory, cost: costGbp, mileage: mileage ?? bike.currentMileage, mileageNeedsManualEntry, mileageWarningText: mileageNeedsManualEntry ? mileageWarning : undefined, mileageConflictReferenceId: conflictReferenceId, mileageConflictReferenceCategory: conflictReferenceCategory, plateMismatch, date, notes: modNotes, attachment };
+    return { id: record.id, category: "mods", aiDescription, duplicate, name: description, modCategory, cost: costGbp, mileage: mileage ?? bike.currentMileage, mileageNeedsManualEntry, mileageWarningText: mileageNeedsManualEntry ? mileageWarning : undefined, mileageConflictReferenceId: conflictReferenceId, mileageConflictReferenceCategory: conflictReferenceCategory, mileageConflictReferenceBatchIndex: conflictReferenceBatchIndex, plateMismatch, date, notes: modNotes, attachment };
   }
 
   const billType = guessBillType(description) ?? "insurance";
