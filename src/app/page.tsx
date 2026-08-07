@@ -39,7 +39,7 @@ export default function HomePage() {
       <p className="disclaimer">
         RoadVerdict compares your quote against typical price ranges for the same job on a
         similar bike. It&apos;s guidance, not a professional inspection or a guarantee any
-        individual garage&apos;s price is unreasonable â€” a &quot;high&quot; verdict can still
+        individual garage&apos;s price is unreasonable - a &quot;high&quot; verdict can still
         have a good reason behind it.
       </p>
     </>

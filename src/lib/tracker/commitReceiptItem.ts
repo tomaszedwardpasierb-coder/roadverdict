@@ -185,7 +185,7 @@ export async function commitReceiptItem(
     ].filter(Boolean).join(" - ");
     const jobLabel = JOB_LABELS[jobType] ?? jobType;
     const aiDescription = buildAiDescription({ description: jobLabel, merchantName, address, city, categoryLabel: "Service" });
-    const duplicate = findPossibleDuplicate(date, costGbp, serviceCandidates);
+    const duplicate = findPossibleDuplicate(date, costGbp, serviceCandidates, jobLabel);
     const record = await createServiceRecord(email, {
       bikeId: bike.id, jobType, cost: costGbp, mileage: mileage ?? bike.currentMileage, date, notes,
       attachments: [attachment], needsReview: true, currencyConversion, mileageConfidence, aiDescription,
@@ -202,7 +202,7 @@ export async function commitReceiptItem(
 
   if (category === "fuel") {
     const aiDescription = buildAiDescription({ description: description || "Fuel", merchantName, address, city, categoryLabel: "Fuel" });
-    const duplicate = findPossibleDuplicate(date, costGbp, fuelCandidates);
+    const duplicate = findPossibleDuplicate(date, costGbp, fuelCandidates, `${(litres ?? 0).toFixed(1)}L fill-up`);
     const litresValue = litres ?? 0;
     const resolvedMileage = mileage ?? bike.currentMileage;
 
@@ -239,7 +239,7 @@ export async function commitReceiptItem(
       mileageWarning ? `⚠️ ${mileageWarning}` : null,
     ].filter(Boolean).join(" - ");
     const aiDescription = buildAiDescription({ description, merchantName, address, city, categoryLabel: "Parts & Accessories" });
-    const duplicate = findPossibleDuplicate(date, costGbp, modCandidates);
+    const duplicate = findPossibleDuplicate(date, costGbp, modCandidates, description);
     const record = await createMod(email, {
       bikeId: bike.id, category: modCategory, name: description, cost: costGbp, mileage: mileage ?? bike.currentMileage, date,
       notes: modNotes, attachments: [attachment], needsReview: true, currencyConversion, mileageConfidence, aiDescription,
@@ -251,7 +251,7 @@ export async function commitReceiptItem(
   const billNotes = forceReview ? `${description} (currency could not be auto-converted - please check the amount)` : description;
   const billLabel = BILL_LABELS[billType] ?? billType;
   const aiDescription = buildAiDescription({ description: billLabel, merchantName, address, city, categoryLabel: "Insurance, tax & MOT" });
-  const duplicate = findPossibleDuplicate(date, costGbp, billCandidates);
+  const duplicate = findPossibleDuplicate(date, costGbp, billCandidates, billLabel);
   const record = await createBill(email, {
     bikeId: bike.id, billType, cost: costGbp, date, notes: billNotes, attachments: [attachment], needsReview: true, currencyConversion, aiDescription,
   });

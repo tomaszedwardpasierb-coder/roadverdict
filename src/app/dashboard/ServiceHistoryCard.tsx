@@ -210,13 +210,13 @@ export function ServiceHistoryCard({ record, bikeClass, brandValue, region, dist
             triggers={remindTriggers}
             onTriggersChange={setRemindTriggers}
             idPrefix={`edit-remind-service-${record.id}`}
-            checkboxLabel="ðŸ”” Remind me when this is due again"
+            checkboxLabel="🔔 Remind me when this is due again"
           />
         </div>
         <hr className="ticket__divider" />
         <div className="ticket__section" style={{ display: 'flex', gap: '0.6rem', alignItems: 'center' }}>
           <button className="submit-button" type="submit" disabled={submitting || isBlocked}>
-            {submitting ? 'Savingâ€¦' : 'Save'}
+            {submitting ? 'Saving…' : 'Save'}
           </button>
           <button type="button" className={styles.iconBtn} onClick={() => setIsEditing(false)} disabled={submitting}>
             Cancel
@@ -305,7 +305,7 @@ export function ServiceHistoryCard({ record, bikeClass, brandValue, region, dist
       <div className={styles.cardActions}>
         <button type="button" className={styles.iconBtn} onClick={() => setIsEditing(true)}>Edit</button>
         <button type="button" className={styles.iconBtn} onClick={handleDelete} disabled={submitting}>
-          {submitting ? 'Deletingâ€¦' : 'Delete'}
+          {submitting ? 'Deleting…' : 'Delete'}
         </button>
       </div>
       {error && <p className="error-text" role="alert">{error}</p>}

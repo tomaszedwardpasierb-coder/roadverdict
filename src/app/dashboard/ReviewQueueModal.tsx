@@ -163,10 +163,10 @@ function QueueItemForm({
           <p>
             This might already be logged: <strong>{entry.duplicate.description}</strong>,{' '}
             {new Date(entry.duplicate.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })},{' '}
-            Â£{entry.duplicate.cost.toFixed(2)}.
+            £{entry.duplicate.cost.toFixed(2)}.
           </p>
           <button type="button" className={styles.iconBtn} onClick={handleDelete} disabled={deleting || submitting}>
-            {deleting ? 'Deletingâ€¦' : 'Delete this new entry'}
+            {deleting ? 'Deleting…' : 'Delete this new entry'}
           </button>
         </div>
       )}
@@ -219,7 +219,7 @@ function QueueItemForm({
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.7rem', marginTop: '0.7rem' }}>
         <div className="field">
-          <label htmlFor="rq-cost">Cost (Â£)</label>
+          <label htmlFor="rq-cost">Cost (£)</label>
           <input id="rq-cost" type="number" min="0" step="0.01" value={cost} onChange={(e) => setCost(e.target.value)} required />
         </div>
         <div className="field">
@@ -307,13 +307,13 @@ function QueueItemForm({
         </button>
         <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center' }}>
           <button type="button" className={styles.reviewQueueFinishLater} onClick={onFinishLater} disabled={submitting || finishing}>
-            {finishing ? 'Saving the restâ€¦' : 'Finish later'}
+            {finishing ? 'Saving the rest…' : 'Finish later'}
           </button>
           <button type="button" className={styles.iconBtn} onClick={onSkip} disabled={submitting || finishing}>
             Skip
           </button>
           <button type="submit" className="submit-button" disabled={submitting || finishing}>
-            {submitting ? 'Savingâ€¦' : 'Save and next'}
+            {submitting ? 'Saving…' : 'Save and next'}
           </button>
         </div>
       </div>
@@ -379,6 +379,41 @@ function isDirty(entry: ReviewQueueEntry, original: ParsedReceiptItem): boolean 
   // silently, since nothing else about it looks wrong.
   if (entry.category === 'fuel' && checkLitresPlausibility(entry.litres, entry.tankCapacityLitres).implausible) return true;
   return false;
+}
+
+// A clean auto-commit skips the human review step entirely, but the
+// record it just created still has needsReview: true - that's the
+// default every new record gets, and the ONLY thing that ever clears it
+// is a real PATCH request, which a human clicking Save would normally
+// send. Auto-commit never sends one, so without this, an auto-committed
+// record would sit flagged as needing review forever - the exact
+// opposite of what auto-commit is for. This re-saves the entry with its
+// own already-confirmed values, unchanged, purely to trigger that flag
+// clearing server-side.
+async function markEntryReviewed(entry: ReviewQueueEntry): Promise<void> {
+  let body: Record<string, unknown>;
+  if (entry.category === 'service') {
+    body = { jobType: entry.jobType, cost: entry.cost, mileage: entry.mileage, date: entry.date, notes: entry.notes, mileageAcknowledged: true };
+  } else if (entry.category === 'fuel') {
+    body = { litres: entry.litres, cost: entry.cost, mileage: entry.mileage, date: entry.date, filledToFull: entry.filledToFull, mileageAcknowledged: true };
+  } else if (entry.category === 'mods') {
+    body = { category: entry.modCategory, name: entry.name, cost: entry.cost, mileage: entry.mileage, date: entry.date, notes: entry.notes, mileageAcknowledged: true };
+  } else {
+    body = { billType: entry.billType, cost: entry.cost, date: entry.date, notes: entry.notes };
+  }
+  try {
+    await fetch(`/api/tracker/${CATEGORY_ROUTE[entry.category]}/${encodeURIComponent(entry.id)}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+  } catch {
+    // Not fatal to the batch if this one follow-up call fails - the
+    // record itself is already safely saved either way, this only
+    // affects whether its review flag clears immediately or waits for
+    // the owner to notice it later. Worth knowing about, not worth
+    // blocking the scan over.
+  }
 }
 
 // "Prev" should always land on something there's actually a reason to
@@ -454,6 +489,7 @@ export function ReviewQueueModal({ parsedItems, onFinished }: { parsedItems: Par
           // that was never actually in question.
           const tier = classifyReceiptTier(items[index]);
           if (isAutoCommitTier(tier) && !isDirty(data.entry, items[index])) {
+            void markEntryReviewed(data.entry);
             setIndex((i) => i + 1);
           }
         } else {
@@ -585,7 +621,7 @@ export function ReviewQueueModal({ parsedItems, onFinished }: { parsedItems: Par
 
         {current === null ? (
           <div className={styles.reviewQueueDoneWrap}>
-            {committing && <p className={styles.subtext}>Saving this entryâ€¦</p>}
+            {committing && <p className={styles.subtext}>Saving this entry…</p>}
             {commitError && (
               <>
                 <p className="error-text" role="alert">{commitError}</p>

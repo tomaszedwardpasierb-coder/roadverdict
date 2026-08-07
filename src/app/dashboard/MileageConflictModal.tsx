@@ -230,10 +230,10 @@ export function MileageConflictModal({
                   Correct the mileage on one or both entries
                 </button>
                 <button type="button" className={styles.iconBtn} disabled={submitting} onClick={() => handleDelete('entry')}>
-                  Delete this entry
+                  Delete this entry ({entryLabel})
                 </button>
                 <button type="button" className={styles.iconBtn} disabled={submitting} onClick={() => handleDelete('reference')}>
-                  Delete the other entry
+                  Delete the other entry ({reference.label})
                 </button>
                 <button type="button" className={styles.iconBtn} disabled={submitting} onClick={() => handleDelete('both')}>
                   Delete both entries
