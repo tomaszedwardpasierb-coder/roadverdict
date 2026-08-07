@@ -7,6 +7,7 @@ import { BILL_LABELS } from '@/lib/tracker/billTypes';
 import { MOD_LABELS } from '@/lib/tracker/modTypes';
 import { AttachmentThumb } from './AttachmentThumb';
 import { checkFullTankPlausibility, checkLitresPlausibility } from '@/lib/tracker/fuelPlausibility';
+import { classifyReceiptTier, isAutoCommitTier } from '@/lib/tracker/receiptTiering';
 import type { ReviewQueueEntry } from '@/lib/tracker/commitReceiptItem';
 import type { ParsedReceiptItem } from '@/lib/tracker/receiptParse';
 import styles from './dashboard.module.css';
@@ -63,6 +64,7 @@ function QueueItemForm({
   onFinishLater,
   canGoPrev,
   finishing,
+  mileageOptional,
 }: {
   entry: ReviewQueueEntry;
   batchHints: { date: string; mileage: number }[];
@@ -73,6 +75,7 @@ function QueueItemForm({
   onFinishLater: () => void;
   canGoPrev: boolean;
   finishing: boolean;
+  mileageOptional: boolean;
 }) {
   const [submitting, setSubmitting] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -102,13 +105,21 @@ function QueueItemForm({
     setSubmitting(true);
     setError(null);
 
+    // A blank mileage field only reaches here when it was optional in
+    // the first place (a non-fuel receipt with no printed mileage) -
+    // Number('') would otherwise silently submit 0, an actively harmful
+    // value to write into the mileage timeline. Falling back to the
+    // estimate the entry already carries is the correct "didn't bother
+    // to re-type it" outcome, not a missing value.
+    const mileageValue = mileage.trim() ? Number(mileage) : entry.category !== 'bills' ? entry.mileage : 0;
+
     let body: Record<string, unknown>;
     if (entry.category === 'service') {
-      body = { jobType, cost: Number(cost), mileage: Number(mileage), date, notes, batchHints };
+      body = { jobType, cost: Number(cost), mileage: mileageValue, date, notes, batchHints };
     } else if (entry.category === 'fuel') {
-      body = { litres: Number(litres), cost: Number(cost), mileage: Number(mileage), date, filledToFull, batchHints };
+      body = { litres: Number(litres), cost: Number(cost), mileage: mileageValue, date, filledToFull, batchHints };
     } else if (entry.category === 'mods') {
-      body = { category: entry.modCategory, name, cost: Number(cost), mileage: Number(mileage), date, notes, batchHints };
+      body = { category: entry.modCategory, name, cost: Number(cost), mileage: mileageValue, date, notes, batchHints };
     } else {
       body = { billType, cost: Number(cost), date, notes };
     }
@@ -224,8 +235,8 @@ function QueueItemForm({
             min="0"
             value={mileage}
             onChange={(e) => setMileage(e.target.value)}
-            placeholder={entry.mileageNeedsManualEntry ? 'Enter the real mileage' : undefined}
-            required
+            placeholder={entry.mileageNeedsManualEntry ? 'Enter the real mileage' : mileageOptional ? 'Optional' : undefined}
+            required={!mileageOptional}
           />
           {liveFuelCheck && (
             <p
@@ -284,6 +295,43 @@ function QueueItemForm({
 // is a real, saved database row by the time item #2 is being estimated,
 // so it genuinely becomes a better anchor for #2 rather than #2 having
 // already been guessed from stale, pre-review context.
+
+// A tier-1/4 item (printed date and mileage) only actually skips human
+// review if the commit came back completely clean - a duplicate, a
+// currency conversion that couldn't complete, or (for fuel specifically)
+// a printed mileage that conflicts with the rest of the timeline all
+// still need a human's eyes regardless of how strong the anchor looked
+// on paper. mileageNeedsManualEntry doesn't exist on the bills variant
+// at all, since bills never need mileage estimation - checking the
+// category first, rather than a blind property access, keeps this safe
+// across the whole union.
+function isDirty(entry: ReviewQueueEntry, original: ParsedReceiptItem): boolean {
+  if (entry.duplicate) return true;
+  if (original.forceReview) return true;
+  if (entry.category !== 'bills' && entry.mileageNeedsManualEntry) return true;
+  // commitReceiptItem doesn't reject on implausible litres the way the
+  // manual write routes do - it only ever surfaces as a live warning in
+  // this same queue. Without this check, a tier-4 item (fuel, printed
+  // mileage) with an OCR-misread litres figure would auto-commit
+  // silently, since nothing else about it looks wrong.
+  if (entry.category === 'fuel' && checkLitresPlausibility(entry.litres, entry.tankCapacityLitres).implausible) return true;
+  return false;
+}
+
+// "Prev" should always land on something there's actually a reason to
+// look at - stepping back exactly one index could land on an
+// already-auto-committed, clean item, which would show the "logging
+// automatically" message again for something that finished a moment
+// ago. Skips backward past any contiguous run of those instead.
+function findPrevInteractiveIndex(items: ParsedReceiptItem[], committed: (ReviewQueueEntry | null)[], from: number): number {
+  for (let i = from - 1; i >= 0; i--) {
+    const tier = classifyReceiptTier(items[i]);
+    const entry = committed[i];
+    if (!isAutoCommitTier(tier) || (entry && isDirty(entry, items[i]))) return i;
+  }
+  return 0;
+}
+
 export function ReviewQueueModal({ parsedItems, onFinished }: { parsedItems: ParsedReceiptItem[]; onFinished: () => void }) {
   const [items, setItems] = useState(parsedItems);
   const [committed, setCommitted] = useState<(ReviewQueueEntry | null)[]>(() => parsedItems.map(() => null));
@@ -328,6 +376,15 @@ export function ReviewQueueModal({ parsedItems, onFinished }: { parsedItems: Par
             next[index] = data.entry;
             return next;
           });
+          // A clean auto-commit-tier item (printed date and mileage,
+          // nothing wrong with it) never needs a human step at all -
+          // move straight to the next item instead of waiting for a
+          // Save/Skip click that would just be clicking through data
+          // that was never actually in question.
+          const tier = classifyReceiptTier(items[index]);
+          if (isAutoCommitTier(tier) && !isDirty(data.entry, items[index])) {
+            setIndex((i) => i + 1);
+          }
         } else {
           attemptedRef.current.delete(index);
           setCommitError(data.error ?? 'Could not save this entry.');
@@ -404,6 +461,41 @@ export function ReviewQueueModal({ parsedItems, onFinished }: { parsedItems: Par
 
   const current = committed[index];
 
+  // Auto-commit tier, still clean (or not yet known to be dirty because
+  // the commit hasn't returned yet) - show a simple progress indicator
+  // instead of the filmstrip and form. This branch is checked explicitly
+  // rather than relying on the setCommitted+setIndex calls in the effect
+  // landing in the same React batch, so the human is never shown a
+  // review step for an item that's about to be skipped a moment later
+  // regardless of timing.
+  const currentTier = classifyReceiptTier(items[index]);
+  const currentIsAutoTier = isAutoCommitTier(currentTier) && !(current && isDirty(current, items[index]));
+
+  if (currentIsAutoTier) {
+    const autoTierTotal = items.filter((it) => isAutoCommitTier(classifyReceiptTier(it))).length;
+    const autoTierDoneCount = items.slice(0, index).filter((it) => isAutoCommitTier(classifyReceiptTier(it))).length;
+    return (
+      <div className={styles.reviewQueueOverlay}>
+        <div className={styles.reviewQueueModal}>
+          <div className={styles.reviewQueueDoneWrap}>
+            <p className={styles.reviewQueueDoneTitle}>Logging clear entries automatically</p>
+            <p className={styles.subtext}>
+              These already have a date and mileage confirmed, so there&apos;s nothing to review, {autoTierDoneCount} of {autoTierTotal} so far.
+            </p>
+            {commitError && (
+              <>
+                <p className="error-text" role="alert">{commitError}</p>
+                <button type="button" className="submit-button" onClick={() => setRetryTick((t) => t + 1)}>
+                  Retry
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className={styles.reviewQueueOverlay}>
       <div className={styles.reviewQueueModal}>
@@ -436,6 +528,7 @@ export function ReviewQueueModal({ parsedItems, onFinished }: { parsedItems: Par
           <QueueItemForm
             key={current.id}
             entry={current}
+            mileageOptional={currentTier === 2}
             batchHints={items
               .filter((_, i) => i !== index)
               .filter((it) => typeof it.mileageOnReceipt === 'number')
@@ -443,7 +536,7 @@ export function ReviewQueueModal({ parsedItems, onFinished }: { parsedItems: Par
             onSaved={goNext}
             onSkip={goNext}
             onDeleteDuplicate={handleDeleteDuplicate}
-            onPrev={() => setIndex((i) => Math.max(0, i - 1))}
+            onPrev={() => setIndex((i) => findPrevInteractiveIndex(items, committed, i))}
             onFinishLater={handleFinishLater}
             canGoPrev={index > 0}
             finishing={finishing}

@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ReviewQueueModal } from './ReviewQueueModal';
 import type { ParsedReceiptItem } from '@/lib/tracker/receiptParse';
+import { classifyReceiptTier, receiptTierSortWeight } from '@/lib/tracker/receiptTiering';
 import styles from './dashboard.module.css';
 
 interface FileParseOutcome {
@@ -72,13 +73,23 @@ export function ScanReceiptButton() {
     setOutcomes(results);
 
     // Combine everything read across every file, and sort into TRUE
-    // chronological order - not upload order, not file-selection order.
-    // The review queue commits each one lazily, right as it's reached,
-    // so a correction to an early item can genuinely improve the
-    // estimate for a later one instead of every item being guessed from
-    // the same stale, pre-review snapshot.
+    // Sorted by tier first, then chronologically within each tier - not
+    // upload order, not file-selection order. The two auto-commit tiers
+    // (a printed date and mileage, needing no estimation at all) go
+    // first regardless of relative date, since neither depends on
+    // anything else in the batch; by the time the weakest tier (fuel
+    // with no mileage) is reached, every stronger anchor from earlier
+    // tiers already exists to interpolate between. The review queue
+    // still commits each one lazily, right as it's reached, so a
+    // correction to an early item can genuinely improve the estimate
+    // for a later one instead of every item being guessed from the same
+    // stale, pre-review snapshot.
     const allItems = results.flatMap((r) => r.items ?? []);
-    allItems.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    allItems.sort((a, b) => {
+      const tierDiff = receiptTierSortWeight(classifyReceiptTier(a)) - receiptTierSortWeight(classifyReceiptTier(b));
+      if (tierDiff !== 0) return tierDiff;
+      return new Date(a.date).getTime() - new Date(b.date).getTime();
+    });
 
     setProgress(null);
     setScanning(false);
