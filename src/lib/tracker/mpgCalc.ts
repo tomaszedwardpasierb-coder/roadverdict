@@ -20,8 +20,11 @@ export interface MpgSegment {
   // continuity, independent of what mpg it happens to produce.
   // "anomalous-value" means the dates/mileages look perfectly ordinary,
   // but the resulting mpg is a statistical outlier against this rider's
-  // own history - the softer, inferred case.
-  exclusionReason?: "unusual-gap" | "anomalous-value" | "anomalous-vs-lifetime";
+  // own history - the softer, inferred case. "marked-anomaly" is neither
+  // inferred - the owner explicitly compared this reading against a
+  // conflicting one and chose to keep both numbers exactly as logged,
+  // rather than correct or delete either.
+  exclusionReason?: "unusual-gap" | "anomalous-value" | "anomalous-vs-lifetime" | "marked-anomaly";
 }
 
 export interface MpgCalcInput {
@@ -31,6 +34,9 @@ export interface MpgCalcInput {
   filledToFull: boolean;
   date: string;
   mileageConfidence?: "interpolated" | "estimated" | "confirmed";
+  // Explicitly set by the owner via the mileage-conflict modal's "keep
+  // both as they are" choice - never inferred by this file itself.
+  mileageAnomaly?: boolean;
 }
 
 // Modified z-score outlier detection (Iglewicz & Hoaglin, "How to
@@ -127,7 +133,7 @@ function isUnusuallyLargeGap(candidateMiles: number, baselineGaps: number[]): bo
 // verified full-tank fill-up simply starts a fresh chain.
 export function computeMPGSeries(fuelLogs: MpgCalcInput[]): MpgSegment[] {
   const sorted = [...fuelLogs].sort((a, b) => a.mileage - b.mileage);
-  const raw: { mileage: number; mpg: number; date: string; fuelLogId: string; miles: number }[] = [];
+  const raw: { mileage: number; mpg: number; date: string; fuelLogId: string; miles: number; mileageAnomaly: boolean }[] = [];
   let litresSinceLastFull = 0;
   let lastFullMileage: number | null = null;
   for (const log of sorted) {
@@ -143,7 +149,7 @@ export function computeMPGSeries(fuelLogs: MpgCalcInput[]): MpgSegment[] {
         const miles = log.mileage - lastFullMileage;
         if (miles > 0 && litresSinceLastFull > 0) {
           const gallons = litresSinceLastFull / 4.546;
-          raw.push({ mileage: log.mileage, mpg: miles / gallons, date: log.date, fuelLogId: log.id, miles });
+          raw.push({ mileage: log.mileage, mpg: miles / gallons, date: log.date, fuelLogId: log.id, miles, mileageAnomaly: Boolean(log.mileageAnomaly) });
         }
       }
       lastFullMileage = log.mileage;
@@ -182,6 +188,19 @@ export function computeMPGSeries(fuelLogs: MpgCalcInput[]): MpgSegment[] {
   const result: MpgSegment[] = [];
 
   for (const seg of raw) {
+    // An explicit human decision takes precedence over both automatic
+    // checks below - there's nothing to infer, the owner already looked
+    // at this exact conflict and chose to keep both numbers as they are.
+    // Unlike a gap-flagged segment, this doesn't reset the baseline
+    // arrays or break the fill-up chain: the mileage itself is still a
+    // real, deliberately-kept number, fine to anchor the NEXT segment
+    // from - it's specifically this one segment's mpg that shouldn't
+    // count toward the average or trend line.
+    if (seg.mileageAnomaly) {
+      result.push({ mileage: seg.mileage, mpg: seg.mpg, date: seg.date, fuelLogId: seg.fuelLogId, likelyMissedFillUps: true, exclusionReason: "marked-anomaly" });
+      continue;
+    }
+
     const gapFlagged = validGapsSoFar.length >= MIN_VALID_SEGMENTS_FOR_BASELINE && isUnusuallyLargeGap(seg.miles, validGapsSoFar);
 
     if (gapFlagged) {

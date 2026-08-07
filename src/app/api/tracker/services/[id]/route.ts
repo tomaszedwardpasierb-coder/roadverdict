@@ -113,6 +113,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     needsReview: false,
     mileageConfidence: nextMileageConfidence,
     mileageConflictWarning: null,
+    ...(mileageAnomaly !== undefined ? { mileageAnomaly } : {}),
   });
   if (!record) {
     return NextResponse.json({ error: "Record not found." }, { status: 404 });

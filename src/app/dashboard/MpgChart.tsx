@@ -44,6 +44,9 @@ function isSegmentFlagged(filtered: MpgSegment[], ctx: { p0DataIndex: number; p1
 
 function exclusionReasonText(point: MpgSegment | undefined): string | null {
   if (!point?.likelyMissedFillUps) return null;
+  if (point.exclusionReason === 'marked-anomaly') {
+    return "Marked as a known anomaly - kept in your records exactly as logged, just excluded from the average and trend line so it doesn't distort them.";
+  }
   if (point.exclusionReason === 'unusual-gap') {
     return 'Excluded - the gap since the last fill-up is much bigger than usual, so a fill-up in between was probably missed.';
   }
@@ -74,7 +77,8 @@ export function MpgChart({
   const { range, viewBy } = useChartFilter();
   const { kind, changeKind } = useChartTypePreference(CHART_ID, initialChartType ?? 'line');
   const dateFiltered = filterByDateRange(series, range);
-  const missedFillUpCount = dateFiltered.filter((s) => s.likelyMissedFillUps).length;
+  const missedFillUpCount = dateFiltered.filter((s) => s.likelyMissedFillUps && s.exclusionReason !== 'marked-anomaly').length;
+  const markedAnomalyCount = dateFiltered.filter((s) => s.exclusionReason === 'marked-anomaly').length;
   // Same range the chart itself is currently showing, applied to the
   // excluded entries too - so the note below always reflects "how much
   // of what you're looking at right now was left out", not a lifetime
@@ -219,6 +223,12 @@ export function MpgChart({
           {missedFillUpCount} {missedFillUpCount === 1 ? 'reading looks' : 'readings look'} far enough outside your
           usual range that a fill-up in between probably wasn&apos;t logged (shown in red above) - hover one for why
           it&apos;s left out of the average.
+        </p>
+      )}
+      {markedAnomalyCount > 0 && (
+        <p className={styles.mpgExcludedNote}>
+          {markedAnomalyCount} {markedAnomalyCount === 1 ? 'reading is' : 'readings are'} marked as a known anomaly
+          (shown in red above) - kept exactly as logged, just excluded from the average and trend line.
         </p>
       )}
     </div>

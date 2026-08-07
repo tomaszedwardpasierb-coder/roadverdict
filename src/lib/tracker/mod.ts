@@ -8,6 +8,7 @@ export interface ModDoc extends TrackerDocBase {
   cost: number;
   mileage: number;
   notes: string;
+  mileageAnomaly?: boolean;
 }
 
 export async function createMod(

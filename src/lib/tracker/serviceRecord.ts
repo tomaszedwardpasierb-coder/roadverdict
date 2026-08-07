@@ -7,6 +7,13 @@ export interface ServiceRecordDoc extends TrackerDocBase {
   cost: number;
   mileage: number;
   notes: string;
+  // Set when the owner explicitly chose "keep both as they are" on a
+  // mileage conflict - the number stays exactly as logged (never
+  // silently altered), but the mileage chart should draw this point as
+  // a distinct marker and exclude it from the trend line, rather than
+  // letting a known-inconsistent reading distort the line everything
+  // else draws through.
+  mileageAnomaly?: boolean;
 }
 
 export async function createServiceRecord(

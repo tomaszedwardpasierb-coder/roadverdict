@@ -12,7 +12,7 @@ import { JOB_LABELS, JOB_REMINDER_DEFAULTS } from "@/lib/tracker/jobTypes";
 import { BILL_LABELS, BILL_REMINDER_DEFAULTS } from "@/lib/tracker/billTypes";
 import { buildAiDescription } from "@/lib/tracker/aiDescription";
 import { findPossibleDuplicate, type DuplicateMatch } from "@/lib/tracker/duplicateCheck";
-import { checkMileageConsistency, type HistoryPoint } from "@/lib/tracker/mileageCheck";
+import { checkMileageConsistency, describeMileageCheck, type HistoryPoint } from "@/lib/tracker/mileageCheck";
 import { guessFilledToFull } from "@/lib/tracker/tankGuess";
 import { checkFullTankPlausibility, describeImplausibleFill } from "@/lib/tracker/fuelPlausibility";
 import { normalizePlate, allKnownPlates } from "@/lib/tracker/reportAccess";
@@ -70,6 +70,20 @@ export async function commitReceiptItem(
     ...batchHints,
   ];
   const trustedMileagePointsForEstimate: MileagePoint[] = trustedMileagePoints.map((p) => ({ date: p.date, mileage: p.mileage }));
+  // Every logged point regardless of confidence, unlike
+  // trustedMileagePoints above - an unconfirmed prior estimate still
+  // represents a real, already-saved number, and nothing computed after
+  // it should be allowed to silently contradict it. Only used to
+  // cross-check a freshly computed estimate against, never to compute
+  // one in the first place - that distinction is the whole point:
+  // an untrusted point isn't reliable enough to extrapolate a RATE
+  // from, but its own mileage is still a real floor or ceiling.
+  const allMileagePoints: HistoryPoint[] = [
+    ...records.map((r) => ({ id: r.id, category: "service" as const, date: r.date, mileage: r.mileage })),
+    ...fuelLogs.map((f) => ({ id: f.id, category: "fuel" as const, date: f.date, mileage: f.mileage })),
+    ...mods.map((m) => ({ id: m.id, category: "mods" as const, date: m.date, mileage: m.mileage })),
+    ...batchHints,
+  ];
 
   let mileage: number | undefined;
   let mileageConfidence: "interpolated" | "estimated" | undefined;
@@ -91,6 +105,24 @@ export async function commitReceiptItem(
     mileageConfidence = estimate.confidence;
     mileageWarning = conflictWarning ?? estimate.warning;
     mileageNeedsManualEntry = conflictWarning ? true : estimate.requiresManualEntry;
+
+    // Cross-check the freshly computed estimate against EVERY logged
+    // point, not just the trustworthy subset it was computed from - this
+    // is what catches the case that used to slip through: an estimate
+    // that's internally reasonable given the anchors it trusted, but
+    // still contradicts an unconfirmed prior record sitting right there
+    // in the database. Only runs when this isn't already a
+    // printed-mileage conflict (conflictWarning set), which has its own
+    // reference already.
+    if (!conflictWarning && mileage !== undefined) {
+      const fullCheck = checkMileageConsistency(mileage, date, allMileagePoints, bike.currentMileage);
+      if (fullCheck.status !== "ok") {
+        mileageWarning = describeMileageCheck(fullCheck);
+        mileageNeedsManualEntry = true;
+        conflictReferenceId = fullCheck.referenceId;
+        conflictReferenceCategory = fullCheck.referenceCategory;
+      }
+    }
   }
 
   if (category !== "bills") {

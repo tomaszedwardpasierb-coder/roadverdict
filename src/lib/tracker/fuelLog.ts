@@ -7,6 +7,10 @@ export interface FuelLogDoc extends TrackerDocBase {
   cost: number;
   mileage: number;
   filledToFull: boolean;
+  // See the same field on ServiceRecordDoc for the full rationale -
+  // matters most here specifically, since fuel entries are what MPG
+  // gets computed from.
+  mileageAnomaly?: boolean;
 }
 
 export async function createFuelLog(

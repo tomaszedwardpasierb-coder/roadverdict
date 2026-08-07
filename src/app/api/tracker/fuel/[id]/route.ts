@@ -104,6 +104,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     needsReview: false,
     mileageConfidence: nextMileageConfidence,
     mileageConflictWarning: null,
+    ...(mileageAnomaly !== undefined ? { mileageAnomaly } : {}),
   });
   if (!log) {
     return NextResponse.json({ error: "Entry not found." }, { status: 404 });
