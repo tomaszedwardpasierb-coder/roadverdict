@@ -309,24 +309,33 @@ export async function deleteBike(email: string, bikeId: string): Promise<void> {
 
   const { resource: bike } = await container.item(bikeId, email).read<BikeDoc>();
 
+  // Every record type queried and deleted in parallel, not sequentially
+  // one type then the next then the next - each type's query and delete
+  // pass is fully independent of the others, so there's no reason to
+  // wait for service records to finish before starting on fuel logs.
+  // Within each type, every matching record is also deleted in parallel
+  // rather than one network round-trip at a time - for an account with
+  // real history (hundreds of fuel logs, say), sequential deletes here
+  // could genuinely take long enough to risk a request timeout; this
+  // does the same work in a fraction of the wall-clock time.
   const recordTypes = ["serviceRecord", "fuelLog", "mod", "bill", "reminder"];
-  for (const type of recordTypes) {
-    const { resources } = await container.items
-      .query<{ id: string }>(
-        {
-          query: "SELECT c.id FROM c WHERE c.type = @type AND c.bikeId = @bikeId",
-          parameters: [
-            { name: "@type", value: type },
-            { name: "@bikeId", value: bikeId },
-          ],
-        },
-        { partitionKey: email }
-      )
-      .fetchAll();
-    for (const r of resources) {
-      await container.item(r.id, email).delete();
-    }
-  }
+  await Promise.all(
+    recordTypes.map(async (type) => {
+      const { resources } = await container.items
+        .query<{ id: string }>(
+          {
+            query: "SELECT c.id FROM c WHERE c.type = @type AND c.bikeId = @bikeId",
+            parameters: [
+              { name: "@type", value: type },
+              { name: "@bikeId", value: bikeId },
+            ],
+          },
+          { partitionKey: email }
+        )
+        .fetchAll();
+      await Promise.all(resources.map((r) => container.item(r.id, email).delete()));
+    })
+  );
 
   if (bike?.shareToken) {
     try {

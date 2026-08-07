@@ -78,7 +78,7 @@ export async function POST(req: NextRequest) {
     ttl: MAGIC_LINK_TTL_SECONDS,
   });
 
-  const link = `${process.env.APP_URL}/api/auth/verify?token=${raw}&e=${encodeEmail(
+  const link = `${process.env.APP_URL ?? "https://roadverdict.co.uk"}/api/auth/verify?token=${raw}&e=${encodeEmail(
     normalizedEmail
   )}`;
 

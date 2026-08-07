@@ -15,6 +15,24 @@ function getResend(): Resend {
   return resendInstance;
 }
 const FROM = "RoadVerdict <noreply@mail.roadverdict.co.uk>";
+
+// Anything interpolated into an HTML email body must go through this -
+// unlike React's JSX (which escapes automatically), a raw template
+// literal does not. buyerMessage specifically is filled in by an
+// anonymous, unauthenticated visitor to the public report page, so it
+// must never be trusted as safe HTML just because it looks like a short
+// note - the same rule applies to any other field reaching these
+// templates, since escaping unconditionally is cheap and getting it
+// right selectively is not.
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 export async function sendMagicLinkEmail(email: string, link: string) {
   const resend = getResend();
   await resend.emails.send({
@@ -37,7 +55,7 @@ export async function sendReminderEmail(email: string, reminderName: string, det
     subject: `Reminder: ${reminderName} is due`,
     html: `
       <p>Hi,</p>
-      <p>Your reminder for <strong>${reminderName}</strong> is now due - ${detail}.</p>
+      <p>Your reminder for <strong>${escapeHtml(reminderName)}</strong> is now due - ${escapeHtml(detail)}.</p>
       <p>Sign in to your <a href="${appUrl}/dashboard">RoadVerdict dashboard</a> to log it and reset this reminder.</p>
     `,
   });
@@ -52,7 +70,9 @@ export async function sendReceiptRequestEmail(params: {
 }) {
   const resend = getResend();
   const appUrl = process.env.APP_URL ?? "https://roadverdict.co.uk";
-  const itemList = params.items.map((i) => `<li>${i.description}</li>`).join("");
+  const safeBikeName = escapeHtml(params.bikeName);
+  const itemList = params.items.map((i) => `<li>${escapeHtml(i.description)}</li>`).join("");
+  const safeBuyerMessage = params.buyerMessage ? escapeHtml(params.buyerMessage) : undefined;
   const approveAllUrl = `${appUrl}/report/receipt-request/decide?token=${params.decisionToken}&action=approve`;
   const declineAllUrl = `${appUrl}/report/receipt-request/decide?token=${params.decisionToken}&action=decline`;
   const reviewUrl = `${appUrl}/report/receipt-request/decide?token=${params.decisionToken}`;
@@ -63,10 +83,10 @@ export async function sendReceiptRequestEmail(params: {
     subject: params.isReminder ? `Reminder: receipt request for ${params.bikeName}` : `Receipt request for ${params.bikeName}`,
     html: `
       <p>Hi,</p>
-      <p>${params.isReminder ? "A reminder that someone" : "Someone"} viewing your RoadVerdict report for <strong>${params.bikeName}</strong> has requested to see the
+      <p>${params.isReminder ? "A reminder that someone" : "Someone"} viewing your RoadVerdict report for <strong>${safeBikeName}</strong> has requested to see the
       receipts/invoices for:</p>
       <ul>${itemList}</ul>
-      ${params.buyerMessage ? `<p>They added a note: "${params.buyerMessage}"</p>` : ""}
+      ${safeBuyerMessage ? `<p>They added a note: "${safeBuyerMessage}"</p>` : ""}
       <p>These may contain personal details (your name, address, or part of a card number) - only share what
       you're comfortable with.</p>
       <p>
@@ -81,16 +101,17 @@ export async function sendReceiptRequestEmail(params: {
 
 export async function sendShareLinkEmail(toEmail: string, bikeName: string, reportUrl: string, expiresAtLabel: string) {
   const resend = getResend();
+  const safeBikeName = escapeHtml(bikeName);
   await resend.emails.send({
     from: FROM,
     to: toEmail,
     subject: `Ownership report for ${bikeName}`,
     html: `
       <p>Hi,</p>
-      <p>You've been sent a RoadVerdict ownership report for <strong>${bikeName}</strong> - a logged history of service,
+      <p>You've been sent a RoadVerdict ownership report for <strong>${safeBikeName}</strong> - a logged history of service,
       modifications, and bills, shared by the seller.</p>
       <p><a href="${reportUrl}">View the report</a></p>
-      <p>This link is valid until ${expiresAtLabel}, after which it will be permanently deleted.</p>
+      <p>This link is valid until ${escapeHtml(expiresAtLabel)}, after which it will be permanently deleted.</p>
     `,
   });
 }

@@ -6,7 +6,7 @@ import { createSessionForEmail } from "@/lib/auth/session";
 
 export const dynamic = "force-dynamic";
 
-const APP_URL = process.env.APP_URL;
+const APP_URL = process.env.APP_URL ?? "https://roadverdict.co.uk";
 
 // Azure sits in front of the app as a reverse proxy, so the real
 // visitor IP arrives via this header, not the raw connection - the

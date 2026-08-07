@@ -1,4 +1,4 @@
-﻿// Place at: src/lib/tracker/reportAccess.ts
+// Place at: src/lib/tracker/reportAccess.ts
 import { cookies } from "next/headers";
 import { getContainer } from "@/lib/cosmos";
 import { hashToken, generateToken } from "@/lib/auth/crypto";
@@ -64,49 +64,54 @@ export async function grantReportAccess(shareToken: string): Promise<{ cookieNam
 }
 
 const MAX_ATTEMPTS_PER_WINDOW = 8;
-const RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000;
+const RATE_LIMIT_WINDOW_SECONDS = 15 * 60;
+
+// One document per attempt, not one shared document holding an array
+// that gets read, modified, and written back on every call. That
+// read-modify-write shape had a real race condition: several requests
+// arriving close together could each read the same attempt count before
+// any of them had written their update, letting more than the intended
+// 8 attempts through under concurrent load. Recording an attempt is now
+// a plain, independent create - nothing to read first, nothing to lose
+// to a race. Checking the limit is a count of how many attempt-records
+// currently exist; Cosmos's own TTL expires them automatically after
+// the window passes, so there's no manual timestamp filtering left to
+// get wrong either. The only remaining race is genuinely simultaneous
+// requests landing in the same instant, which is a much narrower and
+// more acceptable window than "any time within 15 minutes".
+function attemptIdPrefix(shareToken: string): string {
+  return `plate-attempt:${shareToken}:`;
+}
 
 // Attempts (successful or not) are logged so the owner can eventually
 // see "who's been trying to get in", not just be protected from brute
 // forcing - accountability was as much the point as the block itself.
 export async function checkPlateRateLimit(shareToken: string): Promise<{ allowed: boolean }> {
   const container = getContainer();
-  const id = `plate-attempts:${shareToken}`;
-  let resource: { attempts?: string[] } | undefined;
-  try {
-    const result = await container.item(id, shareToken).read();
-    resource = result.resource;
-  } catch {
-    resource = undefined;
-  }
-  const cutoff = Date.now() - RATE_LIMIT_WINDOW_MS;
-  const recentAttempts = (resource?.attempts ?? []).filter((t: string) => new Date(t).getTime() > cutoff);
-  return { allowed: recentAttempts.length < MAX_ATTEMPTS_PER_WINDOW };
+  const { resources } = await container.items
+    .query<{ id: string }>(
+      {
+        query: "SELECT c.id FROM c WHERE c.type = 'reportPlateAttempt' AND STARTSWITH(c.id, @prefix)",
+        parameters: [{ name: "@prefix", value: attemptIdPrefix(shareToken) }],
+      },
+      { partitionKey: shareToken }
+    )
+    .fetchAll();
+  return { allowed: resources.length < MAX_ATTEMPTS_PER_WINDOW };
 }
 
 export async function recordPlateAttempt(shareToken: string): Promise<void> {
   const container = getContainer();
-  const id = `plate-attempts:${shareToken}`;
-  const now = new Date().toISOString();
-  const cutoff = Date.now() - RATE_LIMIT_WINDOW_MS;
-
-  let existing: { attempts?: string[] } | undefined;
-  try {
-    const result = await container.item(id, shareToken).read();
-    existing = result.resource;
-  } catch {
-    existing = undefined;
-  }
-  const attempts = [...(existing?.attempts ?? []).filter((t: string) => new Date(t).getTime() > cutoff), now];
-
-  await container.items.upsert({
-    id,
+  // Random suffix, not just a timestamp - two attempts landing in the
+  // same millisecond would otherwise collide on id and one would
+  // silently overwrite the other instead of both being counted.
+  const suffix = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  await container.items.create({
+    id: `${attemptIdPrefix(shareToken)}${suffix}`,
     pk: shareToken,
-    type: "reportPlateAttempts",
-    attempts,
-    // Cosmos TTL cleans this up automatically well after the rate-limit
-    // window has passed - no separate cleanup job needed.
-    ttl: 60 * 60 * 24,
+    type: "reportPlateAttempt",
+    createdAt: new Date().toISOString(),
+    ttl: RATE_LIMIT_WINDOW_SECONDS,
   });
 }
 
@@ -119,5 +124,3 @@ export async function verifyPlate(shareToken: string, submittedPlate: string): P
   if (known.length === 0) return false; // no registration on record at all - can't gate on something that doesn't exist
   return known.includes(normalizePlate(submittedPlate));
 }
-
-
