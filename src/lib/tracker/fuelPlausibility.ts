@@ -10,6 +10,8 @@
 // riding style, so it's safe to apply as an absolute rule from the very
 // first fill-up, before there's any rider history to build a baseline from.
 
+import { DEFAULT_TANK_CAPACITY_LITRES } from "./tankGuess";
+
 export interface FuelFillCheckResult {
   plausible: boolean;
   actualMiles: number;
@@ -53,4 +55,28 @@ export function checkFullTankPlausibility(
 
 export function describeImplausibleFill(check: FuelFillCheckResult, litres: number): string {
   return `${litres.toFixed(1)}L for a full tank after only ${Math.round(check.actualMiles)} miles works out to about ${Math.round(check.impliedMpg)} mpg, which isn't realistic for a petrol engine. The mileage should be at least ${Math.round(check.precedingMileage + check.minPlausibleMiles).toLocaleString()} for this to add up - please check it, or untick "filled to full" if this was actually a smaller top-up.`;
+}
+
+export interface LitresPlausibilityCheck {
+  implausible: boolean;
+  reason?: string;
+}
+
+// A tank physically cannot hold more than its own capacity, plus a
+// small margin for filler-neck headspace before genuine overflow. This
+// is a different kind of check to everything else in this file - not
+// "does the distance add up", just "is this number even physically
+// possible for this bike" - which is exactly why it can run before any
+// mileage is known at all, unlike the fill-plausibility check above.
+const TANK_OVERFILL_MARGIN = 1.15;
+
+export function checkLitresPlausibility(litres: number, tankCapacityLitres?: number): LitresPlausibilityCheck {
+  const capacity = tankCapacityLitres && tankCapacityLitres > 0 ? tankCapacityLitres : DEFAULT_TANK_CAPACITY_LITRES;
+  if (litres > capacity * TANK_OVERFILL_MARGIN) {
+    return {
+      implausible: true,
+      reason: `${litres.toFixed(1)}L is more than this bike's tank can hold (around ${capacity}L) - please check the figure, it may have been misread from the receipt.`,
+    };
+  }
+  return { implausible: false };
 }

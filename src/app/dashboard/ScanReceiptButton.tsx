@@ -114,6 +114,11 @@ export function ScanReceiptButton() {
             checked against what you&apos;ve already logged in case it&apos;s a duplicate, and a quick review opens
             for anything created so you can check the details before it&apos;s done.
           </p>
+          <p className={styles.scanReceiptTip}>
+            Tip: if you&apos;re scanning a batch of fuel receipts, including a service or parts receipt or two in
+            the same batch helps a lot, they usually have a mileage printed on them, which gives the AI a much
+            stronger starting point for working out mileage on the fuel receipts that don&apos;t.
+          </p>
           <input
             type="file"
             accept="image/*"

@@ -6,7 +6,7 @@ import { JOB_GROUPS, JOB_LABELS } from '@/lib/tracker/jobTypes';
 import { BILL_LABELS } from '@/lib/tracker/billTypes';
 import { MOD_LABELS } from '@/lib/tracker/modTypes';
 import { AttachmentThumb } from './AttachmentThumb';
-import { checkFullTankPlausibility } from '@/lib/tracker/fuelPlausibility';
+import { checkFullTankPlausibility, checkLitresPlausibility } from '@/lib/tracker/fuelPlausibility';
 import type { ReviewQueueEntry } from '@/lib/tracker/commitReceiptItem';
 import type { ParsedReceiptItem } from '@/lib/tracker/receiptParse';
 import styles from './dashboard.module.css';
@@ -94,6 +94,8 @@ function QueueItemForm({
     entry.category === 'fuel' && entry.precedingFuelMileage !== undefined && filledToFull && litres
       ? checkFullTankPlausibility(Number(litres) || 0, Number(mileage) || 0, [{ mileage: entry.precedingFuelMileage }])
       : null;
+  const liveLitresCheck =
+    entry.category === 'fuel' && litres ? checkLitresPlausibility(Number(litres) || 0, entry.tankCapacityLitres) : null;
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
@@ -187,6 +189,11 @@ function QueueItemForm({
         <div className="field">
           <label htmlFor="rq-litres">Litres</label>
           <input id="rq-litres" type="number" min="0" step="0.01" value={litres} onChange={(e) => setLitres(e.target.value)} required />
+          {liveLitresCheck?.implausible && (
+            <p className="field-note" style={{ marginTop: '0.3rem', color: 'var(--verdict-red)' }}>
+              ⚠️ {liveLitresCheck.reason}
+            </p>
+          )}
         </div>
       )}
 

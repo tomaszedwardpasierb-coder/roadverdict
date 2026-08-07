@@ -20,7 +20,7 @@ import { JOB_LABELS, JOB_REMINDER_DEFAULTS } from "@/lib/tracker/jobTypes";
 import { BILL_LABELS, BILL_REMINDER_DEFAULTS } from "@/lib/tracker/billTypes";
 import { buildAiDescription } from "@/lib/tracker/aiDescription";
 import { findPossibleDuplicate, type DuplicateMatch } from "@/lib/tracker/duplicateCheck";
-import { findMileageConflict } from "@/lib/tracker/mileageConflict";
+import { checkMileageConsistency } from "@/lib/tracker/mileageCheck";
 import { guessFilledToFull } from "@/lib/tracker/tankGuess";
 import { checkFullTankPlausibility, describeImplausibleFill } from "@/lib/tracker/fuelPlausibility";
 import type { ParsedReceiptItem } from "@/lib/tracker/receiptParse";
@@ -29,7 +29,7 @@ import type { Attachment } from "@/lib/tracker/cosmosHelpers";
 
 export type ReviewQueueEntry =
   | { id: string; category: "service"; aiDescription: string; duplicate: DuplicateMatch | null; jobType: string; cost: number; mileage: number; mileageNeedsManualEntry: boolean; mileageWarningText?: string; date: string; notes: string; attachment: Attachment }
-  | { id: string; category: "fuel"; aiDescription: string; duplicate: DuplicateMatch | null; litres: number; cost: number; mileage: number; mileageNeedsManualEntry: boolean; mileageWarningText?: string; date: string; filledToFull: boolean; attachment: Attachment; precedingFuelMileage?: number }
+  | { id: string; category: "fuel"; aiDescription: string; duplicate: DuplicateMatch | null; litres: number; cost: number; mileage: number; mileageNeedsManualEntry: boolean; mileageWarningText?: string; date: string; filledToFull: boolean; attachment: Attachment; precedingFuelMileage?: number; tankCapacityLitres?: number }
   | { id: string; category: "mods"; aiDescription: string; duplicate: DuplicateMatch | null; name: string; modCategory: string; cost: number; mileage: number; mileageNeedsManualEntry: boolean; mileageWarningText?: string; date: string; notes: string; attachment: Attachment }
   | { id: string; category: "bills"; aiDescription: string; duplicate: DuplicateMatch | null; billType: string; cost: number; date: string; notes: string; attachment: Attachment };
 
@@ -108,7 +108,9 @@ export async function commitReceiptItem(
     // silently create a broken timeline. Fall back to asking the human
     // instead of trusting an OCR reading that doesn't add up.
     const receiptConflict =
-      typeof mileageOnReceipt === "number" ? findMileageConflict(date, mileageOnReceipt, null, trustedMileagePoints) : null;
+      typeof mileageOnReceipt === "number"
+        ? checkMileageConsistency(mileageOnReceipt, date, trustedMileagePoints, bike.currentMileage).status !== "ok"
+        : false;
     const conflictWarning = receiptConflict
       ? `The receipt appears to show ${mileageOnReceipt!.toLocaleString()} mi, but that conflicts with another record - please check and enter the real figure.`
       : undefined;
@@ -215,7 +217,7 @@ export async function commitReceiptItem(
       bikeId: bike.id, litres: litresValue, cost: costGbp, mileage: resolvedMileage, date,
       filledToFull: filledToFullGuess, attachments: [attachment], needsReview: true, currencyConversion, mileageConfidence, aiDescription,
     });
-    return { id: record.id, category: "fuel", aiDescription, duplicate, litres: litresValue, cost: costGbp, mileage: resolvedMileage, mileageNeedsManualEntry: finalMileageNeedsManualEntry, mileageWarningText: finalMileageNeedsManualEntry ? finalMileageWarning : undefined, date, filledToFull: filledToFullGuess, attachment, precedingFuelMileage };
+    return { id: record.id, category: "fuel", aiDescription, duplicate, litres: litresValue, cost: costGbp, mileage: resolvedMileage, mileageNeedsManualEntry: finalMileageNeedsManualEntry, mileageWarningText: finalMileageNeedsManualEntry ? finalMileageWarning : undefined, date, filledToFull: filledToFullGuess, attachment, precedingFuelMileage, tankCapacityLitres: bike.tankCapacityLitres };
   }
 
   if (category === "mods") {

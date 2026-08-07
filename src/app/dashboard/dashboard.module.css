@@ -446,6 +446,14 @@
 }
 .scanReceiptBtn:hover { background: var(--amber); color: #fff; }
 .scanReceiptCaption { font-size: 0.8rem; color: var(--ink-soft); margin: 0.4rem 0 0; }
+.scanReceiptTip {
+  font-size: 0.8rem;
+  color: var(--amber-ink);
+  background: #fbf1e0;
+  border-radius: 4px;
+  padding: 0.5rem 0.7rem;
+  margin: 0.6rem 0;
+}
 .scanReceiptPanel {
   margin-top: 0.6rem;
   background: var(--paper);

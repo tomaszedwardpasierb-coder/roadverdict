@@ -8,7 +8,7 @@ import { JOB_LABELS } from "@/lib/tracker/jobTypes";
 import { isBeforeProduction } from "@/lib/tracker/productionYearCheck";
 import { getFuelLogs } from "@/lib/tracker/fuelLog";
 import { getMods } from "@/lib/tracker/mod";
-import { findMileageConflict, describeMileageConflict } from "@/lib/tracker/mileageConflict";
+import { checkMileageConsistency, describeMileageCheck } from "@/lib/tracker/mileageCheck";
 import type { Attachment } from "@/lib/tracker/cosmosHelpers";
 
 export const dynamic = "force-dynamic";
@@ -65,13 +65,25 @@ export async function POST(request: NextRequest) {
     getFuelLogs(session.email, bike.id),
     getMods(session.email, bike.id),
   ]);
-  const conflict = findMileageConflict(date, mileage, null, [
-    ...otherRecords.map((r) => ({ id: r.id, date: r.date, mileage: r.mileage })),
-    ...otherFuelLogs.map((f) => ({ id: f.id, date: f.date, mileage: f.mileage })),
-    ...otherMods.map((m) => ({ id: m.id, date: m.date, mileage: m.mileage })),
-  ]);
-  if (conflict && !mileageAcknowledged) {
-    return NextResponse.json({ error: describeMileageConflict(conflict) }, { status: 409 });
+  const mileageResult = checkMileageConsistency(
+    mileage,
+    date,
+    [
+      ...otherRecords.map((r) => ({ id: r.id, date: r.date, mileage: r.mileage })),
+      ...otherFuelLogs.map((f) => ({ id: f.id, date: f.date, mileage: f.mileage })),
+      ...otherMods.map((m) => ({ id: m.id, date: m.date, mileage: m.mileage })),
+    ],
+    bike.currentMileage
+  );
+  // "blocked" is never overridable, regardless of what the client
+  // sends - the old system's mileageAcknowledged flag could only ever
+  // bypass a single, undifferentiated conflict, meaning a clever or
+  // buggy client could acknowledge past a "today, but lower than
+  // current mileage" case even though the UI never offers that option.
+  // Enforcing the distinction server-side, not just trusting the
+  // client's own UI to have hidden the checkbox, closes that gap.
+  if (mileageResult.status === "blocked" || (mileageResult.status === "warning" && !mileageAcknowledged)) {
+    return NextResponse.json({ error: describeMileageCheck(mileageResult) }, { status: 409 });
   }
 
   const record = await createServiceRecord(session.email, {

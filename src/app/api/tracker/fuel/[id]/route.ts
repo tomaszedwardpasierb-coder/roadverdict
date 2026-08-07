@@ -5,8 +5,8 @@ import { updateFuelLog, deleteFuelLog, getFuelLogs, type FuelLogDoc } from "@/li
 import { getPrimaryBike, updateBikeMileage } from "@/lib/tracker/bike";
 import { getServiceRecords } from "@/lib/tracker/serviceRecord";
 import { getMods } from "@/lib/tracker/mod";
-import { findMileageConflict, describeMileageConflict } from "@/lib/tracker/mileageConflict";
-import { checkFullTankPlausibility, describeImplausibleFill } from "@/lib/tracker/fuelPlausibility";
+import { checkMileageConsistency, describeMileageCheck } from "@/lib/tracker/mileageCheck";
+import { checkFullTankPlausibility, describeImplausibleFill, checkLitresPlausibility } from "@/lib/tracker/fuelPlausibility";
 import { getTrackerDocById, type Attachment } from "@/lib/tracker/cosmosHelpers";
 
 export const dynamic = "force-dynamic";
@@ -54,14 +54,32 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
   const [otherRecords, otherFuelLogs, otherMods] = bikeId
     ? await Promise.all([getServiceRecords(session.email, bikeId), getFuelLogs(session.email, bikeId), getMods(session.email, bikeId)])
     : [[], [], []];
-  const conflict = findMileageConflict(date, mileage, id, [
-    ...otherRecords.map((r) => ({ id: r.id, date: r.date, mileage: r.mileage })),
-    ...otherFuelLogs.map((f) => ({ id: f.id, date: f.date, mileage: f.mileage })),
-    ...otherMods.map((m) => ({ id: m.id, date: m.date, mileage: m.mileage })),
-    ...(batchHints ?? []),
-  ]);
-  if (conflict && !mileageAcknowledged) {
-    return NextResponse.json({ error: describeMileageConflict(conflict) }, { status: 409 });
+
+  // Fetched here, before any of the checks below - all three need
+  // either the bike's current mileage or its tank capacity, and reusing
+  // this one fetch is both cheaper than calling getPrimaryBike three
+  // times and avoids separate reads potentially disagreeing mid-request.
+  const bike = await getPrimaryBike(session.email);
+
+  const mileageResult = checkMileageConsistency(
+    mileage,
+    date,
+    [
+      ...otherRecords.map((r) => ({ id: r.id, date: r.date, mileage: r.mileage })),
+      ...otherFuelLogs.map((f) => ({ id: f.id, date: f.date, mileage: f.mileage })),
+      ...otherMods.map((m) => ({ id: m.id, date: m.date, mileage: m.mileage })),
+      ...(batchHints ?? []),
+    ],
+    bike?.currentMileage ?? mileage,
+    id
+  );
+  if (mileageResult.status === "blocked" || (mileageResult.status === "warning" && !mileageAcknowledged)) {
+    return NextResponse.json({ error: describeMileageCheck(mileageResult) }, { status: 409 });
+  }
+
+  const litresCheck = checkLitresPlausibility(litres, bike?.tankCapacityLitres);
+  if (litresCheck.implausible) {
+    return NextResponse.json({ error: litresCheck.reason }, { status: 409 });
   }
 
   if (filledToFull) {
@@ -90,7 +108,6 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     return NextResponse.json({ error: "Entry not found." }, { status: 404 });
   }
 
-  const bike = await getPrimaryBike(session.email);
   if (bike && mileage > bike.currentMileage) {
     await updateBikeMileage(session.email, bike.id, mileage);
   }

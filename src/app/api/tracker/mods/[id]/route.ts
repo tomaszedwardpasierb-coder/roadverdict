@@ -5,7 +5,7 @@ import { updateMod, deleteMod, getMods, type ModDoc } from "@/lib/tracker/mod";
 import { getPrimaryBike, updateBikeMileage } from "@/lib/tracker/bike";
 import { getServiceRecords } from "@/lib/tracker/serviceRecord";
 import { getFuelLogs } from "@/lib/tracker/fuelLog";
-import { findMileageConflict, describeMileageConflict } from "@/lib/tracker/mileageConflict";
+import { checkMileageConsistency, describeMileageCheck } from "@/lib/tracker/mileageCheck";
 import { getTrackerDocById, type Attachment } from "@/lib/tracker/cosmosHelpers";
 
 export const dynamic = "force-dynamic";
@@ -54,14 +54,21 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
   const [otherRecords, otherFuelLogs, otherMods] = bikeId
     ? await Promise.all([getServiceRecords(session.email, bikeId), getFuelLogs(session.email, bikeId), getMods(session.email, bikeId)])
     : [[], [], []];
-  const conflict = findMileageConflict(date, mileage, id, [
-    ...otherRecords.map((r) => ({ id: r.id, date: r.date, mileage: r.mileage })),
-    ...otherFuelLogs.map((f) => ({ id: f.id, date: f.date, mileage: f.mileage })),
-    ...otherMods.map((m) => ({ id: m.id, date: m.date, mileage: m.mileage })),
-    ...(batchHints ?? []),
-  ]);
-  if (conflict && !mileageAcknowledged) {
-    return NextResponse.json({ error: describeMileageConflict(conflict) }, { status: 409 });
+  const bike = await getPrimaryBike(session.email);
+  const mileageResult = checkMileageConsistency(
+    mileage,
+    date,
+    [
+      ...otherRecords.map((r) => ({ id: r.id, date: r.date, mileage: r.mileage })),
+      ...otherFuelLogs.map((f) => ({ id: f.id, date: f.date, mileage: f.mileage })),
+      ...otherMods.map((m) => ({ id: m.id, date: m.date, mileage: m.mileage })),
+      ...(batchHints ?? []),
+    ],
+    bike?.currentMileage ?? mileage,
+    id
+  );
+  if (mileageResult.status === "blocked" || (mileageResult.status === "warning" && !mileageAcknowledged)) {
+    return NextResponse.json({ error: describeMileageCheck(mileageResult) }, { status: 409 });
   }
 
   const mod = await updateMod(session.email, id, {
@@ -80,7 +87,6 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     return NextResponse.json({ error: "Entry not found." }, { status: 404 });
   }
 
-  const bike = await getPrimaryBike(session.email);
   if (bike && mileage > bike.currentMileage) {
     await updateBikeMileage(session.email, bike.id, mileage);
   }

@@ -5,7 +5,7 @@ import { createMod, getMods } from "@/lib/tracker/mod";
 import { getPrimaryBike, updateBikeMileage } from "@/lib/tracker/bike";
 import { getServiceRecords } from "@/lib/tracker/serviceRecord";
 import { getFuelLogs } from "@/lib/tracker/fuelLog";
-import { findMileageConflict, describeMileageConflict } from "@/lib/tracker/mileageConflict";
+import { checkMileageConsistency, describeMileageCheck } from "@/lib/tracker/mileageCheck";
 import type { Attachment } from "@/lib/tracker/cosmosHelpers";
 
 export const dynamic = "force-dynamic";
@@ -48,13 +48,18 @@ export async function POST(request: NextRequest) {
     getFuelLogs(session.email, bike.id),
     getMods(session.email, bike.id),
   ]);
-  const conflict = findMileageConflict(date, mileage, null, [
-    ...otherRecords.map((r) => ({ id: r.id, date: r.date, mileage: r.mileage })),
-    ...otherFuelLogs.map((f) => ({ id: f.id, date: f.date, mileage: f.mileage })),
-    ...otherMods.map((m) => ({ id: m.id, date: m.date, mileage: m.mileage })),
-  ]);
-  if (conflict && !mileageAcknowledged) {
-    return NextResponse.json({ error: describeMileageConflict(conflict) }, { status: 409 });
+  const mileageResult = checkMileageConsistency(
+    mileage,
+    date,
+    [
+      ...otherRecords.map((r) => ({ id: r.id, date: r.date, mileage: r.mileage })),
+      ...otherFuelLogs.map((f) => ({ id: f.id, date: f.date, mileage: f.mileage })),
+      ...otherMods.map((m) => ({ id: m.id, date: m.date, mileage: m.mileage })),
+    ],
+    bike.currentMileage
+  );
+  if (mileageResult.status === "blocked" || (mileageResult.status === "warning" && !mileageAcknowledged)) {
+    return NextResponse.json({ error: describeMileageCheck(mileageResult) }, { status: 409 });
   }
 
   const mod = await createMod(session.email, {

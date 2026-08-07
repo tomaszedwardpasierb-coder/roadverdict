@@ -19,7 +19,7 @@ const FULL_TANK_RATIO = 0.6;
 // when a bike hasn't specified its own tank capacity, so the guess still
 // has somewhere reasonable to start rather than blocking on a field
 // nobody's filled in yet.
-const DEFAULT_TANK_CAPACITY_LITRES = 16;
+export const DEFAULT_TANK_CAPACITY_LITRES = 16;
 
 // Always just a starting suggestion - the review queue's existing
 // "Filled the tank completely full" checkbox already reads this value
