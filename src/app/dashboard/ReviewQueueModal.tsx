@@ -1,4 +1,4 @@
-// Place at: src/app/dashboard/ReviewQueueModal.tsx
+﻿// Place at: src/app/dashboard/ReviewQueueModal.tsx
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
@@ -6,6 +6,7 @@ import { JOB_GROUPS, JOB_LABELS } from '@/lib/tracker/jobTypes';
 import { BILL_LABELS } from '@/lib/tracker/billTypes';
 import { MOD_LABELS } from '@/lib/tracker/modTypes';
 import { AttachmentThumb } from './AttachmentThumb';
+import { MileageConflictModal } from './MileageConflictModal';
 import { checkFullTankPlausibility, checkLitresPlausibility } from '@/lib/tracker/fuelPlausibility';
 import { classifyReceiptTier, isAutoCommitTier } from '@/lib/tracker/receiptTiering';
 import type { ReviewQueueEntry } from '@/lib/tracker/commitReceiptItem';
@@ -92,6 +93,9 @@ function QueueItemForm({
   const [filledToFull, setFilledToFull] = useState(entry.category === 'fuel' ? entry.filledToFull : true);
   const [name, setName] = useState(entry.category === 'mods' ? entry.name : '');
   const [billType, setBillType] = useState(entry.category === 'bills' ? entry.billType : '');
+  const [showConflictModal, setShowConflictModal] = useState(false);
+  const [findingConflict, setFindingConflict] = useState(false);
+  const [conflictLookupError, setConflictLookupError] = useState<string | null>(null);
 
   const liveFuelCheck =
     entry.category === 'fuel' && entry.precedingFuelMileage !== undefined && filledToFull && litres
@@ -140,6 +144,7 @@ function QueueItemForm({
   }
 
   return (
+    <>
     <form onSubmit={handleSave}>
       <div className={styles.reviewQueueReceipt}>
         <AttachmentThumb attachment={entry.attachment} />
@@ -154,10 +159,10 @@ function QueueItemForm({
           <p>
             This might already be logged: <strong>{entry.duplicate.description}</strong>,{' '}
             {new Date(entry.duplicate.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })},{' '}
-            £{entry.duplicate.cost.toFixed(2)}.
+            Â£{entry.duplicate.cost.toFixed(2)}.
           </p>
           <button type="button" className={styles.iconBtn} onClick={handleDelete} disabled={deleting || submitting}>
-            {deleting ? 'Deleting…' : 'Delete this new entry'}
+            {deleting ? 'Deletingâ€¦' : 'Delete this new entry'}
           </button>
         </div>
       )}
@@ -202,7 +207,7 @@ function QueueItemForm({
           <input id="rq-litres" type="number" min="0" step="0.01" value={litres} onChange={(e) => setLitres(e.target.value)} required />
           {liveLitresCheck?.implausible && (
             <p className="field-note" style={{ marginTop: '0.3rem', color: 'var(--verdict-red)' }}>
-              ⚠️ {liveLitresCheck.reason}
+              âš ï¸ {liveLitresCheck.reason}
             </p>
           )}
         </div>
@@ -210,7 +215,7 @@ function QueueItemForm({
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.7rem', marginTop: '0.7rem' }}>
         <div className="field">
-          <label htmlFor="rq-cost">Cost (£)</label>
+          <label htmlFor="rq-cost">Cost (Â£)</label>
           <input id="rq-cost" type="number" min="0" step="0.01" value={cost} onChange={(e) => setCost(e.target.value)} required />
         </div>
         <div className="field">
@@ -223,11 +228,40 @@ function QueueItemForm({
         <div className="field" style={{ marginTop: '0.7rem' }}>
           <label htmlFor="rq-mileage">Mileage</label>
           {entry.mileageNeedsManualEntry && (
-            <p className={styles.reviewQueueDuplicateWarning} style={{ marginBottom: '0.4rem' }}>
-              {entry.mileageWarningText ??
-                "There's nothing nearby to estimate this from reliably - please enter the real mileage from the receipt, or your best own memory of it."}{' '}
-              Once saved, this becomes a real anchor the next entries in this batch can use.
-            </p>
+            <>
+              <p className={styles.reviewQueueDuplicateWarning} style={{ marginBottom: "0.4rem" }}>
+                {entry.mileageWarningText ??
+                  "There is nothing nearby to estimate this from reliably - please enter the real mileage from the receipt, or your best own memory of it."}{" "}
+                Once saved, this becomes a real anchor the next entries in this batch can use.
+              </p>
+              {entry.mileageConflictReferenceId && entry.mileageConflictReferenceCategory && (
+                <button
+                  type="button"
+                  className={styles.iconBtn}
+                  disabled={findingConflict}
+                  onClick={async () => {
+                    setFindingConflict(true);
+                    setConflictLookupError(null);
+                    try {
+                      const res = await fetch(`/api/tracker/mileage-conflict-lookup?category=${entry.category}&id=${encodeURIComponent(entry.id)}`);
+                      const data = await res.json();
+                      if (res.ok) {
+                        setShowConflictModal(true);
+                      } else {
+                        setConflictLookupError(data.error ?? "Could not find the conflicting entry.");
+                      }
+                    } catch {
+                      setConflictLookupError("Could not reach the server.");
+                    } finally {
+                      setFindingConflict(false);
+                    }
+                  }}
+                >
+                  {findingConflict ? "Finding it..." : "Resolve"}
+                </button>
+              )}
+              {conflictLookupError && <p className="error-text" role="alert">{conflictLookupError}</p>}
+            </>
           )}
           <input
             id="rq-mileage"
@@ -243,7 +277,7 @@ function QueueItemForm({
               className="field-note"
               style={{ marginTop: '0.3rem', color: liveFuelCheck.plausible ? 'var(--verdict-green)' : 'var(--verdict-red)' }}
             >
-              → works out to about <strong>{Math.round(liveFuelCheck.impliedMpg)} mpg</strong> for this tank
+              â†’ works out to about <strong>{Math.round(liveFuelCheck.impliedMpg)} mpg</strong> for this tank
               {liveFuelCheck.plausible
                 ? ' - looks reasonable.'
                 : ` - still too low to be realistic (needs to be at least ${Math.round(liveFuelCheck.precedingMileage + liveFuelCheck.minPlausibleMiles).toLocaleString()}).`}
@@ -272,21 +306,53 @@ function QueueItemForm({
 
       <div className={styles.reviewQueueFooterRow}>
         <button type="button" className={styles.iconBtn} onClick={onPrev} disabled={!canGoPrev || submitting || finishing}>
-          ← Prev
+          â† Prev
         </button>
         <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center' }}>
           <button type="button" className={styles.reviewQueueFinishLater} onClick={onFinishLater} disabled={submitting || finishing}>
-            {finishing ? 'Saving the rest…' : 'Finish later'}
+            {finishing ? 'Saving the restâ€¦' : 'Finish later'}
           </button>
           <button type="button" className={styles.iconBtn} onClick={onSkip} disabled={submitting || finishing}>
             Skip
           </button>
           <button type="submit" className="submit-button" disabled={submitting || finishing}>
-            {submitting ? 'Saving…' : 'Save and next'}
+            {submitting ? 'Savingâ€¦' : 'Save and next'}
           </button>
         </div>
       </div>
     </form>
+      {showConflictModal && entry.category !== "bills" && entry.mileageConflictReferenceId && entry.mileageConflictReferenceCategory && (
+        <MileageConflictModal
+          entryId={entry.id}
+          entryCategory={entry.category as "service" | "fuel" | "mods"}
+          entryDate={date}
+          entryMileage={mileage.trim() ? Number(mileage) : entry.mileage}
+          entryLabel={entry.aiDescription}
+          entryAttachment={entry.attachment}
+          referenceId={entry.mileageConflictReferenceId}
+          referenceCategory={entry.mileageConflictReferenceCategory}
+          buildPatchBody={(overrides) => {
+            const mv = mileage.trim() ? Number(mileage) : entry.mileage;
+            const base =
+              entry.category === "service" ? { jobType, cost: Number(cost), mileage: mv, date, notes } :
+              entry.category === "fuel" ? { litres: Number(litres), cost: Number(cost), mileage: mv, date, filledToFull } :
+              entry.category === "mods" ? { category: entry.modCategory, name, cost: Number(cost), mileage: mv, date, notes } :
+              { billType, cost: Number(cost), date, notes };
+            return {
+              ...base,
+              ...(overrides.mileage !== undefined ? { mileage: overrides.mileage } : {}),
+              mileageAcknowledged: overrides.mileageAcknowledged,
+              ...(overrides.mileageAnomaly !== undefined ? { mileageAnomaly: overrides.mileageAnomaly } : {}),
+            };
+          }}
+          onResolved={() => {
+            setShowConflictModal(false);
+            onSaved();
+          }}
+          onClose={() => setShowConflictModal(false)}
+        />
+      )}
+    </>
   );
 }
 
@@ -333,7 +399,14 @@ function findPrevInteractiveIndex(items: ParsedReceiptItem[], committed: (Review
 }
 
 export function ReviewQueueModal({ parsedItems, onFinished }: { parsedItems: ParsedReceiptItem[]; onFinished: () => void }) {
-  const [items, setItems] = useState(parsedItems);
+  const [items, setItems] = useState(() =>
+    [...parsedItems].sort((a, b) => {
+      const aHasMileage = typeof a.mileageOnReceipt === "number";
+      const bHasMileage = typeof b.mileageOnReceipt === "number";
+      if (aHasMileage && bHasMileage) return (a.mileageOnReceipt as number) - (b.mileageOnReceipt as number);
+      return new Date(a.date).getTime() - new Date(b.date).getTime();
+    })
+  );
   const [committed, setCommitted] = useState<(ReviewQueueEntry | null)[]>(() => parsedItems.map(() => null));
   const [index, setIndex] = useState(0);
   const [committing, setCommitting] = useState(false);
@@ -514,7 +587,7 @@ export function ReviewQueueModal({ parsedItems, onFinished }: { parsedItems: Par
 
         {current === null ? (
           <div className={styles.reviewQueueDoneWrap}>
-            {committing && <p className={styles.subtext}>Saving this entry…</p>}
+            {committing && <p className={styles.subtext}>Saving this entryâ€¦</p>}
             {commitError && (
               <>
                 <p className="error-text" role="alert">{commitError}</p>
