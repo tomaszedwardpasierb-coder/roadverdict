@@ -455,6 +455,14 @@ export function ReviewQueueModal({ parsedItems, onFinished }: { parsedItems: Par
   const [retryTick, setRetryTick] = useState(0);
   const [finishing, setFinishing] = useState(false);
   const attemptedRef = useRef<Set<number>>(new Set());
+  // Forces the auto-progress screen off for a specific index, for the
+  // owner to escape manually - regardless of the underlying cause (a
+  // request that never resolves or rejects, a silent server-side
+  // failure, or anything else), this guarantees there's always a way
+  // out that doesn't require refreshing the page. A stuck screen with
+  // no way to intervene is worse than any individual failure mode it
+  // might be covering for.
+  const [forcedOutOfAuto, setForcedOutOfAuto] = useState<Set<number>>(new Set());
 
   useEffect(() => {
     if (index >= items.length) return;
@@ -631,7 +639,7 @@ export function ReviewQueueModal({ parsedItems, onFinished }: { parsedItems: Par
   // review step for an item that's about to be skipped a moment later
   // regardless of timing.
   const currentTier = classifyReceiptTier(items[index]);
-  const currentIsAutoTier = isAutoCommitTier(currentTier) && !(current && isDirty(current, items[index]));
+  const currentIsAutoTier = !forcedOutOfAuto.has(index) && isAutoCommitTier(currentTier) && !(current && isDirty(current, items[index]));
 
   if (currentIsAutoTier) {
     const autoTierTotal = items.filter((it) => isAutoCommitTier(classifyReceiptTier(it))).length;
@@ -652,6 +660,14 @@ export function ReviewQueueModal({ parsedItems, onFinished }: { parsedItems: Par
                 </button>
               </>
             )}
+            <button
+              type="button"
+              className={styles.iconBtn}
+              style={{ marginTop: '0.8rem' }}
+              onClick={() => setForcedOutOfAuto((prev) => new Set([...prev, index]))}
+            >
+              Taking a while - let me review this one myself
+            </button>
           </div>
         </div>
       </div>
@@ -684,6 +700,19 @@ export function ReviewQueueModal({ parsedItems, onFinished }: { parsedItems: Par
                   Retry
                 </button>
               </>
+            )}
+            {!commitError && (
+              <button
+                type="button"
+                className={styles.iconBtn}
+                style={{ marginTop: '0.8rem' }}
+                onClick={() => {
+                  attemptedRef.current.delete(index);
+                  setRetryTick((t) => t + 1);
+                }}
+              >
+                Taking a while - try again
+              </button>
             )}
           </div>
         ) : (
