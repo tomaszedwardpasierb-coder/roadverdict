@@ -13,6 +13,7 @@ import { useTabSwitch, goToNextReview, type ReviewCategory } from './TabSwitchCo
 import { mileageConfidenceLabel } from '@/lib/tracker/mileageEstimate';
 import { checkMileageConsistency, type HistoryPoint } from '@/lib/tracker/mileageCheck';
 import { MileageWarning } from './MileageWarning';
+import { MileageConflictModal } from './MileageConflictModal';
 import styles from './dashboard.module.css';
 
 function fmtDate(d: string): string {
@@ -39,6 +40,10 @@ export function FuelLogCard({
   const { switchTo, focusId, setFocusId, highlightIds } = useTabSwitch();
   const [isEditing, setIsEditing] = useState(false);
   const [isHighlighted, setIsHighlighted] = useState(false);
+  const [showConflictModal, setShowConflictModal] = useState(false);
+  const [conflictReference, setConflictReference] = useState<{ id: string; category: "service" | "fuel" | "mods" } | null>(null);
+  const [findingConflict, setFindingConflict] = useState(false);
+  const [conflictLookupError, setConflictLookupError] = useState<string | null>(null);
   const cardRef = useRef<HTMLDivElement>(null);
   const [litres, setLitres] = useState(String(log.litres));
   const [costDisplay, setCostDisplay] = useState(
@@ -151,7 +156,34 @@ export function FuelLogCard({
       {log.needsReview && (
         <div className={styles.needsReviewNote}>
           {log.mileageConflictWarning ? (
-            <>⚠️ {log.mileageConflictWarning}</>
+            <>⚠️ {log.mileageConflictWarning}
+            <button
+              type="button"
+              className={styles.iconBtn}
+              disabled={findingConflict}
+              onClick={async () => {
+                setFindingConflict(true);
+                setConflictLookupError(null);
+                try {
+                  const res = await fetch(`/api/tracker/mileage-conflict-lookup?category=fuel&id=${encodeURIComponent(log.id)}`);
+                  const data = await res.json();
+                  if (res.ok) {
+                    setConflictReference({ id: data.referenceId, category: data.referenceCategory });
+                    setShowConflictModal(true);
+                  } else {
+                    setConflictLookupError(data.error ?? "Could not find the conflicting entry.");
+                  }
+                } catch {
+                  setConflictLookupError("Could not reach the server.");
+                } finally {
+                  setFindingConflict(false);
+                }
+              }}
+            >
+              {findingConflict ? "Finding it..." : "Resolve"}
+            </button>
+            {conflictLookupError && <p className="error-text" role="alert">{conflictLookupError}</p>}
+            </>
           ) : (
             <>🧠 Auto-created from a scanned receipt - click Edit to review, especially the mileage, before it&apos;s done.</>
           )}
@@ -184,6 +216,32 @@ export function FuelLogCard({
         </button>
       </div>
       {error && <p className="error-text" role="alert">{error}</p>}
+      {showConflictModal && conflictReference && (
+        <MileageConflictModal
+          entryId={log.id}
+          entryCategory="fuel"
+          entryDate={log.date}
+          entryMileage={log.mileage}
+          entryLabel={`${log.litres.toFixed(1)}L fill-up`}
+          entryAttachment={log.attachments?.[0]}
+          referenceId={conflictReference.id}
+          referenceCategory={conflictReference.category}
+          buildPatchBody={(overrides) => ({
+            litres: log.litres,
+            cost: log.cost,
+            mileage: overrides.mileage ?? log.mileage,
+            date: log.date,
+            filledToFull: log.filledToFull,
+            mileageAcknowledged: overrides.mileageAcknowledged,
+            ...(overrides.mileageAnomaly !== undefined ? { mileageAnomaly: overrides.mileageAnomaly } : {}),
+          })}
+          onResolved={() => {
+            setShowConflictModal(false);
+            window.location.reload();
+          }}
+          onClose={() => setShowConflictModal(false)}
+        />
+      )}
     </div>
   );
 }
