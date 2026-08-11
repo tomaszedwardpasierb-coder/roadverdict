@@ -3,6 +3,7 @@
 
 import { useState, useEffect } from 'react';
 import { AttachmentThumb } from './AttachmentThumb';
+import { pointsConflict } from '@/lib/tracker/mileageCheck';
 import type { Attachment } from '@/lib/tracker/cosmosHelpers';
 import styles from './dashboard.module.css';
 
@@ -148,6 +149,20 @@ export function MileageConflictModal({
     else setError('Could not save. Try again.');
   }
 
+  // For when the two entries turn out not to actually conflict any more
+  // (the mileage that caused this was corrected elsewhere, but the
+  // warning text on this record was never cleared) - re-saves this
+  // entry exactly as it is, purely to clear the stale warning, without
+  // marking it a genuine anomaly the way "Keep both" does.
+  async function handleClearStaleWarning() {
+    setSubmitting(true);
+    setError(null);
+    const ok = await patchThisEntry({ mileageAcknowledged: true });
+    setSubmitting(false);
+    if (ok) onResolved();
+    else setError('Could not save. Try again.');
+  }
+
   async function handleCorrectBoth() {
     setSubmitting(true);
     setError(null);
@@ -175,13 +190,25 @@ export function MileageConflictModal({
   }
 
   const entryIsEarlier = reference ? new Date(entryDate).getTime() < new Date(reference.date).getTime() : null;
+  // Re-validated here rather than trusted from whatever produced
+  // referenceId/preloadedReference - that value can go stale (e.g. the
+  // reference's own mileage got corrected elsewhere after the warning
+  // was first set, but nothing re-checks old warnings when that
+  // happens), and this modal is the last line of defence against
+  // presenting a "conflict" that the numbers, right here, don't
+  // actually support.
+  const stillConflicting = reference ? pointsConflict(entryMileage, entryDate, reference.mileage, reference.date) : null;
 
   return (
     <div className={styles.reviewQueueOverlay}>
       <div className={styles.reviewQueueModal} style={{ maxWidth: '640px' }}>
-        <p className={styles.reviewQueueDoneTitle} style={{ marginBottom: '0.3rem' }}>Mileage conflict</p>
+        <p className={styles.reviewQueueDoneTitle} style={{ marginBottom: '0.3rem' }}>
+          {stillConflicting === false ? 'No conflict found' : 'Mileage conflict'}
+        </p>
         <p className="field-note" style={{ marginBottom: '1rem' }}>
-          These two entries don&apos;t agree on the timeline - one shows a higher mileage at an earlier date than the other.
+          {stillConflicting === false
+            ? "These two entries don't actually disagree any more - whatever caused this must have already been corrected elsewhere, but the warning on this entry was never cleared."
+            : "These two entries don't agree on the timeline - one shows a higher mileage at an earlier date than the other."}
         </p>
 
         {loading ? (
@@ -223,24 +250,37 @@ export function MileageConflictModal({
 
             {mode === 'choose' ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                <button type="button" className="submit-button" disabled={submitting} onClick={handleIgnore}>
-                  Keep both as they are - mark as a known anomaly (shown as a separate dot on the mileage chart, excluded from the trend line)
-                </button>
-                <button type="button" className={styles.iconBtn} disabled={submitting} onClick={() => setMode('correctBoth')}>
-                  Correct the mileage on one or both entries
-                </button>
-                <button type="button" className={styles.iconBtn} disabled={submitting} onClick={() => handleDelete('entry')}>
-                  Delete this entry ({entryLabel})
-                </button>
-                <button type="button" className={styles.iconBtn} disabled={submitting} onClick={() => handleDelete('reference')}>
-                  Delete the other entry ({reference.label})
-                </button>
-                <button type="button" className={styles.iconBtn} disabled={submitting} onClick={() => handleDelete('both')}>
-                  Delete both entries
-                </button>
-                <button type="button" className={styles.iconBtn} disabled={submitting} onClick={onClose}>
-                  Cancel
-                </button>
+                {stillConflicting === false ? (
+                  <>
+                    <button type="button" className="submit-button" disabled={submitting} onClick={handleClearStaleWarning}>
+                      {submitting ? 'Clearing…' : 'Clear this warning'}
+                    </button>
+                    <button type="button" className={styles.iconBtn} disabled={submitting} onClick={onClose}>
+                      Cancel
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button type="button" className="submit-button" disabled={submitting} onClick={handleIgnore}>
+                      Keep both as they are - mark as a known anomaly (shown as a separate dot on the mileage chart, excluded from the trend line)
+                    </button>
+                    <button type="button" className={styles.iconBtn} disabled={submitting} onClick={() => setMode('correctBoth')}>
+                      Correct the mileage on one or both entries
+                    </button>
+                    <button type="button" className={styles.iconBtn} disabled={submitting} onClick={() => handleDelete('entry')}>
+                      Delete this entry ({entryLabel})
+                    </button>
+                    <button type="button" className={styles.iconBtn} disabled={submitting} onClick={() => handleDelete('reference')}>
+                      Delete the other entry ({reference.label})
+                    </button>
+                    <button type="button" className={styles.iconBtn} disabled={submitting} onClick={() => handleDelete('both')}>
+                      Delete both entries
+                    </button>
+                    <button type="button" className={styles.iconBtn} disabled={submitting} onClick={onClose}>
+                      Cancel
+                    </button>
+                  </>
+                )}
               </div>
             ) : (
               <div>

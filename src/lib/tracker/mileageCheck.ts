@@ -39,6 +39,14 @@ function startOfToday(): number {
   return d.getTime();
 }
 
+export function pointsConflict(mileageA: number, dateA: string, mileageB: number, dateB: string): boolean {
+  const timeA = new Date(dateA).getTime();
+  const timeB = new Date(dateB).getTime();
+  if (timeA < timeB) return mileageA > mileageB;
+  if (timeA > timeB) return mileageA < mileageB;
+  return false;
+}
+
 export function checkMileageConsistency(
   enteredMileage: number,
   entryDate: string,
@@ -65,15 +73,12 @@ export function checkMileageConsistency(
     if (excludeId && point.id === excludeId) continue;
     const pointTime = new Date(point.date).getTime();
     const gap = Math.abs(pointTime - entryTime);
+    if (gap >= closestGapMs) continue;
+    if (!pointsConflict(enteredMileage, entryDate, point.mileage, point.date)) continue;
 
-    if (pointTime < entryTime && point.mileage > enteredMileage && gap < closestGapMs) {
-      closest = { direction: "below-earlier", mileage: point.mileage, date: point.date, id: point.id, category: point.category, batchIndex: point.batchIndex };
-      closestGapMs = gap;
-    }
-    if (pointTime > entryTime && point.mileage < enteredMileage && gap < closestGapMs) {
-      closest = { direction: "above-later", mileage: point.mileage, date: point.date, id: point.id, category: point.category, batchIndex: point.batchIndex };
-      closestGapMs = gap;
-    }
+    const direction: "below-earlier" | "above-later" = pointTime < entryTime ? "below-earlier" : "above-later";
+    closest = { direction, mileage: point.mileage, date: point.date, id: point.id, category: point.category, batchIndex: point.batchIndex };
+    closestGapMs = gap;
   }
 
   if (closest) {
