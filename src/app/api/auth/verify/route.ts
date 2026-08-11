@@ -52,7 +52,7 @@ export async function GET(req: NextRequest) {
     { op: "replace", path: "/used", value: true },
   ]);
 
-  const { cookieValue, maxAge } = await createSessionForEmail(email, getClientIp(req));
+  const { cookieValue, maxAge } = await createSessionForEmail(email, getClientIp(req), req.headers.get("user-agent") ?? "unknown");
 
   const response = NextResponse.redirect(`${APP_URL}/dashboard`);
 

@@ -108,20 +108,67 @@ export interface RecentSession {
   email: string;
   createdAt: string;
   ip?: string;
+  userAgent?: string;
 }
 
 // Most recent logins, newest first. IP will show as missing for any
-// session created before this feature existed - genuinely absent, not
-// a display bug.
+// session created before that capture was added; userAgent the same
+// for sessions before this specific field existed - genuinely absent,
+// not a display bug either way.
 export async function getRecentSessions(limit = 50): Promise<RecentSession[]> {
   const container = getContainer();
   const { resources } = await container.items
     .query<RecentSession>({
-      query: "SELECT TOP @limit c.pk as email, c.createdAt, c.ip FROM c WHERE c.type = 'session' ORDER BY c.createdAt DESC",
+      query: "SELECT TOP @limit c.pk as email, c.createdAt, c.ip, c.userAgent FROM c WHERE c.type = 'session' ORDER BY c.createdAt DESC",
       parameters: [{ name: "@limit", value: limit }],
     })
     .fetchAll();
   return resources;
+}
+
+// Deliberately simple, not a full parsing library - order matters here,
+// since most browsers' user-agent strings contain other browsers'
+// names too (Chrome's contains "Safari", Edge's contains both "Chrome"
+// and "Safari") - checking the most specific, distinguishing token
+// first is what makes this work without a dependency.
+export function browserFamily(userAgent: string | undefined): string {
+  if (!userAgent) return "Unknown";
+  const ua = userAgent;
+  if (/EdgA|EdgiOS|Edge|Edg\//.test(ua)) return "Edge";
+  if (/SamsungBrowser/.test(ua)) return "Samsung Internet";
+  if (/OPR\/|Opera/.test(ua)) return "Opera";
+  if (/FxiOS|Firefox/.test(ua)) return "Firefox";
+  if (/CriOS|Chrome/.test(ua)) return "Chrome";
+  if (/Safari/.test(ua)) return "Safari";
+  return "Other";
+}
+
+export interface BrowserBreakdownEntry {
+  browser: string;
+  count: number;
+}
+
+// Aggregate only - counts by browser family, never tied back to an
+// individual session or email in this view. Built from the same
+// session documents getRecentSessions reads, just summarised
+// differently.
+export async function getBrowserBreakdown(): Promise<BrowserBreakdownEntry[]> {
+  const container = getContainer();
+  const { resources } = await container.items
+    .query<{ userAgent?: string }>({
+      query: "SELECT c.userAgent FROM c WHERE c.type = 'session'",
+    })
+    .fetchAll();
+
+  const counts = new Map<string, number>();
+  for (const r of resources) {
+    const family = browserFamily(r.userAgent);
+    counts.set(family, (counts.get(family) ?? 0) + 1);
+  }
+
+  return [...counts.entries()]
+    .map(([browser, count]) => ({ browser, count }))
+    .sort((a, b) => b.count - a.count);
 }
 
 export interface ServerHealth {

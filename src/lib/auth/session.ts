@@ -30,7 +30,7 @@ export const SESSION_TTL_SECONDS = 30 * 24 * 60 * 60;
 // Shared by the real magic-link verify route and the demo-account
 // bypass - both need to end up with an identical, equally-real session,
 // not two slightly different implementations of "logged in".
-export async function createSessionForEmail(email: string, ip: string): Promise<{ cookieValue: string; maxAge: number }> {
+export async function createSessionForEmail(email: string, ip: string, userAgent: string): Promise<{ cookieValue: string; maxAge: number }> {
   const container = getContainer();
 
   try {
@@ -57,6 +57,7 @@ export async function createSessionForEmail(email: string, ip: string): Promise<
     expiresAt: expiresAt.toISOString(),
     ttl: SESSION_TTL_SECONDS,
     ip,
+    userAgent,
   });
 
   return { cookieValue: `${encodeEmail(email)}.${sessionRaw}`, maxAge: SESSION_TTL_SECONDS };

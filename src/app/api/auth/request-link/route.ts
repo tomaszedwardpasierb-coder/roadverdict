@@ -43,7 +43,7 @@ export async function POST(req: NextRequest) {
         // refusing to sign in at all.
       }
     }
-    const { cookieValue, maxAge } = await createSessionForEmail(DEMO_EMAIL, getClientIp(req));
+    const { cookieValue, maxAge } = await createSessionForEmail(DEMO_EMAIL, getClientIp(req), req.headers.get("user-agent") ?? "unknown");
     const response = NextResponse.json({ ok: true, demo: true });
     response.cookies.set("session", cookieValue, {
       httpOnly: true,

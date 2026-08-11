@@ -13,6 +13,8 @@ import {
   getCosmosContainerInfo,
   getDetailedCounts,
   getBikeIdBackfillStatus,
+  getBrowserBreakdown,
+  browserFamily,
 } from '@/lib/admin/stats';
 import styles from './tomasz.module.css';
 import { RunCronButton } from './RunCronButton';
@@ -54,6 +56,7 @@ export default async function AdminDashboardPage() {
     cosmosInfo,
     detailedCounts,
     bikeIdBackfillStatus,
+    browserBreakdown,
   ] = await Promise.all([
     getDbStats(),
     getActiveSessionCount(),
@@ -65,6 +68,7 @@ export default async function AdminDashboardPage() {
     getCosmosContainerInfo(),
     getDetailedCounts(),
     getBikeIdBackfillStatus(),
+    getBrowserBreakdown(),
   ]);
   const health = getServerHealth();
 
@@ -212,10 +216,32 @@ export default async function AdminDashboardPage() {
         </table>
       )}
 
+      <h2 className={styles.sectionHeading}>Browser breakdown (aggregate - not tied to any individual session below)</h2>
+      {browserBreakdown.length === 0 ? (
+        <p className={styles.warn}>No sessions recorded.</p>
+      ) : (
+        <table className={styles.table}>
+          <thead>
+            <tr>
+              <th>Browser</th>
+              <th>Sessions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {browserBreakdown.map((b) => (
+              <tr key={b.browser}>
+                <td>{b.browser}</td>
+                <td>{b.count}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+
       <h2 className={styles.sectionHeading}>Recent logins (last 50)</h2>
       <p className={styles.warn} style={{ marginBottom: '0.6rem' }}>
-        IP capture was only added partway through development - it will show as &quot;-&quot; for any login before
-        that point, genuinely absent, not a display bug.
+        IP and browser capture were only added partway through development - both will show as &quot;-&quot; for
+        any login before that point, genuinely absent, not a display bug.
       </p>
       {recentSessions.length === 0 ? (
         <p className={styles.warn}>No sessions recorded.</p>
@@ -226,6 +252,7 @@ export default async function AdminDashboardPage() {
               <th>Email</th>
               <th>Signed in</th>
               <th>IP address</th>
+              <th>Browser</th>
             </tr>
           </thead>
           <tbody>
@@ -234,6 +261,7 @@ export default async function AdminDashboardPage() {
                 <td>{s.email}</td>
                 <td>{fmtDate(s.createdAt)}</td>
                 <td>{s.ip ?? '-'}</td>
+                <td>{s.userAgent ? browserFamily(s.userAgent) : '-'}</td>
               </tr>
             ))}
           </tbody>
