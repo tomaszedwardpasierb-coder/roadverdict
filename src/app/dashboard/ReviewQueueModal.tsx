@@ -167,6 +167,32 @@ function QueueItemForm({
         </div>
       </div>
 
+      {(entry.vehicleMismatch || entry.plateMismatch) && (
+        <div className={styles.reviewQueueDuplicateWarning}>
+          <p>
+            {entry.vehicleMismatch && (
+              <>
+                This receipt looks like it&apos;s for a{' '}
+                <strong>
+                  {entry.vehicleMismatch.makeOnReceipt}
+                  {entry.vehicleMismatch.modelOnReceipt ? ` ${entry.vehicleMismatch.modelOnReceipt}` : ''}
+                </strong>
+                {' '}- are you sure this belongs to this bike?
+              </>
+            )}
+            {entry.vehicleMismatch && entry.plateMismatch && <br />}
+            {entry.plateMismatch && (
+              <>
+                This receipt shows registration <strong>{entry.plateMismatch.registrationOnReceipt}</strong>, which isn&apos;t a plate this bike has ever used.
+              </>
+            )}
+          </p>
+          <button type="button" className={styles.iconBtn} onClick={handleDelete} disabled={deleting || submitting}>
+            {deleting ? 'Deleting…' : 'Delete this entry'}
+          </button>
+        </div>
+      )}
+
       {entry.duplicate && (
         <div className={styles.reviewQueueDuplicateWarning}>
           <p>
@@ -379,6 +405,7 @@ function QueueItemForm({
 // across the whole union.
 function isDirty(entry: ReviewQueueEntry, original: ParsedReceiptItem): boolean {
   if (entry.duplicate) return true;
+  if (entry.plateMismatch || entry.vehicleMismatch) return true;
   if (original.forceReview) return true;
   if (entry.category !== 'bills' && entry.mileageNeedsManualEntry) return true;
   // commitReceiptItem doesn't reject on implausible litres the way the

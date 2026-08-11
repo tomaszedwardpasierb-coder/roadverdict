@@ -32,6 +32,8 @@ const PROMPT = `You are extracting structured data from a photo that is claimed 
   "merchantName": the name of the business/garage/petrol station this receipt is from, if visible - otherwise null. Only relevant if isReceipt is true.,
   "address": the street address printed on the receipt, if visible (e.g. "14 High Street") - otherwise null. Only relevant if isReceipt is true.,
   "city": the town or city printed on the receipt, if visible - otherwise null. Only relevant if isReceipt is true.,
+  "vehicleMakeOnReceipt": the motorcycle's make/brand, ONLY if this specific receipt or invoice explicitly states which vehicle it is FOR (e.g. a garage invoice header reading "Vehicle: Honda CB500F", or a work order listing the customer's bike) - do NOT return a brand name that just happens to appear as the shop's own name, a parts manufacturer, or an unrelated product on the receipt (e.g. a shop called "Royal Enfield of Manchester", or a "Yamaha" branded oil filter bought for a different bike, do not count - only the vehicle the invoice is actually about). This is genuinely rare - most receipts (fuel, parts, tax, insurance) never state it at all. Otherwise null. Only relevant if isReceipt is true.,
+  "vehicleModelOnReceipt": the specific model, ONLY if named alongside the make above in that same "this is the vehicle" context (e.g. "CB500F", "Meteor 350") - otherwise null. Only relevant if isReceipt is true.,
   "items": [
     {
       "category": one of "service", "fuel", "mods", "bills",
@@ -71,6 +73,8 @@ interface GeminiResponse {
   merchantName?: string | null;
   address?: string | null;
   city?: string | null;
+  vehicleMakeOnReceipt?: string | null;
+  vehicleModelOnReceipt?: string | null;
   items?: GeminiItem[];
 }
 
@@ -88,6 +92,8 @@ export interface ParsedReceiptItem {
   merchantName: string | null;
   address: string | null;
   city: string | null;
+  vehicleMakeOnReceipt: string | null;
+  vehicleModelOnReceipt: string | null;
   attachment: Attachment;
   currencyConversion?: CurrencyConversionInfo;
   forceReview: boolean;
@@ -170,6 +176,8 @@ export async function parseReceiptFile(file: File, apiKey: string, bike: BikeDoc
     const merchantName = typeof parsed.merchantName === "string" && parsed.merchantName.trim() ? parsed.merchantName.trim() : null;
     const address = typeof parsed.address === "string" && parsed.address.trim() ? parsed.address.trim() : null;
     const city = typeof parsed.city === "string" && parsed.city.trim() ? parsed.city.trim() : null;
+    const vehicleMakeOnReceipt = typeof parsed.vehicleMakeOnReceipt === "string" && parsed.vehicleMakeOnReceipt.trim() ? parsed.vehicleMakeOnReceipt.trim() : null;
+    const vehicleModelOnReceipt = typeof parsed.vehicleModelOnReceipt === "string" && parsed.vehicleModelOnReceipt.trim() ? parsed.vehicleModelOnReceipt.trim() : null;
 
     // Uploaded once per file, shared as the attachment across every item
     // split out of this one receipt - they're all proof of the same
@@ -248,6 +256,8 @@ export async function parseReceiptFile(file: File, apiKey: string, bike: BikeDoc
         merchantName,
         address,
         city,
+        vehicleMakeOnReceipt,
+        vehicleModelOnReceipt,
         attachment,
         currencyConversion,
         forceReview,
