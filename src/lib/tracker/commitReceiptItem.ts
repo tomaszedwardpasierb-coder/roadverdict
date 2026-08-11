@@ -54,10 +54,16 @@ export async function commitReceiptItem(
     getMods(email, bike.id),
     getBills(email, bike.id),
   ]);
-  const serviceCandidates = records.map((r) => ({ id: r.id, date: r.date, mileage: r.mileage, cost: r.cost, description: JOB_LABELS[r.jobType] ?? r.jobType }));
+  // description here is the specific text (r.notes / the receipt's own
+  // description), not the job-type label - two genuinely different line
+  // items on the same invoice routinely share a job type (both "Other",
+  // say), which would make every duplicate check against them compare
+  // identical labels and never tell them apart. The label is still fine
+  // for fuel and mods, since litres and mod names are already specific.
+  const serviceCandidates = records.map((r) => ({ id: r.id, date: r.date, mileage: r.mileage, cost: r.cost, description: r.notes || (JOB_LABELS[r.jobType] ?? r.jobType) }));
   const fuelCandidates = fuelLogs.map((f) => ({ id: f.id, date: f.date, mileage: f.mileage, cost: f.cost, description: `${f.litres.toFixed(1)}L fill-up` }));
   const modCandidates = mods.map((m) => ({ id: m.id, date: m.date, mileage: m.mileage, cost: m.cost, description: m.name }));
-  const billCandidates = bills.map((b) => ({ id: b.id, date: b.date, cost: b.cost, description: BILL_LABELS[b.billType] ?? b.billType }));
+  const billCandidates = bills.map((b) => ({ id: b.id, date: b.date, cost: b.cost, description: b.notes || (BILL_LABELS[b.billType] ?? b.billType) }));
 
   const isTrustworthy = (confidence: "interpolated" | "estimated" | "confirmed" | undefined) => !confidence || confidence === "confirmed";
   // Now carries id + category for every point, not just date/mileage -
@@ -138,12 +144,19 @@ export async function commitReceiptItem(
         ? checkMileageConsistency(mileageOnReceipt, date, trustedMileagePoints, bike.currentMileage)
         : null;
     const receiptConflict = consistency ? consistency.status !== "ok" : false;
-    const conflictWarning = receiptConflict
-      ? `The receipt appears to show ${mileageOnReceipt!.toLocaleString()} mi, but that conflicts with another record - please check and enter the real figure.`
-      : undefined;
+    // As specific as the live, on-save check gets - the receipt-reading
+    // caveat stays first, since that part genuinely is worth flagging
+    // separately (the AI might have misread it), then the exact same
+    // wording describeMileageCheck produces everywhere else, naming the
+    // real number rather than leaving the owner to guess at one.
+    const conflictWarning =
+      receiptConflict && consistency
+        ? `The receipt appears to show ${mileageOnReceipt!.toLocaleString()} mi. ${describeMileageCheck(consistency)}`
+        : undefined;
     if (receiptConflict && consistency) {
       conflictReferenceId = consistency.referenceId;
       conflictReferenceCategory = consistency.referenceCategory;
+      conflictReferenceBatchIndex = consistency.referenceBatchIndex;
     }
 
     if (typeof mileageOnReceipt === "number" && !receiptConflict) {
@@ -185,7 +198,7 @@ export async function commitReceiptItem(
     ].filter(Boolean).join(" - ");
     const jobLabel = JOB_LABELS[jobType] ?? jobType;
     const aiDescription = buildAiDescription({ description: jobLabel, merchantName, address, city, categoryLabel: "Service" });
-    const duplicate = findPossibleDuplicate(date, costGbp, serviceCandidates, jobLabel);
+    const duplicate = findPossibleDuplicate(date, costGbp, serviceCandidates, description);
     const record = await createServiceRecord(email, {
       bikeId: bike.id, jobType, cost: costGbp, mileage: mileage ?? bike.currentMileage, date, notes,
       attachments: [attachment], needsReview: true, currencyConversion, mileageConfidence, aiDescription,
@@ -251,7 +264,7 @@ export async function commitReceiptItem(
   const billNotes = forceReview ? `${description} (currency could not be auto-converted - please check the amount)` : description;
   const billLabel = BILL_LABELS[billType] ?? billType;
   const aiDescription = buildAiDescription({ description: billLabel, merchantName, address, city, categoryLabel: "Insurance, tax & MOT" });
-  const duplicate = findPossibleDuplicate(date, costGbp, billCandidates, billLabel);
+  const duplicate = findPossibleDuplicate(date, costGbp, billCandidates, description);
   const record = await createBill(email, {
     bikeId: bike.id, billType, cost: costGbp, date, notes: billNotes, attachments: [attachment], needsReview: true, currencyConversion, aiDescription,
   });

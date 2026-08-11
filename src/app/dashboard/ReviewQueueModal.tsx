@@ -71,7 +71,7 @@ function QueueItemForm({
 }: {
   entry: ReviewQueueEntry;
   batchHints: { date: string; mileage: number }[];
-  onSaved: () => void;
+  onSaved: (savedFields: Record<string, unknown>) => void;
   onSkip: () => void;
   onDeleteDuplicate: () => void;
   onPrev: () => void;
@@ -122,19 +122,28 @@ function QueueItemForm({
     const mileageValue = mileage.trim() ? Number(mileage) : entry.category !== 'bills' ? entry.mileage : 0;
 
     let body: Record<string, unknown>;
+    let savedFields: Record<string, unknown>;
     if (entry.category === 'service') {
       body = { jobType, cost: Number(cost), mileage: mileageValue, date, notes, batchHints };
+      savedFields = { jobType, cost: Number(cost), mileage: mileageValue, date, notes };
     } else if (entry.category === 'fuel') {
       body = { litres: Number(litres), cost: Number(cost), mileage: mileageValue, date, filledToFull, batchHints };
+      savedFields = { litres: Number(litres), cost: Number(cost), mileage: mileageValue, date, filledToFull };
     } else if (entry.category === 'mods') {
       body = { category: entry.modCategory, name, cost: Number(cost), mileage: mileageValue, date, notes, batchHints };
+      // ReviewQueueEntry's own field is modCategory, not category -
+      // category there is the discriminant ("mods") and must not be
+      // overwritten with the sub-category string, unlike the PATCH
+      // route's body, which genuinely does expect it under "category".
+      savedFields = { modCategory: entry.modCategory, name, cost: Number(cost), mileage: mileageValue, date, notes };
     } else {
       body = { billType, cost: Number(cost), date, notes };
+      savedFields = { billType, cost: Number(cost), date, notes };
     }
 
     const result = await patchEntry(entry, body);
     setSubmitting(false);
-    if (result.ok) onSaved();
+    if (result.ok) onSaved(savedFields);
     else setError(result.error ?? 'Could not save. Try again.');
   }
 
@@ -303,7 +312,7 @@ function QueueItemForm({
 
       <div className={styles.reviewQueueFooterRow}>
         <button type="button" className={styles.iconBtn} onClick={onPrev} disabled={!canGoPrev || submitting || finishing}>
-          â† Prev
+          ← Prev
         </button>
         <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center' }}>
           <button type="button" className={styles.reviewQueueFinishLater} onClick={onFinishLater} disabled={submitting || finishing}>
@@ -344,7 +353,7 @@ function QueueItemForm({
           }}
           onResolved={() => {
             setShowConflictModal(false);
-            onSaved();
+            onSaved({});
           }}
           onClose={() => setShowConflictModal(false)}
         />
@@ -516,6 +525,52 @@ export function ReviewQueueModal({ parsedItems, onFinished }: { parsedItems: Par
     setIndex((i) => i + 1);
   }
 
+  // A successful save only ever updated the database - committed[index]
+  // itself was never touched, so the cached copy this component
+  // actually renders from stayed frozen at whatever it looked like the
+  // moment this item was first committed. Revisiting an already-saved
+  // item showed the original unsaved state again, and any OTHER item
+  // that had flagged a conflict against this one kept showing that
+  // conflict forever, even once it was genuinely resolved. This updates
+  // the entry that was just saved with its real new values, and clears
+  // the stale conflict fields on every other item that had pointed at
+  // this one - not a re-validation (nothing here re-checks whether a
+  // new conflict now exists), just making sure nothing keeps displaying
+  // a problem that's already been fixed.
+  function handleEntrySaved(savedFields: Record<string, unknown>) {
+    setCommitted((prev) => {
+      const next = [...prev];
+      const savedEntry = next[index];
+      if (savedEntry) {
+        const updated = { ...savedEntry, ...savedFields } as ReviewQueueEntry;
+        if (updated.category !== 'bills') {
+          updated.mileageNeedsManualEntry = false;
+          updated.mileageWarningText = undefined;
+          updated.mileageConflictReferenceId = undefined;
+          updated.mileageConflictReferenceCategory = undefined;
+          updated.mileageConflictReferenceBatchIndex = undefined;
+        }
+        updated.duplicate = null;
+        next[index] = updated;
+      }
+      for (let i = 0; i < next.length; i++) {
+        const other = next[i];
+        if (i !== index && other && other.category !== 'bills' && other.mileageConflictReferenceBatchIndex === index) {
+          next[i] = {
+            ...other,
+            mileageNeedsManualEntry: false,
+            mileageWarningText: undefined,
+            mileageConflictReferenceId: undefined,
+            mileageConflictReferenceCategory: undefined,
+            mileageConflictReferenceBatchIndex: undefined,
+          };
+        }
+      }
+      return next;
+    });
+    setIndex((i) => i + 1);
+  }
+
   function handleDeleteDuplicate() {
     attemptedRef.current.clear();
     setItems((prev) => prev.filter((_, i) => i !== index));
@@ -644,7 +699,7 @@ export function ReviewQueueModal({ parsedItems, onFinished }: { parsedItems: Par
               .filter((_, i) => i !== index)
               .filter((it) => typeof it.mileageOnReceipt === 'number')
               .map((it) => ({ date: it.date, mileage: it.mileageOnReceipt as number }))}
-            onSaved={goNext}
+            onSaved={handleEntrySaved}
             onSkip={goNext}
             onDeleteDuplicate={handleDeleteDuplicate}
             onPrev={() => setIndex((i) => findPrevInteractiveIndex(items, committed, i))}
