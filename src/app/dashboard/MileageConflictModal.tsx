@@ -39,6 +39,14 @@ interface Props {
   referenceId?: string;
   referenceCategory?: 'service' | 'fuel' | 'mods';
   preloadedReference?: ReferenceEntry;
+  // True when the reference is another item still sitting in this same
+  // batch, not yet saved anywhere - it has a description and a receipt
+  // photo to show, but no real database id to PATCH or DELETE. Correct
+  // and Delete still work in this case, just against the batch's own
+  // in-memory item instead of the server.
+  isBatchPeerReference?: boolean;
+  onCorrectBatchPeer?: (newMileage: number, newDate: string) => void;
+  onDeleteBatchPeer?: () => void;
   // Each card knows its OWN record's full shape (a service record needs
   // jobType/notes, fuel needs litres/filledToFull, mods needs
   // name/modCategory) - the PATCH routes require the complete field
@@ -46,7 +54,7 @@ interface Props {
   // body that won't be rejected as incomplete. This function takes
   // just the override(s) this modal actually decided on, and returns
   // the caller's own complete, valid body.
-  buildPatchBody: (overrides: { mileage?: number; mileageAnomaly?: boolean; mileageAcknowledged?: boolean }) => Record<string, unknown>;
+  buildPatchBody: (overrides: { mileage?: number; date?: string; mileageAnomaly?: boolean; mileageAcknowledged?: boolean }) => Record<string, unknown>;
   onResolved: () => void;
   onClose: () => void;
 }
@@ -61,6 +69,9 @@ export function MileageConflictModal({
   referenceId,
   preloadedReference,
   referenceCategory,
+  isBatchPeerReference,
+  onCorrectBatchPeer,
+  onDeleteBatchPeer,
   buildPatchBody,
   onResolved,
   onClose,
@@ -71,12 +82,15 @@ export function MileageConflictModal({
   const [submitting, setSubmitting] = useState(false);
   const [mode, setMode] = useState<'choose' | 'correctBoth'>('choose');
   const [newMileageForEntry, setNewMileageForEntry] = useState(String(entryMileage));
+  const [newDateForEntry, setNewDateForEntry] = useState(entryDate);
   const [newMileageForReference, setNewMileageForReference] = useState('');
+  const [newDateForReference, setNewDateForReference] = useState('');
 
   useEffect(() => {
     if (preloadedReference) {
       setReference(preloadedReference);
       setNewMileageForReference(String(preloadedReference.mileage));
+      setNewDateForReference(preloadedReference.date);
       setLoading(false);
       return;
     }
@@ -94,6 +108,7 @@ export function MileageConflictModal({
         if (res.ok) {
           setReference(data);
           setNewMileageForReference(String(data.mileage));
+          setNewDateForReference(data.date);
         } else {
           setError(data.error ?? "Could not load the other entry.");
         }
@@ -108,7 +123,7 @@ export function MileageConflictModal({
     };
   }, [preloadedReference, referenceId, referenceCategory]);
 
-  async function patchThisEntry(overrides: { mileage?: number; mileageAnomaly?: boolean; mileageAcknowledged?: boolean }): Promise<boolean> {
+  async function patchThisEntry(overrides: { mileage?: number; date?: string; mileageAnomaly?: boolean; mileageAcknowledged?: boolean }): Promise<boolean> {
     const res = await fetch(`/api/tracker/${CATEGORY_ROUTE[entryCategory]}/${encodeURIComponent(entryId)}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
@@ -122,11 +137,11 @@ export function MileageConflictModal({
   // from what conflict-reference returned, using the record's own real
   // values (now included in the response) rather than a placeholder
   // that would silently overwrite them.
-  async function patchReferenceEntry(ref: ReferenceEntry, mileage: number): Promise<boolean> {
+  async function patchReferenceEntry(ref: ReferenceEntry, mileage: number, date: string): Promise<boolean> {
     let body: Record<string, unknown>;
-    if (ref.category === 'service') body = { jobType: ref.jobType, cost: ref.cost, mileage, date: ref.date, notes: ref.notes, mileageAcknowledged: true };
-    else if (ref.category === 'fuel') body = { litres: ref.litres, cost: ref.cost, mileage, date: ref.date, filledToFull: ref.filledToFull, mileageAcknowledged: true };
-    else body = { category: ref.modCategory, name: ref.name, cost: ref.cost, mileage, date: ref.date, notes: ref.notes, mileageAcknowledged: true };
+    if (ref.category === 'service') body = { jobType: ref.jobType, cost: ref.cost, mileage, date, notes: ref.notes, mileageAcknowledged: true };
+    else if (ref.category === 'fuel') body = { litres: ref.litres, cost: ref.cost, mileage, date, filledToFull: ref.filledToFull, mileageAcknowledged: true };
+    else body = { category: ref.modCategory, name: ref.name, cost: ref.cost, mileage, date, notes: ref.notes, mileageAcknowledged: true };
     const res = await fetch(`/api/tracker/${CATEGORY_ROUTE[ref.category]}/${encodeURIComponent(ref.id)}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
@@ -166,12 +181,27 @@ export function MileageConflictModal({
   async function handleCorrectBoth() {
     setSubmitting(true);
     setError(null);
-    const entryChanged = Number(newMileageForEntry) !== entryMileage;
-    const refChanged = reference && Number(newMileageForReference) !== reference.mileage;
-    const results = await Promise.all([
-      entryChanged ? patchThisEntry({ mileage: Number(newMileageForEntry), mileageAcknowledged: true }) : Promise.resolve(true),
-      refChanged && reference ? patchReferenceEntry(reference, Number(newMileageForReference)) : Promise.resolve(true),
-    ]);
+    const entryMileageChanged = Number(newMileageForEntry) !== entryMileage;
+    const entryDateChanged = newDateForEntry !== entryDate;
+    const refMileageChanged = reference && Number(newMileageForReference) !== reference.mileage;
+    const refDateChanged = reference && newDateForReference !== reference.date;
+
+    const tasks: Promise<boolean>[] = [];
+    if (entryMileageChanged || entryDateChanged) {
+      tasks.push(patchThisEntry({ mileage: Number(newMileageForEntry), date: newDateForEntry, mileageAcknowledged: true }));
+    }
+    if ((refMileageChanged || refDateChanged) && reference) {
+      if (isBatchPeerReference && onCorrectBatchPeer) {
+        // Synchronous, client-side only - this item hasn't been saved
+        // anywhere yet, so there's nothing to PATCH. The correction
+        // just updates the batch's own copy, which is what the queue
+        // will actually commit once it's reached.
+        onCorrectBatchPeer(Number(newMileageForReference), newDateForReference);
+      } else {
+        tasks.push(patchReferenceEntry(reference, Number(newMileageForReference), newDateForReference));
+      }
+    }
+    const results = await Promise.all(tasks);
     setSubmitting(false);
     if (results.every(Boolean)) onResolved();
     else setError('Could not save one or both corrections. Try again.');
@@ -182,7 +212,13 @@ export function MileageConflictModal({
     setError(null);
     const tasks: Promise<boolean>[] = [];
     if (which === 'entry' || which === 'both') tasks.push(deleteEntry(entryCategory, entryId));
-    if ((which === 'reference' || which === 'both') && reference) tasks.push(deleteEntry(reference.category, reference.id));
+    if ((which === 'reference' || which === 'both') && reference) {
+      if (isBatchPeerReference && onDeleteBatchPeer) {
+        onDeleteBatchPeer();
+      } else {
+        tasks.push(deleteEntry(reference.category, reference.id));
+      }
+    }
     const results = await Promise.all(tasks);
     setSubmitting(false);
     if (results.every(Boolean)) onResolved();
@@ -288,10 +324,14 @@ export function MileageConflictModal({
                   <div className="field">
                     <label htmlFor="cf-entry-mileage">This entry&apos;s mileage</label>
                     <input id="cf-entry-mileage" type="number" min="0" value={newMileageForEntry} onChange={(e) => setNewMileageForEntry(e.target.value)} />
+                    <label htmlFor="cf-entry-date" style={{ marginTop: '0.5rem', display: 'block' }}>This entry&apos;s date</label>
+                    <input id="cf-entry-date" type="date" value={newDateForEntry} onChange={(e) => setNewDateForEntry(e.target.value)} />
                   </div>
                   <div className="field">
                     <label htmlFor="cf-ref-mileage">{CATEGORY_LABEL[reference.category]}&apos;s mileage</label>
                     <input id="cf-ref-mileage" type="number" min="0" value={newMileageForReference} onChange={(e) => setNewMileageForReference(e.target.value)} />
+                    <label htmlFor="cf-ref-date" style={{ marginTop: '0.5rem', display: 'block' }}>{CATEGORY_LABEL[reference.category]}&apos;s date</label>
+                    <input id="cf-ref-date" type="date" value={newDateForReference} onChange={(e) => setNewDateForReference(e.target.value)} />
                   </div>
                 </div>
                 <div style={{ display: 'flex', gap: '0.6rem' }}>

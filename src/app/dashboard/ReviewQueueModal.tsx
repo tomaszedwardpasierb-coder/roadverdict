@@ -68,6 +68,8 @@ function QueueItemForm({
   mileageOptional,
   conflictPeer,
   onJumpToPeer,
+  onCorrectPeer,
+  onDeletePeer,
 }: {
   entry: ReviewQueueEntry;
   batchHints: { date: string; mileage: number }[];
@@ -81,6 +83,8 @@ function QueueItemForm({
   mileageOptional: boolean;
   conflictPeer: ParsedReceiptItem | null;
   onJumpToPeer: () => void;
+  onCorrectPeer: (newMileage: number, newDate: string) => void;
+  onDeletePeer: () => void;
 }) {
   const [submitting, setSubmitting] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -167,6 +171,19 @@ function QueueItemForm({
         </div>
       </div>
 
+      {entry.duplicate && (
+        <div className={styles.reviewQueueDuplicateWarning}>
+          <p>
+            This might already be logged: <strong>{entry.duplicate.description}</strong>,{' '}
+            {new Date(entry.duplicate.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })},{' '}
+            £{entry.duplicate.cost.toFixed(2)}.
+          </p>
+          <button type="button" className={styles.iconBtn} onClick={handleDelete} disabled={deleting || submitting}>
+            {deleting ? 'Deleting…' : 'Delete this new entry'}
+          </button>
+        </div>
+      )}
+
       {(entry.vehicleMismatch || entry.plateMismatch) && (
         <div className={styles.reviewQueueDuplicateWarning}>
           <p>
@@ -189,19 +206,6 @@ function QueueItemForm({
           </p>
           <button type="button" className={styles.iconBtn} onClick={handleDelete} disabled={deleting || submitting}>
             {deleting ? 'Deleting…' : 'Delete this entry'}
-          </button>
-        </div>
-      )}
-
-      {entry.duplicate && (
-        <div className={styles.reviewQueueDuplicateWarning}>
-          <p>
-            This might already be logged: <strong>{entry.duplicate.description}</strong>,{' '}
-            {new Date(entry.duplicate.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })},{' '}
-            £{entry.duplicate.cost.toFixed(2)}.
-          </p>
-          <button type="button" className={styles.iconBtn} onClick={handleDelete} disabled={deleting || submitting}>
-            {deleting ? 'Deleting…' : 'Delete this new entry'}
           </button>
         </div>
       )}
@@ -246,7 +250,7 @@ function QueueItemForm({
           <input id="rq-litres" type="number" min="0" step="0.01" value={litres} onChange={(e) => setLitres(e.target.value)} required />
           {liveLitresCheck?.implausible && (
             <p className="field-note" style={{ marginTop: '0.3rem', color: 'var(--verdict-red)' }}>
-              âš ï¸ {liveLitresCheck.reason}
+              ⚠️ {liveLitresCheck.reason}
             </p>
           )}
         </div>
@@ -273,24 +277,11 @@ function QueueItemForm({
                   "There is nothing nearby to estimate this from reliably - please enter the real mileage from the receipt, or your best own memory of it."}{" "}
                 Once saved, this becomes a real anchor the next entries in this batch can use.
               </p>
-              {entry.mileageConflictReferenceId && entry.mileageConflictReferenceCategory && (
+              {((entry.mileageConflictReferenceId && entry.mileageConflictReferenceCategory) ||
+                (entry.mileageConflictReferenceBatchIndex !== undefined && conflictPeer)) && (
                 <button type="button" className={styles.iconBtn} onClick={() => setShowConflictModal(true)}>
                   Resolve
                 </button>
-              )}
-              {entry.mileageConflictReferenceBatchIndex !== undefined && conflictPeer && (
-                <div className={styles.reviewQueueDuplicateWarning} style={{ marginTop: "0.4rem" }}>
-                  <p>
-                    This conflicts with another item still in this same batch:{" "}
-                    <strong>{conflictPeer.description}</strong>,{" "}
-                    {new Date(conflictPeer.date).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
-                    {typeof conflictPeer.mileageOnReceipt === "number" ? `, ${conflictPeer.mileageOnReceipt.toLocaleString()} mi` : ""}.
-                    {" "}Correcting that one, once you reach it, will often resolve this too.
-                  </p>
-                  <button type="button" className={styles.iconBtn} onClick={onJumpToPeer}>
-                    Review that item now
-                  </button>
-                </div>
               )}
               {conflictLookupError && <p className="error-text" role="alert">{conflictLookupError}</p>}
             </>
@@ -309,7 +300,7 @@ function QueueItemForm({
               className="field-note"
               style={{ marginTop: '0.3rem', color: liveFuelCheck.plausible ? 'var(--verdict-green)' : 'var(--verdict-red)' }}
             >
-              â†’ works out to about <strong>{Math.round(liveFuelCheck.impliedMpg)} mpg</strong> for this tank
+              → works out to about <strong>{Math.round(liveFuelCheck.impliedMpg)} mpg</strong> for this tank
               {liveFuelCheck.plausible
                 ? ' - looks reasonable.'
                 : ` - still too low to be realistic (needs to be at least ${Math.round(liveFuelCheck.precedingMileage + liveFuelCheck.minPlausibleMiles).toLocaleString()}).`}
@@ -353,7 +344,9 @@ function QueueItemForm({
         </div>
       </div>
     </form>
-      {showConflictModal && entry.category !== "bills" && entry.mileageConflictReferenceId && entry.mileageConflictReferenceCategory && (
+      {showConflictModal && entry.category !== "bills" &&
+        ((entry.mileageConflictReferenceId && entry.mileageConflictReferenceCategory) ||
+          (entry.mileageConflictReferenceBatchIndex !== undefined && conflictPeer)) && (
         <MileageConflictModal
           entryId={entry.id}
           entryCategory={entry.category as "service" | "fuel" | "mods"}
@@ -363,16 +356,32 @@ function QueueItemForm({
           entryAttachment={entry.attachment}
           referenceId={entry.mileageConflictReferenceId}
           referenceCategory={entry.mileageConflictReferenceCategory}
+          isBatchPeerReference={entry.mileageConflictReferenceBatchIndex !== undefined}
+          preloadedReference={
+            entry.mileageConflictReferenceBatchIndex !== undefined && conflictPeer
+              ? {
+                  id: '',
+                  category: (conflictPeer.category === 'bills' ? 'service' : conflictPeer.category) as 'service' | 'fuel' | 'mods',
+                  date: conflictPeer.date,
+                  mileage: conflictPeer.mileageOnReceipt ?? 0,
+                  label: conflictPeer.description,
+                  cost: conflictPeer.costGbp,
+                  attachment: conflictPeer.attachment,
+                }
+              : undefined
+          }
+          onCorrectBatchPeer={onCorrectPeer}
+          onDeleteBatchPeer={onDeletePeer}
           buildPatchBody={(overrides) => {
-            const mv = mileage.trim() ? Number(mileage) : entry.mileage;
+            const mv = overrides.mileage !== undefined ? overrides.mileage : mileage.trim() ? Number(mileage) : entry.mileage;
+            const dt = overrides.date ?? date;
             const base =
-              entry.category === "service" ? { jobType, cost: Number(cost), mileage: mv, date, notes } :
-              entry.category === "fuel" ? { litres: Number(litres), cost: Number(cost), mileage: mv, date, filledToFull } :
-              entry.category === "mods" ? { category: entry.modCategory, name, cost: Number(cost), mileage: mv, date, notes } :
-              { billType, cost: Number(cost), date, notes };
+              entry.category === "service" ? { jobType, cost: Number(cost), mileage: mv, date: dt, notes } :
+              entry.category === "fuel" ? { litres: Number(litres), cost: Number(cost), mileage: mv, date: dt, filledToFull } :
+              entry.category === "mods" ? { category: entry.modCategory, name, cost: Number(cost), mileage: mv, date: dt, notes } :
+              { billType, cost: Number(cost), date: dt, notes };
             return {
               ...base,
-              ...(overrides.mileage !== undefined ? { mileage: overrides.mileage } : {}),
               mileageAcknowledged: overrides.mileageAcknowledged,
               ...(overrides.mileageAnomaly !== undefined ? { mileageAnomaly: overrides.mileageAnomaly } : {}),
             };
@@ -467,13 +476,13 @@ function findPrevInteractiveIndex(items: ParsedReceiptItem[], committed: (Review
 }
 
 export function ReviewQueueModal({ parsedItems, onFinished }: { parsedItems: ParsedReceiptItem[]; onFinished: () => void }) {
-  // Re-sorts with the exact same tier-then-date rule ScanReceiptButton.tsx
-  // already applied before handing this batch over - not a second,
-  // different rule. Re-applying it here (rather than trusting the prop's
-  // order blindly) keeps this component correct on its own if it's ever
-  // called with an unsorted batch, without risking the two disagreeing
-  // the way an independent sort here previously did.
   const [items, setItems] = useState(() =>
+    // Re-sorts with the exact same tier-then-date rule ScanReceiptButton.tsx
+    // already applied before handing this batch over - not a second,
+    // different rule. Re-applying it here (rather than trusting the prop's
+    // order blindly) keeps this component correct on its own if it's ever
+    // called with an unsorted batch, without risking the two disagreeing
+    // the way an independent sort here previously did.
     [...parsedItems].sort((a, b) => {
       const tierDiff = receiptTierSortWeight(classifyReceiptTier(a)) - receiptTierSortWeight(classifyReceiptTier(b));
       if (tierDiff !== 0) return tierDiff;
@@ -612,9 +621,35 @@ export function ReviewQueueModal({ parsedItems, onFinished }: { parsedItems: Par
   }
 
   function handleDeleteDuplicate() {
+    removeItemAtIndex(index);
+  }
+
+  // Shared by "delete this new entry" (duplicate detection) and
+  // deleting a conflicting batch peer from the rich comparison modal -
+  // removing an item from the middle of the array shifts every later
+  // index, which would silently point any OTHER item's
+  // mileageConflictReferenceBatchIndex at the wrong item (or, if it
+  // pointed at exactly the removed one, at nothing at all). This keeps
+  // every reference correct after the removal, not just the array
+  // itself.
+  function removeItemAtIndex(removedIndex: number) {
     attemptedRef.current.clear();
-    setItems((prev) => prev.filter((_, i) => i !== index));
-    setCommitted((prev) => prev.filter((_, i) => i !== index));
+    setItems((prev) => prev.filter((_, i) => i !== removedIndex));
+    setCommitted((prev) =>
+      prev
+        .filter((_, i) => i !== removedIndex)
+        .map((entry) => {
+          if (!entry || entry.category === 'bills' || entry.mileageConflictReferenceBatchIndex === undefined) return entry;
+          if (entry.mileageConflictReferenceBatchIndex === removedIndex) {
+            return { ...entry, mileageConflictReferenceBatchIndex: undefined };
+          }
+          if (entry.mileageConflictReferenceBatchIndex > removedIndex) {
+            return { ...entry, mileageConflictReferenceBatchIndex: entry.mileageConflictReferenceBatchIndex - 1 };
+          }
+          return entry;
+        })
+    );
+    setIndex((i) => (i > removedIndex ? i - 1 : i));
   }
 
   // Anything not yet reached is only sitting in browser memory as parsed
@@ -755,6 +790,15 @@ export function ReviewQueueModal({ parsedItems, onFinished }: { parsedItems: Par
             conflictPeer={current.category !== "bills" && current.mileageConflictReferenceBatchIndex !== undefined ? items[current.mileageConflictReferenceBatchIndex] ?? null : null}
             onJumpToPeer={() => {
               if (current.category !== "bills" && current.mileageConflictReferenceBatchIndex !== undefined) setIndex(current.mileageConflictReferenceBatchIndex);
+            }}
+            onCorrectPeer={(newMileage, newDate) => {
+              if (current.category === "bills" || current.mileageConflictReferenceBatchIndex === undefined) return;
+              const peerIndex = current.mileageConflictReferenceBatchIndex;
+              setItems((prev) => prev.map((it, i) => (i === peerIndex ? { ...it, mileageOnReceipt: newMileage, date: newDate } : it)));
+            }}
+            onDeletePeer={() => {
+              if (current.category === "bills" || current.mileageConflictReferenceBatchIndex === undefined) return;
+              removeItemAtIndex(current.mileageConflictReferenceBatchIndex);
             }}
             batchHints={items
               .filter((_, i) => i !== index)
