@@ -82,11 +82,42 @@ export interface SellerReportData {
   detailedQuestions: string[];
 }
 
-export async function getSellerReportData(token: string): Promise<SellerReportData> {
-  const resolved = await resolveShareToken(token);
-  if (!resolved) notFound();
-  const { email, bikeId } = resolved;
+export interface SellerReportCore {
+  bike: BikeDoc;
+  rows: ReportRow[];
+  total: number;
+  clusters: BulkBackdateCluster[];
+  backdatedCount: number;
+  realTimeCount: number;
+  receiptCount: number;
+  currentRegistration: string | null;
+  registrationChangesCount: number;
+  originalRegistration?: string;
+  mostRecentChangeDate: string | null;
+  daysSinceLastChange: number | null;
+  dateAdded: string;
+  verdict: SellerVerdictResult;
+  buyerQuestions: string[];
+  upcomingReminders: { reminder: ReminderDoc; status: "due-soon" | "overdue" }[];
+  consumablesDueSoon: ConsumableDueSoon[];
+  motCheckUrl: string;
+  mileageCheck: MileagePlausibilityCheck;
+  storyParagraphs: string[];
+  jobTypeGroups: JobTypeGroup[];
+  supportedFindings: string[];
+  unconfirmedFindings: string[];
+  detailedQuestions: string[];
+}
 
+// The actual report computation - everything that depends only on
+// email/bikeId, not on any particular share token. Pulled out so the
+// owner's own dashboard (authenticated by session, no token at all) can
+// compute exactly the same facts a buyer would eventually see, from the
+// same raw records, rather than a second implementation that could
+// silently drift from this one. getSellerReportData below is now just
+// this plus token resolution and the token-specific receipt-request
+// status lookup.
+export async function getSellerReportCore(email: string, bikeId: string): Promise<SellerReportCore> {
   const bike = await getBike(email, bikeId);
   if (!bike) notFound();
 
@@ -167,25 +198,6 @@ export async function getSellerReportData(token: string): Promise<SellerReportDa
   const verdict = computeSellerVerdict(verdictMetrics);
   const buyerQuestions = generateBuyerQuestions(verdictMetrics);
 
-  const requests = await getReceiptRequestsForShareToken(email, token);
-  // Most recent request wins per entry - handles "declined, then asked
-  // again" correctly, since the newer request's pending status should
-  // take precedence over an older decline for display purposes.
-  const entryRequestStatus: Record<string, EntryRequestStatus> = {};
-  for (const r of [...requests].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())) {
-    for (const item of r.items) {
-      entryRequestStatus[item.entryId] = {
-        status: item.status,
-        reason: item.reason,
-        requestCreatedAt: r.createdAt,
-        canRemind: canSendReminder(r),
-      };
-    }
-  }
-
-  // Narrative report - built from the same raw records, never a second,
-  // separately-fetched dataset that could drift from what the itemized
-  // table below actually shows.
   const mileageCheck = checkCurrentMileagePlausibility(bike.currentMileage, bike);
   const jobTypeGroups = groupServiceHistoryByJobType(
     records.map((r) => ({ id: r.id, jobType: r.jobType, date: r.date, cost: r.cost, hasReceipt: !!r.attachments?.[0] }))
@@ -217,7 +229,6 @@ export async function getSellerReportData(token: string): Promise<SellerReportDa
   const detailedQuestions = generateDetailedQuestions(jobTypeGroups, Boolean(otherGroup), hasTyreEntries);
 
   return {
-    token,
     bike,
     rows,
     total,
@@ -236,7 +247,6 @@ export async function getSellerReportData(token: string): Promise<SellerReportDa
     upcomingReminders,
     consumablesDueSoon,
     motCheckUrl: "https://www.check-mot.service.gov.uk/",
-    entryRequestStatus,
     mileageCheck,
     storyParagraphs,
     jobTypeGroups,
@@ -244,4 +254,30 @@ export async function getSellerReportData(token: string): Promise<SellerReportDa
     unconfirmedFindings,
     detailedQuestions,
   };
+}
+
+export async function getSellerReportData(token: string): Promise<SellerReportData> {
+  const resolved = await resolveShareToken(token);
+  if (!resolved) notFound();
+  const { email, bikeId } = resolved;
+
+  const core = await getSellerReportCore(email, bikeId);
+
+  const requests = await getReceiptRequestsForShareToken(email, token);
+  // Most recent request wins per entry - handles "declined, then asked
+  // again" correctly, since the newer request's pending status should
+  // take precedence over an older decline for display purposes.
+  const entryRequestStatus: Record<string, EntryRequestStatus> = {};
+  for (const r of [...requests].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())) {
+    for (const item of r.items) {
+      entryRequestStatus[item.entryId] = {
+        status: item.status,
+        reason: item.reason,
+        requestCreatedAt: r.createdAt,
+        canRemind: canSendReminder(r),
+      };
+    }
+  }
+
+  return { token, ...core, entryRequestStatus };
 }
