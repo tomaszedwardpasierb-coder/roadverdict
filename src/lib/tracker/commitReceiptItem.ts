@@ -56,7 +56,7 @@ export async function commitReceiptItem(
   email: string,
   bike: BikeDoc,
   item: ParsedReceiptItem,
-  batchHints: { date: string; mileage: number; batchIndex?: number }[] = []
+  batchHints: { date: string; mileage: number; batchIndex?: number; category?: "service" | "fuel" | "mods"; litres?: number }[] = []
 ): Promise<ReviewQueueEntry> {
   const { category, date, costGbp, description, litres, mileageOnReceipt, registrationOnReceipt, merchantName, address, city, vehicleMakeOnReceipt, vehicleModelOnReceipt, attachment, currencyConversion, forceReview } = item;
 
@@ -199,8 +199,18 @@ export async function commitReceiptItem(
       applyGenericMileageEstimate(conflictWarning);
     } else if (category === "fuel" && filledToFullGuess && litres) {
       const trustedFuelLogs = fuelLogs.filter((f) => isTrustworthy(f.mileageConfidence));
+      // A batch peer's own printed mileage is just as real an anchor as
+      // an already-saved database record - the only thing that made it
+      // "not yet available" before was that it hadn't been committed
+      // yet, not that it's any less trustworthy. Deliberately still
+      // gated the same way saved records are: only a peer with its OWN
+      // printed reading counts (never another peer's estimate), so this
+      // can never chain one guess off another.
+      const trustedBatchFullTankPoints = batchHints
+        .filter((h) => h.category === "fuel" && typeof h.litres === "number" && guessFilledToFull(h.litres, bike.tankCapacityLitres))
+        .map((h) => ({ mileage: h.mileage, date: h.date }));
       const precedingFullTankMileage =
-        trustedFuelLogs
+        [...trustedFuelLogs.map((f) => ({ mileage: f.mileage, date: f.date, filledToFull: f.filledToFull })), ...trustedBatchFullTankPoints.map((p) => ({ ...p, filledToFull: true }))]
           .filter((f) => f.filledToFull && new Date(f.date).getTime() < new Date(date).getTime())
           .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0]?.mileage ?? null;
       const bikeOwnAverageMpg = computeActualMPG(

@@ -517,7 +517,21 @@ export function ReviewQueueModal({ parsedItems, onFinished }: { parsedItems: Par
       .map((it, i) => ({ it, i }))
       .filter(({ i }) => i !== index)
       .filter(({ it }) => typeof it.mileageOnReceipt === "number")
-      .map(({ it, i }) => ({ date: it.date, mileage: it.mileageOnReceipt as number, batchIndex: i }));
+      .map(({ it, i }) => ({
+        date: it.date,
+        mileage: it.mileageOnReceipt as number,
+        batchIndex: i,
+        // Only meaningful for fuel peers, and only ever read for that
+        // category server-side - carried through so a fuel item's own
+        // mileage estimate can use an earlier, still-unsaved batch
+        // sibling as a real anchor point, the same way an already-saved
+        // database record already could. Without this, two fuel
+        // receipts uploaded in the very same batch couldn't help each
+        // other at all, even when one had an exact printed reading the
+        // other's estimate badly needed.
+        category: it.category,
+        litres: it.litres ?? undefined,
+      }));
 
     let cancelled = false;
     setCommitting(true);
