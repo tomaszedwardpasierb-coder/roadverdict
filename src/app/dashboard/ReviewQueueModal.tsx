@@ -8,7 +8,7 @@ import { MOD_LABELS } from '@/lib/tracker/modTypes';
 import { AttachmentThumb } from './AttachmentThumb';
 import { MileageConflictModal } from './MileageConflictModal';
 import { checkFullTankPlausibility, checkLitresPlausibility } from '@/lib/tracker/fuelPlausibility';
-import { classifyReceiptTier, isAutoCommitTier } from '@/lib/tracker/receiptTiering';
+import { classifyReceiptTier, isAutoCommitTier, receiptTierSortWeight } from '@/lib/tracker/receiptTiering';
 import type { ReviewQueueEntry } from '@/lib/tracker/commitReceiptItem';
 import type { ParsedReceiptItem } from '@/lib/tracker/receiptParse';
 import styles from './dashboard.module.css';
@@ -467,11 +467,16 @@ function findPrevInteractiveIndex(items: ParsedReceiptItem[], committed: (Review
 }
 
 export function ReviewQueueModal({ parsedItems, onFinished }: { parsedItems: ParsedReceiptItem[]; onFinished: () => void }) {
+  // Re-sorts with the exact same tier-then-date rule ScanReceiptButton.tsx
+  // already applied before handing this batch over - not a second,
+  // different rule. Re-applying it here (rather than trusting the prop's
+  // order blindly) keeps this component correct on its own if it's ever
+  // called with an unsorted batch, without risking the two disagreeing
+  // the way an independent sort here previously did.
   const [items, setItems] = useState(() =>
     [...parsedItems].sort((a, b) => {
-      const aHasMileage = typeof a.mileageOnReceipt === "number";
-      const bHasMileage = typeof b.mileageOnReceipt === "number";
-      if (aHasMileage && bHasMileage) return (a.mileageOnReceipt as number) - (b.mileageOnReceipt as number);
+      const tierDiff = receiptTierSortWeight(classifyReceiptTier(a)) - receiptTierSortWeight(classifyReceiptTier(b));
+      if (tierDiff !== 0) return tierDiff;
       return new Date(a.date).getTime() - new Date(b.date).getTime();
     })
   );

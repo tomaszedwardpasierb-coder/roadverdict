@@ -3,11 +3,14 @@
 // A receipt with both a date and a printed mileage needs no estimation
 // at all - it's a fact, not a guess. A fuel receipt with no mileage
 // needs the most help of anything in a batch, since mileage is the
-// entire input to the MPG chain. Processing strong anchors first, right
-// across the whole batch, means by the time the weakest tier is
-// reached, the maximum possible number of real anchors already exist to
-// interpolate between - not just whatever happened to come earlier by
-// date in a single chronological pass.
+// entire input to the MPG chain. Processing strong anchors first within
+// each category means that by the time the weakest tier is reached, the
+// maximum possible number of real anchors already exist to interpolate
+// between - not just whatever happened to come earlier by date in a
+// single chronological pass. Category comes first, though: every
+// non-fuel receipt (service, mods, bills) is processed before any fuel
+// receipt, even a fuel one with its own printed mileage - a deliberate
+// choice, not a side effect of anchor strength.
 
 export type ReceiptTier = 1 | 2 | 4 | 6;
 
@@ -26,13 +29,13 @@ export function classifyReceiptTier(item: TierableItem): ReceiptTier {
   return hasMileage ? 4 : 6;
 }
 
-// 1 and 4 before 2 before 6, matching the confirmed design - both
-// auto-commit tiers go first (order between them doesn't affect
-// correctness, since neither needs estimation), then the tier that
-// still benefits from every tier-1/4 anchor but has lower stakes
-// (mileage optional), then the tier that needs everything already
-// established to interpolate as accurately as possible.
-const TIER_SORT_ORDER: Record<ReceiptTier, number> = { 1: 0, 4: 1, 2: 2, 6: 3 };
+// 1 before 2 before 4 before 6, matching the confirmed design - every
+// non-fuel tier goes before every fuel tier, full stop; strong-anchor-
+// first only decides order WITHIN each of those two groups (1 before 2,
+// 4 before 6). Tier 4 is still auto-commit-eligible like tier 1 (see
+// isAutoCommitTier below) - this only changes when it's processed, not
+// whether it still needs a human.
+const TIER_SORT_ORDER: Record<ReceiptTier, number> = { 1: 0, 2: 1, 4: 2, 6: 3 };
 
 export function receiptTierSortWeight(tier: ReceiptTier): number {
   return TIER_SORT_ORDER[tier];
