@@ -1,7 +1,7 @@
 // Place at: src/app/dashboard/ScanReceiptButton.tsx
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { ReviewQueueModal } from './ReviewQueueModal';
 import type { ParsedReceiptItem } from '@/lib/tracker/receiptParse';
@@ -32,6 +32,46 @@ export function ScanReceiptButton() {
   // gets mixed into it - those stay reachable the normal way, via the
   // pulsing tab dot and clicking Edit on the flagged card.
   const [queueItems, setQueueItems] = useState<ParsedReceiptItem[] | null>(null);
+  // Loaded once on mount - a batch left over from a previous visit that
+  // was interrupted before every item got reviewed. null while still
+  // checking or once nothing's found; an empty-but-checked array is
+  // never a real state here, since the server deletes the document the
+  // moment a batch's last item is committed.
+  const [pendingBatch, setPendingBatch] = useState<ParsedReceiptItem[] | null>(null);
+  const [checkingResume, setCheckingResume] = useState(true);
+  const [discarding, setDiscarding] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch('/api/tracker/pending-scan-batch');
+        const data = await res.json();
+        if (!cancelled && res.ok && data.batch?.items?.length > 0) {
+          setPendingBatch(data.batch.items);
+        }
+      } catch {
+        // Silently proceed as if there's nothing to resume - a failed
+        // check here shouldn't block the normal scan button from
+        // working.
+      } finally {
+        if (!cancelled) setCheckingResume(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  async function handleDiscardPending() {
+    setDiscarding(true);
+    try {
+      await fetch('/api/tracker/pending-scan-batch', { method: 'DELETE' });
+    } finally {
+      setDiscarding(false);
+      setPendingBatch(null);
+    }
+  }
 
   async function parseOneFile(file: File): Promise<FileParseOutcome> {
     try {
@@ -95,11 +135,29 @@ export function ScanReceiptButton() {
     setScanning(false);
     e.target.value = '';
 
-    if (allItems.length > 0) setQueueItems(allItems);
+    if (allItems.length > 0) {
+      // Persisted before the queue even opens, not after - if the owner
+      // closes the tab in the two seconds between parsing finishing and
+      // the queue's first render, this is still the difference between
+      // losing the whole scan and losing nothing.
+      try {
+        await fetch('/api/tracker/pending-scan-batch', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ items: allItems }),
+        });
+      } catch {
+        // Not fatal to starting the review - worst case, this specific
+        // scan just isn't resumable if the owner leaves mid-way, same
+        // as before this feature existed at all.
+      }
+      setQueueItems(allItems);
+    }
   }
 
   function handleQueueFinished() {
     setQueueItems(null);
+    setPendingBatch(null);
     router.refresh();
   }
 
@@ -111,6 +169,22 @@ export function ScanReceiptButton() {
 
   return (
     <div className={styles.scanReceiptWrap}>
+      {!checkingResume && pendingBatch && !queueItems && (
+        <div className={styles.reviewQueueDuplicateWarning} style={{ marginBottom: '0.8rem' }}>
+          <p>
+            You have {pendingBatch.length} {pendingBatch.length === 1 ? 'receipt' : 'receipts'} from an earlier scan still
+            waiting to be reviewed - looks like you left before finishing.
+          </p>
+          <div style={{ display: 'flex', gap: '0.5rem' }}>
+            <button type="button" className="submit-button" onClick={() => setQueueItems(pendingBatch)}>
+              Resume reviewing
+            </button>
+            <button type="button" className={styles.iconBtn} disabled={discarding} onClick={handleDiscardPending}>
+              {discarding ? 'Discarding…' : 'Discard instead'}
+            </button>
+          </div>
+        </div>
+      )}
       <button type="button" className={styles.scanReceiptBtn} onClick={() => setOpen((o) => !o)}>
         <span aria-hidden="true">🧠</span> Scan a receipt
       </button>

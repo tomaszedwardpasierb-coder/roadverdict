@@ -67,7 +67,6 @@ function QueueItemForm({
   finishing,
   mileageOptional,
   conflictPeer,
-  onJumpToPeer,
   onCorrectPeer,
   onDeletePeer,
 }: {
@@ -82,7 +81,6 @@ function QueueItemForm({
   finishing: boolean;
   mileageOptional: boolean;
   conflictPeer: ParsedReceiptItem | null;
-  onJumpToPeer: () => void;
   onCorrectPeer: (newMileage: number, newDate: string) => void;
   onDeletePeer: () => void;
 }) {
@@ -570,6 +568,32 @@ export function ReviewQueueModal({ parsedItems, onFinished }: { parsedItems: Par
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [index, items.length, retryTick]);
 
+  // Keeps the persisted batch in sync with what's actually still left
+  // to review, every time committed changes - a single effect here
+  // rather than a separate call at each individual commit site, so
+  // nothing can commit an item through some path that forgets to sync
+  // afterward. Skips the very first render (nothing's changed yet, no
+  // point in a redundant write of exactly what ScanReceiptButton.tsx
+  // already saved before this component even mounted).
+  const isFirstCommittedRender = useRef(true);
+  useEffect(() => {
+    if (isFirstCommittedRender.current) {
+      isFirstCommittedRender.current = false;
+      return;
+    }
+    const remaining = items.filter((_, i) => committed[i] === null);
+    void fetch('/api/tracker/pending-scan-batch', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ items: remaining }),
+    }).catch(() => {
+      // Not fatal - the actual records are already safely committed
+      // either way, this only affects whether an interrupted resume
+      // would show a couple of already-done items again.
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [committed]);
+
   function goNext() {
     setIndex((i) => i + 1);
   }
@@ -661,6 +685,7 @@ export function ReviewQueueModal({ parsedItems, onFinished }: { parsedItems: Par
   async function handleFinishLater() {
     const remaining = items.filter((_, i) => committed[i] === null);
     if (remaining.length === 0) {
+      await fetch('/api/tracker/pending-scan-batch', { method: 'DELETE' }).catch(() => {});
       onFinished();
       return;
     }
@@ -675,6 +700,11 @@ export function ReviewQueueModal({ parsedItems, onFinished }: { parsedItems: Par
       // Best-effort - if this fails, those items simply stay unscanned;
       // nothing already reviewed is at risk either way.
     }
+    // commit-receipt-items saves everything directly, bypassing
+    // committed/the effect that normally keeps the persisted batch in
+    // sync - without this, the batch document would go stale, still
+    // listing items as unreviewed that are actually already saved.
+    await fetch('/api/tracker/pending-scan-batch', { method: 'DELETE' }).catch(() => {});
     setFinishing(false);
     onFinished();
   }
@@ -788,9 +818,6 @@ export function ReviewQueueModal({ parsedItems, onFinished }: { parsedItems: Par
             entry={current}
             mileageOptional={currentTier === 2}
             conflictPeer={current.category !== "bills" && current.mileageConflictReferenceBatchIndex !== undefined ? items[current.mileageConflictReferenceBatchIndex] ?? null : null}
-            onJumpToPeer={() => {
-              if (current.category !== "bills" && current.mileageConflictReferenceBatchIndex !== undefined) setIndex(current.mileageConflictReferenceBatchIndex);
-            }}
             onCorrectPeer={(newMileage, newDate) => {
               if (current.category === "bills" || current.mileageConflictReferenceBatchIndex === undefined) return;
               const peerIndex = current.mileageConflictReferenceBatchIndex;
