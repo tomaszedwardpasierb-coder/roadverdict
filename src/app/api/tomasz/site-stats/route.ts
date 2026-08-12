@@ -20,6 +20,15 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(stats);
   } catch (err) {
     console.error("site-stats query failed:", err);
-    return NextResponse.json({ error: "Failed to load site stats." }, { status: 502 });
+    // TEMPORARY - remove `detail` once this is confirmed working. Route is
+    // admin-gated so this isn't a public leak, but no reason to keep
+    // exposing internals longer than needed for debugging.
+    return NextResponse.json(
+      {
+        error: "Failed to load site stats.",
+        detail: err instanceof Error ? err.message : String(err),
+      },
+      { status: 502 }
+    );
   }
 }
