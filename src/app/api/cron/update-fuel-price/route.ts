@@ -6,12 +6,40 @@ export const dynamic = "force-dynamic";
 
 const STATS_PAGE_URL = "https://www.gov.uk/government/statistics/weekly-road-fuel-prices";
 
+// GOV.UK's filename convention has changed at least once already - this
+// used to be a new, date-stamped file every week
+// (weekly_road_fuel_prices_DDMMYY.csv), and is now a single,
+// continuously-updated file covering the whole historical range
+// instead (currently CSV__2018_-__.csv, labelled "2018 to 2026" on the
+// page - that end year will keep advancing). Matching any .csv under
+// their standard asset-hosting path, rather than a specific filename,
+// is what survives a rename like that instead of breaking on it again.
+// The current-range file is consistently the first .csv link on the
+// page, ahead of the older historical archive (currently "2003 to
+// 2017"), which is what makes the first match still the right one to
+// take - same strategy the original version relied on, just not tied
+// to a filename that turned out not to be permanent.
 function extractCsvUrl(html: string): string | null {
   const match = html.match(
-    /https:\/\/assets\.publishing\.service\.gov\.uk\/media\/[a-zA-Z0-9]+\/weekly_road_fuel_prices_\d{6}\.csv/
+    /https:\/\/assets\.publishing\.service\.gov\.uk\/media\/[a-zA-Z0-9]+\/[a-zA-Z0-9_.-]+\.csv/
   );
   return match ? match[0] : null;
 }
+
+// DD/MM/YYYY specifically, as DESNZ publishes it - never handed to
+// new Date() directly, since that's ambiguous between DD/MM and MM/DD
+// depending on the JS engine's locale handling, and this is exactly
+// the kind of silent misparse that would corrupt every date derived
+// from it downstream without ever throwing an error to catch it.
+function parseUkDate(value: string): Date | null {
+  const match = value.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (!match) return null;
+  const [, day, month, year] = match;
+  const date = new Date(Number(year), Number(month) - 1, Number(day));
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+const MAX_PLAUSIBLE_AGE_DAYS = 30;
 
 function extractLatestPetrolPrice(
   csvText: string
@@ -29,6 +57,19 @@ function extractLatestPetrolPrice(
   const price = Number(columns[1]);
 
   if (!weekCommencing || !Number.isFinite(price)) return null;
+
+  // Catches the file-identity mistake this endpoint has already made
+  // once (matching the CSV covering 2018-2026 versus the historical
+  // 2003-2017 archive sitting on the same page) without needing to
+  // know in advance which specific mistake to guard against - any
+  // result claiming to be the current week but actually years stale
+  // gets rejected the same way, rather than silently accepted and
+  // written over a genuinely current stored price.
+  const parsedDate = parseUkDate(weekCommencing);
+  if (!parsedDate) return null;
+  const ageDays = (Date.now() - parsedDate.getTime()) / 86_400_000;
+  if (ageDays > MAX_PLAUSIBLE_AGE_DAYS || ageDays < -7) return null;
+
   return { price, weekCommencing };
 }
 
