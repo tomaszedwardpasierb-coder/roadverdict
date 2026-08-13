@@ -46,12 +46,27 @@ async function runQuery(kql: string, timespanIso: string): Promise<LogsTable[]> 
   return body.tables as LogsTable[];
 }
 
+// Bucket size scales with the window so a sparkline always gets a sensible
+// number of points - ~12 for 1h, ~24 for 24h, 7 for a week.
+function bucketSizeFor(hours: number): string {
+  if (hours <= 1) return "5m";
+  if (hours <= 24) return "1h";
+  return "1d";
+}
+
 export interface RouteStat {
   route: string;
   requests: number;
   failures: number;
   failureRatePct: number;
   avgDurationMs: number;
+}
+
+export interface TrendPoint {
+  bucket: string;
+  requests: number;
+  failures: number;
+  avgMs: number;
 }
 
 export interface SiteStats {
@@ -62,10 +77,12 @@ export interface SiteStats {
   avgResponseTimeMs: number;
   byRoute: RouteStat[];
   topExceptions: { type: string; message: string; count: number }[];
+  trend: TrendPoint[];
 }
 
 export async function getSiteStats(windowHours = 24): Promise<SiteStats> {
   const timespan = `PT${windowHours}H`;
+  const bucket = bucketSizeFor(windowHours);
 
   // NOTE: failure detection uses resultCode (actual HTTP status), not the
   // requests table's own `success` column - App Insights' auto-instrumentation
@@ -73,7 +90,7 @@ export async function getSiteStats(windowHours = 24): Promise<SiteStats> {
   // throwing, even if it deliberately returns a 4xx/5xx response (as our own
   // catch blocks do). Confirmed via real data: a 502 from this very endpoint
   // during debugging showed success == true.
-  const [overallTables, byRouteTables, exceptionTables] = await Promise.all([
+  const [overallTables, byRouteTables, exceptionTables, trendTables] = await Promise.all([
     runQuery(
       `requests
        | extend StatusCode = toint(resultCode)
@@ -91,6 +108,13 @@ export async function getSiteStats(windowHours = 24): Promise<SiteStats> {
       `exceptions
        | summarize Count=count() by Type=type, Message=tostring(outerMessage)
        | order by Count desc | take 20`,
+      timespan
+    ),
+    runQuery(
+      `requests
+       | extend StatusCode = toint(resultCode)
+       | summarize Requests=count(), Failures=countif(StatusCode >= 400), AvgMs=avg(duration) by Bucket=bin(timestamp, ${bucket})
+       | order by Bucket asc`,
       timespan
     ),
   ]);
@@ -116,6 +140,12 @@ export async function getSiteStats(windowHours = 24): Promise<SiteStats> {
       type: String(r[0]),
       message: String(r[1] ?? ""),
       count: Number(r[2]),
+    })),
+    trend: (trendTables[0]?.rows ?? []).map((r: any[]) => ({
+      bucket: String(r[0]),
+      requests: Number(r[1]),
+      failures: Number(r[2]),
+      avgMs: Math.round(Number(r[3]) ?? 0),
     })),
   };
 }

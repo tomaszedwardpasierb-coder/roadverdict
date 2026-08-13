@@ -59,6 +59,30 @@ async function getSiteStatsSafe(hours: number): Promise<SiteStats | null> {
   }
 }
 
+function sparklinePoints(values: number[], width = 120, height = 32): string {
+  if (values.length === 0) return '';
+  const max = Math.max(...values, 1);
+  const min = Math.min(...values, 0);
+  const range = max - min || 1;
+  const step = values.length > 1 ? width / (values.length - 1) : width;
+  return values
+    .map((v, i) => `${(i * step).toFixed(1)},${(height - ((v - min) / range) * height).toFixed(1)}`)
+    .join(' ');
+}
+
+function Sparkline({ values, danger }: { values: number[]; danger?: boolean }) {
+  if (values.every((v) => v === 0)) return null;
+  return (
+    <svg viewBox="0 0 120 32" className={styles.sparkline} preserveAspectRatio="none" aria-hidden="true">
+      <polyline
+        points={sparklinePoints(values)}
+        fill="none"
+        style={{ stroke: danger ? 'var(--verdict-red)' : 'var(--ink-soft)', strokeWidth: 1.5 }}
+      />
+    </svg>
+  );
+}
+
 export default async function AdminDashboardPage({
   searchParams,
 }: {
@@ -98,6 +122,11 @@ export default async function AdminDashboardPage({
     getSiteStatsSafe(windowHours),
   ]);
   const health = getServerHealth();
+
+  const trendRequests = siteStats?.trend.map((t) => t.requests) ?? [];
+  const trendFailures = siteStats?.trend.map((t) => t.failures) ?? [];
+  const trendFailureRate = siteStats?.trend.map((t) => (t.requests > 0 ? (t.failures / t.requests) * 100 : 0)) ?? [];
+  const trendAvgMs = siteStats?.trend.map((t) => t.avgMs) ?? [];
 
   return (
     <div className={styles.wrapper}>
@@ -144,22 +173,26 @@ export default async function AdminDashboardPage({
           <div className={styles.metricGrid}>
             <div className={styles.metricCard}>
               <div className={styles.metricLabel}>Total requests</div>
+              <Sparkline values={trendRequests} />
               <div className={styles.metricValue}>{siteStats.totalRequests}</div>
             </div>
             <div className={styles.metricCard}>
               <div className={styles.metricLabel}>Failed requests</div>
+              <Sparkline values={trendFailures} danger={siteStats.failedRequests > 0} />
               <div className={`${styles.metricValue} ${siteStats.failedRequests > 0 ? styles.metricValueDanger : ''}`}>
                 {siteStats.failedRequests}
               </div>
             </div>
             <div className={styles.metricCard}>
               <div className={styles.metricLabel}>Failure rate</div>
+              <Sparkline values={trendFailureRate} danger={siteStats.failureRatePct > 0} />
               <div className={`${styles.metricValue} ${siteStats.failureRatePct > 0 ? styles.metricValueDanger : ''}`}>
                 {siteStats.failureRatePct}%
               </div>
             </div>
             <div className={styles.metricCard}>
               <div className={styles.metricLabel}>Avg response time</div>
+              <Sparkline values={trendAvgMs} />
               <div className={styles.metricValue}>{siteStats.avgResponseTimeMs}ms</div>
             </div>
           </div>

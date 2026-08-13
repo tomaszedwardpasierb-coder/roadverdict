@@ -14,10 +14,11 @@
 /* Traffic & performance section - reuses the same card/table language above */
 .metricGrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 0.8rem; }
 .metricCard { background: var(--paper); border: 1px solid var(--asphalt); border-radius: 6px; padding: 0.9rem 1rem; }
-.metricLabel { font-size: 0.78rem; color: var(--ink-soft); margin-bottom: 0.3rem; }
+.metricLabel { font-size: 0.78rem; color: var(--ink-soft); margin-bottom: 0.2rem; }
 .metricValue { font-family: var(--font-display); font-size: 1.6rem; }
 .metricValueDanger { color: var(--verdict-red); }
 .metricSub { font-size: 0.78rem; color: var(--ink-soft); margin-top: 0.25rem; }
+.sparkline { width: 100%; height: 32px; display: block; margin: 0.3rem 0; }
 
 .badge { display: inline-block; font-size: 0.72rem; padding: 0.15rem 0.55rem; border-radius: 10px; font-family: var(--font-mono); }
 .badgeOk { background: color-mix(in srgb, var(--ink-soft) 10%, transparent); color: var(--ink-soft); }
