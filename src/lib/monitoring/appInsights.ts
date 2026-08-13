@@ -67,14 +67,23 @@ export interface SiteStats {
 export async function getSiteStats(windowHours = 24): Promise<SiteStats> {
   const timespan = `PT${windowHours}H`;
 
+  // NOTE: failure detection uses resultCode (actual HTTP status), not the
+  // requests table's own `success` column - App Insights' auto-instrumentation
+  // marks a request as "success" whenever the handler completes without
+  // throwing, even if it deliberately returns a 4xx/5xx response (as our own
+  // catch blocks do). Confirmed via real data: a 502 from this very endpoint
+  // during debugging showed success == true.
   const [overallTables, byRouteTables, exceptionTables] = await Promise.all([
     runQuery(
-      `requests | summarize Total=count(), Failed=countif(success == false), AvgMs=avg(duration)`,
+      `requests
+       | extend StatusCode = toint(resultCode)
+       | summarize Total=count(), Failed=countif(StatusCode >= 400), AvgMs=avg(duration)`,
       timespan
     ),
     runQuery(
       `requests
-       | summarize Requests=count(), Failures=countif(success == false), AvgMs=avg(duration) by Route=name
+       | extend StatusCode = toint(resultCode)
+       | summarize Requests=count(), Failures=countif(StatusCode >= 400), AvgMs=avg(duration) by Route=name
        | order by Requests desc | take 50`,
       timespan
     ),
