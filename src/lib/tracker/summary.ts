@@ -1,4 +1,4 @@
-﻿// Place at: src/lib/tracker/summary.ts
+// Place at: src/lib/tracker/summary.ts
 import type { ServiceRecordDoc } from "./serviceRecord";
 import type { ModDoc } from "./mod";
 import type { FuelLogDoc } from "./fuelLog";
@@ -52,18 +52,25 @@ export interface MileagePoint {
   date: string;
   mileage: number;
   id?: string;
-  category?: "service" | "fuel" | "mods";
+  category?: "service" | "fuel" | "mods" | "mot";
 }
 
 export function gatherMileagePoints(
   records: ServiceRecordDoc[],
   mods: ModDoc[],
-  fuelLogs: FuelLogDoc[]
+  fuelLogs: FuelLogDoc[],
+  bills: BillDoc[] = []
 ): MileagePoint[] {
   const points: MileagePoint[] = [
     ...records.map((r) => ({ date: r.date, mileage: r.mileage, id: r.id, category: "service" as const })),
     ...mods.map((m) => ({ date: m.date, mileage: m.mileage, id: m.id, category: "mods" as const })),
     ...fuelLogs.map((f) => ({ date: f.date, mileage: f.mileage, id: f.id, category: "fuel" as const })),
+    // Default empty array on the bills param keeps every OTHER existing
+    // caller of this function compiling unchanged, same reasoning as the
+    // id/category fields above being optional.
+    ...bills
+      .filter((b) => b.billType === "mot-test" && b.mileage != null)
+      .map((b) => ({ date: b.date, mileage: b.mileage as number, id: b.id, category: "mot" as const })),
   ];
   return points.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 }

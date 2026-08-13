@@ -1,4 +1,4 @@
-﻿// Place at: src/app/dashboard/page.tsx
+// Place at: src/app/dashboard/page.tsx
 import { getSession } from "@/lib/auth/session";
 import { redirect } from "next/navigation";
 import styles from "./dashboard.module.css";
@@ -119,7 +119,7 @@ export default async function DashboardPage() {
   };
   const actualMpg = computeActualMPG(fuelLogs);
   const mpgSeries = computeMPGSeries(fuelLogs);
-  const mileagePoints = gatherMileagePoints(records, mods, fuelLogs);
+  const mileagePoints = gatherMileagePoints(records, mods, fuelLogs, bills);
   const fuelCostPoints = fuelLogs.map((f) => ({ id: f.id, date: f.date, cost: f.cost, mileage: f.mileage }));
   const summary = computeSpendSummary(records, mods, fuelLogs, bills);
   const currentYear = new Date().getFullYear();

@@ -42,7 +42,12 @@ export function MileageChart({
   function handlePointClick(elements: { index: number }[]) {
     if (elements.length === 0) return;
     const point = filtered[elements[0].index];
-    if (point?.id && point.category) viewRecords(point.category, [point.id], switchTo, setHighlightIds);
+    // MOT-derived points aren't a real dashboard tab of their own - they
+    // live in the same "Insurance, tax & MOT" (bills) tab as everything
+    // else in that section, same mapping ReviewQueueModal.tsx already
+    // uses for the equivalent scan-category mismatch.
+    const reviewCategory = point?.category === 'mot' ? 'bills' : point?.category;
+    if (point?.id && reviewCategory) viewRecords(reviewCategory, [point.id], switchTo, setHighlightIds);
   }
 
   function handleHover(event: { native: Event | null }, elements: unknown[]) {

@@ -1,4 +1,4 @@
-﻿// Place at: src/app/dashboard/MileageConflictModal.tsx
+// Place at: src/app/dashboard/MileageConflictModal.tsx
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -7,12 +7,12 @@ import { pointsConflict } from '@/lib/tracker/mileageCheck';
 import type { Attachment } from '@/lib/tracker/cosmosHelpers';
 import styles from './dashboard.module.css';
 
-const CATEGORY_ROUTE: Record<string, string> = { service: 'services', fuel: 'fuel', mods: 'mods' };
-const CATEGORY_LABEL: Record<string, string> = { service: 'Service', fuel: 'Fuel', mods: 'Parts & Accessories' };
+const CATEGORY_ROUTE: Record<string, string> = { service: 'services', fuel: 'fuel', mods: 'mods', mot: 'bills' };
+const CATEGORY_LABEL: Record<string, string> = { service: 'Service', fuel: 'Fuel', mods: 'Parts & Accessories', mot: 'MOT test' };
 
 interface ReferenceEntry {
   id: string;
-  category: 'service' | 'fuel' | 'mods';
+  category: 'service' | 'fuel' | 'mods' | 'mot';
   date: string;
   mileage: number;
   label: string;
@@ -27,6 +27,7 @@ interface ReferenceEntry {
   filledToFull?: boolean;
   modCategory?: string;
   name?: string;
+  billType?: string;
 }
 
 interface Props {
@@ -37,7 +38,7 @@ interface Props {
   entryLabel: string;
   entryAttachment?: Attachment;
   referenceId?: string;
-  referenceCategory?: 'service' | 'fuel' | 'mods';
+  referenceCategory?: 'service' | 'fuel' | 'mods' | 'mot';
   preloadedReference?: ReferenceEntry;
   // True when the reference is another item still sitting in this same
   // batch, not yet saved anywhere - it has a description and a receipt
@@ -141,6 +142,7 @@ export function MileageConflictModal({
     let body: Record<string, unknown>;
     if (ref.category === 'service') body = { jobType: ref.jobType, cost: ref.cost, mileage, date, notes: ref.notes, mileageAcknowledged: true };
     else if (ref.category === 'fuel') body = { litres: ref.litres, cost: ref.cost, mileage, date, filledToFull: ref.filledToFull, mileageAcknowledged: true };
+    else if (ref.category === 'mot') body = { billType: ref.billType, cost: ref.cost, mileage, date, notes: ref.notes };
     else body = { category: ref.modCategory, name: ref.name, cost: ref.cost, mileage, date, notes: ref.notes, mileageAcknowledged: true };
     const res = await fetch(`/api/tracker/${CATEGORY_ROUTE[ref.category]}/${encodeURIComponent(ref.id)}`, {
       method: 'PATCH',

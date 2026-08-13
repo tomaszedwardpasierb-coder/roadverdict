@@ -1,4 +1,4 @@
-﻿// Place at: src/app/api/tracker/conflict-reference/route.ts
+// Place at: src/app/api/tracker/conflict-reference/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/session";
 import { getTrackerDocById } from "@/lib/tracker/cosmosHelpers";
@@ -6,6 +6,7 @@ import { JOB_LABELS } from "@/lib/tracker/jobTypes";
 import type { ServiceRecordDoc } from "@/lib/tracker/serviceRecord";
 import type { FuelLogDoc } from "@/lib/tracker/fuelLog";
 import type { ModDoc } from "@/lib/tracker/mod";
+import type { BillDoc } from "@/lib/tracker/bill";
 
 export const dynamic = "force-dynamic";
 
@@ -24,7 +25,7 @@ export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const category = searchParams.get("category");
   const id = searchParams.get("id");
-  if (!id || !category || !["service", "fuel", "mods"].includes(category)) {
+  if (!id || !category || !["service", "fuel", "mods", "mot"].includes(category)) {
     return NextResponse.json({ error: "Invalid request." }, { status: 400 });
   }
   if (!id.startsWith(`${session.email}::`)) {
@@ -53,6 +54,16 @@ export async function GET(request: NextRequest) {
       label: `${doc.litres.toFixed(1)}L fill-up`, cost: doc.cost,
       attachment: doc.attachments?.[0] ?? null,
       litres: doc.litres, filledToFull: doc.filledToFull,
+    });
+  }
+  if (category === "mot") {
+    const doc = await getTrackerDocById<BillDoc>(session.email, id);
+    if (!doc) return NextResponse.json({ error: "Not found." }, { status: 404 });
+    return NextResponse.json({
+      id: doc.id, category: "mot", date: doc.date, mileage: doc.mileage,
+      label: "MOT test", cost: doc.cost,
+      attachment: doc.attachments?.[0] ?? null,
+      billType: doc.billType, notes: doc.notes,
     });
   }
   const doc = await getTrackerDocById<ModDoc>(session.email, id);

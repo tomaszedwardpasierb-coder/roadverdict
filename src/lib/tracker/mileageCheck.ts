@@ -1,4 +1,4 @@
-﻿// Place at: src/lib/tracker/mileageCheck.ts
+// Place at: src/lib/tracker/mileageCheck.ts
 //
 // The single source of truth for mileage consistency, used both for
 // live, as-you-type client feedback and for the server-side hard
@@ -6,7 +6,7 @@
 
 export interface HistoryPoint {
   id?: string;
-  category?: "service" | "fuel" | "mods";
+  category?: "service" | "fuel" | "mods" | "mot";
   // Set when this point is another item in the SAME upload batch,
   // not yet saved to the database - lets a conflict point at "item #N
   // in this batch" when there is no real id to reference yet.
@@ -27,7 +27,7 @@ export interface MileageCheckResult {
   // record (including its own receipt image) side by side, rather than
   // only knowing a number and a date.
   referenceId?: string;
-  referenceCategory?: "service" | "fuel" | "mods";
+  referenceCategory?: "service" | "fuel" | "mods" | "mot";
   // Set instead of referenceId when the conflict is against another
   // item still pending in the same upload batch, not yet saved.
   referenceBatchIndex?: number;
@@ -66,7 +66,7 @@ export function checkMileageConsistency(
     return { status: "ok" };
   }
 
-  let closest: { direction: "below-earlier" | "above-later"; mileage: number; date: string; id?: string; category?: "service" | "fuel" | "mods"; batchIndex?: number } | null = null;
+  let closest: { direction: "below-earlier" | "above-later"; mileage: number; date: string; id?: string; category?: "service" | "fuel" | "mods" | "mot"; batchIndex?: number } | null = null;
   let closestGapMs = Infinity;
 
   for (const point of history) {

@@ -1,4 +1,4 @@
-﻿// Place at: src/lib/tracker/commitReceiptItem.ts
+// Place at: src/lib/tracker/commitReceiptItem.ts
 
 import { getServiceRecords, createServiceRecord } from "@/lib/tracker/serviceRecord";
 import { getFuelLogs, createFuelLog } from "@/lib/tracker/fuelLog";
@@ -47,16 +47,16 @@ function vehicleNamesMatch(a: string, b: string): boolean {
 }
 
 export type ReviewQueueEntry =
-  | { id: string; category: "service"; aiDescription: string; duplicate: DuplicateMatch | null; jobType: string; cost: number; mileage: number; mileageNeedsManualEntry: boolean; mileageWarningText?: string; mileageConflictReferenceId?: string; mileageConflictReferenceCategory?: "service" | "fuel" | "mods"; mileageConflictReferenceBatchIndex?: number; plateMismatch: PlateMismatch | null; vehicleMismatch: VehicleMismatch | null; date: string; notes: string; attachment: Attachment }
-  | { id: string; category: "fuel"; aiDescription: string; duplicate: DuplicateMatch | null; litres: number; cost: number; mileage: number; mileageNeedsManualEntry: boolean; mileageWarningText?: string; mileageConflictReferenceId?: string; mileageConflictReferenceCategory?: "service" | "fuel" | "mods"; mileageConflictReferenceBatchIndex?: number; plateMismatch: PlateMismatch | null; vehicleMismatch: VehicleMismatch | null; date: string; filledToFull: boolean; attachment: Attachment; precedingFuelMileage?: number; tankCapacityLitres?: number }
-  | { id: string; category: "mods"; aiDescription: string; duplicate: DuplicateMatch | null; name: string; modCategory: string; cost: number; mileage: number; mileageNeedsManualEntry: boolean; mileageWarningText?: string; mileageConflictReferenceId?: string; mileageConflictReferenceCategory?: "service" | "fuel" | "mods"; mileageConflictReferenceBatchIndex?: number; plateMismatch: PlateMismatch | null; vehicleMismatch: VehicleMismatch | null; date: string; notes: string; attachment: Attachment }
+  | { id: string; category: "service"; aiDescription: string; duplicate: DuplicateMatch | null; jobType: string; cost: number; mileage: number; mileageNeedsManualEntry: boolean; mileageWarningText?: string; mileageConflictReferenceId?: string; mileageConflictReferenceCategory?: "service" | "fuel" | "mods" | "mot"; mileageConflictReferenceBatchIndex?: number; plateMismatch: PlateMismatch | null; vehicleMismatch: VehicleMismatch | null; date: string; notes: string; attachment: Attachment }
+  | { id: string; category: "fuel"; aiDescription: string; duplicate: DuplicateMatch | null; litres: number; cost: number; mileage: number; mileageNeedsManualEntry: boolean; mileageWarningText?: string; mileageConflictReferenceId?: string; mileageConflictReferenceCategory?: "service" | "fuel" | "mods" | "mot"; mileageConflictReferenceBatchIndex?: number; plateMismatch: PlateMismatch | null; vehicleMismatch: VehicleMismatch | null; date: string; filledToFull: boolean; attachment: Attachment; precedingFuelMileage?: number; tankCapacityLitres?: number }
+  | { id: string; category: "mods"; aiDescription: string; duplicate: DuplicateMatch | null; name: string; modCategory: string; cost: number; mileage: number; mileageNeedsManualEntry: boolean; mileageWarningText?: string; mileageConflictReferenceId?: string; mileageConflictReferenceCategory?: "service" | "fuel" | "mods" | "mot"; mileageConflictReferenceBatchIndex?: number; plateMismatch: PlateMismatch | null; vehicleMismatch: VehicleMismatch | null; date: string; notes: string; attachment: Attachment }
   | { id: string; category: "bills"; aiDescription: string; duplicate: DuplicateMatch | null; billType: string; cost: number; plateMismatch: PlateMismatch | null; vehicleMismatch: VehicleMismatch | null; date: string; notes: string; attachment: Attachment };
 
 export async function commitReceiptItem(
   email: string,
   bike: BikeDoc,
   item: ParsedReceiptItem,
-  batchHints: { date: string; mileage: number; batchIndex?: number; category?: "service" | "fuel" | "mods"; litres?: number }[] = []
+  batchHints: { date: string; mileage: number; batchIndex?: number; category?: "service" | "fuel" | "mods" | "mot"; litres?: number }[] = []
 ): Promise<ReviewQueueEntry> {
   const { category, date, costGbp, description, litres, mileageOnReceipt, registrationOnReceipt, merchantName, address, city, vehicleMakeOnReceipt, vehicleModelOnReceipt, attachment, currencyConversion, forceReview } = item;
 
@@ -107,6 +107,11 @@ export async function commitReceiptItem(
     ...records.filter((r) => isTrustworthy(r.mileageConfidence)).map((r) => ({ id: r.id, category: "service" as const, date: r.date, mileage: r.mileage })),
     ...fuelLogs.filter((f) => isTrustworthy(f.mileageConfidence)).map((f) => ({ id: f.id, category: "fuel" as const, date: f.date, mileage: f.mileage })),
     ...mods.filter((m) => isTrustworthy(m.mileageConfidence)).map((m) => ({ id: m.id, category: "mods" as const, date: m.date, mileage: m.mileage })),
+    // DVSA-confirmed MOT odometer readings are always trusted - no
+    // mileageConfidence field on bills at all, since an official test
+    // reading doesn't carry the same "AI guessed this" uncertainty a
+    // receipt-derived estimate does.
+    ...bills.filter((b) => b.billType === "mot-test" && b.mileage != null).map((b) => ({ id: b.id, category: "mot" as const, date: b.date, mileage: b.mileage as number })),
     ...batchHints,
   ];
   const trustedMileagePointsForEstimate: MileagePoint[] = trustedMileagePoints.map((p) => ({ date: p.date, mileage: p.mileage }));
@@ -122,6 +127,7 @@ export async function commitReceiptItem(
     ...records.map((r) => ({ id: r.id, category: "service" as const, date: r.date, mileage: r.mileage })),
     ...fuelLogs.map((f) => ({ id: f.id, category: "fuel" as const, date: f.date, mileage: f.mileage })),
     ...mods.map((m) => ({ id: m.id, category: "mods" as const, date: m.date, mileage: m.mileage })),
+    ...bills.filter((b) => b.billType === "mot-test" && b.mileage != null).map((b) => ({ id: b.id, category: "mot" as const, date: b.date, mileage: b.mileage as number })),
     ...batchHints,
   ];
 
@@ -130,7 +136,7 @@ export async function commitReceiptItem(
   let mileageWarning: string | undefined;
   let mileageNeedsManualEntry = false;
   let conflictReferenceId: string | undefined;
-  let conflictReferenceCategory: "service" | "fuel" | "mods" | undefined;
+  let conflictReferenceCategory: "service" | "fuel" | "mods" | "mot" | undefined;
   let conflictReferenceBatchIndex: number | undefined;
 
   const filledToFullGuess = category === "fuel" ? guessFilledToFull(litres ?? 0, bike.tankCapacityLitres) : false;

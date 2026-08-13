@@ -1,4 +1,4 @@
-﻿// Place at: src/app/dashboard/FuelLogCard.tsx
+// Place at: src/app/dashboard/FuelLogCard.tsx
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
@@ -41,7 +41,7 @@ export function FuelLogCard({
   const [isEditing, setIsEditing] = useState(false);
   const [isHighlighted, setIsHighlighted] = useState(false);
   const [showConflictModal, setShowConflictModal] = useState(false);
-  const [conflictReference, setConflictReference] = useState<{ id: string; category: "service" | "fuel" | "mods" } | null>(null);
+  const [conflictReference, setConflictReference] = useState<{ id: string; category: "service" | "fuel" | "mods" | "mot" } | null>(null);
   const [findingConflict, setFindingConflict] = useState(false);
   const [conflictLookupError, setConflictLookupError] = useState<string | null>(null);
   const cardRef = useRef<HTMLDivElement>(null);

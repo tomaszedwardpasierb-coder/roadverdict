@@ -1,9 +1,10 @@
-﻿// Place at: src/app/api/tracker/mileage-conflict-lookup/route.ts
+// Place at: src/app/api/tracker/mileage-conflict-lookup/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/session";
 import { getServiceRecords } from "@/lib/tracker/serviceRecord";
 import { getFuelLogs } from "@/lib/tracker/fuelLog";
 import { getMods } from "@/lib/tracker/mod";
+import { getBills } from "@/lib/tracker/bill";
 import { checkMileageConsistency, type HistoryPoint } from "@/lib/tracker/mileageCheck";
 import { getPrimaryBike } from "@/lib/tracker/bike";
 
@@ -21,7 +22,7 @@ export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const category = searchParams.get("category");
   const id = searchParams.get("id");
-  if (!id || !category || !["service", "fuel", "mods"].includes(category)) {
+  if (!id || !category || !["service", "fuel", "mods", "mot"].includes(category)) {
     return NextResponse.json({ error: "Invalid request." }, { status: 400 });
   }
   if (!id.startsWith(`${session.email}::`)) {
@@ -31,22 +32,28 @@ export async function GET(request: NextRequest) {
   const bike = await getPrimaryBike(session.email);
   if (!bike) return NextResponse.json({ error: "No bike found." }, { status: 404 });
 
-  const [records, fuelLogs, mods] = await Promise.all([
+  const [records, fuelLogs, mods, bills] = await Promise.all([
     getServiceRecords(session.email, bike.id),
     getFuelLogs(session.email, bike.id),
     getMods(session.email, bike.id),
+    getBills(session.email, bike.id),
   ]);
 
   const target =
     category === "service" ? records.find((r) => r.id === id)
     : category === "fuel" ? fuelLogs.find((f) => f.id === id)
+    : category === "mot" ? bills.find((b) => b.id === id)
     : mods.find((m) => m.id === id);
   if (!target) return NextResponse.json({ error: "Not found." }, { status: 404 });
+  if (target.mileage == null) {
+    return NextResponse.json({ error: "This entry has no mileage recorded." }, { status: 404 });
+  }
 
   const history: HistoryPoint[] = [
     ...records.map((r) => ({ id: r.id, category: "service" as const, date: r.date, mileage: r.mileage })),
     ...fuelLogs.map((f) => ({ id: f.id, category: "fuel" as const, date: f.date, mileage: f.mileage })),
     ...mods.map((m) => ({ id: m.id, category: "mods" as const, date: m.date, mileage: m.mileage })),
+    ...bills.filter((b) => b.billType === "mot-test" && b.mileage != null).map((b) => ({ id: b.id, category: "mot" as const, date: b.date, mileage: b.mileage as number })),
   ];
 
   const result = checkMileageConsistency(target.mileage, target.date, history, bike.currentMileage, id);

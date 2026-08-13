@@ -1,4 +1,4 @@
-﻿// Place at: src/app/api/tracker/bills/[id]/route.ts
+// Place at: src/app/api/tracker/bills/[id]/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/session";
 import { updateBill, deleteBill } from "@/lib/tracker/bill";
@@ -27,12 +27,13 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
   }
 
-  const { billType, cost, date, notes, attachments, reminder } = body as {
+  const { billType, cost, date, notes, attachments, mileage, reminder } = body as {
     billType?: string;
     cost?: number;
     date?: string;
     notes?: string;
     attachments?: Attachment[];
+    mileage?: number;
     reminder?: {
       intervalType: "mileage" | "months" | "date";
       intervalValue?: number;
@@ -51,6 +52,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     date,
     notes: notes ?? "",
     ...(attachments !== undefined ? { attachments } : {}),
+    ...(mileage !== undefined ? { mileage } : {}),
     needsReview: false,
   });
   if (!bill) {
