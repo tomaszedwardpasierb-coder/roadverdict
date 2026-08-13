@@ -23,9 +23,19 @@ export function AddBikeForm() {
 
   const [lookingUp, setLookingUp] = useState(false);
   const [lookupMessage, setLookupMessage] = useState<{ text: string; tone: 'ok' | 'warn' | 'error' } | null>(null);
+  const [customMake, setCustomMake] = useState('');
+  const [customModel, setCustomModel] = useState('');
+  const [customEngineCC, setCustomEngineCC] = useState('');
+  const [formError, setFormError] = useState<string | null>(null);
+
+  const OTHER = '__other__';
 
   function handleMakeChange(newMake: string) {
     setMake(newMake);
+    if (newMake === OTHER) {
+      setModel(OTHER);
+      return;
+    }
     const firstModel = MOTORCYCLE_MODELS.find((m) => m.make === newMake);
     setModel(firstModel?.model ?? '');
   }
@@ -79,9 +89,22 @@ export function AddBikeForm() {
       if (matchedBrand && matchedModelName) {
         parts.push(`Matched to ${matchedBrand} ${matchedModelName} in our list.`);
       } else if (matchedBrand) {
-        parts.push(`Matched the make (${matchedBrand}), but "${data.model}" isn't an exact match in our model list - please pick the closest one below.`);
+        // Make matched but the specific model isn't in our curated list -
+        // rather than making the user retype what was just found, drop
+        // straight into the custom-entry fields pre-filled with the real
+        // returned data. They can still switch back to a dropdown pick
+        // themselves if they'd rather.
+        setModel(OTHER);
+        setCustomModel(String(data.model ?? ''));
+        if (data.engineCapacityCc) setCustomEngineCC(String(data.engineCapacityCc));
+        parts.push(`Matched the make (${matchedBrand}). "${data.model}" isn't in our model list, so it's been filled in below as a custom entry - check it over, or pick a listed model instead if you'd rather.`);
       } else {
-        parts.push(`Found "${data.make} ${data.model}", but that make isn't in our list yet - please select manually below.`);
+        setMake(OTHER);
+        setCustomMake(String(data.make ?? ''));
+        setModel(OTHER);
+        setCustomModel(String(data.model ?? ''));
+        if (data.engineCapacityCc) setCustomEngineCC(String(data.engineCapacityCc));
+        parts.push(`Found "${data.make} ${data.model}" - not in our make list at all, so both have been filled in below as a custom entry. Check the details before submitting.`);
       }
       if (data.plateInRetention) {
         parts.push('Note: this plate is currently in retention (not on any vehicle right now) - the details shown are from the last vehicle it was recorded against, so double-check they\'re actually right for this bike.');
@@ -95,14 +118,32 @@ export function AddBikeForm() {
   }
 
   const selectedModelData = MOTORCYCLE_MODELS.find((m) => m.make === make && m.model === model);
+  const isCustomMake = make === OTHER;
+  const isCustomModel = model === OTHER;
+  const effectiveMake = isCustomMake ? customMake.trim() : make;
+  const effectiveModel = isCustomModel ? customModel.trim() : model;
+  const effectiveEngineCC = isCustomModel ? Number(customEngineCC) : selectedModelData?.engineCC;
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!selectedModelData) return;
+    setFormError(null);
+    if (isCustomMake && !customMake.trim()) {
+      setFormError('Enter the make.');
+      return;
+    }
+    if (isCustomModel && !customModel.trim()) {
+      setFormError('Enter the model.');
+      return;
+    }
+    if (isCustomModel && (!customEngineCC || !(Number(customEngineCC) > 0))) {
+      setFormError('Enter a valid engine size in cc.');
+      return;
+    }
+    if (!isCustomModel && !selectedModelData) return;
     await submit({
-      make,
-      model,
-      engineCC: selectedModelData.engineCC,
+      make: effectiveMake,
+      model: effectiveModel,
+      engineCC: effectiveEngineCC as number,
       year: isCustomBuild ? undefined : Number(year),
       isCustomBuild,
       registration,
@@ -122,20 +163,45 @@ export function AddBikeForm() {
             {ALL_BRANDS.map((b) => (
               <option key={b} value={b}>{b}</option>
             ))}
+            <option value={OTHER}>Other / not in this list</option>
           </select>
         </div>
-        <div className="field" style={{ marginTop: '0.9rem' }}>
-          <label htmlFor="bike-model">Model</label>
-          <select id="bike-model" value={model} onChange={(e) => setModel(e.target.value)}>
-            {modelsForBrand.map((m) => (
-              <option key={m.model} value={m.model}>{m.model} ({m.engineCC}cc)</option>
-            ))}
-          </select>
-        </div>
-        {selectedModelData && (
-          <div className="field-note" style={{ marginTop: '0.9rem' }}>
-            Engine size: {selectedModelData.engineCC}cc ({getBikeClassForCC(selectedModelData.engineCC)})
+        {isCustomMake ? (
+          <div className="field" style={{ marginTop: '0.9rem' }}>
+            <label htmlFor="bike-custom-make">Make (enter manually)</label>
+            <input id="bike-custom-make" type="text" value={customMake} onChange={(e) => setCustomMake(e.target.value)} placeholder="e.g. Zontes" />
           </div>
+        ) : (
+          <div className="field" style={{ marginTop: '0.9rem' }}>
+            <label htmlFor="bike-model">Model</label>
+            <select id="bike-model" value={model} onChange={(e) => setModel(e.target.value)}>
+              {modelsForBrand.map((m) => (
+                <option key={m.model} value={m.model}>{m.model} ({m.engineCC}cc)</option>
+              ))}
+              <option value={OTHER}>Other / not in this list</option>
+            </select>
+          </div>
+        )}
+        {isCustomModel && (
+          <div className="field" style={{ marginTop: '0.9rem' }}>
+            <label htmlFor="bike-custom-model">Model (enter manually)</label>
+            <input id="bike-custom-model" type="text" value={customModel} onChange={(e) => setCustomModel(e.target.value)} placeholder="e.g. K 1200 GT" />
+          </div>
+        )}
+        {isCustomModel ? (
+          <div className="field" style={{ marginTop: '0.9rem' }}>
+            <label htmlFor="bike-custom-cc">Engine size (cc)</label>
+            <input id="bike-custom-cc" type="number" min="1" value={customEngineCC} onChange={(e) => setCustomEngineCC(e.target.value)} placeholder="e.g. 1200" />
+            <p className="field-note" style={{ marginTop: '0.4rem' }}>
+              Not in our curated list, so this one needs the engine size entered directly rather than looked up - it drives cost benchmarking and reminder defaults elsewhere in the app.
+            </p>
+          </div>
+        ) : (
+          selectedModelData && (
+            <div className="field-note" style={{ marginTop: '0.9rem' }}>
+              Engine size: {selectedModelData.engineCC}cc ({getBikeClassForCC(selectedModelData.engineCC)})
+            </div>
+          )
         )}
         <div className="field-checkbox" style={{ marginTop: '0.9rem' }}>
           <label>
@@ -203,6 +269,7 @@ export function AddBikeForm() {
         <button className="submit-button" type="submit" disabled={submitting}>
           {submitting ? 'Adding…' : 'Add bike'}
         </button>
+        {formError && <p className="error-text" role="alert">{formError}</p>}
         {error && <p className="error-text" role="alert">{error}</p>}
       </div>
     </form>
