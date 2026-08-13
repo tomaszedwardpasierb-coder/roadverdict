@@ -1,4 +1,4 @@
-﻿// Place at: src/app/tomasz/page.tsx
+// Place at: src/app/tomasz/page.tsx
 import { redirect } from 'next/navigation';
 import { getAdminSession } from '@/lib/admin/session';
 import {
@@ -16,11 +16,18 @@ import {
   getBrowserBreakdown,
   browserFamily,
 } from '@/lib/admin/stats';
+import { getSiteStats, type SiteStats } from '@/lib/monitoring/appInsights';
 import styles from './tomasz.module.css';
 import { RunCronButton } from './RunCronButton';
 import { AdminLogoutButton } from './AdminLogoutButton';
 
 export const dynamic = 'force-dynamic';
+
+const HOUR_OPTIONS = [
+  { hours: 1, label: '1 hour' },
+  { hours: 24, label: '24 hours' },
+  { hours: 168, label: '7 days' },
+];
 
 function fmtDate(d: string): string {
   return new Date(d).toLocaleString('en-GB', {
@@ -41,9 +48,27 @@ function fmtUptime(seconds: number): string {
   return `${mins}m`;
 }
 
-export default async function AdminDashboardPage() {
+// Guards against a Log Analytics hiccup taking down the whole admin page -
+// every other section on /tomasz should keep working even if this one fails.
+async function getSiteStatsSafe(hours: number): Promise<SiteStats | null> {
+  try {
+    return await getSiteStats(hours);
+  } catch (err) {
+    console.error('Failed to load site stats for /tomasz:', err);
+    return null;
+  }
+}
+
+export default async function AdminDashboardPage({
+  searchParams,
+}: {
+  searchParams: { hours?: string };
+}) {
   const isAdmin = await getAdminSession();
   if (!isAdmin) redirect('/tomasz/login');
+
+  const requestedHours = Number(searchParams?.hours);
+  const windowHours = HOUR_OPTIONS.some((o) => o.hours === requestedHours) ? requestedHours : 24;
 
   const [
     dbStats,
@@ -57,6 +82,7 @@ export default async function AdminDashboardPage() {
     detailedCounts,
     bikeIdBackfillStatus,
     browserBreakdown,
+    siteStats,
   ] = await Promise.all([
     getDbStats(),
     getActiveSessionCount(),
@@ -69,6 +95,7 @@ export default async function AdminDashboardPage() {
     getDetailedCounts(),
     getBikeIdBackfillStatus(),
     getBrowserBreakdown(),
+    getSiteStatsSafe(windowHours),
   ]);
   const health = getServerHealth();
 
@@ -97,6 +124,98 @@ export default async function AdminDashboardPage() {
           <p>Memory: {health.memoryUsedMB}MB / {health.memoryTotalMB}MB</p>
         </div>
       </div>
+
+      <h2 className={styles.sectionHeading}>Traffic & performance</h2>
+      <div className={styles.pillRow}>
+        {HOUR_OPTIONS.map((o) => (
+          <a
+            key={o.hours}
+            href={`/tomasz?hours=${o.hours}`}
+            className={`${styles.pill} ${windowHours === o.hours ? styles.pillActive : ''}`}
+          >
+            {o.label}
+          </a>
+        ))}
+      </div>
+      {siteStats === null ? (
+        <p className={styles.warn}>Couldn&apos;t load traffic stats right now - Application Insights may be unreachable. Rest of this page is unaffected.</p>
+      ) : (
+        <>
+          <div className={styles.metricGrid}>
+            <div className={styles.metricCard}>
+              <div className={styles.metricLabel}>Total requests</div>
+              <div className={styles.metricValue}>{siteStats.totalRequests}</div>
+            </div>
+            <div className={styles.metricCard}>
+              <div className={styles.metricLabel}>Failed requests</div>
+              <div className={`${styles.metricValue} ${siteStats.failedRequests > 0 ? styles.metricValueDanger : ''}`}>
+                {siteStats.failedRequests}
+              </div>
+            </div>
+            <div className={styles.metricCard}>
+              <div className={styles.metricLabel}>Failure rate</div>
+              <div className={`${styles.metricValue} ${siteStats.failureRatePct > 0 ? styles.metricValueDanger : ''}`}>
+                {siteStats.failureRatePct}%
+              </div>
+            </div>
+            <div className={styles.metricCard}>
+              <div className={styles.metricLabel}>Avg response time</div>
+              <div className={styles.metricValue}>{siteStats.avgResponseTimeMs}ms</div>
+            </div>
+          </div>
+
+          {siteStats.byRoute.length > 0 && (
+            <table className={styles.table}>
+              <thead>
+                <tr>
+                  <th>Route</th>
+                  <th>Requests</th>
+                  <th>Avg ms</th>
+                  <th>Failure rate</th>
+                </tr>
+              </thead>
+              <tbody>
+                {siteStats.byRoute.map((r) => (
+                  <tr key={r.route}>
+                    <td><span className={styles.routeCell} title={r.route}>{r.route}</span></td>
+                    <td>{r.requests}</td>
+                    <td>{r.avgDurationMs}</td>
+                    <td>
+                      <span className={`${styles.badge} ${r.failureRatePct > 0 ? styles.badgeDanger : styles.badgeOk}`}>
+                        {r.failureRatePct}%
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+
+          {siteStats.topExceptions.length > 0 && (
+            <>
+              <div className={styles.statusTitle} style={{ marginTop: '1rem' }}>Top exceptions</div>
+              <table className={styles.table}>
+                <thead>
+                  <tr>
+                    <th>Type</th>
+                    <th>Message</th>
+                    <th>Count</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {siteStats.topExceptions.map((e, i) => (
+                    <tr key={i}>
+                      <td>{e.type}</td>
+                      <td>{e.message}</td>
+                      <td>{e.count}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </>
+          )}
+        </>
+      )}
 
       <h2 className={styles.sectionHeading}>Scheduled jobs</h2>
       <div className={styles.statusGrid}>
@@ -174,11 +293,11 @@ export default async function AdminDashboardPage() {
       <div className={styles.statusGrid}>
         <div className={styles.statusCard}>
           <div className={styles.statusTitle}>Total registered users</div>
-          <p style={{ fontSize: '1.6rem', fontFamily: 'var(--font-display)' }}>{totalUsers}</p>
+          <p className={styles.metricValue}>{totalUsers}</p>
         </div>
         <div className={styles.statusCard}>
           <div className={styles.statusTitle}>Active sessions right now</div>
-          <p style={{ fontSize: '1.6rem', fontFamily: 'var(--font-display)' }}>{activeSessions}</p>
+          <p className={styles.metricValue}>{activeSessions}</p>
         </div>
         <div className={styles.statusCard}>
           <div className={styles.statusTitle}>Magic links</div>
