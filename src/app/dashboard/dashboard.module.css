@@ -1,4 +1,4 @@
-﻿/* Place at: src/app/dashboard/dashboard.module.css */
+/* Place at: src/app/dashboard/dashboard.module.css */
 .wrapper {
   min-height: 100dvh;
   background: var(--stone);
@@ -835,3 +835,25 @@
 }
 
 
+
+
+/* UK number-plate styling for the add-bike registration input - matches
+   the real rear-plate look (yellow, black bold text, black border,
+   subtly rounded corners) so it reads unmistakably as "type a plate
+   here" rather than a generic text box. */
+.regPlateInput {
+  background: #FFD800;
+  border: 2px solid #000;
+  border-radius: 6px;
+  color: #000;
+  font-weight: 700;
+  font-family: Arial, "Helvetica Neue", sans-serif;
+  font-size: 1.1rem;
+  letter-spacing: 0.12em;
+  text-align: center;
+  text-transform: uppercase;
+  padding: 0.6rem 0.5rem;
+}
+.regPlateInput::placeholder {
+  color: rgba(0, 0, 0, 0.45);
+}

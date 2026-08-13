@@ -27,6 +27,9 @@ export function AddBikeForm() {
   const [customModel, setCustomModel] = useState('');
   const [customEngineCC, setCustomEngineCC] = useState('');
   const [formError, setFormError] = useState<string | null>(null);
+  const [minMileage, setMinMileage] = useState<number | null>(null);
+  const [minMileageDate, setMinMileageDate] = useState<string | null>(null);
+  const [mileageConfirmed, setMileageConfirmed] = useState(false);
 
   const OTHER = '__other__';
 
@@ -85,6 +88,27 @@ export function AddBikeForm() {
         setYear(String(data.year));
       }
 
+      // Independent of whether make/model matched above - a genuine
+      // mileage floor from DVSA's own records is worth having even if
+      // the vehicle isn't in our curated model list at all. Failure here
+      // is silent and non-blocking: the vehicle lookup already succeeded,
+      // this is a bonus, and "no MOT history yet" (a bike under 3 years
+      // old) is a completely normal, expected outcome, not an error.
+      try {
+        const motRes = await fetch(`/api/tracker/mot-history-preview?vrm=${encodeURIComponent(registration.trim())}`);
+        if (motRes.ok) {
+          const motData = await motRes.json();
+          if (motData.latestTrustedMileage != null) {
+            setMinMileage(motData.latestTrustedMileage);
+            setMinMileageDate(motData.latestTestDate ?? null);
+            setMileage(String(motData.latestTrustedMileage));
+            setMileageConfirmed(false);
+          }
+        }
+      } catch {
+        // Silent, non-blocking - see comment above.
+      }
+
       const parts: string[] = [];
       if (matchedBrand && matchedModelName) {
         parts.push(`Matched to ${matchedBrand} ${matchedModelName} in our list.`);
@@ -138,6 +162,16 @@ export function AddBikeForm() {
     if (isCustomModel && (!customEngineCC || !(Number(customEngineCC) > 0))) {
       setFormError('Enter a valid engine size in cc.');
       return;
+    }
+    if (minMileage !== null) {
+      if (!(Number(mileage) >= minMileage)) {
+        setFormError(`Current mileage has to be at least ${minMileage.toLocaleString()} miles - that's what your last MOT recorded.`);
+        return;
+      }
+      if (!mileageConfirmed) {
+        setFormError('Please confirm the current mileage figure before adding the bike.');
+        return;
+      }
     }
     if (!isCustomModel && !selectedModelData) return;
     await submit({
@@ -221,11 +255,12 @@ export function AddBikeForm() {
             <input
               id="bike-registration"
               type="text"
-              placeholder="e.g. AB12 CDE"
+              placeholder="ENTER REG"
               value={registration}
               onChange={(e) => setRegistration(e.target.value)}
               required
-              style={{ textTransform: 'uppercase', flex: 1 }}
+              className={styles.regPlateInput}
+              style={{ flex: 1 }}
             />
             <button type="button" className={styles.iconBtn} disabled={lookingUp} onClick={handleLookup}>
               {lookingUp ? 'Looking up…' : 'Look up'}
@@ -249,7 +284,27 @@ export function AddBikeForm() {
         </div>
         <div className="field" style={{ marginTop: '0.9rem' }}>
           <label htmlFor="bike-mileage">Current mileage</label>
-          <input id="bike-mileage" type="number" min="0" value={mileage} onChange={(e) => setMileage(e.target.value)} required />
+          <input
+            id="bike-mileage"
+            type="number"
+            min={minMileage ?? 0}
+            value={mileage}
+            onChange={(e) => { setMileage(e.target.value); setMileageConfirmed(false); }}
+            required
+          />
+          {minMileage !== null && (
+            <>
+              <p className="field-note" style={{ marginTop: '0.4rem' }}>
+                Your last MOT{minMileageDate ? ` (${new Date(minMileageDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })})` : ''} recorded {minMileage.toLocaleString()} miles - current mileage has to be at least this.
+              </p>
+              <div className="field-checkbox" style={{ marginTop: '0.4rem' }}>
+                <label>
+                  <input type="checkbox" checked={mileageConfirmed} onChange={(e) => setMileageConfirmed(e.target.checked)} />
+                  I confirm this mileage is correct, or I&apos;ve updated it to the bike&apos;s real current reading
+                </label>
+              </div>
+            </>
+          )}
         </div>
         <div className="field" style={{ marginTop: '0.9rem' }}>
           <label htmlFor="bike-region">Where you keep and run it</label>
