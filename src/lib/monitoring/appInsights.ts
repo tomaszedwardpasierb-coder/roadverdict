@@ -1,30 +1,49 @@
 import { ClientSecretCredential } from "@azure/identity";
-import { LogsQueryClient, LogsQueryResultStatus } from "@azure/monitor-query-logs";
 
 const APP_INSIGHTS_RESOURCE_ID =
   "/subscriptions/bb9e306b-3a3f-485e-9c3e-a952ce5aaecf/resourceGroups/roadverdict-rg/providers/microsoft.insights/components/roadverdict-insights";
 
-let client: LogsQueryClient | null = null;
-function getClient() {
-  if (!client) {
-    const credential = new ClientSecretCredential(
+let credential: ClientSecretCredential | null = null;
+function getCredential() {
+  if (!credential) {
+    credential = new ClientSecretCredential(
       process.env.AZURE_TENANT_ID!,
       process.env.AZURE_CLIENT_ID!,
       process.env.AZURE_CLIENT_SECRET!
     );
-    client = new LogsQueryClient(credential);
   }
-  return client;
+  return credential;
 }
 
-async function runQuery(kql: string, timespan: { duration: string }) {
-  const result = await getClient().queryResource(APP_INSIGHTS_RESOURCE_ID, kql, timespan);
-  if (result.status !== LogsQueryResultStatus.Success) {
-    throw new Error(
-      `Log Analytics query failed: ${result.partialError?.message ?? "unknown error"}`
-    );
+interface LogsTable {
+  name: string;
+  columns: { name: string; type: string }[];
+  rows: any[][];
+}
+
+async function runQuery(kql: string, timespanIso: string): Promise<LogsTable[]> {
+  const token = await getCredential().getToken("https://api.loganalytics.io/.default");
+  if (!token) {
+    throw new Error("Failed to acquire Log Analytics access token.");
   }
-  return result.tables;
+
+  const res = await fetch(`https://api.loganalytics.io/v1${APP_INSIGHTS_RESOURCE_ID}/query`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token.token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ query: kql, timespan: timespanIso }),
+  });
+
+  const body = await res.json();
+
+  if (!res.ok) {
+    const message = body?.error?.message ?? `HTTP ${res.status}`;
+    throw new Error(`Log Analytics query failed: ${message}`);
+  }
+
+  return body.tables as LogsTable[];
 }
 
 export interface RouteStat {
@@ -46,7 +65,7 @@ export interface SiteStats {
 }
 
 export async function getSiteStats(windowHours = 24): Promise<SiteStats> {
-  const timespan = { duration: `PT${windowHours}H` };
+  const timespan = `PT${windowHours}H`;
 
   const [overallTables, byRouteTables, exceptionTables] = await Promise.all([
     runQuery(
