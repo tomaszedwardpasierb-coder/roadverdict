@@ -19,7 +19,7 @@ export function AddBikeForm() {
   const [mileage, setMileage] = useState('');
   const [nickname, setNickname] = useState('');
   const [region, setRegion] = useState<Region>('rest-england-wales');
-  const { submit, submitting, error } = useTrackerFormSubmit('/api/tracker/bike');
+  const { submit, submitting, error, lastResponse } = useTrackerFormSubmit('/api/tracker/bike');
 
   const [lookingUp, setLookingUp] = useState(false);
   const [lookupMessage, setLookupMessage] = useState<{ text: string; tone: 'ok' | 'warn' | 'error' } | null>(null);
@@ -174,7 +174,7 @@ export function AddBikeForm() {
       }
     }
     if (!isCustomModel && !selectedModelData) return;
-    await submit({
+    const ok = await submit({
       make: effectiveMake,
       model: effectiveModel,
       engineCC: effectiveEngineCC as number,
@@ -185,6 +185,25 @@ export function AddBikeForm() {
       nickname,
       region,
     });
+    // Best-effort, non-blocking - the bike itself is already saved
+    // successfully regardless of what happens here. If this fails
+    // silently (no MOT history for this plate, service hiccup, etc.),
+    // the bike still exists and MOT import can always be run again
+    // later - the endpoint safely skips anything already logged.
+    if (ok) {
+      const newBikeId = (lastResponse.current as { bike?: { id?: string } } | null)?.bike?.id;
+      if (newBikeId) {
+        try {
+          await fetch('/api/tracker/mot-history', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ bikeId: newBikeId }),
+          });
+        } catch {
+          // Silent - see comment above.
+        }
+      }
+    }
   }
 
   return (
