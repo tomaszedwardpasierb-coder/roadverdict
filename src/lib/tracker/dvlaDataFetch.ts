@@ -53,6 +53,7 @@ export async function fetchDvlaDataFromVdg(vrm: string): Promise<DvlaVehicleData
     return {
       fetchedAt: new Date().toISOString(),
       dvlaCurrentVrm: vd.VehicleIdentification?.Vrm,
+      dateFirstRegistered: vd.VehicleIdentification?.DateFirstRegistered,
       isImported: status.IsImported,
       isExported: status.IsExported,
       isScrapped: status.IsScrapped,
@@ -63,6 +64,13 @@ export async function fetchDvlaDataFromVdg(vrm: string): Promise<DvlaVehicleData
       v5cIssueDates,
       officialCombinedMpg: md?.Performance?.FuelEconomy?.CombinedMpg,
       euroStatus: md?.Emissions?.EuroStatus,
+      fuelTankCapacityLitres: md?.BodyDetails?.FuelTankCapacityLitres,
+      powerBhp: md?.Performance?.Power?.Bhp,
+      powerRpm: md?.Performance?.Power?.Rpm,
+      torqueNm: md?.Performance?.Torque?.Nm,
+      warrantyMonths: md?.AdditionalInformation?.VehicleWarrantyInformation?.ManufacturerWarrantyMonths,
+      warrantyMiles: md?.AdditionalInformation?.VehicleWarrantyInformation?.ManufacturerWarrantyMiles,
+      countryOfOrigin: md?.ModelIdentification?.CountryOfOrigin,
     };
   } catch (err) {
     console.error("VDG vehicle-details fetch failed:", err);

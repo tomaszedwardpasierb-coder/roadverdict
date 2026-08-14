@@ -54,7 +54,30 @@ export default async function DetailedReportPage({ params }: { params: { token: 
         <p className={styles.subtext}>
           {bike.make} {bike.model} · {bike.isCustomBuild ? "Custom build" : bike.year} · {bike.engineCC}cc ·{" "}
           {bike.currentMileage.toLocaleString()} miles
+          {bike.dvlaData?.powerBhp && ` · ${bike.dvlaData.powerBhp}bhp`}
         </p>
+
+        {bike.dvlaData && (bike.dvlaData.warrantyMonths || bike.dvlaData.warrantyMiles) && bike.dvlaData.dateFirstRegistered && (() => {
+          const regDate = new Date(bike.dvlaData.dateFirstRegistered!);
+          const monthsOld = (Date.now() - regDate.getTime()) / (1000 * 60 * 60 * 24 * 30.44);
+          const timeCovered = bike.dvlaData!.warrantyMonths != null ? monthsOld < bike.dvlaData!.warrantyMonths : null;
+          const mileageCovered = bike.dvlaData!.warrantyMiles != null ? bike.currentMileage < bike.dvlaData!.warrantyMiles : null;
+          // Standard "whichever comes first" - only counted as still
+          // covered if every applicable condition (time, mileage, or
+          // both) still holds.
+          const checks = [timeCovered, mileageCovered].filter((v) => v !== null);
+          const stillCovered = checks.length > 0 && checks.every((v) => v === true);
+          const terms = [
+            bike.dvlaData!.warrantyMonths ? `${bike.dvlaData!.warrantyMonths} months` : null,
+            bike.dvlaData!.warrantyMiles ? `${bike.dvlaData!.warrantyMiles.toLocaleString()} miles` : null,
+          ].filter(Boolean).join(' / ');
+          return (
+            <p className={styles.docParagraph}>
+              Manufacturer warranty: {terms} from new, whichever comes first - based on this bike&apos;s
+              registration date and current mileage, it&apos;s {stillCovered ? 'likely still within warranty' : 'likely outside the manufacturer warranty period'}.
+            </p>
+          );
+        })()}
 
         {mileageCheck.implausible && (
           <div className={styles.warnBlock}>

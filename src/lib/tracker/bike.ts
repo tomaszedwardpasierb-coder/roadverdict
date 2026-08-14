@@ -130,6 +130,14 @@ export interface DvlaVehicleData {
   v5cIssueDates: string[];
   officialCombinedMpg?: number;
   euroStatus?: string;
+  dateFirstRegistered?: string;
+  fuelTankCapacityLitres?: number;
+  powerBhp?: number;
+  powerRpm?: number;
+  torqueNm?: number;
+  warrantyMonths?: number;
+  warrantyMiles?: number;
+  countryOfOrigin?: string;
 }
 
 // The plate a report/UI should actually display "as current" - the most
@@ -252,6 +260,13 @@ export async function updateBikeDvlaData(email: string, bikeId: string, dvlaData
   const { resource } = await container.item(bikeId, email).read<BikeDoc>();
   if (!resource) return null;
   resource.dvlaData = dvlaData;
+  // Auto-fills the existing tankCapacityLitres field (used by
+  // tankGuess.ts's full-tank heuristic) with the bike's real capacity,
+  // but only if nothing's there yet - never overwrites a value an owner
+  // may have already entered themselves.
+  if (dvlaData.fuelTankCapacityLitres && !resource.tankCapacityLitres) {
+    resource.tankCapacityLitres = dvlaData.fuelTankCapacityLitres;
+  }
   await container.items.upsert(resource);
   return resource;
 }

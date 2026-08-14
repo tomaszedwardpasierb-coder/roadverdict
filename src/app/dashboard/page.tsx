@@ -196,6 +196,22 @@ export default async function DashboardPage() {
         );
       })()}
 
+      {(() => {
+        const specParts: string[] = [];
+        if (bike.dvlaData?.powerBhp) {
+          specParts.push(`${bike.dvlaData.powerBhp}bhp${bike.dvlaData.powerRpm ? ` @ ${bike.dvlaData.powerRpm}rpm` : ''}`);
+        }
+        if (bike.dvlaData?.torqueNm) {
+          specParts.push(`${bike.dvlaData.torqueNm}Nm torque`);
+        }
+        if (bike.dvlaData?.countryOfOrigin) {
+          specParts.push(`Made in ${bike.dvlaData.countryOfOrigin}`);
+        }
+        return specParts.length > 0 ? (
+          <p className={styles.subtext} style={{ marginBottom: "1rem" }}>{specParts.join(' · ')}</p>
+        ) : null;
+      })()}
+
       <ScanReceiptButton />
 
       <ChartFilterBar />
