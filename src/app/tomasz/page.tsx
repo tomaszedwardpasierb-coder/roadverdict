@@ -19,6 +19,7 @@ import {
 import { getSiteStats, type SiteStats } from '@/lib/monitoring/appInsights';
 import styles from './tomasz.module.css';
 import { RunCronButton } from './RunCronButton';
+import { ImpersonateButton } from './ImpersonateButton';
 import { AdminLogoutButton } from './AdminLogoutButton';
 
 export const dynamic = 'force-dynamic';
@@ -405,6 +406,7 @@ export default async function AdminDashboardPage({
               <th>Signed in</th>
               <th>IP address</th>
               <th>Browser</th>
+              <th>Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -414,6 +416,7 @@ export default async function AdminDashboardPage({
                 <td>{fmtDate(s.createdAt)}</td>
                 <td>{s.ip ?? '-'}</td>
                 <td>{s.userAgent ? browserFamily(s.userAgent) : '-'}</td>
+                <td><ImpersonateButton email={s.email} /></td>
               </tr>
             ))}
           </tbody>

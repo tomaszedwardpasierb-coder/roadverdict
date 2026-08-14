@@ -1,7 +1,10 @@
-﻿// Place at: src/app/layout.tsx
+// Place at: src/app/layout.tsx
 import type { Metadata } from 'next';
 import { Oswald, IBM_Plex_Sans, IBM_Plex_Mono } from 'next/font/google';
 import Link from 'next/link';
+import { cookies } from 'next/headers';
+import { getAdminSession } from '@/lib/admin/session';
+import { ImpersonationBanner } from './ImpersonationBanner';
 import './globals.css';
 const oswald = Oswald({
   subsets: ['latin'],
@@ -29,10 +32,19 @@ export const metadata: Metadata = {
   description:
     'Enter your bike, the job, and what you were quoted. Get an instant verdict benchmarked against typical UK motorcycle service and repair prices.',
 };
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const cookieStore = await cookies();
+  const impersonatingEmail = cookieStore.get('impersonating_as')?.value ?? null;
+  // Only trust/show this if a real admin session is ALSO currently
+  // valid - the impersonation cookie alone is never sufficient on its
+  // own to display or act on anything.
+  const isAdmin = impersonatingEmail ? await getAdminSession() : false;
+  const showImpersonationBanner = isAdmin && !!impersonatingEmail;
+
   return (
     <html lang="en" className={`${oswald.variable} ${plexSans.variable} ${plexMono.variable}`}>
       <body>
+        {showImpersonationBanner && <ImpersonationBanner email={impersonatingEmail!} />}
         <header className="site-header">
           <Link href="/" className="site-header__logo">
             <img src="/logo.png" alt="RoadVerdict" className="site-header__logo-img" />
