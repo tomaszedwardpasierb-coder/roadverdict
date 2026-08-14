@@ -119,7 +119,7 @@ export default async function DashboardPage() {
   };
   const actualMpg = computeActualMPG(fuelLogs);
   const mpgSeries = computeMPGSeries(fuelLogs);
-  const mileagePoints = gatherMileagePoints(records, mods, fuelLogs);
+  const mileagePoints = gatherMileagePoints(records, mods, fuelLogs, bills);
   const fuelCostPoints = fuelLogs.map((f) => ({ id: f.id, date: f.date, cost: f.cost, mileage: f.mileage }));
   const summary = computeSpendSummary(records, mods, fuelLogs, bills);
   const currentYear = new Date().getFullYear();
@@ -141,7 +141,7 @@ export default async function DashboardPage() {
     })),
     ...mods.map((m) => ({
       id: m.id, reviewCategory: "mods" as const,
-      date: m.date, icon: "⚙️", type: "Part",
+      date: m.date, icon: "⚙", type: "Part",
       description: m.name, category: "Parts & Accessories", cost: m.cost, mileage: m.mileage,
     })),
     ...bills.map((b) => ({
@@ -163,7 +163,7 @@ export default async function DashboardPage() {
       )}
       {overBudget && (
         <div className={styles.budgetWarningBanner}>
-          ⚠️ <strong>You&apos;re over your {currentYear} budget</strong> - {formatCurrency(yearSpend, currency, rates)} spent against a{" "}
+          ⚠ <strong>You&apos;re over your {currentYear} budget</strong> - {formatCurrency(yearSpend, currency, rates)} spent against a{" "}
           {formatCurrency(bike.annualBudget as number, currency, rates)} budget, {formatCurrency(yearSpend - (bike.annualBudget as number), currency, rates)} over.
         </div>
       )}
@@ -475,6 +475,3 @@ export default async function DashboardPage() {
     />
   );
 }
-
-
-
