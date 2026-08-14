@@ -3,15 +3,24 @@ import { getContainer } from "@/lib/cosmos";
 
 const ADMIN_PK = "admin";
 
-// Deliberately checks for a real, already-existing user doc rather than
-// letting createSessionForEmail's own auto-create-on-missing behaviour
-// silently spin up a phantom account for a mistyped or made-up email -
-// impersonation should only ever be possible against a genuine account.
+// Checks for real evidence this account has actually been used, rather
+// than trusting the newer `type: "user"` marker doc alone - that doc is
+// only reliably created going forward (createSessionForEmail only makes
+// one on a login that finds nothing existing yet), so it's absent for
+// every account that was already active before that code shipped. A
+// session doc (a real completed login) or a bike doc (real usage) are
+// both signals that predate that convention and cover every real account.
 export async function userExists(email: string): Promise<boolean> {
   const container = getContainer();
   try {
-    const { resource } = await container.item(email, email).read();
-    return !!resource && resource.type === "user";
+    const { resources } = await container.items
+      .query({
+        query:
+          "SELECT VALUE COUNT(1) FROM c WHERE c.pk = @email AND (c.type = 'user' OR c.type = 'session' OR c.type = 'bike')",
+        parameters: [{ name: "@email", value: email }],
+      })
+      .fetchAll();
+    return (resources[0] ?? 0) > 0;
   } catch {
     return false;
   }
