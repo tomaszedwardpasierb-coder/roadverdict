@@ -63,6 +63,17 @@ export default async function DetailedReportPage({ params }: { params: { token: 
           </div>
         )}
 
+        {bike.dvlaData && (bike.dvlaData.isScrapped || bike.dvlaData.isExported || bike.dvlaData.isUnscrapped) && (
+          <div className={styles.warnBlock}>
+            <p className={styles.warnTitle}>DVLA status - worth knowing before anything else</p>
+            {bike.dvlaData.isScrapped && <p style={{ margin: 0 }}>DVLA has this vehicle recorded as scrapped.</p>}
+            {bike.dvlaData.isUnscrapped && (
+              <p style={{ margin: 0 }}>This vehicle was previously recorded as scrapped, then later un-scrapped.</p>
+            )}
+            {bike.dvlaData.isExported && <p style={{ margin: 0 }}>DVLA has this vehicle recorded as exported.</p>}
+          </div>
+        )}
+
         <h2 className={styles.docHeading}>The story this data tells</h2>
         {storyParagraphs.map((p, i) => <p key={i} className={styles.docParagraph}>{p}</p>)}
         <p className={styles.docParagraph} style={{ fontStyle: "italic", color: "var(--ink-soft)" }}>
@@ -120,6 +131,26 @@ export default async function DetailedReportPage({ params }: { params: { token: 
               <div key={i} className={styles.itemByItemRow}>
                 <dt>{fmtDate(t.testDate)}</dt>
                 <dd>{t.notes}{t.mileage != null ? ` (${t.mileage.toLocaleString()} mi)` : ''}</dd>
+              </div>
+            ))}
+          </dl>
+        </>
+      )}
+
+      {bike.dvlaData && bike.dvlaData.keeperChangeList.length > 0 && (
+        <>
+          <h2 className={styles.docHeading}>Ownership history (DVLA-verified)</h2>
+          <p className={styles.docParagraph}>
+            Keeper changes recorded directly with DVLA, independent of anything logged in RoadVerdict.
+          </p>
+          <dl className={styles.itemByItemList}>
+            {bike.dvlaData.keeperChangeList.slice().reverse().map((k, i) => (
+              <div key={i} className={styles.itemByItemRow}>
+                <dt>{fmtDate(k.keeperStartDate)}</dt>
+                <dd>
+                  New keeper registered
+                  {k.previousKeeperDisposalDate ? ` (previous keeper disposed ${fmtDate(k.previousKeeperDisposalDate)})` : ''}
+                </dd>
               </div>
             ))}
           </dl>

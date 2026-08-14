@@ -80,6 +80,14 @@ export default async function SaleReportPage({ params }: { params: { token: stri
                 day{daysSinceLastChange === 1 ? "" : "s"} before this report was generated.
               </p>
             )}
+            {bike.dvlaData?.dvlaCurrentVrm &&
+              bike.dvlaData.dvlaCurrentVrm.replace(/\s+/g, "") !== currentRegistration?.replace(/\s+/g, "") && (
+                <p className={styles.registrationWarning}>
+                  ⚠️ DVLA had this vehicle&apos;s current registration as <strong>{bike.dvlaData.dvlaCurrentVrm}</strong> as
+                  of {fmtDate(bike.dvlaData.fetchedAt)} - different from what&apos;s shown above. Worth asking the
+                  seller about this directly.
+                </p>
+              )}
           </>
         ) : (
           <p className={styles.registrationNote}>No registration number is on record for this bike.</p>

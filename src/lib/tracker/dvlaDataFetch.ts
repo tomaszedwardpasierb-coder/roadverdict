@@ -52,6 +52,7 @@ export async function fetchDvlaDataFromVdg(vrm: string): Promise<DvlaVehicleData
 
     return {
       fetchedAt: new Date().toISOString(),
+      dvlaCurrentVrm: vd.VehicleIdentification?.Vrm,
       isImported: status.IsImported,
       isExported: status.IsExported,
       isScrapped: status.IsScrapped,

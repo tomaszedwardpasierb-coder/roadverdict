@@ -119,7 +119,7 @@ export default async function DashboardPage() {
   };
   const actualMpg = computeActualMPG(fuelLogs);
   const mpgSeries = computeMPGSeries(fuelLogs);
-  const mileagePoints = gatherMileagePoints(records, mods, fuelLogs, bills);
+  const mileagePoints = gatherMileagePoints(records, mods, fuelLogs);
   const fuelCostPoints = fuelLogs.map((f) => ({ id: f.id, date: f.date, cost: f.cost, mileage: f.mileage }));
   const summary = computeSpendSummary(records, mods, fuelLogs, bills);
   const currentYear = new Date().getFullYear();
@@ -268,7 +268,16 @@ export default async function DashboardPage() {
       <LogFuelForm initialMileage={bike.currentMileage} mileageHistory={mileagePoints} distanceUnit={distanceUnit} currency={currency} rates={rates} bikeYear={bike.year} isCustomBuild={bike.isCustomBuild} />
       {actualMpg ? (
         <p className={styles.subtext} style={{ marginBottom: "0.9rem" }}>
-          Your actual average from logged fill-ups: <strong>{formatFuelEconomy(actualMpg, fuelEconomyUnit)}</strong> (the Cost Calculator assumes 57 mpg generally - this is specific to your bike and riding).
+          Your actual average from logged fill-ups: <strong>{formatFuelEconomy(actualMpg, fuelEconomyUnit)}</strong>{" "}
+          {bike.dvlaData?.officialCombinedMpg ? (
+            <>(the manufacturer&apos;s official combined figure for this exact bike is{" "}
+            {fuelEconomyUnit === "l100km"
+              ? `${(282.481 / bike.dvlaData.officialCombinedMpg).toFixed(1)} L/100km`
+              : `${bike.dvlaData.officialCombinedMpg} mpg`}{" "}
+            - this is your own real-world average, riding your own roads).</>
+          ) : (
+            <>(the Cost Calculator assumes 57 mpg generally - this is specific to your bike and riding).</>
+          )}
         </p>
       ) : (
         <p className={styles.subtext} style={{ marginBottom: "0.9rem" }}>Log at least two consecutive full-tank fill-ups to see your bike&apos;s real fuel economy here.</p>

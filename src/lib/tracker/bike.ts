@@ -112,6 +112,10 @@ export interface DvlaPlateChange {
 
 export interface DvlaVehicleData {
   fetchedAt: string;
+  // DVLA's own live current VRM at the moment of lookup - the direct
+  // field for cross-checking against RoadVerdict's own recorded current
+  // plate, rather than inferring it from plateChangeList's ordering.
+  dvlaCurrentVrm?: string;
   isImported?: boolean;
   isExported?: boolean;
   isScrapped?: boolean;
