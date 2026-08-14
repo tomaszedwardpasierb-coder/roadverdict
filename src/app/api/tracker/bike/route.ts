@@ -10,8 +10,10 @@ import {
   updateBikeUnits,
   updateBikeCurrency,
   updateBikeChartType,
+  updateBikeDvlaData,
   type ChartKind,
 } from "@/lib/tracker/bike";
+import { fetchDvlaDataFromVdg } from "@/lib/tracker/dvlaDataFetch";
 import { getBikeClassForCC } from "@/lib/motorcycleModels";
 import type { Region } from "@/lib/priceData";
 import type { DistanceUnit, FuelEconomyUnit } from "@/lib/tracker/unitFormat";
@@ -75,6 +77,20 @@ export async function POST(request: NextRequest) {
       { error: `Free accounts can track up to ${result.limit} bikes. Upgrade to add more.`, reason: result.reason },
       { status: 403 }
     );
+  }
+
+  // Best-effort, non-blocking - a failed or empty lookup never stops the
+  // bike from being created successfully. Reuses the same VehicleDetails
+  // call plate-lookup already makes, just keeping more of the response
+  // this time instead of discarding everything past make/model/year.
+  try {
+    const dvlaData = await fetchDvlaDataFromVdg(result.bike.originalRegistration ?? "");
+    if (dvlaData) {
+      await updateBikeDvlaData(session.email, result.bike.id, dvlaData);
+      result.bike.dvlaData = dvlaData;
+    }
+  } catch (err) {
+    console.error("DVLA data fetch failed during bike creation:", err);
   }
 
   return NextResponse.json({ bike: result.bike });

@@ -89,6 +89,43 @@ export interface BikeDoc {
   // or originalRegistration itself if this is empty.
   registrationChanges?: RegistrationChangeEntry[];
   dateAdded: string;
+  // A best-effort snapshot from DVLA/DVSA data (via VDG's VehicleDetails
+  // package - the same one plate-lookup already calls), taken at bike
+  // creation. Optional and non-blocking by nature: absence just means
+  // the fetch didn't happen or didn't find anything, never a reason to
+  // fail bike creation itself. See dvlaDataFetch.ts for how this gets
+  // populated.
+  dvlaData?: DvlaVehicleData;
+}
+
+export interface DvlaKeeperChange {
+  numberOfPreviousKeepers: number;
+  keeperStartDate: string;
+  previousKeeperDisposalDate: string | null;
+}
+
+export interface DvlaPlateChange {
+  currentVrm: string;
+  previousVrm: string;
+  dateOfTransaction: string;
+}
+
+export interface DvlaVehicleData {
+  fetchedAt: string;
+  isImported?: boolean;
+  isExported?: boolean;
+  isScrapped?: boolean;
+  isUnscrapped?: boolean;
+  cherishedTransferMarker?: boolean;
+  keeperChangeList: DvlaKeeperChange[];
+  // DVLA's own plate-change record - distinct from this bike's own
+  // registrationChanges above (which is RoadVerdict's user-entered
+  // history). Kept separate deliberately so the two can be cross-checked
+  // against each other rather than one silently overwriting the other.
+  plateChangeList: DvlaPlateChange[];
+  v5cIssueDates: string[];
+  officialCombinedMpg?: number;
+  euroStatus?: string;
 }
 
 // The plate a report/UI should actually display "as current" - the most
@@ -202,6 +239,15 @@ export async function updateBikeMileage(email: string, bikeId: string, newMileag
   const { resource } = await container.item(bikeId, email).read<BikeDoc>();
   if (!resource) return null;
   resource.currentMileage = newMileage;
+  await container.items.upsert(resource);
+  return resource;
+}
+
+export async function updateBikeDvlaData(email: string, bikeId: string, dvlaData: DvlaVehicleData): Promise<BikeDoc | null> {
+  const container = getContainer();
+  const { resource } = await container.item(bikeId, email).read<BikeDoc>();
+  if (!resource) return null;
+  resource.dvlaData = dvlaData;
   await container.items.upsert(resource);
   return resource;
 }
