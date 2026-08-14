@@ -135,6 +135,12 @@ export function BillCard({
             <label htmlFor={`edit-bill-notes-${bill.id}`}>Notes</label>
             <textarea id={`edit-bill-notes-${bill.id}`} rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} />
           </div>
+          {bill.mileage != null && (
+            <p className="field-note" style={{ marginTop: '0.6rem' }}>
+              DVSA-recorded mileage: <strong>{bill.mileage.toLocaleString()} mi</strong> - not editable here, since
+              it&apos;s a verified fact from the MOT test itself, not something entered by hand.
+            </p>
+          )}
           <AttachmentUploader value={attachment} onChange={setAttachment} idSuffix={`-bill-${bill.id}`} compareValues={{ cost: convertDisplayToGbp(Number(costDisplay), currency, rates), date }} />
 
           <ReminderFields
@@ -176,6 +182,9 @@ export function BillCard({
         <span className={styles.jobCardCost}>{formatCurrency(bill.cost, currency, rates)}</span>
       </div>
       <div className={styles.jobCardMeta}>{fmtDate(bill.date)}</div>
+      {bill.mileage != null && (
+        <div className={styles.jobCardMeta}>DVSA-recorded mileage: {bill.mileage.toLocaleString()} mi</div>
+      )}
       {bill.currencyConversion && (
         <div className={styles.currencyConversionNote}>
           Originally {bill.currencyConversion.originalAmount.toFixed(2)} {bill.currencyConversion.originalCurrency},
