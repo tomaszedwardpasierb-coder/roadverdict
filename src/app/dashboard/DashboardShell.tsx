@@ -4,6 +4,7 @@
 import { useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import { UpdateMileageButton } from './UpdateMileageButton';
+import { RefreshVehicleDataButton } from './RefreshVehicleDataButton';
 import { BikeSwitcher, type SwitcherBike } from './BikeSwitcher';
 import LogoutButton from './LogoutButton';
 import { formatDistance, type DistanceUnit } from '@/lib/tracker/unitFormat';
@@ -143,6 +144,9 @@ export function DashboardShell({
           <BikeSwitcher bikes={bikes} activeBikeId={activeBikeId} distanceUnit={distanceUnit} />
           <div style={{ marginTop: '0.6rem' }}>
             <UpdateMileageButton currentMileage={currentMileage} distanceUnit={distanceUnit} />
+          </div>
+          <div style={{ marginTop: '0.6rem' }}>
+            <RefreshVehicleDataButton bikeId={activeBikeId} />
           </div>
 
           <div className={styles.sidebarUserFooter}>
