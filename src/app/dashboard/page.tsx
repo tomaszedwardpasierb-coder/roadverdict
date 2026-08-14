@@ -179,6 +179,23 @@ export default async function DashboardPage() {
       </h1>
       <p className={styles.subtext} style={{ marginBottom: "1rem" }}>Here&apos;s how your bike looks today.</p>
 
+      {bike.dvlaData?.euroStatus && (() => {
+        // Motorcycles need Euro 3 or above for London's ULEZ - a much
+        // lower bar than cars (Euro 4 petrol / Euro 6 diesel). Parses
+        // leading digits from values like "5", "5b", "6b". TfL's own
+        // checker is the definitive source - this is a heads-up, not a
+        // guarantee, hence the link out rather than a flat yes/no claim.
+        const euroNumber = parseInt(bike.dvlaData.euroStatus, 10);
+        if (Number.isNaN(euroNumber)) return null;
+        const likelyCompliant = euroNumber >= 3;
+        return (
+          <p className={styles.subtext} style={{ marginBottom: "1rem" }}>
+            Euro {bike.dvlaData.euroStatus} emissions standard - {likelyCompliant ? "likely compliant with London's ULEZ" : "likely does NOT meet London's ULEZ requirement (Euro 3+)"}.{" "}
+            <a href="https://tfl.gov.uk/modes/driving/check-your-vehicle" target="_blank" rel="noopener">Check definitively on TfL&apos;s own site ↗</a>
+          </p>
+        );
+      })()}
+
       <ScanReceiptButton />
 
       <ChartFilterBar />

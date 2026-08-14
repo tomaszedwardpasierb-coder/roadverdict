@@ -63,15 +63,24 @@ export default async function DetailedReportPage({ params }: { params: { token: 
           </div>
         )}
 
-        {bike.dvlaData && (bike.dvlaData.isScrapped || bike.dvlaData.isExported || bike.dvlaData.isUnscrapped) && (
-          <div className={styles.warnBlock}>
-            <p className={styles.warnTitle}>DVLA status - worth knowing before anything else</p>
-            {bike.dvlaData.isScrapped && <p style={{ margin: 0 }}>DVLA has this vehicle recorded as scrapped.</p>}
-            {bike.dvlaData.isUnscrapped && (
-              <p style={{ margin: 0 }}>This vehicle was previously recorded as scrapped, then later un-scrapped.</p>
-            )}
-            {bike.dvlaData.isExported && <p style={{ margin: 0 }}>DVLA has this vehicle recorded as exported.</p>}
-          </div>
+        {bike.dvlaData && (
+          bike.dvlaData.isScrapped || bike.dvlaData.isExported || bike.dvlaData.isUnscrapped ? (
+            <div className={styles.warnBlock}>
+              <p className={styles.warnTitle}>DVLA status - worth knowing before anything else</p>
+              {bike.dvlaData.isScrapped && <p style={{ margin: 0 }}>DVLA has this vehicle recorded as scrapped.</p>}
+              {bike.dvlaData.isUnscrapped && (
+                <p style={{ margin: 0 }}>This vehicle was previously recorded as scrapped, then later un-scrapped.</p>
+              )}
+              {bike.dvlaData.isExported && <p style={{ margin: 0 }}>DVLA has this vehicle recorded as exported.</p>}
+            </div>
+          ) : (
+            // Explicit confirmation, not silence - a clean check is a real
+            // trust signal for a buyer, and silence here is indistinguishable
+            // from "this check never ran" rather than "it ran and found nothing."
+            <p className={styles.docParagraph} style={{ color: "var(--ink-soft)" }}>
+              DVLA has no scrapped, exported, or unscrapped-status flags on record for this vehicle.
+            </p>
+          )
         )}
 
         <h2 className={styles.docHeading}>The story this data tells</h2>
@@ -137,23 +146,35 @@ export default async function DetailedReportPage({ params }: { params: { token: 
         </>
       )}
 
-      {bike.dvlaData && bike.dvlaData.keeperChangeList.length > 0 && (
+      {bike.dvlaData && (bike.dvlaData.keeperChangeList.length > 0 || bike.dvlaData.v5cIssueDates.length > 0) && (
         <>
           <h2 className={styles.docHeading}>Ownership history (DVLA-verified)</h2>
           <p className={styles.docParagraph}>
-            Keeper changes recorded directly with DVLA, independent of anything logged in RoadVerdict.
+            Recorded directly with DVLA, independent of anything logged in RoadVerdict.
           </p>
-          <dl className={styles.itemByItemList}>
-            {bike.dvlaData.keeperChangeList.slice().reverse().map((k, i) => (
-              <div key={i} className={styles.itemByItemRow}>
-                <dt>{fmtDate(k.keeperStartDate)}</dt>
-                <dd>
-                  New keeper registered
-                  {k.previousKeeperDisposalDate ? ` (previous keeper disposed ${fmtDate(k.previousKeeperDisposalDate)})` : ''}
-                </dd>
-              </div>
-            ))}
-          </dl>
+          {bike.dvlaData.keeperChangeList.length > 0 && (
+            <dl className={styles.itemByItemList}>
+              {bike.dvlaData.keeperChangeList.slice().reverse().map((k, i) => (
+                <div key={`keeper-${i}`} className={styles.itemByItemRow}>
+                  <dt>{fmtDate(k.keeperStartDate)}</dt>
+                  <dd>
+                    New keeper registered
+                    {k.previousKeeperDisposalDate ? ` (previous keeper disposed ${fmtDate(k.previousKeeperDisposalDate)})` : ''}
+                  </dd>
+                </div>
+              ))}
+            </dl>
+          )}
+          {bike.dvlaData.v5cIssueDates.length > 0 && (
+            <dl className={styles.itemByItemList}>
+              {bike.dvlaData.v5cIssueDates.slice().reverse().map((d, i) => (
+                <div key={`v5c-${i}`} className={styles.itemByItemRow}>
+                  <dt>{fmtDate(d)}</dt>
+                  <dd>V5C logbook issued{i === 0 && bike.dvlaData!.v5cIssueDates.length > 1 ? ' (most recent)' : ''}</dd>
+                </div>
+              ))}
+            </dl>
+          )}
         </>
       )}
 
