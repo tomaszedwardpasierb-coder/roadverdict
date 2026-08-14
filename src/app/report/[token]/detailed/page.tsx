@@ -9,6 +9,7 @@ import { reminderDetailLabel } from "@/lib/tracker/reminderStatus";
 import { describeJobTypeGroup } from "@/lib/tracker/reportNarrative";
 import { ReportHistoryTable } from "../ReportHistoryTable";
 import QRCode from "qrcode";
+import { fetchMotHistoryFromVdg } from "@/lib/tracker/motHistoryFetch";
 import styles from "../report.module.css";
 import { PrintButton } from "../PrintButton";
 
@@ -34,6 +35,11 @@ export default async function DetailedReportPage({ params }: { params: { token: 
 
   const canonicalReportUrl = `${process.env.APP_URL ?? "https://roadverdict.co.uk"}/report/${params.token}/detailed`;
   const qrDataUrl = await QRCode.toDataURL(canonicalReportUrl, { margin: 1, width: 150 });
+
+  // Best-effort, non-blocking - a failed lookup or a bike with no MOT
+  // history yet (under 3 years old, MOT-exempt) just means this section
+  // doesn't render. Never lets a lookup problem break the report itself.
+  const motHistory = currentRegistration ? await fetchMotHistoryFromVdg(currentRegistration) : null;
 
   return (
     <div className={styles.wrapper}>
@@ -101,6 +107,24 @@ export default async function DetailedReportPage({ params }: { params: { token: 
           {detailedQuestions.map((q, i) => <li key={i}>{q}</li>)}
         </ol>
       </div>
+
+      {motHistory && motHistory.tests.length > 0 && (
+        <>
+          <h2 className={styles.docHeading}>MOT history (DVSA-verified)</h2>
+          <p className={styles.docParagraph}>
+            Pulled directly from DVSA&apos;s own records - independent of anything the owner has entered into
+            RoadVerdict.{motHistory.motDueDate && ` Next MOT due ${fmtDate(motHistory.motDueDate)}.`}
+          </p>
+          <dl className={styles.itemByItemList}>
+            {motHistory.tests.slice().reverse().map((t, i) => (
+              <div key={i} className={styles.itemByItemRow}>
+                <dt>{fmtDate(t.testDate)}</dt>
+                <dd>{t.notes}{t.mileage != null ? ` (${t.mileage.toLocaleString()} mi)` : ''}</dd>
+              </div>
+            ))}
+          </dl>
+        </>
+      )}
 
       <div className={styles.verifyBlock}>
         <div>
