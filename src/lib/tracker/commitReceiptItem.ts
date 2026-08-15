@@ -16,6 +16,7 @@ import { checkMileageConsistency, describeMileageCheck, type HistoryPoint } from
 import { guessFilledToFull } from "@/lib/tracker/tankGuess";
 import { checkFullTankPlausibility, describeImplausibleFill } from "@/lib/tracker/fuelPlausibility";
 import { normalizePlate, allKnownPlates } from "@/lib/tracker/reportAccess";
+import { reestimateFuelMileage } from "@/lib/tracker/reestimateFuelMileage";
 import type { ParsedReceiptItem } from "@/lib/tracker/receiptParse";
 import type { BikeDoc } from "@/lib/tracker/bike";
 import type { Attachment } from "@/lib/tracker/cosmosHelpers";
@@ -44,6 +45,20 @@ function vehicleNamesMatch(a: string, b: string): boolean {
   const nb = normalizeVehicleName(b);
   if (!na || !nb) return true;
   return na.includes(nb) || nb.includes(na);
+}
+
+// Best-effort, non-blocking - only ever called when mileageConfidence
+// ended up undefined, meaning the printed mileage on the receipt was
+// trusted directly rather than estimated. That's the one moment a new
+// genuine anchor has actually appeared; anything estimated or
+// interpolated is itself just a guess and must never trigger this.
+// Failure here should never undo an otherwise-successful commit.
+async function reestimateNearbyFuelLogs(email: string, bike: BikeDoc) {
+  try {
+    await reestimateFuelMileage(email, bike);
+  } catch (err) {
+    console.error("Fuel mileage re-estimation after receipt commit failed:", err);
+  }
 }
 
 export type ReviewQueueEntry =
@@ -244,7 +259,7 @@ export async function commitReceiptItem(
     const jobType = guessJobType(description) ?? "other";
     const notes = [
       forceReview ? `${description} (currency could not be auto-converted - please check the amount)` : description,
-      mileageWarning ? `⚠️ ${mileageWarning}` : null,
+      mileageWarning ? `⚠ ${mileageWarning}` : null,
     ].filter(Boolean).join(" - ");
     const jobLabel = JOB_LABELS[jobType] ?? jobType;
     const aiDescription = buildAiDescription({ description: jobLabel, merchantName, address, city, categoryLabel: "Service" });
@@ -260,6 +275,7 @@ export async function commitReceiptItem(
         baseMileage: mileage ?? bike.currentMileage, date, sourceKey: `service:${jobType}`,
       });
     }
+    if (mileageConfidence === undefined) await reestimateNearbyFuelLogs(email, bike);
     return { id: record.id, category: "service", aiDescription, duplicate, jobType, cost: costGbp, mileage: mileage ?? bike.currentMileage, mileageNeedsManualEntry, mileageWarningText: mileageNeedsManualEntry ? mileageWarning : undefined, mileageConflictReferenceId: conflictReferenceId, mileageConflictReferenceCategory: conflictReferenceCategory, mileageConflictReferenceBatchIndex: conflictReferenceBatchIndex, plateMismatch, vehicleMismatch, date, notes, attachment };
   }
 
@@ -292,6 +308,7 @@ export async function commitReceiptItem(
       bikeId: bike.id, litres: litresValue, cost: costGbp, mileage: resolvedMileage, date,
       filledToFull: filledToFullGuess, attachments: [attachment], needsReview: true, currencyConversion, mileageConfidence, aiDescription,
     });
+    if (mileageConfidence === undefined) await reestimateNearbyFuelLogs(email, bike);
     return { id: record.id, category: "fuel", aiDescription, duplicate, litres: litresValue, cost: costGbp, mileage: resolvedMileage, mileageNeedsManualEntry: finalMileageNeedsManualEntry, mileageWarningText: finalMileageNeedsManualEntry ? finalMileageWarning : undefined, mileageConflictReferenceId: conflictReferenceId, mileageConflictReferenceCategory: conflictReferenceCategory, mileageConflictReferenceBatchIndex: conflictReferenceBatchIndex, plateMismatch, vehicleMismatch, date, filledToFull: filledToFullGuess, attachment, precedingFuelMileage, tankCapacityLitres: bike.tankCapacityLitres };
   }
 
@@ -299,7 +316,7 @@ export async function commitReceiptItem(
     const modCategory = guessModCategory(description) ?? "other-accessory";
     const modNotes = [
       forceReview ? "Currency could not be auto-converted - please check the amount" : null,
-      mileageWarning ? `⚠️ ${mileageWarning}` : null,
+      mileageWarning ? `⚠ ${mileageWarning}` : null,
     ].filter(Boolean).join(" - ");
     const aiDescription = buildAiDescription({ description, merchantName, address, city, categoryLabel: "Parts & Accessories" });
     const duplicate = findPossibleDuplicate(date, costGbp, modCandidates, description);
@@ -307,6 +324,7 @@ export async function commitReceiptItem(
       bikeId: bike.id, category: modCategory, name: description, cost: costGbp, mileage: mileage ?? bike.currentMileage, date,
       notes: modNotes, attachments: [attachment], needsReview: true, currencyConversion, mileageConfidence, aiDescription,
     });
+    if (mileageConfidence === undefined) await reestimateNearbyFuelLogs(email, bike);
     return { id: record.id, category: "mods", aiDescription, duplicate, name: description, modCategory, cost: costGbp, mileage: mileage ?? bike.currentMileage, mileageNeedsManualEntry, mileageWarningText: mileageNeedsManualEntry ? mileageWarning : undefined, mileageConflictReferenceId: conflictReferenceId, mileageConflictReferenceCategory: conflictReferenceCategory, mileageConflictReferenceBatchIndex: conflictReferenceBatchIndex, plateMismatch, vehicleMismatch, date, notes: modNotes, attachment };
   }
 
