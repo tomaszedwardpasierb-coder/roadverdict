@@ -347,7 +347,7 @@ export default async function DashboardPage() {
       {bills.length === 0 ? (
         <div className={styles.card}><p className={styles.cardBody}>No insurance, tax, or MOT payments logged yet.</p></div>
       ) : (
-        bills.map((b) => <BillCard key={b.id} bill={b} currency={currency} rates={rates} pendingReviewIds={pendingReviewIds} />)
+        bills.map((b) => <BillCard key={b.id} bill={b} currency={currency} rates={rates} pendingReviewIds={pendingReviewIds} distanceUnit={distanceUnit} />)
       )}
     </>
   );

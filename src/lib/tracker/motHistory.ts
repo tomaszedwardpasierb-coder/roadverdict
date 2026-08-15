@@ -4,6 +4,13 @@
 // into what this app actually needs - no Cosmos, no fetch, just data in,
 // data out. Keeps the VDG response's PascalCase/string-typed fields
 // isolated to this one file rather than leaking throughout the app.
+// pointsConflict is imported from mileageCheck.ts rather than duplicated -
+// that file is itself pure maths with zero dependencies of its own, so
+// this doesn't compromise this file's own "no Cosmos, no fetch" design.
+
+import { pointsConflict } from "./mileageCheck";
+
+const KM_TO_MILES = 0.621371;
 
 export interface RawMotTest {
   TestDate: string;
@@ -59,7 +66,7 @@ function dedupeSameDayRetests(tests: RawMotTest[]): RawMotTest[] {
 
 export function parseMotHistory(motDueDate: string | null, rawTests: RawMotTest[]): ParsedMotHistory {
   const deduped = dedupeSameDayRetests(rawTests ?? []);
-  const tests: ParsedMotTest[] = deduped
+  const firstPass: ParsedMotTest[] = deduped
     .map((t) => {
       // Only ever treat a confirmed DVSA reading as a real mileage anchor -
       // OdometerResultType can also be "UN-READABLE", meaning the figure
@@ -68,7 +75,14 @@ export function parseMotHistory(motDueDate: string | null, rawTests: RawMotTest[
       // the log for completeness.
       const mileageTrusted = t.OdometerResultType === "READ";
       const rawReading = Number(t.OdometerReading);
-      const mileage = mileageTrusted && Number.isFinite(rawReading) && rawReading > 0 ? Math.round(rawReading) : null;
+      // DVSA records most readings in miles, but OdometerUnit can genuinely
+      // say Kilometers (most likely on an imported vehicle) - converting
+      // here means every downstream anchor, chart, and comparison can keep
+      // assuming miles without needing to know this file's source data
+      // wasn't always in that unit to begin with.
+      const isKm = /kilomet|km/i.test(t.OdometerUnit ?? "");
+      const readingInMiles = isKm ? rawReading * KM_TO_MILES : rawReading;
+      const mileage = mileageTrusted && Number.isFinite(readingInMiles) && readingInMiles > 0 ? Math.round(readingInMiles) : null;
 
       const parts = [t.TestPassed ? "Passed" : "Failed"];
       const annotationText = summarizeAnnotations(t.AnnotationList);
@@ -84,6 +98,31 @@ export function parseMotHistory(motDueDate: string | null, rawTests: RawMotTest[
       };
     })
     .sort((a, b) => new Date(a.testDate).getTime() - new Date(b.testDate).getTime());
+
+  // Second pass: cross-check DVSA's own odometer sequence against itself,
+  // chronologically. A single "READ" result being internally inconsistent
+  // with an earlier or later READ result in the same MOT history is real,
+  // if rare - a tester mis-keying a figure, or a genuine odometer
+  // replacement between tests. Either way, a chronologically impossible
+  // reading shouldn't become a trusted mileage anchor just because DVSA
+  // itself marked it "READ" rather than "UN-READABLE" - the test result,
+  // pass/fail, and defects are kept regardless; only that specific
+  // mileage figure is excluded from being used as an anchor.
+  const accepted: { date: string; mileage: number }[] = [];
+  const tests: ParsedMotTest[] = firstPass.map((t) => {
+    if (t.mileage === null) return t;
+    const conflicts = accepted.some((a) => pointsConflict(t.mileage as number, t.testDate, a.mileage, a.date));
+    if (conflicts) {
+      return {
+        ...t,
+        mileage: null,
+        mileageTrusted: false,
+        notes: `${t.notes} - odometer reading conflicts with another MOT test in this bike's history, so not used as a mileage anchor`,
+      };
+    }
+    accepted.push({ date: t.testDate, mileage: t.mileage });
+    return t;
+  });
 
   return { motDueDate, tests };
 }

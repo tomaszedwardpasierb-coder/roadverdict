@@ -9,6 +9,7 @@ import { AttachmentUploader } from './AttachmentUploader';
 import { AttachmentThumb } from './AttachmentThumb';
 import type { Attachment } from '@/lib/tracker/cosmosHelpers';
 import { convertGbpToDisplay, convertDisplayToGbp, formatCurrency, CURRENCY_SYMBOLS, type Currency, type ExchangeRates } from '@/lib/tracker/currency';
+import { formatDistance, type DistanceUnit } from '@/lib/tracker/unitFormat';
 import { ReminderFields, type ReminderTriggerRow } from './ReminderFields';
 import type { ReminderTrigger } from '@/lib/tracker/reminder';
 import { useTabSwitch, goToNextReview, type ReviewCategory } from './TabSwitchContext';
@@ -23,11 +24,13 @@ export function BillCard({
   currency,
   rates,
   pendingReviewIds,
+  distanceUnit,
 }: {
   bill: BillDoc;
   currency: Currency;
   rates: ExchangeRates | null;
   pendingReviewIds: Record<ReviewCategory, string[]>;
+  distanceUnit: DistanceUnit;
 }) {
   const { switchTo, focusId, setFocusId, highlightIds } = useTabSwitch();
   const [isEditing, setIsEditing] = useState(false);
@@ -137,8 +140,8 @@ export function BillCard({
           </div>
           {bill.mileage != null && (
             <p className="field-note" style={{ marginTop: '0.6rem' }}>
-              DVSA-recorded mileage: <strong>{bill.mileage.toLocaleString()} mi</strong> - not editable here, since
-              it&apos;s a verified fact from the MOT test itself, not something entered by hand.
+              DVSA-recorded mileage: <strong>{formatDistance(bill.mileage, distanceUnit)}</strong> - not editable here,
+              since it&apos;s a verified fact from the MOT test itself, not something entered by hand.
             </p>
           )}
           <AttachmentUploader value={attachment} onChange={setAttachment} idSuffix={`-bill-${bill.id}`} compareValues={{ cost: convertDisplayToGbp(Number(costDisplay), currency, rates), date }} />
@@ -183,7 +186,7 @@ export function BillCard({
       </div>
       <div className={styles.jobCardMeta}>{fmtDate(bill.date)}</div>
       {bill.mileage != null && (
-        <div className={styles.jobCardMeta}>DVSA-recorded mileage: {bill.mileage.toLocaleString()} mi</div>
+        <div className={styles.jobCardMeta}>DVSA-recorded mileage: {formatDistance(bill.mileage, distanceUnit)}</div>
       )}
       {bill.currencyConversion && (
         <div className={styles.currencyConversionNote}>
