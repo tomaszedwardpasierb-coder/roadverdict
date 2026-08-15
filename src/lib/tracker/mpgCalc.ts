@@ -24,7 +24,7 @@ export interface MpgSegment {
   // inferred - the owner explicitly compared this reading against a
   // conflicting one and chose to keep both numbers exactly as logged,
   // rather than correct or delete either.
-  exclusionReason?: "unusual-gap" | "anomalous-value" | "anomalous-vs-lifetime" | "marked-anomaly";
+  exclusionReason?: "unusual-gap" | "anomalous-value" | "anomalous-vs-lifetime" | "marked-anomaly" | "far-below-manufacturer-figure";
 }
 
 export interface MpgCalcInput {
@@ -80,6 +80,14 @@ const EARLY_FALLBACK_DEVIATION_RATIO = 0.75;
 // number, so it resets the baseline immediately rather than waiting
 // for a second occurrence to confirm.
 const CONSECUTIVE_ANOMALIES_RESET_BASELINE = 2;
+// Deliberately generous, not a tight comparison - real-world MPG can
+// legitimately run well below a lab-tested manufacturer figure (cold
+// starts, load, riding style), so this only needs to catch something
+// clearly broken (a missed fill-up, a litres/units mistake), never
+// normal variation. Only ever consulted during the genuine blind
+// window below - the moment this rider has enough of their own
+// history, the adaptive checks above take over completely instead.
+const MANUFACTURER_MPG_FLOOR_RATIO = 0.4;
 
 function median(values: number[]): number {
   if (values.length === 0) return 0;
@@ -131,7 +139,7 @@ function isUnusuallyLargeGap(candidateMiles: number, baselineGaps: number[]): bo
 // that distance. Breaking the chain means neither the segment ending at
 // this fill-up nor the one starting from it gets computed; the next
 // verified full-tank fill-up simply starts a fresh chain.
-export function computeMPGSeries(fuelLogs: MpgCalcInput[]): MpgSegment[] {
+export function computeMPGSeries(fuelLogs: MpgCalcInput[], manufacturerMpg?: number): MpgSegment[] {
   const sorted = [...fuelLogs].sort((a, b) => a.mileage - b.mileage);
   const raw: { mileage: number; mpg: number; date: string; fuelLogId: string; miles: number; mileageAnomaly: boolean }[] = [];
   let litresSinceLastFull = 0;
@@ -250,6 +258,23 @@ export function computeMPGSeries(fuelLogs: MpgCalcInput[]): MpgSegment[] {
       }
     }
 
+    // The genuinely unguarded case: NEITHER a local nor a lifetime
+    // baseline exists yet - this bike's first couple of fill-ups ever,
+    // where nothing above has anything at all to compare against. The
+    // manufacturer's own figure is the only sanity check available at
+    // this point, so it's used here and nowhere else.
+    if (
+      !valueFlagged &&
+      inBlindWindow &&
+      lifetimeTrustedMpgs.length < MIN_VALID_SEGMENTS_FOR_BASELINE &&
+      manufacturerMpg &&
+      manufacturerMpg > 0 &&
+      seg.mpg < manufacturerMpg * MANUFACTURER_MPG_FLOOR_RATIO
+    ) {
+      valueFlagged = true;
+      exclusionReason = "far-below-manufacturer-figure";
+    }
+
     if (!valueFlagged) {
       validMpgsSoFar.push(seg.mpg);
       validGapsSoFar.push(seg.miles);
@@ -271,8 +296,8 @@ export function computeMPGSeries(fuelLogs: MpgCalcInput[]): MpgSegment[] {
 // Lifetime average deliberately excludes flagged segments - one missed
 // fill-up shouldn't get to drag the number every rider sees on their
 // dashboard away from what the bike is actually doing.
-export function computeActualMPG(fuelLogs: MpgCalcInput[]): number | null {
-  const segments = computeMPGSeries(fuelLogs).filter((s) => !s.likelyMissedFillUps);
+export function computeActualMPG(fuelLogs: MpgCalcInput[], manufacturerMpg?: number): number | null {
+  const segments = computeMPGSeries(fuelLogs, manufacturerMpg).filter((s) => !s.likelyMissedFillUps);
   if (segments.length === 0) return null;
   return segments.reduce((sum, s) => sum + s.mpg, 0) / segments.length;
 }

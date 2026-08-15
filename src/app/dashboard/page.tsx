@@ -117,8 +117,8 @@ export default async function DashboardPage() {
     mods: mods.filter((m) => m.needsReview).map((m) => m.id),
     bills: bills.filter((b) => b.needsReview).map((b) => b.id),
   };
-  const actualMpg = computeActualMPG(fuelLogs);
-  const mpgSeries = computeMPGSeries(fuelLogs);
+  const actualMpg = computeActualMPG(fuelLogs, bike.dvlaData?.officialCombinedMpg);
+  const mpgSeries = computeMPGSeries(fuelLogs, bike.dvlaData?.officialCombinedMpg);
   const mileagePoints = gatherMileagePoints(records, mods, fuelLogs, bills);
   const fuelCostPoints = fuelLogs.map((f) => ({ id: f.id, date: f.date, cost: f.cost, mileage: f.mileage }));
   const summary = computeSpendSummary(records, mods, fuelLogs, bills);

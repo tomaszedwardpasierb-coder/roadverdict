@@ -13,6 +13,7 @@ import { createBill, getBills } from "./bill";
 import { createReminder, deleteRemindersBySourceKey } from "./reminder";
 import { isBeforeProduction } from "./productionYearCheck";
 import { motReminderDate } from "./motHistory";
+import { reestimateFuelMileage } from "./reestimateFuelMileage";
 
 export interface MotImportResult {
   createdCount: number;
@@ -79,6 +80,19 @@ export async function importMotHistoryForBike(
       sourceKey,
     });
     reminderSet = true;
+  }
+
+  // Best-effort, non-blocking - new MOT anchors are exactly the case
+  // that motivated this: a real, trusted odometer reading landing months
+  // or years into an existing fuel-log timeline, right where several AI
+  // guesses were the only thing available before. A failure here should
+  // never undo an otherwise-successful MOT import.
+  if (created.length > 0) {
+    try {
+      await reestimateFuelMileage(email, bike);
+    } catch (err) {
+      console.error("Fuel mileage re-estimation after MOT import failed:", err);
+    }
   }
 
   return {
