@@ -11,6 +11,7 @@ import { formatDistance, type DistanceUnit } from '@/lib/tracker/unitFormat';
 import { TabSwitchProvider, type ReviewCategory } from './TabSwitchContext';
 import { ResetDemoButton } from './ResetDemoButton';
 import { DEMO_EMAIL } from '@/lib/tracker/demoSeed';
+import { Icon, type IconName } from './Icon';
 import styles from './dashboard.module.css';
 
 type Section = 'dashboard' | 'service' | 'fuel' | 'mods' | 'bills' | 'reminders' | 'reports' | 'shareLinks' | 'story';
@@ -20,31 +21,31 @@ function asReviewCategory(key: string): ReviewCategory | null {
   return (REVIEW_CATEGORIES as string[]).includes(key) ? (key as ReviewCategory) : null;
 }
 
-const NAV_ITEMS: { key: Section; label: string; icon: string }[] = [
-  { key: 'dashboard', label: 'Dashboard', icon: '/icons/dashboard.png' },
-  { key: 'service', label: 'Service', icon: '/icons/service.png' },
-  { key: 'fuel', label: 'Fuel', icon: '/icons/fuel.png' },
-  { key: 'mods', label: 'Parts & Accessories', icon: '/icons/parts.png' },
-  { key: 'bills', label: 'Tax & Insurance', icon: '/icons/tax-insurance.png' },
-  { key: 'reminders', label: 'Reminders', icon: '/icons/reminders.png' },
-  { key: 'reports', label: 'Reports', icon: '/icons/reports.png' },
-  { key: 'story', label: 'The Story So Far', icon: '/icons/story.png' },
-  { key: 'shareLinks', label: 'Shareable Links', icon: '/icons/share-links.png' },
+const NAV_ITEMS: { key: Section; label: string; icon: IconName }[] = [
+  { key: 'dashboard', label: 'Dashboard', icon: 'dashboard' },
+  { key: 'service', label: 'Service', icon: 'service' },
+  { key: 'fuel', label: 'Fuel', icon: 'fuel' },
+  { key: 'mods', label: 'Parts & Accessories', icon: 'mods' },
+  { key: 'bills', label: 'Tax & Insurance', icon: 'bills' },
+  { key: 'reminders', label: 'Reminders', icon: 'reminders' },
+  { key: 'reports', label: 'Reports', icon: 'reports' },
+  { key: 'story', label: 'The Story So Far', icon: 'story' },
+  { key: 'shareLinks', label: 'Shareable Links', icon: 'shareLinks' },
 ];
 
-const MOBILE_NAV_ITEMS: { key: Section; label: string; icon: string }[] = [
-  { key: 'dashboard', label: 'Dashboard', icon: '/icons/dashboard.png' },
-  { key: 'service', label: 'Service', icon: '/icons/service.png' },
-  { key: 'fuel', label: 'Fuel', icon: '/icons/fuel.png' },
-  { key: 'mods', label: 'Parts', icon: '/icons/parts.png' },
+const MOBILE_NAV_ITEMS: { key: Section; label: string; icon: IconName }[] = [
+  { key: 'dashboard', label: 'Dashboard', icon: 'dashboard' },
+  { key: 'service', label: 'Service', icon: 'service' },
+  { key: 'fuel', label: 'Fuel', icon: 'fuel' },
+  { key: 'mods', label: 'Parts', icon: 'mods' },
 ];
 
-const MORE_ITEMS: { key: Section; label: string; icon: string }[] = [
-  { key: 'bills', label: 'Tax & Insurance', icon: '/icons/tax-insurance.png' },
-  { key: 'reminders', label: 'Reminders', icon: '/icons/reminders.png' },
-  { key: 'reports', label: 'Reports', icon: '/icons/reports.png' },
-  { key: 'story', label: 'The Story So Far', icon: '/icons/story.png' },
-  { key: 'shareLinks', label: 'Shareable Links', icon: '/icons/share-links.png' },
+const MORE_ITEMS: { key: Section; label: string; icon: IconName }[] = [
+  { key: 'bills', label: 'Tax & Insurance', icon: 'bills' },
+  { key: 'reminders', label: 'Reminders', icon: 'reminders' },
+  { key: 'reports', label: 'Reports', icon: 'reports' },
+  { key: 'story', label: 'The Story So Far', icon: 'story' },
+  { key: 'shareLinks', label: 'Shareable Links', icon: 'shareLinks' },
 ];
 
 interface Props {
@@ -133,7 +134,7 @@ export function DashboardShell({
                   className={`${styles.sidebarNavItem} ${active === item.key ? styles.sidebarNavItemActive : ''}`}
                   onClick={() => setActive(item.key)}
                 >
-                  <img src={item.icon} alt="" className={styles.navIcon} />
+                  <Icon name={item.icon} className={styles.navIcon} />
                   <span>{item.label}</span>
                   {hasPending && <PendingDot />}
                 </button>
@@ -194,7 +195,7 @@ export function DashboardShell({
                   position: 'relative',
                 }}
               >
-                <img src={item.icon} alt="" className={styles.navIcon} />
+                <Icon name={item.icon} className={styles.navIcon} />
                 {item.label}
                 {hasPending && (
                   <span style={{ position: 'absolute', top: 0, right: '30%' }}>
@@ -241,7 +242,7 @@ export function DashboardShell({
                       setShowMore(false);
                     }}
                   >
-                    <img src={item.icon} alt="" className={styles.navIcon} /> {item.label}
+                    <Icon name={item.icon} className={styles.navIcon} /> {item.label}
                     {hasPending && <PendingDot />}
                   </button>
                 );

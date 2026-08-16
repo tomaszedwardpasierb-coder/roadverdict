@@ -582,10 +582,13 @@
 }
 .sidebarNavItemActive:hover { background: var(--asphalt-2); }
 
+/* width/height removed - was fixed at 26px for the old PNG icons and
+   would silently override the new Icon component's own size prop
+   (CSS wins over an SVG's size attribute for rendered dimensions),
+   so the two need to agree rather than fight. Icon's own default
+   (18px) is now the single source of truth; object-fit is a no-op on
+   an SVG component and was only ever relevant for the old <img> tags. */
 .navIcon {
-  width: 26px;
-  height: 26px;
-  object-fit: contain;
   vertical-align: middle;
   flex-shrink: 0;
 }
