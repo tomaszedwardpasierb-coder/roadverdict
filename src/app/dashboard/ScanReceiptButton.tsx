@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { ReviewQueueModal } from './ReviewQueueModal';
 import type { ParsedReceiptItem } from '@/lib/tracker/receiptParse';
 import { classifyReceiptTier, receiptTierSortWeight } from '@/lib/tracker/receiptTiering';
+import { Icon } from './Icon';
 import styles from './dashboard.module.css';
 
 interface FileParseOutcome {
@@ -186,7 +187,7 @@ export function ScanReceiptButton() {
         </div>
       )}
       <button type="button" className={styles.scanReceiptBtn} onClick={() => setOpen((o) => !o)}>
-        <span aria-hidden="true">🧠</span> Scan a receipt
+        <Icon name="camera" size={18} /> Scan a receipt
       </button>
       <p className={styles.scanReceiptCaption}>Turn a shoebox of receipts into a proper history, in minutes, not hours.</p>
       {open && (
