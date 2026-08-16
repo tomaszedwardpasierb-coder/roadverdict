@@ -11,10 +11,26 @@ interface StoryResponse {
   verdict: { tier: string; label: string; reasons: string[] };
 }
 
-export function StorySoFarTab() {
+interface Props {
+  bikeNickname?: string;
+  registration?: string;
+}
+
+export function StorySoFarTab({ bikeNickname, registration }: Props) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [story, setStory] = useState<StoryResponse | null>(null);
+
+  // Same tag shown next to every other tab's page title - built the
+  // same way page.tsx builds it, since this component doesn't have
+  // direct access to the bike doc itself, only what's passed in.
+  const bikeTag = (bikeNickname || registration) ? (
+    <span className={styles.headingBikeTag}>
+      {bikeNickname}
+      {bikeNickname && registration && " · "}
+      {registration}
+    </span>
+  ) : null;
 
   async function handleGenerate() {
     setLoading(true);
@@ -37,8 +53,8 @@ export function StorySoFarTab() {
   if (!story) {
     return (
       <div className={styles.storyIntro}>
-        <h1 className={styles.storyTitle}>The Story So Far</h1>
-        <p className={styles.storyText}>
+        <h1 className={styles.heading}>The Story So Far{bikeTag}</h1>
+        <p className={styles.subtext}>
           What your logged history says about this bike - where it&apos;s strong, where a bit more logging would
           strengthen it, and the same story you can hand a buyer when you&apos;re ready to sell, backed by real dates
           and receipts, not just your word.
@@ -53,7 +69,7 @@ export function StorySoFarTab() {
 
   return (
     <div className={styles.storyIntro}>
-      <h1 className={styles.storyTitle}>The Story So Far</h1>
+      <h1 className={styles.heading}>The Story So Far{bikeTag}</h1>
       <p className={styles.subtext} style={{ marginBottom: '1.2rem' }}>
         Documentation: <strong>{story.verdict.label}</strong>
       </p>

@@ -10,6 +10,7 @@ import { MileageWarning } from './MileageWarning';
 import { AttachmentUploader } from './AttachmentUploader';
 import { isBeforeProduction } from '@/lib/tracker/productionYearCheck';
 import type { Attachment } from '@/lib/tracker/cosmosHelpers';
+import styles from './dashboard.module.css';
 
 export function LogFuelForm({
   initialMileage,
@@ -111,7 +112,7 @@ export function LogFuelForm({
       </div>
       <hr className="ticket__divider" />
       <div className="ticket__section">
-        <button className="submit-button" type="submit" disabled={submitting || isBlocked}>
+        <button className={styles.scanReceiptBtn} type="submit" disabled={submitting || isBlocked}>
           {submitting ? 'Logging…' : 'Log it'}
         </button>
         {error && <p className="error-text" role="alert">{error}</p>}

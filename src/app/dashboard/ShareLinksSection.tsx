@@ -223,9 +223,11 @@ interface Props {
   bikeNames: Record<string, string>;
   appUrl: string;
   requests: ReceiptRequestDocView[];
+  bikeNickname?: string;
+  registration?: string;
 }
 
-export function ShareLinksSection({ links, bikeNames, appUrl, requests }: Props) {
+export function ShareLinksSection({ links, bikeNames, appUrl, requests, bikeNickname, registration }: Props) {
   const [tab, setTab] = useState<SubTab>('links');
   const pendingCount = requests.length;
 
@@ -234,9 +236,21 @@ export function ShareLinksSection({ links, bikeNames, appUrl, requests }: Props)
   // rather than leaving the person looking at a now-hidden tab.
   const activeTab: SubTab = tab === 'requests' && pendingCount === 0 ? 'links' : tab;
 
+  // Same tag shown next to every other tab's page title. This page can
+  // list links across more than one bike (bikeNames covers that per
+  // link below), but the header itself follows the same
+  // currently-active-bike convention every other tab uses.
+  const bikeTag = (bikeNickname || registration) ? (
+    <span className={styles.headingBikeTag}>
+      {bikeNickname}
+      {bikeNickname && registration && " · "}
+      {registration}
+    </span>
+  ) : null;
+
   return (
     <>
-      <h1 className={styles.heading}>Shareable Links</h1>
+      <h1 className={styles.heading}>Shareable Links{bikeTag}</h1>
       <p className={styles.subtext} style={{ marginBottom: '1rem' }}>
         Every link you&apos;ve created, and everything it&apos;s proven. Generate a new one any time you&apos;re
         ready to show what this bike&apos;s really worth, and review any requests to see a receipt that have come

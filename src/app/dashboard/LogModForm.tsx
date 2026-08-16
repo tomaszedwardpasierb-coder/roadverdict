@@ -13,6 +13,7 @@ import { ModSearchAutocomplete } from './ModSearchAutocomplete';
 import { isBackdated, backdateNotice } from '@/lib/tracker/backdateCheck';
 import { isBeforeProduction } from '@/lib/tracker/productionYearCheck';
 import type { Attachment } from '@/lib/tracker/cosmosHelpers';
+import styles from './dashboard.module.css';
 
 export function LogModForm({
   initialMileage,
@@ -165,7 +166,7 @@ export function LogModForm({
       </div>
       <hr className="ticket__divider" />
       <div className="ticket__section">
-        <button className="submit-button" type="submit" disabled={submitting || isBlocked}>
+        <button className={styles.scanReceiptBtn} type="submit" disabled={submitting || isBlocked}>
           {submitting ? 'Logging…' : 'Log it'}
         </button>
         {error && <p className="error-text" role="alert">{error}</p>}
