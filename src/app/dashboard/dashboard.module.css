@@ -536,8 +536,9 @@
 .sidebar {
   width: 260px;
   flex-shrink: 0;
-  background: var(--paper);
-  border-right: 1px solid var(--border);
+  background: var(--asphalt);
+  color: rgba(255, 255, 255, 0.92);
+  border-right: 1px solid rgba(255, 255, 255, 0.08);
   display: flex;
   flex-direction: column;
   padding: 1.5rem 1.2rem;
@@ -547,21 +548,32 @@
   overflow-y: auto;
 }
 
-.sidebarLogo { margin-bottom: 2rem; }
-.sidebarLogo img { width: 140px; display: block; }
+.sidebarLogo { margin-bottom: 2rem; text-align: center; }
+/* Forces the mark to render as a clean white silhouette regardless of
+   its original colour - a real white-logo asset would be the more
+   correct long-term fix if one already exists in the codebase, but
+   this guarantees visibility against the new dark sidebar right now
+   rather than leaving a dark mark invisible on a dark background. */
+.sidebarLogo img { width: 140px; display: block; margin: 0 auto; filter: brightness(0) invert(1); }
 
 .sidebarNav { display: flex; flex-direction: column; gap: 0.2rem; flex: 1; }
 
 .sidebarNavItem {
   display: flex; align-items: center; gap: 0.7rem;
-  padding: 0.65rem 0.8rem; border-radius: 6px;
+  padding: 0.65rem 0.8rem; border-radius: var(--radius-sm);
   font-family: var(--font-display); font-size: 0.9rem;
-  color: var(--ink); background: none; border: none;
+  color: rgba(255, 255, 255, 0.82); background: none; border: none;
+  border-left: 3px solid transparent;
   text-align: left; cursor: pointer; width: 100%;
 }
-.sidebarNavItem:hover { background: var(--stone); }
-.sidebarNavItemActive { background: var(--amber); color: var(--asphalt); font-weight: 600; }
-.sidebarNavItemActive:hover { background: var(--amber); }
+.sidebarNavItem:hover { background: var(--asphalt-2); }
+.sidebarNavItemActive {
+  background: var(--asphalt-2);
+  color: var(--amber);
+  font-weight: 600;
+  border-left: 3px solid var(--amber);
+}
+.sidebarNavItemActive:hover { background: var(--asphalt-2); }
 
 .navIcon {
   width: 26px;
@@ -571,10 +583,10 @@
   flex-shrink: 0;
 }
 
-.sidebarBikeCard { border-top: 1px solid var(--border); padding-top: 1rem; margin-top: 1rem; font-size: 0.85rem; position: relative; }
-.sidebarBikeLabel { font-family: var(--font-mono); font-size: 0.65rem; text-transform: uppercase; color: var(--ink-soft); margin-bottom: 0.3rem; }
+.sidebarBikeCard { border-top: 1px solid rgba(255, 255, 255, 0.12); padding-top: 1rem; margin-top: 1rem; font-size: 0.85rem; position: relative; }
+.sidebarBikeLabel { font-family: var(--font-mono); font-size: 0.65rem; text-transform: uppercase; color: rgba(255, 255, 255, 0.5); margin-bottom: 0.3rem; }
 .sidebarBikeName { font-weight: 600; }
-.sidebarBikeMeta { color: var(--ink-soft); font-size: 0.8rem; margin-bottom: 0.6rem; }
+.sidebarBikeMeta { color: rgba(255, 255, 255, 0.55); font-size: 0.8rem; margin-bottom: 0.6rem; }
 .bikeSwitcherTrigger { display: block; width: 100%; text-align: left; background: none; border: none; padding: 0; cursor: pointer; font-family: inherit; color: inherit; }
 .bikeSwitcherDropdown { position: absolute; left: 0; right: 0; top: 100%; margin-top: 0.4rem; background: var(--paper); border: 1px solid var(--line); border-radius: var(--radius-md); box-shadow: var(--shadow-pop); z-index: 20; overflow: hidden; }
 .bikeSwitcherRow { display: block; width: 100%; text-align: left; background: none; border: none; border-bottom: 1px solid var(--border); padding: 0.55rem 0.7rem; font-size: 0.82rem; cursor: pointer; color: var(--ink); }
@@ -587,9 +599,29 @@
 .bikeSwitcherManageLinkInline { display: inline-block; font-size: 0.78rem; color: var(--amber-ink); text-decoration: none; }
 .bikeSwitcherManageLinkInline:hover { text-decoration: underline; }
 
-.sidebarUserFooter { border-top: 1px solid var(--border); padding-top: 1rem; margin-top: 1rem; display: flex; align-items: center; gap: 0.6rem; }
-.sidebarUserAvatar { width: 28px; height: 28px; border-radius: 50%; background: var(--asphalt); color: var(--paper); display: flex; align-items: center; justify-content: center; font-size: 0.7rem; font-weight: 600; flex-shrink: 0; }
-.sidebarUserEmail { font-size: 0.75rem; color: var(--ink-soft); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sidebarUserFooter { border-top: 1px solid rgba(255, 255, 255, 0.12); padding-top: 1rem; margin-top: 1rem; display: flex; align-items: center; gap: 0.6rem; }
+.sidebarUserAvatar { width: 28px; height: 28px; border-radius: 50%; background: var(--amber); color: var(--asphalt); display: flex; align-items: center; justify-content: center; font-size: 0.7rem; font-weight: 600; flex-shrink: 0; }
+.sidebarUserEmail { font-size: 0.75rem; color: rgba(255, 255, 255, 0.55); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Scoped overrides for the shared button styles when they render inside
+   the dark sidebar (mileage/refresh/logout/reset buttons) - covers both
+   possible class conventions those buttons use (styles.iconBtn is
+   module-scoped so this rule matches it directly within this same
+   stylesheet; "submit-button" is the plain global class some of them
+   use instead) rather than guessing which one applies to which button.
+   Harmless no-op for whichever one doesn't actually match. */
+.sidebar .iconBtn,
+.sidebar :global(.submit-button) {
+  border-color: rgba(255, 255, 255, 0.25);
+  color: rgba(255, 255, 255, 0.85);
+  background: transparent;
+}
+.sidebar .iconBtn:hover:not(:disabled),
+.sidebar :global(.submit-button):hover:not(:disabled) {
+  border-color: var(--amber);
+  color: var(--amber);
+  background: var(--asphalt-2);
+}
 
 /* Content area - deliberately NO max-width, fills whatever space the sidebar doesn't take */
 .content { flex: 1; min-width: 0; padding: 2.5rem 3rem 4rem; }
