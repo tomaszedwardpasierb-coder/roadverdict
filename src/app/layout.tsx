@@ -1,19 +1,20 @@
 // Place at: src/app/layout.tsx
 import type { Metadata } from 'next';
-import { Oswald, IBM_Plex_Sans, IBM_Plex_Mono } from 'next/font/google';
+import { Big_Shoulders_Display, Inter, IBM_Plex_Mono } from 'next/font/google';
 import Link from 'next/link';
 import { cookies } from 'next/headers';
 import { getAdminSession } from '@/lib/admin/session';
 import { ImpersonationBanner } from './ImpersonationBanner';
 import './globals.css';
-const oswald = Oswald({
+const bigShouldersDisplay = Big_Shoulders_Display({
   subsets: ['latin'],
+  weight: ['600', '700', '800'],
   variable: '--font-display',
   display: 'swap',
 });
-const plexSans = IBM_Plex_Sans({
+const inter = Inter({
   subsets: ['latin'],
-  weight: ['400', '500'],
+  weight: ['400', '500', '600', '700'],
   variable: '--font-body',
   display: 'swap',
 });
@@ -40,9 +41,8 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   // own to display or act on anything.
   const isAdmin = impersonatingEmail ? await getAdminSession() : false;
   const showImpersonationBanner = isAdmin && !!impersonatingEmail;
-
   return (
-    <html lang="en" className={`${oswald.variable} ${plexSans.variable} ${plexMono.variable}`}>
+    <html lang="en" className={`${bigShouldersDisplay.variable} ${inter.variable} ${plexMono.variable}`}>
       <body>
         {showImpersonationBanner && <ImpersonationBanner email={impersonatingEmail!} />}
         <header className="site-header">
