@@ -9,7 +9,7 @@ import { formatDistance, formatFuelEconomy, type FuelEconomyUnit, type DistanceU
 import { formatCurrency, type Currency, type ExchangeRates } from '@/lib/tracker/currency';
 import { useChartTypePreference } from './useChartTypePreference';
 import { ChartTypeToggle } from './ChartTypeToggle';
-import { barGradient, BAR_BORDER_RADIUS } from './chartStyle';
+import { barGradient, BAR_BORDER_RADIUS, lineAreaGradient, lastPointRadius, lastPointRing, lastPointRingWidth, dashedValueAxis, plainCategoryAxis } from './chartStyle';
 import { useChartFilter } from './ChartFilterContext';
 import { useTabSwitch, viewRecords } from './TabSwitchContext';
 import styles from './dashboard.module.css';
@@ -19,7 +19,8 @@ ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, BarEleme
 const CHART_ID = 'mpg';
 const LITRES_PER_UK_GALLON = 4.546;
 const KM_PER_MILE = 1.60934;
-const EXCLUDED_COLOR = '#b5432e'; // matches --verdict-red
+const EXCLUDED_COLOR = '#C1483A'; // matches --verdict-red / --red
+const MPG_COLOR = '#EE9A2E'; // matches --amber
 
 function convertMpgValue(mpg: number, unit: FuelEconomyUnit): number {
   if (unit === 'l100km') {
@@ -141,7 +142,7 @@ export function MpgChart({
                 label: fuelEconomyUnit === 'l100km' ? 'L/100km' : 'MPG',
                 data: allValues,
                 backgroundColor: (context: ScriptableContext<'bar'>) =>
-                  filtered[context.dataIndex]?.likelyMissedFillUps ? EXCLUDED_COLOR : barGradient('#e8a33d')(context),
+                  filtered[context.dataIndex]?.likelyMissedFillUps ? EXCLUDED_COLOR : barGradient(MPG_COLOR)(context),
                 borderRadius: BAR_BORDER_RADIUS,
               },
             ],
@@ -152,8 +153,8 @@ export function MpgChart({
               tooltip: { callbacks: { label: (ctx) => tooltipLabel(ctx.dataIndex, ctx.parsed.y) } },
             },
             scales: {
-              y: { title: { display: true, text: yLabel }, grid: { color: '#00000012' } },
-              x: { grid: { display: false } },
+              y: dashedValueAxis({ title: { display: true, text: yLabel } }),
+              x: plainCategoryAxis(),
             },
             onClick: (_evt, elements) => handlePointClick(elements),
             onHover: handleHover,
@@ -168,14 +169,24 @@ export function MpgChart({
               {
                 label: fuelEconomyUnit === 'l100km' ? 'L/100km' : 'MPG',
                 data: allValues,
-                borderColor: '#e8a33d',
-                backgroundColor: 'transparent',
-                borderWidth: 1.25,
+                borderColor: MPG_COLOR,
+                backgroundColor: lineAreaGradient(MPG_COLOR),
+                borderWidth: 2.4,
+                borderCapStyle: 'round',
+                borderJoinStyle: 'round',
                 tension: 0.25,
-                fill: false,
-                pointRadius: 2,
+                fill: true,
+                // Every real point gets a small dot; only the most recent
+                // one renders larger with a white ring, so the chart reads
+                // as "you are here" rather than a static trend. This is
+                // layered on TOP of the existing exclusion colouring below
+                // (pointBackgroundColor is untouched) - the ring is the
+                // point's border, not its fill, so the two never conflict.
+                pointRadius: lastPointRadius(2, 5),
+                pointBorderColor: lastPointRing(MPG_COLOR),
+                pointBorderWidth: lastPointRingWidth(0, 2),
                 pointBackgroundColor: (ctx: ScriptableContext<'line'>) =>
-                  filtered[ctx.dataIndex]?.likelyMissedFillUps ? EXCLUDED_COLOR : '#e8a33d',
+                  filtered[ctx.dataIndex]?.likelyMissedFillUps ? EXCLUDED_COLOR : MPG_COLOR,
                 // One continuous line across the whole range now, rather
                 // than two separate series with a bare gap between them -
                 // the segment styling below is what shows an excluded
@@ -202,8 +213,8 @@ export function MpgChart({
               tooltip: { callbacks: { label: (ctx) => tooltipLabel(ctx.dataIndex, ctx.parsed.y) } },
             },
             scales: {
-              y: { title: { display: true, text: yLabel }, grid: { color: '#00000012' } },
-              x: { grid: { display: false } },
+              y: dashedValueAxis({ title: { display: true, text: yLabel } }),
+              x: plainCategoryAxis(),
             },
             onClick: (_evt, elements) => handlePointClick(elements),
             onHover: handleHover,

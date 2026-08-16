@@ -8,7 +8,7 @@ import { convertGbpToDisplay, CURRENCY_SYMBOLS, type Currency, type ExchangeRate
 import { formatDistance, type DistanceUnit } from '@/lib/tracker/unitFormat';
 import { useChartTypePreference } from './useChartTypePreference';
 import { ChartTypeToggle } from './ChartTypeToggle';
-import { barGradient, BAR_BORDER_RADIUS } from './chartStyle';
+import { barGradient, BAR_BORDER_RADIUS, lineAreaGradient, lastPointRadius, lastPointRing, lastPointRingWidth, dashedValueAxis, plainCategoryAxis } from './chartStyle';
 import { useChartFilter } from './ChartFilterContext';
 import { useTabSwitch, viewRecords } from './TabSwitchContext';
 import styles from './dashboard.module.css';
@@ -16,6 +16,7 @@ import styles from './dashboard.module.css';
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, BarElement, Tooltip, Legend);
 
 const CHART_ID = 'fuel-cost';
+const FUEL_COLOR = '#21815A'; // matches --green - fixed colour-per-metric mapping, fuel is always green
 
 interface FuelPoint {
   id: string;
@@ -76,7 +77,7 @@ export function FuelCostChart({
         <Bar
           data={{
             labels,
-            datasets: [{ label: `Fuel cost per fill-up (${symbol})`, data: dataValues, backgroundColor: barGradient('#3d8b6f'), borderRadius: BAR_BORDER_RADIUS }],
+            datasets: [{ label: `Fuel cost per fill-up (${symbol})`, data: dataValues, backgroundColor: barGradient(FUEL_COLOR), borderRadius: BAR_BORDER_RADIUS }],
           }}
           options={{
             plugins: {
@@ -84,8 +85,8 @@ export function FuelCostChart({
               tooltip: { callbacks: { label: (ctx) => `${symbol}${(ctx.parsed.y as number).toFixed(2)}` } },
             },
             scales: {
-              y: { grid: { color: '#00000012' }, ticks: { callback: (value) => `${symbol}${value}` } },
-              x: { grid: { display: false } },
+              y: dashedValueAxis({ ticks: { callback: (value: number | string) => `${symbol}${value}` } }),
+              x: plainCategoryAxis(),
             },
             onClick: (_evt, elements) => handlePointClick(elements),
             onHover: handleHover,
@@ -100,13 +101,17 @@ export function FuelCostChart({
               {
                 label: `Fuel cost per fill-up (${symbol})`,
                 data: dataValues,
-                borderColor: '#3d8b6f',
-                backgroundColor: 'transparent',
-                borderWidth: 1.25,
+                borderColor: FUEL_COLOR,
+                backgroundColor: lineAreaGradient(FUEL_COLOR),
+                borderWidth: 2.4,
+                borderCapStyle: 'round',
+                borderJoinStyle: 'round',
                 tension: 0.3,
-                fill: false,
-                pointRadius: 2,
-                pointBackgroundColor: '#3d8b6f',
+                fill: true,
+                pointRadius: lastPointRadius(2, 5),
+                pointBorderColor: lastPointRing(FUEL_COLOR),
+                pointBorderWidth: lastPointRingWidth(0, 2),
+                pointBackgroundColor: FUEL_COLOR,
               },
             ],
           }}
@@ -116,8 +121,8 @@ export function FuelCostChart({
               tooltip: { callbacks: { label: (ctx) => `${symbol}${(ctx.parsed.y as number).toFixed(2)}` } },
             },
             scales: {
-              y: { grid: { color: '#00000012' }, ticks: { callback: (value) => `${symbol}${value}` } },
-              x: { grid: { display: false } },
+              y: dashedValueAxis({ ticks: { callback: (value: number | string) => `${symbol}${value}` } }),
+              x: plainCategoryAxis(),
             },
             onClick: (_evt, elements) => handlePointClick(elements),
             onHover: handleHover,

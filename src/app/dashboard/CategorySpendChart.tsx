@@ -9,7 +9,7 @@ import { convertGbpToDisplay, CURRENCY_SYMBOLS, type Currency, type ExchangeRate
 import { convertMilesToDisplay, distanceUnitLabel, type DistanceUnit } from '@/lib/tracker/unitFormat';
 import { useChartTypePreference } from './useChartTypePreference';
 import { ChartTypeToggle } from './ChartTypeToggle';
-import { barGradient, BAR_BORDER_RADIUS } from './chartStyle';
+import { barGradient, BAR_BORDER_RADIUS, lineAreaGradient, lastPointRadius, lastPointRing, lastPointRingWidth, dashedValueAxis, plainCategoryAxis } from './chartStyle';
 import { useChartFilter } from './ChartFilterContext';
 import { useTabSwitch, viewRecords, type ReviewCategory } from './TabSwitchContext';
 import styles from './dashboard.module.css';
@@ -114,11 +114,15 @@ export function CategorySpendChart({
               {
                 data: dataValues,
                 borderColor: color,
-                backgroundColor: 'transparent',
-                borderWidth: 1.25,
+                backgroundColor: lineAreaGradient(color),
+                borderWidth: 2.4,
+                borderCapStyle: 'round',
+                borderJoinStyle: 'round',
                 tension: 0.25,
-                fill: false,
-                pointRadius: 2,
+                fill: true,
+                pointRadius: lastPointRadius(2, 5),
+                pointBorderColor: lastPointRing(color),
+                pointBorderWidth: lastPointRingWidth(0, 2),
                 pointBackgroundColor: color,
               },
             ],
@@ -130,8 +134,8 @@ export function CategorySpendChart({
               tooltip: { callbacks: { label: (ctx) => `${symbol}${Math.round(ctx.parsed.y as number)}` } },
             },
             scales: {
-              x: { grid: { display: false }, ticks: { font: { size: 10 } } },
-              y: { grid: { color: '#00000012' }, ticks: { font: { size: 10 }, callback: (value) => `${symbol}${value}` } },
+              x: plainCategoryAxis(),
+              y: dashedValueAxis({ ticks: { callback: (value: number | string) => `${symbol}${value}` } }),
             },
             onClick: (_evt, elements) => handleBarClick(elements),
             onHover: handleHover,
@@ -150,8 +154,8 @@ export function CategorySpendChart({
               tooltip: { callbacks: { label: (ctx) => `${symbol}${Math.round(ctx.parsed.y as number)}` } },
             },
             scales: {
-              x: { grid: { display: false }, ticks: { font: { size: 10 } } },
-              y: { grid: { color: '#00000012' }, ticks: { font: { size: 10 }, callback: (value) => `${symbol}${value}` } },
+              x: plainCategoryAxis(),
+              y: dashedValueAxis({ ticks: { callback: (value: number | string) => `${symbol}${value}` } }),
             },
             onClick: (_evt, elements) => handleBarClick(elements),
             onHover: handleHover,

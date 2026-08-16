@@ -403,7 +403,7 @@ export default async function DashboardPage() {
         </div>
         <div className={styles.chartCard}>
           {records.length > 0 ? (
-            <CategorySpendChart chartId="servicing-spend" title="Servicing spend over time" items={records} category="service" color="#1a1a1a" currency={currency} rates={rates} distanceUnit={distanceUnit} initialChartType={bike.chartTypes?.["servicing-spend"] === "line" ? "line" : "bar"} />
+            <CategorySpendChart chartId="servicing-spend" title="Servicing spend over time" items={records} category="service" color="#1C1D20" currency={currency} rates={rates} distanceUnit={distanceUnit} initialChartType={bike.chartTypes?.["servicing-spend"] === "line" ? "line" : "bar"} />
           ) : (
             <>
               <div className={styles.chartCardTitle}>Servicing spend over time</div>
@@ -413,7 +413,7 @@ export default async function DashboardPage() {
         </div>
         <div className={styles.chartCard}>
           {mods.length > 0 ? (
-            <CategorySpendChart chartId="mods-spend" title="Parts & Accessories spend over time" items={mods} category="mods" color="#e8a33d" currency={currency} rates={rates} distanceUnit={distanceUnit} initialChartType={bike.chartTypes?.["mods-spend"] === "line" ? "line" : "bar"} />
+            <CategorySpendChart chartId="mods-spend" title="Parts & Accessories spend over time" items={mods} category="mods" color="#EE9A2E" currency={currency} rates={rates} distanceUnit={distanceUnit} initialChartType={bike.chartTypes?.["mods-spend"] === "line" ? "line" : "bar"} />
           ) : (
             <>
               <div className={styles.chartCardTitle}>Parts & Accessories spend over time</div>
@@ -423,7 +423,7 @@ export default async function DashboardPage() {
         </div>
         <div className={styles.chartCard}>
           {bills.length > 0 ? (
-            <CategorySpendChart chartId="bills-spend" title="Insurance, tax & MOT spend over time" items={bills} category="bills" color="#6b5b95" currency={currency} rates={rates} distanceUnit={distanceUnit} supportsMileageView={false} initialChartType={bike.chartTypes?.["bills-spend"] === "line" ? "line" : "bar"} />
+            <CategorySpendChart chartId="bills-spend" title="Insurance, tax & MOT spend over time" items={bills} category="bills" color="#8A867D" currency={currency} rates={rates} distanceUnit={distanceUnit} supportsMileageView={false} initialChartType={bike.chartTypes?.["bills-spend"] === "line" ? "line" : "bar"} />
           ) : (
             <>
               <div className={styles.chartCardTitle}>Insurance, tax & MOT spend over time</div>
