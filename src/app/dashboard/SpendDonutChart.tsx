@@ -1,7 +1,6 @@
 // Place at: src/app/dashboard/SpendDonutChart.tsx
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
 import { Doughnut, Bar } from 'react-chartjs-2';
 import { Chart as ChartJS, ArcElement, BarElement, CategoryScale, LinearScale, Tooltip, Legend } from 'chart.js';
 import { convertGbpToDisplay, CURRENCY_SYMBOLS, type Currency, type ExchangeRates } from '@/lib/tracker/currency';
@@ -22,30 +21,16 @@ const CHART_ID = 'spend-donut';
 const COLORS = ['#1C1D20', '#EE9A2E', '#21815A', '#8A867D'];
 const LABELS = ['Servicing & repairs', 'Modifications', 'Fuel', 'Insurance/tax/MOT'];
 const DONUT_CUTOUT = '68%';
-
-// Reads the donut ring's true centre point from Chart.js's own arc
-// geometry, the same source of truth as before - but rather than
-// drawing text directly on the canvas (ctx.fillText can drift from the
-// visible ring under DPI/coordinate-space quirks that are hard to
-// diagnose from outside the browser), this only ever captures a pixel
-// position into React state. The actual text is a normal HTML element
-// positioned with that value, sidestepping canvas text rendering
-// entirely rather than trying to patch around it.
-function makeCenterCapturePlugin(onCenter: (pos: { x: number; y: number }) => void) {
-  return {
-    id: 'donutCenterCapture',
-    afterDraw(chart: ChartJS) {
-      const meta = chart.getDatasetMeta(0);
-      const arc = meta.data[0] as unknown as { getCenterPoint?: () => { x: number; y: number } };
-      const center = arc?.getCenterPoint?.();
-      if (!center) return;
-      // Deferred to the next frame - calling setState synchronously
-      // from inside Chart.js's own draw cycle risks updating React
-      // state mid-render, which this avoids entirely.
-      requestAnimationFrame(() => onCenter({ x: center.x, y: center.y }));
-    },
-  };
-}
+// Fixed box size matching the reference design exactly (132px, ~68%
+// cutout) - the legend used to be drawn by Chart.js inside the same
+// canvas as the ring, which meant the ring's true centre shifted left
+// or right depending on how much horizontal space the legend text
+// happened to need, and had to be re-measured after every draw to keep
+// the centre total lined up with it. Rendering the legend as plain
+// HTML next to a fixed-size canvas removes that dependency entirely:
+// the ring is now always dead-centre of its own box, so the total can
+// be centred with plain CSS instead of tracked in JS.
+const DONUT_BOX_SIZE = 132;
 
 interface CostItem {
   date: string;
@@ -76,32 +61,6 @@ export function SpendDonutChart({ records, mods, fuelLogs, bills, currency, rate
   const { range } = useChartFilter();
   const { kind, changeKind } = useChartTypePreference(CHART_ID, initialChartType ?? 'pie');
   const symbol = CURRENCY_SYMBOLS[currency];
-  const [centerPos, setCenterPos] = useState<{ x: number; y: number } | null>(null);
-  // Memoized so the plugin instance is stable across renders - passing a
-  // brand-new plugin object into Chart.js's plugins array every render
-  // would make it think the plugin itself changed, not just re-run it.
-  const centerCapturePlugin = useMemo(() => makeCenterCapturePlugin(setCenterPos), []);
-  const chartRef = useRef<ChartJS<'doughnut', number[], string> | null>(null);
-
-  // Clears any position captured by a previous mount of this chart (e.g.
-  // switching to the bar view and back) so a stale coordinate never
-  // flashes before the fresh one arrives. Chart.js also lays out the
-  // legend - and therefore how much room is left for the ring - using
-  // whatever font metrics are available the moment it first draws; if
-  // the web font hasn't finished loading yet, that first pass uses a
-  // fallback font's slightly different text width, and Chart.js never
-  // re-measures on its own once the real font arrives, it only redraws
-  // when update()/resize() is actually called. Forcing one update()
-  // once fonts are confirmed ready makes it redo that layout pass (and
-  // re-fire the centre-capture plugin below) against the real, final
-  // metrics rather than the fallback-font estimate.
-  useEffect(() => {
-    setCenterPos(null);
-    if (kind === 'bar') return;
-    document.fonts?.ready?.then(() => {
-      chartRef.current?.update();
-    });
-  }, [kind]);
 
   const servicingTotal = sumCost(filterByDateRange(records, range));
   const modsTotal = sumCost(filterByDateRange(mods, range));
@@ -147,87 +106,72 @@ export function SpendDonutChart({ records, mods, fuelLogs, bills, currency, rate
               }}
             />
           ) : (
-            <>
-              <Doughnut
-              ref={chartRef}
-              data={{
-                // No border/stroke between segments per the design
-                // system - flat fill colours, no gaps.
-                labels: LABELS,
-                datasets: [{ data: values, backgroundColor: COLORS, borderWidth: 0 }],
-              }}
-              plugins={[centerCapturePlugin]}
-              options={{
-                cutout: DONUT_CUTOUT,
-                plugins: {
-                  legend: {
-                    position: 'right',
-                    labels: {
-                      boxWidth: 10,
-                      boxHeight: 10,
-                      padding: 14,
-                      font: { size: 11, family: "'IBM Plex Sans', system-ui, sans-serif" },
-                      // Chart.js's default legend only shows the label -
-                      // the design system wants the value alongside it,
-                      // in mono, so this overrides the generated text
-                      // per entry rather than replacing the legend
-                      // entirely.
-                      generateLabels: (chart) => {
-                        const data = chart.data;
-                        return (data.labels ?? []).map((label, i) => {
-                          const val = (data.datasets[0].data[i] as number) ?? 0;
-                          return {
-                            text: `${label}  ${symbol}${Math.round(val)}`,
-                            fillStyle: COLORS[i],
-                            strokeStyle: COLORS[i],
-                            fontColor: '#54555A',
-                            index: i,
-                          };
-                        });
-                      },
+            <div style={{ display: 'flex', alignItems: 'center', gap: '1.4rem' }}>
+              <div style={{ position: 'relative', width: `${DONUT_BOX_SIZE}px`, height: `${DONUT_BOX_SIZE}px`, flexShrink: 0 }}>
+                <Doughnut
+                  data={{
+                    // No border/stroke between segments per the design
+                    // system - flat fill colours, no gaps.
+                    labels: LABELS,
+                    datasets: [{ data: values, backgroundColor: COLORS, borderWidth: 0 }],
+                  }}
+                  options={{
+                    cutout: DONUT_CUTOUT,
+                    plugins: {
+                      // The legend is now real HTML rendered next to
+                      // this box (below), not drawn by Chart.js inside
+                      // the canvas - see the note on DONUT_BOX_SIZE
+                      // above for why.
+                      legend: { display: false },
+                      tooltip: { callbacks: { label: (ctx) => `${ctx.label}: ${symbol}${Math.round(ctx.parsed as number)}` } },
                     },
-                  },
-                  tooltip: { callbacks: { label: (ctx) => `${ctx.label}: ${symbol}${Math.round(ctx.parsed as number)}` } },
-                },
-                maintainAspectRatio: false,
-              }}
-            />
-            {centerPos && (
-              <div
-                style={{
-                  position: 'absolute',
-                  left: centerPos.x,
-                  top: centerPos.y,
-                  transform: 'translate(-50%, -50%)',
-                  textAlign: 'center',
-                  pointerEvents: 'none',
-                }}
-              >
+                    maintainAspectRatio: false,
+                  }}
+                />
                 <div
                   style={{
-                    fontFamily: "'IBM Plex Mono', 'Courier New', monospace",
-                    fontWeight: 600,
-                    fontSize: '1.3rem',
-                    color: '#1C1D20',
+                    position: 'absolute',
+                    inset: 0,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    textAlign: 'center',
+                    pointerEvents: 'none',
                   }}
                 >
-                  {symbol}{Math.round(values.reduce((a, b) => a + b, 0))}
-                </div>
-                <div
-                  style={{
-                    fontFamily: "'IBM Plex Sans', system-ui, sans-serif",
-                    fontSize: '0.7rem',
-                    letterSpacing: '0.06em',
-                    textTransform: 'uppercase',
-                    color: '#8A867D',
-                    marginTop: '0.1rem',
-                  }}
-                >
-                  Total
+                  <div style={{ fontFamily: "'IBM Plex Mono', 'Courier New', monospace", fontWeight: 600, fontSize: '16px', color: '#1C1D20' }}>
+                    {symbol}{Math.round(values.reduce((a, b) => a + b, 0))}
+                  </div>
+                  <div
+                    style={{
+                      fontFamily: "'IBM Plex Sans', system-ui, sans-serif",
+                      fontSize: '9px',
+                      letterSpacing: '0.5px',
+                      textTransform: 'uppercase',
+                      color: '#8A867D',
+                      marginTop: '1px',
+                    }}
+                  >
+                    Total
+                  </div>
                 </div>
               </div>
-            )}
-          </>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.55rem', flex: 1, minWidth: 0 }}>
+                {LABELS.map((label, i) => (
+                  <div key={label} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.78rem' }}>
+                    <span style={{ width: '9px', height: '9px', borderRadius: '3px', background: COLORS[i], flexShrink: 0 }} />
+                    <span style={{ flex: 1, color: 'var(--ink-soft)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {label}
+                    </span>
+                    <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 600, color: 'var(--ink)', whiteSpace: 'nowrap' }}>
+                      {symbol}{Math.round(values[i])}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
           )}
         </div>
       )}
