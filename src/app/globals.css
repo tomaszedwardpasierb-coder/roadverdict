@@ -1,14 +1,43 @@
-﻿:root {
-  --asphalt: #000000;
-  --stone: #e4e2dd;
-  --paper: #f7f6f2;
-  --amber: #e8a33d;
-  --amber-ink: #7a5211;
-  --verdict-green: #4c7a4e;
-  --verdict-red: #b5432e;
-  --ink: #000000;
-  --ink-soft: #57554e;
-  --border: #cfcdc4;
+:root {
+  /* Design system v2 - values updated in place so every existing
+     var(--token-name) reference across the app keeps resolving
+     unchanged. New semantic names (--concrete, --line, --amber-dark,
+     --green, --red) are added as aliases pointing at the same values,
+     so newly-written or updated components can use the v2 naming while
+     nothing already using the old names breaks. Font family swap
+     (Oswald to Big Shoulders Display, IBM Plex Sans to Inter) needs a
+     matching change in layout.tsx's next/font/google imports - not
+     done here, tracked as its own step. */
+  --asphalt: #17181B;
+  --asphalt-2: #232529;
+  --asphalt-3: #2E3036;
+  --stone: #F3F1EC;
+  --concrete: #F3F1EC;
+  --paper: #FFFFFF;
+  --amber: #EE9A2E;
+  --amber-ink: #C97D1E;
+  --amber-dark: #C97D1E;
+  --amber-tint: #FBEACC;
+  --verdict-green: #21815A;
+  --green: #21815A;
+  --green-tint: #DEEFE6;
+  --verdict-red: #C1483A;
+  --red: #C1483A;
+  --red-tint: #F8E6E3;
+  --blue: #4A5FBF;
+  --blue-tint: #E9ECFB;
+  --ink: #1C1D20;
+  --ink-soft: #54555A;
+  --slate: #8A867D;
+  --border: #E4E0D6;
+  --line: #E4E0D6;
+  --line-soft: #EDEAE3;
+
+  --radius-lg: 16px;
+  --radius-md: 12px;
+  --radius-sm: 8px;
+  --shadow-card: 0 1px 2px rgba(23, 24, 27, 0.04), 0 10px 28px -14px rgba(23, 24, 27, 0.14);
+  --shadow-pop: 0 4px 10px -2px rgba(23, 24, 27, 0.18);
 
   --font-display: 'Oswald', 'Arial Narrow', sans-serif;
   --font-body: 'IBM Plex Sans', system-ui, sans-serif;
@@ -554,7 +583,3 @@ main {
 
   }
 }
-
-
-
-
