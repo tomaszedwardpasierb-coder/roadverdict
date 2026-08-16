@@ -1,10 +1,21 @@
 // Place at: src/app/dashboard/RecentActivity.tsx
 'use client';
-
 import { convertMilesToDisplay, type DistanceUnit } from '@/lib/tracker/unitFormat';
 import { formatCurrency, type Currency, type ExchangeRates } from '@/lib/tracker/currency';
 import { useTabSwitch, viewRecords, type ReviewCategory } from './TabSwitchContext';
+import { Icon } from './Icon';
 import styles from './dashboard.module.css';
+
+// Reuses the exact same tint classes the stat card icons already use -
+// service/bills get the neutral tile, fuel gets green, mods gets amber,
+// matching the same colour-per-metric convention used throughout the
+// redesign rather than inventing a fourth palette just for this table.
+const CATEGORY_TINT: Record<ReviewCategory, string> = {
+  service: styles.statCardIconNeutral,
+  fuel: styles.statCardIconGreen,
+  mods: styles.statCardIconAmber,
+  bills: styles.statCardIconNeutral,
+};
 
 export interface RecentActivityItem {
   id: string;
@@ -17,11 +28,9 @@ export interface RecentActivityItem {
   cost: number;
   mileage?: number;
 }
-
 function fmtDate(d: string): string {
   return new Date(d).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
 }
-
 export function RecentActivity({
   items,
   distanceUnit,
@@ -34,11 +43,9 @@ export function RecentActivity({
   rates: ExchangeRates | null;
 }) {
   const { switchTo, setHighlightIds } = useTabSwitch();
-
   if (items.length === 0) {
     return <p className={styles.emptyNote}>Nothing logged yet - your recent activity will show up here.</p>;
   }
-
   return (
     <table className={styles.recentActivityTable}>
       <thead>
@@ -59,7 +66,12 @@ export function RecentActivity({
             onClick={() => viewRecords(item.reviewCategory, [item.id], switchTo, setHighlightIds)}
           >
             <td>{fmtDate(item.date)}</td>
-            <td>{item.icon} {item.type}</td>
+            <td>
+              <span className={styles.activityIconTile + ' ' + CATEGORY_TINT[item.reviewCategory]}>
+                <Icon name={item.reviewCategory} size={13} />
+              </span>
+              {item.type}
+            </td>
             <td>{item.description}</td>
             <td>{item.category}</td>
             <td>{formatCurrency(item.cost, currency, rates)}</td>

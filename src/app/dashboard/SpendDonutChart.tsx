@@ -22,6 +22,35 @@ const COLORS = ['#1C1D20', '#EE9A2E', '#21815A', '#8A867D'];
 const LABELS = ['Servicing & repairs', 'Modifications', 'Fuel', 'Insurance/tax/MOT'];
 const DONUT_CUTOUT = '68%';
 
+// Draws the centre total directly on the canvas at the donut ring's own
+// true centre point, read from Chart.js's own arc geometry - not a
+// CSS 50%/50% wrapper midpoint, which only matches the ring's real
+// centre when nothing else (like a right-hand legend) eats into the
+// canvas's width. Robust regardless of legend size, unlike a fixed
+// CSS position would be.
+function makeCenterTextPlugin(totalText: string) {
+  return {
+    id: 'donutCenterText',
+    afterDraw(chart: ChartJS) {
+      const meta = chart.getDatasetMeta(0);
+      const arc = meta.data[0] as unknown as { getCenterPoint?: () => { x: number; y: number } };
+      const center = arc?.getCenterPoint?.();
+      if (!center) return;
+      const { ctx } = chart;
+      ctx.save();
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.font = "600 21px 'IBM Plex Mono', 'Courier New', monospace";
+      ctx.fillStyle = '#1C1D20';
+      ctx.fillText(totalText, center.x, center.y - 9);
+      ctx.font = "11px 'IBM Plex Sans', system-ui, sans-serif";
+      ctx.fillStyle = '#8A867D';
+      ctx.fillText('TOTAL', center.x, center.y + 13);
+      ctx.restore();
+    },
+  };
+}
+
 interface CostItem {
   date: string;
   cost: number;
@@ -96,83 +125,49 @@ export function SpendDonutChart({ records, mods, fuelLogs, bills, currency, rate
               }}
             />
           ) : (
-            <>
-              <Doughnut
-                data={{
-                  // No border/stroke between segments per the design
-                  // system - flat fill colours, no gaps.
-                  labels: LABELS,
-                  datasets: [{ data: values, backgroundColor: COLORS, borderWidth: 0 }],
-                }}
-                options={{
-                  cutout: DONUT_CUTOUT,
-                  plugins: {
-                    legend: {
-                      position: 'right',
-                      labels: {
-                        boxWidth: 10,
-                        boxHeight: 10,
-                        padding: 14,
-                        font: { size: 11, family: "'IBM Plex Sans', system-ui, sans-serif" },
-                        // Chart.js's default legend only shows the label -
-                        // the design system wants the value alongside it,
-                        // in mono, so this overrides the generated text
-                        // per entry rather than replacing the legend
-                        // entirely.
-                        generateLabels: (chart) => {
-                          const data = chart.data;
-                          return (data.labels ?? []).map((label, i) => {
-                            const val = (data.datasets[0].data[i] as number) ?? 0;
-                            return {
-                              text: `${label}  ${symbol}${Math.round(val)}`,
-                              fillStyle: COLORS[i],
-                              strokeStyle: COLORS[i],
-                              fontColor: '#54555A',
-                              index: i,
-                            };
-                          });
-                        },
+            <Doughnut
+              data={{
+                // No border/stroke between segments per the design
+                // system - flat fill colours, no gaps.
+                labels: LABELS,
+                datasets: [{ data: values, backgroundColor: COLORS, borderWidth: 0 }],
+              }}
+              plugins={[makeCenterTextPlugin(`${symbol}${Math.round(values.reduce((a, b) => a + b, 0))}`)]}
+              options={{
+                cutout: DONUT_CUTOUT,
+                plugins: {
+                  legend: {
+                    position: 'right',
+                    labels: {
+                      boxWidth: 10,
+                      boxHeight: 10,
+                      padding: 14,
+                      font: { size: 11, family: "'IBM Plex Sans', system-ui, sans-serif" },
+                      // Chart.js's default legend only shows the label -
+                      // the design system wants the value alongside it,
+                      // in mono, so this overrides the generated text
+                      // per entry rather than replacing the legend
+                      // entirely.
+                      generateLabels: (chart) => {
+                        const data = chart.data;
+                        return (data.labels ?? []).map((label, i) => {
+                          const val = (data.datasets[0].data[i] as number) ?? 0;
+                          return {
+                            text: `${label}  ${symbol}${Math.round(val)}`,
+                            fillStyle: COLORS[i],
+                            strokeStyle: COLORS[i],
+                            fontColor: '#54555A',
+                            index: i,
+                          };
+                        });
                       },
                     },
-                    tooltip: { callbacks: { label: (ctx) => `${ctx.label}: ${symbol}${Math.round(ctx.parsed as number)}` } },
                   },
-                  maintainAspectRatio: false,
-                }}
-              />
-              <div
-                style={{
-                  position: 'absolute',
-                  top: '50%',
-                  left: '50%',
-                  transform: 'translate(-50%, -50%)',
-                  textAlign: 'center',
-                  pointerEvents: 'none',
-                }}
-              >
-                <div
-                  style={{
-                    fontFamily: "'IBM Plex Mono', 'Courier New', monospace",
-                    fontWeight: 600,
-                    fontSize: '1.3rem',
-                    color: '#1C1D20',
-                  }}
-                >
-                  {symbol}{Math.round(grandTotal >= 0 ? convertGbpToDisplay(grandTotal, currency, rates) : 0)}
-                </div>
-                <div
-                  style={{
-                    fontFamily: "'IBM Plex Sans', system-ui, sans-serif",
-                    fontSize: '0.7rem',
-                    letterSpacing: '0.06em',
-                    textTransform: 'uppercase',
-                    color: '#8A867D',
-                    marginTop: '0.1rem',
-                  }}
-                >
-                  Total
-                </div>
-              </div>
-            </>
+                  tooltip: { callbacks: { label: (ctx) => `${ctx.label}: ${symbol}${Math.round(ctx.parsed as number)}` } },
+                },
+                maintainAspectRatio: false,
+              }}
+            />
           )}
         </div>
       )}

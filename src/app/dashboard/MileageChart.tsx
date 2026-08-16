@@ -8,7 +8,7 @@ import type { MileagePoint } from '@/lib/tracker/summary';
 import { convertMilesToDisplay, distanceUnitLabel, type DistanceUnit } from '@/lib/tracker/unitFormat';
 import { useChartTypePreference } from './useChartTypePreference';
 import { ChartTypeToggle } from './ChartTypeToggle';
-import { barGradient, BAR_BORDER_RADIUS } from './chartStyle';
+import { barGradient, BAR_BORDER_RADIUS, lineAreaGradient, lastPointRadius, lastPointRing, lastPointRingWidth, dashedValueAxis, plainCategoryAxis } from './chartStyle';
 import { useChartFilter } from './ChartFilterContext';
 import { useTabSwitch, viewRecords } from './TabSwitchContext';
 import styles from './dashboard.module.css';
@@ -16,6 +16,7 @@ import styles from './dashboard.module.css';
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, BarElement, Tooltip, Legend);
 
 const CHART_ID = 'mileage';
+const MILEAGE_COLOR = '#EE9A2E'; // matches --amber - fixed colour-per-metric mapping, mileage is always amber
 
 function fmtDate(d: string): string {
   return new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
@@ -67,13 +68,13 @@ export function MileageChart({
         <Bar
           data={{
             labels,
-            datasets: [{ label: 'Mileage', data: dataValues, backgroundColor: barGradient('#1a1a1a'), borderRadius: BAR_BORDER_RADIUS }],
+            datasets: [{ label: 'Mileage', data: dataValues, backgroundColor: barGradient(MILEAGE_COLOR), borderRadius: BAR_BORDER_RADIUS }],
           }}
           options={{
             plugins: { legend: { display: false } },
             scales: {
-              y: { title: { display: true, text: distanceUnitLabel(distanceUnit) }, grid: { color: '#00000012' } },
-              x: { grid: { display: false } },
+              y: dashedValueAxis({ title: { display: true, text: distanceUnitLabel(distanceUnit) } }),
+              x: plainCategoryAxis(),
             },
             onClick: (_evt, elements) => handlePointClick(elements),
             onHover: handleHover,
@@ -88,21 +89,25 @@ export function MileageChart({
               {
                 label: 'Mileage',
                 data: dataValues,
-                borderColor: '#000000',
-                backgroundColor: 'transparent',
-                borderWidth: 1.25,
+                borderColor: MILEAGE_COLOR,
+                backgroundColor: lineAreaGradient(MILEAGE_COLOR),
+                borderWidth: 2.4,
+                borderCapStyle: 'round',
+                borderJoinStyle: 'round',
                 tension: 0.2,
-                fill: false,
-                pointRadius: 2,
-                pointBackgroundColor: '#000000',
+                fill: true,
+                pointRadius: lastPointRadius(2, 5),
+                pointBorderColor: lastPointRing(MILEAGE_COLOR),
+                pointBorderWidth: lastPointRingWidth(0, 2),
+                pointBackgroundColor: MILEAGE_COLOR,
               },
             ],
           }}
           options={{
             plugins: { legend: { display: false } },
             scales: {
-              y: { title: { display: true, text: distanceUnitLabel(distanceUnit) }, grid: { color: '#00000012' } },
-              x: { grid: { display: false } },
+              y: dashedValueAxis({ title: { display: true, text: distanceUnitLabel(distanceUnit) } }),
+              x: plainCategoryAxis(),
             },
             onClick: (_evt, elements) => handlePointClick(elements),
             onHover: handleHover,

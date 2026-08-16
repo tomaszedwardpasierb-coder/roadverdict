@@ -168,16 +168,22 @@ export default async function DashboardPage() {
           {formatCurrency(bike.annualBudget as number, currency, rates)} budget, {formatCurrency(yearSpend - (bike.annualBudget as number), currency, rates)} over.
         </div>
       )}
-      <h1 className={styles.heading}>
-        Dashboard
-        {(bike.nickname || getCurrentRegistration(bike)) && (
-          <span className={styles.headingBikeTag}>
-            {bike.nickname}
-            {bike.nickname && getCurrentRegistration(bike) && " · "}
-            {getCurrentRegistration(bike)}
-          </span>
-        )}
-      </h1>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "0.75rem" }}>
+        <h1 className={styles.heading}>
+          Dashboard
+          {(bike.nickname || getCurrentRegistration(bike)) && (
+            <span className={styles.headingBikeTag}>
+              {bike.nickname}
+              {bike.nickname && getCurrentRegistration(bike) && " · "}
+              {getCurrentRegistration(bike)}
+            </span>
+          )}
+        </h1>
+        <div className={styles.headerMileagePill}>
+          <Icon name="currentMiles" size={15} />
+          {Math.round(convertMilesToDisplay(bike.currentMileage, distanceUnit)).toLocaleString()} {distanceUnit === "km" ? "km" : "mi"}
+        </div>
+      </div>
       <p className={styles.subtext} style={{ marginBottom: "1rem" }}>Here&apos;s how your bike looks today.</p>
 
       {bike.dvlaData?.euroStatus && (() => {

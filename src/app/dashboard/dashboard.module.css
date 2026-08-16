@@ -450,9 +450,9 @@
   font-size: 0.85rem;
   padding: 0.6rem 1rem;
   border: 1px solid var(--amber);
-  border-radius: 8px;
-  background: #fff8ec;
-  color: var(--amber-ink);
+  border-radius: var(--radius-md);
+  background: var(--amber-tint);
+  color: var(--amber-dark);
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -462,17 +462,18 @@
 .scanReceiptCaption { font-size: 0.8rem; color: var(--ink-soft); margin: 0.4rem 0 0; }
 .scanReceiptTip {
   font-size: 0.8rem;
-  color: var(--amber-ink);
-  background: #fbf1e0;
-  border-radius: 4px;
+  color: var(--amber-dark);
+  background: var(--amber-tint);
+  border-radius: var(--radius-sm);
   padding: 0.5rem 0.7rem;
   margin: 0.6rem 0;
 }
 .scanReceiptPanel {
   margin-top: 0.6rem;
   background: var(--paper);
-  border: 1px solid var(--border);
-  border-radius: 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
   padding: 0.9rem 1.1rem;
   font-size: 0.88rem;
   max-width: 560px;
@@ -680,6 +681,32 @@
 .recentActivityTable th { font-family: var(--font-mono); font-size: 0.65rem; text-transform: uppercase; color: var(--ink-soft); }
 .recentActivityRow { cursor: pointer; }
 .recentActivityRow:hover { background: var(--stone); }
+.activityIconTile {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: var(--radius-sm);
+  vertical-align: middle;
+  margin-right: 0.4rem;
+}
+
+.headerMileagePill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 0.5rem 1rem;
+  font-family: var(--font-mono);
+  font-weight: 600;
+  font-size: 0.95rem;
+  color: var(--asphalt);
+  box-shadow: var(--shadow-card);
+  flex-shrink: 0;
+}
 
 .reportsGrid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
 @media (max-width: 1100px) { .reportsGrid { grid-template-columns: 1fr; } }
