@@ -2,7 +2,7 @@
 'use client';
 
 import { Line, Bar } from 'react-chartjs-2';
-import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, BarElement, Tooltip, Legend } from 'chart.js';
+import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, BarElement, Tooltip, Legend, Filler } from 'chart.js';
 import { filterByDateRange } from '@/lib/tracker/dateRange';
 import { convertGbpToDisplay, CURRENCY_SYMBOLS, type Currency, type ExchangeRates } from '@/lib/tracker/currency';
 import { formatDistance, type DistanceUnit } from '@/lib/tracker/unitFormat';
@@ -13,7 +13,7 @@ import { useChartFilter } from './ChartFilterContext';
 import { useTabSwitch, viewRecords } from './TabSwitchContext';
 import styles from './dashboard.module.css';
 
-ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, BarElement, Tooltip, Legend);
+ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, BarElement, Tooltip, Legend, Filler);
 
 const CHART_ID = 'fuel-cost';
 const FUEL_COLOR = '#21815A'; // matches --green - fixed colour-per-metric mapping, fuel is always green

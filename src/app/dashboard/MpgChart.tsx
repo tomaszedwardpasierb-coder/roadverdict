@@ -2,7 +2,7 @@
 'use client';
 
 import { Line, Bar } from 'react-chartjs-2';
-import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, BarElement, Tooltip, Legend, type ScriptableContext } from 'chart.js';
+import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, BarElement, Tooltip, Legend, Filler, type ScriptableContext } from 'chart.js';
 import { filterByDateRange } from '@/lib/tracker/dateRange';
 import type { MpgSegment } from '@/lib/tracker/fuelLog';
 import { formatDistance, formatFuelEconomy, type FuelEconomyUnit, type DistanceUnit } from '@/lib/tracker/unitFormat';
@@ -14,7 +14,7 @@ import { useChartFilter } from './ChartFilterContext';
 import { useTabSwitch, viewRecords } from './TabSwitchContext';
 import styles from './dashboard.module.css';
 
-ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, BarElement, Tooltip, Legend);
+ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, BarElement, Tooltip, Legend, Filler);
 
 const CHART_ID = 'mpg';
 const LITRES_PER_UK_GALLON = 4.546;

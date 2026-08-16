@@ -2,7 +2,7 @@
 'use client';
 
 import { Line, Bar } from 'react-chartjs-2';
-import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, BarElement, Tooltip, Legend } from 'chart.js';
+import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, BarElement, Tooltip, Legend, Filler } from 'chart.js';
 import { filterByDateRange } from '@/lib/tracker/dateRange';
 import type { MileagePoint } from '@/lib/tracker/summary';
 import { convertMilesToDisplay, distanceUnitLabel, type DistanceUnit } from '@/lib/tracker/unitFormat';
@@ -13,7 +13,7 @@ import { useChartFilter } from './ChartFilterContext';
 import { useTabSwitch, viewRecords } from './TabSwitchContext';
 import styles from './dashboard.module.css';
 
-ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, BarElement, Tooltip, Legend);
+ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, BarElement, Tooltip, Legend, Filler);
 
 const CHART_ID = 'mileage';
 const MILEAGE_COLOR = '#EE9A2E'; // matches --amber - fixed colour-per-metric mapping, mileage is always amber

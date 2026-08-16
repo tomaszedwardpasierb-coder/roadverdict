@@ -2,7 +2,7 @@
 'use client';
 
 import { Bar, Line } from 'react-chartjs-2';
-import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, PointElement, LineElement, Tooltip } from 'chart.js';
+import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, PointElement, LineElement, Tooltip, Filler } from 'chart.js';
 import { bucketByMonth, bucketByMileage } from '@/lib/tracker/summary';
 import { filterByDateRange } from '@/lib/tracker/dateRange';
 import { convertGbpToDisplay, CURRENCY_SYMBOLS, type Currency, type ExchangeRates } from '@/lib/tracker/currency';
@@ -14,7 +14,7 @@ import { useChartFilter } from './ChartFilterContext';
 import { useTabSwitch, viewRecords, type ReviewCategory } from './TabSwitchContext';
 import styles from './dashboard.module.css';
 
-ChartJS.register(CategoryScale, LinearScale, BarElement, PointElement, LineElement, Tooltip);
+ChartJS.register(CategoryScale, LinearScale, BarElement, PointElement, LineElement, Tooltip, Filler);
 
 interface CostItem {
   id: string;
