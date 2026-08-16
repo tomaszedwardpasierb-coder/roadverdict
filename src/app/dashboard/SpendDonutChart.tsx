@@ -1,6 +1,7 @@
 // Place at: src/app/dashboard/SpendDonutChart.tsx
 'use client';
 
+import { useMemo, useState } from 'react';
 import { Doughnut, Bar } from 'react-chartjs-2';
 import { Chart as ChartJS, ArcElement, BarElement, CategoryScale, LinearScale, Tooltip, Legend } from 'chart.js';
 import { convertGbpToDisplay, CURRENCY_SYMBOLS, type Currency, type ExchangeRates } from '@/lib/tracker/currency';
@@ -22,31 +23,26 @@ const COLORS = ['#1C1D20', '#EE9A2E', '#21815A', '#8A867D'];
 const LABELS = ['Servicing & repairs', 'Modifications', 'Fuel', 'Insurance/tax/MOT'];
 const DONUT_CUTOUT = '68%';
 
-// Draws the centre total directly on the canvas at the donut ring's own
-// true centre point, read from Chart.js's own arc geometry - not a
-// CSS 50%/50% wrapper midpoint, which only matches the ring's real
-// centre when nothing else (like a right-hand legend) eats into the
-// canvas's width. Robust regardless of legend size, unlike a fixed
-// CSS position would be.
-function makeCenterTextPlugin(totalText: string) {
+// Reads the donut ring's true centre point from Chart.js's own arc
+// geometry, the same source of truth as before - but rather than
+// drawing text directly on the canvas (ctx.fillText can drift from the
+// visible ring under DPI/coordinate-space quirks that are hard to
+// diagnose from outside the browser), this only ever captures a pixel
+// position into React state. The actual text is a normal HTML element
+// positioned with that value, sidestepping canvas text rendering
+// entirely rather than trying to patch around it.
+function makeCenterCapturePlugin(onCenter: (pos: { x: number; y: number }) => void) {
   return {
-    id: 'donutCenterText',
+    id: 'donutCenterCapture',
     afterDraw(chart: ChartJS) {
       const meta = chart.getDatasetMeta(0);
       const arc = meta.data[0] as unknown as { getCenterPoint?: () => { x: number; y: number } };
       const center = arc?.getCenterPoint?.();
       if (!center) return;
-      const { ctx } = chart;
-      ctx.save();
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.font = "600 21px 'IBM Plex Mono', 'Courier New', monospace";
-      ctx.fillStyle = '#1C1D20';
-      ctx.fillText(totalText, center.x, center.y - 9);
-      ctx.font = "11px 'IBM Plex Sans', system-ui, sans-serif";
-      ctx.fillStyle = '#8A867D';
-      ctx.fillText('TOTAL', center.x, center.y + 13);
-      ctx.restore();
+      // Deferred to the next frame - calling setState synchronously
+      // from inside Chart.js's own draw cycle risks updating React
+      // state mid-render, which this avoids entirely.
+      requestAnimationFrame(() => onCenter({ x: center.x, y: center.y }));
     },
   };
 }
@@ -80,6 +76,11 @@ export function SpendDonutChart({ records, mods, fuelLogs, bills, currency, rate
   const { range } = useChartFilter();
   const { kind, changeKind } = useChartTypePreference(CHART_ID, initialChartType ?? 'pie');
   const symbol = CURRENCY_SYMBOLS[currency];
+  const [centerPos, setCenterPos] = useState<{ x: number; y: number } | null>(null);
+  // Memoized so the plugin instance is stable across renders - passing a
+  // brand-new plugin object into Chart.js's plugins array every render
+  // would make it think the plugin itself changed, not just re-run it.
+  const centerCapturePlugin = useMemo(() => makeCenterCapturePlugin(setCenterPos), []);
 
   const servicingTotal = sumCost(filterByDateRange(records, range));
   const modsTotal = sumCost(filterByDateRange(mods, range));
@@ -125,14 +126,15 @@ export function SpendDonutChart({ records, mods, fuelLogs, bills, currency, rate
               }}
             />
           ) : (
-            <Doughnut
+            <>
+              <Doughnut
               data={{
                 // No border/stroke between segments per the design
                 // system - flat fill colours, no gaps.
                 labels: LABELS,
                 datasets: [{ data: values, backgroundColor: COLORS, borderWidth: 0 }],
               }}
-              plugins={[makeCenterTextPlugin(`${symbol}${Math.round(values.reduce((a, b) => a + b, 0))}`)]}
+              plugins={[centerCapturePlugin]}
               options={{
                 cutout: DONUT_CUTOUT,
                 plugins: {
@@ -168,6 +170,42 @@ export function SpendDonutChart({ records, mods, fuelLogs, bills, currency, rate
                 maintainAspectRatio: false,
               }}
             />
+            {centerPos && (
+              <div
+                style={{
+                  position: 'absolute',
+                  left: centerPos.x,
+                  top: centerPos.y,
+                  transform: 'translate(-50%, -50%)',
+                  textAlign: 'center',
+                  pointerEvents: 'none',
+                }}
+              >
+                <div
+                  style={{
+                    fontFamily: "'IBM Plex Mono', 'Courier New', monospace",
+                    fontWeight: 600,
+                    fontSize: '1.3rem',
+                    color: '#1C1D20',
+                  }}
+                >
+                  {symbol}{Math.round(values.reduce((a, b) => a + b, 0))}
+                </div>
+                <div
+                  style={{
+                    fontFamily: "'IBM Plex Sans', system-ui, sans-serif",
+                    fontSize: '0.7rem',
+                    letterSpacing: '0.06em',
+                    textTransform: 'uppercase',
+                    color: '#8A867D',
+                    marginTop: '0.1rem',
+                  }}
+                >
+                  Total
+                </div>
+              </div>
+            )}
+          </>
           )}
         </div>
       )}
