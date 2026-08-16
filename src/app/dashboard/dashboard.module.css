@@ -569,7 +569,7 @@
   display: flex; align-items: center; gap: 0.7rem;
   padding: 0.65rem 0.8rem; border-radius: var(--radius-sm);
   font-family: var(--font-display); font-size: 0.9rem;
-  color: rgba(255, 255, 255, 0.82); background: none; border: none;
+  color: rgba(255, 255, 255, 0.95); background: none; border: none;
   border-left: 3px solid transparent;
   text-align: left; cursor: pointer; width: 100%;
 }
