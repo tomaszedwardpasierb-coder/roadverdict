@@ -549,12 +549,19 @@
 }
 
 .sidebarLogo { margin-bottom: 2rem; text-align: center; }
-/* Forces the mark to render as a clean white silhouette regardless of
-   its original colour - a real white-logo asset would be the more
-   correct long-term fix if one already exists in the codebase, but
-   this guarantees visibility against the new dark sidebar right now
-   rather than leaving a dark mark invisible on a dark background. */
-.sidebarLogo img { width: 140px; display: block; margin: 0 auto; filter: brightness(0) invert(1); }
+/* A small, deliberate white card behind the mark, rather than trying to
+   invert-filter it white - the filter approach breaks if the source
+   PNG has an opaque white background baked in rather than genuine
+   transparency (brightness(0) then invert(1) just returns an opaque
+   white canvas to white, doing nothing to remove it). This looks
+   correct either way, without needing to know which case applies. */
+.sidebarLogo a {
+  display: inline-block;
+  background: #fff;
+  border-radius: var(--radius-md);
+  padding: 0.7rem 1.1rem;
+}
+.sidebarLogo img { width: 120px; display: block; margin: 0 auto; }
 
 .sidebarNav { display: flex; flex-direction: column; gap: 0.2rem; flex: 1; }
 
@@ -621,6 +628,23 @@
   border-color: var(--amber);
   color: var(--amber);
   background: var(--asphalt-2);
+}
+/* LogoutButton genuinely uses .logoutButton, not .iconBtn or
+   .submit-button as guessed above - confirmed from its real source
+   rather than assumed. Same-module selector, no :global() needed since
+   .logoutButton lives in this same stylesheet. Base definition (white
+   background, dark border/text) is left untouched since the plain,
+   generic class name suggests it may be used somewhere outside the
+   dark sidebar too - only overridden here, when nested inside it. */
+.sidebar .logoutButton {
+  background: transparent;
+  border-color: rgba(255, 255, 255, 0.25);
+  color: rgba(255, 255, 255, 0.85);
+}
+.sidebar .logoutButton:hover:not(:disabled) {
+  background: var(--asphalt-2);
+  border-color: var(--amber);
+  color: var(--amber);
 }
 
 /* Content area - deliberately NO max-width, fills whatever space the sidebar doesn't take */
