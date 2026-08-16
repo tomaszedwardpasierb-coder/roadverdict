@@ -1,7 +1,7 @@
 // Place at: src/app/dashboard/SpendDonutChart.tsx
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Doughnut, Bar } from 'react-chartjs-2';
 import { Chart as ChartJS, ArcElement, BarElement, CategoryScale, LinearScale, Tooltip, Legend } from 'chart.js';
 import { convertGbpToDisplay, CURRENCY_SYMBOLS, type Currency, type ExchangeRates } from '@/lib/tracker/currency';
@@ -81,6 +81,27 @@ export function SpendDonutChart({ records, mods, fuelLogs, bills, currency, rate
   // brand-new plugin object into Chart.js's plugins array every render
   // would make it think the plugin itself changed, not just re-run it.
   const centerCapturePlugin = useMemo(() => makeCenterCapturePlugin(setCenterPos), []);
+  const chartRef = useRef<ChartJS<'doughnut', number[], string> | null>(null);
+
+  // Clears any position captured by a previous mount of this chart (e.g.
+  // switching to the bar view and back) so a stale coordinate never
+  // flashes before the fresh one arrives. Chart.js also lays out the
+  // legend - and therefore how much room is left for the ring - using
+  // whatever font metrics are available the moment it first draws; if
+  // the web font hasn't finished loading yet, that first pass uses a
+  // fallback font's slightly different text width, and Chart.js never
+  // re-measures on its own once the real font arrives, it only redraws
+  // when update()/resize() is actually called. Forcing one update()
+  // once fonts are confirmed ready makes it redo that layout pass (and
+  // re-fire the centre-capture plugin below) against the real, final
+  // metrics rather than the fallback-font estimate.
+  useEffect(() => {
+    setCenterPos(null);
+    if (kind === 'bar') return;
+    document.fonts?.ready?.then(() => {
+      chartRef.current?.update();
+    });
+  }, [kind]);
 
   const servicingTotal = sumCost(filterByDateRange(records, range));
   const modsTotal = sumCost(filterByDateRange(mods, range));
@@ -128,6 +149,7 @@ export function SpendDonutChart({ records, mods, fuelLogs, bills, currency, rate
           ) : (
             <>
               <Doughnut
+              ref={chartRef}
               data={{
                 // No border/stroke between segments per the design
                 // system - flat fill colours, no gaps.

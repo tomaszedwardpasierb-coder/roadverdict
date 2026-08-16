@@ -49,7 +49,7 @@ export function BudgetWidget({ yearSpend, currentYear, initialBudget, currency, 
               required
             />
           </div>
-          <button className="submit-button" type="submit" disabled={submitting}>
+          <button className={styles.scanReceiptBtn} type="submit" disabled={submitting}>
             {submitting ? 'Saving…' : 'Set budget'}
           </button>
         </div>

@@ -100,7 +100,7 @@ export function ExportShareSection() {
         yours, receipts and invoices only appear if you specifically approve sharing them when someone asks.
       </p>
       <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap', alignItems: 'center' }}>
-        <a href="/api/tracker/export/csv" className="submit-button" style={{ textDecoration: 'none' }}>
+        <a href="/api/tracker/export/csv" className={styles.scanReceiptBtn} style={{ textDecoration: 'none' }}>
           Download CSV
         </a>
       </div>
@@ -135,7 +135,7 @@ export function ExportShareSection() {
             from the Shareable Links tab.
           </p>
           {createError && <p className="error-text" role="alert">{createError}</p>}
-          <button type="button" className="submit-button" onClick={handleGetLink} disabled={loading} style={{ marginTop: '0.7rem' }}>
+          <button type="button" className={styles.scanReceiptBtn} onClick={handleGetLink} disabled={loading} style={{ marginTop: '0.7rem' }}>
             {loading ? 'Generating…' : 'Get shareable report link'}
           </button>
         </div>
