@@ -6,6 +6,7 @@ import { filterByDateRange } from '@/lib/tracker/dateRange';
 import { computeMPGSeries, type MpgCalcInput } from '@/lib/tracker/mpgCalc';
 import { formatCurrency, type Currency, type ExchangeRates } from '@/lib/tracker/currency';
 import { formatFuelEconomy, formatCostPerDistance, type DistanceUnit, type FuelEconomyUnit } from '@/lib/tracker/unitFormat';
+import { Icon } from './Icon';
 import styles from './dashboard.module.css';
 
 interface CostItem {
@@ -79,14 +80,23 @@ export function DashboardStatCards({
   return (
     <>
       <div className={styles.statCard}>
+        <div className={`${styles.statCardIcon} ${styles.statCardIconNeutral}`}>
+          <Icon name="totalSpend" size={16} />
+        </div>
         <div className={styles.statCardValue}>{formatCurrency(totalSpend, currency, rates)}</div>
         <div className={styles.statCardLabel}>Total spend</div>
       </div>
       <div className={styles.statCard}>
+        <div className={`${styles.statCardIcon} ${styles.statCardIconGreen}`}>
+          <Icon name="economy" size={16} />
+        </div>
         <div className={styles.statCardValue}>{actualMpg ? formatFuelEconomy(actualMpg, fuelEconomyUnit) : '-'}</div>
         <div className={styles.statCardLabel}>Actual economy</div>
       </div>
       <div className={styles.statCard}>
+        <div className={`${styles.statCardIcon} ${styles.statCardIconAmber}`}>
+          <Icon name="perMile" size={16} />
+        </div>
         <div className={styles.statCardValue}>{costPerMile != null ? formatCostPerDistance(costPerMile, distanceUnit) : '-'}</div>
         <div className={styles.statCardLabel}>Per {distanceUnit === 'km' ? 'km' : 'mile'}</div>
       </div>

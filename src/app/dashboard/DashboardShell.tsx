@@ -119,7 +119,7 @@ export function DashboardShell({
         <aside className={styles.sidebar}>
           <div className={styles.sidebarLogo}>
             <Link href="/">
-              <img src="/logo.png" alt="RoadVerdict" />
+              <img src="/logo-dark.png" alt="RoadVerdict" />
             </Link>
           </div>
 

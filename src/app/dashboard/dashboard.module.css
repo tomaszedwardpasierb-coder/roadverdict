@@ -296,7 +296,19 @@
 }
 
 .statsStrip { display: grid; grid-template-columns: repeat(auto-fit, minmax(115px, 1fr)); gap: 0.7rem; margin-bottom: 1.4rem; }
-.statCard { background: var(--paper); border: 1px solid var(--line); border-radius: var(--radius-md); box-shadow: var(--shadow-card); padding: 0.9rem 0.8rem; text-align: center; }
+.statCard { background: var(--paper); border: 1px solid var(--line); border-radius: var(--radius-md); box-shadow: var(--shadow-card); padding: 0.9rem 0.8rem; text-align: left; }
+.statCardIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-sm);
+  margin-bottom: 0.6rem;
+}
+.statCardIconNeutral { background: var(--line-soft); color: var(--ink-soft); }
+.statCardIconGreen { background: var(--green-tint); color: var(--green); }
+.statCardIconAmber { background: var(--amber-tint); color: var(--amber-dark); }
 .statCardValue { font-family: var(--font-display); font-size: 1.4rem; color: var(--asphalt); line-height: 1.1; }
 .statCardLabel { font-family: var(--font-mono); font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.03em; color: var(--ink-soft); margin-top: 0.3rem; }
 
@@ -548,20 +560,11 @@
   overflow-y: auto;
 }
 
+/* The white-card bridge-fix is no longer needed - logo-dark.png is a
+   real asset with the mark and wordmark already rendered correctly for
+   a dark background, so it's used directly rather than worked around. */
 .sidebarLogo { margin-bottom: 2rem; text-align: center; }
-/* A small, deliberate white card behind the mark, rather than trying to
-   invert-filter it white - the filter approach breaks if the source
-   PNG has an opaque white background baked in rather than genuine
-   transparency (brightness(0) then invert(1) just returns an opaque
-   white canvas to white, doing nothing to remove it). This looks
-   correct either way, without needing to know which case applies. */
-.sidebarLogo a {
-  display: inline-block;
-  background: #fff;
-  border-radius: var(--radius-md);
-  padding: 0.7rem 1.1rem;
-}
-.sidebarLogo img { width: 120px; display: block; margin: 0 auto; }
+.sidebarLogo img { width: 150px; display: block; margin: 0 auto; }
 
 .sidebarNav { display: flex; flex-direction: column; gap: 0.2rem; flex: 1; }
 

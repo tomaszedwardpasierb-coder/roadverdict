@@ -1,7 +1,7 @@
 // Place at: src/app/dashboard/Icon.tsx
 'use client';
 
-import { Gauge, Wrench, Droplet, Package, FileText, Bell, BarChart3, BookOpen, Share2 } from 'lucide-react';
+import { Gauge, Wrench, Droplet, Package, FileText, Bell, BarChart3, BookOpen, Share2, Receipt, Tag, Calendar } from 'lucide-react';
 import type { LucideProps } from 'lucide-react';
 
 // Maps this app's semantic icon names to their lucide-react component -
@@ -18,6 +18,14 @@ const ICONS = {
   reports: BarChart3,
   story: BookOpen,
   shareLinks: Share2,
+  // Stat-card icons - reuse the same underlying lucide component where
+  // conceptually the same thing (Droplet for fuel economy, Gauge for
+  // mileage) rather than importing a near-duplicate.
+  totalSpend: Receipt,
+  economy: Droplet,
+  perMile: Tag,
+  currentMiles: Gauge,
+  spendThisYear: Calendar,
 } as const;
 
 export type IconName = keyof typeof ICONS;

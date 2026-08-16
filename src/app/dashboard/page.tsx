@@ -55,6 +55,7 @@ import { DashboardStatCards } from "./DashboardStatCards";
 import { CustomFilterPanel } from "./CustomFilterPanel";
 import { ScanReceiptButton } from "./ScanReceiptButton";
 import { RegistrationBackfillBanner } from "./RegistrationBackfillBanner";
+import { Icon } from "./Icon";
 
 export const dynamic = "force-dynamic";
 
@@ -234,10 +235,16 @@ export default async function DashboardPage() {
           fuelEconomyUnit={fuelEconomyUnit}
         />
         <div className={styles.statCard}>
+          <div className={`${styles.statCardIcon} ${styles.statCardIconNeutral}`}>
+            <Icon name="currentMiles" size={16} />
+          </div>
           <div className={styles.statCardValue}>{Math.round(convertMilesToDisplay(bike.currentMileage, distanceUnit)).toLocaleString()}</div>
           <div className={styles.statCardLabel}>Current {distanceUnit === "km" ? "km" : "miles"}</div>
         </div>
         <div className={styles.statCard}>
+          <div className={`${styles.statCardIcon} ${styles.statCardIconNeutral}`}>
+            <Icon name="spendThisYear" size={16} />
+          </div>
           <div className={styles.statCardValue}>{formatCurrency(yearSpend, currency, rates)}</div>
           <div className={styles.statCardLabel}>Spend this year</div>
         </div>
