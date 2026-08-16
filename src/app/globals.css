@@ -39,8 +39,17 @@
   --shadow-card: 0 1px 2px rgba(23, 24, 27, 0.04), 0 10px 28px -14px rgba(23, 24, 27, 0.14);
   --shadow-pop: 0 4px 10px -2px rgba(23, 24, 27, 0.18);
 
-  --font-display: 'Oswald', 'Arial Narrow', sans-serif;
-  --font-body: 'IBM Plex Sans', system-ui, sans-serif;
+  /* These static fallbacks were never updated when layout.tsx's
+     next/font/google imports switched from Oswald/IBM Plex Sans to Big
+     Shoulders Display/Inter - both declarations target the same
+     --font-display/--font-body variables on the same <html> element,
+     and this static one had been silently winning ever since, with
+     the browser falling through to "Arial Narrow" once "Oswald" itself
+     was no longer actually loaded as a real font. Updated to match
+     what's genuinely loaded now, removing the conflict rather than
+     leaving two different sources of truth for the same variable. */
+  --font-display: 'Big Shoulders Display', 'Arial Narrow', sans-serif;
+  --font-body: 'Inter', system-ui, sans-serif;
   --font-mono: 'IBM Plex Mono', 'Courier New', monospace;
 }
 
