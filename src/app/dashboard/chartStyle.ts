@@ -18,7 +18,7 @@ function hexToRgba(hex: string, alpha: number): string {
 export function barGradient(color: string) {
   return (context: ScriptableContext<'bar'>) => {
     const { ctx, chartArea } = context.chart;
-    if (!chartArea) return color; // not yet laid out - fall back to flat color
+    if (!chartArea) return hexToRgba(color, 1); // not yet laid out - fall back to flat RGBA color
     const gradient = ctx.createLinearGradient(0, chartArea.top, 0, chartArea.bottom);
     gradient.addColorStop(0, hexToRgba(color, 0.55));
     gradient.addColorStop(1, hexToRgba(color, 1));
