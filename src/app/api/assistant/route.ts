@@ -123,6 +123,8 @@ export async function POST(req: Request) {
       });
 
       if (!res.ok) {
+        const errBody = await res.text().catch(() => "(could not read response body)");
+        console.error(`Assistant: Gemini API returned ${res.status} ${res.statusText}:`, errBody);
         return NextResponse.json({ error: "Assistant is temporarily unavailable." }, { status: 502 });
       }
 
@@ -145,13 +147,15 @@ export async function POST(req: Request) {
 
       const replyText = parts.find((p) => typeof p.text === "string")?.text;
       if (!replyText) {
+        console.error("Assistant: Gemini response had no text part. Full parts:", JSON.stringify(parts));
         return NextResponse.json({ error: "Assistant is temporarily unavailable." }, { status: 502 });
       }
       return NextResponse.json({ reply: replyText });
     }
 
     return NextResponse.json({ error: "Assistant took too many steps to answer that - try rephrasing." }, { status: 502 });
-  } catch {
+  } catch (err) {
+    console.error("Assistant: unhandled error:", err);
     return NextResponse.json({ error: "Assistant is temporarily unavailable." }, { status: 502 });
   }
 }
