@@ -51,7 +51,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             <img src="/logo.png" alt="RoadVerdict" className="site-header__logo-img" />
           </Link>
           <nav className="site-header__nav">
-            <Link href="/track">Track your bike</Link>
+            <Link href="/quote-checker">Quote Checker</Link>
             <Link href="/cost-calculator">Cost calculator</Link>
             <Link href="/buying-guide">Buying a used bike</Link>
             <Link href="/privacy">Privacy</Link>
