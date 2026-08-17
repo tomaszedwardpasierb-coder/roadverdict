@@ -168,6 +168,18 @@ export default async function DashboardPage() {
       {currentRegistration}
     </span>
   ) : null;
+  // Same pill shown next to every tab's page title, not just
+  // Dashboard - built once here for the same reuse reason as bikeTag
+  // above. Story So Far and Shareable Links build their own copy from
+  // the plain currentMileage/distanceUnit props passed below, matching
+  // how they already build their own bikeTag rather than receiving JSX
+  // directly.
+  const mileagePill = (
+    <div className={styles.headerMileagePill}>
+      <Icon name="currentMiles" size={15} />
+      {Math.round(convertMilesToDisplay(bike.currentMileage, distanceUnit)).toLocaleString()} {distanceUnit === "km" ? "km" : "mi"}
+    </div>
+  );
 
   const dashboardContent = (
     <ChartFilterProvider>
@@ -299,7 +311,10 @@ export default async function DashboardPage() {
 
   const serviceContent = (
     <>
-      <h1 className={styles.heading}>Service{bikeTag}</h1>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "0.75rem" }}>
+        <h1 className={styles.heading}>Service{bikeTag}</h1>
+        {mileagePill}
+      </div>
       <p className={styles.subtext}>Every oil change, every brake job - a real maintenance record, not a hazy memory of &quot;I think I did it.&quot;</p>
       <LogServiceForm initialMileage={bike.currentMileage} mileageHistory={mileagePoints} distanceUnit={distanceUnit} currency={currency} rates={rates} bikeYear={bike.year} isCustomBuild={bike.isCustomBuild} />
       <h2 className={styles.sectionHeading}>Service history</h2>
@@ -315,7 +330,10 @@ export default async function DashboardPage() {
 
   const fuelContent = (
     <>
-      <h1 className={styles.heading}>Fuel{bikeTag}</h1>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "0.75rem" }}>
+        <h1 className={styles.heading}>Fuel{bikeTag}</h1>
+        {mileagePill}
+      </div>
       <p className={styles.subtext}>Log a fill-up in seconds, and watch your actual mpg emerge - not the manufacturer&apos;s claim, yours.</p>
       <LogFuelForm initialMileage={bike.currentMileage} mileageHistory={mileagePoints} distanceUnit={distanceUnit} currency={currency} rates={rates} bikeYear={bike.year} isCustomBuild={bike.isCustomBuild} />
       {actualMpg ? (
@@ -345,7 +363,10 @@ export default async function DashboardPage() {
 
   const modsContent = (
     <>
-      <h1 className={styles.heading}>Parts & Accessories{bikeTag}</h1>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "0.75rem" }}>
+        <h1 className={styles.heading}>Parts & Accessories{bikeTag}</h1>
+        {mileagePill}
+      </div>
       <p className={styles.subtext}>Every upgrade, with the receipt to prove it wasn&apos;t a bodge job.</p>
       <LogModForm initialMileage={bike.currentMileage} mileageHistory={mileagePoints} distanceUnit={distanceUnit} currency={currency} rates={rates} bikeYear={bike.year} isCustomBuild={bike.isCustomBuild} />
       <h2 className={styles.sectionHeading}>History</h2>
@@ -359,7 +380,10 @@ export default async function DashboardPage() {
 
   const billsContent = (
     <>
-      <h1 className={styles.heading}>Insurance, tax & MOT{bikeTag}</h1>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "0.75rem" }}>
+        <h1 className={styles.heading}>Insurance, tax & MOT{bikeTag}</h1>
+        {mileagePill}
+      </div>
       <p className={styles.subtext}>The paperwork you genuinely can&apos;t afford to forget, tracked in one place, automatically.</p>
       <LogBillForm currency={currency} rates={rates} bikeYear={bike.year} isCustomBuild={bike.isCustomBuild} />
       <h2 className={styles.sectionHeading}>History</h2>
@@ -373,7 +397,10 @@ export default async function DashboardPage() {
 
   const remindersContent = (
     <>
-      <h1 className={styles.heading}>Reminders{bikeTag}</h1>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "0.75rem" }}>
+        <h1 className={styles.heading}>Reminders{bikeTag}</h1>
+        {mileagePill}
+      </div>
       <p className={styles.subtext}>RoadVerdict remembers so you don&apos;t have to. Nothing missed, nothing lapsed.</p>
       {reminders.length === 0 ? (
         <div className={styles.card}><p className={styles.cardBody}>No reminders set yet. Tick &quot;Remind me&quot; when logging a service or a bill to add one.</p></div>
@@ -385,7 +412,10 @@ export default async function DashboardPage() {
 
   const reportsContent = (
     <ChartFilterProvider>
-      <h1 className={styles.heading}>Reports{bikeTag}</h1>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "0.75rem" }}>
+        <h1 className={styles.heading}>Reports{bikeTag}</h1>
+        {mileagePill}
+      </div>
       <p className={styles.subtext}>Every chart in one place - see where the money&apos;s really going, and whether your bike&apos;s getting thirstier with age.</p>
       <p className={styles.subtext} style={{ marginBottom: "1rem" }}>Every chart in one place.</p>
       <ChartFilterBar />
@@ -463,6 +493,8 @@ export default async function DashboardPage() {
       requests={pendingReceiptRequests}
       bikeNickname={bike.nickname}
       registration={currentRegistration}
+      currentMileage={bike.currentMileage}
+      distanceUnit={distanceUnit}
     />
   );
 
@@ -491,7 +523,7 @@ export default async function DashboardPage() {
       billsContent={billsContent}
       remindersContent={remindersContent}
       reportsContent={reportsContent}
-      storyContent={<StorySoFarTab bikeNickname={bike.nickname} registration={currentRegistration} />}
+      storyContent={<StorySoFarTab bikeNickname={bike.nickname} registration={currentRegistration} currentMileage={bike.currentMileage} distanceUnit={distanceUnit} />}
       shareLinksContent={shareLinksContent}
     />
   );

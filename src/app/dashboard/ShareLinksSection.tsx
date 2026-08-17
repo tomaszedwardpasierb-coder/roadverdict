@@ -3,6 +3,8 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { Icon } from './Icon';
+import { convertMilesToDisplay, type DistanceUnit } from '@/lib/tracker/unitFormat';
 import { AttachmentThumb } from './AttachmentThumb';
 import { ShareLinksList } from './ShareLinksList';
 import { ExportShareSection } from './ExportShareSection';
@@ -225,9 +227,11 @@ interface Props {
   requests: ReceiptRequestDocView[];
   bikeNickname?: string;
   registration?: string;
+  currentMileage: number;
+  distanceUnit: DistanceUnit;
 }
 
-export function ShareLinksSection({ links, bikeNames, appUrl, requests, bikeNickname, registration }: Props) {
+export function ShareLinksSection({ links, bikeNames, appUrl, requests, bikeNickname, registration, currentMileage, distanceUnit }: Props) {
   const [tab, setTab] = useState<SubTab>('links');
   const pendingCount = requests.length;
 
@@ -247,10 +251,19 @@ export function ShareLinksSection({ links, bikeNames, appUrl, requests, bikeNick
       {registration}
     </span>
   ) : null;
+  const mileagePill = (
+    <div className={styles.headerMileagePill}>
+      <Icon name="currentMiles" size={15} />
+      {Math.round(convertMilesToDisplay(currentMileage, distanceUnit)).toLocaleString()} {distanceUnit === "km" ? "km" : "mi"}
+    </div>
+  );
 
   return (
     <>
-      <h1 className={styles.heading}>Shareable Links{bikeTag}</h1>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "0.75rem" }}>
+        <h1 className={styles.heading}>Shareable Links{bikeTag}</h1>
+        {mileagePill}
+      </div>
       <p className={styles.subtext} style={{ marginBottom: '1rem' }}>
         Every link you&apos;ve created, and everything it&apos;s proven. Generate a new one any time you&apos;re
         ready to show what this bike&apos;s really worth, and review any requests to see a receipt that have come

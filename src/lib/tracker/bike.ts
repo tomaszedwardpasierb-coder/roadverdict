@@ -4,6 +4,7 @@ import { getContainer } from "@/lib/cosmos";
 import type { BikeClass, Region } from "@/lib/priceData";
 import type { DistanceUnit, FuelEconomyUnit } from "@/lib/tracker/unitFormat";
 import type { Currency } from "@/lib/tracker/currency";
+import type { BikeIdentity, CategorySpend } from "@/lib/tracker/storyFacts";
 
 // Free-tier cap. No paid tier exists yet - when it does, the natural
 // extension point is a `plan` field on some account-level doc, checked
@@ -96,6 +97,22 @@ export interface BikeDoc {
   // fail bike creation itself. See dvlaDataFetch.ts for how this gets
   // populated.
   dvlaData?: DvlaVehicleData;
+  // Caches the last AI-generated Story So Far result, capped at one
+  // real generation per week to avoid burning an AI call every time
+  // someone just wants to re-read their own story. Absent until the
+  // first generation. See src/app/api/tracker/story-so-far/route.ts
+  // for the cooldown check that reads this.
+  storyCache?: {
+    generatedAt: string;
+    response: {
+      generatedWithAi: boolean;
+      sharedStory: string[];
+      ownerNotes: string[];
+      verdict: { tier: string; label: string; reasons: string[] };
+      identity: BikeIdentity;
+      categorySpend: CategorySpend[];
+    };
+  };
 }
 
 export interface DvlaKeeperChange {
@@ -285,6 +302,15 @@ export async function updateBikeBudget(email: string, bikeId: string, annualBudg
   const { resource } = await container.item(bikeId, email).read<BikeDoc>();
   if (!resource) return null;
   resource.annualBudget = annualBudget;
+  await container.items.upsert(resource);
+  return resource;
+}
+
+export async function updateBikeStoryCache(email: string, bikeId: string, storyCache: BikeDoc["storyCache"]): Promise<BikeDoc | null> {
+  const container = getContainer();
+  const { resource } = await container.item(bikeId, email).read<BikeDoc>();
+  if (!resource) return null;
+  resource.storyCache = storyCache;
   await container.items.upsert(resource);
   return resource;
 }
