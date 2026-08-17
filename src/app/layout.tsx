@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { cookies } from 'next/headers';
 import { getAdminSession } from '@/lib/admin/session';
 import { ImpersonationBanner } from './ImpersonationBanner';
+import { AssistantWidget } from '@/components/AssistantWidget';
 import './globals.css';
 const bigShouldersDisplay = Big_Shoulders_Display({
   subsets: ['latin'],
@@ -63,6 +64,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             inspection. <Link href="/privacy">Privacy</Link> · <a href="mailto:hello@roadverdict.co.uk">hello@roadverdict.co.uk</a>
           </p>
         </footer>
+        <AssistantWidget />
       </body>
     </html>
   );
