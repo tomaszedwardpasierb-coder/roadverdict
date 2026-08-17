@@ -11,6 +11,7 @@ import {
 import {
   getModelsForBrand,
   getBikeClassForCC,
+  slugifyMake,
 } from '@/lib/motorcycleModels';
 import type { AnnualCostBreakdown } from '@/lib/costCalculator';
 import { CostBreakdownResult } from './CostBreakdownResult';
@@ -22,18 +23,47 @@ interface ApiResponse {
   error?: string;
 }
 
+interface PlateLookupResponse {
+  vrm: string;
+  make: string;
+  model: string;
+  year: number;
+  engineCapacityCc: number | null;
+  plateInRetention: boolean;
+  error?: string;
+}
+
 const BIKE_CLASSES = Object.keys(BIKE_CLASS_LABELS) as BikeClass[];
 const REGIONS = Object.keys(REGION_LABELS) as Region[];
 
-export function CostCalculatorForm() {
-  const [bikeClass, setBikeClass] = useState<BikeClass>('medium');
-  const [brand, setBrand] = useState(BRAND_OPTIONS[0].value);
-  const [model, setModel] = useState('');
+interface Props {
+  signedIn: boolean;
+  initialBrand?: string;
+  initialModel?: string;
+  initialBikeClass?: BikeClass;
+}
+
+export function CostCalculatorForm({ signedIn, initialBrand, initialModel, initialBikeClass }: Props) {
+  const [bikeClass, setBikeClass] = useState<BikeClass>(initialBikeClass ?? 'medium');
+  const [brand, setBrand] = useState(initialBrand ?? BRAND_OPTIONS[0].value);
+  const [model, setModel] = useState(initialModel ?? '');
   const [region, setRegion] = useState<Region>('rest-england-wales');
   const [annualMileage, setAnnualMileage] = useState('4000');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<ApiResponse | null>(null);
+
+  // Registration search - reuses the same lookup the tracker's "add
+  // bike" flow uses, which is why it's only offered signed in: that
+  // endpoint calls a paid, metered vehicle-data API, and requiring a
+  // session is what keeps it from being an open, unmetered public
+  // endpoint. Left enabled after a successful lookup rather than
+  // locked, so a different plate can be searched immediately without
+  // reloading the page.
+  const [vrm, setVrm] = useState('');
+  const [lookupLoading, setLookupLoading] = useState(false);
+  const [lookupError, setLookupError] = useState<string | null>(null);
+  const [lookupNote, setLookupNote] = useState<string | null>(null);
 
   const modelsForBrand = getModelsForBrand(brand);
 
@@ -49,6 +79,51 @@ export function CostCalculatorForm() {
       if (selected) {
         setBikeClass(getBikeClassForCC(selected.engineCC));
       }
+    }
+  }
+
+  async function handlePlateLookup() {
+    const cleaned = vrm.trim().toUpperCase().replace(/\s+/g, '');
+    if (!cleaned) {
+      setLookupError('Enter a registration number first.');
+      return;
+    }
+    setLookupLoading(true);
+    setLookupError(null);
+    setLookupNote(null);
+    try {
+      const res = await fetch(`/api/tracker/plate-lookup?vrm=${encodeURIComponent(cleaned)}`);
+      const data: PlateLookupResponse = await res.json();
+      if (!res.ok) {
+        setLookupError(data.error ?? 'No vehicle found for that registration. Pick it manually below instead.');
+        return;
+      }
+
+      const matchedBrand = slugifyMake(data.make);
+      const resolvedBrand = BRAND_OPTIONS.some((b) => b.value === matchedBrand) ? matchedBrand : 'other';
+      setBrand(resolvedBrand);
+
+      const candidates = getModelsForBrand(resolvedBrand);
+      const matchedModel = candidates.find(
+        (m) => m.model.toLowerCase().includes(data.model.toLowerCase()) || data.model.toLowerCase().includes(m.model.toLowerCase())
+      );
+      setModel(matchedModel?.model ?? '');
+
+      // The engine size drives the actual price estimate - set from
+      // the looked-up figure directly rather than only from a matched
+      // model, since a real vehicle very often won't have an exact
+      // match in the curated model list even when the brand does.
+      if (data.engineCapacityCc) {
+        setBikeClass(getBikeClassForCC(data.engineCapacityCc));
+      }
+
+      setLookupNote(
+        `Found: ${data.make} ${data.model} (${data.year})${data.plateInRetention ? " - this plate isn't currently attached to a vehicle; showing the last one it was on" : ''}. Fields below updated - check them before working it out.`
+      );
+    } catch {
+      setLookupError("Couldn't reach the lookup service. Pick your bike manually below instead.");
+    } finally {
+      setLookupLoading(false);
     }
   }
 
@@ -92,6 +167,32 @@ export function CostCalculatorForm() {
             <span className="ticket__label">Your bike</span>
             <span className="ticket__step">Step 1 of 3</span>
           </div>
+
+          {signedIn ? (
+            <div className="field" style={{ marginBottom: '1.1rem' }}>
+              <label htmlFor="cc-vrm">Search by registration (optional)</label>
+              <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                <input
+                  id="cc-vrm"
+                  type="text"
+                  value={vrm}
+                  onChange={(e) => setVrm(e.target.value)}
+                  placeholder="e.g. AB12 CDE"
+                  style={{ flex: '1 1 160px' }}
+                />
+                <button type="button" className="btn-primary" onClick={handlePlateLookup} disabled={lookupLoading}>
+                  {lookupLoading ? 'Looking up…' : 'Look up'}
+                </button>
+              </div>
+              {lookupError && <p className="error-text" role="alert">{lookupError}</p>}
+              {lookupNote && <p className="field-note">{lookupNote}</p>}
+            </div>
+          ) : (
+            <p className="field-note" style={{ marginBottom: '1.1rem' }}>
+              <a href="/login">Sign in</a> to search by your bike&apos;s registration instead of picking it manually below.
+            </p>
+          )}
+
           <div className="field">
             <label htmlFor="cc-brand">Make</label>
             <select
@@ -188,7 +289,7 @@ export function CostCalculatorForm() {
                 required
               />
             </div>
-            <button className="submit-button" type="submit" disabled={submitting}>
+            <button className="btn-primary" type="submit" disabled={submitting}>
               {submitting ? 'Calculating…' : 'Work it out'}
             </button>
           </div>
