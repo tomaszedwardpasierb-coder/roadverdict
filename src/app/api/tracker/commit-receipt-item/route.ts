@@ -18,7 +18,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "No bike found for this account." }, { status: 404 });
   }
 
-  let body: { item?: ParsedReceiptItem; batchHints?: { date: string; mileage: number }[] };
+  let body: { item?: ParsedReceiptItem; batchHints?: { date: string; mileage: number }[]; boundsOnlyHints?: { date: string; mileage: number; batchIndex?: number }[] };
   try {
     body = await request.json();
   } catch {
@@ -29,7 +29,7 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const entry = await commitReceiptItem(session.email, bike, body.item, body.batchHints ?? []);
+    const entry = await commitReceiptItem(session.email, bike, body.item, body.batchHints ?? [], body.boundsOnlyHints ?? []);
     return NextResponse.json({ entry });
   } catch (err) {
     return NextResponse.json(

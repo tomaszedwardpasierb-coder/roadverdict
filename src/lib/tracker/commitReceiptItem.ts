@@ -5,7 +5,7 @@ import { getFuelLogs, createFuelLog } from "@/lib/tracker/fuelLog";
 import { getMods, createMod } from "@/lib/tracker/mod";
 import { getBills, createBill } from "@/lib/tracker/bill";
 import { createReminder } from "@/lib/tracker/reminder";
-import { estimateMileage, estimateFuelMileageFromLitres, type MileagePoint } from "@/lib/tracker/mileageEstimate";
+import { estimateMileage, estimateFuelMileageFromLitres, applyKnownBounds, type MileagePoint } from "@/lib/tracker/mileageEstimate";
 import { computeActualMPG } from "@/lib/tracker/mpgCalc";
 import { guessJobType, guessModCategory, guessBillType } from "@/lib/tracker/guessCategory";
 import { JOB_LABELS, JOB_REMINDER_DEFAULTS } from "@/lib/tracker/jobTypes";
@@ -71,7 +71,17 @@ export async function commitReceiptItem(
   email: string,
   bike: BikeDoc,
   item: ParsedReceiptItem,
-  batchHints: { date: string; mileage: number; batchIndex?: number; category?: "service" | "fuel" | "mods" | "mot"; litres?: number }[] = []
+  batchHints: { date: string; mileage: number; batchIndex?: number; category?: "service" | "fuel" | "mods" | "mot"; litres?: number }[] = [],
+  // Same idea as batchHints, but deliberately kept separate: these are
+  // already-committed batch peers, whose mileage may itself be an AI
+  // estimate rather than a real printed reading. That makes them unfit
+  // to compute a RATE from (batchHints above stays reserved for that),
+  // but they're still real, already-saved numbers a new estimate must
+  // never contradict - exactly what applyKnownBounds is for. Folding
+  // these into batchHints instead would let one guess quietly become
+  // the foundation for the next, which is the exact chaining risk this
+  // file has always deliberately avoided.
+  boundsOnlyHints: { date: string; mileage: number; batchIndex?: number }[] = []
 ): Promise<ReviewQueueEntry> {
   const { category, date, costGbp, description, litres, mileageOnReceipt, registrationOnReceipt, merchantName, address, city, vehicleMakeOnReceipt, vehicleModelOnReceipt, attachment, currencyConversion, forceReview } = item;
 
@@ -144,7 +154,11 @@ export async function commitReceiptItem(
     ...mods.map((m) => ({ id: m.id, category: "mods" as const, date: m.date, mileage: m.mileage })),
     ...bills.filter((b) => b.billType === "mot-test" && b.mileage != null).map((b) => ({ id: b.id, category: "mot" as const, date: b.date, mileage: b.mileage as number })),
     ...batchHints,
+    ...boundsOnlyHints,
   ];
+  // Same set, reduced to the {date, mileage} shape estimateMileage's
+  // bounds parameter and applyKnownBounds both actually need.
+  const allPointsForBounds: MileagePoint[] = allMileagePoints.map((p) => ({ date: p.date, mileage: p.mileage }));
 
   let mileage: number | undefined;
   let mileageConfidence: "interpolated" | "estimated" | undefined;
@@ -157,11 +171,16 @@ export async function commitReceiptItem(
   const filledToFullGuess = category === "fuel" ? guessFilledToFull(litres ?? 0, bike.tankCapacityLitres) : false;
 
   function applyGenericMileageEstimate(conflictWarning?: string) {
-    const estimate = estimateMileage(date, trustedMileagePointsForEstimate, {
-      startingMileage: bike.startingMileage,
-      currentMileage: bike.currentMileage,
-      dateAdded: bike.dateAdded,
-    });
+    const estimate = estimateMileage(
+      date,
+      trustedMileagePointsForEstimate,
+      {
+        startingMileage: bike.startingMileage,
+        currentMileage: bike.currentMileage,
+        dateAdded: bike.dateAdded,
+      },
+      allPointsForBounds
+    );
     mileage = estimate.mileage;
     mileageConfidence = estimate.confidence;
     mileageWarning = conflictWarning ?? estimate.warning;
@@ -243,10 +262,14 @@ export async function commitReceiptItem(
         dateAdded: bike.dateAdded,
       });
       if (litresEstimate) {
-        mileage = litresEstimate.mileage;
+        const bounded = applyKnownBounds(litresEstimate.mileage, date, allPointsForBounds);
+        mileage = bounded.mileage;
         mileageConfidence = litresEstimate.confidence;
-        mileageWarning = litresEstimate.warning;
-        crossCheckEstimateAgainstFullHistory();
+        mileageWarning = bounded.boundsConflict
+          ? bounded.boundsWarning
+          : [litresEstimate.warning, bounded.boundsWarning].filter(Boolean).join(" ");
+        mileageNeedsManualEntry = bounded.boundsConflict;
+        if (!bounded.boundsConflict) crossCheckEstimateAgainstFullHistory();
       } else {
         applyGenericMileageEstimate();
       }

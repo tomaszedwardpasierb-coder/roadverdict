@@ -53,6 +53,85 @@ function daysBetween(a: number, b: number): number {
   return Math.abs(a - b) / 86400000;
 }
 
+// A point too unreliable to compute a RATE from is still a real,
+// already-saved number - and nothing computed for a different date
+// should ever contradict it. This is deliberately a separate concept
+// from "trusted": the points passed in here can include an already-
+// committed batch peer or a prior AI estimate, neither of which is fit
+// to derive a pace from (that's still gated by isTrustworthy at the
+// call site), but both of which are still real floors/ceilings a new
+// guess must respect. Without this, an estimate computed purely from a
+// bike's broad lifetime average can land anywhere - including below an
+// earlier, already-logged fill-up - and the only thing that used to
+// catch it was a cross-check running well after the fact, on a result
+// this function had no way to get right in the first place.
+export function applyKnownBounds(
+  mileage: number,
+  targetDate: string,
+  allKnownPoints: MileagePoint[]
+): { mileage: number; boundsWarning?: string; boundsConflict: boolean } {
+  const target = new Date(targetDate).getTime();
+  let floor: { mileage: number; date: string } | null = null;
+  let ceiling: { mileage: number; date: string } | null = null;
+
+  for (const p of allKnownPoints) {
+    const pTime = new Date(p.date).getTime();
+    if (pTime <= target) {
+      if (!floor || p.mileage > floor.mileage) floor = { mileage: p.mileage, date: p.date };
+    } else {
+      if (!ceiling || p.mileage < ceiling.mileage) ceiling = { mileage: p.mileage, date: p.date };
+    }
+  }
+
+  // The known points themselves disagree with each other (a floor
+  // higher than a ceiling) - that's a pre-existing data conflict this
+  // one estimate can't safely resolve by picking a side. Ask a human
+  // rather than silently landing somewhere between two numbers that
+  // already contradict each other.
+  if (floor && ceiling && floor.mileage > ceiling.mileage) {
+    return {
+      mileage,
+      boundsConflict: true,
+      boundsWarning: `Already-logged records disagree with each other around this date - one from ${new Date(floor.date).toLocaleDateString("en-GB")} shows ${floor.mileage.toLocaleString()} mi, another from ${new Date(ceiling.date).toLocaleDateString("en-GB")} shows ${ceiling.mileage.toLocaleString()} mi, and those two can't both be right. Please check both and enter the real mileage for this one.`,
+    };
+  }
+
+  if (floor && mileage < floor.mileage) {
+    return {
+      mileage: floor.mileage,
+      boundsConflict: false,
+      boundsWarning: `Adjusted up to stay consistent with a record already logged on ${new Date(floor.date).toLocaleDateString("en-GB")} showing ${floor.mileage.toLocaleString()} mi.`,
+    };
+  }
+  if (ceiling && mileage > ceiling.mileage) {
+    return {
+      mileage: ceiling.mileage,
+      boundsConflict: false,
+      boundsWarning: `Adjusted down to stay consistent with a record already logged on ${new Date(ceiling.date).toLocaleDateString("en-GB")} showing ${ceiling.mileage.toLocaleString()} mi.`,
+    };
+  }
+
+  return { mileage, boundsConflict: false };
+}
+
+// Every auto-computed (non-manual-entry) branch below routes through
+// here before returning, so the bounds check in applyKnownBounds above
+// is never something an individual branch could forget to call.
+function finalizeWithBounds(
+  mileage: number,
+  confidence: MileageConfidence,
+  warning: string | undefined,
+  targetDate: string,
+  allPointsForBounds: MileagePoint[]
+): MileageEstimateResult {
+  const bounded = applyKnownBounds(mileage, targetDate, allPointsForBounds);
+  if (bounded.boundsConflict) {
+    return { mileage: bounded.mileage, confidence, warning: bounded.boundsWarning, requiresManualEntry: true };
+  }
+  const combinedWarning = bounded.boundsWarning ? [warning, bounded.boundsWarning].filter(Boolean).join(" ") : warning;
+  return { mileage: bounded.mileage, confidence, warning: combinedWarning, requiresManualEntry: false };
+}
+
 function trustedExtrapolationDays(observedWindowDays: number): number {
   return Math.min(observedWindowDays * MAX_EXTRAPOLATION_MULTIPLE, MAX_EXTRAPOLATION_DAYS_HARD_CAP);
 }
@@ -142,7 +221,12 @@ export function estimateFuelMileageFromLitres(
 //    across its whole known lifetime (bounded by two real numbers the owner themselves
 //    provided when adding the bike, so this stays automatic).
 // 5. Target date is before the bike was even added - same trust-distance rule as (3).
-export function estimateMileage(targetDate: string, knownPoints: MileagePoint[], bike: BikeLifetime): MileageEstimateResult {
+export function estimateMileage(
+  targetDate: string,
+  knownPoints: MileagePoint[],
+  bike: BikeLifetime,
+  allPointsForBounds: MileagePoint[] = knownPoints
+): MileageEstimateResult {
   const target = new Date(targetDate).getTime();
   const sorted = [...knownPoints].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
@@ -159,7 +243,7 @@ export function estimateMileage(targetDate: string, knownPoints: MileagePoint[],
       gapDays > WIDE_GAP_DAYS
         ? `The nearest logged records either side of this date are ${Math.round(gapDays)} days apart - this is a straight-line guess across a wide gap, worth checking if you can.`
         : undefined;
-    return { mileage, confidence: "interpolated", warning, requiresManualEntry: false };
+    return finalizeWithBounds(mileage, "interpolated", warning, targetDate, allPointsForBounds);
   }
 
   if (before) {
@@ -179,7 +263,7 @@ export function estimateMileage(targetDate: string, knownPoints: MileagePoint[],
       daysSince > NEARBY_POINT_DAYS
         ? `${Math.round(daysSince)} days on from the nearest earlier record, extrapolated at ${isBikeSpecific ? "this bike's own average pace" : "a generic UK average (no bike-specific pace to go on yet)"}.`
         : undefined;
-    return { mileage, confidence: "estimated", warning, requiresManualEntry: false };
+    return finalizeWithBounds(mileage, "estimated", warning, targetDate, allPointsForBounds);
   }
 
   if (after) {
@@ -199,7 +283,7 @@ export function estimateMileage(targetDate: string, knownPoints: MileagePoint[],
       daysBefore > NEARBY_POINT_DAYS
         ? `${Math.round(daysBefore)} days before the nearest later record, extrapolated backward at ${isBikeSpecific ? "this bike's own average pace" : "a generic UK average (no bike-specific pace to go on yet)"}.`
         : undefined;
-    return { mileage, confidence: "estimated", warning, requiresManualEntry: false };
+    return finalizeWithBounds(mileage, "estimated", warning, targetDate, allPointsForBounds);
   }
 
   const addedTime = new Date(bike.dateAdded).getTime();
@@ -208,12 +292,13 @@ export function estimateMileage(targetDate: string, knownPoints: MileagePoint[],
   if (target >= addedTime) {
     const frac = nowTime > addedTime ? (target - addedTime) / (nowTime - addedTime) : 0;
     const mileage = clampToPlausible(bike.startingMileage + frac * (bike.currentMileage - bike.startingMileage), bike);
-    return {
+    return finalizeWithBounds(
       mileage,
-      confidence: "estimated",
-      warning: "No logged records at all yet to anchor this - spread evenly across the bike's whole time on RoadVerdict.",
-      requiresManualEntry: false,
-    };
+      "estimated",
+      "No logged records at all yet to anchor this - spread evenly across the bike's whole time on RoadVerdict.",
+      targetDate,
+      allPointsForBounds
+    );
   }
 
   // Target date is before the bike was even added to RoadVerdict - this
@@ -236,5 +321,5 @@ export function estimateMileage(targetDate: string, knownPoints: MileagePoint[],
   }
   const mileage = clampToPlausible(bike.startingMileage - rate * daysBeforeAdded, bike);
   const warning = `From before this bike was added to RoadVerdict - extrapolated backward ${Math.round(daysBeforeAdded)} days at this bike's own average pace.`;
-  return { mileage, confidence: "estimated", warning, requiresManualEntry: false };
+  return finalizeWithBounds(mileage, "estimated", warning, targetDate, allPointsForBounds);
 }

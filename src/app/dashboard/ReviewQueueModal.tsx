@@ -533,6 +533,22 @@ export function ReviewQueueModal({ parsedItems, onFinished }: { parsedItems: Par
         litres: it.litres ?? undefined,
       }));
 
+    // Already-committed peers from earlier in this same batch - unlike
+    // batchHints above, these are included regardless of whether their
+    // own mileage came from a printed reading or was itself an AI
+    // estimate. That's deliberate: it's not reliable enough to compute
+    // a RATE from (the server keeps that restriction), but it's still a
+    // real, already-saved number nothing computed after it should be
+    // allowed to silently contradict. This is what was missing before -
+    // a peer reviewed and saved five items ago in this same batch is
+    // exactly as real an anchor as one sitting in the database from a
+    // previous session, and had no way to help at all until now.
+    const boundsOnlyHints: { date: string; mileage: number; batchIndex: number }[] = [];
+    committed.forEach((entry, i) => {
+      if (i === index || !entry || entry.category === "bills") return;
+      boundsOnlyHints.push({ date: entry.date, mileage: entry.mileage, batchIndex: i });
+    });
+
     let cancelled = false;
     setCommitting(true);
     setCommitError(null);
@@ -542,7 +558,7 @@ export function ReviewQueueModal({ parsedItems, onFinished }: { parsedItems: Par
         const res = await fetch('/api/tracker/commit-receipt-item', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ item: items[index], batchHints }),
+          body: JSON.stringify({ item: items[index], batchHints, boundsOnlyHints }),
         });
         const data = await res.json();
         if (cancelled) return;
