@@ -599,6 +599,30 @@
   flex-shrink: 0;
 }
 
+.sidebarSecondaryNav {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  padding-top: 0.7rem;
+  margin-top: 0.5rem;
+}
+.sidebarSecondaryNavItem {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.45rem 0.8rem;
+  border-radius: var(--radius-sm);
+  font-family: var(--font-body);
+  font-size: 0.78rem;
+  color: rgba(255, 255, 255, 0.55);
+  text-decoration: none;
+}
+.sidebarSecondaryNavItem:hover {
+  background: var(--asphalt-2);
+  color: rgba(255, 255, 255, 0.85);
+}
+
 .sidebarBikeCard { border-top: 1px solid rgba(255, 255, 255, 0.12); padding-top: 1rem; margin-top: 1rem; font-size: 0.85rem; position: relative; }
 .sidebarBikeLabel { font-family: var(--font-mono); font-size: 0.65rem; text-transform: uppercase; color: rgba(255, 255, 255, 0.5); margin-bottom: 0.3rem; }
 .sidebarBikeName { font-weight: 600; }

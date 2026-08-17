@@ -1,7 +1,7 @@
 // Place at: src/app/dashboard/Icon.tsx
 'use client';
 
-import { Gauge, Wrench, Droplet, Package, Shield, Bell, BarChart3, BookOpen, Share2, Receipt, Tag, Calendar, Camera } from 'lucide-react';
+import { Gauge, Wrench, Droplet, Package, Shield, Bell, BarChart3, BookOpen, Share2, Receipt, Tag, Calendar, Camera, Calculator, ClipboardCheck, Lock } from 'lucide-react';
 import type { LucideProps } from 'lucide-react';
 
 // Maps this app's semantic icon names to their lucide-react component -
@@ -27,6 +27,13 @@ const ICONS = {
   currentMiles: Gauge,
   spendThisYear: Calendar,
   camera: Camera,
+  // Secondary sidebar menu (Cost Calculator / Buying a Used Bike /
+  // Privacy) - deliberately not reusing Shield or BookOpen, both
+  // already meaning something else above (Tax & Insurance, Story So
+  // Far), to avoid two different nav items reading as the same icon.
+  costCalculator: Calculator,
+  buyingGuide: ClipboardCheck,
+  privacy: Lock,
 } as const;
 
 export type IconName = keyof typeof ICONS;

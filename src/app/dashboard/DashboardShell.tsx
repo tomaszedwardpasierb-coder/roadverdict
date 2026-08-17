@@ -142,6 +142,21 @@ export function DashboardShell({
             })}
           </nav>
 
+          <nav className={styles.sidebarSecondaryNav}>
+            <Link href="/cost-calculator" className={styles.sidebarSecondaryNavItem}>
+              <Icon name="costCalculator" className={styles.navIcon} size={15} />
+              <span>Cost calculator</span>
+            </Link>
+            <Link href="/buying-guide" className={styles.sidebarSecondaryNavItem}>
+              <Icon name="buyingGuide" className={styles.navIcon} size={15} />
+              <span>Buying a used bike</span>
+            </Link>
+            <Link href="/privacy" className={styles.sidebarSecondaryNavItem}>
+              <Icon name="privacy" className={styles.navIcon} size={15} />
+              <span>Privacy</span>
+            </Link>
+          </nav>
+
           <BikeSwitcher bikes={bikes} activeBikeId={activeBikeId} distanceUnit={distanceUnit} />
           <div style={{ marginTop: '0.6rem' }}>
             <UpdateMileageButton currentMileage={currentMileage} distanceUnit={distanceUnit} />
