@@ -136,6 +136,10 @@ export default async function AdminDashboardPage({
         <AdminLogoutButton />
       </div>
 
+      <p style={{ marginTop: '-0.5rem', marginBottom: '1.5rem' }}>
+        <a href="/privacy-draft">Privacy policy draft →</a>
+      </p>
+
       <h2 className={styles.sectionHeading}>Server & hosting</h2>
       <div className={styles.statusGrid}>
         <div className={styles.statusCard}>
