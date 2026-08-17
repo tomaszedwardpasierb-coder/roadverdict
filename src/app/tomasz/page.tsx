@@ -17,6 +17,7 @@ import {
   browserFamily,
 } from '@/lib/admin/stats';
 import { getSiteStats, type SiteStats } from '@/lib/monitoring/appInsights';
+import { getAllAssistantQuestions, groupSimilarQuestions, type AssistantQuestionLogDoc } from '@/lib/tracker/assistantQuestionLog';
 import styles from './tomasz.module.css';
 import { RunCronButton } from './RunCronButton';
 import { ImpersonateButton } from './ImpersonateButton';
@@ -57,6 +58,18 @@ async function getSiteStatsSafe(hours: number): Promise<SiteStats | null> {
   } catch (err) {
     console.error('Failed to load site stats for /tomasz:', err);
     return null;
+  }
+}
+
+// Same reasoning as getSiteStatsSafe above - this is a new query
+// against a document type that's never run in production before, so
+// it gets the same defensive treatment as everything else on this page.
+async function getAssistantQuestionsSafe(): Promise<AssistantQuestionLogDoc[]> {
+  try {
+    return await getAllAssistantQuestions();
+  } catch (err) {
+    console.error('Failed to load assistant questions for /tomasz:', err);
+    return [];
   }
 }
 
@@ -108,6 +121,7 @@ export default async function AdminDashboardPage({
     bikeIdBackfillStatus,
     browserBreakdown,
     siteStats,
+    assistantQuestions,
   ] = await Promise.all([
     getDbStats(),
     getActiveSessionCount(),
@@ -121,8 +135,10 @@ export default async function AdminDashboardPage({
     getBikeIdBackfillStatus(),
     getBrowserBreakdown(),
     getSiteStatsSafe(windowHours),
+    getAssistantQuestionsSafe(),
   ]);
   const health = getServerHealth();
+  const commonQuestions = groupSimilarQuestions(assistantQuestions);
 
   const trendRequests = siteStats?.trend.map((t) => t.requests) ?? [];
   const trendFailures = siteStats?.trend.map((t) => t.failures) ?? [];
@@ -421,6 +437,64 @@ export default async function AdminDashboardPage({
                 <td>{s.ip ?? '-'}</td>
                 <td>{s.userAgent ? browserFamily(s.userAgent) : '-'}</td>
                 <td><ImpersonateButton email={s.email} /></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+
+      <h2 className={styles.sectionHeading}>AI Assistant Questions</h2>
+      <p style={{ marginBottom: '0.6rem' }}>
+        {assistantQuestions.length} question{assistantQuestions.length === 1 ? '' : 's'} logged in total.
+        Not linked to who asked - see the note in assistantQuestionLog.ts for why.
+      </p>
+      <p className={styles.warn} style={{ marginBottom: '0.6rem' }}>
+        &quot;Most common&quot; below is an exact-match count on normalized text, not real theme
+        clustering - &quot;when&apos;s my MOT due&quot; and &quot;MOT due date&quot; count as two
+        different questions despite meaning the same thing. Treat this as a signal to skim the
+        raw list below for real patterns, not as a definitive ranking.
+      </p>
+      {commonQuestions.length === 0 ? (
+        <p className={styles.warn}>No questions logged yet.</p>
+      ) : (
+        <table className={styles.table}>
+          <thead>
+            <tr>
+              <th>Question (normalized)</th>
+              <th>Times asked</th>
+            </tr>
+          </thead>
+          <tbody>
+            {commonQuestions.map((q, i) => (
+              <tr key={i}>
+                <td>{q.text}</td>
+                <td>{q.count}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+
+      <h3 style={{ marginTop: '1.2rem', marginBottom: '0.6rem' }}>Most recent</h3>
+      {assistantQuestions.length === 0 ? (
+        <p className={styles.warn}>No questions logged yet.</p>
+      ) : (
+        <table className={styles.table}>
+          <thead>
+            <tr>
+              <th>Asked</th>
+              <th>Question</th>
+              <th>Signed in</th>
+              <th>Result</th>
+            </tr>
+          </thead>
+          <tbody>
+            {assistantQuestions.slice(0, 100).map((q) => (
+              <tr key={q.id}>
+                <td>{fmtDate(q.askedAt)}</td>
+                <td>{q.question}</td>
+                <td>{q.signedIn ? 'Yes' : 'No'}</td>
+                <td style={q.hadError ? { color: 'var(--verdict-red)' } : undefined}>{q.hadError ? 'Error' : 'Answered'}</td>
               </tr>
             ))}
           </tbody>

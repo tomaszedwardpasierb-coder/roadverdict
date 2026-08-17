@@ -11,6 +11,7 @@ import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/session";
 import { ASSISTANT_KNOWLEDGE_BASE, getLivePrivacyPolicyText } from "@/lib/tracker/assistantKnowledge";
 import { ASSISTANT_TOOL_DECLARATIONS, runAssistantTool } from "@/lib/tracker/assistantTools";
+import { logAssistantQuestion } from "@/lib/tracker/assistantQuestionLog";
 
 export const dynamic = "force-dynamic";
 
@@ -105,6 +106,10 @@ export async function POST(req: Request) {
     console.error("Assistant: getSession() failed, continuing as anonymous:", err);
   }
   const signedIn = !!session;
+  // The client always appends the new message before sending, so this
+  // is the actual question being asked right now - not the full
+  // history, which would have already been logged on earlier requests.
+  const question = messages[messages.length - 1]?.content ?? "";
 
   const privacyPolicyText = await getLivePrivacyPolicyText();
   const systemInstruction = buildSystemInstruction(signedIn, privacyPolicyText);
@@ -130,6 +135,7 @@ export async function POST(req: Request) {
       if (!res.ok) {
         const errBody = await res.text().catch(() => "(could not read response body)");
         console.error(`Assistant: Gemini API returned ${res.status} ${res.statusText}:`, errBody);
+        await logAssistantQuestion(question, signedIn, true);
         return NextResponse.json({ error: "Assistant is temporarily unavailable." }, { status: 502 });
       }
 
@@ -155,14 +161,18 @@ export async function POST(req: Request) {
       const replyText = parts.find((p) => typeof p.text === "string")?.text;
       if (!replyText) {
         console.error("Assistant: Gemini response had no text part. Full parts:", JSON.stringify(parts));
+        await logAssistantQuestion(question, signedIn, true);
         return NextResponse.json({ error: "Assistant is temporarily unavailable." }, { status: 502 });
       }
+      await logAssistantQuestion(question, signedIn, false);
       return NextResponse.json({ reply: replyText });
     }
 
+    await logAssistantQuestion(question, signedIn, true);
     return NextResponse.json({ error: "Assistant took too many steps to answer that - try rephrasing." }, { status: 502 });
   } catch (err) {
     console.error("Assistant: unhandled error:", err);
+    await logAssistantQuestion(question, signedIn, true);
     return NextResponse.json({ error: "Assistant is temporarily unavailable." }, { status: 502 });
   }
 }
