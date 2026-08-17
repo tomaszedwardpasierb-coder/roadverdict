@@ -288,6 +288,32 @@ main {
   cursor: not-allowed;
 }
 
+/* Marketing-page primary CTA, matching the dashboard's amber button
+   style (scanReceiptBtn) rather than the older bordered/uppercase
+   .submit-button above - kept as its own class rather than changing
+   .submit-button itself, since that class is also used on the login
+   page and other forms not in scope here. */
+.btn-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-family: var(--font-body);
+  font-weight: 700;
+  font-size: 0.95rem;
+  background: var(--amber);
+  color: var(--asphalt);
+  border: none;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+  padding: 0.8rem 1.6rem;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.btn-primary:hover {
+  background: var(--amber-dark);
+}
+
 .error-text {
   color: var(--verdict-red);
   font-size: 0.9rem;
@@ -502,8 +528,9 @@ main {
 }
 .info-card {
   background: var(--paper);
-  border: 1px solid var(--asphalt);
-  border-radius: 6px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
   padding: 1.25rem 1.4rem;
 }
 .info-card h3 {
@@ -530,8 +557,9 @@ main {
 }
 .steps-list li {
   background: var(--paper);
-  border: 1px solid var(--asphalt);
-  border-radius: 6px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
   padding: 1.25rem 1.4rem;
   position: relative;
 }
@@ -548,8 +576,9 @@ main {
   text-align: center;
   padding: 2.5rem 1.5rem;
   background: var(--paper);
-  border: 1px solid var(--asphalt);
-  border-radius: 6px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
   margin: 2.5rem 0;
 }
 .tracker-cta h2 { margin-top: 0; }

@@ -61,7 +61,8 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <footer className="site-footer">
           <p>
             RoadVerdict is guidance benchmarked against typical prices, not a professional
-            inspection. <Link href="/privacy">Privacy</Link> · <a href="mailto:hello@roadverdict.co.uk">hello@roadverdict.co.uk</a>
+            inspection. <Link href="/privacy">Privacy</Link> · <Link href="/about">About us</Link> ·{' '}
+            <a href="mailto:hello@roadverdict.co.uk">hello@roadverdict.co.uk</a>
           </p>
         </footer>
         <AssistantWidget />

@@ -24,7 +24,7 @@ export default async function TrackLandingPage() {
         bike. Sign in with just your email, no password to remember.
       </p>
       <p style={{ marginBottom: '2.5rem' }}>
-        <Link href="/login" className="submit-button" style={{ textDecoration: 'none', display: 'inline-block' }}>
+        <Link href="/login" className="btn-primary" style={{ textDecoration: 'none', display: 'inline-block' }}>
           Start tracking free
         </Link>
       </p>
@@ -120,7 +120,7 @@ export default async function TrackLandingPage() {
       <div className="tracker-cta">
         <h2>Start tracking your bike, free</h2>
         <p style={{ maxWidth: 'none', margin: '0 auto' }}>No credit card, no premium tier, no catch.</p>
-        <Link href="/login" className="submit-button" style={{ textDecoration: 'none', display: 'inline-block', marginTop: '0.5rem' }}>
+        <Link href="/login" className="btn-primary" style={{ textDecoration: 'none', display: 'inline-block', marginTop: '0.5rem' }}>
           Start tracking free
         </Link>
       </div>
