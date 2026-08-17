@@ -30,8 +30,8 @@
 
 .launcherIcon {
   display: block;
-  width: 28px;
-  height: 28px;
+  width: 40px;
+  height: 40px;
   object-fit: contain;
 }
 
@@ -156,6 +156,17 @@
   cursor: default;
 }
 
+/* Clears the dashboard's mobile bottom tab bar - dashboard.module.css's
+   .mobileBottomNav appears at this same 900px breakpoint and reserves
+   5rem of space for exactly this reason. Applied globally on mobile
+   since this widget sits on every page, not just the dashboard - a
+   little extra bottom margin on pages without that bar is a harmless
+   trade-off against actually covering navigation on the ones that
+   have it. */
+@media (max-width: 900px) {
+  .wrap { bottom: calc(1.25rem + 5rem); }
+}
+
 @media (max-width: 480px) {
-  .wrap { right: 0.75rem; bottom: 0.75rem; }
+  .wrap { right: 0.75rem; }
 }
