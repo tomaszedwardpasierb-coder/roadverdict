@@ -1,18 +1,20 @@
 // Place at: src/lib/tracker/assistantQuestionLog.ts
 //
-// Logs the text of questions asked to the RoadVerdict assistant, for
-// product feedback - what people are actually trying to do, what's
-// commonly asked, what's failing. Deliberately NOT linked to a user's
-// email or account: every other doc type in this container is scoped
-// to one user's own partition (see cosmosHelpers.ts), but this is
-// aggregate feedback, not personal data tied to who asked - so it gets
-// its own fixed partition instead of piggybacking on a user's.
+// Logs the text of questions asked to the RoadVerdict assistant, along
+// with who asked (when signed in) - product feedback about what
+// people are actually trying to do, what's commonly asked, what's
+// failing, and who to follow up with if a specific person keeps
+// getting stuck. Uses a single fixed partition rather than each user's
+// own (see cosmosHelpers.ts for that pattern) since these are read as
+// one list across everyone, not queried per-user the way the rest of
+// this container's documents are.
 //
-// This is a new kind of data collection that isn't described in the
-// privacy policy yet (neither the live one nor the more comprehensive
-// draft, which predates this file). That needs adding before this is
-// genuinely accurate - see the privacy-draft work from earlier in this
-// project for the pattern to follow.
+// This links a real identity (email) to what someone typed, which is
+// personal data. It isn't described in the privacy policy yet -
+// neither the live one nor the more comprehensive draft, both of which
+// predate this file - and it needs to be before this is genuinely
+// accurate. See the privacy-draft work elsewhere in this project for
+// the pattern to follow when adding it.
 import { getContainer } from "@/lib/cosmos";
 
 const LOG_TYPE = "assistantQuestion";
@@ -25,6 +27,9 @@ export interface AssistantQuestionLogDoc {
   question: string;
   askedAt: string;
   signedIn: boolean;
+  // Absent for anonymous visitors, since there's no identity to
+  // record - never a placeholder string standing in for "unknown".
+  email?: string;
   hadError: boolean;
 }
 
@@ -32,7 +37,7 @@ export interface AssistantQuestionLogDoc {
 // choice regardless of hosting model) but never lets a failure here
 // affect the actual chat response - a logging problem should never be
 // the reason someone doesn't get an answer.
-export async function logAssistantQuestion(question: string, signedIn: boolean, hadError: boolean): Promise<void> {
+export async function logAssistantQuestion(question: string, signedIn: boolean, hadError: boolean, email?: string): Promise<void> {
   try {
     const container = getContainer();
     const doc: AssistantQuestionLogDoc = {
@@ -45,6 +50,7 @@ export async function logAssistantQuestion(question: string, signedIn: boolean, 
       question: question.slice(0, 500),
       askedAt: new Date().toISOString(),
       signedIn,
+      ...(email ? { email } : {}),
       hadError,
     };
     await container.items.upsert(doc);
@@ -90,4 +96,13 @@ export function groupSimilarQuestions(questions: AssistantQuestionLogDoc[], topN
     .map(([text, count]) => ({ text, count }))
     .sort((a, b) => b.count - a.count)
     .slice(0, topN);
+}
+
+// For clearing out noise - test messages, junk, anything not worth
+// keeping in the log. All docs here share the same fixed partition
+// key (see LOG_PARTITION_KEY above), so this is a direct point-delete,
+// not a query.
+export async function deleteAssistantQuestion(id: string): Promise<void> {
+  const container = getContainer();
+  await container.item(id, LOG_PARTITION_KEY).delete();
 }

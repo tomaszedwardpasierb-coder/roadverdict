@@ -20,6 +20,7 @@ import { getSiteStats, type SiteStats } from '@/lib/monitoring/appInsights';
 import { getAllAssistantQuestions, groupSimilarQuestions, type AssistantQuestionLogDoc } from '@/lib/tracker/assistantQuestionLog';
 import styles from './tomasz.module.css';
 import { RunCronButton } from './RunCronButton';
+import { DeleteQuestionButton } from './DeleteQuestionButton';
 import { ImpersonateButton } from './ImpersonateButton';
 import { AdminLogoutButton } from './AdminLogoutButton';
 
@@ -446,7 +447,10 @@ export default async function AdminDashboardPage({
       <h2 className={styles.sectionHeading}>AI Assistant Questions</h2>
       <p style={{ marginBottom: '0.6rem' }}>
         {assistantQuestions.length} question{assistantQuestions.length === 1 ? '' : 's'} logged in total.
-        Not linked to who asked - see the note in assistantQuestionLog.ts for why.
+      </p>
+      <p className={styles.warn} style={{ marginBottom: '0.6rem' }}>
+        Signed-in questions are linked to the account that asked them - this isn&apos;t covered
+        in the privacy policy yet, see the note in assistantQuestionLog.ts.
       </p>
       <p className={styles.warn} style={{ marginBottom: '0.6rem' }}>
         &quot;Most common&quot; below is an exact-match count on normalized text, not real theme
@@ -484,8 +488,9 @@ export default async function AdminDashboardPage({
             <tr>
               <th>Asked</th>
               <th>Question</th>
-              <th>Signed in</th>
+              <th>Asked by</th>
               <th>Result</th>
+              <th>Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -493,8 +498,9 @@ export default async function AdminDashboardPage({
               <tr key={q.id}>
                 <td>{fmtDate(q.askedAt)}</td>
                 <td>{q.question}</td>
-                <td>{q.signedIn ? 'Yes' : 'No'}</td>
+                <td>{q.email ?? (q.signedIn ? 'Signed in (no email captured)' : 'Anonymous')}</td>
                 <td style={q.hadError ? { color: 'var(--verdict-red)' } : undefined}>{q.hadError ? 'Error' : 'Answered'}</td>
+                <td><DeleteQuestionButton id={q.id} /></td>
               </tr>
             ))}
           </tbody>
