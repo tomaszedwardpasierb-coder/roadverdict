@@ -28,6 +28,13 @@
   background: var(--amber-dark);
 }
 
+.launcherIcon {
+  display: block;
+  width: 28px;
+  height: 28px;
+  object-fit: contain;
+}
+
 .panel {
   width: min(360px, calc(100vw - 2.5rem));
   height: min(520px, calc(100vh - 7rem));
