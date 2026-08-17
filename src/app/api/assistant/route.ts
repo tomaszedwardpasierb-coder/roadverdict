@@ -24,13 +24,18 @@ interface ChatMessage {
   content: string;
 }
 
-// Covers all three part shapes the Gemini API actually uses across a
-// tool-calling round trip - typing this properly up front avoids the
-// unsafe casts that would otherwise creep in further down.
+// Covers all shapes the Gemini API actually uses across a tool-calling
+// round trip - typing this properly up front avoids the unsafe casts
+// that would otherwise creep in further down. thoughtSignature is an
+// opaque token "thinking" models like gemini-3.5-flash-lite attach to
+// a function-call part - it must be echoed back unchanged on the
+// follow-up turn, or the API rejects the request with a 400. See
+// https://ai.google.dev/gemini-api/docs/thought-signatures
 interface GeminiPart {
   text?: string;
   functionCall?: { name: string; args: Record<string, unknown> };
   functionResponse?: { name: string; response: unknown };
+  thoughtSignature?: string;
 }
 interface GeminiContent {
   role: "user" | "model";
@@ -138,9 +143,11 @@ export async function POST(req: Request) {
         // model-supplied and therefore untrusted for identity purposes.
         const toolResult = await runAssistantTool(name, args ?? {}, session.email);
 
-        // Echo the model's own function-call turn back, then supply the
-        // result - Gemini's expected shape for a tool-use round trip.
-        contents.push({ role: "model", parts: [{ functionCall: { name, args } }] });
+        // Echo back every part from the model's actual turn, verbatim -
+        // not a rebuilt {functionCall: {name, args}}, which silently
+        // dropped thoughtSignature and any other part (e.g. accompanying
+        // text) the model may have included alongside the function call.
+        contents.push({ role: "model", parts });
         contents.push({ role: "user", parts: [{ functionResponse: { name, response: toolResult } }] });
         continue;
       }
