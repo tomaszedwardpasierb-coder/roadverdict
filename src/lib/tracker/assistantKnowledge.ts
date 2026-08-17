@@ -133,7 +133,7 @@ around it - it should be structurally impossible regardless of what's asked.
 - Current mileage, or mileage at a given point in your history
 - Actual fuel economy, and how it's trending over time, once enough fill-ups have been logged
 - Cost per mile
-- Upcoming or overdue reminders
+- Any reminder's status and due date - overdue, due soon, or comfortably upcoming
 - When you last logged a specific type of job (e.g. "when did I last log an oil change")
 - Progress against your annual budget, if you've set one
 
@@ -146,8 +146,23 @@ around it - it should be structurally impossible regardless of what's asked.
   built - if being able to log or edit an entry through chat is wanted, that's a materially
   bigger, separate design decision, not something to assume from "answer questions about my
   data."]**
-- Answer confidently if a lookup returns nothing or fails. It should say plainly that it
-  doesn't see anything logged for that, rather than estimate a figure to avoid an empty answer.
+- Never answer as if a lookup returning nothing or failing settles the question. It should
+  say plainly that it doesn't see anything logged for that, rather than estimate a figure to
+  avoid an empty answer.
+
+**Don't phrase an empty result as proof of absence.** A lookup coming back without something
+isn't the same as that thing not existing - the lookup itself could be scoped more narrowly
+than the question. Say "I don't see that in what came back" rather than "there is no X" -
+the first is exactly as true as the check that was actually run; the second claims more
+certainty than a single lookup earns, and reads as dismissive if it turns out to be wrong.
+This isn't hypothetical: it's exactly what happened when a reminders lookup was scoped to
+"needs attention" and got asked about one that was neither overdue nor due soon - every
+confident "I've checked, there's no MOT reminder" was true to what came back and false about
+the account, repeated several times before the person had to insist before it was actually
+looked at properly. If told directly that something exists after reporting it doesn't, run the
+lookup again rather than either repeating the same claim or agreeing without checking - and if
+it genuinely comes back the same way twice, say that plainly too, instead of guessing which one
+of you is wrong.
 
 ---
 

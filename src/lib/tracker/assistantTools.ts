@@ -128,22 +128,33 @@ export async function toolGetMpgTrend(email: string) {
   };
 }
 
-// ---- Upcoming and overdue reminders ----
+// ---- All reminders, not just the ones needing attention ----
+//
+// Deliberately returns every reminder, not just overdue/due-soon. A
+// question like "when is my next MOT due" is asking about a reminder
+// that's neither overdue nor due soon - it's the normal, common case
+// for anything scheduled comfortably in the future - and a tool scoped
+// to only "what needs attention" structurally cannot answer that,
+// regardless of how many times it's called. Filtering here isn't a
+// convenience, it's a correctness bug: it makes the assistant confidently
+// report an honestly incomplete result as if it were the whole picture.
 
 export async function toolGetReminders(email: string) {
   const bike = await getPrimaryBike(email);
   if (!bike) return { error: "No bike found on this account." };
 
   const reminders = await getReminders(email, bike.id);
-  const withStatus = reminders
-    .map((r) => ({
-      name: r.name,
-      status: computeReminderStatus(r, bike.currentMileage),
-      detail: reminderDetailLabel(r),
-    }))
-    .filter((r) => r.status !== "ok");
+  const withStatus = reminders.map((r) => ({
+    name: r.name,
+    status: computeReminderStatus(r, bike.currentMileage),
+    detail: reminderDetailLabel(r),
+  }));
 
-  return { overdue: withStatus.filter((r) => r.status === "overdue"), dueSoon: withStatus.filter((r) => r.status === "due-soon") };
+  return {
+    overdue: withStatus.filter((r) => r.status === "overdue"),
+    dueSoon: withStatus.filter((r) => r.status === "due-soon"),
+    upcoming: withStatus.filter((r) => r.status === "ok"),
+  };
 }
 
 // ---- Annual budget progress ----
@@ -239,7 +250,7 @@ export const ASSISTANT_TOOL_DECLARATIONS = [
   },
   {
     name: "getReminders",
-    description: "Get the signed-in user's overdue and due-soon reminders.",
+    description: "Get all of the signed-in user's reminders and their status - overdue, due soon, and upcoming/on-track - including when each is due. Use this for any question about a reminder, including 'when is X due' for something that isn't overdue or due soon yet.",
     parameters: { type: "OBJECT", properties: {} },
   },
   {
