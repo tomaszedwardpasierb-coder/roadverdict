@@ -81,10 +81,15 @@ interface Props {
   costCalculatorContent: ReactNode;
   buyingGuideContent: ReactNode;
   privacyContent: ReactNode;
+  storyReady: boolean;
 }
 
 function PendingDot() {
   return <span className={styles.navPendingBadge} aria-label="An entry here needs review" />;
+}
+
+function ReadyDot() {
+  return <span className={styles.navReadyBadge} aria-label="Enough logged history for a worthwhile story" />;
 }
 
 export function DashboardShell({
@@ -110,6 +115,7 @@ export function DashboardShell({
   costCalculatorContent,
   buyingGuideContent,
   privacyContent,
+  storyReady,
 }: Props) {
   const [active, setActive] = useState<Section>('dashboard');
   const [showMore, setShowMore] = useState(false);
@@ -156,6 +162,7 @@ export function DashboardShell({
                   <Icon name={item.icon} className={styles.navIcon} />
                   <span>{item.label}</span>
                   {hasPending && <PendingDot />}
+                  {item.key === 'story' && storyReady && <ReadyDot />}
                 </button>
               );
             })}
@@ -273,6 +280,7 @@ export function DashboardShell({
                   >
                     <Icon name={item.icon} className={styles.navIcon} /> {item.label}
                     {hasPending && <PendingDot />}
+                    {item.key === 'story' && storyReady && <ReadyDot />}
                   </button>
                 );
               })}

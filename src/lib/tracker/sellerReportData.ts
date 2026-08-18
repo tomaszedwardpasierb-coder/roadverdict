@@ -28,6 +28,10 @@ import { BILL_LABELS } from "@/lib/tracker/billTypes";
 import { isBackdated, backdateNotice, detectBulkBackdating, type BackdateCheckItem, type BulkBackdateCluster } from "@/lib/tracker/backdateCheck";
 import type { Attachment } from "@/lib/tracker/cosmosHelpers";
 import type { BikeDoc } from "@/lib/tracker/bike";
+import type { ServiceRecordDoc } from "@/lib/tracker/serviceRecord";
+import type { ModDoc } from "@/lib/tracker/mod";
+import type { BillDoc } from "@/lib/tracker/bill";
+import type { FuelLogDoc } from "@/lib/tracker/fuelLog";
 
 export interface ReportRow {
   id: string;
@@ -117,18 +121,24 @@ export interface SellerReportCore {
 // silently drift from this one. getSellerReportData below is now just
 // this plus token resolution and the token-specific receipt-request
 // status lookup.
-export async function getSellerReportCore(email: string, bikeId: string): Promise<SellerReportCore> {
-  const bike = await getBike(email, bikeId);
-  if (!bike) notFound();
-
-  const [records, mods, bills, fuelLogs, reminders] = await Promise.all([
-    getServiceRecords(email, bikeId),
-    getMods(email, bikeId),
-    getBills(email, bikeId),
-    getFuelLogs(email, bikeId),
-    getReminders(email, bikeId),
-  ]);
-
+// Pulled out of getSellerReportCore so a readiness check (does this
+// bike currently have enough logged to be worth generating a report
+// or story from?) can reuse the exact same metrics the real report is
+// judged by, without a second round of database queries - this takes
+// already-fetched records/mods/bills/fuelLogs/reminders as plain
+// arguments rather than fetching them itself. getSellerReportCore
+// below still needs several of these values (rows, total, clusters,
+// registration info) for its own further computation, so this returns
+// all of them, not just the verdict metrics - the readiness check
+// only reads the one field it actually needs.
+export function computeSellerReportRowsAndMetrics(
+  bike: BikeDoc,
+  records: ServiceRecordDoc[],
+  mods: ModDoc[],
+  bills: BillDoc[],
+  fuelLogs: FuelLogDoc[],
+  reminders: ReminderDoc[]
+) {
   const rows: ReportRow[] = [
     ...records.map((r) => ({ id: r.id, date: r.date, createdAt: r.createdAt, category: "Service", description: JOB_LABELS[r.jobType] ?? r.jobType, cost: r.cost, attachment: r.attachments?.[0] ?? null })),
     ...mods.map((m) => ({ id: m.id, date: m.date, createdAt: m.createdAt, category: "Modification", description: `${MOD_LABELS[m.category] ?? m.category}: ${m.name}`, cost: m.cost, attachment: m.attachments?.[0] ?? null })),
@@ -169,6 +179,63 @@ export async function getSellerReportCore(email: string, bikeId: string): Promis
 
   const overdueReminderCount = reminders.filter((r) => computeReminderStatus(r, bike.currentMileage) === "overdue").length;
 
+  const verdictMetrics: SellerVerdictMetrics = {
+    totalEntries: rows.length,
+    receiptCount,
+    entriesInBulkClusters,
+    largestClusterSpanDays,
+    mileageViolationCount,
+    longestGapDays,
+    spanYears,
+    overdueReminderCount,
+    totalReminderCount: reminders.length,
+    recentRegistrationChangeDays: daysSinceLastChange,
+  };
+
+  return {
+    rows,
+    total,
+    backdatedCount,
+    realTimeCount,
+    receiptCount,
+    clusters,
+    registrationChanges,
+    currentRegistration,
+    mostRecentChange,
+    daysSinceLastChange,
+    verdictMetrics,
+  };
+}
+
+export async function getSellerReportCore(email: string, bikeId: string): Promise<SellerReportCore> {
+  const bike = await getBike(email, bikeId);
+  if (!bike) notFound();
+
+  const [records, mods, bills, fuelLogs, reminders] = await Promise.all([
+    getServiceRecords(email, bikeId),
+    getMods(email, bikeId),
+    getBills(email, bikeId),
+    getFuelLogs(email, bikeId),
+    getReminders(email, bikeId),
+  ]);
+
+  const {
+    rows,
+    total,
+    backdatedCount,
+    realTimeCount,
+    receiptCount,
+    clusters,
+    registrationChanges,
+    currentRegistration,
+    mostRecentChange,
+    daysSinceLastChange,
+    verdictMetrics,
+  } = computeSellerReportRowsAndMetrics(bike, records, mods, bills, fuelLogs, reminders);
+
+  const verdict = computeSellerVerdict(verdictMetrics);
+  const buyerQuestions = generateBuyerQuestions(verdictMetrics);
+
   const upcomingReminders = reminders
     .map((r) => ({ reminder: r, status: computeReminderStatus(r, bike.currentMileage) }))
     .filter((x): x is { reminder: ReminderDoc; status: "due-soon" | "overdue" } => x.status === "due-soon" || x.status === "overdue")
@@ -182,21 +249,6 @@ export async function getSellerReportCore(email: string, bikeId: string): Promis
     bike.currentMileage,
     activeReminderJobTypes
   );
-
-  const verdictMetrics: SellerVerdictMetrics = {
-    totalEntries: rows.length,
-    receiptCount,
-    entriesInBulkClusters,
-    largestClusterSpanDays,
-    mileageViolationCount,
-    longestGapDays,
-    spanYears,
-    overdueReminderCount,
-    totalReminderCount: reminders.length,
-    recentRegistrationChangeDays: daysSinceLastChange,
-  };
-  const verdict = computeSellerVerdict(verdictMetrics);
-  const buyerQuestions = generateBuyerQuestions(verdictMetrics);
 
   const mileageCheck = checkCurrentMileagePlausibility(bike.currentMileage, bike);
   const jobTypeGroups = groupServiceHistoryByJobType(

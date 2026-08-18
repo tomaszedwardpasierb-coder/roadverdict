@@ -52,6 +52,8 @@ import { QuoteForm } from "@/components/QuoteForm";
 import { CostCalculatorForm } from "@/components/CostCalculatorForm";
 import { BuyingGuideForm } from "@/components/BuyingGuideForm";
 import { PrivacyContent } from "../privacy/PrivacyContent";
+import { computeSellerReportRowsAndMetrics } from "@/lib/tracker/sellerReportData";
+import { computeSellerVerdict } from "@/lib/tracker/sellerReportVerdict";
 import { StorySoFarTab } from "./StorySoFarTab";
 import { ChartFilterProvider } from "./ChartFilterContext";
 import { ChartFilterBar } from "./ChartFilterBar";
@@ -537,6 +539,16 @@ export default async function DashboardPage() {
       }
     : null;
 
+  // Reuses the exact same metrics/verdict logic the real Story So
+  // Far and buyer report are judged by (see sellerReportVerdict.ts) -
+  // "ready" means this bike would currently score better than the
+  // floor tier, not an arbitrary entry count that might not actually
+  // correlate with what verdict someone gets. Built from records/
+  // mods/bills/fuelLogs/reminders already fetched above for the other
+  // tabs, so this adds no new database queries.
+  const { verdictMetrics } = computeSellerReportRowsAndMetrics(bike, records, mods, bills, fuelLogs, reminders);
+  const storyReady = computeSellerVerdict(verdictMetrics).tier !== "limited-documentation";
+
   const quoteCheckerContent = (
     <>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "0.75rem" }}>
@@ -601,6 +613,7 @@ export default async function DashboardPage() {
       costCalculatorContent={costCalculatorContent}
       buyingGuideContent={buyingGuideContent}
       privacyContent={privacyContent}
+      storyReady={storyReady}
     />
   );
 }

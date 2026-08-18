@@ -102,6 +102,13 @@ export function StorySoFarTab({ bikeNickname, registration, currentMileage, dist
           strengthen it, and the same story you can hand a buyer when you&apos;re ready to sell, backed by real dates
           and receipts, not just your word.
         </p>
+        <div className={styles.storyReadinessNote}>
+          Best used once you&apos;ve built up a decent spread of history with receipts and supporting documents
+          attached, rather than straight after adding the bike. If you run it too early, when there are only a
+          handful of entries, the result is likely to have little or no real value. It may simply come back as
+          &quot;Limited documentation&quot;, or produce a summary that doesn&apos;t tell the bike&apos;s story
+          properly at all, regardless of how good its actual history is.
+        </div>
         <button type="button" className={styles.scanReceiptBtn} disabled={loading} onClick={handleGenerate}>
           {loading ? 'Putting it together…' : 'Generate my story →'}
         </button>
