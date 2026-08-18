@@ -6,6 +6,7 @@ import { cookies } from 'next/headers';
 import { getAdminSession } from '@/lib/admin/session';
 import { ImpersonationBanner } from './ImpersonationBanner';
 import { AssistantWidget } from '@/components/AssistantWidget';
+import { SiteHeaderNav } from './SiteHeaderNav';
 import './globals.css';
 const bigShouldersDisplay = Big_Shoulders_Display({
   subsets: ['latin'],
@@ -48,14 +49,9 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         {showImpersonationBanner && <ImpersonationBanner email={impersonatingEmail!} />}
         <header className="site-header">
           <Link href="/" className="site-header__logo">
-            <img src="/logo.png" alt="RoadVerdict" className="site-header__logo-img" />
+            <img src="/logo-dark.png" alt="RoadVerdict" className="site-header__logo-img" />
           </Link>
-          <nav className="site-header__nav">
-            <Link href="/quote-checker">Quote Checker</Link>
-            <Link href="/cost-calculator">Cost calculator</Link>
-            <Link href="/buying-guide">Buying a used bike</Link>
-            <Link href="/privacy">Privacy</Link>
-          </nav>
+          <SiteHeaderNav />
         </header>
         <main>{children}</main>
         <footer className="site-footer">
