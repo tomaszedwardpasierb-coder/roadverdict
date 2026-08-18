@@ -111,7 +111,7 @@ a {
 .site-header__nav {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.4rem;
+  gap: 0.6rem 0.5rem;
 }
 
 /* Deliberately matches .sidebarNavItem / .sidebarNavItemActive in
@@ -146,6 +146,10 @@ a {
 @media (max-width: 480px) {
   .site-header {
     padding: 1rem;
+  }
+
+  .site-header__logo-img {
+    height: 44px;
   }
 
   .site-header__nav-item {

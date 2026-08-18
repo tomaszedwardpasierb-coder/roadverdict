@@ -49,6 +49,10 @@ const MORE_ITEMS: { key: Section; label: string; icon: IconName }[] = [
   { key: 'reports', label: 'Reports', icon: 'reports' },
   { key: 'story', label: 'The Story So Far', icon: 'story' },
   { key: 'shareLinks', label: 'Shareable Links', icon: 'shareLinks' },
+  { key: 'quoteChecker', label: 'Quote Checker', icon: 'quoteChecker' },
+  { key: 'costCalculator', label: 'Cost calculator', icon: 'costCalculator' },
+  { key: 'buyingGuide', label: 'Buying a used bike', icon: 'buyingGuide' },
+  { key: 'privacy', label: 'Privacy', icon: 'privacy' },
 ];
 
 interface Props {
@@ -126,7 +130,7 @@ export function DashboardShell({
     privacy: privacyContent,
   };
 
-  const isMoreActive = active === 'bills' || active === 'reminders' || active === 'reports' || active === 'story' || active === 'shareLinks';
+  const isMoreActive = active === 'bills' || active === 'reminders' || active === 'reports' || active === 'story' || active === 'shareLinks' || active === 'quoteChecker' || active === 'costCalculator' || active === 'buyingGuide' || active === 'privacy';
 
   return (
     <TabSwitchProvider onSwitchTab={(cat) => setActive(cat)}>

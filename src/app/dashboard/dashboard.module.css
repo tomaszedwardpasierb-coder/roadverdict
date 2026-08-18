@@ -765,7 +765,18 @@
     display: block; position: fixed; bottom: 0; left: 0; right: 0;
     background: var(--paper); border-top: 1px solid var(--border);
     border-radius: var(--radius-lg) var(--radius-lg) 0 0; padding: 1rem 1.2rem 1.6rem;
-    z-index: 40; box-shadow: var(--shadow-pop);
+    /* Was 40, below .mobileBottomNav's 50 - the nav bar was rendering
+       on top of whatever sat at the bottom of this sheet's content,
+       which is exactly why Sign Out (the last item) was invisible and
+       unclickable even though it was genuinely present in the DOM. */
+    z-index: 55; box-shadow: var(--shadow-pop);
+    /* Capped and scrollable rather than growing to fit its content -
+       this sheet now holds nine nav items plus the whole account
+       section, comfortably taller than some phone screens, and an
+       uncapped fixed-position element with more content than fits
+       just pushes its top off-screen instead of scrolling. */
+    max-height: 80vh;
+    overflow-y: auto;
   }
   .mobileMoreSheetItem {
     display: block; width: 100%; text-align: left; background: none; border: none;
