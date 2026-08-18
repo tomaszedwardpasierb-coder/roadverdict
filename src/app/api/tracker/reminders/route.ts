@@ -2,7 +2,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/session";
 import { createReminder, deleteRemindersBySourceKey } from "@/lib/tracker/reminder";
-import { getPrimaryBike } from "@/lib/tracker/bike";
+import { getPrimaryBike, isBikeReadOnly, BIKE_READ_ONLY_MESSAGE } from "@/lib/tracker/bike";
 
 export const dynamic = "force-dynamic";
 
@@ -42,6 +42,9 @@ export async function POST(request: NextRequest) {
   const bike = await getPrimaryBike(session.email);
   if (!bike) {
     return NextResponse.json({ error: "No bike found for this account." }, { status: 404 });
+  }
+  if (isBikeReadOnly(bike)) {
+    return NextResponse.json({ error: BIKE_READ_ONLY_MESSAGE }, { status: 403 });
   }
 
   if (sourceKey) {

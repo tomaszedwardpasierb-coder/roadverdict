@@ -2,7 +2,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/session";
 import { createMod, getMods } from "@/lib/tracker/mod";
-import { getPrimaryBike, updateBikeMileage } from "@/lib/tracker/bike";
+import { getPrimaryBike, updateBikeMileage, isBikeReadOnly, BIKE_READ_ONLY_MESSAGE } from "@/lib/tracker/bike";
 import { getServiceRecords } from "@/lib/tracker/serviceRecord";
 import { getFuelLogs } from "@/lib/tracker/fuelLog";
 import { checkMileageConsistency, describeMileageCheck } from "@/lib/tracker/mileageCheck";
@@ -41,6 +41,9 @@ export async function POST(request: NextRequest) {
   const bike = await getPrimaryBike(session.email);
   if (!bike) {
     return NextResponse.json({ error: "No bike found for this account." }, { status: 404 });
+  }
+  if (isBikeReadOnly(bike)) {
+    return NextResponse.json({ error: BIKE_READ_ONLY_MESSAGE }, { status: 403 });
   }
 
   const [otherRecords, otherFuelLogs, otherMods] = await Promise.all([

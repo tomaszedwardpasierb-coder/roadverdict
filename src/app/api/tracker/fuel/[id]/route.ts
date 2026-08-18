@@ -2,7 +2,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/session";
 import { updateFuelLog, deleteFuelLog, getFuelLogs, type FuelLogDoc } from "@/lib/tracker/fuelLog";
-import { getPrimaryBike, updateBikeMileage } from "@/lib/tracker/bike";
+import { getBike, getPrimaryBike, updateBikeMileage, isBikeReadOnly, BIKE_READ_ONLY_MESSAGE } from "@/lib/tracker/bike";
 import { getServiceRecords } from "@/lib/tracker/serviceRecord";
 import { getMods } from "@/lib/tracker/mod";
 import { checkMileageConsistency, describeMileageCheck } from "@/lib/tracker/mileageCheck";
@@ -61,6 +61,9 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
   // this one fetch is both cheaper than calling getPrimaryBike three
   // times and avoids separate reads potentially disagreeing mid-request.
   const bike = await getPrimaryBike(session.email);
+  if (bike && isBikeReadOnly(bike)) {
+    return NextResponse.json({ error: BIKE_READ_ONLY_MESSAGE }, { status: 403 });
+  }
 
   const mileageResult = checkMileageConsistency(
     mileage,
@@ -126,6 +129,14 @@ export async function DELETE(request: NextRequest, { params }: { params: { id: s
   const id = decodeURIComponent(params.id);
   if (!id.startsWith(`${session.email}::fuel::`)) {
     return NextResponse.json({ error: "Entry not found." }, { status: 404 });
+  }
+
+  const existing = await getTrackerDocById<FuelLogDoc>(session.email, id);
+  if (existing?.bikeId) {
+    const bike = await getBike(session.email, existing.bikeId);
+    if (bike && isBikeReadOnly(bike)) {
+      return NextResponse.json({ error: BIKE_READ_ONLY_MESSAGE }, { status: 403 });
+    }
   }
 
   await deleteFuelLog(session.email, id);

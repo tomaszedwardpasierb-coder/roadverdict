@@ -2,7 +2,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/session";
 import { updateBill, deleteBill } from "@/lib/tracker/bill";
-import { getPrimaryBike } from "@/lib/tracker/bike";
+import { getPrimaryBike, isBikeReadOnly, BIKE_READ_ONLY_MESSAGE } from "@/lib/tracker/bike";
 import { createReminder, deleteRemindersBySourceKey } from "@/lib/tracker/reminder";
 import { BILL_LABELS } from "@/lib/tracker/billTypes";
 import type { Attachment } from "@/lib/tracker/cosmosHelpers";
@@ -46,6 +46,13 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     return NextResponse.json({ error: "Please fill in all required fields." }, { status: 400 });
   }
 
+  // Fetched here, before the save, so the read-only check runs first -
+  // reused below for the reminder step too, instead of a second call.
+  const bike = await getPrimaryBike(session.email);
+  if (bike && isBikeReadOnly(bike)) {
+    return NextResponse.json({ error: BIKE_READ_ONLY_MESSAGE }, { status: 403 });
+  }
+
   const bill = await updateBill(session.email, id, {
     billType,
     cost,
@@ -59,23 +66,20 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     return NextResponse.json({ error: "Entry not found." }, { status: 404 });
   }
 
-  if (reminder) {
-    const bike = await getPrimaryBike(session.email);
-    if (bike) {
-      const sourceKey = `bill:${billType}`;
-      await deleteRemindersBySourceKey(session.email, bike.id, sourceKey);
-      await createReminder(session.email, {
-        bikeId: bike.id,
-        name: `${BILL_LABELS[billType] ?? billType} renewal`,
-        intervalType: reminder.intervalType,
-        intervalValue: reminder.intervalValue,
-        exactDate: reminder.exactDate,
-        additionalTriggers: reminder.additionalTriggers,
-        baseMileage: bike.currentMileage,
-        date,
-        sourceKey,
-      });
-    }
+  if (reminder && bike) {
+    const sourceKey = `bill:${billType}`;
+    await deleteRemindersBySourceKey(session.email, bike.id, sourceKey);
+    await createReminder(session.email, {
+      bikeId: bike.id,
+      name: `${BILL_LABELS[billType] ?? billType} renewal`,
+      intervalType: reminder.intervalType,
+      intervalValue: reminder.intervalValue,
+      exactDate: reminder.exactDate,
+      additionalTriggers: reminder.additionalTriggers,
+      baseMileage: bike.currentMileage,
+      date,
+      sourceKey,
+    });
   }
 
   return NextResponse.json({ bill });
@@ -90,6 +94,11 @@ export async function DELETE(request: NextRequest, { params }: { params: { id: s
   const id = decodeURIComponent(params.id);
   if (!id.startsWith(`${session.email}::bill::`)) {
     return NextResponse.json({ error: "Entry not found." }, { status: 404 });
+  }
+
+  const bike = await getPrimaryBike(session.email);
+  if (bike && isBikeReadOnly(bike)) {
+    return NextResponse.json({ error: BIKE_READ_ONLY_MESSAGE }, { status: 403 });
   }
 
   await deleteBill(session.email, id);

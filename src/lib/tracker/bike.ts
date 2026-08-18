@@ -51,6 +51,19 @@ export function generateBikeId(email: string): string {
   return `${email}::bike::${Date.now()}::${Math.random().toString(36).slice(2, 8)}`;
 }
 
+// A transferred bike is read-only going forward - the old owner's copy
+// freezes at the moment of handover rather than staying live. Every
+// route that writes bike-associated data (services, fuel, mods, bills,
+// reminders, bike edits, mileage updates) should call this right after
+// fetching the bike and before making any change, returning this
+// message with a 403 if it's true. See bikeTransfer.ts for where
+// transferredTo actually gets set.
+export const BIKE_READ_ONLY_MESSAGE = "This bike has been transferred and is now read-only.";
+
+export function isBikeReadOnly(bike: BikeDoc): boolean {
+  return !!bike.transferredTo;
+}
+
 export interface BikeDoc {
   id: string;
   pk: string;

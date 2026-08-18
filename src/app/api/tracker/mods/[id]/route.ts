@@ -2,7 +2,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/session";
 import { updateMod, deleteMod, getMods, type ModDoc } from "@/lib/tracker/mod";
-import { getPrimaryBike, updateBikeMileage } from "@/lib/tracker/bike";
+import { getBike, getPrimaryBike, updateBikeMileage, isBikeReadOnly, BIKE_READ_ONLY_MESSAGE } from "@/lib/tracker/bike";
 import { getServiceRecords } from "@/lib/tracker/serviceRecord";
 import { getFuelLogs } from "@/lib/tracker/fuelLog";
 import { checkMileageConsistency, describeMileageCheck } from "@/lib/tracker/mileageCheck";
@@ -56,6 +56,9 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     ? await Promise.all([getServiceRecords(session.email, bikeId), getFuelLogs(session.email, bikeId), getMods(session.email, bikeId)])
     : [[], [], []];
   const bike = await getPrimaryBike(session.email);
+  if (bike && isBikeReadOnly(bike)) {
+    return NextResponse.json({ error: BIKE_READ_ONLY_MESSAGE }, { status: 403 });
+  }
   const mileageResult = checkMileageConsistency(
     mileage,
     date,
@@ -105,6 +108,14 @@ export async function DELETE(request: NextRequest, { params }: { params: { id: s
   const id = decodeURIComponent(params.id);
   if (!id.startsWith(`${session.email}::mod::`)) {
     return NextResponse.json({ error: "Entry not found." }, { status: 404 });
+  }
+
+  const existing = await getTrackerDocById<ModDoc>(session.email, id);
+  if (existing?.bikeId) {
+    const bike = await getBike(session.email, existing.bikeId);
+    if (bike && isBikeReadOnly(bike)) {
+      return NextResponse.json({ error: BIKE_READ_ONLY_MESSAGE }, { status: 403 });
+    }
   }
 
   await deleteMod(session.email, id);

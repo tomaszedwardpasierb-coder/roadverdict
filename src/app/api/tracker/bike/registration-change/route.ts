@@ -1,7 +1,7 @@
 // Place at: src/app/api/tracker/bike/registration-change/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/session";
-import { getBikesForUser, addRegistrationChange, type RegistrationChangeReason } from "@/lib/tracker/bike";
+import { getBikesForUser, addRegistrationChange, isBikeReadOnly, BIKE_READ_ONLY_MESSAGE, type RegistrationChangeReason } from "@/lib/tracker/bike";
 
 export const dynamic = "force-dynamic";
 
@@ -38,8 +38,12 @@ export async function POST(request: NextRequest) {
   }
 
   const bikes = await getBikesForUser(session.email);
-  if (!bikes.some((b) => b.id === bikeId)) {
+  const bike = bikes.find((b) => b.id === bikeId);
+  if (!bike) {
     return NextResponse.json({ error: "Bike not found on this account." }, { status: 404 });
+  }
+  if (isBikeReadOnly(bike)) {
+    return NextResponse.json({ error: BIKE_READ_ONLY_MESSAGE }, { status: 403 });
   }
 
   const updated = await addRegistrationChange(session.email, bikeId, plate.trim().toUpperCase(), reason);

@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/session";
 import { createBill } from "@/lib/tracker/bill";
 import { createReminder, deleteRemindersBySourceKey } from "@/lib/tracker/reminder";
-import { getPrimaryBike } from "@/lib/tracker/bike";
+import { getPrimaryBike, isBikeReadOnly, BIKE_READ_ONLY_MESSAGE } from "@/lib/tracker/bike";
 import { isBeforeProduction } from "@/lib/tracker/productionYearCheck";
 import { BILL_LABELS } from "@/lib/tracker/billTypes";
 import type { Attachment } from "@/lib/tracker/cosmosHelpers";
@@ -44,6 +44,9 @@ export async function POST(request: NextRequest) {
   const bike = await getPrimaryBike(session.email);
   if (!bike) {
     return NextResponse.json({ error: "No bike found for this account." }, { status: 404 });
+  }
+  if (isBikeReadOnly(bike)) {
+    return NextResponse.json({ error: BIKE_READ_ONLY_MESSAGE }, { status: 403 });
   }
 
   if (isBeforeProduction(date, bike)) {

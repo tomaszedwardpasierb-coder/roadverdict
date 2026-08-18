@@ -11,6 +11,8 @@ import {
   updateBikeCurrency,
   updateBikeChartType,
   updateBikeDvlaData,
+  isBikeReadOnly,
+  BIKE_READ_ONLY_MESSAGE,
   type ChartKind,
 } from "@/lib/tracker/bike";
 import { fetchDvlaDataFromVdg } from "@/lib/tracker/dvlaDataFetch";
@@ -138,6 +140,9 @@ export async function PATCH(request: NextRequest) {
   const primaryBike = await getPrimaryBike(session.email);
   if (!primaryBike) {
     return NextResponse.json({ error: "No bike found for this account." }, { status: 404 });
+  }
+  if (isBikeReadOnly(primaryBike)) {
+    return NextResponse.json({ error: BIKE_READ_ONLY_MESSAGE }, { status: 403 });
   }
   const bikeId = primaryBike.id;
 

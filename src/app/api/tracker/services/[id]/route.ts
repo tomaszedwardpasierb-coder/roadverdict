@@ -2,7 +2,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/session";
 import { updateServiceRecord, deleteServiceRecord, getServiceRecords, type ServiceRecordDoc } from "@/lib/tracker/serviceRecord";
-import { getPrimaryBike, updateBikeMileage } from "@/lib/tracker/bike";
+import { getBike, getPrimaryBike, updateBikeMileage, isBikeReadOnly, BIKE_READ_ONLY_MESSAGE } from "@/lib/tracker/bike";
 import { createReminder, deleteRemindersBySourceKey } from "@/lib/tracker/reminder";
 import { JOB_LABELS } from "@/lib/tracker/jobTypes";
 import { getFuelLogs } from "@/lib/tracker/fuelLog";
@@ -81,6 +81,9 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
   // available for the consistency check below, and reused later instead
   // of a second call to getPrimaryBike.
   const bike = await getPrimaryBike(session.email);
+  if (bike && isBikeReadOnly(bike)) {
+    return NextResponse.json({ error: BIKE_READ_ONLY_MESSAGE }, { status: 403 });
+  }
   const mileageResult = checkMileageConsistency(
     mileage,
     date,
@@ -154,6 +157,14 @@ export async function DELETE(request: NextRequest, { params }: { params: { id: s
   const id = decodeURIComponent(params.id);
   if (!id.startsWith(`${session.email}::service::`)) {
     return NextResponse.json({ error: "Record not found." }, { status: 404 });
+  }
+
+  const existing = await getTrackerDocById<ServiceRecordDoc>(session.email, id);
+  if (existing?.bikeId) {
+    const bike = await getBike(session.email, existing.bikeId);
+    if (bike && isBikeReadOnly(bike)) {
+      return NextResponse.json({ error: BIKE_READ_ONLY_MESSAGE }, { status: 403 });
+    }
   }
 
   await deleteServiceRecord(session.email, id);

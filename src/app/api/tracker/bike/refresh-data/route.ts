@@ -8,7 +8,7 @@
 // correctly on record) never gets a second chance without this.
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/session";
-import { getBike, getCurrentRegistration, updateBikeDvlaData } from "@/lib/tracker/bike";
+import { getBike, getCurrentRegistration, updateBikeDvlaData, isBikeReadOnly, BIKE_READ_ONLY_MESSAGE } from "@/lib/tracker/bike";
 import { fetchDvlaDataFromVdg } from "@/lib/tracker/dvlaDataFetch";
 import { importMotHistoryForBike } from "@/lib/tracker/motHistoryImport";
 
@@ -38,6 +38,9 @@ export async function POST(request: NextRequest) {
   const bike = await getBike(session.email, bikeId);
   if (!bike) {
     return NextResponse.json({ error: "Bike not found." }, { status: 404 });
+  }
+  if (isBikeReadOnly(bike)) {
+    return NextResponse.json({ error: BIKE_READ_ONLY_MESSAGE }, { status: 403 });
   }
 
   const registration = getCurrentRegistration(bike);

@@ -2,7 +2,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/session";
 import { createServiceRecord, getServiceRecords } from "@/lib/tracker/serviceRecord";
-import { getPrimaryBike, updateBikeMileage } from "@/lib/tracker/bike";
+import { getPrimaryBike, updateBikeMileage, isBikeReadOnly, BIKE_READ_ONLY_MESSAGE } from "@/lib/tracker/bike";
 import { createReminder, deleteRemindersBySourceKey } from "@/lib/tracker/reminder";
 import { JOB_LABELS } from "@/lib/tracker/jobTypes";
 import { isBeforeProduction } from "@/lib/tracker/productionYearCheck";
@@ -49,6 +49,9 @@ export async function POST(request: NextRequest) {
   const bike = await getPrimaryBike(session.email);
   if (!bike) {
     return NextResponse.json({ error: "No bike found for this account." }, { status: 404 });
+  }
+  if (isBikeReadOnly(bike)) {
+    return NextResponse.json({ error: BIKE_READ_ONLY_MESSAGE }, { status: 403 });
   }
 
   if (isBeforeProduction(date, bike)) {
