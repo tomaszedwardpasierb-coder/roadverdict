@@ -14,7 +14,7 @@ import { DEMO_EMAIL } from '@/lib/tracker/demoSeed';
 import { Icon, type IconName } from './Icon';
 import styles from './dashboard.module.css';
 
-type Section = 'dashboard' | 'service' | 'fuel' | 'mods' | 'bills' | 'reminders' | 'reports' | 'shareLinks' | 'story';
+type Section = 'dashboard' | 'service' | 'fuel' | 'mods' | 'bills' | 'reminders' | 'reports' | 'shareLinks' | 'story' | 'quoteChecker' | 'costCalculator' | 'buyingGuide';
 
 const REVIEW_CATEGORIES: ReviewCategory[] = ['service', 'fuel', 'mods', 'bills'];
 function asReviewCategory(key: string): ReviewCategory | null {
@@ -70,6 +70,9 @@ interface Props {
   reportsContent: ReactNode;
   storyContent: ReactNode;
   shareLinksContent: ReactNode;
+  quoteCheckerContent: ReactNode;
+  costCalculatorContent: ReactNode;
+  buyingGuideContent: ReactNode;
 }
 
 function PendingDot() {
@@ -95,6 +98,9 @@ export function DashboardShell({
   reportsContent,
   storyContent,
   shareLinksContent,
+  quoteCheckerContent,
+  costCalculatorContent,
+  buyingGuideContent,
 }: Props) {
   const [active, setActive] = useState<Section>('dashboard');
   const [showMore, setShowMore] = useState(false);
@@ -109,6 +115,9 @@ export function DashboardShell({
     reports: reportsContent,
     story: storyContent,
     shareLinks: shareLinksContent,
+    quoteChecker: quoteCheckerContent,
+    costCalculator: costCalculatorContent,
+    buyingGuide: buyingGuideContent,
   };
 
   const isMoreActive = active === 'bills' || active === 'reminders' || active === 'reports' || active === 'story' || active === 'shareLinks';
@@ -143,14 +152,30 @@ export function DashboardShell({
           </nav>
 
           <nav className={styles.sidebarSecondaryNav}>
-            <Link href="/cost-calculator" className={styles.sidebarSecondaryNavItem}>
+            <button
+              type="button"
+              className={`${styles.sidebarSecondaryNavItem} ${active === 'quoteChecker' ? styles.sidebarSecondaryNavItemActive : ''}`}
+              onClick={() => setActive('quoteChecker')}
+            >
+              <Icon name="quoteChecker" className={styles.navIcon} size={15} />
+              <span>Quote Checker</span>
+            </button>
+            <button
+              type="button"
+              className={`${styles.sidebarSecondaryNavItem} ${active === 'costCalculator' ? styles.sidebarSecondaryNavItemActive : ''}`}
+              onClick={() => setActive('costCalculator')}
+            >
               <Icon name="costCalculator" className={styles.navIcon} size={15} />
               <span>Cost calculator</span>
-            </Link>
-            <Link href="/buying-guide" className={styles.sidebarSecondaryNavItem}>
+            </button>
+            <button
+              type="button"
+              className={`${styles.sidebarSecondaryNavItem} ${active === 'buyingGuide' ? styles.sidebarSecondaryNavItemActive : ''}`}
+              onClick={() => setActive('buyingGuide')}
+            >
               <Icon name="buyingGuide" className={styles.navIcon} size={15} />
               <span>Buying a used bike</span>
-            </Link>
+            </button>
             <Link href="/privacy" className={styles.sidebarSecondaryNavItem}>
               <Icon name="privacy" className={styles.navIcon} size={15} />
               <span>Privacy</span>

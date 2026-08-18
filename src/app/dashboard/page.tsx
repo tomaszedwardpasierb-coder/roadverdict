@@ -13,8 +13,8 @@ import { getShareLinksForUser } from "@/lib/tracker/shareLink";
 import { getPendingReceiptRequestsForOwner } from "@/lib/tracker/receiptRequest";
 import { ShareLinksSection } from "./ShareLinksSection";
 import { computeSpendSummary, computeYearSpend, gatherMileagePoints } from "@/lib/tracker/summary";
-import { slugifyMake } from "@/lib/motorcycleModels";
-import type { Region } from "@/lib/priceData";
+import { slugifyMake, getBikeClassForCC, getModelsForBrand } from "@/lib/motorcycleModels";
+import { BRAND_OPTIONS, type Region } from "@/lib/priceData";
 import { JOB_LABELS } from "@/lib/tracker/jobTypes";
 import { BILL_LABELS } from "@/lib/tracker/billTypes";
 import {
@@ -48,6 +48,9 @@ import { UnitSettings } from "./UnitSettings";
 import { ExportShareSection } from "./ExportShareSection";
 import { RecentActivity, type RecentActivityItem } from "./RecentActivity";
 import { DashboardShell } from "./DashboardShell";
+import { QuoteForm } from "@/components/QuoteForm";
+import { CostCalculatorForm } from "@/components/CostCalculatorForm";
+import { BuyingGuideForm } from "@/components/BuyingGuideForm";
 import { StorySoFarTab } from "./StorySoFarTab";
 import { ChartFilterProvider } from "./ChartFilterContext";
 import { ChartFilterBar } from "./ChartFilterBar";
@@ -505,6 +508,51 @@ export default async function DashboardPage() {
     currentMileage: b.currentMileage,
   }));
 
+  // Pre-population for the three embedded tools below - always signed
+  // in here (this is the dashboard), so unlike the standalone pages
+  // there's no need to branch on session state, just reuse the same
+  // matching logic. brandValue is already computed above for other
+  // purposes; validated fresh here since this specific use needs the
+  // 'other' fallback for a brand the curated list doesn't have.
+  const toolInitialBrand = BRAND_OPTIONS.some((b) => b.value === brandValue) ? brandValue : "other";
+  const toolInitialModel = getModelsForBrand(toolInitialBrand).find(
+    (m) => m.model.toLowerCase().includes(bike.model.toLowerCase()) || bike.model.toLowerCase().includes(m.model.toLowerCase())
+  )?.model;
+  const toolInitialBikeClass = getBikeClassForCC(bike.engineCC);
+
+  const quoteCheckerContent = (
+    <>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "0.75rem" }}>
+        <h1 className={styles.heading}>Quote Checker{bikeTag}</h1>
+        {mileagePill}
+      </div>
+      <p className={styles.subtext}>Three quick questions. One honest answer, benchmarked against typical UK prices.</p>
+      <QuoteForm signedIn initialBrand={toolInitialBrand} initialBikeClass={toolInitialBikeClass} />
+    </>
+  );
+
+  const costCalculatorContent = (
+    <>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "0.75rem" }}>
+        <h1 className={styles.heading}>Cost calculator{bikeTag}</h1>
+        {mileagePill}
+      </div>
+      <p className={styles.subtext}>Servicing, tyres, MOT, tax, and fuel - one honest number, benchmarked against typical UK prices.</p>
+      <CostCalculatorForm signedIn initialBrand={toolInitialBrand} initialModel={toolInitialModel} initialBikeClass={toolInitialBikeClass} />
+    </>
+  );
+
+  const buyingGuideContent = (
+    <>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "0.75rem" }}>
+        <h1 className={styles.heading}>Buying a used bike{bikeTag}</h1>
+        {mileagePill}
+      </div>
+      <p className={styles.subtext}>A buyer checklist weighted by how old the bike actually is - not a generic list.</p>
+      <BuyingGuideForm />
+    </>
+  );
+
   return (
     <DashboardShell
       bikeName={bikeName}
@@ -525,6 +573,9 @@ export default async function DashboardPage() {
       reportsContent={reportsContent}
       storyContent={<StorySoFarTab bikeNickname={bike.nickname} registration={currentRegistration} currentMileage={bike.currentMileage} distanceUnit={distanceUnit} />}
       shareLinksContent={shareLinksContent}
+      quoteCheckerContent={quoteCheckerContent}
+      costCalculatorContent={costCalculatorContent}
+      buyingGuideContent={buyingGuideContent}
     />
   );
 }

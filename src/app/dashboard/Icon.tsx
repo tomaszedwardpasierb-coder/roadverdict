@@ -1,7 +1,7 @@
 // Place at: src/app/dashboard/Icon.tsx
 'use client';
 
-import { Gauge, Wrench, Droplet, Package, Shield, Bell, BarChart3, BookOpen, Share2, Receipt, Tag, Calendar, Camera, Calculator, ClipboardCheck, Lock } from 'lucide-react';
+import { Gauge, Wrench, Droplet, Package, Shield, Bell, BarChart3, BookOpen, Share2, Receipt, Tag, Calendar, Camera, Calculator, ClipboardCheck, Lock, Scale } from 'lucide-react';
 import type { LucideProps } from 'lucide-react';
 
 // Maps this app's semantic icon names to their lucide-react component -
@@ -34,6 +34,7 @@ const ICONS = {
   costCalculator: Calculator,
   buyingGuide: ClipboardCheck,
   privacy: Lock,
+  quoteChecker: Scale,
 } as const;
 
 export type IconName = keyof typeof ICONS;
