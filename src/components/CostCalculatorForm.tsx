@@ -1,6 +1,6 @@
 ﻿'use client';
 
-import { useState, type FormEvent } from 'react';
+import { useState, type FormEvent, type ReactNode } from 'react';
 import {
   BIKE_CLASS_LABELS,
   BRAND_OPTIONS,
@@ -63,7 +63,7 @@ export function CostCalculatorForm({ signedIn, initialBrand, initialModel, initi
   const [vrm, setVrm] = useState('');
   const [lookupLoading, setLookupLoading] = useState(false);
   const [lookupError, setLookupError] = useState<string | null>(null);
-  const [lookupNote, setLookupNote] = useState<string | null>(null);
+  const [lookupNote, setLookupNote] = useState<ReactNode>(null);
 
   const modelsForBrand = getModelsForBrand(brand);
 
@@ -83,6 +83,16 @@ export function CostCalculatorForm({ signedIn, initialBrand, initialModel, initi
   }
 
   async function handlePlateLookup() {
+    if (!signedIn) {
+      setLookupError(null);
+      setLookupNote(
+        <>
+          Sign in to search by your bike&apos;s registration instead of picking it manually
+          below - <a href="/login">sign in here</a>.
+        </>
+      );
+      return;
+    }
     const cleaned = vrm.trim().toUpperCase().replace(/\s+/g, '');
     if (!cleaned) {
       setLookupError('Enter a registration number first.');
@@ -168,30 +178,24 @@ export function CostCalculatorForm({ signedIn, initialBrand, initialModel, initi
             <span className="ticket__step">Step 1 of 3</span>
           </div>
 
-          {signedIn ? (
-            <div className="field" style={{ marginBottom: '1.1rem' }}>
-              <label htmlFor="cc-vrm">Search by registration (optional)</label>
-              <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                <input
-                  id="cc-vrm"
-                  type="text"
-                  value={vrm}
-                  onChange={(e) => setVrm(e.target.value)}
-                  placeholder="e.g. AB12 CDE"
-                  style={{ flex: '1 1 160px' }}
-                />
-                <button type="button" className="btn-primary" onClick={handlePlateLookup} disabled={lookupLoading}>
-                  {lookupLoading ? 'Looking up…' : 'Look up'}
-                </button>
-              </div>
-              {lookupError && <p className="error-text" role="alert">{lookupError}</p>}
-              {lookupNote && <p className="field-note">{lookupNote}</p>}
+          <div className="field" style={{ marginBottom: '1.1rem' }}>
+            <label htmlFor="cc-vrm">Search by registration (optional)</label>
+            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+              <input
+                id="cc-vrm"
+                type="text"
+                value={vrm}
+                onChange={(e) => setVrm(e.target.value)}
+                placeholder="e.g. AB12 CDE"
+                style={{ flex: '1 1 160px' }}
+              />
+              <button type="button" className="btn-primary" onClick={handlePlateLookup} disabled={lookupLoading}>
+                {lookupLoading ? 'Looking up…' : 'Look up'}
+              </button>
             </div>
-          ) : (
-            <p className="field-note" style={{ marginBottom: '1.1rem' }}>
-              <a href="/login">Sign in</a> to search by your bike&apos;s registration instead of picking it manually below.
-            </p>
-          )}
+            {lookupError && <p className="error-text" role="alert">{lookupError}</p>}
+            {lookupNote && <p className="field-note">{lookupNote}</p>}
+          </div>
 
           <div className="field">
             <label htmlFor="cc-brand">Make</label>

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, type FormEvent } from 'react';
+import { useState, type FormEvent, type ReactNode } from 'react';
 import {
   BIKE_CLASS_LABELS,
   BRAND_OPTIONS,
@@ -10,6 +10,7 @@ import {
   type JobType,
   type Region,
 } from '@/lib/priceData';
+import { getModelsForBrand, getBikeClassForCC, slugifyMake } from '@/lib/motorcycleModels';
 import type { Verdict } from '@/lib/verdict';
 import { VerdictResult } from './VerdictResult';
 
@@ -23,19 +24,90 @@ interface ApiResponse {
   error?: string;
 }
 
+interface PlateLookupResponse {
+  vrm: string;
+  make: string;
+  model: string;
+  year: number;
+  engineCapacityCc: number | null;
+  plateInRetention: boolean;
+  error?: string;
+}
+
 const BIKE_CLASSES = Object.keys(BIKE_CLASS_LABELS) as BikeClass[];
 const JOB_TYPES = Object.keys(JOB_LABELS) as JobType[];
 const REGIONS = Object.keys(REGION_LABELS) as Region[];
 
-export function QuoteForm() {
-  const [bikeClass, setBikeClass] = useState<BikeClass>('medium');
-  const [brand, setBrand] = useState(BRAND_OPTIONS[0].value);
+interface Props {
+  signedIn: boolean;
+  initialBrand?: string;
+  initialBikeClass?: BikeClass;
+}
+
+export function QuoteForm({ signedIn, initialBrand, initialBikeClass }: Props) {
+  const [bikeClass, setBikeClass] = useState<BikeClass>(initialBikeClass ?? 'medium');
+  const [brand, setBrand] = useState(initialBrand ?? BRAND_OPTIONS[0].value);
   const [region, setRegion] = useState<Region>('rest-england-wales');
   const [jobType, setJobType] = useState<JobType>('full-service');
   const [quotedPrice, setQuotedPrice] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<ApiResponse | null>(null);
+
+  // Same registration-search mechanism as Cost Calculator, deliberately
+  // kept identical rather than reimplemented - same endpoint, same
+  // signed-in gate (that endpoint calls a paid, metered vehicle-data
+  // API), same behavior of showing the box to everyone and only
+  // blocking the actual lookup when clicked while signed out.
+  const [vrm, setVrm] = useState('');
+  const [lookupLoading, setLookupLoading] = useState(false);
+  const [lookupError, setLookupError] = useState<string | null>(null);
+  const [lookupNote, setLookupNote] = useState<ReactNode>(null);
+
+  async function handlePlateLookup() {
+    if (!signedIn) {
+      setLookupError(null);
+      setLookupNote(
+        <>
+          Sign in to search by your bike&apos;s registration instead of picking it manually
+          below - <a href="/login">sign in here</a>.
+        </>
+      );
+      return;
+    }
+    const cleaned = vrm.trim().toUpperCase().replace(/\s+/g, '');
+    if (!cleaned) {
+      setLookupError('Enter a registration number first.');
+      return;
+    }
+    setLookupLoading(true);
+    setLookupError(null);
+    setLookupNote(null);
+    try {
+      const res = await fetch(`/api/tracker/plate-lookup?vrm=${encodeURIComponent(cleaned)}`);
+      const data: PlateLookupResponse = await res.json();
+      if (!res.ok) {
+        setLookupError(data.error ?? 'No vehicle found for that registration. Pick it manually below instead.');
+        return;
+      }
+
+      const matchedBrand = slugifyMake(data.make);
+      const resolvedBrand = BRAND_OPTIONS.some((b) => b.value === matchedBrand) ? matchedBrand : 'other';
+      setBrand(resolvedBrand);
+
+      if (data.engineCapacityCc) {
+        setBikeClass(getBikeClassForCC(data.engineCapacityCc));
+      }
+
+      setLookupNote(
+        `Found: ${data.make} ${data.model} (${data.year})${data.plateInRetention ? " - this plate isn't currently attached to a vehicle; showing the last one it was on" : ''}. Fields below updated - check them before checking your quote.`
+      );
+    } catch {
+      setLookupError("Couldn't reach the lookup service. Pick your bike manually below instead.");
+    } finally {
+      setLookupLoading(false);
+    }
+  }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -77,6 +149,26 @@ export function QuoteForm() {
             <span className="ticket__label">Your bike</span>
             <span className="ticket__step">Step 1 of 4</span>
           </div>
+
+          <div className="field" style={{ marginBottom: '1.1rem' }}>
+            <label htmlFor="qc-vrm">Search by registration (optional)</label>
+            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+              <input
+                id="qc-vrm"
+                type="text"
+                value={vrm}
+                onChange={(e) => setVrm(e.target.value)}
+                placeholder="e.g. AB12 CDE"
+                style={{ flex: '1 1 160px' }}
+              />
+              <button type="button" className="btn-primary" onClick={handlePlateLookup} disabled={lookupLoading}>
+                {lookupLoading ? 'Looking up…' : 'Look up'}
+              </button>
+            </div>
+            {lookupError && <p className="error-text" role="alert">{lookupError}</p>}
+            {lookupNote && <p className="field-note">{lookupNote}</p>}
+          </div>
+
           <div className="field">
             <label htmlFor="brand">Make</label>
             <select id="brand" value={brand} onChange={(e) => setBrand(e.target.value)}>
@@ -171,7 +263,7 @@ export function QuoteForm() {
                 />
               </div>
             </div>
-            <button className="submit-button" type="submit" disabled={submitting}>
+            <button className="btn-primary" type="submit" disabled={submitting}>
               {submitting ? 'Checking…' : 'Check my quote'}
             </button>
           </div>
