@@ -11,10 +11,17 @@ import { ReportHistoryTable } from "../ReportHistoryTable";
 import QRCode from "qrcode";
 import { fetchMotHistoryFromVdg } from "@/lib/tracker/motHistoryFetch";
 import { fetchValuationFromVdg } from "@/lib/tracker/valuationFetch";
+import { updateBikeBuyerOpinionCache } from "@/lib/tracker/bike";
+import { generateBuyerOpinion, type BuyerOpinionInput } from "@/lib/tracker/buyerOpinionProse";
 import styles from "../report.module.css";
 import { PrintButton } from "../PrintButton";
 
 export const dynamic = "force-dynamic";
+
+// Same weekly cap and same reasoning as Story So Far's COOLDOWN_MS -
+// see buyerOpinionCache on BikeDoc for why this page specifically
+// needs one even though it isn't triggered by an explicit button click.
+const OPINION_COOLDOWN_MS = 7 * 24 * 60 * 60 * 1000;
 
 function fmtDate(d: string): string {
   return new Date(d).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
@@ -31,7 +38,7 @@ export default async function DetailedReportPage({ params }: { params: { token: 
     bike, rows, total, backdatedCount, realTimeCount, receiptCount,
     currentRegistration, upcomingReminders, consumablesDueSoon, motCheckUrl,
     mileageCheck, storyParagraphs, jobTypeGroups, supportedFindings,
-    unconfirmedFindings, detailedQuestions,
+    unconfirmedFindings, detailedQuestions, verdict,
   } = data;
 
   const canonicalReportUrl = `${process.env.APP_URL ?? "https://roadverdict.co.uk"}/report/${params.token}/detailed`;
@@ -46,6 +53,68 @@ export default async function DetailedReportPage({ params }: { params: { token: 
   // this bike's real current mileage, not whatever it was when added.
   const valuation = currentRegistration ? await fetchValuationFromVdg(currentRegistration, bike.currentMileage) : null;
   const valuationAttempted = currentRegistration != null;
+
+  // Same warranty-still-covered logic as the inline JSX block further
+  // down (kept as a separate, small duplication rather than reaching
+  // into that block's own IIFE from out here - that block works and is
+  // already tested, not worth disturbing just to share one value).
+  let warrantyStatus: BuyerOpinionInput["warrantyStatus"] = null;
+  if (bike.dvlaData && (bike.dvlaData.warrantyMonths || bike.dvlaData.warrantyMiles) && bike.dvlaData.dateFirstRegistered) {
+    const regDate = new Date(bike.dvlaData.dateFirstRegistered);
+    const monthsOld = (Date.now() - regDate.getTime()) / (1000 * 60 * 60 * 24 * 30.44);
+    const timeCovered = bike.dvlaData.warrantyMonths != null ? monthsOld < bike.dvlaData.warrantyMonths : null;
+    const mileageCovered = bike.dvlaData.warrantyMiles != null ? bike.currentMileage < bike.dvlaData.warrantyMiles : null;
+    const checks = [timeCovered, mileageCovered].filter((v) => v !== null);
+    const stillCovered = checks.length > 0 && checks.every((v) => v === true);
+    warrantyStatus = stillCovered ? "likely still within warranty" : "likely outside warranty";
+  }
+
+  // Cached on the bike doc, refreshed weekly - this page has no login
+  // and no rate limit of its own, and can be opened by anyone with the
+  // link any number of times, so without a cache an AI call would fire
+  // on every single view. See buyerOpinionCache on BikeDoc.
+  let buyerOpinion = null;
+  if (bike.buyerOpinionCache && Date.now() - new Date(bike.buyerOpinionCache.generatedAt).getTime() < OPINION_COOLDOWN_MS) {
+    buyerOpinion = bike.buyerOpinionCache.response;
+  } else {
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (apiKey) {
+      const opinionInput: BuyerOpinionInput = {
+        make: bike.make,
+        model: bike.model,
+        year: bike.year,
+        isCustomBuild: !!bike.isCustomBuild,
+        engineCC: bike.engineCC,
+        currentMileage: bike.currentMileage,
+        verdictLabel: verdict.label,
+        verdictReasons: verdict.reasons,
+        totalSpend: total,
+        totalEntries: rows.length,
+        receiptCount,
+        backdatedCount,
+        realTimeCount,
+        dvlaScrapped: !!bike.dvlaData?.isScrapped,
+        dvlaExported: !!bike.dvlaData?.isExported,
+        dvlaUnscrapped: !!bike.dvlaData?.isUnscrapped,
+        warrantyStatus,
+        motTestCount: motHistory?.tests.length ?? 0,
+        motFailCount: motHistory?.tests.filter((t) => !t.passed).length ?? 0,
+        motDueDate: motHistory?.motDueDate ?? null,
+        keeperChangeCount: bike.dvlaData?.keeperChangeList.length ?? 0,
+        valuationPrivateAverage: valuation?.figures.privateAverage ?? null,
+        upcomingOverdueCount: upcomingReminders.filter((r) => r.status === "overdue").length + consumablesDueSoon.filter((c) => c.status === "overdue").length,
+        upcomingDueSoonCount: upcomingReminders.filter((r) => r.status === "due-soon").length + consumablesDueSoon.filter((c) => c.status !== "overdue").length,
+      };
+      buyerOpinion = await generateBuyerOpinion(opinionInput, apiKey);
+      if (buyerOpinion) {
+        // Awaited rather than fire-and-forget, same reasoning as
+        // Story So Far's cache save - if this fails, the visitor still
+        // gets their opinion this once, they just won't get the free
+        // cached re-read for the next visitor within the week.
+        await updateBikeBuyerOpinionCache(bike.pk, bike.id, { generatedAt: new Date().toISOString(), response: buyerOpinion });
+      }
+    }
+  }
 
   return (
     <div className={styles.wrapper}>
@@ -110,6 +179,37 @@ export default async function DetailedReportPage({ params }: { params: { token: 
               DVLA has no scrapped, exported, or unscrapped-status flags on record for this vehicle.
             </p>
           )
+        )}
+
+        {buyerOpinion && (
+          <>
+            <h2 className={styles.docHeading}>The honest read</h2>
+            <p className={styles.docParagraph}>{buyerOpinion.honestRead}</p>
+            {(buyerOpinion.strengths.length > 0 || buyerOpinion.concerns.length > 0) && (
+              <div className={styles.twoColumn}>
+                {buyerOpinion.strengths.length > 0 && (
+                  <div>
+                    <h2 className={styles.docHeading}>Strengths</h2>
+                    <ul className={styles.findingsList}>
+                      {buyerOpinion.strengths.map((s, i) => <li key={i} className={styles.findingGood}>{s}</li>)}
+                    </ul>
+                  </div>
+                )}
+                {buyerOpinion.concerns.length > 0 && (
+                  <div>
+                    <h2 className={styles.docHeading}>Worth asking about</h2>
+                    <ul className={styles.findingsList}>
+                      {buyerOpinion.concerns.map((c, i) => <li key={i} className={styles.findingGap}>{c}</li>)}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            )}
+            <p className={styles.docParagraph} style={{ fontStyle: "italic", color: "var(--ink-soft)" }}>
+              An informed read on the record above, the way a dealer reads a service history before a bike arrives
+              on the forecourt - not a hands-on inspection, and not a substitute for viewing the bike yourself.
+            </p>
+          </>
         )}
 
         <h2 className={styles.docHeading}>The story this data tells</h2>

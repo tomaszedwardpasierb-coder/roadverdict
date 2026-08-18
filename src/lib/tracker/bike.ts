@@ -113,6 +113,19 @@ export interface BikeDoc {
       categorySpend: CategorySpend[];
     };
   };
+  // Same reasoning and same weekly cap as storyCache above, but for the
+  // dealer's-read opinion shown on the buyer-facing shareable report
+  // (/report/[token]/detailed) - that page has no rate limit of its own
+  // and can be viewed by anyone with the link, any number of times, so
+  // without this cache an AI call would fire on every single page load.
+  buyerOpinionCache?: {
+    generatedAt: string;
+    response: {
+      strengths: string[];
+      concerns: string[];
+      honestRead: string;
+    };
+  };
 }
 
 export interface DvlaKeeperChange {
@@ -311,6 +324,15 @@ export async function updateBikeStoryCache(email: string, bikeId: string, storyC
   const { resource } = await container.item(bikeId, email).read<BikeDoc>();
   if (!resource) return null;
   resource.storyCache = storyCache;
+  await container.items.upsert(resource);
+  return resource;
+}
+
+export async function updateBikeBuyerOpinionCache(email: string, bikeId: string, buyerOpinionCache: BikeDoc["buyerOpinionCache"]): Promise<BikeDoc | null> {
+  const container = getContainer();
+  const { resource } = await container.item(bikeId, email).read<BikeDoc>();
+  if (!resource) return null;
+  resource.buyerOpinionCache = buyerOpinionCache;
   await container.items.upsert(resource);
   return resource;
 }
