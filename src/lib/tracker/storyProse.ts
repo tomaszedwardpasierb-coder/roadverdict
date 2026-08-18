@@ -1,12 +1,16 @@
 // Place at: src/lib/tracker/storyProse.ts
 //
-// Turns already-computed, already-verified facts into warm, readable
-// prose - never asked to compute or infer a fact itself. Every number
-// the model sees below was produced by deterministic code elsewhere in
-// this app (sellerReportData.ts, storyFacts.ts); this file's only job
-// is turning a fixed set of true statements into a story, the same
+// Turns already-computed, already-verified facts into a story - never
+// asked to compute or infer a fact itself. Every number the model sees
+// below was produced by deterministic code elsewhere in this app
+// (sellerReportData.ts, storyFacts.ts); this file's only job is
+// turning a fixed set of true statements into a story, the same
 // division of labour receiptParse.ts already draws between "the model
 // reads what's on the page" and "the app decides what that means."
+// That story is allowed to interpret what the facts suggest about the
+// bike's care and use (the kind of read a mechanic gives, not a flat
+// restatement of numbers) - see SYSTEM_PROMPT below for exactly where
+// that line sits relative to never judging the owner as a person.
 // If this call fails or returns something unusable, the caller falls
 // back to the plain, deterministic paragraphs - this layer is additive
 // polish, never a dependency the feature can't work without.
@@ -95,17 +99,20 @@ function buildFactsBlock(input: StoryProseInput): string {
   return lines.join("\n");
 }
 
-const SYSTEM_PROMPT = `You are writing a short, warm, plainly factual "story so far" about a motorcycle's documented maintenance history, using ONLY the facts given below. This may be read by both the bike's current owner and a future potential buyer, so it must be honest and even-handed, never a sales pitch.
+const SYSTEM_PROMPT = `You are writing a short "story so far" about a motorcycle's documented maintenance history, using ONLY the facts given below. This may be read by both the bike's current owner and a future potential buyer, so it must be honest and grounded in the facts - never invented, never a sales pitch.
+
+This isn't just a fact summary. It should read like the kind of honest, informed read an experienced mechanic or motorcycle dealer would give a friend asking "what do you make of this bike's history?" - genuinely interpreting what the pattern of servicing, spend, and use suggests about how the bike has evidently been looked after, not just listing the numbers back.
 
 Strict rules:
-- Never invent, estimate, or assume any fact not explicitly given below - if something isn't in the facts, don't mention it.
-- Never speculate about WHY a pattern exists (why a gap happened, why spending was high one year, why something wasn't logged) - state what happened, not why. That is a judgement about the person, which you must never make.
-- Never make any claim about the owner's character, honesty, carefulness, or intentions.
-- Reference specific numbers and dates from the facts, not vague generalities like "well maintained" without a fact backing it up.
-- Warm and readable, not clinical, but never hyped, never salesy, never using words like "amazing" or "impressive" - a skeptical buyer should find this credible, not promotional.
+- Never invent, estimate, or assume any fact not explicitly given below - every interpretation must be clearly traceable to a specific fact given, not an invented flourish.
+- You may interpret what a pattern suggests about the BIKE - whether it reads as looked after, ridden regularly or left sitting for a stretch, invested in beyond the bare minimum, or going through a quiet patch. This is exactly the kind of read a buyer actually wants, not something to avoid.
+- Never make any claim about the OWNER as a person - their honesty, character, or intentions. Stay with what the record shows about the machine and how it's been used, not a judgement of who owns it. "Went through a quiet spell in 2020" is fine. "The owner clearly lost interest" is not.
+- Where a pattern is genuinely ambiguous, say so plainly rather than reaching for a confident-sounding explanation - a hedge ("could mean," "reads like") is more honest than false certainty.
+- Reference specific numbers and dates to back up any interpretation - never a vague claim like "well maintained" floating free of the fact that supports it.
+- Plain and honest, the way an experienced mechanic actually talks - not hyped, not salesy, no words like "amazing" or "impressive". A skeptical buyer should find this credible, not promotional.
 
 Produce exactly two things:
-1. "sharedStory": 4 to 6 short paragraphs (1-3 sentences each) suitable for BOTH the owner and a future buyer to read - covering the bike's shape, its service rhythm, where the money has gone, and its fuel-efficiency trend if there's enough data for one. Do not mention the documentation verdict's internal reasons list directly; you may reference the verdict label itself naturally.
+1. "sharedStory": 4 to 6 short paragraphs (1-3 sentences each) suitable for BOTH the owner and a future buyer to read - covering the bike's shape, its service rhythm, where the money has gone, its fuel-efficiency trend if there's enough data for one, and an honest overall read on how it's evidently been looked after. Do not mention the documentation verdict's internal reasons list directly; you may reference the verdict label itself naturally.
 2. "ownerNotes": 1 to 3 short, specific, actionable notes for the OWNER ONLY, based strictly on the "WHAT WOULD STRENGTHEN THE RECORD" facts if given - never generic maintenance advice unconnected to those specific facts. If no such facts were given, return an empty array.
 
 Return ONLY valid JSON matching this shape, nothing else, no markdown fences:
