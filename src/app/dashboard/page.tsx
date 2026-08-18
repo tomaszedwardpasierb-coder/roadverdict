@@ -51,6 +51,7 @@ import { DashboardShell } from "./DashboardShell";
 import { QuoteForm } from "@/components/QuoteForm";
 import { CostCalculatorForm } from "@/components/CostCalculatorForm";
 import { BuyingGuideForm } from "@/components/BuyingGuideForm";
+import { PrivacyContent } from "../privacy/PrivacyContent";
 import { StorySoFarTab } from "./StorySoFarTab";
 import { ChartFilterProvider } from "./ChartFilterContext";
 import { ChartFilterBar } from "./ChartFilterBar";
@@ -553,6 +554,13 @@ export default async function DashboardPage() {
     </>
   );
 
+  // No bikeTag/mileagePill header wrapper here, unlike the other
+  // embedded tools above - PrivacyContent already has its own complete
+  // heading (title, last-updated date, summary box), and it isn't
+  // about this specific bike the way the other three tools are, so
+  // wrapping it the same way would just add a redundant second heading.
+  const privacyContent = <PrivacyContent />;
+
   return (
     <DashboardShell
       bikeName={bikeName}
@@ -576,6 +584,7 @@ export default async function DashboardPage() {
       quoteCheckerContent={quoteCheckerContent}
       costCalculatorContent={costCalculatorContent}
       buyingGuideContent={buyingGuideContent}
+      privacyContent={privacyContent}
     />
   );
 }

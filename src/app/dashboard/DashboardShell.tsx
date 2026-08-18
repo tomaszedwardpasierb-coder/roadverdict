@@ -14,7 +14,7 @@ import { DEMO_EMAIL } from '@/lib/tracker/demoSeed';
 import { Icon, type IconName } from './Icon';
 import styles from './dashboard.module.css';
 
-type Section = 'dashboard' | 'service' | 'fuel' | 'mods' | 'bills' | 'reminders' | 'reports' | 'shareLinks' | 'story' | 'quoteChecker' | 'costCalculator' | 'buyingGuide';
+type Section = 'dashboard' | 'service' | 'fuel' | 'mods' | 'bills' | 'reminders' | 'reports' | 'shareLinks' | 'story' | 'quoteChecker' | 'costCalculator' | 'buyingGuide' | 'privacy';
 
 const REVIEW_CATEGORIES: ReviewCategory[] = ['service', 'fuel', 'mods', 'bills'];
 function asReviewCategory(key: string): ReviewCategory | null {
@@ -31,6 +31,9 @@ const NAV_ITEMS: { key: Section; label: string; icon: IconName }[] = [
   { key: 'reports', label: 'Reports', icon: 'reports' },
   { key: 'story', label: 'The Story So Far', icon: 'story' },
   { key: 'shareLinks', label: 'Shareable Links', icon: 'shareLinks' },
+  { key: 'quoteChecker', label: 'Quote Checker', icon: 'quoteChecker' },
+  { key: 'costCalculator', label: 'Cost calculator', icon: 'costCalculator' },
+  { key: 'buyingGuide', label: 'Buying a used bike', icon: 'buyingGuide' },
 ];
 
 const MOBILE_NAV_ITEMS: { key: Section; label: string; icon: IconName }[] = [
@@ -73,6 +76,7 @@ interface Props {
   quoteCheckerContent: ReactNode;
   costCalculatorContent: ReactNode;
   buyingGuideContent: ReactNode;
+  privacyContent: ReactNode;
 }
 
 function PendingDot() {
@@ -101,6 +105,7 @@ export function DashboardShell({
   quoteCheckerContent,
   costCalculatorContent,
   buyingGuideContent,
+  privacyContent,
 }: Props) {
   const [active, setActive] = useState<Section>('dashboard');
   const [showMore, setShowMore] = useState(false);
@@ -118,6 +123,7 @@ export function DashboardShell({
     quoteChecker: quoteCheckerContent,
     costCalculator: costCalculatorContent,
     buyingGuide: buyingGuideContent,
+    privacy: privacyContent,
   };
 
   const isMoreActive = active === 'bills' || active === 'reminders' || active === 'reports' || active === 'story' || active === 'shareLinks';
@@ -151,37 +157,6 @@ export function DashboardShell({
             })}
           </nav>
 
-          <nav className={styles.sidebarSecondaryNav}>
-            <button
-              type="button"
-              className={`${styles.sidebarSecondaryNavItem} ${active === 'quoteChecker' ? styles.sidebarSecondaryNavItemActive : ''}`}
-              onClick={() => setActive('quoteChecker')}
-            >
-              <Icon name="quoteChecker" className={styles.navIcon} size={15} />
-              <span>Quote Checker</span>
-            </button>
-            <button
-              type="button"
-              className={`${styles.sidebarSecondaryNavItem} ${active === 'costCalculator' ? styles.sidebarSecondaryNavItemActive : ''}`}
-              onClick={() => setActive('costCalculator')}
-            >
-              <Icon name="costCalculator" className={styles.navIcon} size={15} />
-              <span>Cost calculator</span>
-            </button>
-            <button
-              type="button"
-              className={`${styles.sidebarSecondaryNavItem} ${active === 'buyingGuide' ? styles.sidebarSecondaryNavItemActive : ''}`}
-              onClick={() => setActive('buyingGuide')}
-            >
-              <Icon name="buyingGuide" className={styles.navIcon} size={15} />
-              <span>Buying a used bike</span>
-            </button>
-            <Link href="/privacy" className={styles.sidebarSecondaryNavItem}>
-              <Icon name="privacy" className={styles.navIcon} size={15} />
-              <span>Privacy</span>
-            </Link>
-          </nav>
-
           <BikeSwitcher bikes={bikes} activeBikeId={activeBikeId} distanceUnit={distanceUnit} />
           <div style={{ marginTop: '0.6rem' }}>
             <UpdateMileageButton currentMileage={currentMileage} distanceUnit={distanceUnit} />
@@ -201,6 +176,16 @@ export function DashboardShell({
           )}
           <div style={{ marginTop: '0.6rem' }}>
             <LogoutButton />
+          </div>
+          <div style={{ marginTop: '0.8rem', borderTop: '1px solid rgba(255, 255, 255, 0.12)', paddingTop: '0.6rem' }}>
+            <button
+              type="button"
+              className={`${styles.sidebarNavItem} ${active === 'privacy' ? styles.sidebarNavItemActive : ''}`}
+              onClick={() => setActive('privacy')}
+            >
+              <Icon name="privacy" className={styles.navIcon} />
+              <span>Privacy</span>
+            </button>
           </div>
         </aside>
 
