@@ -11,6 +11,7 @@ interface StoryResponse {
   sharedStory: string[];
   ownerNotes: string[];
   verdict: { tier: string; label: string; reasons: string[] };
+  generatedAt: string;
   cached: boolean;
   nextAvailableAt: string;
 }
@@ -20,18 +21,33 @@ interface Props {
   registration?: string;
   currentMileage: number;
   distanceUnit: DistanceUnit;
+  // The bike's already-saved story, passed straight from page.tsx
+  // (which already has bike.storyCache loaded as part of the normal
+  // page data) rather than fetched again client-side. This is what
+  // makes the story persist across a sign-out/sign-in or any other
+  // fresh page load - previously this component always started blank
+  // and needed an explicit click just to check whether one existed,
+  // which looked exactly like the cooldown had reset even when it
+  // genuinely hadn't.
+  initialStory: StoryResponse | null;
 }
 
-export function StorySoFarTab({ bikeNickname, registration, currentMileage, distanceUnit }: Props) {
+function formatDate(iso: string): string {
+  return new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+function timeLeftText(nextAvailableAt: string): string {
+  const msLeft = new Date(nextAvailableAt).getTime() - Date.now();
+  if (msLeft <= 0) return '';
+  const daysLeft = Math.ceil(msLeft / 86400000);
+  const hoursLeft = Math.ceil(msLeft / 3600000);
+  return daysLeft > 1 ? `${daysLeft} days` : hoursLeft > 1 ? `${hoursLeft} hours` : 'less than an hour';
+}
+
+export function StorySoFarTab({ bikeNickname, registration, currentMileage, distanceUnit, initialStory }: Props) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [story, setStory] = useState<StoryResponse | null>(null);
-  // Only ever set from an explicit "Regenerate" click that came back
-  // cached - never on the first "Generate my story" click, even if
-  // that one happens to return a still-fresh cached story too. Seeing
-  // your own recent story shouldn't come with a cooldown notice; only
-  // explicitly asking for another one within the week should.
-  const [cooldownNotice, setCooldownNotice] = useState<string | null>(null);
+  const [story, setStory] = useState<StoryResponse | null>(initialStory);
 
   // Same tag shown next to every other tab's page title - built the
   // same way page.tsx builds it, since this component doesn't have
@@ -50,7 +66,13 @@ export function StorySoFarTab({ bikeNickname, registration, currentMileage, dist
     </div>
   );
 
-  async function handleGenerate(isRegenerateClick: boolean) {
+  // Recomputed on every render, which is enough for something with
+  // day-scale granularity - no need for a live ticking countdown for
+  // a cooldown measured in days, and any state change (including just
+  // re-rendering) re-evaluates this against the real clock anyway.
+  const canRegenerate = !story || new Date(story.nextAvailableAt).getTime() <= Date.now();
+
+  async function handleGenerate() {
     setLoading(true);
     setError(null);
     try {
@@ -58,17 +80,6 @@ export function StorySoFarTab({ bikeNickname, registration, currentMileage, dist
       const data = await res.json();
       if (res.ok) {
         setStory(data);
-        if (isRegenerateClick && data.cached) {
-          const msLeft = new Date(data.nextAvailableAt).getTime() - Date.now();
-          const daysLeft = Math.ceil(msLeft / 86400000);
-          const hoursLeft = Math.ceil(msLeft / 3600000);
-          const timeLeftText = daysLeft > 1 ? `${daysLeft} days` : hoursLeft > 1 ? `${hoursLeft} hours` : 'less than an hour';
-          setCooldownNotice(
-            `Stories refresh once a week to keep AI use sensible - this is still your most recent one. Next refresh available in ${timeLeftText}.`
-          );
-        } else {
-          setCooldownNotice(null);
-        }
       } else {
         setError(data.error ?? 'Could not generate the story. Try again.');
       }
@@ -91,7 +102,7 @@ export function StorySoFarTab({ bikeNickname, registration, currentMileage, dist
           strengthen it, and the same story you can hand a buyer when you&apos;re ready to sell, backed by real dates
           and receipts, not just your word.
         </p>
-        <button type="button" className={styles.scanReceiptBtn} disabled={loading} onClick={() => handleGenerate(false)}>
+        <button type="button" className={styles.scanReceiptBtn} disabled={loading} onClick={handleGenerate}>
           {loading ? 'Putting it together…' : 'Generate my story →'}
         </button>
         {error && <p className="error-text" role="alert" style={{ marginTop: '0.8rem' }}>{error}</p>}
@@ -105,8 +116,14 @@ export function StorySoFarTab({ bikeNickname, registration, currentMileage, dist
         <h1 className={styles.heading}>The Story So Far{bikeTag}</h1>
         {mileagePill}
       </div>
-      <p className={styles.subtext} style={{ marginBottom: '1.2rem' }}>
+      <p className={styles.subtext} style={{ marginBottom: '0.3rem' }}>
         Documentation: <strong>{story.verdict.label}</strong>
+      </p>
+      {/* Always visible, not just after clicking Regenerate - the whole
+          point is knowing at a glance whether this is fresh or old
+          without having to guess or test the button first. */}
+      <p className={styles.subtext} style={{ marginBottom: '1.2rem', fontSize: '0.8rem' }}>
+        Generated {formatDate(story.generatedAt)}
       </p>
 
       {story.sharedStory.map((paragraph, i) => (
@@ -126,14 +143,24 @@ export function StorySoFarTab({ bikeNickname, registration, currentMileage, dist
         </div>
       )}
 
-      <button type="button" className={styles.iconBtn} style={{ marginTop: '1.4rem' }} onClick={() => handleGenerate(true)} disabled={loading}>
+      <button
+        type="button"
+        className={styles.iconBtn}
+        style={{ marginTop: '1.4rem' }}
+        onClick={handleGenerate}
+        disabled={loading || !canRegenerate}
+      >
         {loading ? 'Putting it together…' : 'Regenerate'}
       </button>
-      {cooldownNotice && (
+      {/* Shown upfront whenever it's locked, not discovered by clicking
+          a button that turns out not to do anything - a disabled
+          button with no explanation is worse than no button at all. */}
+      {!canRegenerate && (
         <p className={styles.subtext} style={{ marginTop: '0.6rem', marginBottom: 0 }}>
-          {cooldownNotice}
+          Stories refresh once a week to keep AI use sensible. Next refresh available in {timeLeftText(story.nextAvailableAt)}.
         </p>
       )}
+      {error && <p className="error-text" role="alert" style={{ marginTop: '0.6rem' }}>{error}</p>}
     </div>
   );
 }

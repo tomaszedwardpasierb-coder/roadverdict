@@ -521,6 +521,22 @@ export default async function DashboardPage() {
   )?.model;
   const toolInitialBikeClass = getBikeClassForCC(bike.engineCC);
 
+  // Same cooldown window as story-so-far/route.ts - duplicated as a
+  // plain constant since a route handler isn't a regular importable
+  // module, but this must stay in sync with that file's own COOLDOWN_MS.
+  const STORY_COOLDOWN_MS = 7 * 24 * 60 * 60 * 1000;
+  const initialStory = bike.storyCache
+    ? {
+        generatedWithAi: bike.storyCache.response.generatedWithAi,
+        sharedStory: bike.storyCache.response.sharedStory,
+        ownerNotes: bike.storyCache.response.ownerNotes,
+        verdict: bike.storyCache.response.verdict,
+        generatedAt: bike.storyCache.generatedAt,
+        cached: true,
+        nextAvailableAt: new Date(new Date(bike.storyCache.generatedAt).getTime() + STORY_COOLDOWN_MS).toISOString(),
+      }
+    : null;
+
   const quoteCheckerContent = (
     <>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "0.75rem" }}>
@@ -579,7 +595,7 @@ export default async function DashboardPage() {
       billsContent={billsContent}
       remindersContent={remindersContent}
       reportsContent={reportsContent}
-      storyContent={<StorySoFarTab bikeNickname={bike.nickname} registration={currentRegistration} currentMileage={bike.currentMileage} distanceUnit={distanceUnit} />}
+      storyContent={<StorySoFarTab bikeNickname={bike.nickname} registration={currentRegistration} currentMileage={bike.currentMileage} distanceUnit={distanceUnit} initialStory={initialStory} />}
       shareLinksContent={shareLinksContent}
       quoteCheckerContent={quoteCheckerContent}
       costCalculatorContent={costCalculatorContent}

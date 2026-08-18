@@ -32,13 +32,14 @@ export async function GET() {
   // freshly-recomputed facts paired with week-old prose could. No
   // Gemini call happens on this path at all.
   if (bike.storyCache) {
-    const generatedAt = new Date(bike.storyCache.generatedAt).getTime();
-    const ageMs = Date.now() - generatedAt;
+    const generatedAtMs = new Date(bike.storyCache.generatedAt).getTime();
+    const ageMs = Date.now() - generatedAtMs;
     if (ageMs < COOLDOWN_MS) {
       return NextResponse.json({
         ...bike.storyCache.response,
+        generatedAt: bike.storyCache.generatedAt,
         cached: true,
-        nextAvailableAt: new Date(generatedAt + COOLDOWN_MS).toISOString(),
+        nextAvailableAt: new Date(generatedAtMs + COOLDOWN_MS).toISOString(),
       });
     }
   }
@@ -97,5 +98,5 @@ export async function GET() {
   // this request finishes.
   await updateBikeStoryCache(session.email, bike.id, { generatedAt, response });
 
-  return NextResponse.json({ ...response, cached: false, nextAvailableAt: new Date(Date.now() + COOLDOWN_MS).toISOString() });
+  return NextResponse.json({ ...response, generatedAt, cached: false, nextAvailableAt: new Date(Date.now() + COOLDOWN_MS).toISOString() });
 }
