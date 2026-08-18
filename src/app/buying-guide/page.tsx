@@ -1,6 +1,9 @@
 import type { Metadata } from 'next';
 import { headers } from 'next/headers';
 import { BuyingGuideForm } from '@/components/BuyingGuideForm';
+import { getSession } from '@/lib/auth/session';
+
+export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = {
   title: 'What to check before you buy a used motorcycle',
@@ -20,8 +23,20 @@ const jsonLd = {
     'A buyer checklist for a used UK motorcycle - inspection points and seller questions, weighted by the bike\'s age.',
 };
 
-export default function BuyingGuidePage() {
+export default async function BuyingGuidePage() {
   const nonce = headers().get('x-nonce') ?? undefined;
+
+  // Same defensive wrapping as Cost Calculator and Quote Checker: this
+  // page previously had no Cosmos dependency, and getContainer() throws
+  // unconditionally if Cosmos config is ever missing - a problem there
+  // should degrade to "treat as anonymous", not take down a public,
+  // no-account-needed tool for every visitor.
+  let session: Awaited<ReturnType<typeof getSession>> = null;
+  try {
+    session = await getSession();
+  } catch (err) {
+    console.error("Buying guide: getSession() failed, continuing as anonymous:", err);
+  }
 
   return (
     <>
@@ -35,7 +50,7 @@ export default function BuyingGuidePage() {
         <h1>What should you check before buying it?</h1>
         <p>A buyer checklist weighted by how old the bike actually is - not a generic list.</p>
       </div>
-      <BuyingGuideForm />
+      <BuyingGuideForm signedIn={!!session} />
       <p className="disclaimer">
         General inspection guidance, not a substitute for a professional pre-purchase check -
         especially on anything safety-critical like brakes or frame condition.

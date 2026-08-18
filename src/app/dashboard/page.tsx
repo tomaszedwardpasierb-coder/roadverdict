@@ -549,7 +549,7 @@ export default async function DashboardPage() {
         {mileagePill}
       </div>
       <p className={styles.subtext}>A buyer checklist weighted by how old the bike actually is - not a generic list.</p>
-      <BuyingGuideForm />
+      <BuyingGuideForm signedIn />
     </>
   );
 
