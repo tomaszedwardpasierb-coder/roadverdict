@@ -47,7 +47,7 @@ export interface RegistrationChangeEntry {
 // overwrite the first bike's document (same id, upsert just replaces) -
 // this is the actual fix for that. The random suffix guards against the
 // theoretical case of two bikes being created in the same millisecond.
-function generateBikeId(email: string): string {
+export function generateBikeId(email: string): string {
   return `${email}::bike::${Date.now()}::${Math.random().toString(36).slice(2, 8)}`;
 }
 
@@ -125,6 +125,38 @@ export interface BikeDoc {
       concerns: string[];
       honestRead: string;
     };
+  };
+  // Set on a NEW bike document when it was created by transferring
+  // ownership from a previous account, rather than added fresh by this
+  // owner. Points back at the old document under the previous owner's
+  // partition - deliberately a link between two documents, not a
+  // change of owner on one document, since bikes here are partitioned
+  // by owner email and can't move partitions in place. See
+  // bikeTransfer.ts for the function that creates this pair.
+  transferredFrom?: {
+    previousBikeId: string;
+    previousOwnerEmail: string;
+    transferredAt: string;
+    // Frozen at the moment of transfer, not a live figure - the new
+    // owner doesn't inherit the previous owner's actual service/fuel/
+    // bill records (those stay under the previous owner's account
+    // unless explicitly shared - see Phase 3 of the digital passport
+    // plan), only this snapshot of what they added up to.
+    summaryAtTransfer: {
+      totalEntries: number;
+      totalSpend: number;
+      documentationVerdictLabel: string;
+      mileageAtTransfer: number;
+    };
+  };
+  // Set on the OLD bike document once it's been superseded by a
+  // transfer - the presence of this field is what makes a bike
+  // historical/read-only rather than a separate boolean flag. Points
+  // forward at the new owner's copy.
+  transferredTo?: {
+    newBikeId: string;
+    newOwnerEmail: string;
+    transferredAt: string;
   };
 }
 
