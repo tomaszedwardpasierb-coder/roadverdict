@@ -86,6 +86,27 @@ export async function getPendingTransferRequestsForOwner(ownerEmail: string): Pr
   return resources;
 }
 
+// Single-partition, same reasoning as above - used by the history
+// follow-up cron to skip a bike that's already been requested or
+// handed off before the 4-week email would fire. "Active" means
+// pending or accepted; a declined request doesn't count, since someone
+// declining one offer shouldn't permanently block a genuinely
+// different buyer's follow-up email later.
+export async function hasActiveTransferRequestForBike(ownerEmail: string, bikeId: string): Promise<boolean> {
+  const container = getContainer();
+  const { resources } = await container.items
+    .query<{ id: string }>({
+      query:
+        "SELECT c.id FROM c WHERE c.pk = @email AND c.type = 'bikeTransferRequest' AND c.bikeId = @bikeId AND (c.status = 'pending' OR c.status = 'accepted')",
+      parameters: [
+        { name: "@email", value: ownerEmail },
+        { name: "@bikeId", value: bikeId },
+      ],
+    })
+    .fetchAll();
+  return resources.length > 0;
+}
+
 // Cross-partition - the recipient's link only ever carries the raw
 // token, never the owner's email, so there's no partition to scope to
 // upfront. Only ever called once per link click, so the extra query

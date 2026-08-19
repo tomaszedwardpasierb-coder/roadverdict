@@ -173,3 +173,38 @@ export async function sendBikeTransferAcceptedEmail(params: {
     `,
   });
 }
+
+// Sent once, 4 weeks after a shareable report link was created, to
+// whoever it was addressed to - regardless of whether they ever opened
+// the original report. See getShareLinksNeedingFollowUp() in
+// shareLink.ts for the query that decides who's eligible, and
+// hasActiveTransferRequestForBike() for the check that skips a bike
+// already requested or handed off by the time this would send.
+//
+// reportUrl deliberately points at the existing report page for now,
+// not a dedicated request flow - that flow (the CTA on shared reports
+// itself) doesn't exist yet as of this email being built. Update this
+// once it does, rather than leaving it pointed here permanently.
+export async function sendHistoryFollowUpEmail(params: {
+  recipientEmail: string;
+  bikeSummary: { make: string; model: string; year?: number; isCustomBuild: boolean };
+  reportUrl: string;
+}) {
+  const resend = getResend();
+  const safeBikeName = escapeHtml(formatBikeName(params.bikeSummary));
+
+  await resend.emails.send({
+    from: FROM,
+    to: params.recipientEmail,
+    subject: `Bought the bike? Take its history with you`,
+    html: `
+      <p>If you bought this ${safeBikeName}, don't leave its history behind.</p>
+      <p>Request its existing RoadVerdict history and continue building a complete record of its ownership,
+      servicing, maintenance and spend - helping you protect your investment and giving the bike a stronger history
+      when you eventually sell.</p>
+      <p><a href="${params.reportUrl}">Request this bike's history</a></p>
+      <p style="color: #888; font-size: 0.9em;">You're getting this because a RoadVerdict report for this bike was shared with you a few weeks ago. If you
+      didn't buy it, no action needed - you won't be emailed about it again.</p>
+    `,
+  });
+}

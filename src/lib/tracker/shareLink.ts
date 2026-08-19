@@ -24,6 +24,12 @@ export interface ShareLinkDoc {
   // documents have no recipientEmail property at runtime no matter
   // what this type claims.
   recipientEmail?: string;
+  // Set once the 4-week history-request follow-up has been processed
+  // for this link - in BOTH senses: an email actually sent, or a
+  // deliberate skip because the bike was already claimed/requested by
+  // then. Both cases mean "don't check this link again," which is the
+  // only thing this field is actually used to decide.
+  followUpSentAt?: string;
 }
 
 export type ShareLinkDuration = "1week" | "1month" | "6months";
@@ -162,4 +168,37 @@ export async function deleteExpiredShareLinks(): Promise<number> {
     await container.item(r.id, r.id).delete();
   }
   return resources.length;
+}
+
+// A bigger decision than a 15-minute sign-in link deserves a longer
+// window than most things in this app wait for - 4 weeks is roughly
+// how long it takes for "did this person actually buy the bike" to
+// become knowable, not an arbitrary number.
+const FOLLOW_UP_DELAY_DAYS = 28;
+
+// Cross-partition, same accepted exception as deleteExpiredShareLinks
+// directly above - only ever called once a day from the follow-up cron,
+// never a hot path. IS_DEFINED on recipientEmail excludes the small
+// number of legacy links created before that field was required; a
+// link with nobody to email obviously can't get a follow-up email.
+export async function getShareLinksNeedingFollowUp(): Promise<ShareLinkDoc[]> {
+  const container = getContainer();
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - FOLLOW_UP_DELAY_DAYS);
+  const { resources } = await container.items
+    .query<ShareLinkDoc>({
+      query:
+        "SELECT * FROM c WHERE c.type = 'shareLink' AND IS_DEFINED(c.recipientEmail) AND NOT IS_DEFINED(c.followUpSentAt) AND c.createdAt <= @cutoff",
+      parameters: [{ name: "@cutoff", value: cutoff.toISOString() }],
+    })
+    .fetchAll();
+  return resources;
+}
+
+export async function markShareLinkFollowUpSent(token: string): Promise<void> {
+  const container = getContainer();
+  const { resource } = await container.item(token, token).read<ShareLinkDoc>();
+  if (!resource) return;
+  resource.followUpSentAt = new Date().toISOString();
+  await container.items.upsert(resource);
 }
