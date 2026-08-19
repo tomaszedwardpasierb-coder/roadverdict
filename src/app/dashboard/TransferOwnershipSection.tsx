@@ -49,8 +49,7 @@ export function TransferOwnershipSection({ pendingRequest, bikeIsReadOnly }: Pro
 
   if (bikeIsReadOnly) {
     return (
-      <div className={styles.card} style={{ marginTop: '1.4rem' }}>
-        <h2 style={{ fontFamily: 'var(--font-display)', fontSize: '1.1rem', marginBottom: '0.5rem' }}>Transfer ownership</h2>
+      <div className={styles.card}>
         <p className={styles.subtext}>This bike has already been transferred and can&apos;t be offered again.</p>
       </div>
     );
@@ -59,8 +58,7 @@ export function TransferOwnershipSection({ pendingRequest, bikeIsReadOnly }: Pro
   const activeRequest = sentTo ? { recipientEmail: sentTo, createdAt: new Date().toISOString() } : pendingRequest;
 
   return (
-    <div className={styles.card} style={{ marginTop: '1.4rem' }}>
-      <h2 style={{ fontFamily: 'var(--font-display)', fontSize: '1.1rem', marginBottom: '0.5rem' }}>Transfer ownership</h2>
+    <div className={styles.card}>
       {activeRequest ? (
         <p className={styles.subtext}>
           Waiting for <strong>{activeRequest.recipientEmail}</strong> to accept - offered{' '}

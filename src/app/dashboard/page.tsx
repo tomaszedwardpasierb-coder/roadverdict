@@ -497,17 +497,25 @@ export default async function DashboardPage() {
   const pendingTransferForThisBike = pendingTransferRequests.find((r) => r.bikeId === bike.id);
 
   const shareLinksContent = (
+    <ShareLinksSection
+      links={shareLinks}
+      bikeNames={bikeNames}
+      appUrl={process.env.APP_URL ?? "https://roadverdict.co.uk"}
+      requests={pendingReceiptRequests}
+      bikeNickname={bike.nickname}
+      registration={currentRegistration}
+      currentMileage={bike.currentMileage}
+      distanceUnit={distanceUnit}
+    />
+  );
+
+  const transferOwnershipContent = (
     <>
-      <ShareLinksSection
-        links={shareLinks}
-        bikeNames={bikeNames}
-        appUrl={process.env.APP_URL ?? "https://roadverdict.co.uk"}
-        requests={pendingReceiptRequests}
-        bikeNickname={bike.nickname}
-        registration={currentRegistration}
-        currentMileage={bike.currentMileage}
-        distanceUnit={distanceUnit}
-      />
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "0.75rem" }}>
+        <h1 className={styles.heading}>Transfer ownership{bikeTag}</h1>
+        {mileagePill}
+      </div>
+      <p className={styles.subtext}>Selling this bike? Hand the buyer your logged history instead of them starting fresh.</p>
       <TransferOwnershipSection
         pendingRequest={pendingTransferForThisBike ? { recipientEmail: pendingTransferForThisBike.recipientEmail, createdAt: pendingTransferForThisBike.createdAt } : null}
         bikeIsReadOnly={isBikeReadOnly(bike)}
@@ -624,6 +632,7 @@ export default async function DashboardPage() {
       costCalculatorContent={costCalculatorContent}
       buyingGuideContent={buyingGuideContent}
       privacyContent={privacyContent}
+      transferOwnershipContent={transferOwnershipContent}
       storyReady={storyReady}
     />
   );

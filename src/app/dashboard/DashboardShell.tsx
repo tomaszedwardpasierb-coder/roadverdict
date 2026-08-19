@@ -14,7 +14,7 @@ import { DEMO_EMAIL } from '@/lib/tracker/demoSeed';
 import { Icon, type IconName } from './Icon';
 import styles from './dashboard.module.css';
 
-type Section = 'dashboard' | 'service' | 'fuel' | 'mods' | 'bills' | 'reminders' | 'reports' | 'shareLinks' | 'story' | 'quoteChecker' | 'costCalculator' | 'buyingGuide' | 'privacy';
+type Section = 'dashboard' | 'service' | 'fuel' | 'mods' | 'bills' | 'reminders' | 'reports' | 'shareLinks' | 'story' | 'quoteChecker' | 'costCalculator' | 'buyingGuide' | 'privacy' | 'transferOwnership';
 
 const REVIEW_CATEGORIES: ReviewCategory[] = ['service', 'fuel', 'mods', 'bills'];
 function asReviewCategory(key: string): ReviewCategory | null {
@@ -34,6 +34,7 @@ const NAV_ITEMS: { key: Section; label: string; icon: IconName }[] = [
   { key: 'quoteChecker', label: 'Quote Checker', icon: 'quoteChecker' },
   { key: 'costCalculator', label: 'Cost calculator', icon: 'costCalculator' },
   { key: 'buyingGuide', label: 'Buying a used bike', icon: 'buyingGuide' },
+  { key: 'transferOwnership', label: 'Transfer ownership', icon: 'transferOwnership' },
 ];
 
 const MOBILE_NAV_ITEMS: { key: Section; label: string; icon: IconName }[] = [
@@ -52,6 +53,7 @@ const MORE_ITEMS: { key: Section; label: string; icon: IconName }[] = [
   { key: 'quoteChecker', label: 'Quote Checker', icon: 'quoteChecker' },
   { key: 'costCalculator', label: 'Cost calculator', icon: 'costCalculator' },
   { key: 'buyingGuide', label: 'Buying a used bike', icon: 'buyingGuide' },
+  { key: 'transferOwnership', label: 'Transfer ownership', icon: 'transferOwnership' },
   { key: 'privacy', label: 'Privacy', icon: 'privacy' },
 ];
 
@@ -81,6 +83,7 @@ interface Props {
   costCalculatorContent: ReactNode;
   buyingGuideContent: ReactNode;
   privacyContent: ReactNode;
+  transferOwnershipContent: ReactNode;
   storyReady: boolean;
 }
 
@@ -115,6 +118,7 @@ export function DashboardShell({
   costCalculatorContent,
   buyingGuideContent,
   privacyContent,
+  transferOwnershipContent,
   storyReady,
 }: Props) {
   const [active, setActive] = useState<Section>('dashboard');
@@ -134,9 +138,10 @@ export function DashboardShell({
     costCalculator: costCalculatorContent,
     buyingGuide: buyingGuideContent,
     privacy: privacyContent,
+    transferOwnership: transferOwnershipContent,
   };
 
-  const isMoreActive = active === 'bills' || active === 'reminders' || active === 'reports' || active === 'story' || active === 'shareLinks' || active === 'quoteChecker' || active === 'costCalculator' || active === 'buyingGuide' || active === 'privacy';
+  const isMoreActive = active === 'bills' || active === 'reminders' || active === 'reports' || active === 'story' || active === 'shareLinks' || active === 'quoteChecker' || active === 'costCalculator' || active === 'buyingGuide' || active === 'privacy' || active === 'transferOwnership';
 
   return (
     <TabSwitchProvider onSwitchTab={(cat) => setActive(cat)}>
