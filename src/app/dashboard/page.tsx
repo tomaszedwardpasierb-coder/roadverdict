@@ -53,6 +53,7 @@ import { CostCalculatorForm } from "@/components/CostCalculatorForm";
 import { BuyingGuideForm } from "@/components/BuyingGuideForm";
 import { PrivacyContent } from "../privacy/PrivacyContent";
 import { TransferOwnershipSection } from "./TransferOwnershipSection";
+import { IncomingOwnershipRequestCard } from "./IncomingOwnershipRequestCard";
 import { getPendingTransferRequestsForOwner } from "@/lib/tracker/bikeTransferRequest";
 import { computeSellerReportRowsAndMetrics } from "@/lib/tracker/sellerReportData";
 import { computeSellerVerdict } from "@/lib/tracker/sellerReportVerdict";
@@ -494,7 +495,9 @@ export default async function DashboardPage() {
   );
 
   const pendingTransferRequests = await getPendingTransferRequestsForOwner(session.email);
-  const pendingTransferForThisBike = pendingTransferRequests.find((r) => r.bikeId === bike.id);
+  const requestsForThisBike = pendingTransferRequests.filter((r) => r.bikeId === bike.id);
+  const outgoingOffer = requestsForThisBike.find((r) => r.initiatedBy === "owner");
+  const incomingRequest = requestsForThisBike.find((r) => r.initiatedBy === "recipient");
 
   const shareLinksContent = (
     <ShareLinksSection
@@ -516,8 +519,15 @@ export default async function DashboardPage() {
         {mileagePill}
       </div>
       <p className={styles.subtext}>Selling this bike? Hand the buyer your logged history instead of them starting fresh.</p>
+      {incomingRequest && (
+        <IncomingOwnershipRequestCard
+          requestId={incomingRequest.id}
+          requesterEmail={incomingRequest.recipientEmail}
+          createdAt={incomingRequest.createdAt}
+        />
+      )}
       <TransferOwnershipSection
-        pendingRequest={pendingTransferForThisBike ? { recipientEmail: pendingTransferForThisBike.recipientEmail, createdAt: pendingTransferForThisBike.createdAt } : null}
+        pendingRequest={outgoingOffer ? { recipientEmail: outgoingOffer.recipientEmail, createdAt: outgoingOffer.createdAt } : null}
         bikeIsReadOnly={isBikeReadOnly(bike)}
       />
     </>

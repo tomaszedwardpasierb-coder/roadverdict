@@ -7,7 +7,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/session";
 import { getPrimaryBike, isBikeReadOnly } from "@/lib/tracker/bike";
-import { createBikeTransferRequest, getPendingTransferRequestsForOwner } from "@/lib/tracker/bikeTransferRequest";
+import { createBikeTransferRequest, getPendingTransferRequestsForOwner, hasActiveTransferRequestForBike } from "@/lib/tracker/bikeTransferRequest";
 import { sendBikeTransferOfferEmail } from "@/lib/resend";
 
 export const dynamic = "force-dynamic";
@@ -48,6 +48,12 @@ export async function POST(request: NextRequest) {
   }
   if (isBikeReadOnly(bike)) {
     return NextResponse.json({ error: "This bike has already been transferred and can't be offered again." }, { status: 403 });
+  }
+  if (await hasActiveTransferRequestForBike(session.email, bike.id)) {
+    return NextResponse.json(
+      { error: "This bike already has a request or offer in progress. Try again once it's resolved." },
+      { status: 409 }
+    );
   }
 
   const { doc, token } = await createBikeTransferRequest({

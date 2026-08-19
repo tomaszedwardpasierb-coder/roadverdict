@@ -31,6 +31,9 @@ export function AddBikeForm() {
   // this needs a button, not just a line of text.
   const [existingBike, setExistingBike] = useState<{ status: 'own' | 'other'; bikeId?: string } | null>(null);
   const [switchingBike, setSwitchingBike] = useState(false);
+  const [requestingOwnership, setRequestingOwnership] = useState(false);
+  const [ownershipRequestSent, setOwnershipRequestSent] = useState(false);
+  const [ownershipRequestError, setOwnershipRequestError] = useState<string | null>(null);
   const router = useRouter();
   const [customMake, setCustomMake] = useState('');
   const [customModel, setCustomModel] = useState('');
@@ -79,6 +82,28 @@ export function AddBikeForm() {
     } catch {
       setLookupMessage({ text: "Couldn't reach the server. Try again.", tone: 'error' });
       setSwitchingBike(false);
+    }
+  }
+
+  async function handleRequestOwnership() {
+    setRequestingOwnership(true);
+    setOwnershipRequestError(null);
+    try {
+      const res = await fetch('/api/tracker/bike-transfer/request-ownership', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ registration: registration.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setOwnershipRequestError(data.error ?? 'Could not send the request. Try again.');
+        return;
+      }
+      setOwnershipRequestSent(true);
+    } catch {
+      setOwnershipRequestError("Couldn't reach the server. Try again.");
+    } finally {
+      setRequestingOwnership(false);
     }
   }
 
@@ -371,23 +396,33 @@ export function AddBikeForm() {
           {existingBike?.status === 'other' && (
             <div className={styles.card} style={{ marginTop: '0.6rem' }}>
               <p style={{ fontWeight: 600, marginBottom: '0.3rem' }}>This bike already has a RoadVerdict history.</p>
-              <p className="field-note">
-                This bike has previously been registered with RoadVerdict. If you&apos;ve bought it, you can request
-                ownership and continue building its existing history.
-              </p>
-              {/* Deliberately disabled - the recipient-initiated request
-                  mechanism this needs doesn't exist yet. Shown and
-                  explained honestly rather than wired to something that
-                  looks like it works but doesn't do anything. */}
-              <button
-                type="button"
-                className="btn-secondary"
-                disabled
-                title="Coming soon - requesting ownership isn't available yet"
-                style={{ marginTop: '0.5rem' }}
-              >
-                Request ownership
-              </button>
+              {ownershipRequestSent ? (
+                <p className="field-note">
+                  Request sent. If the current owner approves it, this bike&apos;s history moves to your account and
+                  you&apos;ll get an email either way.
+                </p>
+              ) : (
+                <>
+                  <p className="field-note">
+                    This bike has previously been registered with RoadVerdict. If you&apos;ve bought it, you can
+                    request ownership and continue building its existing history.
+                  </p>
+                  <button
+                    type="button"
+                    className="btn-primary"
+                    disabled={requestingOwnership}
+                    onClick={handleRequestOwnership}
+                    style={{ marginTop: '0.5rem' }}
+                  >
+                    {requestingOwnership ? 'Sending…' : 'Request ownership'}
+                  </button>
+                  {ownershipRequestError && (
+                    <p className="error-text" role="alert" style={{ marginTop: '0.6rem' }}>
+                      {ownershipRequestError}
+                    </p>
+                  )}
+                </>
+              )}
             </div>
           )}
           <p className="field-note" style={{ marginTop: '0.4rem' }}>

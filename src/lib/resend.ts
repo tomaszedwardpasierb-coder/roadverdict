@@ -208,3 +208,73 @@ export async function sendHistoryFollowUpEmail(params: {
     `,
   });
 }
+
+// The reverse of sendBikeTransferOfferEmail - here the stranger is the
+// one initiating, and the current owner is the one who needs to act.
+// Deliberately never names the requester's account details beyond
+// their email (which they themselves supplied when requesting) - the
+// owner learns who's asking, not anything else about them.
+export async function sendIncomingOwnershipRequestEmail(params: {
+  ownerEmail: string;
+  requesterEmail: string;
+  bikeSummary: { make: string; model: string; year?: number; isCustomBuild: boolean };
+}) {
+  const resend = getResend();
+  const appUrl = process.env.APP_URL ?? "https://roadverdict.co.uk";
+  const safeBikeName = escapeHtml(formatBikeName(params.bikeSummary));
+
+  await resend.emails.send({
+    from: FROM,
+    to: params.ownerEmail,
+    subject: `${params.requesterEmail} is requesting your ${safeBikeName}'s RoadVerdict history`,
+    html: `
+      <p>Hi,</p>
+      <p><strong>${escapeHtml(params.requesterEmail)}</strong> has requested the RoadVerdict history for your
+      <strong>${safeBikeName}</strong> - if you've sold it to them, approving this hands over its logged service
+      history, mileage, and documentation to their account, and your own copy becomes read-only.</p>
+      <p><a href="${appUrl}/dashboard">Review this request</a></p>
+      <p>If you don't recognise this request, or haven't sold the bike, you can safely decline it from the same
+      place - nothing changes unless you approve it.</p>
+    `,
+  });
+}
+
+export async function sendOwnershipRequestApprovedEmail(params: {
+  requesterEmail: string;
+  bikeSummary: { make: string; model: string; year?: number; isCustomBuild: boolean };
+}) {
+  const resend = getResend();
+  const appUrl = process.env.APP_URL ?? "https://roadverdict.co.uk";
+  const safeBikeName = escapeHtml(formatBikeName(params.bikeSummary));
+
+  await resend.emails.send({
+    from: FROM,
+    to: params.requesterEmail,
+    subject: `Your request for the ${safeBikeName}'s history was approved`,
+    html: `
+      <p>Hi,</p>
+      <p>Your request for the <strong>${safeBikeName}</strong>'s RoadVerdict history has been approved. It now
+      appears on your account, with its logged service history, mileage, and documentation intact.</p>
+      <p><a href="${appUrl}/dashboard">Go to your dashboard</a></p>
+    `,
+  });
+}
+
+export async function sendOwnershipRequestDeclinedEmail(params: {
+  requesterEmail: string;
+  bikeSummary: { make: string; model: string; year?: number; isCustomBuild: boolean };
+}) {
+  const resend = getResend();
+  const safeBikeName = escapeHtml(formatBikeName(params.bikeSummary));
+
+  await resend.emails.send({
+    from: FROM,
+    to: params.requesterEmail,
+    subject: `Your request for the ${safeBikeName}'s history wasn't approved`,
+    html: `
+      <p>Hi,</p>
+      <p>The current owner didn't approve your request for the <strong>${safeBikeName}</strong>'s RoadVerdict
+      history. If you believe this is a mistake, you're welcome to get in touch at hello@roadverdict.co.uk.</p>
+    `,
+  });
+}

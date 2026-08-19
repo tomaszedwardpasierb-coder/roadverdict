@@ -48,6 +48,7 @@ export async function createBikeTransferRequest(params: {
   bikeId: string;
   recipientEmail: string;
   bikeSummary: BikeTransferRequestDoc["bikeSummary"];
+  initiatedBy?: "owner" | "recipient";
 }): Promise<{ doc: BikeTransferRequestDoc; token: string }> {
   const container = getContainer();
   const { raw: token, hash: tokenHash } = generateToken();
@@ -59,7 +60,7 @@ export async function createBikeTransferRequest(params: {
     bikeId: params.bikeId,
     ownerEmail: params.ownerEmail,
     recipientEmail: params.recipientEmail,
-    initiatedBy: "owner",
+    initiatedBy: params.initiatedBy ?? "owner",
     status: "pending",
     tokenHash,
     createdAt: new Date().toISOString(),
@@ -122,6 +123,20 @@ export async function getBikeTransferRequestByToken(rawToken: string): Promise<B
     })
     .fetchAll();
   return resources[0] ?? null;
+}
+
+// Direct read by id, same access pattern decideBikeTransferRequest
+// uses internally - separated out so the owner-side approve/decline
+// routes can inspect a request's details (bikeId, recipientEmail)
+// before acting, without changing its status as a side effect of just
+// looking at it.
+export async function getBikeTransferRequestById(
+  requestId: string,
+  ownerEmail: string
+): Promise<BikeTransferRequestDoc | null> {
+  const container = getContainer();
+  const { resource } = await container.item(requestId, ownerEmail).read<BikeTransferRequestDoc>();
+  return resource ?? null;
 }
 
 export async function decideBikeTransferRequest(
