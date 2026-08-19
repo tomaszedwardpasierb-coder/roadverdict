@@ -644,6 +644,7 @@ export default async function DashboardPage() {
       privacyContent={privacyContent}
       transferOwnershipContent={transferOwnershipContent}
       storyReady={storyReady}
+      hasIncomingRequest={!!incomingRequest}
     />
   );
 }

@@ -85,10 +85,18 @@ interface Props {
   privacyContent: ReactNode;
   transferOwnershipContent: ReactNode;
   storyReady: boolean;
+  hasIncomingRequest: boolean;
 }
 
 function PendingDot() {
   return <span className={styles.navPendingBadge} aria-label="An entry here needs review" />;
+}
+
+function RequestDot() {
+  // Reuses the same pulsing badge as PendingDot above - visually
+  // identical "something needs your attention" signal, just with an
+  // accurate label for what's actually waiting here.
+  return <span className={styles.navPendingBadge} aria-label="Someone is requesting this bike's history" />;
 }
 
 function ReadyDot() {
@@ -120,6 +128,7 @@ export function DashboardShell({
   privacyContent,
   transferOwnershipContent,
   storyReady,
+  hasIncomingRequest,
 }: Props) {
   const [active, setActive] = useState<Section>('dashboard');
   const [showMore, setShowMore] = useState(false);
@@ -168,6 +177,7 @@ export function DashboardShell({
                   <span>{item.label}</span>
                   {hasPending && <PendingDot />}
                   {item.key === 'story' && storyReady && <ReadyDot />}
+                  {item.key === 'transferOwnership' && hasIncomingRequest && <RequestDot />}
                 </button>
               );
             })}
@@ -286,6 +296,7 @@ export function DashboardShell({
                     <Icon name={item.icon} className={styles.navIcon} /> {item.label}
                     {hasPending && <PendingDot />}
                     {item.key === 'story' && storyReady && <ReadyDot />}
+                    {item.key === 'transferOwnership' && hasIncomingRequest && <RequestDot />}
                   </button>
                 );
               })}
