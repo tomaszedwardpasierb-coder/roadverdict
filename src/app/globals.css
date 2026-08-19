@@ -342,6 +342,26 @@ main {
   background: var(--amber-dark);
 }
 
+.btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-family: var(--font-body);
+  font-weight: 700;
+  font-size: 0.95rem;
+  background: none;
+  color: var(--asphalt);
+  border: 1.5px solid var(--line);
+  border-radius: var(--radius-lg);
+  padding: 0.8rem 1.6rem;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.btn-secondary:hover {
+  background: var(--concrete);
+}
+
 .error-text {
   color: var(--verdict-red);
   font-size: 0.9rem;

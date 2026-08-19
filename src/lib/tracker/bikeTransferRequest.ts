@@ -1,0 +1,118 @@
+// Place at: src/lib/tracker/bikeTransferRequest.ts
+//
+// A pending offer to hand a bike's RoadVerdict record to another
+// account - distinct from bikeTransfer.ts, which performs the actual
+// transfer once a request here has been accepted. Deliberately mirrors
+// receiptRequest.ts's own conventions (hashed token, TTL-based expiry,
+// cross-partition lookup by token) rather than inventing a new pattern,
+// since this is genuinely the same kind of thing: one party proposes an
+// action, a token lets the other party act on it without needing to be
+// signed in just to view what's being offered.
+//
+// initiatedBy exists from the start even though every request created
+// today is "owner" - a future flow where a buyer who's just added a
+// bike that's already tracked elsewhere can request the existing
+// history (rather than the current owner proactively offering it) will
+// reuse this exact same document shape, just with the roles reversed.
+import { getContainer } from "@/lib/cosmos";
+import { hashToken, generateToken } from "@/lib/auth/crypto";
+
+export interface BikeTransferRequestDoc {
+  id: string;
+  pk: string; // owner's email - matches every other tracker doc's partitioning
+  type: "bikeTransferRequest";
+  bikeId: string;
+  ownerEmail: string;
+  recipientEmail: string;
+  initiatedBy: "owner" | "recipient";
+  status: "pending" | "accepted" | "declined";
+  tokenHash: string;
+  createdAt: string;
+  decidedAt?: string;
+  // Bike identity snapshotted at request time, so the recipient's offer
+  // page and the emails can show what's being offered without a second
+  // lookup, and so it still reads sensibly if the bike's own details
+  // change before the offer is acted on.
+  bikeSummary: { make: string; model: string; year?: number; isCustomBuild: boolean };
+  ttl: number;
+}
+
+// A bigger decision than a 15-minute sign-in link deserves a longer
+// window - someone might not see the email right away, and deciding
+// whether to accept a bike is not a "do it in the next few minutes"
+// kind of action.
+const REQUEST_TTL_SECONDS = 7 * 24 * 60 * 60;
+
+export async function createBikeTransferRequest(params: {
+  ownerEmail: string;
+  bikeId: string;
+  recipientEmail: string;
+  bikeSummary: BikeTransferRequestDoc["bikeSummary"];
+}): Promise<{ doc: BikeTransferRequestDoc; token: string }> {
+  const container = getContainer();
+  const { raw: token, hash: tokenHash } = generateToken();
+
+  const doc: BikeTransferRequestDoc = {
+    id: `${params.ownerEmail}::bikeTransferRequest::${Date.now()}`,
+    pk: params.ownerEmail,
+    type: "bikeTransferRequest",
+    bikeId: params.bikeId,
+    ownerEmail: params.ownerEmail,
+    recipientEmail: params.recipientEmail,
+    initiatedBy: "owner",
+    status: "pending",
+    tokenHash,
+    createdAt: new Date().toISOString(),
+    bikeSummary: params.bikeSummary,
+    ttl: REQUEST_TTL_SECONDS,
+  };
+
+  await container.items.upsert(doc);
+  return { doc, token };
+}
+
+// Single-partition query - the dashboard always knows the signed-in
+// owner's email already, so this never needs the cross-partition token
+// lookup below. Powers "waiting for [email] to accept" on the owner's
+// own side.
+export async function getPendingTransferRequestsForOwner(ownerEmail: string): Promise<BikeTransferRequestDoc[]> {
+  const container = getContainer();
+  const { resources } = await container.items
+    .query<BikeTransferRequestDoc>({
+      query: "SELECT * FROM c WHERE c.pk = @email AND c.type = 'bikeTransferRequest' AND c.status = 'pending'",
+      parameters: [{ name: "@email", value: ownerEmail }],
+    })
+    .fetchAll();
+  return resources;
+}
+
+// Cross-partition - the recipient's link only ever carries the raw
+// token, never the owner's email, so there's no partition to scope to
+// upfront. Only ever called once per link click, so the extra query
+// cost is a fine trade, same reasoning as the receipt-request version
+// this mirrors.
+export async function getBikeTransferRequestByToken(rawToken: string): Promise<BikeTransferRequestDoc | null> {
+  const container = getContainer();
+  const hash = hashToken(rawToken);
+  const { resources } = await container.items
+    .query<BikeTransferRequestDoc>({
+      query: "SELECT * FROM c WHERE c.type = 'bikeTransferRequest' AND c.tokenHash = @hash",
+      parameters: [{ name: "@hash", value: hash }],
+    })
+    .fetchAll();
+  return resources[0] ?? null;
+}
+
+export async function decideBikeTransferRequest(
+  requestId: string,
+  ownerEmail: string,
+  decision: "accepted" | "declined"
+): Promise<BikeTransferRequestDoc | null> {
+  const container = getContainer();
+  const { resource } = await container.item(requestId, ownerEmail).read<BikeTransferRequestDoc>();
+  if (!resource) return null;
+  resource.status = decision;
+  resource.decidedAt = new Date().toISOString();
+  await container.items.upsert(resource);
+  return resource;
+}

@@ -3,7 +3,7 @@ import { getSession } from "@/lib/auth/session";
 import { redirect } from "next/navigation";
 import styles from "./dashboard.module.css";
 import LogoutButton from "./LogoutButton";
-import { getBikesForUser, pickActiveBike, getCurrentRegistration } from "@/lib/tracker/bike";
+import { getBikesForUser, pickActiveBike, getCurrentRegistration, isBikeReadOnly } from "@/lib/tracker/bike";
 import { getServiceRecords } from "@/lib/tracker/serviceRecord";
 import { getFuelLogs, computeActualMPG, computeMPGSeries } from "@/lib/tracker/fuelLog";
 import { getMods } from "@/lib/tracker/mod";
@@ -52,6 +52,8 @@ import { QuoteForm } from "@/components/QuoteForm";
 import { CostCalculatorForm } from "@/components/CostCalculatorForm";
 import { BuyingGuideForm } from "@/components/BuyingGuideForm";
 import { PrivacyContent } from "../privacy/PrivacyContent";
+import { TransferOwnershipSection } from "./TransferOwnershipSection";
+import { getPendingTransferRequestsForOwner } from "@/lib/tracker/bikeTransferRequest";
 import { computeSellerReportRowsAndMetrics } from "@/lib/tracker/sellerReportData";
 import { computeSellerVerdict } from "@/lib/tracker/sellerReportVerdict";
 import { StorySoFarTab } from "./StorySoFarTab";
@@ -491,17 +493,26 @@ export default async function DashboardPage() {
     </ChartFilterProvider>
   );
 
+  const pendingTransferRequests = await getPendingTransferRequestsForOwner(session.email);
+  const pendingTransferForThisBike = pendingTransferRequests.find((r) => r.bikeId === bike.id);
+
   const shareLinksContent = (
-    <ShareLinksSection
-      links={shareLinks}
-      bikeNames={bikeNames}
-      appUrl={process.env.APP_URL ?? "https://roadverdict.co.uk"}
-      requests={pendingReceiptRequests}
-      bikeNickname={bike.nickname}
-      registration={currentRegistration}
-      currentMileage={bike.currentMileage}
-      distanceUnit={distanceUnit}
-    />
+    <>
+      <ShareLinksSection
+        links={shareLinks}
+        bikeNames={bikeNames}
+        appUrl={process.env.APP_URL ?? "https://roadverdict.co.uk"}
+        requests={pendingReceiptRequests}
+        bikeNickname={bike.nickname}
+        registration={currentRegistration}
+        currentMileage={bike.currentMileage}
+        distanceUnit={distanceUnit}
+      />
+      <TransferOwnershipSection
+        pendingRequest={pendingTransferForThisBike ? { recipientEmail: pendingTransferForThisBike.recipientEmail, createdAt: pendingTransferForThisBike.createdAt } : null}
+        bikeIsReadOnly={isBikeReadOnly(bike)}
+      />
+    </>
   );
 
   const switcherBikes = bikes.map((b) => ({

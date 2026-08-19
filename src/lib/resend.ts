@@ -115,3 +115,61 @@ export async function sendShareLinkEmail(toEmail: string, bikeName: string, repo
     `,
   });
 }
+
+function formatBikeName(summary: { make: string; model: string; year?: number; isCustomBuild: boolean }): string {
+  const prefix = summary.isCustomBuild ? "Custom build" : summary.year ? String(summary.year) : "";
+  return `${prefix} ${summary.make} ${summary.model}`.trim();
+}
+
+export async function sendBikeTransferOfferEmail(params: {
+  recipientEmail: string;
+  ownerEmail: string;
+  bikeSummary: { make: string; model: string; year?: number; isCustomBuild: boolean };
+  token: string;
+}) {
+  const resend = getResend();
+  const appUrl = process.env.APP_URL ?? "https://roadverdict.co.uk";
+  const safeBikeName = escapeHtml(formatBikeName(params.bikeSummary));
+  const offerUrl = `${appUrl}/bike-transfer/${params.token}`;
+
+  await resend.emails.send({
+    from: FROM,
+    to: params.recipientEmail,
+    subject: `${params.ownerEmail} wants to hand you the RoadVerdict record for a ${safeBikeName}`,
+    html: `
+      <p>Hi,</p>
+      <p><strong>${escapeHtml(params.ownerEmail)}</strong> has offered to hand you the RoadVerdict tracking record for their
+      <strong>${safeBikeName}</strong> - its logged service history, mileage, and documentation, continuing under your
+      account rather than starting fresh.</p>
+      <p><a href="${offerUrl}">View the offer</a></p>
+      <p>If you don't have a RoadVerdict account yet, sign in or create one at
+      <a href="${appUrl}/login">roadverdict.co.uk/login</a> using this same email address
+      (${escapeHtml(params.recipientEmail)}), then come back to this link to accept.</p>
+      <p>This offer is valid for 7 days. If you're not expecting this, you can safely ignore this email or decline it
+      from the link above.</p>
+    `,
+  });
+}
+
+export async function sendBikeTransferAcceptedEmail(params: {
+  ownerEmail: string;
+  recipientEmail: string;
+  bikeSummary: { make: string; model: string; year?: number; isCustomBuild: boolean };
+}) {
+  const resend = getResend();
+  const safeBikeName = escapeHtml(formatBikeName(params.bikeSummary));
+
+  await resend.emails.send({
+    from: FROM,
+    to: params.ownerEmail,
+    subject: `${params.recipientEmail} accepted the handover for your ${safeBikeName}`,
+    html: `
+      <p>Hi,</p>
+      <p><strong>${escapeHtml(params.recipientEmail)}</strong> has accepted the RoadVerdict record you offered for your
+      <strong>${safeBikeName}</strong>. Your own copy is now read-only - a frozen record of everything you logged, kept
+      for your own reference, but no longer editable.</p>
+      <p>This is expected and can't be undone from here - if that doesn't sound right, reply to
+      hello@roadverdict.co.uk and we'll take a look.</p>
+    `,
+  });
+}
