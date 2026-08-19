@@ -67,6 +67,23 @@ export function AddBikeForm() {
         return;
       }
 
+      // Checked immediately, before any of the auto-fill below - a
+      // definite non-motorcycle stops here entirely (nothing gets
+      // filled in, nothing can be accidentally saved), and a genuinely
+      // uncertain result is treated the same way rather than assumed
+      // to be a bike just because that's the more common case.
+      if (data.vehicleType === 'four-wheeled') {
+        setLookupMessage({ text: "Oops! Are you sure that's a bike? It looks like it has four wheels. 🏍️", tone: 'error' });
+        return;
+      }
+      if (data.vehicleType === 'unknown') {
+        setLookupMessage({
+          text: "Couldn't confirm what type of vehicle this registration belongs to. Double-check the registration number, or enter the bike's details manually below.",
+          tone: 'error',
+        });
+        return;
+      }
+
       const matchedBrand = ALL_BRANDS.find((b) => b.toLowerCase() === String(data.make ?? '').toLowerCase());
       let matchedModelName: string | null = null;
       if (matchedBrand) {
