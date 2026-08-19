@@ -2,6 +2,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { ALL_BRANDS, MOTORCYCLE_MODELS, getBikeClassForCC } from '@/lib/motorcycleModels';
 import { REGION_LABELS, type Region } from '@/lib/priceData';
 import { useTrackerFormSubmit } from './useTrackerFormSubmit';
@@ -23,6 +24,14 @@ export function AddBikeForm() {
 
   const [lookingUp, setLookingUp] = useState(false);
   const [lookupMessage, setLookupMessage] = useState<{ text: string; tone: 'ok' | 'warn' | 'error' } | null>(null);
+  // Set when the registration lookup finds this bike already tracked
+  // somewhere - 'own' if it's already on this account (nothing to add,
+  // just go to it), 'other' if it belongs to someone else. Rendered as
+  // its own block rather than folded into lookupMessage above, since
+  // this needs a button, not just a line of text.
+  const [existingBike, setExistingBike] = useState<{ status: 'own' | 'other'; bikeId?: string } | null>(null);
+  const [switchingBike, setSwitchingBike] = useState(false);
+  const router = useRouter();
   const [customMake, setCustomMake] = useState('');
   const [customModel, setCustomModel] = useState('');
   const [customEngineCC, setCustomEngineCC] = useState('');
@@ -52,6 +61,27 @@ export function AddBikeForm() {
   // "INTERCEPTOR 650 TWIN"). No match found for either is a real,
   // expected outcome (bike not in the curated list at all) - not a bug,
   // handled explicitly below rather than silently failing.
+  async function handleGoToExistingBike(bikeId: string) {
+    setSwitchingBike(true);
+    try {
+      const res = await fetch('/api/tracker/active-bike', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ bikeId }),
+      });
+      if (!res.ok) {
+        setLookupMessage({ text: "Couldn't switch to that bike. Try again.", tone: 'error' });
+        setSwitchingBike(false);
+        return;
+      }
+      router.push('/dashboard');
+      router.refresh();
+    } catch {
+      setLookupMessage({ text: "Couldn't reach the server. Try again.", tone: 'error' });
+      setSwitchingBike(false);
+    }
+  }
+
   async function handleLookup() {
     if (!registration.trim()) {
       setLookupMessage({ text: 'Enter a registration number first.', tone: 'error' });
@@ -59,6 +89,7 @@ export function AddBikeForm() {
     }
     setLookingUp(true);
     setLookupMessage(null);
+    setExistingBike(null);
     try {
       const res = await fetch(`/api/tracker/plate-lookup?vrm=${encodeURIComponent(registration.trim())}`);
       const data = await res.json();
@@ -81,6 +112,18 @@ export function AddBikeForm() {
           text: "Couldn't confirm what type of vehicle this registration belongs to. Double-check the registration number, or enter the bike's details manually below.",
           tone: 'error',
         });
+        return;
+      }
+
+      // Checked before any auto-fill, same reasoning as the vehicle-type
+      // gate above - if this bike is already tracked somewhere, nothing
+      // below should proceed regardless of what it actually is.
+      const dupRes = await fetch(`/api/tracker/bike-exists?registration=${encodeURIComponent(registration.trim())}`);
+      const dupData = await dupRes.json();
+      if (dupRes.ok && dupData.exists) {
+        setExistingBike(
+          dupData.belongsToCurrentUser ? { status: 'own', bikeId: dupData.bikeId } : { status: 'other' }
+        );
         return;
       }
 
@@ -310,6 +353,42 @@ export function AddBikeForm() {
             >
               {lookupMessage.text}
             </p>
+          )}
+          {existingBike?.status === 'own' && (
+            <div className={styles.card} style={{ marginTop: '0.6rem' }}>
+              <p className="field-note">You&apos;ve already added this bike to your account.</p>
+              <button
+                type="button"
+                className="btn-primary"
+                disabled={switchingBike}
+                onClick={() => existingBike.bikeId && handleGoToExistingBike(existingBike.bikeId)}
+                style={{ marginTop: '0.5rem' }}
+              >
+                {switchingBike ? 'Switching…' : 'Go to this bike'}
+              </button>
+            </div>
+          )}
+          {existingBike?.status === 'other' && (
+            <div className={styles.card} style={{ marginTop: '0.6rem' }}>
+              <p style={{ fontWeight: 600, marginBottom: '0.3rem' }}>This bike already has a RoadVerdict history.</p>
+              <p className="field-note">
+                This bike has previously been registered with RoadVerdict. If you&apos;ve bought it, you can request
+                ownership and continue building its existing history.
+              </p>
+              {/* Deliberately disabled - the recipient-initiated request
+                  mechanism this needs doesn't exist yet. Shown and
+                  explained honestly rather than wired to something that
+                  looks like it works but doesn't do anything. */}
+              <button
+                type="button"
+                className="btn-secondary"
+                disabled
+                title="Coming soon - requesting ownership isn't available yet"
+                style={{ marginTop: '0.5rem' }}
+              >
+                Request ownership
+              </button>
+            </div>
           )}
           <p className="field-note" style={{ marginTop: '0.4rem' }}>
             This is recorded permanently as this bike&apos;s original registration and can&apos;t be removed later - only

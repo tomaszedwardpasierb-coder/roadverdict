@@ -239,6 +239,49 @@ export async function getBikesForUser(email: string): Promise<BikeDoc[]> {
   return resources;
 }
 
+// Cross-partition, same accepted exception used elsewhere in this app
+// for genuinely cross-account lookups - bikes are stored one-per-owner
+// partition, so "does this registration exist anywhere at all" has no
+// single partition to scope to. Only ever called from the add-bike
+// flow, never a hot path.
+//
+// Normalizes both the incoming registration AND the stored values the
+// same way (uppercase, no spaces) before comparing - registrations get
+// saved slightly differently depending on which flow created them
+// (bike creation trims and uppercases but doesn't strip spaces; the
+// plate-lookup flow strips them entirely), so comparing raw strings
+// could silently miss a real match.
+//
+// Checks both originalRegistration and every entry in
+// registrationChanges, since a bike that's had a private plate applied
+// (or removed) should still be found under whichever plate it's
+// carried at any point, not just its very first one.
+export async function findBikeByRegistrationAcrossAccounts(
+  registration: string
+): Promise<{ ownerEmail: string; bikeId: string } | null> {
+  const normalized = registration.trim().toUpperCase().replace(/\s+/g, "");
+  if (!normalized) return null;
+
+  const container = getContainer();
+  const { resources } = await container.items
+    .query<{ id: string; pk: string; transferredTo?: unknown }>({
+      query:
+        "SELECT c.id, c.pk, c.transferredTo FROM c WHERE c.type = 'bike' AND (UPPER(REPLACE(c.originalRegistration, ' ', '')) = @reg OR EXISTS(SELECT VALUE rc FROM rc IN c.registrationChanges WHERE UPPER(REPLACE(rc.plate, ' ', '')) = @reg))",
+      parameters: [{ name: "@reg", value: normalized }],
+    })
+    .fetchAll();
+
+  if (resources.length === 0) return null;
+
+  // A bike that's already been transferred once still has its old,
+  // read-only document sitting around sharing the same registration
+  // as its successor - prefer whichever match is currently the live
+  // head of the chain (no transferredTo set) over a historical one.
+  const active = resources.find((r) => !r.transferredTo);
+  const match = active ?? resources[0];
+  return { ownerEmail: match.pk, bikeId: match.id };
+}
+
 // Resolves which of a given list of bikes is "active" - the one set via
 // the bike switcher/garage page, falling back to the first (oldest) bike
 // if no cookie is set, or if the cookie points to a bike not in this
