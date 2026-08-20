@@ -20,6 +20,16 @@ export async function POST(request: NextRequest, { params }: { params: { request
     return NextResponse.json({ error: "Not signed in." }, { status: 401 });
   }
 
+  // No body at all is a legitimate, expected case here (not an error) -
+  // defaults to including records, matching the feature's own default.
+  let includeRecords = true;
+  try {
+    const body = (await request.json()) as { includeRecords?: boolean };
+    if (typeof body.includeRecords === "boolean") includeRecords = body.includeRecords;
+  } catch {
+    // No body sent, or not valid JSON - fall through with the default.
+  }
+
   const doc = await getBikeTransferRequestById(params.requestId, session.email);
   if (!doc) {
     return NextResponse.json({ error: "Request not found." }, { status: 404 });
@@ -35,7 +45,7 @@ export async function POST(request: NextRequest, { params }: { params: { request
     return NextResponse.json({ error: `This request has already been ${doc.status}.` }, { status: 409 });
   }
 
-  const result = await transferBike(doc.ownerEmail, doc.bikeId, doc.recipientEmail);
+  const result = await transferBike(doc.ownerEmail, doc.bikeId, doc.recipientEmail, includeRecords);
   if (!result.ok) {
     switch (result.reason) {
       case "bike_not_found":

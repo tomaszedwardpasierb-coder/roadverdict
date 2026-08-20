@@ -527,7 +527,7 @@ export default async function DashboardPage() {
         />
       )}
       <TransferOwnershipSection
-        pendingRequest={outgoingOffer ? { recipientEmail: outgoingOffer.recipientEmail, createdAt: outgoingOffer.createdAt } : null}
+        pendingRequest={outgoingOffer ? { recipientEmail: outgoingOffer.recipientEmail, createdAt: outgoingOffer.createdAt, includeRecords: outgoingOffer.includeRecords } : null}
         bikeIsReadOnly={isBikeReadOnly(bike)}
       />
     </>

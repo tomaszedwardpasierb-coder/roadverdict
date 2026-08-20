@@ -33,7 +33,7 @@ export async function POST(request: NextRequest) {
   } catch {
     return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
   }
-  const { recipientEmail } = body as { recipientEmail?: string };
+  const { recipientEmail, includeRecords } = body as { recipientEmail?: string; includeRecords?: boolean };
   const cleanedRecipient = recipientEmail?.trim().toLowerCase();
   if (!cleanedRecipient || !cleanedRecipient.includes("@")) {
     return NextResponse.json({ error: "Enter a valid email address." }, { status: 400 });
@@ -61,6 +61,7 @@ export async function POST(request: NextRequest) {
     bikeId: bike.id,
     recipientEmail: cleanedRecipient,
     bikeSummary: { make: bike.make, model: bike.model, year: bike.year, isCustomBuild: !!bike.isCustomBuild },
+    includeRecords: includeRecords ?? true,
   });
 
   try {

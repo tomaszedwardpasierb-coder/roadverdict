@@ -29,6 +29,14 @@ export interface BikeTransferRequestDoc {
   tokenHash: string;
   createdAt: string;
   decidedAt?: string;
+  // Whether the previous owner's individual service/fuel/mod/bill
+  // records (not just the bike-level facts and frozen summary) should
+  // come along with the transfer. Only meaningful for owner-initiated
+  // requests, where the owner decides this at the moment they create
+  // the offer - a recipient-initiated request has no owner decision to
+  // record yet at creation time, since the owner hasn't acted at all
+  // until they approve it, which is where that choice gets made instead.
+  includeRecords?: boolean;
   // Bike identity snapshotted at request time, so the recipient's offer
   // page and the emails can show what's being offered without a second
   // lookup, and so it still reads sensibly if the bike's own details
@@ -49,6 +57,7 @@ export async function createBikeTransferRequest(params: {
   recipientEmail: string;
   bikeSummary: BikeTransferRequestDoc["bikeSummary"];
   initiatedBy?: "owner" | "recipient";
+  includeRecords?: boolean;
 }): Promise<{ doc: BikeTransferRequestDoc; token: string }> {
   const container = getContainer();
   const { raw: token, hash: tokenHash } = generateToken();
@@ -65,6 +74,7 @@ export async function createBikeTransferRequest(params: {
     tokenHash,
     createdAt: new Date().toISOString(),
     bikeSummary: params.bikeSummary,
+    includeRecords: params.includeRecords,
     ttl: REQUEST_TTL_SECONDS,
   };
 

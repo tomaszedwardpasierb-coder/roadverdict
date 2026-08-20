@@ -31,7 +31,7 @@ export async function POST(request: NextRequest, { params }: { params: { token: 
     );
   }
 
-  const result = await transferBike(doc.ownerEmail, doc.bikeId, session.email);
+  const result = await transferBike(doc.ownerEmail, doc.bikeId, session.email, doc.includeRecords ?? true);
   if (!result.ok) {
     switch (result.reason) {
       case "bike_not_found":

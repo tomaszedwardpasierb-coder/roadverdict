@@ -11,6 +11,7 @@ interface Props {
 }
 
 export function IncomingOwnershipRequestCard({ requestId, requesterEmail, createdAt }: Props) {
+  const [includeRecords, setIncludeRecords] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<'approved' | 'declined' | null>(null);
@@ -19,7 +20,12 @@ export function IncomingOwnershipRequestCard({ requestId, requesterEmail, create
     setSubmitting(true);
     setError(null);
     try {
-      const res = await fetch(`/api/tracker/bike-transfer/incoming/${requestId}/${decision}`, { method: 'POST' });
+      const res = await fetch(`/api/tracker/bike-transfer/incoming/${requestId}/${decision}`, {
+        method: 'POST',
+        ...(decision === 'approve'
+          ? { headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ includeRecords }) }
+          : {}),
+      });
       const data = await res.json();
       if (!res.ok) {
         setError(data.error ?? 'Something went wrong. Try again.');
@@ -37,7 +43,10 @@ export function IncomingOwnershipRequestCard({ requestId, requesterEmail, create
     return (
       <div className={styles.card}>
         <p className={styles.subtext}>
-          Approved. This bike now belongs to {requesterEmail}&apos;s account, and your own copy is now read-only.
+          Approved. This bike now belongs to {requesterEmail}&apos;s account, and your own copy is now read-only.{' '}
+          {includeRecords
+            ? 'Your logged service records, fuel logs, mods, bills, and any attached receipts went with it too.'
+            : "Your individual records stayed private on your own account - only the bike's identity and a summary transferred."}
         </p>
       </div>
     );
@@ -57,6 +66,19 @@ export function IncomingOwnershipRequestCard({ requestId, requesterEmail, create
         {new Date(createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}. If
         you&apos;ve sold them this bike, approving hands over its logged history and makes your own copy read-only.
       </p>
+      <label style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem', marginTop: '0.8rem', cursor: 'pointer' }}>
+        <input
+          type="checkbox"
+          checked={includeRecords}
+          onChange={(e) => setIncludeRecords(e.target.checked)}
+          style={{ marginTop: '0.2rem' }}
+        />
+        <span className="field-note">
+          Include my logged service records, fuel logs, mods, bills, and any attached receipts. If unchecked, only
+          the bike&apos;s identity and a summary transfer - your individual records stay private on your own
+          account.
+        </span>
+      </label>
       <div style={{ display: 'flex', gap: '0.6rem', marginTop: '0.8rem' }}>
         <button type="button" className="btn-primary" disabled={submitting} onClick={() => handleDecision('approve')}>
           {submitting ? 'Please wait…' : 'Approve'}

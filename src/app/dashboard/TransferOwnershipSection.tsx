@@ -7,6 +7,7 @@ import styles from './dashboard.module.css';
 interface PendingRequest {
   recipientEmail: string;
   createdAt: string;
+  includeRecords?: boolean;
 }
 
 interface Props {
@@ -16,6 +17,7 @@ interface Props {
 
 export function TransferOwnershipSection({ pendingRequest, bikeIsReadOnly }: Props) {
   const [email, setEmail] = useState('');
+  const [includeRecords, setIncludeRecords] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sentTo, setSentTo] = useState<string | null>(null);
@@ -32,7 +34,7 @@ export function TransferOwnershipSection({ pendingRequest, bikeIsReadOnly }: Pro
       const res = await fetch('/api/tracker/bike-transfer', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ recipientEmail: cleaned }),
+        body: JSON.stringify({ recipientEmail: cleaned, includeRecords }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -55,7 +57,9 @@ export function TransferOwnershipSection({ pendingRequest, bikeIsReadOnly }: Pro
     );
   }
 
-  const activeRequest = sentTo ? { recipientEmail: sentTo, createdAt: new Date().toISOString() } : pendingRequest;
+  const activeRequest = sentTo
+    ? { recipientEmail: sentTo, createdAt: new Date().toISOString(), includeRecords }
+    : pendingRequest;
 
   return (
     <div className={styles.card}>
@@ -63,7 +67,10 @@ export function TransferOwnershipSection({ pendingRequest, bikeIsReadOnly }: Pro
         <p className={styles.subtext}>
           Waiting for <strong>{activeRequest.recipientEmail}</strong> to accept - offered{' '}
           {new Date(activeRequest.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}.
-          Once accepted, this bike moves to their account and your copy becomes read-only.
+          Once accepted, this bike moves to their account and your copy becomes read-only.{' '}
+          {activeRequest.includeRecords === false
+            ? "Your individual service records, fuel logs, mods, bills, and any attached receipts stay private on your own account - only the bike's identity and a summary go with it."
+            : "Your logged service records, fuel logs, mods, bills, and any attached receipts go with it too."}
         </p>
       ) : (
         <>
@@ -83,6 +90,19 @@ export function TransferOwnershipSection({ pendingRequest, bikeIsReadOnly }: Pro
               {submitting ? 'Sending…' : 'Start handover'}
             </button>
           </div>
+          <label style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem', marginTop: '0.8rem', cursor: 'pointer' }}>
+            <input
+              type="checkbox"
+              checked={includeRecords}
+              onChange={(e) => setIncludeRecords(e.target.checked)}
+              style={{ marginTop: '0.2rem' }}
+            />
+            <span className="field-note">
+              Include my logged service records, fuel logs, mods, bills, and any attached receipts. If unchecked,
+              only the bike&apos;s identity and a summary transfer - your individual records stay private on your
+              own account.
+            </span>
+          </label>
           {error && <p className="error-text" role="alert" style={{ marginTop: '0.6rem' }}>{error}</p>}
         </>
       )}

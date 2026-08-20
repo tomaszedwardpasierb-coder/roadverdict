@@ -2,11 +2,9 @@
 //
 // Admin-only, Phase 1 of the digital passport plan. There is no
 // user-facing flow yet - this exists purely to exercise transferBike()
-// against real accounts and confirm the split between what moves
-// (bike-level facts, frozen summary) and what doesn't (the actual
-// service/fuel/bill records, which stay with the previous owner) is
-// correct before any UI gets built on top of it. Same auth pattern as
-// mot-history-override and the other /tomasz-only endpoints.
+// against real accounts. includeRecords defaults to true here to match
+// the feature's own default; pass false in the request body to test
+// the bike-facts-only path instead.
 import { NextRequest, NextResponse } from "next/server";
 import { getAdminSession } from "@/lib/admin/session";
 import { transferBike } from "@/lib/tracker/bikeTransfer";
@@ -25,12 +23,22 @@ export async function POST(request: NextRequest) {
   } catch {
     return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
   }
-  const { fromEmail, bikeId, toEmail } = body as { fromEmail?: string; bikeId?: string; toEmail?: string };
+  const { fromEmail, bikeId, toEmail, includeRecords } = body as {
+    fromEmail?: string;
+    bikeId?: string;
+    toEmail?: string;
+    includeRecords?: boolean;
+  };
   if (!fromEmail || !bikeId || !toEmail) {
     return NextResponse.json({ error: "fromEmail, bikeId, and toEmail are all required." }, { status: 400 });
   }
 
-  const result = await transferBike(fromEmail.trim().toLowerCase(), bikeId, toEmail.trim().toLowerCase());
+  const result = await transferBike(
+    fromEmail.trim().toLowerCase(),
+    bikeId,
+    toEmail.trim().toLowerCase(),
+    includeRecords ?? true
+  );
 
   if (!result.ok) {
     switch (result.reason) {

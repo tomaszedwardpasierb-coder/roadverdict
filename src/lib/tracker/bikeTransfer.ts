@@ -8,13 +8,15 @@
 // and marking the old one read-only/historical rather than deleting or
 // mutating it. See transferredFrom/transferredTo on BikeDoc.
 //
-// Deliberately narrow for this phase: only bike-level facts move
-// (identity, registration history, DVLA data, current mileage, and a
-// frozen summary of what the previous owner's records added up to).
-// The actual service/fuel/bill/mod records themselves stay under the
-// previous owner's account - carrying those forward selectively is
-// Phase 3, a deliberately separate and later step, not something this
-// function does implicitly.
+// Bike-level facts (identity, registration history, DVLA data, current
+// mileage) always move, along with a frozen summary of what the
+// previous owner's records added up to at the moment of transfer.
+// Whether the individual service/fuel/bill/mod/reminder records
+// themselves also move is the caller's choice via includeRecords -
+// the current owner decides this, since it's their own logged history
+// being handed over, not an automatic consequence of the bike itself
+// changing hands. Attachments (receipt/invoice images) travel with
+// whichever records copy, since blob storage isn't owner-scoped.
 import { getContainer } from "@/lib/cosmos";
 import { getBike, getBikesForUser, generateBikeId, MAX_FREE_BIKES, type BikeDoc } from "@/lib/tracker/bike";
 import { getServiceRecords } from "@/lib/tracker/serviceRecord";
@@ -22,6 +24,7 @@ import { getMods } from "@/lib/tracker/mod";
 import { getBills } from "@/lib/tracker/bill";
 import { getFuelLogs } from "@/lib/tracker/fuelLog";
 import { getReminders } from "@/lib/tracker/reminder";
+import { copyTrackerDoc } from "@/lib/tracker/cosmosHelpers";
 import { computeSellerReportRowsAndMetrics } from "@/lib/tracker/sellerReportData";
 import { computeSellerVerdict } from "@/lib/tracker/sellerReportVerdict";
 
@@ -32,7 +35,12 @@ export type TransferBikeResult =
   | { ok: false; reason: "same_owner" }
   | { ok: false; reason: "recipient_limit_reached"; limit: number };
 
-export async function transferBike(fromEmail: string, bikeId: string, toEmail: string): Promise<TransferBikeResult> {
+export async function transferBike(
+  fromEmail: string,
+  bikeId: string,
+  toEmail: string,
+  includeRecords: boolean
+): Promise<TransferBikeResult> {
   if (fromEmail === toEmail) {
     return { ok: false, reason: "same_owner" };
   }
@@ -122,6 +130,28 @@ export async function transferBike(fromEmail: string, bikeId: string, toEmail: s
   // which is the worse of the two failure shapes to leave behind.
   await container.items.upsert(oldBike);
   await container.items.upsert(newBike);
+
+  if (includeRecords) {
+    // Best-effort from here - the bike transfer itself already
+    // succeeded and is the part that actually matters. A record that
+    // fails to copy is a real problem worth logging, but not one that
+    // should make this function report failure after the ownership
+    // change has already been committed.
+    const copyResults = await Promise.allSettled([
+      ...records.map((r) => copyTrackerDoc(r, "service", toEmail, newBikeId)),
+      ...mods.map((m) => copyTrackerDoc(m, "mod", toEmail, newBikeId)),
+      ...bills.map((b) => copyTrackerDoc(b, "bill", toEmail, newBikeId)),
+      ...fuelLogs.map((f) => copyTrackerDoc(f, "fuel", toEmail, newBikeId)),
+      // notifiedAt reset to null - the new owner hasn't been notified
+      // about anything yet, regardless of whether the previous owner
+      // already was before the sale.
+      ...reminders.map((rm) => copyTrackerDoc(rm, "reminder", toEmail, newBikeId, { notifiedAt: null })),
+    ]);
+    const failures = copyResults.filter((r) => r.status === "rejected");
+    if (failures.length > 0) {
+      console.error(`transferBike: ${failures.length} record(s) failed to copy for bike ${newBikeId}:`, failures);
+    }
+  }
 
   return { ok: true, newBike };
 }

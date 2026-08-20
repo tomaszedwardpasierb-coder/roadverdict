@@ -99,6 +99,43 @@ export async function createTrackerDoc<TDoc extends TrackerDocBase>(
   return doc;
 }
 
+// Copies an existing tracker doc to a different account and bike -
+// used when transferring bike ownership with records included. Unlike
+// createTrackerDoc above, this can run many times in a single batch
+// (one call per historical record being carried over), so the id needs
+// a random suffix on top of the timestamp - Date.now() alone could
+// collide if several copies land in the same millisecond, and a
+// collision here would mean one record silently overwriting another.
+//
+// attachments carry over untouched - blob storage isn't scoped by
+// owner (see the attachment route's own comment on this), so the copy
+// can reference the exact same blobName without copying the underlying
+// file anywhere.
+//
+// overrides exists for the one known type-specific exception: a
+// reminder's notifiedAt should never carry over, since the new owner
+// hasn't been notified about anything yet, regardless of whether the
+// previous owner already was.
+export async function copyTrackerDoc<TDoc extends TrackerDocBase>(
+  original: TDoc,
+  idPrefix: string,
+  toEmail: string,
+  newBikeId: string,
+  overrides?: Partial<TDoc>
+): Promise<TDoc> {
+  const container = getContainer();
+  const copy = {
+    ...original,
+    id: `${toEmail}::${idPrefix}::${Date.now()}::${Math.random().toString(36).slice(2, 8)}`,
+    pk: toEmail,
+    bikeId: newBikeId,
+    createdAt: new Date().toISOString(),
+    ...overrides,
+  } as TDoc;
+  await container.items.upsert(copy);
+  return copy;
+}
+
 // Queries every doc of a given type AND bike within one user's
 // partition, newest first. Scoped via partitionKey (not just a WHERE
 // clause) so it stays a cheap single-partition query. Filtering strictly
