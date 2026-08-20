@@ -2,7 +2,7 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { getSession } from "@/lib/auth/session";
-import { getBikesForUser, pickActiveBike, getCurrentRegistration, MAX_FREE_BIKES } from "@/lib/tracker/bike";
+import { getBikesForUser, pickActiveBike, getCurrentRegistration, countActiveBikes, MAX_FREE_BIKES } from "@/lib/tracker/bike";
 import LogoutButton from "@/app/dashboard/LogoutButton";
 import dashboardStyles from "@/app/dashboard/dashboard.module.css";
 import styles from "./garage.module.css";
@@ -32,7 +32,7 @@ export default async function GaragePage() {
 
       <h1 className={dashboardStyles.heading}>Your bikes</h1>
       <p className={dashboardStyles.subtext} style={{ marginBottom: "1.3rem" }}>
-        {bikes.length} of {MAX_FREE_BIKES} free bikes used.
+        {countActiveBikes(bikes)} of {MAX_FREE_BIKES} free bikes used.
       </p>
 
       <div className={styles.grid}>
@@ -52,7 +52,7 @@ export default async function GaragePage() {
         ))}
       </div>
 
-      <AddAnotherBikeSection bikeCount={bikes.length} maxFreeBikes={MAX_FREE_BIKES} key={bikes.length} />
+      <AddAnotherBikeSection bikeCount={countActiveBikes(bikes)} maxFreeBikes={MAX_FREE_BIKES} key={bikes.length} />
     </main>
   );
 }

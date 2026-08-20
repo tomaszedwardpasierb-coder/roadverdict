@@ -64,6 +64,17 @@ export function isBikeReadOnly(bike: BikeDoc): boolean {
   return !!bike.transferredTo;
 }
 
+// A read-only, transferred bike is a historical record kept for its
+// previous owner's own reference - it isn't something actively being
+// tracked day to day, so it shouldn't count against the free-bike
+// limit, which exists to cap how many bikes someone is actively
+// managing, not how much history they've accumulated over time.
+// Every place that checks or displays the limit should count through
+// this, not bikes.length directly.
+export function countActiveBikes(bikes: BikeDoc[]): number {
+  return bikes.filter((b) => !isBikeReadOnly(b)).length;
+}
+
 export interface BikeDoc {
   id: string;
   pk: string;
@@ -338,7 +349,7 @@ export async function createBike(
   }
 ): Promise<CreateBikeResult> {
   const existing = await getBikesForUser(email);
-  if (existing.length >= MAX_FREE_BIKES) {
+  if (countActiveBikes(existing) >= MAX_FREE_BIKES) {
     return { ok: false, reason: "limit_reached", limit: MAX_FREE_BIKES };
   }
 

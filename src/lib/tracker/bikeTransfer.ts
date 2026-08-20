@@ -18,7 +18,7 @@
 // changing hands. Attachments (receipt/invoice images) travel with
 // whichever records copy, since blob storage isn't owner-scoped.
 import { getContainer } from "@/lib/cosmos";
-import { getBike, getBikesForUser, generateBikeId, MAX_FREE_BIKES, type BikeDoc } from "@/lib/tracker/bike";
+import { getBike, getBikesForUser, generateBikeId, countActiveBikes, MAX_FREE_BIKES, type BikeDoc } from "@/lib/tracker/bike";
 import { getServiceRecords } from "@/lib/tracker/serviceRecord";
 import { getMods } from "@/lib/tracker/mod";
 import { getBills } from "@/lib/tracker/bill";
@@ -55,8 +55,11 @@ export async function transferBike(
 
   // Same limit createBike() enforces - a transfer shouldn't be a way
   // to bypass the free-bike cap that adding a bike normally respects.
+  // Counted the same way as everywhere else - a read-only bike the
+  // recipient already has doesn't cost them an active slot, so it
+  // shouldn't block them from accepting a genuinely new one either.
   const recipientBikes = await getBikesForUser(toEmail);
-  if (recipientBikes.length >= MAX_FREE_BIKES) {
+  if (countActiveBikes(recipientBikes) >= MAX_FREE_BIKES) {
     return { ok: false, reason: "recipient_limit_reached", limit: MAX_FREE_BIKES };
   }
 
