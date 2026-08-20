@@ -36,8 +36,8 @@ RoadVerdict is where a motorcycle's history lives - not just for whoever happens
 it today, but for the bike itself, across however many owners it has. Every service, every
 fuel fill-up, every part fitted, every year of insurance and tax, builds a permanent record.
 When the bike is sold, that record doesn't reset to zero and start again with the next owner
-guessing - it hands over with the bike, through RoadVerdict's Passport, so the history a buyer
-sees is genuinely continuous, not a fresh account with three receipts in it. The bike keeps its
+guessing - it hands over with the bike through ownership transfer, so the history a buyer sees
+is genuinely continuous, not a fresh account with three receipts in it. The bike keeps its
 story. Ownership of *access* to that story is what changes hands.
 
 ## 2. The problem it solves
@@ -52,16 +52,6 @@ starting over. For the current owner, it's the record itself (spend, mileage, fu
 what's overdue); for a seller, it's evidence a buyer can actually trust; for a buyer, it's the
 first real way to check a bike's past before handing over money - and for whoever owns it five
 owners from now, it's still there.
-
-> **Note on this framing, for whoever configures the live assistant:** the paragraphs above
-> describe RoadVerdict's full intended identity, including Passport, written as the product's
-> core premise rather than hedged as a future plan - as asked. What must stay accurate
-> regardless is section 6.19 below: it keeps an honest Live/Planned status and never invents
-> transfer steps that don't exist yet, because a live assistant telling a real user "yes, here's
-> how" for a feature it can't actually do would be exactly the kind of fabrication this document
-> exists to prevent. Once Passport genuinely ships, flip that one status marker and the two
-> sections will finally agree with each other - no rewrite needed at that point, just a true
-> status.
 
 ## 3. Who it's for
 
@@ -80,9 +70,10 @@ fuel economy benchmarks, and vehicle lookups are all built around bike-specific 
   your email, click the link that arrives, you're in. There's no password to create, forget, or
   reset.
 - **Live.** One account can track a bike's full history for as long as you own it.
-- **[VERIFY]** Whether an account currently supports more than one bike at a time, and how
-  switching between bikes works if so - confirm the real behaviour before answering this
-  precisely; until confirmed, the safe answer is "each account is set up to track one bike."
+- **Live.** Free accounts can track up to two bikes at once. If a bike's been handed over to a
+  new owner (see section 6.20), it becomes read-only on your account and stops counting toward
+  that limit - so handing off a bike frees up the slot it was using, rather than leaving you
+  stuck at your limit because of something you no longer actively use.
 
 ---
 
@@ -95,17 +86,17 @@ asking it something. Treat this section with the same weight as a feature entry,
 aside - "what can you see about me" is one of the first things a real user will want to know
 before they trust the assistant with anything.
 
-**Status of this whole section: Planned - not built yet.** Today, the assistant has no access
-to any account data at all. Until this is built, if asked anything covered below, the honest
-answer is: it currently has no access to your logged data, and can only speak to how
-RoadVerdict's features work in general.
+**Status of this whole section: Live.** The assistant can look up specific, computed facts
+about the currently signed-in user's own account - not open-ended access to your data, and
+never anyone else's account. If asked something covered below while nobody's signed in, the
+honest answer is: it'd need you signed in to check that.
 
-**How it's meant to work, once built:** every question below is answered through a specific,
-narrow lookup, not open-ended access to your account. The assistant asks a defined question
-("what's this signed-in user's total spend between these two dates"), gets back a computed
-number, and answers from that - it never browses your data freely, and it never reuses an
-earlier answer later in the same conversation. It looks the answer up fresh every time, because
-what you've logged can change while you're talking to it.
+**How it works:** every question below is answered through a specific, narrow lookup, not
+open-ended access to your account. The assistant asks a defined question ("what's this
+signed-in user's total spend between these two dates"), gets back a computed number, and
+answers from that - it never browses your data freely, and it never reuses an earlier answer
+later in the same conversation. It looks the answer up fresh every time, because what you've
+logged can change while you're talking to it.
 
 **Whose data it can see:** only the account that's currently signed in and asking. This has to
 be enforced the same way sign-in protects the rest of RoadVerdict - not a rule the assistant is
@@ -127,7 +118,7 @@ around it - it should be structurally impossible regardless of what's asked.
 *Example reply:* "I can only look up your own account, not anyone else's, even with their email
 - that's true no matter who's asking or why. Happy to look up your own MPG though."
 
-**What it will be able to answer about your own account:**
+**What it can answer about your own account:**
 - Total spend over a date range, or a specific month/year
 - Spend broken down by category (servicing, fuel, parts, insurance/tax/MOT) over a range
 - Current mileage, or mileage at a given point in your history
@@ -136,16 +127,17 @@ around it - it should be structurally impossible regardless of what's asked.
 - Any reminder's status and due date - overdue, due soon, or comfortably upcoming
 - When you last logged a specific type of job (e.g. "when did I last log an oil change")
 - Progress against your annual budget, if you've set one
+**[VERIFY]** This list describes the intended scope; confirm it against the actual tool
+declarations before treating every item above as individually confirmed live - the reminders
+lookup specifically is confirmed (see the incident described below), the rest should be checked
+against what's actually wired up.
 
 **What it will not do, even for your own account:**
 - Look up, compare against, or in any way reference another account's data - see above.
 - Read or describe the contents of a receipt image or attachment itself - only the data that
   was extracted from it and saved (amount, date, category), never the document.
 - Take any action on your account. It can look things up; it cannot log, edit, or delete
-  anything for you. **[VERIFY: confirm this is actually the intended scope before this gets
-  built - if being able to log or edit an entry through chat is wanted, that's a materially
-  bigger, separate design decision, not something to assume from "answer questions about my
-  data."]**
+  anything for you. This is a lookup-only system by design, not a pending decision.
 - Never answer as if a lookup returning nothing or failing settles the question. It should
   say plainly that it doesn't see anything logged for that, rather than estimate a figure to
   avoid an empty answer.
@@ -179,6 +171,16 @@ manufacturer fuel-economy figures by hand.
 in the make, model, year, and official specs automatically. You can refresh this data any time
 if something about the bike's official record changes.
 **Status:** Live.
+**Two checks run automatically on the registration you enter, before anything's saved:**
+- **It has to actually be a motorcycle.** If the registration comes back as a car or other
+  four-wheeled vehicle, adding it is refused outright with a plain explanation. If the vehicle
+  type genuinely can't be confirmed either way, it's treated the same as a four-wheeler rather
+  than assumed to be a motorcycle just because that's the more common case - you'd be asked to
+  double-check the registration or enter the bike's details manually instead.
+- **It checks whether this exact bike is already tracked on RoadVerdict, under a different
+  account.** If it is, you're not blocked from adding it - you get a choice instead: request
+  the existing owner's permission to take over that history (see section 6.20), or start a
+  completely new, separate record and decline the existing one. Neither is forced on you.
 
 ### 6.2 Scanning a receipt
 **What:** Take a photo of a paper receipt or invoice and RoadVerdict reads the date, cost, item,
@@ -309,10 +311,20 @@ been recorded, the more complete the story it can tell.
 giving them access to your account.
 **Why:** This is the actual point of everything else - all that logging becomes worth something
 the moment you're selling, because you can hand a buyer proof instead of a promise.
-**How:** Shareable Links tab → generate a link → send it to whoever's interested. A buyer
-viewing the link can request to see a specific receipt if they want more detail; you get to
-approve or decline each request individually before anything's shared.
+**How:** Shareable Links tab → generate a link → send it to whoever's interested. You choose how
+long the link stays valid - 1 week, 1 month, or 6 months - and it stops working automatically
+once that period ends. A buyer viewing the link can request to see a specific receipt if they
+want more detail; you get to approve or decline each request individually before anything's
+shared.
 **Status:** Live.
+**One more thing worth knowing:** if the recipient hasn't already requested that bike's
+ownership within 4 weeks of the link being created, RoadVerdict emails them once, unprompted,
+encouraging them to take over the bike's history if they did end up buying it - this fires
+whether or not they ever actually opened the original link. It's sent at most once per link,
+and never at all if the bike's already been handed over or requested by then. See section 6.20
+for what that request actually does. The report itself also carries its own "request this
+bike's history" option directly on the page, for a buyer who's looking at it right now rather
+than waiting for that follow-up.
 
 ### 6.15 Exporting your data
 **What:** Download everything you've logged as a CSV file.
@@ -327,14 +339,13 @@ needing to own it yet or log anything.
 **Why:** For anyone still deciding whether a bike is affordable to run, before they've committed
 to buying it. It's the "what am I actually signing up for" answer, up front, instead of finding
 out the hard way over the first year of ownership.
-**How:** Available directly from the RoadVerdict site, no account required - enter the bike's
-details and get an estimated cost breakdown.
+**How:** Available directly from the RoadVerdict site, no account required - either enter a
+registration plate to pull in real details automatically, or enter the make, model, and engine
+size by hand if you'd rather not look up a specific bike yet.
 **Status:** Live.
 **Limits:** These are estimates based on typical figures, not a promise of what a specific bike
 will actually cost - once you're logging real fill-ups and services in the tracker, your actual
-numbers (real fuel economy, real spend) will be more accurate than any general estimate. [VERIFY:
-the exact fields the calculator asks for and how its estimate is built - described generally
-above since the precise inputs/outputs haven't been confirmed against the live tool.]
+numbers (real fuel economy, real spend) will be more accurate than any general estimate.
 
 ### 6.17 Buying Guide
 **What:** Guidance on what to check before buying a used motorcycle - what to look at, what to
@@ -342,10 +353,13 @@ ask the seller, what paperwork should exist.
 **Why:** Buying a used bike is exactly the situation this whole product exists for - a buyer
 with no way to verify what they're being told. This gives a buyer a concrete checklist to work
 from, whether or not the seller happens to be using RoadVerdict themselves.
-**How:** Available directly from the RoadVerdict site, no account required.
+**How:** Available directly from the RoadVerdict site, no account required - includes a
+registration lookup that pulls in the bike's full official MOT test history alongside the
+checklist, so you're not checking the guide and a separate DVSA lookup as two different steps.
 **Status:** Live.
-**Limits:** [VERIFY: the exact content/structure of the guide - confirm before describing its
-specific checklist items, since the precise content hasn't been reviewed here.]
+**Limits:** [VERIFY: the exact checklist content and structure beyond the registration/MOT
+lookup described above - that part is confirmed, the specific checklist wording hasn't been
+reviewed here.]
 
 ### 6.18 Units and currency
 **What:** Switch between miles/km, mpg/L per 100km, and currency display.
@@ -354,23 +368,61 @@ think about your own bike, not force one convention on you.
 **How:** Unit settings, available from the Dashboard.
 **Status:** Live.
 
-### 6.19 Ownership transfer ("Passport")
-**What:** When you sell your bike, hand its entire logged history over to the new owner, so
-they don't start from zero - the record becomes the bike's, not just yours.
-**Why:** Today, selling a bike means handing over a folder of paper (or nothing at all) and
-hoping it's believed. This is meant to make the *history itself* the thing that transfers with
-the bike, not just the machine - genuinely continuous documentation across owners, not a reset
-every time it changes hands.
-**How:** Not available yet - there are no steps to give, because it doesn't exist in the app
-today.
-**Status:** **Planned. Not built. Do not describe this as available or invent steps for using
-it.** If asked, the honest answer is: it's on the roadmap, not available today, and email
-hello@roadverdict.co.uk if you want to be told when it ships.
-**What it's intended to do, once built (for context only - not a description of anything
-live):** A seller will choose exactly what transfers to the new owner and confirm it before
-anything moves - nothing is meant to hand over automatically or without the seller's explicit
-say-so. The seller's own private account details and private notes are never intended to be
-part of what transfers, only the bike's own documented history.
+### 6.19 The garage: managing more than one bike
+**What:** Switch between your bikes, see all of them at a glance, and manage each one
+individually - delete a bike you no longer track, or update its registration if a private plate
+changes.
+**Why:** Most owners eventually have more than one bike, or move on from one to another - this
+is where you see everything you're tracking in one place, not just whichever bike happens to be
+active right now.
+**How:** The Garage page lists every bike on your account. Click into one to make it the active
+bike your Dashboard, Service tab, and everything else is currently showing. From there you can
+also change a bike's registration (for a genuine plate change, like a private plate being
+applied) or delete it entirely.
+**Status:** Live.
+**A bike that's been handed over to a new owner (see 6.20) is tagged "Read-only - transferred to
+[email]" here, and behaves differently from a bike you're still actively tracking:** you can
+still view everything you logged against it, but you can no longer add new entries, edit its
+registration, or delete it - deleting it would break the link the new owner's copy still points
+back to, so that option is removed rather than left to fail. Every other bike on your account
+works exactly as normal.
+
+### 6.20 Ownership transfer
+**What:** When you sell your bike, hand its logged history over to the new owner instead of
+them starting from nothing - the record becomes something that follows the bike itself, not
+just something that dies with your account.
+**Why:** Selling a bike normally means handing over a folder of paper, or nothing at all, and
+hoping it's believed. This makes the *history* the thing that actually transfers with the bike -
+genuinely continuous documentation across owners, not a reset every time it changes hands. It
+also means when you sell, you keep your own read-only copy forever, as proof of what you did
+while you owned it.
+**Status:** Live.
+**How - there are two ways this starts, depending on who acts first:**
+- **You're the seller, and you start it.** From your own Transfer ownership tab, enter the
+  buyer's email and choose whether to include your logged service records, fuel logs, mods,
+  bills, and any attached receipts, or just the bike's identity and a summary of what it added
+  up to - then start the handover. The buyer gets an email; they sign in or create a free
+  account using that same email address, then accept it from the offer page. The bike moves to
+  their account the moment they do.
+- **You're the buyer, and you start it.** If you try to add a bike by registration and
+  RoadVerdict already has a record for it under someone else's account (see 6.1), or you're
+  looking at a Buyer Verdict Report for a bike you've bought, you can request its history
+  directly instead of starting fresh. The current owner gets an email and sees your request on
+  their own Transfer ownership tab, where they choose whether to include their logged records
+  and then approve or decline it.
+**What actually moves, and what always stays private:** whoever's approving the handover - the
+seller if they started it, or the current owner responding to a request either way - decides
+whether individual service records, fuel logs, mods, bills, and any attached receipt images
+come along, or whether only the bike's identity and a frozen summary (total entries, total
+spend, an overall documentation verdict) go across. Either way, the previous owner always keeps
+their own copy, permanently, read-only, as their own record of what they did while they owned
+the bike - nothing is ever deleted from their side, regardless of which choice was made.
+**Privacy:** neither party ever sees the other's private account details as part of this. A
+buyer requesting ownership never learns who the current owner is unless that owner chooses to
+act on the request; the current owner only ever sees the requester's email once they've
+actually asked.
+**A request that's never acted on expires after 7 days**, in either direction - after that, it
+simply lapses, and the same request would need to be made again.
 
 ---
 
@@ -397,8 +449,26 @@ You can export everything as a CSV at any time, and you can ask to have your acc
 everything in it deleted whenever you like.
 
 **"Can I transfer my bike's history to whoever buys it?"**
-Not yet - that's a planned feature ("Passport"), not something available today. See section
-6.19.
+Yes - see section 6.20. Either you offer it directly to the buyer once you know who they are,
+or they can request it themselves, whether that's because they tried adding the bike and found
+it already tracked, or they're looking at the report you shared with them. You choose whether
+your individual logged records come along or just the bike's identity and a summary either
+way, and you always keep your own read-only copy afterward.
+
+**"How many bikes can I track?"**
+Up to two, on a free account. A bike you've handed over to a new owner becomes read-only and
+doesn't count toward that limit, so it doesn't cost you a slot just because you're not actively
+using it anymore.
+
+**"How long does a shareable link last?"**
+You choose when you create it - 1 week, 1 month, or 6 months. It stops working on its own once
+that period ends.
+
+**"How do I log something like a clutch cable I replaced?"**
+Parts & Accessories tab - scan the receipt, or fill in the form directly with the date, cost,
+and what it was. The same applies to any single part or accessory, not just a clutch cable -
+tyres, a chain and sprocket set, luggage, crash protection, anything you've bought or fitted.
+See section 6.5.
 
 **"How do I know the price I was quoted is fair?"**
 Log it in the Service tab, or check it directly with the Quote Checker - either way you'll get
@@ -407,14 +477,14 @@ engine size.
 
 **"Do I need an account to check a bike someone's selling me?"**
 No - if the seller's shared a RoadVerdict link with you, you can view it directly. You'd only
-need an account yourself if you want to start tracking your own bike.
+need an account yourself if you want to start tracking your own bike, or if you want to request
+that bike's existing history once you've bought it.
 
 **"Can you (the assistant) see my data?"**
-See section 5 for the full answer. Until that's built, the honest answer today is: no - this
-assistant currently has no access to any account's logged data, including yours. Once it's
-built, it will only ever be able to look up the currently signed-in user's own data, never
-anyone else's, and never the contents of a receipt image itself - only computed answers like
-totals and dates.
+See section 5 for the full answer. Yes, but only in a narrow, specific way: it can look up
+computed facts about your own account, like your total spend or current mileage, when you're
+signed in and ask. It can never see another account's data, and it never sees the contents of a
+receipt image itself, only the data that was extracted from it and saved.
 
 **"Does RoadVerdict share my data with anyone else / other companies?"**
 This is a different question from the one above - it's about RoadVerdict's own data handling,
