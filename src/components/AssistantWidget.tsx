@@ -14,17 +14,102 @@ const GREETING: Message = {
   content: "Hi - I can help with anything about using RoadVerdict: logging a receipt, checking your spend, whatever you're trying to do. What can I help with?",
 };
 
+// One silent automatic retry beyond the first attempt - most failures
+// here are a brief blip (a transient network drop, or Gemini itself
+// returning a momentary 502), and the person should never see an error
+// for something that resolves itself a second later. Only retried
+// automatically (or offered a manual retry) when the failure looks
+// transient in the first place - see isRetryable below.
+const MAX_AUTO_RETRIES = 1;
+const RETRY_DELAY_MS = 1200;
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+// A 4xx means the request itself was the problem - too long, or
+// malformed - and resending the exact same thing would just fail the
+// same way again. Only a 5xx (something genuinely went wrong server
+// side, or Gemini itself is temporarily down) or a network failure
+// that never reached the server at all are worth retrying.
+function isRetryable(status: number | null): boolean {
+  return status === null || status >= 500;
+}
+
+type SendResult = { ok: true; reply: string } | { ok: false; error: string; retryable: boolean };
+
+async function attemptSend(payload: Message[]): Promise<SendResult> {
+  let status: number | null = null;
+  try {
+    const res = await fetch('/api/assistant', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      // Only role/content goes over the wire - nothing else about
+      // the user is sent from here; anything the assistant knows
+      // about their account, it gets server-side from their own
+      // session, not from this request body.
+      body: JSON.stringify({ messages: payload.map((m) => ({ role: m.role, content: m.content })) }),
+    });
+    status = res.status;
+    const data = await res.json().catch(() => null);
+    if (res.ok && data?.reply) {
+      return { ok: true, reply: data.reply };
+    }
+    return {
+      ok: false,
+      error: data?.error ?? "Couldn't reach the assistant just now.",
+      retryable: isRetryable(status),
+    };
+  } catch {
+    // A genuine network failure - the request never got a response at
+    // all, which is exactly the kind of thing worth retrying.
+    return { ok: false, error: "Couldn't reach the assistant just now.", retryable: true };
+  }
+}
+
 export function AssistantWidget() {
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([GREETING]);
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // The exact payload that failed, kept only when the failure looked
+  // retryable - lets "Retry" resend precisely what didn't go through
+  // without the person needing to retype anything. Never set for a
+  // non-retryable failure (e.g. message too long), since resending the
+  // same thing there would just fail identically - the only real fix
+  // in that case is a different message, typed fresh.
+  const [lastFailedMessages, setLastFailedMessages] = useState<Message[] | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     listRef.current?.scrollTo({ top: listRef.current.scrollHeight, behavior: 'smooth' });
   }, [messages, sending]);
+
+  async function sendWithRetry(payload: Message[]) {
+    setSending(true);
+    setError(null);
+    setLastFailedMessages(null);
+
+    let result = await attemptSend(payload);
+    let attempts = 1;
+    // Retries silently, still inside the same "sending" state - the
+    // person just sees the normal typing indicator for slightly longer
+    // if this happens, never a flash of an error that then recovers.
+    while (!result.ok && result.retryable && attempts <= MAX_AUTO_RETRIES) {
+      await sleep(RETRY_DELAY_MS);
+      result = await attemptSend(payload);
+      attempts++;
+    }
+
+    setSending(false);
+    if (result.ok) {
+      setMessages((prev) => [...prev, { role: 'assistant', content: result.reply }]);
+    } else {
+      setError(result.retryable ? `${result.error} Try again.` : result.error);
+      if (result.retryable) setLastFailedMessages(payload);
+    }
+  }
 
   async function handleSend() {
     const text = input.trim();
@@ -33,30 +118,12 @@ export function AssistantWidget() {
     const nextMessages = [...messages, { role: 'user' as const, content: text }];
     setMessages(nextMessages);
     setInput('');
-    setError(null);
-    setSending(true);
+    await sendWithRetry(nextMessages);
+  }
 
-    try {
-      const res = await fetch('/api/assistant', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        // Only role/content goes over the wire - nothing else about
-        // the user is sent from here; anything the assistant knows
-        // about their account, it gets server-side from their own
-        // session, not from this request body.
-        body: JSON.stringify({ messages: nextMessages.map((m) => ({ role: m.role, content: m.content })) }),
-      });
-      const data = await res.json();
-      if (!res.ok || !data.reply) {
-        setError("Couldn't reach the assistant just now - try again in a moment.");
-        return;
-      }
-      setMessages((prev) => [...prev, { role: 'assistant', content: data.reply }]);
-    } catch {
-      setError("Couldn't reach the assistant just now - try again in a moment.");
-    } finally {
-      setSending(false);
-    }
+  function handleRetry() {
+    if (!lastFailedMessages || sending) return;
+    void sendWithRetry(lastFailedMessages);
   }
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
@@ -84,7 +151,16 @@ export function AssistantWidget() {
               </div>
             ))}
             {sending && <div className={styles.bubbleAssistant}>…</div>}
-            {error && <div className={styles.errorNote}>{error}</div>}
+            {error && (
+              <div className={styles.errorNote}>
+                {error}
+                {lastFailedMessages && (
+                  <button type="button" className="submit-button" style={{ marginTop: '0.5rem' }} onClick={handleRetry} disabled={sending}>
+                    Retry
+                  </button>
+                )}
+              </div>
+            )}
           </div>
 
           <div className={styles.inputRow}>
