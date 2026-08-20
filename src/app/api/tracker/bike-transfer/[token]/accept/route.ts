@@ -45,6 +45,11 @@ export async function POST(request: NextRequest, { params }: { params: { token: 
           { error: `You already have the maximum of ${result.limit} bikes. Remove one first, then try again.` },
           { status: 403 }
         );
+      case "recipient_already_has_bike":
+        return NextResponse.json(
+          { error: "You already have a separate bike on your account with this same registration - resolve that one first (most likely by deleting it, if it was a fresh start for this same bike), then try accepting again." },
+          { status: 409 }
+        );
     }
   }
 

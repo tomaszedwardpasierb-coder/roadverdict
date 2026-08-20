@@ -61,6 +61,25 @@ async function reestimateNearbyFuelLogs(email: string, bike: BikeDoc) {
   }
 }
 
+// Same reasoning as reestimateNearbyFuelLogs above, applied to reminder
+// creation - a reminder is a convenience sitting on top of the actual
+// service/bill record, not the record itself. If the record was
+// already successfully created and this fails, letting the failure
+// propagate up would make the whole commit look like it failed when
+// the genuinely valuable data was already safely saved - exactly the
+// kind of partial failure that risks a caller retrying and creating a
+// real duplicate of the record that already succeeded. Worse for the
+// person to lose a reminder silently than to end up with two logged
+// entries for the same job; they can always set one manually from the
+// Reminders tab afterward.
+async function createReminderBestEffort(email: string, data: Parameters<typeof createReminder>[1]) {
+  try {
+    await createReminder(email, data);
+  } catch (err) {
+    console.error("Reminder creation after receipt commit failed (the record itself was still saved):", err);
+  }
+}
+
 export type ReviewQueueEntry =
   | { id: string; category: "service"; aiDescription: string; duplicate: DuplicateMatch | null; jobType: string; cost: number; mileage: number; mileageNeedsManualEntry: boolean; mileageWarningText?: string; mileageConflictReferenceId?: string; mileageConflictReferenceCategory?: "service" | "fuel" | "mods" | "mot"; mileageConflictReferenceBatchIndex?: number; plateMismatch: PlateMismatch | null; vehicleMismatch: VehicleMismatch | null; date: string; notes: string; attachment: Attachment }
   | { id: string; category: "fuel"; aiDescription: string; duplicate: DuplicateMatch | null; litres: number; cost: number; mileage: number; mileageNeedsManualEntry: boolean; mileageWarningText?: string; mileageConflictReferenceId?: string; mileageConflictReferenceCategory?: "service" | "fuel" | "mods" | "mot"; mileageConflictReferenceBatchIndex?: number; plateMismatch: PlateMismatch | null; vehicleMismatch: VehicleMismatch | null; date: string; filledToFull: boolean; attachment: Attachment; precedingFuelMileage?: number; tankCapacityLitres?: number }
@@ -293,7 +312,7 @@ export async function commitReceiptItem(
     });
     const reminderDefault = JOB_REMINDER_DEFAULTS[jobType];
     if (reminderDefault) {
-      await createReminder(email, {
+      await createReminderBestEffort(email, {
         bikeId: bike.id, name: jobLabel, intervalType: reminderDefault.type, intervalValue: reminderDefault.value,
         baseMileage: mileage ?? bike.currentMileage, date, sourceKey: `service:${jobType}`,
       });
@@ -361,7 +380,7 @@ export async function commitReceiptItem(
   });
   const reminderDefault = BILL_REMINDER_DEFAULTS[billType];
   if (reminderDefault) {
-    await createReminder(email, {
+    await createReminderBestEffort(email, {
       bikeId: bike.id, name: `${billLabel} renewal`, intervalType: reminderDefault.type, intervalValue: reminderDefault.value,
       baseMileage: bike.currentMileage, date, sourceKey: `bill:${billType}`,
     });

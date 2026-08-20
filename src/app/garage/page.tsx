@@ -48,6 +48,7 @@ export default async function GaragePage() {
             currentRegistration={getCurrentRegistration(bike)}
             registrationChangeCount={bike.registrationChanges?.length ?? 0}
             transferredToEmail={bike.transferredTo?.newOwnerEmail}
+            mayHavePriorHistory={bike.mayHavePriorHistory}
           />
         ))}
       </div>

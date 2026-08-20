@@ -24,13 +24,17 @@ interface Props {
   currentRegistration?: string;
   registrationChangeCount: number;
   transferredToEmail?: string;
+  mayHavePriorHistory?: boolean;
 }
 
-export function BikeCard({ bikeId, name, year, isCustomBuild, currentMileage, isActive, currentRegistration, registrationChangeCount, transferredToEmail }: Props) {
+export function BikeCard({ bikeId, name, year, isCustomBuild, currentMileage, isActive, currentRegistration, registrationChangeCount, transferredToEmail, mayHavePriorHistory }: Props) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [requestingHistory, setRequestingHistory] = useState(false);
+  const [historyRequestSent, setHistoryRequestSent] = useState(false);
+  const [historyRequestError, setHistoryRequestError] = useState<string | null>(null);
   const [showChangeForm, setShowChangeForm] = useState(false);
   const [newPlate, setNewPlate] = useState('');
   const [reason, setReason] = useState<RegistrationChangeReason>('private-plate-assigned');
@@ -77,6 +81,27 @@ export function BikeCard({ bikeId, name, year, isCustomBuild, currentMileage, is
       setDeleteError(data.error ?? 'Could not delete this bike. Try again.');
     } finally {
       setDeleting(false);
+    }
+  }
+
+  async function handleRequestHistory() {
+    if (!currentRegistration) return;
+    setRequestingHistory(true);
+    setHistoryRequestError(null);
+    try {
+      const res = await fetch('/api/tracker/bike-transfer/request-ownership', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ registration: currentRegistration }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setHistoryRequestError(data.error ?? 'Could not send the request. Try again.');
+        return;
+      }
+      setHistoryRequestSent(true);
+    } finally {
+      setRequestingHistory(false);
     }
   }
 
@@ -145,6 +170,34 @@ export function BikeCard({ bikeId, name, year, isCustomBuild, currentMileage, is
         )}
       </div>
       {deleteError && <p className="error-text" role="alert" style={{ marginTop: '0.5rem' }}>{deleteError}</p>}
+
+      {mayHavePriorHistory && !transferredToEmail && (
+        <div style={{ marginTop: '0.6rem', paddingTop: '0.6rem', borderTop: '1px solid var(--line)' }}>
+          {historyRequestSent ? (
+            <p className="field-note">
+              Request sent - if the current owner approves it, this bike&apos;s earlier history moves to your account.
+            </p>
+          ) : (
+            <>
+              <p className="field-note">
+                This bike may have RoadVerdict history logged by a previous owner.
+              </p>
+              <button
+                type="button"
+                className={styles.iconBtn}
+                style={{ marginTop: '0.3rem' }}
+                disabled={requestingHistory || !currentRegistration}
+                onClick={handleRequestHistory}
+              >
+                {requestingHistory ? 'Sending…' : 'Request it'}
+              </button>
+              {historyRequestError && (
+                <p className="error-text" role="alert" style={{ marginTop: '0.4rem' }}>{historyRequestError}</p>
+              )}
+            </>
+          )}
+        </div>
+      )}
 
       {showChangeForm && (
         <form onSubmit={handleChangeRegistration} className={styles.registrationChangeForm}>

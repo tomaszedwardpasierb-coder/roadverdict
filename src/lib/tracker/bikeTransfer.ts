@@ -18,7 +18,7 @@
 // changing hands. Attachments (receipt/invoice images) travel with
 // whichever records copy, since blob storage isn't owner-scoped.
 import { getContainer } from "@/lib/cosmos";
-import { getBike, getBikesForUser, generateBikeId, countActiveBikes, MAX_FREE_BIKES, type BikeDoc } from "@/lib/tracker/bike";
+import { getBike, getBikesForUser, generateBikeId, countActiveBikes, findBikeByRegistrationAcrossAccounts, getCurrentRegistration, MAX_FREE_BIKES, type BikeDoc } from "@/lib/tracker/bike";
 import { getServiceRecords } from "@/lib/tracker/serviceRecord";
 import { getMods } from "@/lib/tracker/mod";
 import { getBills } from "@/lib/tracker/bill";
@@ -33,7 +33,8 @@ export type TransferBikeResult =
   | { ok: false; reason: "bike_not_found" }
   | { ok: false; reason: "already_transferred" }
   | { ok: false; reason: "same_owner" }
-  | { ok: false; reason: "recipient_limit_reached"; limit: number };
+  | { ok: false; reason: "recipient_limit_reached"; limit: number }
+  | { ok: false; reason: "recipient_already_has_bike" };
 
 export async function transferBike(
   fromEmail: string,
@@ -61,6 +62,28 @@ export async function transferBike(
   const recipientBikes = await getBikesForUser(toEmail);
   if (countActiveBikes(recipientBikes) >= MAX_FREE_BIKES) {
     return { ok: false, reason: "recipient_limit_reached", limit: MAX_FREE_BIKES };
+  }
+
+  // Guards against a specific collision: the recipient may have already
+  // clicked "Start fresh" on the add-bike flow for this exact
+  // registration, rather than waiting for this same offer or request to
+  // be approved (or requested ownership through one path while adding
+  // the bike manually through another). transferBike() always creates
+  // a brand new bike document, with no awareness on its own of whether
+  // the recipient already has a separate, active record for the same
+  // physical bike - silently creating a second one here would leave
+  // them with two disconnected histories for the same bike, one just
+  // appearing with no explanation, genuinely hard to untangle after the
+  // fact. This is detected and blocked, not silently resolved: the
+  // person needs to sort out which record should actually continue
+  // (most likely by deleting the fresh one) before the transfer can go
+  // through, rather than the system guessing which one should win.
+  const currentReg = getCurrentRegistration(oldBike);
+  if (currentReg) {
+    const existingRecipientMatch = await findBikeByRegistrationAcrossAccounts(currentReg);
+    if (existingRecipientMatch && existingRecipientMatch.ownerEmail === toEmail) {
+      return { ok: false, reason: "recipient_already_has_bike" };
+    }
   }
 
   // Same metrics/verdict logic the buyer report and Story So Far are
