@@ -23,12 +23,14 @@ interface Props {
   isActive: boolean;
   currentRegistration?: string;
   registrationChangeCount: number;
+  transferredToEmail?: string;
 }
 
-export function BikeCard({ bikeId, name, year, isCustomBuild, currentMileage, isActive, currentRegistration, registrationChangeCount }: Props) {
+export function BikeCard({ bikeId, name, year, isCustomBuild, currentMileage, isActive, currentRegistration, registrationChangeCount, transferredToEmail }: Props) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const [showChangeForm, setShowChangeForm] = useState(false);
   const [newPlate, setNewPlate] = useState('');
   const [reason, setReason] = useState<RegistrationChangeReason>('private-plate-assigned');
@@ -64,11 +66,15 @@ export function BikeCard({ bikeId, name, year, isCustomBuild, currentMileage, is
       return;
     }
     setDeleting(true);
+    setDeleteError(null);
     try {
       const res = await fetch(`/api/tracker/bike/${encodeURIComponent(bikeId)}`, { method: 'DELETE' });
       if (res.ok) {
         router.refresh();
+        return;
       }
+      const data = await res.json().catch(() => ({}));
+      setDeleteError(data.error ?? 'Could not delete this bike. Try again.');
     } finally {
       setDeleting(false);
     }
@@ -106,6 +112,9 @@ export function BikeCard({ bikeId, name, year, isCustomBuild, currentMileage, is
   return (
     <div className={styles.card}>
       {isActive && <div className={styles.activeBadge}>Currently viewing</div>}
+      {transferredToEmail && (
+        <div className={styles.readOnlyBadge}>Read-only - transferred to {transferredToEmail}</div>
+      )}
       <div className={styles.cardName}>{name}</div>
       <div className={styles.cardMeta}>
         {isCustomBuild ? 'Custom build' : year} · {currentMileage.toLocaleString()} miles
@@ -120,15 +129,22 @@ export function BikeCard({ bikeId, name, year, isCustomBuild, currentMileage, is
         <button type="button" className="submit-button" onClick={handleViewDashboard} disabled={loading || deleting}>
           {loading ? 'Switching…' : 'View dashboard'}
         </button>
-        {currentRegistration && (
+        {/* Change registration and Delete both reject a read-only bike
+            server-side unconditionally, so there's no point showing
+            either here - it would just fail with no clear reason why,
+            which is very likely what actually happened before this. */}
+        {!transferredToEmail && currentRegistration && (
           <button type="button" className={styles.deleteBtn} onClick={() => setShowChangeForm((s) => !s)} disabled={loading || deleting}>
             {showChangeForm ? 'Cancel' : 'Change registration'}
           </button>
         )}
-        <button type="button" className={styles.deleteBtn} onClick={handleDelete} disabled={loading || deleting}>
-          {deleting ? 'Deleting…' : 'Delete'}
-        </button>
+        {!transferredToEmail && (
+          <button type="button" className={styles.deleteBtn} onClick={handleDelete} disabled={loading || deleting}>
+            {deleting ? 'Deleting…' : 'Delete'}
+          </button>
+        )}
       </div>
+      {deleteError && <p className="error-text" role="alert" style={{ marginTop: '0.5rem' }}>{deleteError}</p>}
 
       {showChangeForm && (
         <form onSubmit={handleChangeRegistration} className={styles.registrationChangeForm}>

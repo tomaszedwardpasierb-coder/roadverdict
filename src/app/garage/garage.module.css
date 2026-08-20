@@ -34,6 +34,18 @@
   margin-bottom: 0.6rem;
 }
 
+.readOnlyBadge {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  color: var(--asphalt);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 0.15rem 0.4rem;
+  margin-bottom: 0.6rem;
+}
+
 .cardName {
   font-weight: 600;
   margin-bottom: 0.2rem;

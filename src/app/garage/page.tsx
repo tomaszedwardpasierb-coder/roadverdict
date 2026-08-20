@@ -47,6 +47,7 @@ export default async function GaragePage() {
             isActive={bike.id === activeBike?.id}
             currentRegistration={getCurrentRegistration(bike)}
             registrationChangeCount={bike.registrationChanges?.length ?? 0}
+            transferredToEmail={bike.transferredTo?.newOwnerEmail}
           />
         ))}
       </div>
