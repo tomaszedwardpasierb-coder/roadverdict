@@ -34,6 +34,8 @@ export function AddBikeForm() {
   const [requestingOwnership, setRequestingOwnership] = useState(false);
   const [ownershipRequestSent, setOwnershipRequestSent] = useState(false);
   const [ownershipRequestError, setOwnershipRequestError] = useState<string | null>(null);
+  const [startedFreshDespiteDuplicate, setStartedFreshDespiteDuplicate] = useState(false);
+  const [pendingLookupData, setPendingLookupData] = useState<{ make?: string; model?: string; year?: number; engineCapacityCc?: number; plateInRetention?: boolean } | null>(null);
   const router = useRouter();
   const [customMake, setCustomMake] = useState('');
   const [customModel, setCustomModel] = useState('');
@@ -107,6 +109,81 @@ export function AddBikeForm() {
     }
   }
 
+  // Runs the make/model matching, year, and MOT-mileage-floor auto-fill
+  // against an already-fetched plate-lookup response. Split out from
+  // handleLookup so "Start fresh" can call this exact same logic on data
+  // that's already in hand, without a second network round-trip and
+  // without duplicating what it does.
+  async function applyLookupData(data: { make?: string; model?: string; year?: number; engineCapacityCc?: number; plateInRetention?: boolean }) {
+    const matchedBrand = ALL_BRANDS.find((b) => b.toLowerCase() === String(data.make ?? '').toLowerCase());
+    let matchedModelName: string | null = null;
+    if (matchedBrand) {
+      handleMakeChange(matchedBrand);
+      const candidates = MOTORCYCLE_MODELS.filter((m) => m.make === matchedBrand);
+      const dvlaModel = String(data.model ?? '').toLowerCase();
+      const exact = candidates.find((m) => m.model.toLowerCase() === dvlaModel);
+      const partial = candidates.find(
+        (m) => dvlaModel.includes(m.model.toLowerCase()) || m.model.toLowerCase().includes(dvlaModel)
+      );
+      const found = exact ?? partial;
+      if (found) {
+        setModel(found.model);
+        matchedModelName = found.model;
+      }
+    }
+
+    if (data.year && !isCustomBuild) {
+      setYear(String(data.year));
+    }
+
+    // Independent of whether make/model matched above - a genuine
+    // mileage floor from DVSA's own records is worth having even if
+    // the vehicle isn't in our curated model list at all. Failure here
+    // is silent and non-blocking: the vehicle lookup already succeeded,
+    // this is a bonus, and "no MOT history yet" (a bike under 3 years
+    // old) is a completely normal, expected outcome, not an error.
+    try {
+      const motRes = await fetch(`/api/tracker/mot-history-preview?vrm=${encodeURIComponent(registration.trim())}`);
+      if (motRes.ok) {
+        const motData = await motRes.json();
+        if (motData.latestTrustedMileage != null) {
+          setMinMileage(motData.latestTrustedMileage);
+          setMinMileageDate(motData.latestTestDate ?? null);
+          setMileage(String(motData.latestTrustedMileage));
+          setMileageConfirmed(false);
+        }
+      }
+    } catch {
+      // Silent, non-blocking - see comment above.
+    }
+
+    const parts: string[] = [];
+    if (matchedBrand && matchedModelName) {
+      parts.push(`Matched to ${matchedBrand} ${matchedModelName} in our list.`);
+    } else if (matchedBrand) {
+      // Make matched but the specific model isn't in our curated list -
+      // rather than making the user retype what was just found, drop
+      // straight into the custom-entry fields pre-filled with the real
+      // returned data. They can still switch back to a dropdown pick
+      // themselves if they'd rather.
+      setModel(OTHER);
+      setCustomModel(String(data.model ?? ''));
+      if (data.engineCapacityCc) setCustomEngineCC(String(data.engineCapacityCc));
+      parts.push(`Matched the make (${matchedBrand}). "${data.model}" isn't in our model list, so it's been filled in below as a custom entry - check it over, or pick a listed model instead if you'd rather.`);
+    } else {
+      setMake(OTHER);
+      setCustomMake(String(data.make ?? ''));
+      setModel(OTHER);
+      setCustomModel(String(data.model ?? ''));
+      if (data.engineCapacityCc) setCustomEngineCC(String(data.engineCapacityCc));
+      parts.push(`Found "${data.make} ${data.model}" - not in our make list at all, so both have been filled in below as a custom entry. Check the details before submitting.`);
+    }
+    if (data.plateInRetention) {
+      parts.push('Note: this plate is currently in retention (not on any vehicle right now) - the details shown are from the last vehicle it was recorded against, so double-check they\'re actually right for this bike.');
+    }
+    setLookupMessage({ text: parts.join(' '), tone: matchedBrand && matchedModelName ? 'ok' : 'warn' });
+  }
+
   async function handleLookup() {
     if (!registration.trim()) {
       setLookupMessage({ text: 'Enter a registration number first.', tone: 'error' });
@@ -115,6 +192,7 @@ export function AddBikeForm() {
     setLookingUp(true);
     setLookupMessage(null);
     setExistingBike(null);
+    setStartedFreshDespiteDuplicate(false);
     try {
       const res = await fetch(`/api/tracker/plate-lookup?vrm=${encodeURIComponent(registration.trim())}`);
       const data = await res.json();
@@ -142,87 +220,32 @@ export function AddBikeForm() {
 
       // Checked before any auto-fill, same reasoning as the vehicle-type
       // gate above - if this bike is already tracked somewhere, nothing
-      // below should proceed regardless of what it actually is.
+      // below should proceed regardless of what it actually is. The
+      // fetched data is kept in state (not discarded) so "Start fresh"
+      // can resume the auto-fill below without looking it up again.
       const dupRes = await fetch(`/api/tracker/bike-exists?registration=${encodeURIComponent(registration.trim())}`);
       const dupData = await dupRes.json();
       if (dupRes.ok && dupData.exists) {
         setExistingBike(
           dupData.belongsToCurrentUser ? { status: 'own', bikeId: dupData.bikeId } : { status: 'other' }
         );
+        setPendingLookupData(data);
         return;
       }
 
-      const matchedBrand = ALL_BRANDS.find((b) => b.toLowerCase() === String(data.make ?? '').toLowerCase());
-      let matchedModelName: string | null = null;
-      if (matchedBrand) {
-        handleMakeChange(matchedBrand);
-        const candidates = MOTORCYCLE_MODELS.filter((m) => m.make === matchedBrand);
-        const dvlaModel = String(data.model ?? '').toLowerCase();
-        const exact = candidates.find((m) => m.model.toLowerCase() === dvlaModel);
-        const partial = candidates.find(
-          (m) => dvlaModel.includes(m.model.toLowerCase()) || m.model.toLowerCase().includes(dvlaModel)
-        );
-        const found = exact ?? partial;
-        if (found) {
-          setModel(found.model);
-          matchedModelName = found.model;
-        }
-      }
-
-      if (data.year && !isCustomBuild) {
-        setYear(String(data.year));
-      }
-
-      // Independent of whether make/model matched above - a genuine
-      // mileage floor from DVSA's own records is worth having even if
-      // the vehicle isn't in our curated model list at all. Failure here
-      // is silent and non-blocking: the vehicle lookup already succeeded,
-      // this is a bonus, and "no MOT history yet" (a bike under 3 years
-      // old) is a completely normal, expected outcome, not an error.
-      try {
-        const motRes = await fetch(`/api/tracker/mot-history-preview?vrm=${encodeURIComponent(registration.trim())}`);
-        if (motRes.ok) {
-          const motData = await motRes.json();
-          if (motData.latestTrustedMileage != null) {
-            setMinMileage(motData.latestTrustedMileage);
-            setMinMileageDate(motData.latestTestDate ?? null);
-            setMileage(String(motData.latestTrustedMileage));
-            setMileageConfirmed(false);
-          }
-        }
-      } catch {
-        // Silent, non-blocking - see comment above.
-      }
-
-      const parts: string[] = [];
-      if (matchedBrand && matchedModelName) {
-        parts.push(`Matched to ${matchedBrand} ${matchedModelName} in our list.`);
-      } else if (matchedBrand) {
-        // Make matched but the specific model isn't in our curated list -
-        // rather than making the user retype what was just found, drop
-        // straight into the custom-entry fields pre-filled with the real
-        // returned data. They can still switch back to a dropdown pick
-        // themselves if they'd rather.
-        setModel(OTHER);
-        setCustomModel(String(data.model ?? ''));
-        if (data.engineCapacityCc) setCustomEngineCC(String(data.engineCapacityCc));
-        parts.push(`Matched the make (${matchedBrand}). "${data.model}" isn't in our model list, so it's been filled in below as a custom entry - check it over, or pick a listed model instead if you'd rather.`);
-      } else {
-        setMake(OTHER);
-        setCustomMake(String(data.make ?? ''));
-        setModel(OTHER);
-        setCustomModel(String(data.model ?? ''));
-        if (data.engineCapacityCc) setCustomEngineCC(String(data.engineCapacityCc));
-        parts.push(`Found "${data.make} ${data.model}" - not in our make list at all, so both have been filled in below as a custom entry. Check the details before submitting.`);
-      }
-      if (data.plateInRetention) {
-        parts.push('Note: this plate is currently in retention (not on any vehicle right now) - the details shown are from the last vehicle it was recorded against, so double-check they\'re actually right for this bike.');
-      }
-      setLookupMessage({ text: parts.join(' '), tone: matchedBrand && matchedModelName ? 'ok' : 'warn' });
+      await applyLookupData(data);
     } catch {
       setLookupMessage({ text: "Couldn't reach the lookup service - enter details manually below.", tone: 'error' });
     } finally {
       setLookingUp(false);
+    }
+  }
+
+  async function handleStartFresh() {
+    setExistingBike(null);
+    setStartedFreshDespiteDuplicate(true);
+    if (pendingLookupData) {
+      await applyLookupData(pendingLookupData);
     }
   }
 
@@ -269,6 +292,7 @@ export function AddBikeForm() {
       currentMileage: Number(mileage),
       nickname,
       region,
+      mayHavePriorHistory: startedFreshDespiteDuplicate,
     });
     // Best-effort, non-blocking - the bike itself is already saved
     // successfully regardless of what happens here. If this fails
@@ -407,15 +431,23 @@ export function AddBikeForm() {
                     This bike has previously been registered with RoadVerdict. If you&apos;ve bought it, you can
                     request ownership and continue building its existing history.
                   </p>
-                  <button
-                    type="button"
-                    className="btn-primary"
-                    disabled={requestingOwnership}
-                    onClick={handleRequestOwnership}
-                    style={{ marginTop: '0.5rem' }}
-                  >
-                    {requestingOwnership ? 'Sending…' : 'Request ownership'}
-                  </button>
+                  <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginTop: '0.5rem' }}>
+                    <button
+                      type="button"
+                      className="btn-primary"
+                      disabled={requestingOwnership}
+                      onClick={handleRequestOwnership}
+                    >
+                      {requestingOwnership ? 'Sending…' : 'Request ownership'}
+                    </button>
+                    <button type="button" className="btn-secondary" onClick={handleStartFresh}>
+                      Start fresh, without requesting
+                    </button>
+                  </div>
+                  <p className="field-note" style={{ marginTop: '0.5rem' }}>
+                    Starting fresh begins a brand new record for this bike under your account - the previous
+                    owner&apos;s logged history stays on theirs, and won&apos;t be included.
+                  </p>
                   {ownershipRequestError && (
                     <p className="error-text" role="alert" style={{ marginTop: '0.6rem' }}>
                       {ownershipRequestError}

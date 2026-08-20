@@ -161,11 +161,12 @@ export interface BikeDoc {
     previousBikeId: string;
     previousOwnerEmail: string;
     transferredAt: string;
-    // Frozen at the moment of transfer, not a live figure - the new
-    // owner doesn't inherit the previous owner's actual service/fuel/
-    // bill records (those stay under the previous owner's account
-    // unless explicitly shared - see Phase 3 of the digital passport
-    // plan), only this snapshot of what they added up to.
+    // Frozen at the moment of transfer, not a live figure - a useful
+    // permanent snapshot of what the bike's history added up to right
+    // then, regardless of whether the individual service/fuel/bill
+    // records themselves also copied over (see includeRecords on
+    // BikeTransferRequestDoc - that's the caller's choice, not
+    // something this summary depends on either way).
     summaryAtTransfer: {
       totalEntries: number;
       totalSpend: number;
@@ -173,6 +174,13 @@ export interface BikeDoc {
       mileageAtTransfer: number;
     };
   };
+  // Set when this bike was added despite the registration already
+  // having a RoadVerdict record under a different account - the
+  // person chose to start a brand new history rather than request the
+  // existing one. Surfaced later as a garage annotation, since they
+  // may still want to request that history at some point rather than
+  // never knowing it's out there.
+  mayHavePriorHistory?: boolean;
   // Set on the OLD bike document once it's been superseded by a
   // transfer - the presence of this field is what makes a bike
   // historical/read-only rather than a separate boolean flag. Points
@@ -346,6 +354,7 @@ export async function createBike(
     currentMileage: number;
     nickname: string;
     region: Region;
+    mayHavePriorHistory?: boolean;
   }
 ): Promise<CreateBikeResult> {
   const existing = await getBikesForUser(email);
@@ -370,6 +379,7 @@ export async function createBike(
     nickname: data.nickname,
     region: data.region,
     dateAdded: new Date().toISOString().slice(0, 10),
+    mayHavePriorHistory: data.mayHavePriorHistory,
   };
   await container.items.upsert(doc);
   return { ok: true, bike: doc };

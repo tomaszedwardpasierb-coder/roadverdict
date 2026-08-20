@@ -36,7 +36,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
   }
 
-  const { make, model, engineCC, year, isCustomBuild, registration, currentMileage, nickname, region } = body as {
+  const { make, model, engineCC, year, isCustomBuild, registration, currentMileage, nickname, region, mayHavePriorHistory } = body as {
     make?: string;
     model?: string;
     engineCC?: number;
@@ -46,6 +46,7 @@ export async function POST(request: NextRequest) {
     currentMileage?: number;
     nickname?: string;
     region?: Region;
+    mayHavePriorHistory?: boolean;
   };
 
   if (!make || !model || !engineCC || currentMileage == null || !region) {
@@ -70,6 +71,7 @@ export async function POST(request: NextRequest) {
     currentMileage,
     nickname: nickname ?? "",
     region,
+    mayHavePriorHistory,
   });
 
   if (!result.ok) {
