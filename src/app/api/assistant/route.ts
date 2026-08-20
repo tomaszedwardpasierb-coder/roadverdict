@@ -9,7 +9,7 @@
 // for the full reasoning behind that boundary.
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/session";
-import { ASSISTANT_KNOWLEDGE_BASE, SKURA_EXTENDED_STORY, getLivePrivacyPolicyText } from "@/lib/tracker/assistantKnowledge";
+import { ASSISTANT_KNOWLEDGE_BASE, getLivePrivacyPolicyText } from "@/lib/tracker/assistantKnowledge";
 import { ASSISTANT_TOOL_DECLARATIONS, runAssistantTool } from "@/lib/tracker/assistantTools";
 import { logAssistantQuestion } from "@/lib/tracker/assistantQuestionLog";
 
@@ -43,7 +43,7 @@ interface GeminiContent {
   parts: GeminiPart[];
 }
 
-function buildSystemInstruction(signedIn: boolean, privacyPolicyText: string | null, includeSkuraStory: boolean): string {
+function buildSystemInstruction(signedIn: boolean, privacyPolicyText: string | null): string {
   const parts = [ASSISTANT_KNOWLEDGE_BASE];
 
   parts.push(
@@ -57,16 +57,6 @@ function buildSystemInstruction(signedIn: boolean, privacyPolicyText: string | n
       ? `\n\n---\n\nLIVE PRIVACY POLICY (current text, fetched just now - use this directly for any data-handling or privacy question per section 8.3 of the document above, never your own reasoning):\n\n${privacyPolicyText}`
       : "\n\n---\n\nThe live Privacy Policy could not be fetched for this conversation. For any data-handling or privacy question, say you're not able to pull up the policy's exact wording right now and point to roadverdict.co.uk/privacy directly, rather than answering from general reasoning."
   );
-
-  // Only added to the system instruction on requests where "skura" has
-  // actually appeared somewhere in the conversation - see the comment
-  // on SKURA_EXTENDED_STORY itself for why this stays out of the
-  // always-loaded knowledge base above.
-  if (includeSkuraStory) {
-    parts.push(
-      `\n\n---\n\nLONGER PROFESSOR SKURA STORY (available this turn because "skura" appeared in this conversation - see knowledge base section 10 for how to use this alongside the short version already in the main document above):\n\n${SKURA_EXTENDED_STORY}`
-    );
-  }
 
   return parts.join("");
 }
@@ -120,15 +110,9 @@ export async function POST(req: Request) {
   // is the actual question being asked right now - not the full
   // history, which would have already been logged on earlier requests.
   const question = messages[messages.length - 1]?.content ?? "";
-  // Checked across the whole conversation, not just this message - a
-  // follow-up like "tell me more about the wheel" a couple of turns
-  // into an already-established Skura conversation shouldn't lose
-  // access to the story just because it doesn't repeat the trigger
-  // word itself.
-  const includeSkuraStory = messages.some((m) => m.content.toLowerCase().includes("skura"));
 
   const privacyPolicyText = await getLivePrivacyPolicyText();
-  const systemInstruction = buildSystemInstruction(signedIn, privacyPolicyText, includeSkuraStory);
+  const systemInstruction = buildSystemInstruction(signedIn, privacyPolicyText);
 
   const contents: GeminiContent[] = toGeminiContents(messages);
   const tools = signedIn ? [{ functionDeclarations: ASSISTANT_TOOL_DECLARATIONS }] : undefined;
