@@ -13,6 +13,8 @@ import { fetchMotHistoryFromVdg } from "@/lib/tracker/motHistoryFetch";
 import { fetchValuationFromVdg } from "@/lib/tracker/valuationFetch";
 import { updateBikeBuyerOpinionCache } from "@/lib/tracker/bike";
 import { generateBuyerOpinion, type BuyerOpinionInput } from "@/lib/tracker/buyerOpinionProse";
+import { getSession } from "@/lib/auth/session";
+import { RequestHistoryCta } from "../RequestHistoryCta";
 import styles from "../report.module.css";
 import { PrintButton } from "../PrintButton";
 
@@ -28,10 +30,22 @@ function fmtDate(d: string): string {
 }
 
 export default async function DetailedReportPage({ params }: { params: { token: string } }) {
-  if (!(await resolveShareToken(params.token))) notFound();
+  const resolved = await resolveShareToken(params.token);
+  if (!resolved) notFound();
 
   const verified = await hasReportAccess(params.token);
   if (!verified) return <PlateGate token={params.token} />;
+
+  // Never used to gate viewing the report itself - only to decide
+  // whether the request-history CTA makes sense to show at all (never
+  // to the bike's own current owner) and which state it should render.
+  let viewerSession: Awaited<ReturnType<typeof getSession>> = null;
+  try {
+    viewerSession = await getSession();
+  } catch (err) {
+    console.error("Detailed report page: getSession() failed, continuing as signed out:", err);
+  }
+  const showRequestHistoryCta = viewerSession?.email !== resolved.email;
 
   const data = await getSellerReportData(params.token);
   const {
@@ -404,6 +418,10 @@ export default async function DetailedReportPage({ params }: { params: { token: 
         receiptCount={receiptCount}
         entryRequestStatus={data.entryRequestStatus}
       />
+
+      {showRequestHistoryCta && currentRegistration && (
+        <RequestHistoryCta registration={currentRegistration} signedInEmail={viewerSession?.email ?? null} />
+      )}
 
       <p className={styles.caveat}>
         This report describes patterns in the logged record - what was entered, when, and how completely - not a

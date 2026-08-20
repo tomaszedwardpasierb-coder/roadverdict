@@ -58,7 +58,7 @@ export async function POST(req: NextRequest) {
       await sendHistoryFollowUpEmail({
         recipientEmail: link.recipientEmail,
         bikeSummary: { make: bike.make, model: bike.model, year: bike.year, isCustomBuild: !!bike.isCustomBuild },
-        reportUrl: `${appUrl}/report/${link.id}`,
+        reportUrl: `${appUrl}/report/${link.id}/detailed`,
       });
       await markShareLinkFollowUpSent(link.id);
       sent++;
