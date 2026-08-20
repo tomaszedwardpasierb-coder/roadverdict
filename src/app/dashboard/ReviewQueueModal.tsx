@@ -1,4 +1,4 @@
-﻿// Place at: src/app/dashboard/ReviewQueueModal.tsx
+// Place at: src/app/dashboard/ReviewQueueModal.tsx
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
@@ -493,6 +493,11 @@ export function ReviewQueueModal({ parsedItems, onFinished }: { parsedItems: Par
   const [commitError, setCommitError] = useState<string | null>(null);
   const [retryTick, setRetryTick] = useState(0);
   const [finishing, setFinishing] = useState(false);
+  // Set only when "Finish later" itself fails, partially or fully - see
+  // handleFinishLater below. Deliberately separate from commitError
+  // above, which is about a single item's normal one-at-a-time commit,
+  // not the bulk fallback path.
+  const [finishLaterError, setFinishLaterError] = useState<string | null>(null);
   const attemptedRef = useRef<Set<number>>(new Set());
   // Forces the auto-progress screen off for a specific index, for the
   // owner to escape manually - regardless of the underlying cause (a
@@ -712,6 +717,15 @@ export function ReviewQueueModal({ parsedItems, onFinished }: { parsedItems: Par
   // commits the remainder in one background pass before actually
   // closing, so nothing from this scan is ever silently lost, even if
   // it isn't individually reviewed.
+  //
+  // Critically, this only ever treats the commit as successful, deletes
+  // the resumable batch, and closes the modal when the server actually
+  // confirms every item saved. A response that arrives but reports an
+  // error (or a partial failure - some items saved, some didn't) used
+  // to fall through this same success path unchecked, silently deleting
+  // the safety net and closing the modal as if nothing had gone wrong -
+  // the exact "closes normally, receipts are just gone, no indication
+  // anything failed" failure this whole feature exists to prevent.
   async function handleFinishLater() {
     const remaining = items.filter((_, i) => committed[i] === null);
     if (remaining.length === 0) {
@@ -720,20 +734,75 @@ export function ReviewQueueModal({ parsedItems, onFinished }: { parsedItems: Par
       return;
     }
     setFinishing(true);
+    setFinishLaterError(null);
+
+    let res: Response;
     try {
-      await fetch('/api/tracker/commit-receipt-items', {
+      res = await fetch('/api/tracker/commit-receipt-items', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ items: remaining }),
       });
     } catch {
-      // Best-effort - if this fails, those items simply stay unscanned;
-      // nothing already reviewed is at risk either way.
+      // A genuine network failure - nothing was sent, nothing was saved.
+      // The pending batch already reflects `remaining` from the last
+      // sync, so it's still fully resumable exactly as it was.
+      setFinishing(false);
+      setFinishLaterError("Couldn't reach the server. Your receipts are still safely waiting here - nothing's been lost. Try again.");
+      return;
     }
-    // commit-receipt-items saves everything directly, bypassing
-    // committed/the effect that normally keeps the persisted batch in
-    // sync - without this, the batch document would go stale, still
-    // listing items as unreviewed that are actually already saved.
+
+    let data: {
+      createdCount?: number;
+      failedCount?: number;
+      failedItems?: ParsedReceiptItem[];
+      error?: string;
+    } | null = null;
+    try {
+      data = await res.json();
+    } catch {
+      data = null;
+    }
+
+    if (!res.ok) {
+      // A hard server error - treat exactly like the network failure
+      // above. The pending batch is untouched, so this is still fully
+      // resumable.
+      setFinishing(false);
+      setFinishLaterError(data?.error ?? "Something went wrong saving these entries. Your receipts are still safely waiting here - nothing's been lost. Try again.");
+      return;
+    }
+
+    if (data && (data.failedCount ?? 0) > 0 && data.failedItems) {
+      // Partial success - some items genuinely saved, some didn't. Only
+      // the ones that failed are still outstanding, so the local state
+      // and the persisted batch both need to shrink down to exactly
+      // those, rather than either losing track of the failures or
+      // risking a retry resending items that already saved a moment
+      // ago.
+      const stillOutstanding = data.failedItems;
+      await fetch('/api/tracker/pending-scan-batch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ items: stillOutstanding }),
+      }).catch(() => {
+        // Not fatal - the records that DID save are safely saved either
+        // way. Worst case here is the resumable batch going briefly out
+        // of sync with what's actually still outstanding.
+      });
+      setItems(stillOutstanding);
+      setCommitted(stillOutstanding.map(() => null));
+      attemptedRef.current.clear();
+      setIndex(0);
+      setFinishing(false);
+      setFinishLaterError(
+        `${data.createdCount ?? 0} of ${remaining.length} saved. ${data.failedCount} couldn't be saved and ${data.failedCount === 1 ? "is" : "are"} still waiting here below - try Finish later again, or review ${data.failedCount === 1 ? "it" : "them"} individually.`
+      );
+      return;
+    }
+
+    // Full success - only now is it actually safe to clear the
+    // resumable batch and close.
     await fetch('/api/tracker/pending-scan-batch', { method: 'DELETE' }).catch(() => {});
     setFinishing(false);
     onFinished();
@@ -816,6 +885,12 @@ export function ReviewQueueModal({ parsedItems, onFinished }: { parsedItems: Par
           <span>Reviewing {index + 1} of {items.length}</span>
           <span className="field-note">{Math.round(((index + 1) / items.length) * 100)}%</span>
         </div>
+
+        {finishLaterError && (
+          <p className="error-text" role="alert" style={{ marginBottom: '0.6rem' }}>
+            {finishLaterError}
+          </p>
+        )}
 
         {current === null ? (
           <div className={styles.reviewQueueDoneWrap}>

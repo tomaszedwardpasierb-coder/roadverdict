@@ -8,6 +8,14 @@
 // each one still seeing everything committed before it - rather than
 // silently lost because the original photos aren't kept around to
 // re-scan.
+//
+// Continues past a single item's failure rather than abandoning the
+// rest of the batch - a bad OCR read on one receipt shouldn't cost the
+// other nine, genuinely fine ones, their chance to be saved. Reports
+// exactly which items succeeded and which didn't, rather than a single
+// pass/fail for the whole call - the caller needs this to retry only
+// what's actually still outstanding, never resending items that
+// already saved successfully a moment earlier.
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/session";
 import { getPrimaryBike } from "@/lib/tracker/bike";
@@ -34,26 +42,40 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid request." }, { status: 400 });
   }
   if (!Array.isArray(body.items) || body.items.length === 0) {
-    return NextResponse.json({ createdEntries: [], createdCount: 0, categories: [] });
+    return NextResponse.json({ createdEntries: [], createdCount: 0, categories: [], failedItems: [], failedCount: 0 });
   }
 
   // Trust nothing about ordering from the client - re-sort here too.
   const items = [...body.items].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
-  try {
-    const createdEntries: ReviewQueueEntry[] = [];
-    for (const item of items) {
+  const createdEntries: ReviewQueueEntry[] = [];
+  const failedItems: ParsedReceiptItem[] = [];
+  let lastErrorDetail: string | undefined;
+
+  for (const item of items) {
+    try {
       createdEntries.push(await commitReceiptItem(session.email, bike, item));
+    } catch (err) {
+      // Kept in the batch rather than dropped - each failed item is
+      // still real, unsaved data the caller needs back so it can be
+      // retried or shown to the person, not silently discarded here.
+      failedItems.push(item);
+      lastErrorDetail = err instanceof Error ? err.message : String(err);
+      console.error("commit-receipt-items: one item failed, continuing with the rest of the batch:", lastErrorDetail);
     }
-    return NextResponse.json({
-      createdEntries,
-      createdCount: createdEntries.length,
-      categories: [...new Set(createdEntries.map((e) => e.category))],
-    });
-  } catch (err) {
-    return NextResponse.json(
-      { error: "Something went wrong saving these entries. Please try again.", detail: err instanceof Error ? err.message : String(err) },
-      { status: 500 }
-    );
   }
+
+  return NextResponse.json({
+    createdEntries,
+    createdCount: createdEntries.length,
+    categories: [...new Set(createdEntries.map((e) => e.category))],
+    failedItems,
+    failedCount: failedItems.length,
+    ...(failedItems.length > 0
+      ? {
+          error: `${createdEntries.length} of ${items.length} saved successfully; ${failedItems.length} couldn't be saved.`,
+          detail: lastErrorDetail,
+        }
+      : {}),
+  });
 }
