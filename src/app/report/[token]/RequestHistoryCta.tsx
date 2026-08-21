@@ -7,9 +7,10 @@ import styles from './report.module.css';
 interface Props {
   registration: string;
   signedInEmail: string | null;
+  currentPath: string;
 }
 
-export function RequestHistoryCta({ registration, signedInEmail }: Props) {
+export function RequestHistoryCta({ registration, signedInEmail, currentPath }: Props) {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sent, setSent] = useState(false);
@@ -62,7 +63,8 @@ export function RequestHistoryCta({ registration, signedInEmail }: Props) {
         </button>
       ) : (
         <p className={styles.upcomingNote} style={{ marginTop: '0.4rem' }}>
-          <a href="/login">Sign in or create a free account</a>, then come back to this page to request it.
+          <a href={`/login?redirect=${encodeURIComponent(currentPath)}`}>Sign in or create a free account</a>, then
+          you&apos;ll land right back here to request it.
         </p>
       )}
       {error && <p className="error-text" role="alert" style={{ marginTop: '0.6rem' }}>{error}</p>}

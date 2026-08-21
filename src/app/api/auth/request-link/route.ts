@@ -1,9 +1,10 @@
-﻿// Place at: src/app/api/auth/request-link/route.ts
+// Place at: src/app/api/auth/request-link/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { getContainer } from "@/lib/cosmos";
 import { generateToken, encodeEmail } from "@/lib/auth/crypto";
 import { sendMagicLinkEmail } from "@/lib/resend";
 import { createSessionForEmail } from "@/lib/auth/session";
+import { getSafeRedirectPath } from "@/lib/auth/safeRedirect";
 import { demoBikeExists, runDemoSeed } from "@/lib/tracker/demoSeedRunner";
 
 const lastRequestByEmail = new Map<string, number>();
@@ -24,13 +25,17 @@ function getClientIp(req: NextRequest): string {
 
 export async function POST(req: NextRequest) {
   const container = getContainer();
-  const { email } = await req.json();
+  const { email, redirect } = await req.json();
 
   if (!email || typeof email !== "string" || !email.includes("@")) {
     return NextResponse.json({ error: "Valid email required" }, { status: 400 });
   }
 
   const normalizedEmail = email.toLowerCase().trim();
+  // Validated once here, and again in the verify route once the link is
+  // actually clicked - see safeRedirect.ts for why it isn't trusted
+  // just because it passed this first check.
+  const safeRedirect = getSafeRedirectPath(redirect);
 
   if (normalizedEmail === DEMO_EMAIL) {
     const alreadySeeded = await demoBikeExists();
@@ -44,7 +49,10 @@ export async function POST(req: NextRequest) {
       }
     }
     const { cookieValue, maxAge } = await createSessionForEmail(DEMO_EMAIL, getClientIp(req), req.headers.get("user-agent") ?? "unknown");
-    const response = NextResponse.json({ ok: true, demo: true });
+    // No emailed link in this branch - the client redirects immediately
+    // on its own, so the safe destination is handed back directly
+    // rather than baked into a URL.
+    const response = NextResponse.json({ ok: true, demo: true, redirect: safeRedirect });
     response.cookies.set("session", cookieValue, {
       httpOnly: true,
       secure: true,
@@ -80,7 +88,7 @@ export async function POST(req: NextRequest) {
 
   const link = `${process.env.APP_URL ?? "https://roadverdict.co.uk"}/api/auth/verify?token=${raw}&e=${encodeEmail(
     normalizedEmail
-  )}`;
+  )}${safeRedirect ? `&redirect=${encodeURIComponent(safeRedirect)}` : ""}`;
 
   await sendMagicLinkEmail(normalizedEmail, link);
 

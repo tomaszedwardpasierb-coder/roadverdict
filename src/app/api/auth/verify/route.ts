@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getContainer } from "@/lib/cosmos";
 import { hashToken, decodeEmail } from "@/lib/auth/crypto";
 import { createSessionForEmail } from "@/lib/auth/session";
+import { getSafeRedirectPath } from "@/lib/auth/safeRedirect";
 
 export const dynamic = "force-dynamic";
 
@@ -23,6 +24,11 @@ export async function GET(req: NextRequest) {
   const url = new URL(req.url);
   const rawToken = url.searchParams.get("token");
   const encodedEmail = url.searchParams.get("e");
+  // Re-validated here even though request-link already checked it once -
+  // this URL is plain, copyable text sitting in an inbox, not something
+  // to trust just because an earlier step approved it. See
+  // safeRedirect.ts for the full reasoning.
+  const safeRedirect = getSafeRedirectPath(url.searchParams.get("redirect"));
 
   if (!rawToken || !encodedEmail) {
     return NextResponse.redirect(`${APP_URL}/login?error=invalid_link`);
@@ -54,7 +60,7 @@ export async function GET(req: NextRequest) {
 
   const { cookieValue, maxAge } = await createSessionForEmail(email, getClientIp(req), req.headers.get("user-agent") ?? "unknown");
 
-  const response = NextResponse.redirect(`${APP_URL}/dashboard`);
+  const response = NextResponse.redirect(`${APP_URL}${safeRedirect ?? "/dashboard"}`);
 
   response.cookies.set("session", cookieValue, {
     httpOnly: true,

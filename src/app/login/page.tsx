@@ -1,4 +1,4 @@
-﻿// Place at: src/app/login/page.tsx
+// Place at: src/app/login/page.tsx
 "use client";
 
 import { Suspense, useState } from "react";
@@ -13,6 +13,13 @@ const URL_ERROR_MESSAGES: Record<string, string> = {
 function LoginForm() {
   const searchParams = useSearchParams();
   const urlError = searchParams.get("error");
+  // Where to return to after a successful sign-in, if this page was
+  // reached from somewhere specific (e.g. "sign in to request this
+  // bike's history" on a shared report) rather than navigated to
+  // directly. Threaded through to the emailed link itself in
+  // request-link's own response - see safeRedirect.ts for why this
+  // can't just be trusted as-is without validation.
+  const redirect = searchParams.get("redirect");
 
   const [email, setEmail] = useState("");
   const [status, setStatus] = useState<"idle" | "sending" | "sent" | "error">("idle");
@@ -27,7 +34,7 @@ function LoginForm() {
       const res = await fetch("/api/auth/request-link", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email }),
+        body: JSON.stringify({ email, redirect }),
       });
       const data = await res.json();
 
@@ -38,7 +45,7 @@ function LoginForm() {
       }
 
       if (data.demo) {
-        window.location.href = "/dashboard";
+        window.location.href = data.redirect ?? "/dashboard";
         return;
       }
 

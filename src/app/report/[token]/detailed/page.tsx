@@ -420,7 +420,11 @@ export default async function DetailedReportPage({ params }: { params: { token: 
       />
 
       {showRequestHistoryCta && currentRegistration && (
-        <RequestHistoryCta registration={currentRegistration} signedInEmail={viewerSession?.email ?? null} />
+        <RequestHistoryCta
+          registration={currentRegistration}
+          signedInEmail={viewerSession?.email ?? null}
+          currentPath={`/report/${params.token}/detailed`}
+        />
       )}
 
       <p className={styles.caveat}>
