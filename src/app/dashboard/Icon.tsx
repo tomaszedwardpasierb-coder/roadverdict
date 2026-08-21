@@ -1,9 +1,7 @@
 // Place at: src/app/dashboard/Icon.tsx
 'use client';
-
-import { Gauge, Wrench, Droplet, Package, Shield, Bell, BarChart3, BookOpen, Share2, Receipt, Tag, Calendar, Camera, Calculator, ClipboardCheck, Lock, Scale, ArrowRightLeft } from 'lucide-react';
+import { Gauge, Wrench, Droplet, Package, Shield, Bell, BellRing, BarChart3, BookOpen, Share2, Receipt, Tag, Calendar, Camera, Calculator, ClipboardCheck, Lock, Scale, ArrowRightLeft } from 'lucide-react';
 import type { LucideProps } from 'lucide-react';
-
 // Maps this app's semantic icon names to their lucide-react component -
 // keeps every call site referring to "what this icon means" (fuel,
 // reminders...) rather than importing and naming a specific lucide
@@ -36,14 +34,12 @@ const ICONS = {
   privacy: Lock,
   quoteChecker: Scale,
   transferOwnership: ArrowRightLeft,
+  notificationBell: BellRing,
 } as const;
-
 export type IconName = keyof typeof ICONS;
-
 interface Props extends Omit<LucideProps, 'ref'> {
   name: IconName;
 }
-
 // Matches the design system's stroke-icon spec directly: lucide's own
 // defaults already use round line caps/joins, so only stroke-width and
 // the default render size need setting explicitly. 18px is the app's

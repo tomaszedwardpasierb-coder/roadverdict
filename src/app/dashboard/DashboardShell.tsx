@@ -7,6 +7,7 @@ import { UpdateMileageButton } from './UpdateMileageButton';
 import { RefreshVehicleDataButton } from './RefreshVehicleDataButton';
 import { BikeSwitcher, type SwitcherBike } from './BikeSwitcher';
 import LogoutButton from './LogoutButton';
+import { NotificationBell } from './NotificationBell';
 import { formatDistance, type DistanceUnit } from '@/lib/tracker/unitFormat';
 import { TabSwitchProvider, type ReviewCategory } from './TabSwitchContext';
 import { ResetDemoButton } from './ResetDemoButton';
@@ -156,10 +157,11 @@ export function DashboardShell({
     <TabSwitchProvider onSwitchTab={(cat) => setActive(cat)}>
       <div className={styles.shell}>
         <aside className={styles.sidebar}>
-          <div className={styles.sidebarLogo}>
+          <div className={styles.sidebarLogo} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <Link href="/">
               <img src="/logo-dark.png" alt="RoadVerdict" />
             </Link>
+            <NotificationBell dropdownAlign="left" />
           </div>
 
           <nav className={styles.sidebarNav}>
@@ -222,7 +224,10 @@ export function DashboardShell({
               {bikeYear ?? 'Custom build'} · {formatDistance(currentMileage, distanceUnit)}
             </span>
           </div>
-          <UpdateMileageButton currentMileage={currentMileage} distanceUnit={distanceUnit} />
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+            <NotificationBell dropdownAlign="right" />
+            <UpdateMileageButton currentMileage={currentMileage} distanceUnit={distanceUnit} />
+          </div>
         </div>
 
         <div className={styles.content}>{contentMap[active]}</div>
