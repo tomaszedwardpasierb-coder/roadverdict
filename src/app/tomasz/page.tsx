@@ -18,11 +18,13 @@ import {
 } from '@/lib/admin/stats';
 import { getSiteStats, type SiteStats } from '@/lib/monitoring/appInsights';
 import { getAllAssistantQuestions, groupSimilarQuestions, type AssistantQuestionLogDoc } from '@/lib/tracker/assistantQuestionLog';
+import { getAllUserEmails } from '@/lib/tracker/notification';
 import styles from './tomasz.module.css';
 import { RunCronButton } from './RunCronButton';
 import { DeleteQuestionButton } from './DeleteQuestionButton';
 import { ImpersonateButton } from './ImpersonateButton';
 import { AdminLogoutButton } from './AdminLogoutButton';
+import { SendNotificationForm } from './SendNotificationForm';
 
 export const dynamic = 'force-dynamic';
 
@@ -70,6 +72,18 @@ async function getAssistantQuestionsSafe(): Promise<AssistantQuestionLogDoc[]> {
     return await getAllAssistantQuestions();
   } catch (err) {
     console.error('Failed to load assistant questions for /tomasz:', err);
+    return [];
+  }
+}
+
+// Same reasoning again - a new query against a document type this page
+// hasn't touched before shouldn't be able to take down the send-
+// notification section (or the rest of the page around it) if it fails.
+async function getAllUserEmailsSafe(): Promise<string[]> {
+  try {
+    return await getAllUserEmails();
+  } catch (err) {
+    console.error('Failed to load user emails for /tomasz:', err);
     return [];
   }
 }
@@ -123,6 +137,7 @@ export default async function AdminDashboardPage({
     browserBreakdown,
     siteStats,
     assistantQuestions,
+    allUserEmails,
   ] = await Promise.all([
     getDbStats(),
     getActiveSessionCount(),
@@ -137,6 +152,7 @@ export default async function AdminDashboardPage({
     getBrowserBreakdown(),
     getSiteStatsSafe(windowHours),
     getAssistantQuestionsSafe(),
+    getAllUserEmailsSafe(),
   ]);
   const health = getServerHealth();
   const commonQuestions = groupSimilarQuestions(assistantQuestions);
@@ -365,6 +381,9 @@ export default async function AdminDashboardPage({
           <p>Expired (still stored): {detailedCounts.expiredSessions}</p>
         </div>
       </div>
+
+      <h2 className={styles.sectionHeading}>Notifications</h2>
+      <SendNotificationForm allEmails={allUserEmails} />
 
       <h2 className={styles.sectionHeading}>Magic link requests (every email, ever - including ones that never completed sign-in)</h2>
       {magicLinkRequests.length === 0 ? (
