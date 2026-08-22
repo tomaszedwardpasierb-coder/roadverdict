@@ -669,3 +669,16 @@ main {
 
   }
 }
+
+/* Admin dashboard opt-out from the public site chrome - see AdminShell.tsx
+   for the data-admin-shell marker this targets. The root layout renders
+   the public header/footer/assistant widget for every route, including
+   /tomasz, since a nested layout can't remove markup an ancestor layout
+   already rendered - this is the deliberate, low-risk way to hide them
+   for this one page without restructuring every other route in the app
+   into separate route groups just to give this one page its own root. */
+body:has(main [data-admin-shell]) .site-header,
+body:has(main [data-admin-shell]) .site-footer,
+body:has(main [data-admin-shell]) [data-assistant-widget] {
+  display: none;
+}

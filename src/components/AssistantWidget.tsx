@@ -134,7 +134,7 @@ export function AssistantWidget() {
   }
 
   return (
-    <div className={styles.wrap}>
+    <div data-assistant-widget className={styles.wrap}>
       {open && (
         <div className={styles.panel} role="dialog" aria-label="RoadVerdict assistant">
           <div className={styles.header}>
