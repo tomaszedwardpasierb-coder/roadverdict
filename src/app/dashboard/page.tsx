@@ -48,6 +48,7 @@ import { UnitSettings } from "./UnitSettings";
 import { ExportShareSection } from "./ExportShareSection";
 import { RecentActivity, type RecentActivityItem } from "./RecentActivity";
 import { DashboardShell } from "./DashboardShell";
+import { NotificationBell } from "./NotificationBell";
 import { QuoteForm } from "@/components/QuoteForm";
 import { CostCalculatorForm } from "@/components/CostCalculatorForm";
 import { BuyingGuideForm } from "@/components/BuyingGuideForm";
@@ -177,16 +178,21 @@ export default async function DashboardPage() {
       {currentRegistration}
     </span>
   ) : null;
-  // Same pill shown next to every tab's page title, not just
-  // Dashboard - built once here for the same reuse reason as bikeTag
-  // above. Story So Far and Shareable Links build their own copy from
-  // the plain currentMileage/distanceUnit props passed below, matching
-  // how they already build their own bikeTag rather than receiving JSX
-  // directly.
+  // Same pill (now with the notification bell alongside it) shown next
+  // to every tab's page title, not just Dashboard - built once here for
+  // the same reuse reason as bikeTag above. Story So Far and Shareable
+  // Links build their own copy from the plain currentMileage/
+  // distanceUnit props passed below, matching how they already build
+  // their own bikeTag rather than receiving JSX directly - so the bell
+  // is not yet present on those two tabs' own headers, only wherever
+  // this shared variable itself is used directly.
   const mileagePill = (
-    <div className={styles.headerMileagePill}>
-      <Icon name="currentMiles" size={15} />
-      {Math.round(convertMilesToDisplay(bike.currentMileage, distanceUnit)).toLocaleString()} {distanceUnit === "km" ? "km" : "mi"}
+    <div style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
+      <NotificationBell dropdownAlign="right" />
+      <div className={styles.headerMileagePill}>
+        <Icon name="currentMiles" size={15} />
+        {Math.round(convertMilesToDisplay(bike.currentMileage, distanceUnit)).toLocaleString()} {distanceUnit === "km" ? "km" : "mi"}
+      </div>
     </div>
   );
 
@@ -206,10 +212,7 @@ export default async function DashboardPage() {
           Dashboard
           {bikeTag}
         </h1>
-        <div className={styles.headerMileagePill}>
-          <Icon name="currentMiles" size={15} />
-          {Math.round(convertMilesToDisplay(bike.currentMileage, distanceUnit)).toLocaleString()} {distanceUnit === "km" ? "km" : "mi"}
-        </div>
+        {mileagePill}
       </div>
       <p className={styles.subtext} style={{ marginBottom: "1rem" }}>Here&apos;s how your bike looks today.</p>
 
