@@ -5,21 +5,22 @@ import { useEffect, useRef, useState } from 'react';
 import { Icon } from './Icon';
 import type { NotificationDoc } from '@/lib/tracker/notification';
 
-interface Props {
-  // Which side the dropdown opens toward, relative to the bell itself -
-  // the sidebar sits near the left edge of the screen (dropdown should
-  // extend right, into the main content), while the mobile top bar puts
-  // the bell near the right edge (dropdown should extend left instead).
-  // Getting this wrong in either context would push the panel straight
-  // off-screen.
-  dropdownAlign: 'left' | 'right';
-}
-
-export function NotificationBell({ dropdownAlign }: Props) {
+export function NotificationBell() {
   const [notifications, setNotifications] = useState<NotificationDoc[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(true);
+  // Whether to anchor the dropdown's right edge to the bell (extending
+  // leftward) rather than its left edge (extending rightward) - decided
+  // fresh every time the dropdown opens, from the bell's own actual
+  // position on screen at that moment, rather than assumed from which
+  // part of the layout it's rendered in. The same markup lands in a
+  // genuinely different spot depending on viewport width (a header row
+  // that wraps on a narrow screen puts the bell near the left edge,
+  // even though on a wide screen the identical markup puts it near the
+  // right) - measuring directly is correct regardless of that, without
+  // needing to know in advance where it'll end up.
+  const [anchorRight, setAnchorRight] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -95,11 +96,23 @@ export function NotificationBell({ dropdownAlign }: Props) {
   // exactly as well as the real, much larger number would.
   const badgeText = unreadCount > 999 ? '999+' : String(unreadCount);
 
+  function handleToggle() {
+    if (!open && wrapRef.current) {
+      const rect = wrapRef.current.getBoundingClientRect();
+      // Same width the dropdown itself actually renders at - see the
+      // width set on the dropdown below, kept in sync with this value.
+      const dropdownWidth = Math.min(320, window.innerWidth * 0.9);
+      const wouldOverflowRight = rect.left + dropdownWidth > window.innerWidth;
+      setAnchorRight(wouldOverflowRight);
+    }
+    setOpen((o) => !o);
+  }
+
   return (
     <div ref={wrapRef} style={{ position: 'relative' }}>
       <button
         type="button"
-        onClick={() => setOpen((o) => !o)}
+        onClick={handleToggle}
         aria-label={unreadCount > 0 ? `Notifications, ${unreadCount} unread` : 'Notifications'}
         style={{
           position: 'relative',
@@ -139,7 +152,7 @@ export function NotificationBell({ dropdownAlign }: Props) {
           style={{
             position: 'absolute',
             top: '100%',
-            [dropdownAlign]: 0,
+            [anchorRight ? 'right' : 'left']: 0,
             marginTop: '0.4rem',
             width: 'min(320px, 90vw)',
             maxHeight: '400px',

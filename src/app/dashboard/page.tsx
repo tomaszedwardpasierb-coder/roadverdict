@@ -188,7 +188,7 @@ export default async function DashboardPage() {
   // this shared variable itself is used directly.
   const mileagePill = (
     <div style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
-      <NotificationBell dropdownAlign="right" />
+      <NotificationBell />
       <div className={styles.headerMileagePill}>
         <Icon name="currentMiles" size={15} />
         {Math.round(convertMilesToDisplay(bike.currentMileage, distanceUnit)).toLocaleString()} {distanceUnit === "km" ? "km" : "mi"}
