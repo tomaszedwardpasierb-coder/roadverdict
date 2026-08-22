@@ -1,4 +1,4 @@
-﻿// Place at: src/lib/admin/stats.ts
+// Place at: src/lib/admin/stats.ts
 import { getContainer } from "@/lib/cosmos";
 
 export interface DbTypeCount {
@@ -77,6 +77,25 @@ export async function getBikeIdBackfillStatus(): Promise<BikeIdBackfillStatus | 
   const container = getContainer();
   try {
     const { resource } = await container.item("cronStatus::backfillBikeId", "system").read<BikeIdBackfillStatus>();
+    return resource ?? null;
+  } catch {
+    return null;
+  }
+}
+
+export interface UserBackfillStatus {
+  lastRunAt: string;
+  usersCreated: number;
+  alreadyExisted: number;
+}
+
+// Same reasoning and shape as getBikeIdBackfillStatus above - tracks
+// the one-off migration that creates a missing user document for
+// every email that's ever had a session, see backfill-users/route.ts.
+export async function getUserBackfillStatus(): Promise<UserBackfillStatus | null> {
+  const container = getContainer();
+  try {
+    const { resource } = await container.item("cronStatus::backfillUsers", "system").read<UserBackfillStatus>();
     return resource ?? null;
   } catch {
     return null;

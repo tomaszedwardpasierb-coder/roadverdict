@@ -13,6 +13,7 @@ import {
   getCosmosContainerInfo,
   getDetailedCounts,
   getBikeIdBackfillStatus,
+  getUserBackfillStatus,
   getBrowserBreakdown,
   browserFamily,
 } from '@/lib/admin/stats';
@@ -134,6 +135,7 @@ export default async function AdminDashboardPage({
     cosmosInfo,
     detailedCounts,
     bikeIdBackfillStatus,
+    userBackfillStatus,
     browserBreakdown,
     siteStats,
     assistantQuestions,
@@ -149,6 +151,7 @@ export default async function AdminDashboardPage({
     getCosmosContainerInfo(),
     getDetailedCounts(),
     getBikeIdBackfillStatus(),
+    getUserBackfillStatus(),
     getBrowserBreakdown(),
     getSiteStatsSafe(windowHours),
     getAssistantQuestionsSafe(),
@@ -336,6 +339,23 @@ export default async function AdminDashboardPage({
             <p className={styles.warn}>Not run yet.</p>
           )}
           <RunCronButton name="backfill-bike-id" label="Run backfill" />
+        </div>
+        <div className={styles.statusCard}>
+          <div className={styles.statusTitle}>User document backfill</div>
+          <p className={styles.warn} style={{ marginBottom: '0.4rem' }}>
+            Creates a missing user document for every email that has ever had a session - a bug in
+            createSessionForEmail() meant this never actually happened for anyone, live or historical. Skips any
+            email that already has one, so safe to click more than once.
+          </p>
+          {userBackfillStatus ? (
+            <p>
+              Last run {fmtDate(userBackfillStatus.lastRunAt)} · {userBackfillStatus.usersCreated} user(s) created ·{' '}
+              {userBackfillStatus.alreadyExisted} already existed
+            </p>
+          ) : (
+            <p className={styles.warn}>Not run yet.</p>
+          )}
+          <RunCronButton name="backfill-users" label="Run backfill" />
         </div>
         <div className={styles.statusCard}>
           <div className={styles.statusTitle}>Mileage audit</div>

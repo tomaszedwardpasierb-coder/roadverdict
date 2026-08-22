@@ -1,4 +1,4 @@
-﻿// Place at: src/lib/auth/session.ts
+// Place at: src/lib/auth/session.ts
 import { cookies } from "next/headers";
 import { getContainer } from "@/lib/cosmos";
 import { hashToken, decodeEmail, generateToken, encodeEmail } from "@/lib/auth/crypto";
@@ -33,16 +33,34 @@ export const SESSION_TTL_SECONDS = 30 * 24 * 60 * 60;
 export async function createSessionForEmail(email: string, ip: string, userAgent: string): Promise<{ cookieValue: string; maxAge: number }> {
   const container = getContainer();
 
+  // .item(id, pk).read() on a non-existent item resolves successfully
+  // with an empty resource, rather than throwing - the same Cosmos SDK
+  // behavior getSession() above already accounts for via its own
+  // !resource check. A bare try/catch here never actually caught the
+  // "doesn't exist yet" case at all, since that path never threw in
+  // the first place - which is why no user document has ever actually
+  // been created for anyone, despite every real sign-in this app has
+  // ever had.
   try {
-    await container.item(email, email).read();
-  } catch {
-    await container.items.create({
-      id: email,
-      pk: email,
-      type: "user",
-      email,
-      createdAt: new Date().toISOString(),
-    });
+    const { resource: existingUser } = await container.item(email, email).read();
+    if (!existingUser) {
+      await container.items.create({
+        id: email,
+        pk: email,
+        type: "user",
+        email,
+        createdAt: new Date().toISOString(),
+      });
+    }
+  } catch (err) {
+    // A genuine failure to check/create the user document (a network
+    // blip, a permissions issue) shouldn't block sign-in itself, which
+    // is the part that actually matters here - worst case, this
+    // account's "first seen" record ends up created on a later sign-in
+    // instead. Logged rather than silently swallowed, unlike before -
+    // silence here is exactly what let the bug above go unnoticed for
+    // as long as it did.
+    console.error(`createSessionForEmail: failed to check/create user document for ${email}:`, err);
   }
 
   const { raw: sessionRaw, hash: sessionHash } = generateToken();

@@ -1,10 +1,10 @@
-﻿// Place at: src/app/api/admin/run-cron/[name]/route.ts
+// Place at: src/app/api/admin/run-cron/[name]/route.ts
 import { NextResponse } from "next/server";
 import { getAdminSession } from "@/lib/admin/session";
 
 export const dynamic = "force-dynamic";
 
-const VALID_NAMES = new Set(["update-fuel-price", "check-reminders", "backfill-bike-id", "delete-expired-share-links", "audit-mileage", "purge-orphaned-receipt-requests"]);
+const VALID_NAMES = new Set(["update-fuel-price", "check-reminders", "backfill-bike-id", "delete-expired-share-links", "audit-mileage", "purge-orphaned-receipt-requests", "update-exchange-rates", "send-history-follow-ups", "backfill-users"]);
 
 export async function POST(request: Request, { params }: { params: { name: string } }) {
   const isAdmin = await getAdminSession();
