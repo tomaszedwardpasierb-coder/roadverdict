@@ -1,14 +1,12 @@
 // Place at: src/app/tomasz/ImpersonateButton.tsx
 'use client';
-
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-
+import styles from './adminShell.module.css';
 export function ImpersonateButton({ email }: { email: string }) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
   async function handleClick() {
     if (!window.confirm(`View the app as ${email}? You'll be logged in as this account until you exit impersonation.`)) {
       return;
@@ -33,13 +31,12 @@ export function ImpersonateButton({ email }: { email: string }) {
       setLoading(false);
     }
   }
-
   return (
     <span>
-      <button type="button" className="submit-button" onClick={handleClick} disabled={loading} style={{ padding: '0.2rem 0.6rem', fontSize: '0.75rem' }}>
-        {loading ? '…' : 'Impersonate'}
+      <button type="button" className={`${styles.button} ${styles.buttonSmall}`} onClick={handleClick} disabled={loading}>
+        {loading ? '\u2026' : 'Impersonate'}
       </button>
-      {error && <span style={{ color: 'var(--verdict-red)', fontSize: '0.72rem', marginLeft: '0.4rem' }}>{error}</span>}
+      {error && <span style={{ color: 'var(--admin-danger)', fontSize: '0.72rem', marginLeft: '0.4rem' }}>{error}</span>}
     </span>
   );
 }

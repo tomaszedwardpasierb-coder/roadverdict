@@ -337,6 +337,11 @@ information-first rather than airy.
   background: var(--admin-danger-light);
 }
 
+.buttonSmall {
+  padding: 0.18rem 0.55rem;
+  font-size: 0.72rem;
+}
+
 .jsonBlock {
   background: #f3f2f1;
   border: 1px solid var(--admin-border);

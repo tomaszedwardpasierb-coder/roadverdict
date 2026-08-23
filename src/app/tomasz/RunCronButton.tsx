@@ -1,21 +1,23 @@
-﻿// Place at: src/app/tomasz/RunCronButton.tsx
+// Place at: src/app/tomasz/RunCronButton.tsx
 'use client';
-
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-
+import styles from './adminShell.module.css';
 export function RunCronButton({ name, label }: { name: string; label: string }) {
   const router = useRouter();
   const [running, setRunning] = useState(false);
   const [result, setResult] = useState<string | null>(null);
-
   async function handleClick() {
     setRunning(true);
     setResult(null);
     try {
       const res = await fetch(`/api/admin/run-cron/${name}`, { method: 'POST' });
       const data = await res.json();
-      setResult(res.ok ? JSON.stringify(data) : (data.error ?? 'Failed'));
+      // Pretty-printed rather than a single unformatted line - the
+      // previous version, run against a real backfill returning dozens
+      // of per-item entries, spilled out well past its own card with
+      // no wrapping or scroll boundary at all.
+      setResult(res.ok ? JSON.stringify(data, null, 2) : (data.error ?? 'Failed'));
       router.refresh();
     } catch {
       setResult('Could not reach the server.');
@@ -23,13 +25,12 @@ export function RunCronButton({ name, label }: { name: string; label: string }) 
       setRunning(false);
     }
   }
-
   return (
-    <div style={{ marginTop: '0.5rem' }}>
-      <button type="button" className="submit-button" onClick={handleClick} disabled={running}>
-        {running ? 'Running…' : label}
+    <div>
+      <button type="button" className={styles.button} onClick={handleClick} disabled={running}>
+        {running ? 'Running\u2026' : label}
       </button>
-      {result && <p style={{ fontFamily: 'var(--font-mono)', fontSize: '0.75rem', marginTop: '0.4rem' }}>{result}</p>}
+      {result && <div className={styles.jsonBlock}>{result}</div>}
     </div>
   );
 }
