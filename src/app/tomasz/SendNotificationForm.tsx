@@ -2,7 +2,7 @@
 'use client';
 
 import { useState } from 'react';
-import styles from './tomasz.module.css';
+import styles from './adminShell.module.css';
 
 interface Props {
   allEmails: string[];
@@ -73,40 +73,40 @@ export function SendNotificationForm({ allEmails }: Props) {
   }
 
   return (
-    <div className={styles.statusCard}>
-      <div className={styles.statusTitle}>Send a notification</div>
-      <p style={{ marginBottom: '0.6rem' }}>
+    <div className={styles.card}>
+      <div className={styles.cardTitle}>Send a notification</div>
+      <p className={styles.note} style={{ marginBottom: '0.6rem' }}>
         Appears in the notification bell for whoever it&apos;s sent to - not an email, only visible if they open
         the app.
       </p>
 
       <form onSubmit={handleSubmit}>
         <div style={{ marginBottom: '0.6rem' }}>
-          <label htmlFor="notif-title" style={{ display: 'block', marginBottom: '0.2rem' }}>Title</label>
+          <label htmlFor="notif-title" style={{ display: 'block', marginBottom: '0.25rem', fontSize: '0.82rem' }}>Title</label>
           <input
             id="notif-title"
             type="text"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             required
-            style={{ width: '100%', maxWidth: '420px' }}
+            className={styles.input}
           />
         </div>
 
         <div style={{ marginBottom: '0.6rem' }}>
-          <label htmlFor="notif-message" style={{ display: 'block', marginBottom: '0.2rem' }}>Message</label>
+          <label htmlFor="notif-message" style={{ display: 'block', marginBottom: '0.25rem', fontSize: '0.82rem' }}>Message</label>
           <textarea
             id="notif-message"
             value={message}
             onChange={(e) => setMessage(e.target.value)}
             required
             rows={3}
-            style={{ width: '100%', maxWidth: '420px' }}
+            className={styles.input}
           />
         </div>
 
         <div style={{ marginBottom: '0.8rem' }}>
-          <label htmlFor="notif-link" style={{ display: 'block', marginBottom: '0.2rem' }}>
+          <label htmlFor="notif-link" style={{ display: 'block', marginBottom: '0.25rem', fontSize: '0.82rem' }}>
             Link when clicked (optional)
           </label>
           <input
@@ -115,15 +115,15 @@ export function SendNotificationForm({ allEmails }: Props) {
             value={linkTo}
             onChange={(e) => setLinkTo(e.target.value)}
             placeholder="/dashboard"
-            style={{ width: '100%', maxWidth: '420px' }}
+            className={styles.input}
           />
-          <p className={styles.warn} style={{ marginTop: '0.2rem' }}>
+          <p className={styles.warnNote} style={{ marginTop: '0.3rem' }}>
             Must be a path on this site starting with a single /, e.g. /dashboard - anything else is silently
             dropped, same validation the sign-in redirect uses.
           </p>
         </div>
 
-        <div style={{ marginBottom: '0.8rem' }}>
+        <div style={{ marginBottom: '0.8rem', fontSize: '0.83rem' }}>
           <label style={{ marginRight: '1rem' }}>
             <input type="radio" checked={mode === 'all'} onChange={() => setMode('all')} /> Everyone ({allEmails.length}{' '}
             user{allEmails.length === 1 ? '' : 's'})
@@ -134,12 +134,12 @@ export function SendNotificationForm({ allEmails }: Props) {
         </div>
 
         {mode === 'specific' && (
-          <div style={{ maxHeight: '220px', overflowY: 'auto', border: '1px solid var(--border)', borderRadius: '6px', padding: '0.5rem', marginBottom: '0.8rem' }}>
+          <div style={{ maxHeight: '220px', overflowY: 'auto', border: '1px solid var(--admin-border)', borderRadius: '6px', padding: '0.5rem', marginBottom: '0.8rem' }}>
             {allEmails.length === 0 ? (
-              <p className={styles.warn}>No registered users found.</p>
+              <p className={styles.warnNote}>No registered users found.</p>
             ) : (
               allEmails.map((email) => (
-                <label key={email} style={{ display: 'block', padding: '0.2rem 0' }}>
+                <label key={email} style={{ display: 'block', padding: '0.25rem 0', fontSize: '0.82rem' }}>
                   <input type="checkbox" checked={selectedEmails.has(email)} onChange={() => toggleEmail(email)} /> {email}
                 </label>
               ))
@@ -147,13 +147,13 @@ export function SendNotificationForm({ allEmails }: Props) {
           </div>
         )}
 
-        {error && <p className={styles.warn} style={{ color: 'var(--verdict-red)', marginBottom: '0.6rem' }}>{error}</p>}
+        {error && <p className={styles.warnNote} style={{ color: 'var(--admin-danger)', marginBottom: '0.6rem' }}>{error}</p>}
         {sentCount !== null && (
-          <p style={{ marginBottom: '0.6rem' }}>Sent to {sentCount} user{sentCount === 1 ? '' : 's'}.</p>
+          <p className={styles.note} style={{ marginBottom: '0.6rem' }}>Sent to {sentCount} user{sentCount === 1 ? '' : 's'}.</p>
         )}
 
-        <button type="submit" disabled={sending}>
-          {sending ? 'Sending…' : 'Send notification'}
+        <button type="submit" disabled={sending} className={styles.button}>
+          {sending ? 'Sending\u2026' : 'Send notification'}
         </button>
       </form>
     </div>

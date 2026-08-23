@@ -230,6 +230,24 @@ information-first rather than airy.
   font-size: 0.78rem;
 }
 
+.input {
+  width: 100%;
+  max-width: 420px;
+  padding: 0.42rem 0.6rem;
+  border: 1px solid var(--admin-border-strong);
+  border-radius: 4px;
+  font-family: inherit;
+  font-size: 0.83rem;
+  color: var(--admin-text);
+  background: var(--admin-surface);
+}
+
+.input:focus {
+  outline: 2px solid var(--admin-accent);
+  outline-offset: -1px;
+  border-color: var(--admin-accent);
+}
+
 .pillRow {
   display: flex;
   gap: 0.4rem;
