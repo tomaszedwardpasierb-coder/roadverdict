@@ -21,7 +21,9 @@ import {
 import { getSiteStats, type SiteStats } from '@/lib/monitoring/appInsights';
 import { getAllAssistantQuestions, groupSimilarQuestions, type AssistantQuestionLogDoc } from '@/lib/tracker/assistantQuestionLog';
 import { getAllUserEmails } from '@/lib/tracker/notification';
+import { getAssistantConfig } from '@/lib/tracker/assistantConfig';
 import { AdminShell } from './AdminShell';
+import { KnowledgeBaseEditor } from './KnowledgeBaseEditor';
 import styles from './adminShell.module.css';
 import { RunCronButton } from './RunCronButton';
 import { DeleteQuestionButton } from './DeleteQuestionButton';
@@ -148,6 +150,7 @@ export default async function AdminDashboardPage({
     siteStats,
     assistantQuestions,
     allUserEmails,
+    assistantConfig,
   ] = await Promise.all([
     getDbStats(),
     getActiveSessionCount(),
@@ -165,6 +168,7 @@ export default async function AdminDashboardPage({
     getSiteStatsSafe(windowHours),
     getAssistantQuestionsSafe(),
     getAllUserEmailsSafe(),
+    getAssistantConfig(),
   ]);
   const health = getServerHealth();
   const commonQuestions = groupSimilarQuestions(assistantQuestions);
@@ -539,6 +543,19 @@ export default async function AdminDashboardPage({
 
   const assistantContent = (
     <>
+      <h2 className={styles.sectionHeading}>Assistant configuration</h2>
+      {assistantConfig ? (
+        <KnowledgeBaseEditor
+          initialContent={assistantConfig.knowledgeBase}
+          initialUpdatedAt={assistantConfig.knowledgeBaseUpdatedAt}
+        />
+      ) : (
+        <p className={styles.warnNote} style={{ marginBottom: '1.5rem' }}>
+          Couldn&apos;t load the assistant config - has the seed migration in Jobs &amp; migrations been run yet?
+        </p>
+      )}
+
+      <h2 className={styles.sectionHeading}>Question log</h2>
       <p className={styles.note} style={{ marginBottom: '0.6rem' }}>
         {assistantQuestions.length} question{assistantQuestions.length === 1 ? '' : 's'} logged in total.
       </p>
