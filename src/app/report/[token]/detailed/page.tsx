@@ -10,7 +10,6 @@ import { describeJobTypeGroup } from "@/lib/tracker/reportNarrative";
 import { ReportHistoryTable } from "../ReportHistoryTable";
 import QRCode from "qrcode";
 import { fetchMotHistoryFromVdg } from "@/lib/tracker/motHistoryFetch";
-import { fetchValuationFromVdg } from "@/lib/tracker/valuationFetch";
 import { updateBikeBuyerOpinionCache } from "@/lib/tracker/bike";
 import { generateBuyerOpinion, type BuyerOpinionInput } from "@/lib/tracker/buyerOpinionProse";
 import { getSession } from "@/lib/auth/session";
@@ -63,11 +62,6 @@ export default async function DetailedReportPage({ params }: { params: { token: 
   // doesn't render. Never lets a lookup problem break the report itself.
   const motHistory = currentRegistration ? await fetchMotHistoryFromVdg(currentRegistration) : null;
 
-  // Live, not a stored snapshot - see valuationFetch.ts for why. Uses
-  // this bike's real current mileage, not whatever it was when added.
-  const valuation = currentRegistration ? await fetchValuationFromVdg(currentRegistration, bike.currentMileage) : null;
-  const valuationAttempted = currentRegistration != null;
-
   // Same warranty-still-covered logic as the inline JSX block further
   // down (kept as a separate, small duplication rather than reaching
   // into that block's own IIFE from out here - that block works and is
@@ -115,7 +109,6 @@ export default async function DetailedReportPage({ params }: { params: { token: 
         motFailCount: motHistory?.tests.filter((t) => !t.passed).length ?? 0,
         motDueDate: motHistory?.motDueDate ?? null,
         keeperChangeCount: bike.dvlaData?.keeperChangeList.length ?? 0,
-        valuationPrivateAverage: valuation?.figures.privateAverage ?? null,
         upcomingOverdueCount: upcomingReminders.filter((r) => r.status === "overdue").length + consumablesDueSoon.filter((c) => c.status === "overdue").length,
         upcomingDueSoonCount: upcomingReminders.filter((r) => r.status === "due-soon").length + consumablesDueSoon.filter((c) => c.status !== "overdue").length,
       };
@@ -317,50 +310,6 @@ export default async function DetailedReportPage({ params }: { params: { token: 
                 </div>
               ))}
             </dl>
-          )}
-        </>
-      )}
-
-      {valuationAttempted && (
-        <>
-          <h2 className={styles.docHeading}>Estimated value</h2>
-          {valuation ? (
-            <>
-              <p className={styles.docParagraph}>
-                Based on this bike&apos;s actual current mileage ({bike.currentMileage.toLocaleString()} miles) -
-                a rough guide, not a guarantee, and only as good as the market data behind it.
-              </p>
-              <dl className={styles.itemByItemList}>
-                {valuation.figures.privateClean != null && (
-                  <div className={styles.itemByItemRow}>
-                    <dt>Private sale (clean/excellent)</dt>
-                    <dd>£{valuation.figures.privateClean.toLocaleString()}</dd>
-                  </div>
-                )}
-                {valuation.figures.privateAverage != null && (
-                  <div className={styles.itemByItemRow}>
-                    <dt>Private sale (average condition)</dt>
-                    <dd>£{valuation.figures.privateAverage.toLocaleString()}</dd>
-                  </div>
-                )}
-                {valuation.figures.dealerForecourt != null && (
-                  <div className={styles.itemByItemRow}>
-                    <dt>Dealer forecourt</dt>
-                    <dd>£{valuation.figures.dealerForecourt.toLocaleString()}</dd>
-                  </div>
-                )}
-                {valuation.figures.partExchange != null && (
-                  <div className={styles.itemByItemRow}>
-                    <dt>Part exchange</dt>
-                    <dd>£{valuation.figures.partExchange.toLocaleString()}</dd>
-                  </div>
-                )}
-              </dl>
-            </>
-          ) : (
-            <p className={styles.docParagraph} style={{ color: "var(--ink-soft)" }}>
-              Valuation data isn&apos;t available for this specific model.
-            </p>
           )}
         </>
       )}

@@ -2,7 +2,7 @@
 //
 // Same division of labour as storyProse.ts: every fact the model sees
 // below was computed by deterministic code elsewhere (sellerReportData.ts,
-// the DVLA/MOT/valuation fetches in detailed/page.tsx) - this file's only
+// the DVLA/MOT fetches in detailed/page.tsx) - this file's only
 // job is turning those facts into an opinion, never inventing one of its
 // own. But this is a genuinely different document from Story So Far, not
 // just a bigger version of it: this is read by a stranger who might spend
@@ -41,7 +41,6 @@ export interface BuyerOpinionInput {
   motFailCount: number;
   motDueDate: string | null;
   keeperChangeCount: number;
-  valuationPrivateAverage: number | null;
   upcomingOverdueCount: number;
   upcomingDueSoonCount: number;
 }
@@ -87,11 +86,6 @@ function buildFactsBlock(input: BuyerOpinionInput): string {
     lines.push("MOT HISTORY (DVSA-verified):");
     lines.push(`- ${input.motTestCount} test${input.motTestCount === 1 ? "" : "s"} on record, ${input.motFailCount} fail${input.motFailCount === 1 ? "" : "s"}`);
     if (input.motDueDate) lines.push(`- Next MOT due ${fmtDate(input.motDueDate)}`);
-    lines.push("");
-  }
-
-  if (input.valuationPrivateAverage != null) {
-    lines.push(`ESTIMATED VALUE (private sale, average condition): £${input.valuationPrivateAverage.toLocaleString()}`);
     lines.push("");
   }
 
