@@ -6,6 +6,13 @@
 // see section 8 of the document itself for the full reasoning. Keep
 // this in sync with the real app: a stale entry here means the
 // assistant will confidently repeat something that stopped being true.
+//
+// This constant is no longer read directly by the live assistant route
+// - the knowledge base now lives in the database (assistantConfig.ts),
+// editable from /tomasz. Kept here deliberately as the one-time seed
+// source for that migration (seed-assistant-config/route.ts) and as a
+// known-good reference copy, not dead weight to be removed casually -
+// see the migration route for the reasoning on why this stays for now.
 
 export const ASSISTANT_KNOWLEDGE_BASE = `# RoadVerdict Assistant Knowledge Base
 
@@ -717,4 +724,3 @@ export async function getLivePrivacyPolicyText(): Promise<string | null> {
     return null;
   }
 }
-

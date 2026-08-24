@@ -9,7 +9,8 @@
 // for the full reasoning behind that boundary.
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/session";
-import { ASSISTANT_KNOWLEDGE_BASE, getLivePrivacyPolicyText } from "@/lib/tracker/assistantKnowledge";
+import { getLivePrivacyPolicyText } from "@/lib/tracker/assistantKnowledge";
+import { getAssistantConfig, type AssistantConfigDoc } from "@/lib/tracker/assistantConfig";
 import { ASSISTANT_TOOL_DECLARATIONS, runAssistantTool } from "@/lib/tracker/assistantTools";
 import { logAssistantQuestion } from "@/lib/tracker/assistantQuestionLog";
 
@@ -43,8 +44,24 @@ interface GeminiContent {
   parts: GeminiPart[];
 }
 
-function buildSystemInstruction(signedIn: boolean, privacyPolicyText: string | null): string {
-  const parts = [ASSISTANT_KNOWLEDGE_BASE];
+function buildSystemInstruction(config: AssistantConfigDoc, signedIn: boolean, privacyPolicyText: string | null): string {
+  const parts = [config.knowledgeBase];
+
+  // Appended right after the knowledge base, before the more
+  // operational blocks below - both this and the knowledge base are
+  // admin-authored content, kept together as one block, rather than
+  // mixed in with the technical instructions about tools and data
+  // sources that follow. Skipped entirely if personality is off, or
+  // on but the selected slot was never actually written - an empty
+  // block adds nothing but noise.
+  if (config.personalityEnabled && config.activePersonalityId) {
+    const active = config.personalities.find((p) => p.id === config.activePersonalityId);
+    if (active && active.body.trim()) {
+      parts.push(
+        `\n\n---\n\nPERSONALITY (how to sound, not what to know - every rule in the document above still applies exactly as written, this only shapes tone):\n\n${active.body}`
+      );
+    }
+  }
 
   parts.push(
     signedIn
@@ -111,8 +128,20 @@ export async function POST(req: Request) {
   // history, which would have already been logged on earlier requests.
   const question = messages[messages.length - 1]?.content ?? "";
 
-  const privacyPolicyText = await getLivePrivacyPolicyText();
-  const systemInstruction = buildSystemInstruction(signedIn, privacyPolicyText);
+  const [config, privacyPolicyText] = await Promise.all([getAssistantConfig(), getLivePrivacyPolicyText()]);
+
+  // Deliberately not a silent fallback to some hardcoded copy - a
+  // second, driftable source is exactly the failure this migration
+  // exists to remove. If the live config can't be read, the assistant
+  // is genuinely unavailable, the same as a Gemini API failure below,
+  // not quietly running on stale content nobody chose.
+  if (!config) {
+    console.error("Assistant: getAssistantConfig() returned null - config document missing or unreadable.");
+    await logAssistantQuestion(question, signedIn, true, session?.email);
+    return NextResponse.json({ error: "Assistant is temporarily unavailable." }, { status: 503 });
+  }
+
+  const systemInstruction = buildSystemInstruction(config, signedIn, privacyPolicyText);
 
   const contents: GeminiContent[] = toGeminiContents(messages);
   const tools = signedIn ? [{ functionDeclarations: ASSISTANT_TOOL_DECLARATIONS }] : undefined;

@@ -102,6 +102,26 @@ export async function getUserBackfillStatus(): Promise<UserBackfillStatus | null
   }
 }
 
+export interface SeedAssistantConfigStatus {
+  lastRunAt: string;
+}
+
+// Simpler shape than the backfills above - this migration either
+// creates the assistantConfig document once or does nothing on every
+// later run, so there's no per-record count to report, just whether
+// and when it happened. See seed-assistant-config/route.ts - the
+// status doc is only written on the actual creation, not on a later
+// "already seeded" no-op run, since nothing changed on those.
+export async function getSeedAssistantConfigStatus(): Promise<SeedAssistantConfigStatus | null> {
+  const container = getContainer();
+  try {
+    const { resource } = await container.item("cronStatus::seedAssistantConfig", "system").read<SeedAssistantConfigStatus>();
+    return resource ?? null;
+  } catch {
+    return null;
+  }
+}
+
 export interface MagicLinkRequestSummary {
   email: string;
   requestCount: number;

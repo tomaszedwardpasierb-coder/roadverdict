@@ -14,6 +14,7 @@ import {
   getDetailedCounts,
   getBikeIdBackfillStatus,
   getUserBackfillStatus,
+  getSeedAssistantConfigStatus,
   getBrowserBreakdown,
   browserFamily,
 } from '@/lib/admin/stats';
@@ -142,6 +143,7 @@ export default async function AdminDashboardPage({
     detailedCounts,
     bikeIdBackfillStatus,
     userBackfillStatus,
+    seedAssistantConfigStatus,
     browserBreakdown,
     siteStats,
     assistantQuestions,
@@ -158,6 +160,7 @@ export default async function AdminDashboardPage({
     getDetailedCounts(),
     getBikeIdBackfillStatus(),
     getUserBackfillStatus(),
+    getSeedAssistantConfigStatus(),
     getBrowserBreakdown(),
     getSiteStatsSafe(windowHours),
     getAssistantQuestionsSafe(),
@@ -344,6 +347,23 @@ export default async function AdminDashboardPage({
 
       <h2 className={styles.sectionHeading}>Migrations (one-time, safe to re-run)</h2>
       <div className={styles.grid}>
+        <div className={styles.card}>
+          <div className={styles.cardTitle}>Assistant config seed</div>
+          <p className={styles.warnNote} style={{ marginBottom: '0.5rem' }}>
+            Creates the assistant&apos;s live knowledge base and personality document in the database, seeded from
+            the current hardcoded content, ahead of the admin-editable knowledge base and personality panel. Does
+            nothing if the document already exists - safe to click more than once, and will never overwrite
+            live-edited content once it has been run.
+          </p>
+          {seedAssistantConfigStatus ? (
+            <p className={styles.note}>Seeded {fmtDate(seedAssistantConfigStatus.lastRunAt)}</p>
+          ) : (
+            <p className={styles.warnNote}>Not run yet - the assistant will not respond until this has been run once.</p>
+          )}
+          <div style={{ marginTop: '0.6rem' }}>
+            <RunCronButton name="seed-assistant-config" label="Run seed" />
+          </div>
+        </div>
         <div className={styles.card}>
           <div className={styles.cardTitle}>Bike-ID backfill</div>
           <p className={styles.warnNote} style={{ marginBottom: '0.5rem' }}>
