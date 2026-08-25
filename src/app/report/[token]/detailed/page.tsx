@@ -11,6 +11,7 @@ import QRCode from "qrcode";
 import { fetchMotHistoryFromVdg } from "@/lib/tracker/motHistoryFetch";
 import { updateBikeBuyerOpinionCache } from "@/lib/tracker/bike";
 import { generateBuyerOpinion, type BuyerOpinionInput } from "@/lib/tracker/buyerOpinionProse";
+import { buildKnownFacts } from "@/lib/tracker/knownFacts";
 import { getSession } from "@/lib/auth/session";
 import { RequestHistoryCta } from "../RequestHistoryCta";
 import styles from "../report.module.css";
@@ -48,8 +49,8 @@ export default async function DetailedReportPage({ params }: { params: { token: 
   const data = await getSellerReportData(params.token);
   const {
     bike, rows, total, backdatedCount, realTimeCount, receiptCount,
-    currentRegistration, upcomingReminders, consumablesDueSoon, upcomingCostItems, motCheckUrl,
-    mileageCheck, storyParagraphs, jobTypeGroups, supportedFindings,
+    currentRegistration, registrationChangesCount, upcomingReminders, consumablesDueSoon, upcomingCostItems,
+    evidenceQuality, motCheckUrl, mileageCheck, storyParagraphs, jobTypeGroups, supportedFindings,
     unconfirmedFindings, detailedQuestions, verdict,
   } = data;
 
@@ -60,6 +61,8 @@ export default async function DetailedReportPage({ params }: { params: { token: 
   // history yet (under 3 years old, MOT-exempt) just means this section
   // doesn't render. Never lets a lookup problem break the report itself.
   const motHistory = currentRegistration ? await fetchMotHistoryFromVdg(currentRegistration) : null;
+
+  const knownFacts = buildKnownFacts(bike, currentRegistration, registrationChangesCount, rows.length, receiptCount, motHistory);
 
   // Same warranty-still-covered logic as the inline JSX block further
   // down (kept as a separate, small duplication rather than reaching
@@ -216,6 +219,58 @@ export default async function DetailedReportPage({ params }: { params: { token: 
               on the forecourt - not a hands-on inspection, and not a substitute for viewing the bike yourself.
             </p>
           </>
+        )}
+
+        <h2 className={styles.docHeading}>Known facts</h2>
+        <dl className={styles.itemByItemList}>
+          {knownFacts.map((fact, i) => (
+            <div key={i} className={styles.itemByItemRow}>
+              <dt>{fact.label}</dt>
+              <dd>
+                {fact.value} <span className={styles.subtext}>({fact.source})</span>
+              </dd>
+            </div>
+          ))}
+        </dl>
+
+        <h2 className={styles.docHeading}>Evidence quality</h2>
+        {evidenceQuality.totalRecords > 0 ? (
+          <>
+            <dl className={styles.itemByItemList}>
+              <div className={styles.itemByItemRow}>
+                <dt>Records logged</dt>
+                <dd>{evidenceQuality.totalRecords}</dd>
+              </div>
+              <div className={styles.itemByItemRow}>
+                <dt>Receipt coverage</dt>
+                <dd>{evidenceQuality.receiptCount} of {evidenceQuality.totalRecords} ({evidenceQuality.receiptCoveragePct}%)</dd>
+              </div>
+              <div className={styles.itemByItemRow}>
+                <dt>Entered in real time</dt>
+                <dd>{evidenceQuality.realTimeCount} of {evidenceQuality.totalRecords} ({evidenceQuality.realTimePct}%)</dd>
+              </div>
+              {evidenceQuality.longestGapDays > 0 && (
+                <div className={styles.itemByItemRow}>
+                  <dt>Longest gap between entries</dt>
+                  <dd>{evidenceQuality.longestGapDays} days</dd>
+                </div>
+              )}
+              <div className={styles.itemByItemRow}>
+                <dt>Mileage internally consistent</dt>
+                <dd>
+                  {evidenceQuality.mileageInternallyConsistent
+                    ? "Yes - no entry shows a lower mileage than one logged before it"
+                    : "No - at least one logged entry shows a lower mileage than an earlier one, worth asking about"}
+                </dd>
+              </div>
+            </dl>
+            <p className={styles.subtext}>
+              This is a self-reported record - everything above marked RoadVerdict was entered by the bike&apos;s
+              owner, not independently verified.
+            </p>
+          </>
+        ) : (
+          <p className={styles.subtext}>Nothing logged yet for this bike.</p>
         )}
 
         <h2 className={styles.docHeading}>The story this data tells</h2>

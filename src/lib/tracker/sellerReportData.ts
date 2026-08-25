@@ -14,6 +14,7 @@ import { generateBuyerQuestions } from "@/lib/tracker/reportQuestions";
 import { findConsumablesDueSoon, type ConsumableDueSoon } from "@/lib/tracker/consumablesDueSoon";
 import { buildUpcomingCostItems, type UpcomingCostItem } from "@/lib/tracker/upcomingCosts";
 import { getBikeClassForCC } from "@/lib/motorcycleModels";
+import { buildEvidenceQuality, type EvidenceQuality } from "./evidenceQuality";
 import { getReceiptRequestsForShareToken, canSendReminder } from "@/lib/tracker/receiptRequest";
 import {
   checkCurrentMileagePlausibility,
@@ -72,6 +73,7 @@ export interface SellerReportData {
   upcomingReminders: { reminder: ReminderDoc; status: "due-soon" | "overdue" }[];
   consumablesDueSoon: ConsumableDueSoon[];
   upcomingCostItems: UpcomingCostItem[];
+  evidenceQuality: EvidenceQuality;
   motCheckUrl: string;
   // Entries this specific report link already has permission to show
   // the real receipt for - re-checked fresh on every page load, so a
@@ -108,6 +110,7 @@ export interface SellerReportCore {
   upcomingReminders: { reminder: ReminderDoc; status: "due-soon" | "overdue" }[];
   consumablesDueSoon: ConsumableDueSoon[];
   upcomingCostItems: UpcomingCostItem[];
+  evidenceQuality: EvidenceQuality;
   motCheckUrl: string;
   mileageCheck: MileagePlausibilityCheck;
   storyParagraphs: string[];
@@ -284,6 +287,7 @@ export async function getSellerReportCore(email: string, bikeId: string): Promis
   );
   const detailedQuestions = generateDetailedQuestions(jobTypeGroups, Boolean(otherGroup), hasTyreEntries);
   const upcomingCostItems = buildUpcomingCostItems(upcomingReminders, consumablesDueSoon, getBikeClassForCC(bike.engineCC));
+  const evidenceQuality = buildEvidenceQuality(rows.length, receiptCount, realTimeCount, verdictMetrics.longestGapDays, verdictMetrics.mileageViolationCount);
 
   return {
     bike,
@@ -304,6 +308,7 @@ export async function getSellerReportCore(email: string, bikeId: string): Promis
     upcomingReminders,
     consumablesDueSoon,
     upcomingCostItems,
+    evidenceQuality,
     motCheckUrl: "https://www.check-mot.service.gov.uk/",
     mileageCheck,
     storyParagraphs,
