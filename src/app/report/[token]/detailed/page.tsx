@@ -13,6 +13,8 @@ import { updateBikeBuyerOpinionCache } from "@/lib/tracker/bike";
 import { generateBuyerOpinion, type BuyerOpinionInput } from "@/lib/tracker/buyerOpinionProse";
 import { buildKnownFacts } from "@/lib/tracker/knownFacts";
 import { buildWalkAwayIssues, INSPECTION_REQUIRED_RISKS } from "@/lib/tracker/walkAwayRisks";
+import { buildBuyerActionPlan } from "@/lib/tracker/buyerActionPlan";
+import { MECHANICAL_CONFIDENCE_STATEMENT } from "@/lib/tracker/confidenceLimits";
 import { getSession } from "@/lib/auth/session";
 import { RequestHistoryCta } from "../RequestHistoryCta";
 import styles from "../report.module.css";
@@ -65,6 +67,7 @@ export default async function DetailedReportPage({ params }: { params: { token: 
 
   const knownFacts = buildKnownFacts(bike, currentRegistration, registrationChangesCount, rows.length, receiptCount, motHistory);
   const walkAwayIssues = buildWalkAwayIssues(bike, mileageCheck, evidenceQuality);
+  const buyerActionPlan = buildBuyerActionPlan(detailedQuestions.length, walkAwayIssues.length);
 
   // Same warranty-still-covered logic as the inline JSX block further
   // down (kept as a separate, small duplication rather than reaching
@@ -346,6 +349,34 @@ export default async function DetailedReportPage({ params }: { params: { token: 
         <ol className={styles.questionsList}>
           {detailedQuestions.map((q, i) => <li key={i}>{q}</li>)}
         </ol>
+
+        <h2 className={styles.docHeading}>Buyer action plan</h2>
+        <ol className={styles.questionsList}>
+          {buyerActionPlan.map((step, i) => (
+            <li key={i}>
+              <strong>{step.stage}:</strong> {step.detail}
+            </li>
+          ))}
+        </ol>
+
+        <h2 className={styles.docHeading}>Confidence and limitations</h2>
+        <dl className={styles.itemByItemList}>
+          <div className={styles.itemByItemRow}>
+            <dt>Record confidence</dt>
+            <dd>
+              {verdict.label}
+              {verdict.reasons.length > 0 && (
+                <ul className={styles.findingsList} style={{ marginTop: "0.4rem" }}>
+                  {verdict.reasons.map((r, i) => <li key={i}>{r}</li>)}
+                </ul>
+              )}
+            </dd>
+          </div>
+          <div className={styles.itemByItemRow}>
+            <dt>Mechanical confidence</dt>
+            <dd>{MECHANICAL_CONFIDENCE_STATEMENT}</dd>
+          </div>
+        </dl>
       </div>
 
       {motHistory && motHistory.tests.length > 0 && (
