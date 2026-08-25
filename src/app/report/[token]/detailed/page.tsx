@@ -12,6 +12,7 @@ import { fetchMotHistoryFromVdg } from "@/lib/tracker/motHistoryFetch";
 import { updateBikeBuyerOpinionCache } from "@/lib/tracker/bike";
 import { generateBuyerOpinion, type BuyerOpinionInput } from "@/lib/tracker/buyerOpinionProse";
 import { buildKnownFacts } from "@/lib/tracker/knownFacts";
+import { buildWalkAwayIssues, INSPECTION_REQUIRED_RISKS } from "@/lib/tracker/walkAwayRisks";
 import { getSession } from "@/lib/auth/session";
 import { RequestHistoryCta } from "../RequestHistoryCta";
 import styles from "../report.module.css";
@@ -63,6 +64,7 @@ export default async function DetailedReportPage({ params }: { params: { token: 
   const motHistory = currentRegistration ? await fetchMotHistoryFromVdg(currentRegistration) : null;
 
   const knownFacts = buildKnownFacts(bike, currentRegistration, registrationChangesCount, rows.length, receiptCount, motHistory);
+  const walkAwayIssues = buildWalkAwayIssues(bike, mileageCheck, evidenceQuality);
 
   // Same warranty-still-covered logic as the inline JSX block further
   // down (kept as a separate, small duplication rather than reaching
@@ -311,6 +313,34 @@ export default async function DetailedReportPage({ params }: { params: { token: 
             </ul>
           </div>
         </div>
+
+        <h2 className={styles.docHeading}>Walk-away risks</h2>
+        {walkAwayIssues.length > 0 && (
+          <>
+            <p className={styles.docParagraph} style={{ fontWeight: 600 }}>Potential walk-away issues</p>
+            <ul className={styles.findingsList}>
+              {walkAwayIssues.map((issue, i) => (
+                <li key={i} className={styles.findingGap}>
+                  <strong>{issue.label}:</strong> {issue.detail}
+                </li>
+              ))}
+            </ul>
+          </>
+        )}
+        <p className={styles.docParagraph} style={{ fontWeight: 600, marginTop: walkAwayIssues.length > 0 ? "1rem" : 0 }}>
+          Inspection-required risks
+        </p>
+        <p className={styles.docParagraph}>
+          Nothing in this report, however clean, can tell you about a bike&apos;s mechanical condition - that
+          needs a physical inspection, not a records check. In particular, this data cannot detect:
+        </p>
+        <ul className={styles.findingsList}>
+          {INSPECTION_REQUIRED_RISKS.map((risk, i) => <li key={i}>{risk}</li>)}
+        </ul>
+        <p className={styles.docParagraph} style={{ fontStyle: "italic", color: "var(--ink-soft)" }}>
+          A clean, well-documented digital record is not the same thing as a mechanically sound bike - it&apos;s
+          evidence about paperwork and spend, not a substitute for seeing and riding the bike yourself.
+        </p>
 
         <h2 className={styles.docHeading}>Questions worth asking the seller</h2>
         <ol className={styles.questionsList}>
