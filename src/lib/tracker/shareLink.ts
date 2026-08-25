@@ -30,6 +30,12 @@ export interface ShareLinkDoc {
   // then. Both cases mean "don't check this link again," which is the
   // only thing this field is actually used to decide.
   followUpSentAt?: string;
+  // The seller's own choice, always optional - a link works exactly
+  // the same with or without one. Set at creation or edited any time
+  // afterward via updateShareLinkAskingPrice, since an asking price
+  // genuinely changes during a sale. Absent (not zero, not null) is
+  // "the seller chose not to share one," not "not yet decided."
+  askingPrice?: number;
 }
 
 export type ShareLinkDuration = "1week" | "1month" | "6months";
@@ -64,7 +70,8 @@ export async function createShareLink(
   email: string,
   bikeId: string,
   duration: ShareLinkDuration,
-  recipientEmail: string
+  recipientEmail: string,
+  askingPrice?: number
 ): Promise<ShareLinkDoc> {
   const token = generateToken();
   const container = getContainer();
@@ -77,6 +84,7 @@ export async function createShareLink(
     createdAt: new Date().toISOString(),
     expiresAt: computeExpiresAt(duration),
     recipientEmail: recipientEmail.trim().toLowerCase(),
+    askingPrice,
   };
   await container.items.upsert(doc);
   return doc;
@@ -87,13 +95,13 @@ export async function createShareLink(
 // An expired link resolves as if it doesn't exist at all, even if the
 // cleanup cron hasn't physically deleted it yet - expiry is enforced the
 // moment it's checked, not just eventually.
-export async function resolveShareToken(token: string): Promise<{ email: string; bikeId: string; recipientEmail?: string } | null> {
+export async function resolveShareToken(token: string): Promise<{ email: string; bikeId: string; recipientEmail?: string; askingPrice?: number } | null> {
   try {
     const container = getContainer();
     const { resource } = await container.item(token, token).read<ShareLinkDoc>();
     if (!resource) return null;
     if (resource.expiresAt && new Date(resource.expiresAt) < new Date()) return null;
-    return { email: resource.email, bikeId: resource.bikeId, recipientEmail: resource.recipientEmail };
+    return { email: resource.email, bikeId: resource.bikeId, recipientEmail: resource.recipientEmail, askingPrice: resource.askingPrice };
   } catch {
     return null;
   }
@@ -129,6 +137,22 @@ export async function extendShareLink(token: string, duration: ShareLinkDuration
   const { resource } = await container.item(token, token).read<ShareLinkDoc>();
   if (!resource) return null;
   resource.expiresAt = computeExpiresAt(duration);
+  await container.items.upsert(resource);
+  return resource;
+}
+
+// null clears a previously-set price, rather than being a separate
+// "remove" function - the seller can change their mind either way
+// through the same action.
+export async function updateShareLinkAskingPrice(token: string, askingPrice: number | null): Promise<ShareLinkDoc | null> {
+  const container = getContainer();
+  const { resource } = await container.item(token, token).read<ShareLinkDoc>();
+  if (!resource) return null;
+  if (askingPrice == null) {
+    delete resource.askingPrice;
+  } else {
+    resource.askingPrice = askingPrice;
+  }
   await container.items.upsert(resource);
   return resource;
 }

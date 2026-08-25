@@ -20,6 +20,7 @@ const DURATION_OPTIONS: { value: ShareLinkDuration; label: string }[] = [
 export function ExportShareSection() {
   const [duration, setDuration] = useState<ShareLinkDuration>('1month');
   const [recipientEmail, setRecipientEmail] = useState('');
+  const [askingPrice, setAskingPrice] = useState('');
   const [shareUrl, setShareUrl] = useState<string | null>(null);
   const [expiresAt, setExpiresAt] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -34,13 +35,22 @@ export function ExportShareSection() {
       setCreateError('Please enter the email address you\u2019re sharing this link with.');
       return;
     }
+    let parsedAskingPrice: number | undefined;
+    if (askingPrice.trim()) {
+      const parsed = Number(askingPrice);
+      if (!Number.isFinite(parsed) || parsed <= 0) {
+        setCreateError('Enter a valid asking price, or leave it blank.');
+        return;
+      }
+      parsedAskingPrice = parsed;
+    }
     setCreateError(null);
     setLoading(true);
     try {
       const res = await fetch('/api/tracker/share-link', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ duration, recipientEmail: recipientEmail.trim() }),
+        body: JSON.stringify({ duration, recipientEmail: recipientEmail.trim(), askingPrice: parsedAskingPrice }),
       });
       const data = await res.json();
       if (res.ok) {
@@ -133,6 +143,24 @@ export function ExportShareSection() {
           <p className="field-note" style={{ marginTop: '0.5rem' }}>
             After this, the link stops working and is permanently deleted, it can be extended any time before then
             from the Shareable Links tab.
+          </p>
+          <div className="field" style={{ marginTop: '0.8rem', maxWidth: '220px' }}>
+            <label htmlFor="share-asking-price">Asking price (optional)</label>
+            <input
+              id="share-asking-price"
+              type="number"
+              inputMode="decimal"
+              min="1"
+              max="200000"
+              placeholder="e.g. 3200"
+              value={askingPrice}
+              onChange={(e) => setAskingPrice(e.target.value)}
+              style={{ width: '100%', padding: '0.5rem', border: '1px solid var(--border)', borderRadius: '4px' }}
+            />
+          </div>
+          <p className="field-note" style={{ marginTop: '0.4rem' }}>
+            Shown to the buyer alongside your bike&apos;s logged history and upcoming costs, leave blank if
+            you&apos;d rather not include it.
           </p>
           {createError && <p className="error-text" role="alert">{createError}</p>}
           <button type="button" className={styles.scanReceiptBtn} onClick={handleGetLink} disabled={loading} style={{ marginTop: '0.7rem' }}>
