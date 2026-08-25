@@ -80,6 +80,11 @@ export interface SellerReportData {
   // decision the owner just made shows up the next time this same link
   // is visited, no caching to go stale.
   entryRequestStatus: Record<string, EntryRequestStatus>;
+  // The seller's own choice for this specific link, not the bike -
+  // see shareLink.ts for why it lives there. Never on SellerReportCore,
+  // since the owner's own dashboard reuses that same core data with no
+  // concept of "which link" at all.
+  askingPrice?: number;
   // Narrative report content - see reportNarrative.ts for how each
   // piece is derived; nothing here is free text, every sentence traces
   // to a specific computed fact.
@@ -322,7 +327,7 @@ export async function getSellerReportCore(email: string, bikeId: string): Promis
 export async function getSellerReportData(token: string): Promise<SellerReportData> {
   const resolved = await resolveShareToken(token);
   if (!resolved) notFound();
-  const { email, bikeId } = resolved;
+  const { email, bikeId, askingPrice } = resolved;
 
   const core = await getSellerReportCore(email, bikeId);
 
@@ -342,5 +347,5 @@ export async function getSellerReportData(token: string): Promise<SellerReportDa
     }
   }
 
-  return { token, ...core, entryRequestStatus };
+  return { token, ...core, entryRequestStatus, askingPrice };
 }

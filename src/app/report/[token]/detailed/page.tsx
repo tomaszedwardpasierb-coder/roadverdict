@@ -15,6 +15,7 @@ import { buildKnownFacts } from "@/lib/tracker/knownFacts";
 import { buildWalkAwayIssues, INSPECTION_REQUIRED_RISKS } from "@/lib/tracker/walkAwayRisks";
 import { buildBuyerActionPlan } from "@/lib/tracker/buyerActionPlan";
 import { MECHANICAL_CONFIDENCE_STATEMENT } from "@/lib/tracker/confidenceLimits";
+import { buildNegotiationSummary } from "@/lib/tracker/negotiationSummary";
 import { getSession } from "@/lib/auth/session";
 import { RequestHistoryCta } from "../RequestHistoryCta";
 import styles from "../report.module.css";
@@ -54,7 +55,7 @@ export default async function DetailedReportPage({ params }: { params: { token: 
     bike, rows, total, backdatedCount, realTimeCount, receiptCount,
     currentRegistration, registrationChangesCount, upcomingReminders, consumablesDueSoon, upcomingCostItems,
     evidenceQuality, motCheckUrl, mileageCheck, storyParagraphs, jobTypeGroups, supportedFindings,
-    unconfirmedFindings, detailedQuestions, verdict,
+    unconfirmedFindings, detailedQuestions, verdict, askingPrice,
   } = data;
 
   const canonicalReportUrl = `${process.env.APP_URL ?? "https://roadverdict.co.uk"}/report/${params.token}/detailed`;
@@ -68,6 +69,10 @@ export default async function DetailedReportPage({ params }: { params: { token: 
   const knownFacts = buildKnownFacts(bike, currentRegistration, registrationChangesCount, rows.length, receiptCount, motHistory);
   const walkAwayIssues = buildWalkAwayIssues(bike, mileageCheck, evidenceQuality);
   const buyerActionPlan = buildBuyerActionPlan(detailedQuestions.length, walkAwayIssues.length);
+  const negotiationSummary =
+    askingPrice != null
+      ? buildNegotiationSummary(askingPrice, upcomingCostItems, walkAwayIssues, unconfirmedFindings, evidenceQuality)
+      : null;
 
   // Same warranty-still-covered logic as the inline JSX block further
   // down (kept as a separate, small duplication rather than reaching
@@ -472,6 +477,41 @@ export default async function DetailedReportPage({ params }: { params: { token: 
             for this specific bike or garage - treat both as helpful estimates, not guarantees.
           </p>
         </div>
+      )}
+
+      {negotiationSummary && (
+        <>
+          <h2 className={styles.docHeading}>Negotiation points</h2>
+          <dl className={styles.itemByItemList}>
+            <div className={styles.itemByItemRow}>
+              <dt>Asking price</dt>
+              <dd>£{negotiationSummary.askingPrice.toLocaleString()}</dd>
+            </div>
+            {negotiationSummary.upcomingCostsTotal && (
+              <div className={styles.itemByItemRow}>
+                <dt>Estimated upcoming costs</dt>
+                <dd>
+                  £{negotiationSummary.upcomingCostsTotal.low.toLocaleString()}-£
+                  {negotiationSummary.upcomingCostsTotal.high.toLocaleString()}
+                </dd>
+              </div>
+            )}
+          </dl>
+          {negotiationSummary.discussionPoints.length > 0 && (
+            <>
+              <p className={styles.docParagraph} style={{ fontWeight: 600, marginTop: "0.8rem" }}>
+                Points worth discussing
+              </p>
+              <ul className={styles.findingsList}>
+                {negotiationSummary.discussionPoints.map((point, i) => <li key={i}>{point}</li>)}
+              </ul>
+            </>
+          )}
+          <p className={styles.docParagraph} style={{ fontStyle: "italic", color: "var(--ink-soft)" }}>
+            This isn&apos;t a suggested offer or a valuation - RoadVerdict doesn&apos;t estimate what this bike is
+            worth, just factual points from this record worth raising before agreeing a price.
+          </p>
+        </>
       )}
 
       <h2 className={styles.docHeading}>Full logged history</h2>
