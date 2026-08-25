@@ -12,6 +12,8 @@ import { findMileageMonotonicityViolations } from "@/lib/tracker/mileageAudit";
 import { computeSellerVerdict, type SellerVerdictMetrics, type SellerVerdictResult } from "@/lib/tracker/sellerReportVerdict";
 import { generateBuyerQuestions } from "@/lib/tracker/reportQuestions";
 import { findConsumablesDueSoon, type ConsumableDueSoon } from "@/lib/tracker/consumablesDueSoon";
+import { buildUpcomingCostItems, type UpcomingCostItem } from "@/lib/tracker/upcomingCosts";
+import { getBikeClassForCC } from "@/lib/motorcycleModels";
 import { getReceiptRequestsForShareToken, canSendReminder } from "@/lib/tracker/receiptRequest";
 import {
   checkCurrentMileagePlausibility,
@@ -69,6 +71,7 @@ export interface SellerReportData {
   buyerQuestions: string[];
   upcomingReminders: { reminder: ReminderDoc; status: "due-soon" | "overdue" }[];
   consumablesDueSoon: ConsumableDueSoon[];
+  upcomingCostItems: UpcomingCostItem[];
   motCheckUrl: string;
   // Entries this specific report link already has permission to show
   // the real receipt for - re-checked fresh on every page load, so a
@@ -104,6 +107,7 @@ export interface SellerReportCore {
   buyerQuestions: string[];
   upcomingReminders: { reminder: ReminderDoc; status: "due-soon" | "overdue" }[];
   consumablesDueSoon: ConsumableDueSoon[];
+  upcomingCostItems: UpcomingCostItem[];
   motCheckUrl: string;
   mileageCheck: MileagePlausibilityCheck;
   storyParagraphs: string[];
@@ -279,6 +283,7 @@ export async function getSellerReportCore(email: string, bikeId: string): Promis
     hasTyreEntries
   );
   const detailedQuestions = generateDetailedQuestions(jobTypeGroups, Boolean(otherGroup), hasTyreEntries);
+  const upcomingCostItems = buildUpcomingCostItems(upcomingReminders, consumablesDueSoon, getBikeClassForCC(bike.engineCC));
 
   return {
     bike,
@@ -298,6 +303,7 @@ export async function getSellerReportCore(email: string, bikeId: string): Promis
     buyerQuestions,
     upcomingReminders,
     consumablesDueSoon,
+    upcomingCostItems,
     motCheckUrl: "https://www.check-mot.service.gov.uk/",
     mileageCheck,
     storyParagraphs,

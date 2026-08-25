@@ -5,7 +5,6 @@ import { resolveShareToken } from "@/lib/tracker/shareLink";
 import { getSellerReportData } from "@/lib/tracker/sellerReportData";
 import { hasReportAccess } from "@/lib/tracker/reportAccess";
 import { PlateGate } from "../PlateGate";
-import { reminderDetailLabel } from "@/lib/tracker/reminderStatus";
 import { describeJobTypeGroup } from "@/lib/tracker/reportNarrative";
 import { ReportHistoryTable } from "../ReportHistoryTable";
 import QRCode from "qrcode";
@@ -49,7 +48,7 @@ export default async function DetailedReportPage({ params }: { params: { token: 
   const data = await getSellerReportData(params.token);
   const {
     bike, rows, total, backdatedCount, realTimeCount, receiptCount,
-    currentRegistration, upcomingReminders, consumablesDueSoon, motCheckUrl,
+    currentRegistration, upcomingReminders, consumablesDueSoon, upcomingCostItems, motCheckUrl,
     mileageCheck, storyParagraphs, jobTypeGroups, supportedFindings,
     unconfirmedFindings, detailedQuestions, verdict,
   } = data;
@@ -331,27 +330,30 @@ export default async function DetailedReportPage({ params }: { params: { token: 
         </div>
       </div>
 
-      {(upcomingReminders.length > 0 || consumablesDueSoon.length > 0) && (
+      {upcomingCostItems.length > 0 && (
         <div className={styles.upcomingBlock}>
-          <p className={styles.upcomingTitle}>What a new owner should budget for soon</p>
+          <p className={styles.upcomingTitle}>What&apos;s coming up</p>
           <ul className={styles.upcomingList}>
-            {upcomingReminders.map(({ reminder, status }) => (
-              <li key={reminder.id} className={status === "overdue" ? styles.upcomingOverdue : styles.upcomingSoon}>
-                {reminder.name} - {reminderDetailLabel(reminder)}
-                {status === "overdue" ? " (overdue)" : ""}
-              </li>
-            ))}
-            {consumablesDueSoon.map((c) => (
-              <li key={c.jobType} className={c.status === "overdue" ? styles.upcomingOverdue : styles.upcomingSoon}>
-                {c.label} - last done at {c.lastDoneMileage.toLocaleString()} mi
-                {c.intervalMiles ? `, typically due again every ${c.intervalMiles.toLocaleString()} mi` : ""}
-                {c.status === "overdue" ? " (likely overdue by now)" : " (likely due soon)"}
+            {upcomingCostItems.map((item) => (
+              <li key={item.jobType} className={item.timing === "overdue" ? styles.upcomingOverdue : styles.upcomingSoon}>
+                <strong>{item.label}</strong> - {item.timingDetail}
+                {item.timing === "overdue" ? " (overdue)" : " (due soon)"}
+                <br />
+                {item.pricing.status === "priced" ? (
+                  <span className={styles.subtext}>
+                    Indicative cost if arranged now: £{item.pricing.low}-£{item.pricing.high} ({item.pricing.confidence}{" "}
+                    confidence - {item.pricing.sourceName}, last reviewed {item.pricing.lastReviewed})
+                  </span>
+                ) : (
+                  <span className={styles.subtext}>Not currently priced by RoadVerdict</span>
+                )}
               </li>
             ))}
           </ul>
           <p className={styles.upcomingNote}>
-            Based on this bike&apos;s own logged intervals, not a generic assumption - inferred from what&apos;s
-            actually been recorded, so treat it as a helpful estimate rather than a guarantee.
+            Timing is based on this bike&apos;s own logged intervals, not a generic assumption. Where a cost is
+            shown, it&apos;s an indicative benchmark against typical UK prices for this size of bike, not a quote
+            for this specific bike or garage - treat both as helpful estimates, not guarantees.
           </p>
         </div>
       )}

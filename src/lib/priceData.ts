@@ -1,32 +1,7 @@
 /**
- * BENCHMARK DATA — sourced, but still thin. Read this before trusting it.
- * ------------------------------------------------------------------------
- * These ranges are now anchored to real UK sources (named specialists' own
- * published price lists, a breakdown-cover advice page, and UK rider forum
- * threads), not invented. But "anchored" isn't the same as "done":
- *
- * - chain-and-sprockets: well anchored. Two independent London motorcycle
- *   specialists (FWR, Two Tyres) publish "from" prices by engine-size band
- *   for a fitted chain+sprocket kit, and they closely agree with each other
- *   and with UK forum quotes. Numbers below add headroom above their "from"
- *   price for mid/premium kit choices.
- * - brake-pads-front: thinly anchored. One London specialist quotes ~£30 to
- *   supply and fit a pair of pads (one caliper). Extrapolated upward for
- *   bikes with twin front discs (large class). Only one real source — needs
- *   more before you'd call this solid.
- * - basic-service / full-service: anchored to a breakdown-cover site's
- *   published guide, banded by engine size — but that page is dated
- *   2022-11-10, so treat it as a starting point for inflation-adjustment,
- *   not gospel. basic-service is derived as ~60% of full-service since no
- *   source split the two.
- * - tyres-pair: weakest of the five. Only the small-bike figure has a real
- *   anchor (a named specialist's 125cc budget tyre-pair price, plus typical
- *   fitting labour). Medium/large are extrapolated from general knowledge
- *   of how tyre unit cost scales with size, not from a source that actually
- *   quoted those bikes. Prioritise re-checking this one first.
- *
- * Brand-tier and region multipliers below are STILL estimates, not sourced —
- * that research hasn't happened yet.
+ * BENCHMARK DATA - each cell below carries its own source, dates, and
+ * confidence. See the source field on each entry rather than a prose
+ * block here - that's the single place this now lives, not duplicated.
  */
 
 import { INFLATION_MULTIPLIER_SINCE_RESEARCH } from './inflation';
@@ -41,7 +16,7 @@ export interface BrandOption {
   tier: BrandTier;
 }
 
-// Brand TIER, not brand+model — full model-level pricing needs real per-model
+// Brand TIER, not brand+model - full model-level pricing needs real per-model
 // research (the same trap the classic-parts-finder idea hit). Tier captures the
 // real signal (a Triumph/BMW service costs more than a Honda/Royal Enfield one)
 // without needing hundreds of researched rows.
@@ -67,9 +42,10 @@ export const REGION_LABELS: Record<Region, string> = {
   'scotland-ni': 'Scotland & Northern Ireland',
 };
 
-// PLACEHOLDER multipliers — same caveat as BENCHMARKS below. Directionally
-// reasonable (premium brands and London/SE labour cost more) but not sourced
-// from real rate cards yet.
+// PLACEHOLDER multipliers - directionally reasonable (premium brands and
+// London/SE labour cost more) but not sourced from real rate cards yet.
+// Not currently used by getInflationAdjustedBenchmark below - see that
+// function's own comment for why.
 const BRAND_TIER_MULTIPLIER: Record<BrandTier, number> = {
   budget: 0.88,
   mainstream: 1.0,
@@ -94,33 +70,183 @@ export interface PriceRange {
   high: number;
 }
 
-type BenchmarkTable = Record<JobType, Record<BikeClass, PriceRange>>;
+export type ConfidenceLevel = 'higher' | 'medium' | 'lower';
+
+export interface BenchmarkSource {
+  sourceName: string;
+  sourceUrl?: string;
+  sourceDate: string;
+  lastReviewed: string;
+  confidence: ConfidenceLevel;
+  note?: string;
+}
+
+export interface Benchmark extends PriceRange {
+  source: BenchmarkSource;
+}
+
+type BenchmarkTable = Record<JobType, Record<BikeClass, Benchmark>>;
 
 export const BENCHMARKS: BenchmarkTable = {
   'basic-service': {
-    small: { low: 55, high: 95 },
-    medium: { low: 95, high: 145 },
-    large: { low: 125, high: 195 },
+    small: {
+      low: 55, high: 95,
+      source: {
+        sourceName: 'Derived from full-service - no source prices this separately',
+        sourceDate: '2022-11-10',
+        lastReviewed: '2026-07',
+        confidence: 'lower',
+        note: 'Computed as roughly 60% of full-service - no source ever split the two directly.',
+      },
+    },
+    medium: {
+      low: 95, high: 145,
+      source: {
+        sourceName: 'Derived from full-service - no source prices this separately',
+        sourceDate: '2022-11-10',
+        lastReviewed: '2026-07',
+        confidence: 'lower',
+        note: 'Computed as roughly 60% of full-service - no source ever split the two directly.',
+      },
+    },
+    large: {
+      low: 125, high: 195,
+      source: {
+        sourceName: 'Derived from full-service - no source prices this separately',
+        sourceDate: '2022-11-10',
+        lastReviewed: '2026-07',
+        confidence: 'lower',
+        note: 'Computed as roughly 60% of full-service - no source ever split the two directly.',
+      },
+    },
   },
   'full-service': {
-    small: { low: 85, high: 150 },
-    medium: { low: 150, high: 220 },
-    large: { low: 190, high: 300 },
+    small: {
+      low: 85, high: 150,
+      source: {
+        sourceName: 'UK breakdown-cover provider - published servicing price guide, banded by engine size',
+        sourceDate: '2022-11-10',
+        lastReviewed: '2026-07',
+        confidence: 'medium',
+        note: 'Source page is dated November 2022 - a starting point for inflation adjustment, not current fact on its own.',
+      },
+    },
+    medium: {
+      low: 150, high: 220,
+      source: {
+        sourceName: 'UK breakdown-cover provider - published servicing price guide, banded by engine size',
+        sourceDate: '2022-11-10',
+        lastReviewed: '2026-07',
+        confidence: 'medium',
+        note: 'Source page is dated November 2022 - a starting point for inflation adjustment, not current fact on its own.',
+      },
+    },
+    large: {
+      low: 190, high: 300,
+      source: {
+        sourceName: 'UK breakdown-cover provider - published servicing price guide, banded by engine size',
+        sourceDate: '2022-11-10',
+        lastReviewed: '2026-07',
+        confidence: 'medium',
+        note: 'Source page is dated November 2022 - a starting point for inflation adjustment, not current fact on its own.',
+      },
+    },
   },
   'tyres-pair': {
-    small: { low: 150, high: 190 },
-    medium: { low: 220, high: 300 },
-    large: { low: 280, high: 380 },
+    small: {
+      low: 150, high: 190,
+      source: {
+        sourceName: 'Named UK specialist - 125cc budget tyre-pair price plus typical fitting labour',
+        sourceDate: '2026-07',
+        lastReviewed: '2026-07',
+        confidence: 'medium',
+        note: 'The only one of the three tyres-pair sizes with a real quoted anchor.',
+      },
+    },
+    medium: {
+      low: 220, high: 300,
+      source: {
+        sourceName: 'Extrapolated from the small-bike figure using general knowledge of tyre cost scaling - not a quoted source for this size',
+        sourceDate: '2026-07',
+        lastReviewed: '2026-07',
+        confidence: 'lower',
+        note: 'Weakest of the five job types - prioritise re-checking this against a real source first.',
+      },
+    },
+    large: {
+      low: 280, high: 380,
+      source: {
+        sourceName: 'Extrapolated from the small-bike figure using general knowledge of tyre cost scaling - not a quoted source for this size',
+        sourceDate: '2026-07',
+        lastReviewed: '2026-07',
+        confidence: 'lower',
+        note: 'Weakest of the five job types - prioritise re-checking this against a real source first.',
+      },
+    },
   },
   'brake-pads-front': {
-    small: { low: 30, high: 55 },
-    medium: { low: 45, high: 75 },
-    large: { low: 60, high: 100 },
+    small: {
+      low: 30, high: 55,
+      source: {
+        sourceName: 'One London specialist - quoted price to supply and fit a pair of pads (one caliper)',
+        sourceDate: '2026-07',
+        lastReviewed: '2026-07',
+        confidence: 'medium',
+        note: 'Only one real source - needs a second before this is solid.',
+      },
+    },
+    medium: {
+      low: 45, high: 75,
+      source: {
+        sourceName: 'Not clearly stated in the original research notes - between the small (one caliper) and large (twin disc) figures',
+        sourceDate: '2026-07',
+        lastReviewed: '2026-07',
+        confidence: 'lower',
+        note: 'How this specific figure was derived is not documented - flagged lower by default rather than guessed as medium. Worth confirming against a real source.',
+      },
+    },
+    large: {
+      low: 60, high: 100,
+      source: {
+        sourceName: 'Extrapolated upward from the small-bike figure for twin front discs',
+        sourceDate: '2026-07',
+        lastReviewed: '2026-07',
+        confidence: 'lower',
+        note: 'Extrapolated for bikes with twin front discs, not a quoted source for this size.',
+      },
+    },
   },
   'chain-and-sprockets': {
-    small: { low: 120, high: 160 },
-    medium: { low: 140, high: 190 },
-    large: { low: 160, high: 230 },
+    small: {
+      low: 120, high: 160,
+      source: {
+        sourceName: 'Two independent London motorcycle specialists - published from-prices by engine-size band, cross-checked against UK rider forum quotes',
+        sourceDate: '2026-07',
+        lastReviewed: '2026-07',
+        confidence: 'higher',
+        note: 'Best-anchored of the five job types - two independent sources that agree with each other and with forum quotes.',
+      },
+    },
+    medium: {
+      low: 140, high: 190,
+      source: {
+        sourceName: 'Two independent London motorcycle specialists - published from-prices by engine-size band, cross-checked against UK rider forum quotes',
+        sourceDate: '2026-07',
+        lastReviewed: '2026-07',
+        confidence: 'higher',
+        note: 'Best-anchored of the five job types - two independent sources that agree with each other and with forum quotes.',
+      },
+    },
+    large: {
+      low: 160, high: 230,
+      source: {
+        sourceName: 'Two independent London motorcycle specialists - published from-prices by engine-size band, cross-checked against UK rider forum quotes',
+        sourceDate: '2026-07',
+        lastReviewed: '2026-07',
+        confidence: 'higher',
+        note: 'Best-anchored of the five job types - two independent sources that agree with each other and with forum quotes.',
+      },
+    },
   },
 };
 
@@ -134,11 +260,11 @@ export const JOB_LABELS: Record<JobType, string> = {
 
 export const BIKE_CLASS_LABELS: Record<BikeClass, string> = {
   small: 'Small (up to 400cc)',
-  medium: 'Medium (401–750cc)',
+  medium: 'Medium (401-750cc)',
   large: 'Large (751cc+)',
 };
 
-export function getBenchmark(job: JobType, bikeClass: BikeClass): PriceRange {
+export function getBenchmark(job: JobType, bikeClass: BikeClass): Benchmark {
   return BENCHMARKS[job][bikeClass];
 }
 
@@ -148,6 +274,7 @@ export function getBrandTier(brandValue: string): BrandTier {
 
 export interface AdjustedBenchmark extends PriceRange {
   brandTier: BrandTier;
+  source: BenchmarkSource;
 }
 
 export function getAdjustedBenchmark(
@@ -165,5 +292,23 @@ export function getAdjustedBenchmark(
     low: Math.round(base.low * multiplier),
     high: Math.round(base.high * multiplier),
     brandTier,
+    source: base.source,
+  };
+}
+
+// Inflation-only variant for contexts higher-stakes than the Quote
+// Checker's own "does my quote look reasonable" use - the buyer report
+// reads to a stranger who might spend real money, and brand/region are
+// explicitly unsourced placeholders above, not something that belongs
+// baked into a number shown with a confidence label and source notes.
+// Inflation is different in kind: a documented correction for a
+// disclosed problem (the underlying source data being dated), not a
+// guess - see inflation.ts.
+export function getInflationAdjustedBenchmark(job: JobType, bikeClass: BikeClass): Benchmark {
+  const base = BENCHMARKS[job][bikeClass];
+  return {
+    low: Math.round(base.low * INFLATION_MULTIPLIER_SINCE_RESEARCH),
+    high: Math.round(base.high * INFLATION_MULTIPLIER_SINCE_RESEARCH),
+    source: base.source,
   };
 }
