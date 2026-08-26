@@ -56,8 +56,9 @@ import { PrivacyContent } from "../privacy/PrivacyContent";
 import { TransferOwnershipSection } from "./TransferOwnershipSection";
 import { IncomingOwnershipRequestCard } from "./IncomingOwnershipRequestCard";
 import { getPendingTransferRequestsForOwner } from "@/lib/tracker/bikeTransferRequest";
-import { computeSellerReportRowsAndMetrics } from "@/lib/tracker/sellerReportData";
-import { computeSellerVerdict } from "@/lib/tracker/sellerReportVerdict";
+import { getSellerReportCore } from "@/lib/tracker/sellerReportData";
+import { buildWalkAwayIssues } from "@/lib/tracker/walkAwayRisks";
+import { buildSellerPrepIssues, buildSellerPrepPlan } from "@/lib/tracker/sellerPrep";
 import { StorySoFarTab } from "./StorySoFarTab";
 import { ChartFilterProvider } from "./ChartFilterContext";
 import { ChartFilterBar } from "./ChartFilterBar";
@@ -571,15 +572,29 @@ export default async function DashboardPage() {
       }
     : null;
 
-  // Reuses the exact same metrics/verdict logic the real Story So
-  // Far and buyer report are judged by (see sellerReportVerdict.ts) -
-  // "ready" means this bike would currently score better than the
-  // floor tier, not an arbitrary entry count that might not actually
-  // correlate with what verdict someone gets. Built from records/
-  // mods/bills/fuelLogs/reminders already fetched above for the other
-  // tabs, so this adds no new database queries.
-  const { verdictMetrics } = computeSellerReportRowsAndMetrics(bike, records, mods, bills, fuelLogs, reminders);
-  const storyReady = computeSellerVerdict(verdictMetrics).tier !== "limited-documentation";
+  // The exact same core the buyer report and Story So Far's own API
+  // route are already built from (see sellerReportData.ts) - not a
+  // second, separately-derived version that could drift from what a
+  // buyer eventually sees. Re-fetches records/mods/bills/fuelLogs/
+  // reminders internally, a small, accepted duplicate of what's
+  // already fetched above for the other tabs - this page loads once
+  // per visit for one signed-in person, not a hot path worth the
+  // complexity of avoiding.
+  const sellerCore = await getSellerReportCore(session.email, bike.id);
+  const storyReady = sellerCore.verdict.tier !== "limited-documentation";
+  const sellerWalkAwayIssues = buildWalkAwayIssues(bike, sellerCore.mileageCheck, sellerCore.evidenceQuality);
+  const sellerPrep = {
+    evidenceQuality: sellerCore.evidenceQuality,
+    prepIssues: buildSellerPrepIssues(sellerWalkAwayIssues),
+    upcomingCostItems: sellerCore.upcomingCostItems,
+    likelyQuestions: sellerCore.detailedQuestions,
+    prepPlan: buildSellerPrepPlan(
+      sellerCore.evidenceQuality.receiptCoveragePct,
+      sellerWalkAwayIssues.length,
+      sellerCore.upcomingCostItems.filter((i) => i.timing === "overdue").length,
+      sellerCore.detailedQuestions.length
+    ),
+  };
 
   const quoteCheckerContent = (
     <>
@@ -639,7 +654,7 @@ export default async function DashboardPage() {
       billsContent={billsContent}
       remindersContent={remindersContent}
       reportsContent={reportsContent}
-      storyContent={<StorySoFarTab bikeNickname={bike.nickname} registration={currentRegistration} currentMileage={bike.currentMileage} distanceUnit={distanceUnit} initialStory={initialStory} />}
+      storyContent={<StorySoFarTab bikeNickname={bike.nickname} registration={currentRegistration} currentMileage={bike.currentMileage} distanceUnit={distanceUnit} initialStory={initialStory} sellerPrep={sellerPrep} />}
       shareLinksContent={shareLinksContent}
       quoteCheckerContent={quoteCheckerContent}
       costCalculatorContent={costCalculatorContent}

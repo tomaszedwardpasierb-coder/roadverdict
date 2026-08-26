@@ -4,6 +4,9 @@
 import { useState } from 'react';
 import { Icon } from './Icon';
 import { convertMilesToDisplay, type DistanceUnit } from '@/lib/tracker/unitFormat';
+import type { EvidenceQuality } from '@/lib/tracker/evidenceQuality';
+import type { SellerPrepIssue, PrepStep } from '@/lib/tracker/sellerPrep';
+import type { UpcomingCostItem } from '@/lib/tracker/upcomingCosts';
 import styles from './dashboard.module.css';
 
 interface StoryResponse {
@@ -14,6 +17,19 @@ interface StoryResponse {
   generatedAt: string;
   cached: boolean;
   nextAvailableAt: string;
+}
+
+// Deterministic, no AI, no weekly cooldown - computed fresh on every
+// dashboard load in page.tsx (see sellerPrep.ts), unlike the cached
+// story above. Rendered unconditionally, not gated behind whether a
+// story has ever been generated - a new owner should see where their
+// record stands without needing to spend a weekly AI generation first.
+interface SellerPrepData {
+  evidenceQuality: EvidenceQuality;
+  prepIssues: SellerPrepIssue[];
+  upcomingCostItems: UpcomingCostItem[];
+  likelyQuestions: string[];
+  prepPlan: PrepStep[];
 }
 
 interface Props {
@@ -30,6 +46,7 @@ interface Props {
   // which looked exactly like the cooldown had reset even when it
   // genuinely hadn't.
   initialStory: StoryResponse | null;
+  sellerPrep: SellerPrepData;
 }
 
 function formatDate(iso: string): string {
@@ -44,7 +61,99 @@ function timeLeftText(nextAvailableAt: string): string {
   return daysLeft > 1 ? `${daysLeft} days` : hoursLeft > 1 ? `${hoursLeft} hours` : 'less than an hour';
 }
 
-export function StorySoFarTab({ bikeNickname, registration, currentMileage, distanceUnit, initialStory }: Props) {
+// Rendered from both of StorySoFarTab's return branches below, rather
+// than duplicated JSX in each - same content either way, whether or
+// not an AI story has been generated yet.
+function SellerPrepSection({ data }: { data: SellerPrepData }) {
+  const { evidenceQuality, prepIssues, upcomingCostItems, likelyQuestions, prepPlan } = data;
+
+  return (
+    <div style={{ marginTop: '2rem', paddingTop: '1.6rem', borderTop: '1px solid var(--border)' }}>
+      <h2 className={styles.sectionHeading}>Getting ready to sell</h2>
+      <p className={styles.subtext} style={{ marginBottom: '1.2rem' }}>
+        A buyer opening a share link sees this exact record, read the same way - here&apos;s how it currently
+        looks, and what&apos;s worth doing before you list it.
+      </p>
+
+      {evidenceQuality.totalRecords === 0 ? (
+        <p className={styles.subtext}>
+          Nothing logged yet - start adding your service history, fuel, and bills to build the record a buyer
+          will eventually see here.
+        </p>
+      ) : (
+        <>
+          <p className={styles.subtext} style={{ fontWeight: 600, marginBottom: '0.3rem' }}>Your record so far</p>
+          <p className={styles.subtext}>
+            {evidenceQuality.totalRecords} entries logged, {evidenceQuality.receiptCoveragePct}% with a receipt
+            attached, {evidenceQuality.realTimePct}% entered in real time.
+          </p>
+          <p className={styles.subtext} style={{ marginBottom: '1.2rem' }}>
+            {evidenceQuality.mileageInternallyConsistent
+              ? 'No conflicting mileage readings across your logged entries.'
+              : 'At least one logged entry shows a lower mileage than an earlier one - worth checking for a typo.'}
+          </p>
+
+          {prepIssues.length > 0 && (
+            <>
+              <p className={styles.subtext} style={{ fontWeight: 600, marginBottom: '0.5rem' }}>
+                Worth addressing before you list
+              </p>
+              {prepIssues.map((issue, i) => (
+                <div key={i} className={styles.reviewQueueDuplicateWarning} style={{ marginBottom: '0.6rem' }}>
+                  <p style={{ fontWeight: 600, marginBottom: '0.2rem' }}>{issue.label}</p>
+                  <p style={{ margin: '0 0 0.3rem' }}>{issue.detail}</p>
+                  <p style={{ margin: 0, fontStyle: 'italic' }}>{issue.suggestion}</p>
+                </div>
+              ))}
+            </>
+          )}
+
+          {upcomingCostItems.length > 0 && (
+            <>
+              <p className={styles.subtext} style={{ fontWeight: 600, marginTop: '1rem', marginBottom: '0.5rem' }}>
+                What a buyer&apos;s report will show as coming up
+              </p>
+              <ul style={{ margin: '0 0 1rem', paddingLeft: '1.2rem' }}>
+                {upcomingCostItems.map((item, i) => (
+                  <li key={i} className={styles.subtext} style={{ marginBottom: '0.3rem' }}>
+                    <strong>{item.label}</strong> - {item.timingDetail} ({item.timing === 'overdue' ? 'overdue' : 'due soon'})
+                    {item.pricing.status === 'priced' && (
+                      <> - typically £{item.pricing.low}-£{item.pricing.high}</>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
+
+          {likelyQuestions.length > 0 && (
+            <>
+              <p className={styles.subtext} style={{ fontWeight: 600, marginBottom: '0.5rem' }}>
+                Questions a buyer is likely to ask - have your answers ready
+              </p>
+              <ul style={{ margin: '0 0 1rem', paddingLeft: '1.2rem' }}>
+                {likelyQuestions.map((q, i) => (
+                  <li key={i} className={styles.subtext} style={{ marginBottom: '0.3rem' }}>{q}</li>
+                ))}
+              </ul>
+            </>
+          )}
+
+          <p className={styles.subtext} style={{ fontWeight: 600, marginBottom: '0.5rem' }}>Your prep checklist</p>
+          <ol style={{ margin: 0, paddingLeft: '1.2rem' }}>
+            {prepPlan.map((step, i) => (
+              <li key={i} className={styles.subtext} style={{ marginBottom: '0.4rem' }}>
+                <strong>{step.stage}:</strong> {step.detail}
+              </li>
+            ))}
+          </ol>
+        </>
+      )}
+    </div>
+  );
+}
+
+export function StorySoFarTab({ bikeNickname, registration, currentMileage, distanceUnit, initialStory, sellerPrep }: Props) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [story, setStory] = useState<StoryResponse | null>(initialStory);
@@ -113,6 +222,7 @@ export function StorySoFarTab({ bikeNickname, registration, currentMileage, dist
           {loading ? 'Putting it together…' : 'Generate my story →'}
         </button>
         {error && <p className="error-text" role="alert" style={{ marginTop: '0.8rem' }}>{error}</p>}
+        <SellerPrepSection data={sellerPrep} />
       </div>
     );
   }
@@ -168,6 +278,7 @@ export function StorySoFarTab({ bikeNickname, registration, currentMileage, dist
         </p>
       )}
       {error && <p className="error-text" role="alert" style={{ marginTop: '0.6rem' }}>{error}</p>}
+      <SellerPrepSection data={sellerPrep} />
     </div>
   );
 }
