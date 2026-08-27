@@ -1,4 +1,4 @@
-﻿/* Place at: src/app/report/[token]/report.module.css */
+/* Place at: src/app/report/[token]/report.module.css */
 .wrapper {
   max-width: 800px;
   margin: 0 auto;
@@ -95,6 +95,17 @@
 .findingGap { color: var(--ink-soft); }
 @media (max-width: 640px) {
   .twoColumn { grid-template-columns: 1fr; }
+
+  /* upsellBlock's CTA link, verifyBlock's QR code, and requestBar's
+     form all resist shrinking (flexShrink: 0, or fixed-width content) -
+     on a row layout with no wrap, that forces their sibling text into
+     a sliver-width column instead. Stacking removes the squeeze. */
+  .upsellBlock, .verifyBlock, .requestBar {
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: flex-start;
+  }
+  .qrBlock { align-self: center; }
 }
 
 .gateBlock { max-width: 420px; margin: 3rem auto; text-align: center; }

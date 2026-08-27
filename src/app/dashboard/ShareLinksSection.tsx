@@ -4,6 +4,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Icon } from './Icon';
+import { NotificationBell } from './NotificationBell';
 import { convertMilesToDisplay, type DistanceUnit } from '@/lib/tracker/unitFormat';
 import { AttachmentThumb } from './AttachmentThumb';
 import { ShareLinksList } from './ShareLinksList';
@@ -252,9 +253,12 @@ export function ShareLinksSection({ links, bikeNames, appUrl, requests, bikeNick
     </span>
   ) : null;
   const mileagePill = (
-    <div className={styles.headerMileagePill}>
-      <Icon name="currentMiles" size={15} />
-      {Math.round(convertMilesToDisplay(currentMileage, distanceUnit)).toLocaleString()} {distanceUnit === "km" ? "km" : "mi"}
+    <div style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
+      <NotificationBell />
+      <div className={styles.headerMileagePill}>
+        <Icon name="currentMiles" size={15} />
+        {Math.round(convertMilesToDisplay(currentMileage, distanceUnit)).toLocaleString()} {distanceUnit === "km" ? "km" : "mi"}
+      </div>
     </div>
   );
 

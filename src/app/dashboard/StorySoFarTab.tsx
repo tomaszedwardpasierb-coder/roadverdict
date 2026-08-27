@@ -3,6 +3,7 @@
 
 import { useState } from 'react';
 import { Icon } from './Icon';
+import { NotificationBell } from './NotificationBell';
 import { convertMilesToDisplay, type DistanceUnit } from '@/lib/tracker/unitFormat';
 import type { EvidenceQuality } from '@/lib/tracker/evidenceQuality';
 import type { SellerPrepIssue, PrepStep } from '@/lib/tracker/sellerPrep';
@@ -169,9 +170,12 @@ export function StorySoFarTab({ bikeNickname, registration, currentMileage, dist
     </span>
   ) : null;
   const mileagePill = (
-    <div className={styles.headerMileagePill}>
-      <Icon name="currentMiles" size={15} />
-      {Math.round(convertMilesToDisplay(currentMileage, distanceUnit)).toLocaleString()} {distanceUnit === "km" ? "km" : "mi"}
+    <div style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
+      <NotificationBell />
+      <div className={styles.headerMileagePill}>
+        <Icon name="currentMiles" size={15} />
+        {Math.round(convertMilesToDisplay(currentMileage, distanceUnit)).toLocaleString()} {distanceUnit === "km" ? "km" : "mi"}
+      </div>
     </div>
   );
 
@@ -201,11 +205,12 @@ export function StorySoFarTab({ bikeNickname, registration, currentMileage, dist
 
   if (!story) {
     return (
-      <div className={styles.storyIntro}>
+      <>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "0.75rem" }}>
           <h1 className={styles.heading}>The Story So Far{bikeTag}</h1>
           {mileagePill}
         </div>
+        <div className={styles.storyIntro}>
         <p className={styles.subtext}>
           What your logged history says about this bike - where it&apos;s strong, where a bit more logging would
           strengthen it, and the same story you can hand a buyer when you&apos;re ready to sell, backed by real dates
@@ -223,16 +228,18 @@ export function StorySoFarTab({ bikeNickname, registration, currentMileage, dist
         </button>
         {error && <p className="error-text" role="alert" style={{ marginTop: '0.8rem' }}>{error}</p>}
         <SellerPrepSection data={sellerPrep} />
-      </div>
+        </div>
+      </>
     );
   }
 
   return (
-    <div className={styles.storyIntro}>
+    <>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "0.75rem" }}>
         <h1 className={styles.heading}>The Story So Far{bikeTag}</h1>
         {mileagePill}
       </div>
+      <div className={styles.storyIntro}>
       <p className={styles.subtext} style={{ marginBottom: '0.3rem' }}>
         Documentation: <strong>{story.verdict.label}</strong>
       </p>
@@ -279,6 +286,7 @@ export function StorySoFarTab({ bikeNickname, registration, currentMileage, dist
       )}
       {error && <p className="error-text" role="alert" style={{ marginTop: '0.6rem' }}>{error}</p>}
       <SellerPrepSection data={sellerPrep} />
-    </div>
+      </div>
+    </>
   );
 }
