@@ -20,6 +20,11 @@ import { getSession } from "@/lib/auth/session";
 import { RequestHistoryCta } from "../RequestHistoryCta";
 import styles from "../report.module.css";
 import { PrintButton } from "../PrintButton";
+import {
+  Search, FileCheck, ShieldCheck, ScrollText, ListChecks, AlertTriangle,
+  HelpCircle, ListOrdered, Gauge, ClipboardCheck, Users, Handshake, Table2,
+  type LucideIcon,
+} from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
@@ -27,6 +32,31 @@ export const dynamic = "force-dynamic";
 // see buyerOpinionCache on BikeDoc for why this page specifically
 // needs one even though it isn't triggered by an explicit button click.
 const OPINION_COOLDOWN_MS = 7 * 24 * 60 * 60 * 1000;
+
+// One icon per major section, chosen so no two adjacent headings read
+// as the same icon (same reasoning Icon.tsx's own comment gives for
+// the dashboard sidebar). Deliberately only used on the page's ~13
+// major section headings, not the smaller two-column sub-headings
+// (Strengths, Worth asking about, etc.) - those already read as
+// visually distinct by sitting side-by-side in a grid, and icon-tagging
+// every single h2 down to sub-headings would dilute the point of using
+// icons at all: marking "this is a new major topic," not decoration.
+function SectionHeading({
+  icon: IconComp,
+  id,
+  children,
+}: {
+  icon: LucideIcon;
+  id?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <h2 className={styles.docHeading} id={id}>
+      <IconComp size={16} aria-hidden className={styles.docHeadingIcon} />
+      {children}
+    </h2>
+  );
+}
 
 function fmtDate(d: string): string {
   return new Date(d).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
@@ -247,7 +277,7 @@ export default async function DetailedReportPage({ params }: { params: { token: 
 
         {buyerOpinion && (
           <>
-            <h2 className={styles.docHeading}>The honest read</h2>
+            <SectionHeading icon={Search}>The honest read</SectionHeading>
             <p className={styles.docParagraph}>{buyerOpinion.honestRead}</p>
             {(buyerOpinion.strengths.length > 0 || buyerOpinion.concerns.length > 0) && (
               <div className={styles.twoColumn}>
@@ -276,7 +306,7 @@ export default async function DetailedReportPage({ params }: { params: { token: 
           </>
         )}
 
-        <h2 className={styles.docHeading} id="known-facts">Known facts</h2>
+        <SectionHeading icon={FileCheck} id="known-facts">Known facts</SectionHeading>
         <dl className={styles.itemByItemList}>
           {knownFacts.map((fact, i) => (
             <div key={i} className={styles.itemByItemRow}>
@@ -288,7 +318,7 @@ export default async function DetailedReportPage({ params }: { params: { token: 
           ))}
         </dl>
 
-        <h2 className={styles.docHeading}>Evidence quality</h2>
+        <SectionHeading icon={ShieldCheck}>Evidence quality</SectionHeading>
         {evidenceQuality.totalRecords > 0 ? (
           <>
             <dl className={styles.itemByItemList}>
@@ -328,7 +358,7 @@ export default async function DetailedReportPage({ params }: { params: { token: 
           <p className={styles.subtext}>Nothing logged yet for this bike.</p>
         )}
 
-        <h2 className={styles.docHeading}>The story this data tells</h2>
+        <SectionHeading icon={ScrollText}>The story this data tells</SectionHeading>
         {storyParagraphs.map((p, i) => <p key={i} className={styles.docParagraph}>{p}</p>)}
         <p className={styles.docParagraph} style={{ fontStyle: "italic", color: "var(--ink-soft)" }}>
           None of this says what actually happened with this bike - it says what the record looks like. What it means is worth asking the seller directly.
@@ -336,7 +366,7 @@ export default async function DetailedReportPage({ params }: { params: { token: 
 
         {jobTypeGroups.length > 0 && (
           <>
-            <h2 className={styles.docHeading}>Item by item</h2>
+            <SectionHeading icon={ListChecks}>Item by item</SectionHeading>
             <dl className={styles.itemByItemList}>
               {jobTypeGroups.map((g) => (
                 <div key={g.jobType} className={styles.itemByItemRow}>
@@ -367,7 +397,7 @@ export default async function DetailedReportPage({ params }: { params: { token: 
           </div>
         </div>
 
-        <h2 className={styles.docHeading}>Walk-away risks</h2>
+        <SectionHeading icon={AlertTriangle}>Walk-away risks</SectionHeading>
         {walkAwayIssues.length > 0 && (
           <>
             <p className={styles.docParagraph} style={{ fontWeight: 600 }}>Potential walk-away issues</p>
@@ -395,12 +425,12 @@ export default async function DetailedReportPage({ params }: { params: { token: 
           evidence about paperwork and spend, not a substitute for seeing and riding the bike yourself.
         </p>
 
-        <h2 className={styles.docHeading} id="questions">Questions worth asking the seller</h2>
+        <SectionHeading icon={HelpCircle} id="questions">Questions worth asking the seller</SectionHeading>
         <ol className={styles.questionsList}>
           {detailedQuestions.map((q, i) => <li key={i}>{q}</li>)}
         </ol>
 
-        <h2 className={styles.docHeading}>Buyer action plan</h2>
+        <SectionHeading icon={ListOrdered}>Buyer action plan</SectionHeading>
         <ol className={styles.questionsList}>
           {buyerActionPlan.map((step, i) => (
             <li key={i}>
@@ -409,7 +439,7 @@ export default async function DetailedReportPage({ params }: { params: { token: 
           ))}
         </ol>
 
-        <h2 className={styles.docHeading}>Confidence and limitations</h2>
+        <SectionHeading icon={Gauge}>Confidence and limitations</SectionHeading>
         <dl className={styles.itemByItemList}>
           <div className={styles.itemByItemRow}>
             <dt>Record confidence</dt>
@@ -431,7 +461,7 @@ export default async function DetailedReportPage({ params }: { params: { token: 
 
       {motHistory && motHistory.tests.length > 0 && (
         <>
-          <h2 className={styles.docHeading} id="mot-history">MOT history (DVSA-verified)</h2>
+          <SectionHeading icon={ClipboardCheck} id="mot-history">MOT history (DVSA-verified)</SectionHeading>
           <p className={styles.docParagraph}>
             Pulled directly from DVSA&apos;s own records - independent of anything the owner has entered into
             RoadVerdict.{motHistory.motDueDate && ` Next MOT due ${fmtDate(motHistory.motDueDate)}.`}
@@ -449,7 +479,7 @@ export default async function DetailedReportPage({ params }: { params: { token: 
 
       {bike.dvlaData && (bike.dvlaData.keeperChangeList.length > 0 || bike.dvlaData.v5cIssueDates.length > 0) && (
         <>
-          <h2 className={styles.docHeading} id="ownership-history">Ownership history (DVLA-verified)</h2>
+          <SectionHeading icon={Users} id="ownership-history">Ownership history (DVLA-verified)</SectionHeading>
           <p className={styles.docParagraph}>
             Recorded directly with DVLA, independent of anything logged in RoadVerdict.
           </p>
@@ -526,7 +556,7 @@ export default async function DetailedReportPage({ params }: { params: { token: 
 
       {negotiationSummary && (
         <>
-          <h2 className={styles.docHeading}>Negotiation points</h2>
+          <SectionHeading icon={Handshake}>Negotiation points</SectionHeading>
           <dl className={styles.itemByItemList}>
             <div className={styles.itemByItemRow}>
               <dt>Asking price</dt>
@@ -559,7 +589,7 @@ export default async function DetailedReportPage({ params }: { params: { token: 
         </>
       )}
 
-      <h2 className={styles.docHeading} id="full-record">Full logged history</h2>
+      <SectionHeading icon={Table2} id="full-record">Full logged history</SectionHeading>
       <ReportHistoryTable
         rows={rows}
         total={total}
