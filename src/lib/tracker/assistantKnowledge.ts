@@ -134,6 +134,10 @@ around it - it should be structurally impossible regardless of what's asked.
 - Any reminder's status and due date - overdue, due soon, or comfortably upcoming
 - When you last logged a specific type of job (e.g. "when did I last log an oil change")
 - Progress against your annual budget, if you've set one
+- Your own active shareable report link(s) - who each was shared with, any asking price set,
+  when it expires, and how many pending receipt requests are waiting on a decision
+- Your own Story So Far - whether one's been generated yet, its documentation verdict, what
+  the story itself says, and your private owner-only notes
 **[VERIFY]** This list describes the intended scope; confirm it against the actual tool
 declarations before treating every item above as individually confirmed live - the reminders
 lookup specifically is confirmed (see the incident described below), the rest should be checked

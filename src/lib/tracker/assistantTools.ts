@@ -20,6 +20,8 @@ import { computeReminderStatus, reminderDetailLabel } from "./reminderStatus";
 import { computeActualMPG, computeMPGSeries } from "./mpgCalc";
 import { gatherMileagePoints } from "./summary";
 import { JOB_LABELS } from "./jobTypes";
+import { getShareLinksForUser } from "./shareLink";
+import { getPendingReceiptRequestsForOwner } from "./receiptRequest";
 
 type CostItem = { date: string; cost: number };
 
@@ -214,6 +216,76 @@ export async function toolGetLastLoggedJob(email: string, args: Record<string, u
   return { found: true, date: latest.date, mileage: latest.mileage, cost: latest.cost, jobType: JOB_LABELS[latest.jobType] ?? latest.jobType };
 }
 
+// ---- Share links - whether any are active, and any pending receipt requests ----
+//
+// Same email-only scoping as every tool above: getShareLinksForUser and
+// getPendingReceiptRequestsForOwner both take the session's own email,
+// nothing model-supplied. Filtered down to the primary bike specifically
+// (rather than returning every link across every bike on the account),
+// matching how every other tool here answers about "this account's
+// bike" singular, not the account in general.
+
+export async function toolGetShareLinks(email: string) {
+  const bike = await getPrimaryBike(email);
+  if (!bike) return { error: "No bike found on this account." };
+
+  const [allLinks, pendingRequests] = await Promise.all([
+    getShareLinksForUser(email),
+    getPendingReceiptRequestsForOwner(email),
+  ]);
+
+  const now = Date.now();
+  const activeLinks = allLinks.filter((l) => l.bikeId === bike.id && (!l.expiresAt || new Date(l.expiresAt).getTime() > now));
+  const pendingForBike = pendingRequests.filter((r) => r.bikeId === bike.id);
+
+  if (activeLinks.length === 0) {
+    return { hasActiveLinks: false, pendingReceiptRequestCount: pendingForBike.length };
+  }
+
+  return {
+    hasActiveLinks: true,
+    activeLinkCount: activeLinks.length,
+    links: activeLinks.map((l) => ({
+      sharedWith: l.recipientEmail ?? "not recorded (created before this was required)",
+      askingPrice: l.askingPrice ?? null,
+      createdAt: l.createdAt,
+      expiresAt: l.expiresAt ?? "never expires",
+    })),
+    pendingReceiptRequestCount: pendingForBike.length,
+  };
+}
+
+// ---- The Story So Far - the cached AI narrative, if one's been generated ----
+//
+// Reads bike.storyCache directly off the already-fetched bike document -
+// no extra query needed, same document every other tool here already
+// loads via getPrimaryBike. Deliberately doesn't trigger a fresh
+// generation if none exists yet (that's a paid-in-AI-calls action with
+// its own weekly cooldown, gated behind an explicit button click on the
+// Story So Far tab - a chat question should never silently spend it).
+
+export async function toolGetStorySoFar(email: string) {
+  const bike = await getPrimaryBike(email);
+  if (!bike) return { error: "No bike found on this account." };
+
+  if (!bike.storyCache) {
+    return {
+      hasStory: false,
+      note: "No Story So Far has been generated yet for this bike - the owner needs to visit the Story So Far tab and click Generate my story.",
+    };
+  }
+
+  const { generatedAt, response } = bike.storyCache;
+  return {
+    hasStory: true,
+    generatedAt,
+    documentationVerdict: response.verdict.label,
+    verdictReasons: response.verdict.reasons,
+    story: response.sharedStory,
+    ownerOnlyNotes: response.ownerNotes,
+  };
+}
+
 // ---- Gemini function-calling schema for every tool above ----
 // Kept in the same file as the implementations so the two can never
 // drift apart - a tool declared here without a matching case in the
@@ -269,6 +341,16 @@ export const ASSISTANT_TOOL_DECLARATIONS = [
       required: ["jobQuery"],
     },
   },
+  {
+    name: "getShareLinks",
+    description: "Get the signed-in user's own active shareable report links for their bike - who each was shared with, any asking price set, when it expires, and how many pending receipt requests are waiting on a decision. Use for any question about their share link(s), whether they've shared their bike, or receipt requests from a buyer.",
+    parameters: { type: "OBJECT", properties: {} },
+  },
+  {
+    name: "getStorySoFar",
+    description: "Get the signed-in user's own cached 'Story So Far' - the AI-written narrative about their bike's logged history, its documentation verdict, and the private owner-only notes. Use for any question about their Story So Far, what it says, or whether one has been generated yet.",
+    parameters: { type: "OBJECT", properties: {} },
+  },
 ] as const;
 
 export type ToolName = (typeof ASSISTANT_TOOL_DECLARATIONS)[number]["name"];
@@ -290,6 +372,10 @@ export async function runAssistantTool(name: string, args: Record<string, unknow
       return toolGetBudgetProgress(email);
     case "getLastLoggedJob":
       return toolGetLastLoggedJob(email, args);
+    case "getShareLinks":
+      return toolGetShareLinks(email);
+    case "getStorySoFar":
+      return toolGetStorySoFar(email);
     default:
       return { error: `Unknown tool: ${name}` };
   }
