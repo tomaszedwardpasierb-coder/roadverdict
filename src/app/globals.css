@@ -143,6 +143,15 @@ a {
   background: var(--asphalt-2);
 }
 
+/* Hidden at every width by default - only ever shown inside the
+   mobile media query below. Keeping the "off" state as the base rule
+   (rather than only defining these inside the media query) means a
+   window resized from mobile to desktop while the menu happens to be
+   open can never leave it visible - the CSS hides it regardless of
+   React's open state. */
+.site-header__menuBtn { display: none; }
+.site-header__mobileMenu { display: none; }
+
 @media (max-width: 480px) {
   .site-header {
     padding: 1rem;
@@ -155,6 +164,41 @@ a {
   .site-header__nav-item {
     font-size: 0.8rem;
     padding: 0.4rem 0.7rem;
+  }
+
+  /* The horizontal link row is replaced, not just shrunk further - a
+     single icon button is essentially immune to the "doesn't fit"
+     failure mode four spelled-out labels have under font-size scaling
+     or a narrow viewport. */
+  .site-header__nav { display: none; }
+
+  .site-header__menuBtn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    border-radius: var(--radius-sm);
+    background: none;
+    border: 1.5px solid transparent;
+    color: #fff;
+  }
+  .site-header__menuBtn:hover { background: var(--asphalt-2); }
+
+  /* flex-basis: 100% forces this onto its own row below the logo/button
+     row, rather than trying to sit alongside them - .site-header is
+     already display:flex; flex-wrap:wrap, so no extra positioning is
+     needed to get that wrap. Items inside stretch to full width by
+     flex's own default align-items: stretch, without needing to touch
+     .site-header__nav-item itself (shared with the desktop row). */
+  .site-header__mobileMenu {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+    flex-basis: 100%;
+    margin-top: 0.75rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.12);
   }
 }
 
