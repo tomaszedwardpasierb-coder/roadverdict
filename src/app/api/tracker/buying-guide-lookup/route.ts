@@ -18,6 +18,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/session";
 import { parseMotHistory, type RawMotTest } from "@/lib/tracker/motHistory";
+import { classifyVehicleType, type VehicleTypeCheck } from "@/lib/tracker/vehicleTypeCheck";
 
 export const dynamic = "force-dynamic";
 
@@ -33,6 +34,7 @@ interface VdgVehicleResponse {
         DvlaModel: string;
         YearOfManufacture: number;
         DvlaFuelType: string;
+        DvlaBodyType: string;
       };
       VehicleHistory?: { ColourDetails?: { CurrentColour: string } };
     };
@@ -62,6 +64,7 @@ export interface BuyingGuideLookupResult {
   colour: string;
   engineCapacityCc: number | null;
   plateInRetention: boolean;
+  vehicleType: VehicleTypeCheck;
   motDueDate: string | null;
   motTests: {
     testDate: string;
@@ -146,6 +149,7 @@ export async function GET(request: NextRequest) {
     colour: vd.VehicleHistory?.ColourDetails?.CurrentColour ?? "",
     engineCapacityCc: md?.Powertrain?.IceDetails?.EngineCapacityCc ?? null,
     plateInRetention,
+    vehicleType: classifyVehicleType(vd.VehicleIdentification.DvlaBodyType ?? ""),
     motDueDate,
     motTests,
   };

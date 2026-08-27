@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import { useState, type FormEvent, type ReactNode } from 'react';
 import {
@@ -14,6 +14,7 @@ import {
   slugifyMake,
 } from '@/lib/motorcycleModels';
 import type { AnnualCostBreakdown } from '@/lib/costCalculator';
+import type { VehicleTypeCheck } from '@/lib/tracker/vehicleTypeCheck';
 import { CostBreakdownResult } from './CostBreakdownResult';
 
 interface ApiResponse {
@@ -30,6 +31,7 @@ interface PlateLookupResponse {
   year: number;
   engineCapacityCc: number | null;
   plateInRetention: boolean;
+  vehicleType: VehicleTypeCheck;
   error?: string;
 }
 
@@ -106,6 +108,21 @@ export function CostCalculatorForm({ signedIn, initialBrand, initialModel, initi
       const data: PlateLookupResponse = await res.json();
       if (!res.ok) {
         setLookupError(data.error ?? 'No vehicle found for that registration. Pick it manually below instead.');
+        return;
+      }
+
+      // Same gate as the "add a bike" flow in the dashboard, and the
+      // exact same wording - a definite non-motorcycle stops here
+      // entirely, before any of the fields below get auto-filled with
+      // a car's data, and a genuinely uncertain result is treated the
+      // same way rather than assumed to be a bike just because that's
+      // the more common case.
+      if (data.vehicleType === 'four-wheeled') {
+        setLookupError("Oops! Are you sure that's a bike? It looks like it has four wheels. 🏍️");
+        return;
+      }
+      if (data.vehicleType === 'unknown') {
+        setLookupError("Couldn't confirm what type of vehicle this registration belongs to. Double-check the registration number, or enter the bike's details manually below.");
         return;
       }
 
