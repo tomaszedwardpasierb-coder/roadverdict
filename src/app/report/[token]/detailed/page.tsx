@@ -135,6 +135,22 @@ export default async function DetailedReportPage({ params }: { params: { token: 
     }
   }
 
+  // Curated, data-driven jump-nav - only ever includes a pill for a
+  // section that actually renders on THIS report, so a link can never
+  // point at a heading that isn't there for this particular bike.
+  const jumpNavItems: { href: string; label: string }[] = [{ href: "#known-facts", label: "Known facts" }];
+  if (motHistory && motHistory.tests.length > 0) jumpNavItems.push({ href: "#mot-history", label: "MOT history" });
+  if (bike.dvlaData && (bike.dvlaData.keeperChangeList.length > 0 || bike.dvlaData.v5cIssueDates.length > 0)) {
+    jumpNavItems.push({ href: "#ownership-history", label: "Ownership" });
+  }
+  if (upcomingCostItems.length > 0) jumpNavItems.push({ href: "#whats-coming-up", label: "Costs" });
+  jumpNavItems.push({ href: "#questions", label: "Questions" });
+  jumpNavItems.push({ href: "#full-record", label: "Full record" });
+
+  const overdueCount = upcomingCostItems.filter((i) => i.timing === "overdue").length;
+  const verdictTierClass =
+    verdict.tier === "well-documented" ? styles.verdictGood : verdict.tier === "partially-documented" ? styles.verdictMid : styles.verdictPoor;
+
   return (
     <div className={styles.wrapper}>
       <div className={styles.noPrint} style={{ marginBottom: "1.2rem", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -142,15 +158,44 @@ export default async function DetailedReportPage({ params }: { params: { token: 
         <PrintButton />
       </div>
 
-      <div className={styles.docPage}>
-        <p className={styles.upsellFlag}>Buyer Verdict Report</p>
-        <h1 className={styles.title}>What this data says about {bike.nickname ? bike.nickname : `this ${bike.make} ${bike.model}`}</h1>
-        <p className={styles.subtext}>
-          {bike.make} {bike.model} · {bike.isCustomBuild ? "Custom build" : bike.year} · {bike.engineCC}cc ·{" "}
-          {bike.currentMileage.toLocaleString()} miles
-          {bike.dvlaData?.powerBhp && ` · ${bike.dvlaData.powerBhp}bhp`}
-        </p>
+      <p className={styles.upsellFlag}>Buyer Verdict Report</p>
+      <h1 className={styles.title}>What this data says about {bike.nickname ? bike.nickname : `this ${bike.make} ${bike.model}`}</h1>
+      <p className={styles.subtext}>
+        {bike.make} {bike.model} · {bike.isCustomBuild ? "Custom build" : bike.year} · {bike.engineCC}cc ·{" "}
+        {bike.currentMileage.toLocaleString()} miles
+        {bike.dvlaData?.powerBhp && ` · ${bike.dvlaData.powerBhp}bhp`}
+      </p>
 
+      <div className={`${styles.verdictBlock} ${verdictTierClass}`}>
+        <p className={styles.verdictBadge}>{verdict.label}</p>
+        <p className={styles.docParagraph} style={{ margin: 0 }}>
+          {buyerOpinion ? buyerOpinion.honestRead : verdict.reasons[0] ?? "See the full record below for what's behind this documentation tier."}
+        </p>
+        {(overdueCount > 0 || walkAwayIssues.length > 0 || (buyerOpinion && (buyerOpinion.strengths.length > 0 || buyerOpinion.concerns.length > 0))) && (
+          <div className={styles.verdictChips}>
+            {buyerOpinion && buyerOpinion.strengths.length > 0 && (
+              <span className={styles.verdictChipGood}>{buyerOpinion.strengths.length} strength{buyerOpinion.strengths.length === 1 ? "" : "s"}</span>
+            )}
+            {buyerOpinion && buyerOpinion.concerns.length > 0 && (
+              <span className={styles.verdictChipWarn}>{buyerOpinion.concerns.length} worth asking about</span>
+            )}
+            {walkAwayIssues.length > 0 && (
+              <span className={styles.verdictChipWarn}>{walkAwayIssues.length} walk-away flag{walkAwayIssues.length === 1 ? "" : "s"}</span>
+            )}
+            {overdueCount > 0 && <span className={styles.verdictChipNeutral}>{overdueCount} overdue</span>}
+          </div>
+        )}
+      </div>
+
+      <nav className={styles.jumpNav} aria-label="Jump to a section">
+        <div className={styles.jumpNavInner}>
+          {jumpNavItems.map((item) => (
+            <a key={item.href} href={item.href} className={styles.jumpNavItem}>{item.label}</a>
+          ))}
+        </div>
+      </nav>
+
+      <div className={styles.docPage}>
         {bike.dvlaData && (bike.dvlaData.warrantyMonths || bike.dvlaData.warrantyMiles) && bike.dvlaData.dateFirstRegistered && (() => {
           const regDate = new Date(bike.dvlaData.dateFirstRegistered!);
           const monthsOld = (Date.now() - regDate.getTime()) / (1000 * 60 * 60 * 24 * 30.44);
@@ -231,7 +276,7 @@ export default async function DetailedReportPage({ params }: { params: { token: 
           </>
         )}
 
-        <h2 className={styles.docHeading}>Known facts</h2>
+        <h2 className={styles.docHeading} id="known-facts">Known facts</h2>
         <dl className={styles.itemByItemList}>
           {knownFacts.map((fact, i) => (
             <div key={i} className={styles.itemByItemRow}>
@@ -350,7 +395,7 @@ export default async function DetailedReportPage({ params }: { params: { token: 
           evidence about paperwork and spend, not a substitute for seeing and riding the bike yourself.
         </p>
 
-        <h2 className={styles.docHeading}>Questions worth asking the seller</h2>
+        <h2 className={styles.docHeading} id="questions">Questions worth asking the seller</h2>
         <ol className={styles.questionsList}>
           {detailedQuestions.map((q, i) => <li key={i}>{q}</li>)}
         </ol>
@@ -386,7 +431,7 @@ export default async function DetailedReportPage({ params }: { params: { token: 
 
       {motHistory && motHistory.tests.length > 0 && (
         <>
-          <h2 className={styles.docHeading}>MOT history (DVSA-verified)</h2>
+          <h2 className={styles.docHeading} id="mot-history">MOT history (DVSA-verified)</h2>
           <p className={styles.docParagraph}>
             Pulled directly from DVSA&apos;s own records - independent of anything the owner has entered into
             RoadVerdict.{motHistory.motDueDate && ` Next MOT due ${fmtDate(motHistory.motDueDate)}.`}
@@ -404,7 +449,7 @@ export default async function DetailedReportPage({ params }: { params: { token: 
 
       {bike.dvlaData && (bike.dvlaData.keeperChangeList.length > 0 || bike.dvlaData.v5cIssueDates.length > 0) && (
         <>
-          <h2 className={styles.docHeading}>Ownership history (DVLA-verified)</h2>
+          <h2 className={styles.docHeading} id="ownership-history">Ownership history (DVLA-verified)</h2>
           <p className={styles.docParagraph}>
             Recorded directly with DVLA, independent of anything logged in RoadVerdict.
           </p>
@@ -453,7 +498,7 @@ export default async function DetailedReportPage({ params }: { params: { token: 
 
       {upcomingCostItems.length > 0 && (
         <div className={styles.upcomingBlock}>
-          <p className={styles.upcomingTitle}>What&apos;s coming up</p>
+          <p className={styles.upcomingTitle} id="whats-coming-up">What&apos;s coming up</p>
           <ul className={styles.upcomingList}>
             {upcomingCostItems.map((item) => (
               <li key={item.jobType} className={item.timing === "overdue" ? styles.upcomingOverdue : styles.upcomingSoon}>
@@ -514,7 +559,7 @@ export default async function DetailedReportPage({ params }: { params: { token: 
         </>
       )}
 
-      <h2 className={styles.docHeading}>Full logged history</h2>
+      <h2 className={styles.docHeading} id="full-record">Full logged history</h2>
       <ReportHistoryTable
         rows={rows}
         total={total}

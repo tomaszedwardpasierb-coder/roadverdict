@@ -29,6 +29,43 @@
 .verdictReasons { margin: 0; padding-left: 1.2rem; font-size: 0.85rem; color: var(--ink-soft); }
 .verdictReasons li { margin-bottom: 0.2rem; }
 
+.verdictChips { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.7rem; }
+.verdictChip, .verdictChipGood, .verdictChipWarn, .verdictChipNeutral {
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 0.2rem 0.65rem;
+  border-radius: 20px;
+  white-space: nowrap;
+}
+.verdictChipGood { background: var(--green-tint); color: #173404; }
+.verdictChipWarn { background: var(--red-tint); color: #501313; }
+.verdictChipNeutral { background: #fff; color: var(--ink-soft); border: 1px solid var(--border); }
+
+.jumpNav {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  background: var(--stone);
+  margin: 0 -1.5rem 1.5rem;
+  padding: 0.6rem 1.5rem;
+  border-bottom: 1px solid var(--border);
+}
+.jumpNavInner { display: flex; gap: 0.5rem; overflow-x: auto; scrollbar-width: none; }
+.jumpNavInner::-webkit-scrollbar { display: none; }
+.jumpNavItem {
+  flex-shrink: 0;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--ink);
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 0.35rem 0.8rem;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.jumpNavItem:hover { background: var(--stone); }
+
 .upsellBlock {
   display: flex;
   justify-content: space-between;
@@ -71,6 +108,7 @@
   margin: 1.6rem 0 0.7rem;
   padding-bottom: 0.35rem;
   border-bottom: 1px solid var(--border);
+  scroll-margin-top: 4.5rem;
 }
 .docHeading:first-of-type { margin-top: 0.4rem; }
 .docParagraph { font-size: 0.92rem; line-height: 1.6; margin: 0 0 0.8rem; }
@@ -223,7 +261,7 @@
   padding: 1rem 1.2rem;
   margin-bottom: 1.5rem;
 }
-.upcomingTitle { font-family: var(--font-display); font-size: 1rem; margin: 0 0 0.6rem; }
+.upcomingTitle { font-family: var(--font-display); font-size: 1rem; margin: 0 0 0.6rem; scroll-margin-top: 4.5rem; }
 .upcomingList { margin: 0; padding-left: 1.2rem; font-size: 0.87rem; }
 .upcomingList li { margin-bottom: 0.3rem; }
 .upcomingOverdue { color: var(--verdict-red); }
