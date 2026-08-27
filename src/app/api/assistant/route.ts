@@ -11,8 +11,10 @@ import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/session";
 import { getLivePrivacyPolicyText } from "@/lib/tracker/assistantKnowledge";
 import { getAssistantConfig, type AssistantConfigDoc } from "@/lib/tracker/assistantConfig";
-import { ASSISTANT_TOOL_DECLARATIONS, runAssistantTool } from "@/lib/tracker/assistantTools";
+import { ASSISTANT_TOOL_DECLARATIONS, REPORT_TOOL_DECLARATIONS, runAssistantTool } from "@/lib/tracker/assistantTools";
 import { logAssistantQuestion } from "@/lib/tracker/assistantQuestionLog";
+import { resolveShareToken } from "@/lib/tracker/shareLink";
+import { hasReportAccess } from "@/lib/tracker/reportAccess";
 
 export const dynamic = "force-dynamic";
 
@@ -44,7 +46,7 @@ interface GeminiContent {
   parts: GeminiPart[];
 }
 
-function buildSystemInstruction(config: AssistantConfigDoc, signedIn: boolean, privacyPolicyText: string | null): string {
+function buildSystemInstruction(config: AssistantConfigDoc, signedIn: boolean, privacyPolicyText: string | null, reportOpen: boolean): string {
   const parts = [config.knowledgeBase];
 
   // Appended right after the knowledge base, before the more
@@ -68,6 +70,12 @@ function buildSystemInstruction(config: AssistantConfigDoc, signedIn: boolean, p
       ? "\n\n---\n\nCURRENT SESSION: a real, signed-in user is asking. The tools described in section 5 of the document above are available to you now - use them for any question about their own logged data rather than guessing or asking them to look it up themselves. Never ask the user for an account identifier, email, or bike ID to look something up - you already have everything you need through the tools; asking for it would be both unnecessary and a sign something's gone wrong."
       : "\n\n---\n\nCURRENT SESSION: nobody is signed in right now. The personal-data tools in section 5 are not available for this conversation. If asked about their own spend, mileage, or similar, say plainly that you'd need them signed in to look that up - don't guess, and don't claim to check something you have no way to check right now."
   );
+
+  if (reportOpen) {
+    parts.push(
+      "\n\n---\n\nCURRENT PAGE: the visitor currently has a specific shared report open - either their own bike's, or one someone else generated to show a bike's logged history to a potential buyer. The getViewedReport tool is available now - use it for any question about 'this report', 'this bike' (while a report page is open), or a request to summarize what's shown. This report may belong to a completely different account than whoever is signed in, if anyone - never conflate the two. Never use the signed-in user's own personal-data tools to answer a question about this report, and never use getViewedReport to answer a question about the signed-in user's own account in general."
+    );
+  }
 
   parts.push(
     privacyPolicyText
@@ -93,7 +101,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Assistant is not configured." }, { status: 503 });
   }
 
-  let body: { messages?: ChatMessage[] };
+  let body: { messages?: ChatMessage[]; reportToken?: string };
   try {
     body = await req.json();
   } catch {
@@ -123,6 +131,26 @@ export async function POST(req: Request) {
     console.error("Assistant: getSession() failed, continuing as anonymous:", err);
   }
   const signedIn = !!session;
+
+  // Only ever trusted after both checks below pass - a token that
+  // merely exists isn't enough, since that would let the assistant
+  // answer about a report the visitor hasn't actually unlocked yet
+  // (e.g. a guessed or leaked token with no plate-gate pass behind it).
+  // hasReportAccess() is the exact same cookie-backed check the report
+  // pages themselves use to decide whether to render at all.
+  let reportToken: string | null = null;
+  const rawReportToken = typeof body.reportToken === "string" ? body.reportToken.trim() : "";
+  if (rawReportToken) {
+    try {
+      const resolved = await resolveShareToken(rawReportToken);
+      if (resolved && (await hasReportAccess(rawReportToken))) {
+        reportToken = rawReportToken;
+      }
+    } catch (err) {
+      console.error("Assistant: report token validation failed, continuing without it:", err);
+    }
+  }
+
   // The client always appends the new message before sending, so this
   // is the actual question being asked right now - not the full
   // history, which would have already been logged on earlier requests.
@@ -141,10 +169,14 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Assistant is temporarily unavailable." }, { status: 503 });
   }
 
-  const systemInstruction = buildSystemInstruction(config, signedIn, privacyPolicyText);
+  const systemInstruction = buildSystemInstruction(config, signedIn, privacyPolicyText, !!reportToken);
 
   const contents: GeminiContent[] = toGeminiContents(messages);
-  const tools = signedIn ? [{ functionDeclarations: ASSISTANT_TOOL_DECLARATIONS }] : undefined;
+  const toolDeclarations = [
+    ...(signedIn ? ASSISTANT_TOOL_DECLARATIONS : []),
+    ...(reportToken ? REPORT_TOOL_DECLARATIONS : []),
+  ];
+  const tools = toolDeclarations.length > 0 ? [{ functionDeclarations: toolDeclarations }] : undefined;
 
   try {
     // Bounded rather than while(true) - a tool-call loop that somehow
@@ -172,11 +204,13 @@ export async function POST(req: Request) {
       const parts: GeminiPart[] = data?.candidates?.[0]?.content?.parts ?? [];
       const functionCallPart = parts.find((p) => p.functionCall);
 
-      if (functionCallPart?.functionCall && session && round < MAX_TOOL_ROUNDS) {
+      if (functionCallPart?.functionCall && (session || reportToken) && round < MAX_TOOL_ROUNDS) {
         const { name, args } = functionCallPart.functionCall;
         // session.email only - never anything from `args`, which is
         // model-supplied and therefore untrusted for identity purposes.
-        const toolResult = await runAssistantTool(name, args ?? {}, session.email);
+        // reportToken is this same request's own server-validated value
+        // from above, for the same reason.
+        const toolResult = await runAssistantTool(name, args ?? {}, session?.email ?? "", reportToken ?? undefined);
 
         // Echo back every part from the model's actual turn, verbatim -
         // not a rebuilt {functionCall: {name, args}}, which silently

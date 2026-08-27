@@ -22,6 +22,7 @@ import { gatherMileagePoints } from "./summary";
 import { JOB_LABELS } from "./jobTypes";
 import { getShareLinksForUser } from "./shareLink";
 import { getPendingReceiptRequestsForOwner } from "./receiptRequest";
+import { getSellerReportData } from "./sellerReportData";
 
 type CostItem = { date: string; cost: number };
 
@@ -355,10 +356,76 @@ export const ASSISTANT_TOOL_DECLARATIONS = [
 
 export type ToolName = (typeof ASSISTANT_TOOL_DECLARATIONS)[number]["name"];
 
+// ---- The specific shared report currently open, if any ----
+//
+// Deliberately NOT part of ASSISTANT_TOOL_DECLARATIONS above and NOT
+// gated on a session at all - a signed-out buyer with a valid,
+// already-unlocked report link must be able to use this. The token
+// this reads is never model-supplied (same principle as email for the
+// tools above): route.ts only offers this declaration once it has
+// independently verified, server-side, that the token resolves to a
+// real report AND that this same browser already passed that report's
+// plate-gate (hasReportAccess) - the exact same check the report pages
+// themselves use to decide whether to render at all. So this tool can
+// never surface anything the visitor couldn't already read directly
+// off the page in front of them.
+export const REPORT_TOOL_DECLARATIONS = [
+  {
+    name: "getViewedReport",
+    description: "Get a summary of the specific shared report currently open on this page - the documentation verdict, evidence quality, the story the record tells, upcoming costs, and (if available) the dealer-style honest read with strengths and things worth asking about. Use this for any question about 'this report', 'this bike' when a report page is open, or a request to summarize what's shown. This report may belong to a completely different account than whoever is signed in, if anyone - never answer a question about it using the signed-in user's own personal-data tools, and never use this tool to answer a question about the signed-in user's own account.",
+    parameters: { type: "OBJECT", properties: {} },
+  },
+] as const;
+
+export async function toolGetViewedReport(shareToken: string) {
+  try {
+    const data = await getSellerReportData(shareToken);
+    const bike = data.bike;
+    const honestRead = bike.buyerOpinionCache?.response ?? null;
+
+    return {
+      bike: `${bike.isCustomBuild ? "Custom build" : bike.year ?? ""} ${bike.make} ${bike.model}`.trim(),
+      currentMileage: bike.currentMileage,
+      askingPrice: data.askingPrice ?? null,
+      documentationVerdict: data.verdict.label,
+      verdictReasons: data.verdict.reasons,
+      recordSummary: data.storyParagraphs,
+      evidenceQuality: {
+        totalRecords: data.evidenceQuality.totalRecords,
+        receiptCoveragePct: data.evidenceQuality.receiptCoveragePct,
+        realTimePct: data.evidenceQuality.realTimePct,
+        mileageInternallyConsistent: data.evidenceQuality.mileageInternallyConsistent,
+      },
+      upcomingCosts: data.upcomingCostItems.map((i) => ({ label: i.label, timing: i.timing, timingDetail: i.timingDetail })),
+      // Only present if already generated and cached - never triggers a
+      // fresh AI generation from a chat question, same reasoning as
+      // toolGetStorySoFar above.
+      ...(honestRead ? { honestRead: honestRead.honestRead, strengths: honestRead.strengths, concerns: honestRead.concerns } : {}),
+    };
+  } catch (err) {
+    // Covers a token that stops resolving between route.ts's check and
+    // this call (e.g. deleted or expired in that gap) - fail as a plain
+    // tool error the model can relay honestly, never an unhandled throw.
+    console.error("toolGetViewedReport failed:", err);
+    return { error: "Couldn't load this report right now." };
+  }
+}
+
 // Single dispatch point - the API route calls this instead of a
 // hand-written switch of its own, so the set of callable tools is
 // defined in exactly one place.
-export async function runAssistantTool(name: string, args: Record<string, unknown>, email: string) {
+export async function runAssistantTool(name: string, args: Record<string, unknown>, email: string, reportToken?: string) {
+  // Checked before the session-scoped switch below, and independent of
+  // it - this tool works with no session at all, as long as route.ts
+  // already validated the report token. reportToken here is always the
+  // server-checked value from route.ts, never read from `args` (which
+  // is model-supplied and therefore untrusted for deciding which report
+  // to look up, same reasoning as email above).
+  if (name === "getViewedReport") {
+    if (!reportToken) return { error: "No report is currently open." };
+    return toolGetViewedReport(reportToken);
+  }
+
   switch (name as ToolName) {
     case "getSpendTotal":
       return toolGetSpendTotal(email, args as SpendTotalArgs);

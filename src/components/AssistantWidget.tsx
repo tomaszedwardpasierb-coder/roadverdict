@@ -2,6 +2,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { usePathname } from 'next/navigation';
 import styles from './AssistantWidget.module.css';
 
 interface Message {
@@ -13,6 +14,21 @@ const GREETING: Message = {
   role: 'assistant',
   content: "Hi - I can help with anything about using RoadVerdict: logging a receipt, checking your spend, whatever you're trying to do. What can I help with?",
 };
+
+// Matches /report/<token> or /report/<token>/detailed - the two pages
+// a share link actually resolves to. Deliberately excludes
+// /report/receipt-request/..., the one other route under /report/ that
+// isn't a share-token page at all. This is only ever a hint to the
+// server about which page is open - the server independently verifies
+// the token is real and that this browser has actually passed that
+// report's plate-gate before trusting it for anything (see route.ts).
+function extractReportToken(pathname: string): string | null {
+  const match = pathname.match(/^\/report\/([^/]+)(?:\/detailed)?\/?$/);
+  if (!match) return null;
+  const token = match[1];
+  if (token === 'receipt-request') return null;
+  return token;
+}
 
 // One silent automatic retry beyond the first attempt - most failures
 // here are a brief blip (a transient network drop, or Gemini itself
@@ -38,17 +54,21 @@ function isRetryable(status: number | null): boolean {
 
 type SendResult = { ok: true; reply: string } | { ok: false; error: string; retryable: boolean };
 
-async function attemptSend(payload: Message[]): Promise<SendResult> {
+async function attemptSend(payload: Message[], reportToken: string | null): Promise<SendResult> {
   let status: number | null = null;
   try {
     const res = await fetch('/api/assistant', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      // Only role/content goes over the wire - nothing else about
-      // the user is sent from here; anything the assistant knows
-      // about their account, it gets server-side from their own
-      // session, not from this request body.
-      body: JSON.stringify({ messages: payload.map((m) => ({ role: m.role, content: m.content })) }),
+      // Only role/content (and, if a report page is open, that report's
+      // token) goes over the wire - nothing else about the user is sent
+      // from here; anything the assistant knows about their own
+      // account, it gets server-side from their own session, never
+      // from this request body.
+      body: JSON.stringify({
+        messages: payload.map((m) => ({ role: m.role, content: m.content })),
+        ...(reportToken ? { reportToken } : {}),
+      }),
     });
     status = res.status;
     const data = await res.json().catch(() => null);
@@ -68,6 +88,8 @@ async function attemptSend(payload: Message[]): Promise<SendResult> {
 }
 
 export function AssistantWidget() {
+  const pathname = usePathname();
+  const reportToken = extractReportToken(pathname ?? '');
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([GREETING]);
   const [input, setInput] = useState('');
@@ -86,19 +108,19 @@ export function AssistantWidget() {
     listRef.current?.scrollTo({ top: listRef.current.scrollHeight, behavior: 'smooth' });
   }, [messages, sending]);
 
-  async function sendWithRetry(payload: Message[]) {
+  async function sendWithRetry(payload: Message[], reportToken: string | null) {
     setSending(true);
     setError(null);
     setLastFailedMessages(null);
 
-    let result = await attemptSend(payload);
+    let result = await attemptSend(payload, reportToken);
     let attempts = 1;
     // Retries silently, still inside the same "sending" state - the
     // person just sees the normal typing indicator for slightly longer
     // if this happens, never a flash of an error that then recovers.
     while (!result.ok && result.retryable && attempts <= MAX_AUTO_RETRIES) {
       await sleep(RETRY_DELAY_MS);
-      result = await attemptSend(payload);
+      result = await attemptSend(payload, reportToken);
       attempts++;
     }
 
@@ -118,12 +140,12 @@ export function AssistantWidget() {
     const nextMessages = [...messages, { role: 'user' as const, content: text }];
     setMessages(nextMessages);
     setInput('');
-    await sendWithRetry(nextMessages);
+    await sendWithRetry(nextMessages, reportToken);
   }
 
   function handleRetry() {
     if (!lastFailedMessages || sending) return;
-    void sendWithRetry(lastFailedMessages);
+    void sendWithRetry(lastFailedMessages, reportToken);
   }
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
