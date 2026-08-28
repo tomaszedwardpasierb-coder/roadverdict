@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { quoteRequestSchema } from '@/lib/validation';
-import { getAdjustedBenchmark, REGION_LABELS, BRAND_OPTIONS } from '@/lib/priceData';
-import { computeVerdict } from '@/lib/verdict';
+import { getAdjustedBenchmark, REGION_LABELS, BRAND_OPTIONS, JOB_LABELS, BIKE_CLASS_LABELS } from '@/lib/priceData';
+import { computeVerdict, VERDICT_LABELS } from '@/lib/verdict';
 import { logQuoteCheck, getCommunityStats } from '@/lib/db';
+import { generateQuoteAdvice } from '@/lib/tracker/quoteAdvice';
 
 // better-sqlite3 needs the Node.js runtime, not the Edge runtime.
 export const runtime = 'nodejs';
@@ -65,6 +66,29 @@ export async function POST(request: NextRequest) {
   // comment in db.ts for why this isn't used to calculate the verdict itself.
   const communityStats = getCommunityStats(jobType, bikeClass);
 
+  // Additive only - the verdict stamp above already works standalone, so a
+  // missing GEMINI_API_KEY or a failed call just means this section stays
+  // empty rather than the whole response failing.
+  const geminiKey = process.env.GEMINI_API_KEY;
+  const advice = geminiKey
+    ? await generateQuoteAdvice(
+        {
+          jobLabel: JOB_LABELS[jobType],
+          bikeClassLabel: BIKE_CLASS_LABELS[bikeClass],
+          brandLabel: BRAND_OPTIONS.find((b) => b.value === brand)?.label ?? brand,
+          brandTier: adjusted.brandTier,
+          regionLabel: REGION_LABELS[region],
+          quotedPrice,
+          range: { low: adjusted.low, high: adjusted.high },
+          verdictLabel: VERDICT_LABELS[verdict],
+          sourceConfidence: adjusted.source.confidence,
+          sourceNote: adjusted.source.note,
+          communityStats,
+        },
+        geminiKey
+      )
+    : null;
+
   return NextResponse.json({
     verdict,
     range: { low: adjusted.low, high: adjusted.high },
@@ -72,5 +96,6 @@ export async function POST(request: NextRequest) {
     brandLabel: BRAND_OPTIONS.find((b) => b.value === brand)?.label ?? brand,
     regionLabel: REGION_LABELS[region],
     communityStats,
+    advice,
   });
 }

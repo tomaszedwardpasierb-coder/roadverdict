@@ -22,6 +22,7 @@ interface ApiResponse {
   brandLabel: string;
   regionLabel: string;
   communityStats: { sampleSize: number; low: number; high: number } | null;
+  advice: { explanation: string; questionsToAsk: string[] } | null;
   error?: string;
 }
 
@@ -296,6 +297,7 @@ export function QuoteForm({ signedIn, initialBrand, initialBikeClass }: Props) {
           brandLabel={result.brandLabel}
           regionLabel={result.regionLabel}
           communityStats={result.communityStats}
+          advice={result.advice}
         />
       )}
     </>
