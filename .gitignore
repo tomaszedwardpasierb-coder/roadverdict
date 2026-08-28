@@ -18,3 +18,9 @@ data/*.db-wal
 # misc
 .DS_Store
 *.log
+
+# test output
+coverage/
+test-results/
+playwright-report/
+tsconfig.tsbuildinfo
