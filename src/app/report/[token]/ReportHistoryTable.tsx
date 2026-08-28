@@ -256,7 +256,7 @@ export function ReportHistoryTable({
             <div className={styles.requestForm}>
               <p className={styles.subtext} style={{ margin: '0 0 0.5rem' }}>
                 The seller will be asked to share {selected.size} receipt{selected.size === 1 ? '' : 's'}. These may
-                contain personal details, so it's their choice. They'll see this request came in through the link
+                contain personal details, so it&apos;s their choice. They&apos;ll see this request came in through the link
                 you were sent.
               </p>
               <textarea

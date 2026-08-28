@@ -47,6 +47,15 @@ export function DecideRequestForm({
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Was previously declared after the early returns below, meaning it
+  // was skipped whenever preselectAll was truthy - a real Rules-of-Hooks
+  // violation. Harmless today only because the one place that changes
+  // preselectAll ("Review each one" below) uses a plain <a> tag, which
+  // forces a full page reload rather than an in-place re-render - but
+  // that's fragile against a future change, not a guarantee. Moved here
+  // so hook order is unconditional regardless of how this component is
+  // ever navigated to in future.
+  const [reasons, setReasons] = useState<Record<string, string>>({});
 
   async function submitAll(decision: 'approved' | 'declined', entryIds: string[] | 'all') {
     setSubmitting(true);
@@ -101,8 +110,6 @@ export function DecideRequestForm({
       </div>
     );
   }
-
-  const [reasons, setReasons] = useState<Record<string, string>>({});
 
   async function handleIndividualSubmit() {
     const approvedIds = Object.entries(decisions).filter(([, v]) => v === 'approved').map(([id]) => id);

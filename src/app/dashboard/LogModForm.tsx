@@ -1,4 +1,4 @@
-﻿// Place at: src/app/dashboard/LogModForm.tsx
+// Place at: src/app/dashboard/LogModForm.tsx
 'use client';
 
 import { useState, useMemo } from 'react';
@@ -120,7 +120,7 @@ export function LogModForm({
             onSelect={handleCategorySearch}
             placeholder="e.g. chain guide, tank bag, disc lock..."
           />
-          <div className="field-note">Not sure which group it's under? Start typing here instead.</div>
+          <div className="field-note">Not sure which group it&apos;s under? Start typing here instead.</div>
         </div>
         <div className="field" style={{ marginTop: '0.9rem' }}>
           <label htmlFor="mod-group">Group</label>

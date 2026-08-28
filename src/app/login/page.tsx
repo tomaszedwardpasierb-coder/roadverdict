@@ -64,7 +64,7 @@ function LoginForm() {
         </div>
         <h1 className={styles.heading}>Check your email</h1>
         <p className={styles.subtext}>
-          We've sent a sign-in link to <strong>{email}</strong>. It expires in 15 minutes
+          We&apos;ve sent a sign-in link to <strong>{email}</strong>. It expires in 15 minutes
           and works once.
         </p>
         <button
@@ -83,7 +83,7 @@ function LoginForm() {
       <img src="/logo.png" alt="RoadVerdict" className={styles.logoImg} />
       <h1 className={styles.heading}>Sign in to track your bike</h1>
       <p className={styles.subtext}>
-        Enter your email and we'll send you a link to sign in - no password to remember.
+        Enter your email and we&apos;ll send you a link to sign in - no password to remember.
       </p>
 
       {urlError && URL_ERROR_MESSAGES[urlError] && (

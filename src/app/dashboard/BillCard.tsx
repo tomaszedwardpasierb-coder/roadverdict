@@ -176,7 +176,7 @@ export function BillCard({
     >
       {bill.needsReview && (
         <div className={styles.needsReviewNote}>
-          🧠 Auto-created from a scanned receipt - click Edit to review before it's done.
+          🧠 Auto-created from a scanned receipt - click Edit to review before it&apos;s done.
           {bill.aiDescription && <div className={styles.aiDescriptionNote}>{bill.aiDescription}</div>}
         </div>
       )}

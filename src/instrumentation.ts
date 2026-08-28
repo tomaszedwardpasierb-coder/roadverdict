@@ -35,7 +35,6 @@
 // standing, widely-used pattern for exactly this situation, not a hack
 // specific to this app.
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 type ApplicationInsightsModule = any;
 
 export async function register() {
