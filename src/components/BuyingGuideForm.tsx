@@ -43,6 +43,11 @@ interface BuyingGuideLookupResponse {
     mileageTrusted: boolean;
     notes: string;
   }[];
+  briefing: {
+    motFlags: string[];
+    modelNotes: string[];
+    summary: string;
+  } | null;
   error?: string;
 }
 
@@ -211,6 +216,37 @@ export function BuyingGuideForm({ signedIn }: Props) {
             {lookupError && <p className="error-text" role="alert">{lookupError}</p>}
             {lookupNote && <p className="field-note">{lookupNote}</p>}
           </div>
+
+          {motResult?.briefing && (
+            <div className="field" style={{ marginBottom: '1.1rem' }}>
+              <p className="field-note" style={{ fontWeight: 600, marginBottom: '0.5rem' }}>
+                AI-generated pre-purchase briefing for this bike
+              </p>
+              {motResult.briefing.motFlags.length > 0 && (
+                <div style={{ borderLeft: '3px solid var(--amber)', paddingLeft: '0.6rem', marginBottom: '0.6rem' }}>
+                  <p className="field-note" style={{ fontWeight: 600, margin: '0 0 0.3rem' }}>
+                    From this bike&apos;s own MOT history
+                  </p>
+                  <ul style={{ margin: 0, paddingLeft: '1.1rem' }}>
+                    {motResult.briefing.motFlags.map((f, i) => (
+                      <li key={i} className="field-note">{f}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              {motResult.briefing.modelNotes.length > 0 && (
+                <div style={{ marginBottom: '0.6rem' }}>
+                  <p className="field-note" style={{ fontWeight: 600, margin: '0 0 0.3rem' }}>Known for this model</p>
+                  <ul style={{ margin: 0, paddingLeft: '1.1rem' }}>
+                    {motResult.briefing.modelNotes.map((n, i) => (
+                      <li key={i} className="field-note">{n}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              <p className="field-note">{motResult.briefing.summary}</p>
+            </div>
+          )}
 
           {motResult && (
             <div className="field" style={{ marginBottom: '1.1rem' }}>
