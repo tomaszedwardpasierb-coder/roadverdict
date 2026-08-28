@@ -21,6 +21,7 @@ interface ApiResponse {
   breakdown: AnnualCostBreakdown;
   brandLabel: string;
   regionLabel: string;
+  advice: { explanation: string; watchOutFor: string[] } | null;
   error?: string;
 }
 
@@ -323,6 +324,7 @@ export function CostCalculatorForm({ signedIn, initialBrand, initialModel, initi
           breakdown={result.breakdown}
           brandLabel={result.brandLabel}
           regionLabel={result.regionLabel}
+          advice={result.advice}
         />
       )}
     </>

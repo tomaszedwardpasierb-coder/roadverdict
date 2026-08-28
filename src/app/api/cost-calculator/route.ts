@@ -1,7 +1,8 @@
-﻿import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { costCalculatorRequestSchema } from '@/lib/validation';
 import { computeAnnualCost } from '@/lib/costCalculator';
-import { BRAND_OPTIONS, REGION_LABELS } from '@/lib/priceData';
+import { BRAND_OPTIONS, REGION_LABELS, BIKE_CLASS_LABELS } from '@/lib/priceData';
+import { generateCostAdvice } from '@/lib/tracker/costAdvice';
 
 export const runtime = 'nodejs';
 
@@ -54,9 +55,24 @@ export async function POST(request: NextRequest) {
   // its own anonymised log later the same way the verdict endpoint does, but
   // that's a deliberate "not yet" rather than an oversight.
 
+  const brandLabel = BRAND_OPTIONS.find((b) => b.value === brand)?.label ?? brand;
+  const regionLabel = REGION_LABELS[region];
+
+  // Additive only - the breakdown above already works standalone, so a
+  // missing GEMINI_API_KEY or a failed call just means this section stays
+  // empty rather than the whole response failing.
+  const geminiKey = process.env.GEMINI_API_KEY;
+  const advice = geminiKey
+    ? await generateCostAdvice(
+        { bikeClassLabel: BIKE_CLASS_LABELS[bikeClass], brandLabel, regionLabel, annualMileage, breakdown },
+        geminiKey
+      )
+    : null;
+
   return NextResponse.json({
     breakdown,
-    brandLabel: BRAND_OPTIONS.find((b) => b.value === brand)?.label ?? brand,
-    regionLabel: REGION_LABELS[region],
+    brandLabel,
+    regionLabel,
+    advice,
   });
 }
