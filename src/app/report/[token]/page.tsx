@@ -51,7 +51,7 @@ export default async function SaleReportPage({ params }: { params: { token: stri
             isn&apos;t, and specific questions worth asking the seller - all drawn from the same records below.
           </p>
         </div>
-        <Link href={`/report/${params.token}/detailed`} className="submit-button" style={{ textDecoration: "none", flexShrink: 0 }}>
+        <Link href={`/report/${params.token}/detailed`} className="btn-primary" style={{ textDecoration: "none", flexShrink: 0 }}>
           Get the Buyer Verdict Report
         </Link>
       </div>

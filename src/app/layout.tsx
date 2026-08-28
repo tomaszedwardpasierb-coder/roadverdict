@@ -1,5 +1,5 @@
 // Place at: src/app/layout.tsx
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import { Big_Shoulders_Display, Inter, IBM_Plex_Mono } from 'next/font/google';
 import Link from 'next/link';
 import { cookies } from 'next/headers';
@@ -34,6 +34,17 @@ export const metadata: Metadata = {
   },
   description:
     'Enter your bike, the job, and what you were quoted. Get an instant verdict benchmarked against typical UK motorcycle service and repair prices.',
+};
+
+// No viewport configuration existed anywhere before this - not this
+// export, not a manual <meta name="viewport"> tag, nothing. A
+// responsive site with zero explicit viewport declaration is relying
+// entirely on each browser's own fallback guess, which is exactly the
+// kind of gap that can behave inconsistently across browsers and zoom
+// levels rather than consistently one way or another.
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
 };
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const cookieStore = await cookies();

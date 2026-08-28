@@ -1,8 +1,8 @@
-﻿// Place at: src/app/report/[token]/PrintButton.tsx
+// Place at: src/app/report/[token]/PrintButton.tsx
 'use client';
 export function PrintButton() {
   return (
-    <button type="button" className="submit-button" onClick={() => window.print()}>
+    <button type="button" className="btn-primary" onClick={() => window.print()}>
       Print this report
     </button>
   );
