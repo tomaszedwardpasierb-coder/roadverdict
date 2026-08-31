@@ -39,3 +39,11 @@ jobs:
           app-name: 'roadverdict'
           slot-name: 'Production'
           package: .
+      - name: Wait for the deployed instance to finish restarting
+        run: sleep 20
+      - name: Install Playwright browser
+        run: npx playwright install --with-deps chromium
+      - name: Post-deploy smoke test
+        run: npm run test:e2e
+        env:
+          PLAYWRIGHT_BASE_URL: https://roadverdict.co.uk
