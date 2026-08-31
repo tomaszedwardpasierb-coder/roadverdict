@@ -47,6 +47,11 @@ describe("computeReminderStatus", () => {
 
   it("computes a months-type trigger the same way, using the real elapsed months", () => {
     const twoMonthsAgo = new Date();
+    // Anchor to day 1 before subtracting months - otherwise JS Date's
+    // setMonth silently overflows into the following month whenever
+    // today's day-of-month doesn't exist in the target month (e.g. day 31
+    // landing on a 30-day month), which flakes this test near month-end.
+    twoMonthsAgo.setDate(1);
     twoMonthsAgo.setMonth(twoMonthsAgo.getMonth() - 2);
     const r = { intervalType: "months", intervalValue: 2, date: isoDate(twoMonthsAgo), baseMileage: 0 } as any;
     expect(computeReminderStatus(r, 5000)).toBe("overdue");
