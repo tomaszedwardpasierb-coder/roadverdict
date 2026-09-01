@@ -244,7 +244,7 @@ describe("transferBike", () => {
     mocks.getReminders.mockResolvedValue([{ id: "rm-1", notifiedAt: "2025-01-01" }]);
     await transferBike(fromEmail, bikeId, toEmail, true);
     const reminderCopy = mocks.copyTrackerDoc.mock.calls.find((c: any[]) => c[1] === "reminder");
-    expect(reminderCopy[4]).toEqual({ notifiedAt: null });
+    expect(reminderCopy![4]).toEqual({ notifiedAt: null });
   });
 
   it("still returns ok:true if a record copy fails (best-effort copies)", async () => {
