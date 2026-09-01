@@ -11,6 +11,9 @@ import { afterEach } from "vitest";
 if (!Element.prototype.scrollTo) {
   Element.prototype.scrollTo = () => {};
 }
+if (!Element.prototype.scrollIntoView) {
+  Element.prototype.scrollIntoView = () => {};
+}
 
 // Without this, DOM nodes rendered by one test file's cases would still
 // be attached to jsdom's document when the next case runs, so a query
