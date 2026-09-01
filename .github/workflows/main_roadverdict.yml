@@ -10,6 +10,23 @@ jobs:
     permissions:
       id-token: write
       contents: read
+    # Started at job start, in parallel with checkout/setup/typecheck/lint/
+    # unit-tests below - by the time the "Wait for Cosmos DB Emulator" step
+    # runs, most of its startup time has likely already elapsed in the
+    # background, rather than being pure added latency.
+    services:
+      cosmosdb-emulator:
+        image: mcr.microsoft.com/cosmosdb/linux/azure-cosmos-emulator:latest
+        ports:
+          - 8081:8081
+          - 10250:10250
+          - 10251:10251
+          - 10252:10252
+          - 10253:10253
+          - 10254:10254
+        env:
+          AZURE_COSMOS_EMULATOR_PARTITION_COUNT: '3'
+          AZURE_COSMOS_EMULATOR_ENABLE_DATA_PERSISTENCE: 'false'
     steps:
       - uses: actions/checkout@v4
       - name: Set up Node.js version
@@ -24,6 +41,19 @@ jobs:
         run: npm run lint
       - name: Unit tests
         run: npm test
+      - name: Wait for Cosmos DB Emulator
+        run: |
+          for i in $(seq 1 60); do
+            if curl -sk --fail https://localhost:8081/_explorer/emulator.pem -o /dev/null; then
+              echo "Cosmos DB Emulator is ready."
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "Cosmos DB Emulator did not become ready in time." >&2
+          exit 1
+      - name: Integration tests (Cosmos DB Emulator)
+        run: npm run test:integration
       - name: Build
         run: npm run build
       - name: Login to Azure
