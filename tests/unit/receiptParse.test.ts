@@ -263,7 +263,7 @@ describe("parseReceiptFile", () => {
     expect(result.ok).toBe(true);
     expect(mocks.sharpToBuffer).not.toHaveBeenCalled();
     const geminiCall = fetchMock.mock.calls.find((c) => String(c[0]).includes('generativelanguage'));
-    const body = JSON.parse(geminiCall[1].body);
+    const body = JSON.parse(geminiCall![1].body);
     expect(body.contents[0].parts[1].inline_data.mime_type).toBe('application/pdf');
     expect(mocks.uploadData).toHaveBeenCalledWith(
       expect.any(Buffer),
