@@ -299,7 +299,7 @@ describe("GET /api/tracker/buying-guide-lookup", () => {
   it("makes exactly two parallel VDG calls (vehicle + MOT)", async () => {
     await GET(request("AB20YAM"));
     expect(mocks.fetch).toHaveBeenCalledTimes(2);
-    const urls = mocks.fetch.mock.calls.map((c: [string]) => c[0]);
+    const urls = mocks.fetch.mock.calls.map((c: unknown[]) => c[0] as string);
     expect(urls.some((u: string) => u.includes("VehicleDetails"))).toBe(true);
     expect(urls.some((u: string) => u.includes("MotHistoryDetails"))).toBe(true);
   });
