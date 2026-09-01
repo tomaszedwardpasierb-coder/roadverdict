@@ -1,0 +1,179 @@
+/* Place at: src/app/pro/pro.module.css */
+
+.main {
+  max-width: 860px;
+  margin: 0 auto;
+  padding: 2rem 1.2rem 4rem;
+}
+
+.hero {
+  text-align: center;
+  margin-bottom: 3rem;
+}
+
+.eyebrow {
+  font-size: 0.85rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--amber);
+  margin: 0 0 0.5rem;
+}
+
+.heading {
+  font-family: var(--font-display);
+  font-size: 2.2rem;
+  margin: 0 0 0.8rem;
+  line-height: 1.15;
+}
+
+.sub {
+  color: var(--ink-soft);
+  font-size: 1.05rem;
+  max-width: 520px;
+  margin: 0 auto;
+}
+
+.plans {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+  margin-bottom: 3.5rem;
+}
+
+@media (max-width: 600px) {
+  .plans { grid-template-columns: 1fr; }
+  .heading { font-size: 1.6rem; }
+}
+
+.planCard {
+  border: 1.5px solid var(--line);
+  border-radius: 14px;
+  padding: 1.8rem 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  position: relative;
+  background: var(--paper);
+}
+
+.planCardPro {
+  border-color: var(--amber);
+  box-shadow: 0 0 0 3px rgba(238,154,46,0.15);
+}
+
+.planBadge {
+  position: absolute;
+  top: -0.7rem;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--amber);
+  color: #000;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  padding: 0.2rem 0.8rem;
+  border-radius: 20px;
+  white-space: nowrap;
+}
+
+.planName {
+  font-family: var(--font-display);
+  font-size: 1.2rem;
+  font-weight: 700;
+}
+
+.planPrice {
+  font-size: 2.4rem;
+  font-weight: 700;
+  line-height: 1;
+  margin: 0.3rem 0 0;
+}
+
+.planPricePer {
+  font-size: 1.1rem;
+  font-weight: 400;
+  color: var(--ink-soft);
+}
+
+.planPriceSub {
+  font-size: 0.82rem;
+  color: var(--ink-soft);
+  margin-bottom: 0.8rem;
+}
+
+.featureList {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 1.2rem;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  font-size: 0.92rem;
+}
+
+.featureList li::before {
+  content: '✓ ';
+  color: var(--amber);
+  font-weight: 700;
+}
+
+.planCta {
+  display: block;
+  text-align: center;
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 0.95rem;
+  text-decoration: none;
+  cursor: pointer;
+  border: none;
+}
+
+.planCtaSecondary {
+  background: var(--stone);
+  color: var(--ink);
+  border: 1.5px solid var(--line);
+}
+
+.planCtaPro {
+  background: var(--amber);
+  color: #000;
+  opacity: 0.6;
+  cursor: not-allowed;
+  width: 100%;
+}
+
+.planCtaNote {
+  font-size: 0.8rem;
+  color: var(--ink-soft);
+  text-align: center;
+  margin: 0.4rem 0 0;
+}
+
+.faq {
+  border-top: 1px solid var(--line);
+  padding-top: 2.5rem;
+}
+
+.faqHeading {
+  font-family: var(--font-display);
+  font-size: 1.3rem;
+  margin: 0 0 1.5rem;
+}
+
+.faqItem {
+  margin-bottom: 1.3rem;
+}
+
+.faqItem strong {
+  display: block;
+  margin-bottom: 0.25rem;
+}
+
+.faqItem p {
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: 0.93rem;
+}

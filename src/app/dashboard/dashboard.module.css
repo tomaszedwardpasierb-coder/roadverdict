@@ -980,3 +980,55 @@
 .regPlateInput::placeholder {
   color: rgba(0, 0, 0, 0.45);
 }
+
+/* Pro feature gate */
+.proGate {
+  border: 2px dashed var(--amber);
+  border-radius: 14px;
+  padding: 2rem 1.5rem;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.6rem;
+  background: rgba(238,154,46,0.04);
+  margin: 1rem 0;
+}
+.proGateBadge {
+  background: var(--amber);
+  color: #000;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  padding: 0.2rem 0.7rem;
+  border-radius: 20px;
+  text-transform: uppercase;
+}
+.proGateTitle {
+  font-family: var(--font-display);
+  font-size: 1.25rem;
+  margin: 0;
+}
+.proGateDesc {
+  color: var(--ink-soft);
+  font-size: 0.93rem;
+  max-width: 380px;
+  margin: 0;
+}
+.proGateBtn {
+  display: inline-block;
+  margin-top: 0.4rem;
+  background: var(--amber);
+  color: #000;
+  font-weight: 700;
+  font-size: 0.95rem;
+  padding: 0.7rem 1.4rem;
+  border-radius: 8px;
+  text-decoration: none;
+}
+.proGateBtn:hover { background: var(--amber-dark); }
+.proGateAnnual {
+  font-size: 0.8rem;
+  color: var(--ink-soft);
+  margin: 0;
+}

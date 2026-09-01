@@ -67,6 +67,8 @@ import { CustomFilterPanel } from "./CustomFilterPanel";
 import { ScanReceiptButton } from "./ScanReceiptButton";
 import { RegistrationBackfillBanner } from "./RegistrationBackfillBanner";
 import { Icon } from "./Icon";
+import { isPro } from "@/lib/subscriptions";
+import { ProGate } from "./ProGate";
 
 export const dynamic = "force-dynamic";
 
@@ -77,6 +79,7 @@ export default async function DashboardPage() {
   const bikes = await getBikesForUser(session.email);
   const bike = await pickActiveBike(bikes);
   const shareLinks = await getShareLinksForUser(session.email);
+  const userIsPro = await isPro(session.email);
   const pendingReceiptRequests = await getPendingReceiptRequestsForOwner(session.email);
   const bikeNames: Record<string, string> = {};
   for (const b of bikes) {
@@ -250,7 +253,7 @@ export default async function DashboardPage() {
         ) : null;
       })()}
 
-      <ScanReceiptButton />
+      <ScanReceiptButton isPro={userIsPro} />
 
       <ChartFilterBar />
 
@@ -318,7 +321,7 @@ export default async function DashboardPage() {
         </div>
       </div>
 
-      <ExportShareSection />
+      <ExportShareSection isPro={userIsPro} />
     </ChartFilterProvider>
   );
 
@@ -504,7 +507,7 @@ export default async function DashboardPage() {
   const incomingRequest = requestsForThisBike.find((r) => r.initiatedBy === "recipient");
 
   const shareLinksContent = (
-    <ShareLinksSection
+    <ShareLinksSection isPro={userIsPro}
       links={shareLinks}
       bikeNames={bikeNames}
       appUrl={process.env.APP_URL ?? "https://roadverdict.co.uk"}
@@ -654,7 +657,7 @@ export default async function DashboardPage() {
       billsContent={billsContent}
       remindersContent={remindersContent}
       reportsContent={reportsContent}
-      storyContent={<StorySoFarTab bikeNickname={bike.nickname} registration={currentRegistration} currentMileage={bike.currentMileage} distanceUnit={distanceUnit} initialStory={initialStory} sellerPrep={sellerPrep} />}
+      storyContent={<ProGate featureName="The Story So Far" description="An AI-generated narrative of your ownership � your bike's history told as a story, with insights on what's been done, what's coming, and how your costs compare." isPro={userIsPro}><StorySoFarTab bikeNickname={bike.nickname} registration={currentRegistration} currentMileage={bike.currentMileage} distanceUnit={distanceUnit} initialStory={initialStory} sellerPrep={sellerPrep} /></ProGate>}
       shareLinksContent={shareLinksContent}
       quoteCheckerContent={quoteCheckerContent}
       costCalculatorContent={costCalculatorContent}

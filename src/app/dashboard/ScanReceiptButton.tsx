@@ -20,7 +20,7 @@ interface FileParseOutcome {
   error?: string;
 }
 
-export function ScanReceiptButton() {
+export function ScanReceiptButton({ isPro = false }: { isPro?: boolean }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [scanning, setScanning] = useState(false);
@@ -208,11 +208,16 @@ export function ScanReceiptButton() {
           <input
             type="file"
             accept="image/jpeg,image/png,application/pdf"
-            multiple
+            multiple={isPro}
             onChange={handleFilesSelected}
             disabled={scanning}
             style={{ marginTop: '0.7rem' }}
           />
+          {!isPro && (
+            <p className="field-note" style={{ marginTop: '0.4rem' }}>
+              Free plan: one file at a time. <a href="/pro" style={{ color: 'var(--amber-ink)', fontWeight: 600 }}>Upgrade to Pro</a> to scan a whole batch at once.
+            </p>
+          )}
           {progress && (
             <p className="field-note">
               Reading receipt {progress.current} of {progress.total}…
