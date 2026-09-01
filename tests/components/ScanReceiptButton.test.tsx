@@ -250,10 +250,7 @@ describe("ScanReceiptButton", () => {
     const input = document.querySelector('input[type="file"]') as HTMLInputElement;
     await user.upload(input, jpgFile("old.jpg"));
 
-    // Note: the source's singular copy reads "1 item were dated" (grammatically
-    // off - "was" - regardless of count), pinning the real current text rather
-    // than the grammatically-corrected text it should probably say.
-    expect(await screen.findByText(/1 item were dated before your bike was made, so it wasn't logged\./)).toBeInTheDocument();
+    expect(await screen.findByText(/1 item was dated before your bike was made, so it wasn't logged\./)).toBeInTheDocument();
     expect(screen.getByText(/2 fuel items looked like diesel/)).toBeInTheDocument();
     expect(screen.getByText(/1 fuel item couldn't be read clearly enough/)).toBeInTheDocument();
   });

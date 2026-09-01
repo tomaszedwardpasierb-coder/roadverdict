@@ -3,7 +3,7 @@
 export type DistanceUnit = "mi" | "km";
 export type FuelEconomyUnit = "mpg" | "l100km";
 
-const KM_PER_MILE = 1.60934;
+export const KM_PER_MILE = 1.60934;
 const LITRES_PER_UK_GALLON = 4.546;
 
 // Canonical storage is always miles / UK mpg - these functions only

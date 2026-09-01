@@ -117,21 +117,25 @@ export function DecideRequestForm({
     setSubmitting(true);
     setError(null);
     try {
+      let allOk = true;
       if (approvedIds.length > 0) {
-        await fetch('/api/report/receipt-request/decide', {
+        const res = await fetch('/api/report/receipt-request/decide', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ token, entryIds: approvedIds, decision: 'approved' }),
         });
+        if (!res.ok) allOk = false;
       }
       for (const id of declinedIds) {
-        await fetch('/api/report/receipt-request/decide', {
+        const res = await fetch('/api/report/receipt-request/decide', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ token, entryIds: [id], decision: 'declined', reason: reasons[id] }),
         });
+        if (!res.ok) allOk = false;
       }
-      setDone(true);
+      if (allOk) setDone(true);
+      else setError('Could not save your decision. Please try again.');
     } catch {
       setError('Could not reach the server. Please try again.');
     } finally {

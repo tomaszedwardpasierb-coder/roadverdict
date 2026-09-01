@@ -111,12 +111,7 @@ describe("ServiceHistoryCard", () => {
   it("shows the date/mileage line and an 'interpolated' mileage-confidence tag", () => {
     const record = { ...baseRecord, mileageConfidence: "interpolated" as const };
     render(<ServiceHistoryCard {...defaultProps} record={record} />);
-    // NB: "Â·" (not "·") is the component's own real rendered output - a
-    // genuine mojibake bug already in ServiceHistoryCard.tsx's source (the
-    // middle-dot separator appears to have been double-UTF-8-encoded), not
-    // a typo introduced here. Asserting the actual behavior, per the house
-    // rule of testing what's really reachable rather than what was intended.
-    expect(screen.getByText("1 Jun 2025 Â· 5,000 miles")).toBeInTheDocument();
+    expect(screen.getByText("1 Jun 2025 · 5,000 miles")).toBeInTheDocument();
     // getByText's default normalizer trims leading/trailing whitespace, so
     // the leading space the component actually renders isn't part of the match.
     expect(screen.getByText("(mileage interpolated)")).toBeInTheDocument();

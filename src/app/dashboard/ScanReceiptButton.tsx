@@ -232,7 +232,7 @@ export function ScanReceiptButton({ isPro = false }: { isPro?: boolean }) {
               )}
               {totalSkippedBeforeProduction > 0 && (
                 <p className="field-note" style={{ color: 'var(--amber-ink)', marginTop: '0.4rem' }}>
-                  {totalSkippedBeforeProduction} item{totalSkippedBeforeProduction === 1 ? '' : 's'} were dated
+                  {totalSkippedBeforeProduction} item{totalSkippedBeforeProduction === 1 ? '' : 's'} {totalSkippedBeforeProduction === 1 ? 'was' : 'were'} dated
                   before your bike was made, so {totalSkippedBeforeProduction === 1 ? "it wasn't" : "they weren't"} logged.
                 </p>
               )}

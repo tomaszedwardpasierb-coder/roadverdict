@@ -61,7 +61,17 @@ export function UnitSettings({ distanceUnit, fuelEconomyUnit, currency }: Props)
       <button className="submit-button" type="submit" disabled={submitting}>
         {submitting ? 'Saving…' : 'Save'}
       </button>
-      <button type="button" className={styles.iconBtn} onClick={() => setEditing(false)} disabled={submitting}>
+      <button
+        type="button"
+        className={styles.iconBtn}
+        onClick={() => {
+          setDUnit(distanceUnit);
+          setFUnit(fuelEconomyUnit);
+          setCurr(currency);
+          setEditing(false);
+        }}
+        disabled={submitting}
+      >
         Cancel
       </button>
       {error && <span className="error-text">{error}</span>}

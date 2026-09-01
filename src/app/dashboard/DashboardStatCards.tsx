@@ -4,8 +4,8 @@
 import { useChartFilter } from './ChartFilterContext';
 import { filterByDateRange } from '@/lib/tracker/dateRange';
 import { computeMPGSeries, type MpgCalcInput } from '@/lib/tracker/mpgCalc';
-import { formatCurrency, type Currency, type ExchangeRates } from '@/lib/tracker/currency';
-import { formatFuelEconomy, formatCostPerDistance, type DistanceUnit, type FuelEconomyUnit } from '@/lib/tracker/unitFormat';
+import { formatCurrency, convertGbpToDisplay, CURRENCY_SYMBOLS, type Currency, type ExchangeRates } from '@/lib/tracker/currency';
+import { formatFuelEconomy, formatCostPerDistance, KM_PER_MILE, type DistanceUnit, type FuelEconomyUnit } from '@/lib/tracker/unitFormat';
 import { Icon } from './Icon';
 import styles from './dashboard.module.css';
 
@@ -75,7 +75,12 @@ export function DashboardStatCards({
     mileagePoints.push(startingMileage, currentMileage);
   }
   const milesInRange = mileagePoints.length >= 2 ? Math.max(...mileagePoints) - Math.min(...mileagePoints) : 0;
-  const costPerMile = milesInRange > 0 ? (totalSpend / milesInRange) * 100 : null;
+  // In the bike's own selected display currency, not raw GBP - matches
+  // the "Total spend" card above, which already converts. Previously
+  // this stayed in GBP pence regardless of currency, so a EUR/PLN/etc.
+  // bike showed its per-mile figure mislabeled as GBP pence.
+  const displayTotalSpend = convertGbpToDisplay(totalSpend, currency, rates);
+  const costPerMileDisplay = milesInRange > 0 ? displayTotalSpend / milesInRange : null;
 
   return (
     <>
@@ -97,7 +102,13 @@ export function DashboardStatCards({
         <div className={`${styles.statCardIcon} ${styles.statCardIconAmber}`}>
           <Icon name="perMile" size={16} />
         </div>
-        <div className={styles.statCardValue}>{costPerMile != null ? formatCostPerDistance(costPerMile, distanceUnit) : '-'}</div>
+        <div className={styles.statCardValue}>
+          {costPerMileDisplay == null
+            ? '-'
+            : currency === 'GBP'
+              ? formatCostPerDistance(costPerMileDisplay * 100, distanceUnit)
+              : `${CURRENCY_SYMBOLS[currency]}${(distanceUnit === 'km' ? costPerMileDisplay / KM_PER_MILE : costPerMileDisplay).toFixed(2)}`}
+        </div>
         <div className={styles.statCardLabel}>Per {distanceUnit === 'km' ? 'km' : 'mile'}</div>
       </div>
     </>

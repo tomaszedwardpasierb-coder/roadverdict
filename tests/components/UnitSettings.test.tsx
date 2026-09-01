@@ -62,4 +62,17 @@ describe("UnitSettings", () => {
     expect(screen.getByRole("button", { name: "Units: Miles / MPG / GBP" })).toBeInTheDocument();
     expect(fetch).not.toHaveBeenCalled();
   });
+
+  it("Cancel reverts any edited-but-unsaved selections, so reopening shows the original units again", async () => {
+    const user = userEvent.setup();
+    render(<UnitSettings distanceUnit="mi" fuelEconomyUnit="mpg" currency="GBP" />);
+    await user.click(screen.getByRole("button", { name: "Units: Miles / MPG / GBP" }));
+    await user.selectOptions(screen.getByLabelText("Distance"), "km");
+    await user.selectOptions(screen.getByLabelText("Currency"), "EUR");
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
+
+    await user.click(screen.getByRole("button", { name: "Units: Miles / MPG / GBP" }));
+    expect(screen.getByLabelText("Distance")).toHaveValue("mi");
+    expect(screen.getByLabelText("Currency")).toHaveValue("GBP");
+  });
 });

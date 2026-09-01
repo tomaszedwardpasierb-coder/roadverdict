@@ -174,20 +174,15 @@ describe("DecideRequestForm", () => {
       expect(screen.getByText(/Bought the bike last week, would appreciate these\./)).toBeInTheDocument();
     });
 
-    it("BUG: individual save never checks the decide endpoint's response status - a not-ok response is still treated as done", async () => {
-      // Unlike submitAll (used by the preselectAll confirmation screen,
-      // which does check res.ok), handleIndividualSubmit's try block
-      // calls setDone(true) unconditionally after its fetches resolve,
-      // regardless of whether the server actually accepted the decision.
-      // Only a thrown fetch (network failure) is treated as a failure.
+    it("a not-ok response from an individual save shows an error instead of the done message", async () => {
       (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({ ok: false });
       const user = userEvent.setup();
       render(<DecideRequestForm token="tok1" items={[item({ entryId: "e1", status: "pending" })]} preselectAll={null} />);
       await user.click(screen.getByRole("radio", { name: "Share" }));
       await user.click(screen.getByRole("button", { name: "Save decisions" }));
 
-      expect(await screen.findByText(/Done - your decision has been saved/)).toBeInTheDocument();
-      expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+      expect(await screen.findByRole("alert")).toHaveTextContent("Could not save your decision. Please try again.");
+      expect(screen.queryByText(/Done - your decision has been saved/)).not.toBeInTheDocument();
     });
 
     it("shows a connection error, not the done message, when fetch itself throws", async () => {

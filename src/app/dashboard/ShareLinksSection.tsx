@@ -115,32 +115,40 @@ function RequestCard({ request }: { request: ReceiptRequestDocView }) {
       .filter((i) => decisions[i.entryId] === 'pending' && i.status !== 'pending')
       .map((i) => i.entryId);
     try {
+      let allOk = true;
       if (approvedIds.length > 0) {
-        await fetch(`/api/tracker/receipt-request/${request.id}/decide`, {
+        const res = await fetch(`/api/tracker/receipt-request/${request.id}/decide`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ entryIds: approvedIds, decision: 'approved' }),
         });
+        if (!res.ok) allOk = false;
       }
       // Sent one at a time, since each can carry its own reason - the
       // small extra number of calls costs nothing at this scale and
       // avoids trying to group items by matching reason text.
       for (const id of declinedIds) {
-        await fetch(`/api/tracker/receipt-request/${request.id}/decide`, {
+        const res = await fetch(`/api/tracker/receipt-request/${request.id}/decide`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ entryIds: [id], decision: 'declined', reason: reasons[id] }),
         });
+        if (!res.ok) allOk = false;
       }
       if (revertedIds.length > 0) {
-        await fetch(`/api/tracker/receipt-request/${request.id}/decide`, {
+        const res = await fetch(`/api/tracker/receipt-request/${request.id}/decide`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ entryIds: revertedIds, decision: 'pending' }),
         });
+        if (!res.ok) allOk = false;
       }
-      setCollapsed(true);
-      router.refresh();
+      if (allOk) {
+        setCollapsed(true);
+        router.refresh();
+      } else {
+        setError('Could not save all decisions. Please try again.');
+      }
     } catch {
       setError('Could not save. Please try again.');
     } finally {

@@ -82,7 +82,10 @@ describe("DashboardStatCards", () => {
     );
     expect(screen.getByText("€100")).toBeInTheDocument(); // £50 * rate 2
     expect(screen.getByText("Per km")).toBeInTheDocument();
-    expect(screen.getByText("31.1p")).toBeInTheDocument(); // 50p/mile converted to per-km
+    // Per-distance now converts through the same EUR rate as "Total
+    // spend" above, rather than staying in raw GBP pence: €100 over 100
+    // miles = €1/mile, converted to per-km (÷ KM_PER_MILE) = €0.62/km.
+    expect(screen.getByText("€0.62")).toBeInTheDocument();
   });
 
   it("falls back to a dash for cost-per-distance when the bike's starting and current mileage are identical (no real distance to divide by)", () => {

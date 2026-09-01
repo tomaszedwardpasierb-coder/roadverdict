@@ -274,7 +274,7 @@ export function ServiceHistoryCard({ record, bikeClass, brandValue, region, dist
         <span className={styles.jobCardCost}>{formatCurrency(record.cost, currency, rates)}</span>
       </div>
       <div className={styles.jobCardMeta}>
-        {fmtDate(record.date)} Â· {formatDistance(record.mileage, distanceUnit)}
+        {fmtDate(record.date)} · {formatDistance(record.mileage, distanceUnit)}
         {record.mileageConfidence && (
           <span className={record.mileageConfidence === 'confirmed' ? styles.mileageConfirmedTag : styles.mileageConfidenceTag}>
             {mileageConfidenceLabel(record.mileageConfidence)}

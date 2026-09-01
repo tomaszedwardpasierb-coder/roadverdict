@@ -72,13 +72,10 @@ describe("KnowledgeBaseEditor", () => {
       })
     );
     expect(await screen.findByText("Saved - live now.")).toBeInTheDocument();
-    // Real behaviour, not necessarily intended: `dirty` is computed as
-    // `content !== initialContent`, and initialContent is a static prop
-    // that a successful save never updates (there's no local "last saved
-    // baseline" state). So Save stays enabled after a successful save,
-    // and clicking it again re-confirms and re-POSTs the exact same
-    // content that was just saved, rather than becoming a no-op.
-    expect(screen.getByRole("button", { name: /Save/ })).not.toBeDisabled();
+    // The saved-baseline moves to whatever was just saved, so Save goes
+    // back to disabled immediately after a successful save instead of
+    // staying clickable and re-POSTing the same content again.
+    expect(screen.getByRole("button", { name: /Save/ })).toBeDisabled();
   });
 
   it("shows the server's own error message when saving fails, and Save stays enabled so the user can retry", async () => {

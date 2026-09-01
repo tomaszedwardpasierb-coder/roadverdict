@@ -288,13 +288,7 @@ describe("ShareLinksSection", () => {
     expect(mockRouter.refresh).not.toHaveBeenCalled();
   });
 
-  // BUG: save() never checks res.ok on the /decide responses - only a
-  // thrown fetch (a real network failure) is treated as a failure. A
-  // real server-side error response (400/500, res.ok === false) is
-  // silently treated as success: the card still collapses and
-  // router.refresh() still runs, with no error ever shown to the owner
-  // even though nothing was actually saved.
-  it("BUG: a server error response on /decide (res.ok: false) is currently swallowed as if it saved successfully", async () => {
+  it("a server error response on /decide (res.ok: false) shows an error and does not collapse or refresh", async () => {
     (fetch as ReturnType<typeof vi.fn>).mockImplementation(async (url: string) => {
       if (url.includes("/decide")) return { ok: false, json: async () => ({ error: "boom" }) };
       return { ok: true, json: async () => ({}) };
@@ -306,9 +300,9 @@ describe("ShareLinksSection", () => {
     await user.click(screen.getByRole("radio", { name: "Don't share" }));
     await user.click(screen.getByRole("button", { name: "Save decisions" }));
 
-    // Documents current (arguably buggy) behaviour rather than desired
-    // behaviour - no error shown, and the card collapses as if it worked.
-    await vi.waitFor(() => expect(mockRouter.refresh).toHaveBeenCalledTimes(1));
-    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(await screen.findByRole("alert")).toHaveTextContent("Could not save all decisions. Please try again.");
+    expect(mockRouter.refresh).not.toHaveBeenCalled();
+    // The card is still expanded, not collapsed as if it had saved.
+    expect(screen.getByRole("button", { name: "Save decisions" })).toBeInTheDocument();
   });
 });

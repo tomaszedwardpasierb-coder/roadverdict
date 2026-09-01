@@ -33,6 +33,12 @@ function fmtDate(d: string): string {
 // from a git diff and a review before deploy.
 export function KnowledgeBaseEditor({ initialContent, initialUpdatedAt }: Props) {
   const [content, setContent] = useState(initialContent);
+  // The baseline "nothing to save" content is compared against - starts
+  // at the initial prop, but has to move to whatever was just saved,
+  // not stay pinned to the prop forever, or the Save button would stay
+  // enabled after a successful save and a second click would silently
+  // re-save the exact same content that's already live.
+  const [savedContent, setSavedContent] = useState(initialContent);
   const [updatedAt, setUpdatedAt] = useState(initialUpdatedAt);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -40,7 +46,7 @@ export function KnowledgeBaseEditor({ initialContent, initialUpdatedAt }: Props)
   const [versions, setVersions] = useState<KnowledgeBaseVersion[] | null>(null);
   const [loadingVersions, setLoadingVersions] = useState(false);
 
-  const dirty = content !== initialContent;
+  const dirty = content !== savedContent;
 
   async function handleSave() {
     if (!confirm("Save this as the assistant's live knowledge base? This takes effect immediately for every user - there's no review step after this.")) {
@@ -59,6 +65,7 @@ export function KnowledgeBaseEditor({ initialContent, initialUpdatedAt }: Props)
         throw new Error(data.error ?? 'Save failed');
       }
       setUpdatedAt(new Date().toISOString());
+      setSavedContent(content);
       setVersions(null);
       setMessage('Saved - live now.');
     } catch (err) {

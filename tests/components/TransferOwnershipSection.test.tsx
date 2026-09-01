@@ -52,19 +52,24 @@ describe("TransferOwnershipSection", () => {
     expect(fetch).not.toHaveBeenCalled();
   });
 
-  it("CONCERN: the client-side check is only 'contains an @' - a bare '@' with nothing else passes it and reaches the server", async () => {
+  it("rejects a bare '@' with nothing else, instead of sending it to the server", async () => {
     (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({ ok: true, json: async () => ({}) });
     const user = userEvent.setup();
     render(<TransferOwnershipSection bikeIsReadOnly={false} pendingRequest={null} />);
     await user.type(screen.getByPlaceholderText("buyer@example.com"), "@");
     await user.click(screen.getByRole("button", { name: "Start handover" }));
 
-    // No client-side error is shown - the malformed address is sent as-is.
-    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
-    expect(fetch).toHaveBeenCalledWith(
-      "/api/tracker/bike-transfer",
-      expect.objectContaining({ body: JSON.stringify({ recipientEmail: "@", includeRecords: true }) })
-    );
+    expect(await screen.findByRole("alert")).toHaveTextContent("Enter a valid email address.");
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("rejects an address with no domain suffix (no dot after the @)", async () => {
+    const user = userEvent.setup();
+    render(<TransferOwnershipSection bikeIsReadOnly={false} pendingRequest={null} />);
+    await user.type(screen.getByPlaceholderText("buyer@example.com"), "buyer@example");
+    await user.click(screen.getByRole("button", { name: "Start handover" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("Enter a valid email address.");
   });
 
   it("submits recipientEmail and the includeRecords choice, then shows the optimistic waiting state with the correct excluded-records wording", async () => {
@@ -122,7 +127,7 @@ describe("TransferOwnershipSection", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent("Couldn't reach the server. Try again.");
   });
 
-  it("CONCERN: once an offer is sent (or already pending), there is no cancel/withdraw control anywhere in this component", async () => {
+  it("KNOWN GAP (not fixed - needs a new cancel-offer API endpoint): once an offer is sent, there is no cancel/withdraw control anywhere in this component", async () => {
     (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({ ok: true, json: async () => ({}) });
     const user = userEvent.setup();
     render(<TransferOwnershipSection bikeIsReadOnly={false} pendingRequest={null} />);

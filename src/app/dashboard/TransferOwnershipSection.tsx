@@ -4,6 +4,11 @@
 import { useState } from 'react';
 import styles from './dashboard.module.css';
 
+// A real (if intentionally simple) shape check - "contains an @" alone
+// let a bare "@" through with no local or domain part at all, straight
+// into the ownership-handover request.
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 interface PendingRequest {
   recipientEmail: string;
   createdAt: string;
@@ -24,7 +29,7 @@ export function TransferOwnershipSection({ pendingRequest, bikeIsReadOnly }: Pro
 
   async function handleSubmit() {
     const cleaned = email.trim();
-    if (!cleaned || !cleaned.includes('@')) {
+    if (!cleaned || !EMAIL_PATTERN.test(cleaned)) {
       setError('Enter a valid email address.');
       return;
     }
