@@ -61,10 +61,10 @@ describe("parseReceiptFile", () => {
 
   afterEach(() => vi.unstubAllGlobals());
 
-  it("rejects a file type that isn't JPG or PNG, before touching the network at all", async () => {
+  it("rejects a file type that is not JPG, PNG, or PDF", async () => {
     vi.stubGlobal("fetch", vi.fn());
-    const result = await parseReceiptFile(fakeFile({ type: "application/pdf" }), "key", bike);
-    expect(result).toEqual({ ok: false, fileName: "receipt.jpg", error: "Only JPG or PNG photos are supported for scanning.", status: 400 });
+    const result = await parseReceiptFile(fakeFile({ type: "text/plain" }), "key", bike);
+    expect(result).toEqual({ ok: false, fileName: "receipt.jpg", error: "Only JPG, PNG, or PDF files are supported for scanning.", status: 400 });
   });
 
   it("rejects a file over the 10MB limit", async () => {
@@ -253,5 +253,24 @@ describe("parseReceiptFile", () => {
       error: "Something went wrong reading the receipt. Please try again or enter it manually.",
       status: 500,
     });
+  });
+  it('accepts a PDF, skips sharp, sends PDF bytes to Gemini with application/pdf mime type, and stores attachment as application/pdf', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      geminiResponse(JSON.stringify({ ...validGeminiPayload, items: [{ category: 'service', date: '2025-06-12', cost: 80, description: 'Service' }] }))
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    const result = await parseReceiptFile(fakeFile({ type: 'application/pdf', name: 'invoice.pdf' }), 'key', bike);
+    expect(result.ok).toBe(true);
+    expect(mocks.sharpToBuffer).not.toHaveBeenCalled();
+    const geminiCall = fetchMock.mock.calls.find((c) => String(c[0]).includes('generativelanguage'));
+    const body = JSON.parse(geminiCall[1].body);
+    expect(body.contents[0].parts[1].inline_data.mime_type).toBe('application/pdf');
+    expect(mocks.uploadData).toHaveBeenCalledWith(
+      expect.any(Buffer),
+      expect.objectContaining({ blobHTTPHeaders: { blobContentType: 'application/pdf' } })
+    );
+    if (result.ok) {
+      expect(result.items[0].attachment?.fileType).toBe('application/pdf');
+    }
   });
 });

@@ -207,7 +207,7 @@ export function ScanReceiptButton() {
           </p>
           <input
             type="file"
-            accept="image/*"
+            accept="image/jpeg,image/png,application/pdf"
             multiple
             onChange={handleFilesSelected}
             disabled={scanning}
@@ -260,7 +260,7 @@ export function ScanReceiptButton() {
               )}
             </div>
           )}
-          <p className={styles.scanReceiptConstruction}>PDF receipts aren&apos;t scanned yet - attach those manually as before.</p>
+
         </div>
       )}
       {queueItems && <ReviewQueueModal parsedItems={queueItems} onFinished={handleQueueFinished} />}

@@ -1,4 +1,4 @@
-﻿// Place at: src/lib/tracker/receiptParse.ts
+// Place at: src/lib/tracker/receiptParse.ts
 //
 // Phase 1 of scanning: read a receipt photo and turn it into structured
 // data. Deliberately touches the database for nothing except uploading
@@ -21,7 +21,7 @@ import type { BikeDoc } from "@/lib/tracker/bike";
 
 const GEMINI_MODEL = "gemini-3.5-flash-lite";
 const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024;
-const ALLOWED_TYPES = new Set(["image/jpeg", "image/png"]);
+const ALLOWED_TYPES = new Set(["image/jpeg", "image/png", "application/pdf"]);
 
 const PROMPT = `You are extracting structured data from a photo that is claimed to be a UK motorcycle-related receipt or invoice. First, check whether the image genuinely looks like a receipt or invoice at all (a till receipt, an emailed/printed invoice, a garage work order, etc.) - not a random photo of something else. Then, this receipt may contain ONE purchase, or it may contain SEVERAL distinct items that belong to different categories (for example, an oil change AND a padlock bought at the same garage visit, or fuel AND a snack). Respond with ONLY a JSON object (no markdown, no explanation) matching this exact shape:
 {
@@ -115,26 +115,49 @@ export async function parseReceiptFile(file: File, apiKey: string, bike: BikeDoc
   const fileName = file.name || "receipt.jpg";
 
   if (!ALLOWED_TYPES.has(file.type)) {
-    return { ok: false, fileName, error: "Only JPG or PNG photos are supported for scanning.", status: 400 };
+    return { ok: false, fileName, error: "Only JPG, PNG, or PDF files are supported for scanning.", status: 400 };
   }
   if (file.size > MAX_FILE_SIZE_BYTES) {
     return { ok: false, fileName, error: "File is too large - 10MB maximum.", status: 400 };
   }
 
+  const isPdf = file.type === "application/pdf";
+
   try {
-    const originalBuffer = Buffer.from(await file.arrayBuffer());
-    const compressed = await sharp(originalBuffer)
-      .rotate()
-      .resize({ width: 1600, height: 1600, fit: "inside", withoutEnlargement: true })
-      .jpeg({ quality: 80 })
-      .toBuffer();
-    const base64 = compressed.toString("base64");
+    let base64: string;
+    let mimeTypeForGemini: string;
+    let uploadBuffer: Buffer;
+    let uploadContentType: string;
+    let uploadExtension: string;
+
+    if (isPdf) {
+      // Send PDF bytes directly to Gemini as a document - no rasterisation
+      // needed since Gemini reads PDF natively. The original PDF is stored
+      // as the attachment so the buyer can open the real invoice later.
+      uploadBuffer = Buffer.from(await file.arrayBuffer());
+      base64 = uploadBuffer.toString("base64");
+      mimeTypeForGemini = "application/pdf";
+      uploadContentType = "application/pdf";
+      uploadExtension = "pdf";
+    } else {
+      // Images: compress/resize before sending to keep API payload small.
+      const originalBuffer = Buffer.from(await file.arrayBuffer());
+      uploadBuffer = await sharp(originalBuffer)
+        .rotate()
+        .resize({ width: 1600, height: 1600, fit: "inside", withoutEnlargement: true })
+        .jpeg({ quality: 80 })
+        .toBuffer();
+      base64 = uploadBuffer.toString("base64");
+      mimeTypeForGemini = "image/jpeg";
+      uploadContentType = "image/jpeg";
+      uploadExtension = "jpg";
+    }
 
     const geminiRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`, {
       method: "POST",
       headers: { "Content-Type": "application/json", "X-goog-api-key": apiKey },
       body: JSON.stringify({
-        contents: [{ parts: [{ text: PROMPT }, { inline_data: { mime_type: "image/jpeg", data: base64 } }] }],
+        contents: [{ parts: [{ text: PROMPT }, { inline_data: { mime_type: mimeTypeForGemini, data: base64 } }] }],
         generationConfig: { responseMimeType: "application/json" },
       }),
     });
@@ -182,12 +205,12 @@ export async function parseReceiptFile(file: File, apiKey: string, bike: BikeDoc
     // Uploaded once per file, shared as the attachment across every item
     // split out of this one receipt - they're all proof of the same
     // physical piece of paper.
-    const blobName = `${randomBytes(24).toString("base64url")}.jpg`;
+    const blobName = `${randomBytes(24).toString("base64url")}.${uploadExtension}`;
     const container = await getAttachmentContainer();
     const blockBlobClient = container.getBlockBlobClient(blobName);
-    await blockBlobClient.uploadData(compressed, { blobHTTPHeaders: { blobContentType: "image/jpeg" } });
-    const attachment: Attachment = { blobName, fileName, fileType: "image/jpeg", uploadedAt: new Date().toISOString() };
 
+    await blockBlobClient.uploadData(uploadBuffer, { blobHTTPHeaders: { blobContentType: uploadContentType } });
+    const attachment: Attachment = { blobName, fileName, fileType: (isPdf ? "application/pdf" : "image/jpeg") as Attachment["fileType"], uploadedAt: new Date().toISOString() };
     const rates = await getExchangeRates();
     const currencySupported = (ALL_CURRENCIES as string[]).includes(detectedCurrency);
 
@@ -274,6 +297,7 @@ export async function parseReceiptFile(file: File, apiKey: string, bike: BikeDoc
     };
   }
 }
+
 
 
 
