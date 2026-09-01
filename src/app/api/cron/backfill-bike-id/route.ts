@@ -34,6 +34,7 @@ export async function POST(req: NextRequest) {
     let bikesProcessed = 0;
     let docsPatched = 0;
     const perBike: { email: string; bikeId: string; patched: number }[] = [];
+    const errors: { id: string; bikeId?: string; error: string }[] = [];
 
     for (const bike of bikes) {
       bikesProcessed++;
@@ -55,10 +56,18 @@ export async function POST(req: NextRequest) {
           .fetchAll();
 
         for (const doc of docs) {
-          const updated = { ...doc, bikeId: bike.id };
-          await container.items.upsert(updated);
-          docsPatched++;
-          patchedForThisBike++;
+          // Isolated per doc: one bad upsert shouldn't take down the
+          // rest of this bike's docs, or every other bike still queued
+          // behind it in the same run.
+          try {
+            const updated = { ...doc, bikeId: bike.id };
+            await container.items.upsert(updated);
+            docsPatched++;
+            patchedForThisBike++;
+          } catch (err) {
+            console.error(`Bike-id backfill failed for doc ${doc.id} (bike ${bike.id}):`, err);
+            errors.push({ id: doc.id, bikeId: bike.id, error: err instanceof Error ? err.message : String(err) });
+          }
         }
       }
 
@@ -79,14 +88,19 @@ export async function POST(req: NextRequest) {
       .fetchAll();
 
     for (const link of shareLinks) {
-      const linkBikes = await container.items
-        .query<BikeDoc>({ query: "SELECT * FROM c WHERE c.type = 'bike' ORDER BY c.dateAdded ASC" }, { partitionKey: link.email })
-        .fetchAll()
-        .then((r) => r.resources);
-      const primaryBike = linkBikes[0];
-      if (!primaryBike) continue;
-      await container.items.upsert({ ...link, bikeId: primaryBike.id });
-      shareLinksPatched++;
+      try {
+        const linkBikes = await container.items
+          .query<BikeDoc>({ query: "SELECT * FROM c WHERE c.type = 'bike' ORDER BY c.dateAdded ASC" }, { partitionKey: link.email })
+          .fetchAll()
+          .then((r) => r.resources);
+        const primaryBike = linkBikes[0];
+        if (!primaryBike) continue;
+        await container.items.upsert({ ...link, bikeId: primaryBike.id });
+        shareLinksPatched++;
+      } catch (err) {
+        console.error(`Bike-id backfill failed for share link ${link.id}:`, err);
+        errors.push({ id: link.id, error: err instanceof Error ? err.message : String(err) });
+      }
     }
 
     await container.items.upsert({
@@ -99,7 +113,10 @@ export async function POST(req: NextRequest) {
       shareLinksPatched,
     });
 
-    return NextResponse.json({ ok: true, bikesProcessed, docsPatched, shareLinksPatched, perBike });
+    return NextResponse.json({
+      ok: true, bikesProcessed, docsPatched, shareLinksPatched, perBike,
+      ...(errors.length ? { errors } : {}),
+    });
   } catch (err) {
     return NextResponse.json(
       { error: "Unexpected error running bike-id backfill", detail: err instanceof Error ? err.message : String(err) },

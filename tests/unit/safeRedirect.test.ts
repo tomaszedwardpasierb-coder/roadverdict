@@ -98,65 +98,48 @@ describe("getSafeRedirectPath", () => {
   );
 
   // ===========================================================================
-  // SECURITY FINDING - not a bug in this function's own documented contract,
-  // but a real, currently-exploitable gap for at least one of its actual
-  // callers. Reported per instructions rather than silently patched.
+  // Browser URL-normalization bypasses - FIXED.
   //
-  // getSafeRedirectPath's only defense against host confusion is a literal
-  // `startsWith("//")` check. It does not strip, or account for, the ASCII
-  // tab/newline characters that the WHATWG URL parser (i.e. every browser)
-  // unconditionally strips from a URL before parsing it, nor the backslash
-  // character that the same parser treats as equivalent to "/" for any
-  // "special" scheme (http/https/ws/wss/ftp/file) when deciding where the
-  // authority (host) component starts.
+  // getSafeRedirectPath's host-confusion defense used to be a literal
+  // `startsWith("//")` check only. It didn't strip, or account for, the
+  // ASCII tab/newline characters that the WHATWG URL parser (i.e. every
+  // browser) unconditionally strips from a URL before parsing it, nor the
+  // backslash character that the same parser treats as equivalent to "/"
+  // for any "special" scheme (http/https/ws/wss/ftp/file) when deciding
+  // where the authority (host) component starts.
   //
-  // Concretely:
+  // Concretely, these used to bypass the "//" check and be returned as if
+  // they were safe, same-site paths:
   //   "/\evil.com"     -> after backslash normalization, a browser parses
   //                        this exactly like "//evil.com".
   //   "/\t/evil.com"    -> the browser deletes the tab entirely before
   //                        parsing, leaving literally "//evil.com".
   //   "/\n/evil.com"    -> same, via the stripped newline.
   //
-  // Both bypass getSafeRedirectPath's "//" check below and are returned
-  // as if they were safe, same-site paths.
-  //
-  // This is harmless wherever the caller prefixes the result with APP_URL
-  // before handing it to a browser (src/app/api/auth/verify/route.ts,
-  // src/app/api/tomasz/send-notification/route.ts) - by the time a
-  // backslash/tab could be reinterpreted, the scheme+host have already
-  // been fixed by the APP_URL prefix, so the value only ever lands in the
-  // *path* of roadverdict's own origin.
-  //
-  // It is NOT harmless in src/app/login/page.tsx (around line 48):
-  //   if (data.demo) { window.location.href = data.redirect ?? "/dashboard"; }
-  // `data.redirect` there is exactly this function's return value, used
-  // completely unprefixed as a raw browser navigation target. An
-  // attacker-supplied `?redirect=/\evil.com` (or the tab/newline variant)
-  // passed through src/app/api/auth/request-link/route.ts's demo branch
-  // survives getSafeRedirectPath untouched and reaches
-  // `window.location.href` as-is - a genuine, if narrow (gated behind the
-  // hardcoded demo email flow), open redirect. Recorded here as a passing
-  // test of ACTUAL current behavior (not the desired/safe behavior), so
-  // this stays visible without editing src/ per instructions.
+  // This was exploitable in src/app/login/page.tsx (around line 48), which
+  // uses this function's return value completely unprefixed as a raw
+  // `window.location.href` navigation target for the demo sign-in flow -
+  // unlike every other caller, which prefixes the result with APP_URL
+  // before it could ever be reinterpreted. The source now strips
+  // tab/CR/LF and checks the character immediately after the leading
+  // slash for "/" or "\" before returning, closing the gap for every
+  // caller regardless of whether it happens to prefix the result.
   // ===========================================================================
 
-  it("SECURITY BUG: does not block the backslash open-redirect trick ('/\\evil.com')", () => {
+  it("rejects the backslash open-redirect trick ('/\\evil.com')", () => {
     // A browser treats "\" as equivalent to "/" for special schemes, so
-    // this is parsed identically to the already-blocked "//evil.com".
-    const result = getSafeRedirectPath("/\\evil.com");
-    expect(result).toBe("/\\evil.com"); // returned as "safe" - it is not.
+    // this parses identically to the already-blocked "//evil.com".
+    expect(getSafeRedirectPath("/\\evil.com")).toBeNull();
   });
 
-  it("SECURITY BUG: does not block a tab-character open-redirect trick ('/\\t/evil.com')", () => {
+  it("rejects a tab-character open-redirect trick ('/\\t/evil.com')", () => {
     // Browsers strip ASCII tab/newline from a URL before parsing it, so
-    // this literal string is parsed identically to "//evil.com".
-    const result = getSafeRedirectPath("/\t/evil.com");
-    expect(result).toBe("/\t/evil.com"); // returned as "safe" - it is not.
+    // this literal string parses identically to "//evil.com".
+    expect(getSafeRedirectPath("/\t/evil.com")).toBeNull();
   });
 
-  it("SECURITY BUG: does not block a newline-character open-redirect trick ('/\\n/evil.com')", () => {
-    const result = getSafeRedirectPath("/\n/evil.com");
-    expect(result).toBe("/\n/evil.com"); // returned as "safe" - it is not.
+  it("rejects a newline-character open-redirect trick ('/\\n/evil.com')", () => {
+    expect(getSafeRedirectPath("/\n/evil.com")).toBeNull();
   });
 
   // ---------------------------------------------------------------------

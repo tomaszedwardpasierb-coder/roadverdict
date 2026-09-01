@@ -22,15 +22,28 @@
 // without APP_URL prefixed first).
 const MAX_REDIRECT_LENGTH = 200;
 
+// Browsers (per the WHATWG URL parser) strip ASCII tab/CR/LF from a URL
+// before parsing it, and treat "\" as equivalent to "/" for any special
+// scheme (http/https/ws/wss/ftp/file) when locating the authority (host)
+// component. A value that only looks single-slash-relative in its raw
+// form - e.g. "/\evil.com" or "/\t/evil.com" - can still resolve to a
+// protocol-relative, different-host URL once a browser normalizes it, so
+// normalization has to happen before the host-confusion check below runs.
+const CONTROL_STRIP_PATTERN = /[\t\r\n]/g;
+
 export function getSafeRedirectPath(value: unknown): string | null {
   if (typeof value !== "string" || value.length === 0 || value.length > MAX_REDIRECT_LENGTH) {
     return null;
   }
-  if (!value.startsWith("/") || value.startsWith("//")) {
+  const normalized = value.replace(CONTROL_STRIP_PATTERN, "");
+  if (!normalized.startsWith("/")) {
     return null;
   }
-  if (/^[a-z][a-z0-9+.-]*:/i.test(value)) {
+  if (normalized[1] === "/" || normalized[1] === "\\") {
     return null;
   }
-  return value;
+  if (/^[a-z][a-z0-9+.-]*:/i.test(normalized)) {
+    return null;
+  }
+  return normalized;
 }

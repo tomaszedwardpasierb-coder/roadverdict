@@ -38,25 +38,34 @@ export async function POST(req: NextRequest) {
     let usersCreated = 0;
     let alreadyExisted = 0;
     const createdEmails: string[] = [];
+    const errors: { email: string; error: string }[] = [];
 
     for (const email of distinctEmails) {
-      // Same check session.ts itself now uses correctly - .read() on a
-      // non-existent item resolves with an empty resource rather than
-      // throwing.
-      const { resource: existingUser } = await container.item(email, email).read();
-      if (existingUser) {
-        alreadyExisted++;
-        continue;
+      // Isolated per email: one failed read/create shouldn't stop every
+      // other already-caught-up-or-not email in the same run from being
+      // checked.
+      try {
+        // Same check session.ts itself now uses correctly - .read() on a
+        // non-existent item resolves with an empty resource rather than
+        // throwing.
+        const { resource: existingUser } = await container.item(email, email).read();
+        if (existingUser) {
+          alreadyExisted++;
+          continue;
+        }
+        await container.items.create({
+          id: email,
+          pk: email,
+          type: "user",
+          email,
+          createdAt: new Date().toISOString(),
+        });
+        usersCreated++;
+        createdEmails.push(email);
+      } catch (err) {
+        console.error(`User backfill failed for ${email}:`, err);
+        errors.push({ email, error: err instanceof Error ? err.message : String(err) });
       }
-      await container.items.create({
-        id: email,
-        pk: email,
-        type: "user",
-        email,
-        createdAt: new Date().toISOString(),
-      });
-      usersCreated++;
-      createdEmails.push(email);
     }
 
     await container.items.upsert({
@@ -68,7 +77,10 @@ export async function POST(req: NextRequest) {
       alreadyExisted,
     });
 
-    return NextResponse.json({ ok: true, usersCreated, alreadyExisted, createdEmails });
+    return NextResponse.json({
+      ok: true, usersCreated, alreadyExisted, createdEmails,
+      ...(errors.length ? { errors } : {}),
+    });
   } catch (err) {
     return NextResponse.json(
       { error: "Unexpected error running user backfill", detail: err instanceof Error ? err.message : String(err) },

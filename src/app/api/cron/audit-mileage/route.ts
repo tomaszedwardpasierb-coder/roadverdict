@@ -35,52 +35,60 @@ export async function POST(req: NextRequest) {
     let bikesProcessed = 0;
     let recordsFlagged = 0;
     const perBike: { email: string; bikeId: string; flagged: number }[] = [];
+    const errors: { email: string; bikeId: string; error: string }[] = [];
 
     for (const bike of bikes) {
       bikesProcessed++;
-      const [records, fuelLogs, mods] = await Promise.all([
-        getServiceRecords(bike.pk, bike.id),
-        getFuelLogs(bike.pk, bike.id),
-        getMods(bike.pk, bike.id),
-      ]);
+      // Isolated per bike: one bike's own read/write failure shouldn't
+      // stop the audit from ever reaching every other bike in the run.
+      try {
+        const [records, fuelLogs, mods] = await Promise.all([
+          getServiceRecords(bike.pk, bike.id),
+          getFuelLogs(bike.pk, bike.id),
+          getMods(bike.pk, bike.id),
+        ]);
 
-      const combined: (AuditableRecord & { type: FlaggableType })[] = [
-        ...records.map((r) => ({ id: r.id, date: r.date, mileage: r.mileage, mileageConfidence: r.mileageConfidence, type: "serviceRecord" as const })),
-        ...fuelLogs.map((f) => ({ id: f.id, date: f.date, mileage: f.mileage, mileageConfidence: f.mileageConfidence, type: "fuelLog" as const })),
-        ...mods.map((m) => ({ id: m.id, date: m.date, mileage: m.mileage, mileageConfidence: m.mileageConfidence, type: "mod" as const })),
-      ];
+        const combined: (AuditableRecord & { type: FlaggableType })[] = [
+          ...records.map((r) => ({ id: r.id, date: r.date, mileage: r.mileage, mileageConfidence: r.mileageConfidence, type: "serviceRecord" as const })),
+          ...fuelLogs.map((f) => ({ id: f.id, date: f.date, mileage: f.mileage, mileageConfidence: f.mileageConfidence, type: "fuelLog" as const })),
+          ...mods.map((m) => ({ id: m.id, date: m.date, mileage: m.mileage, mileageConfidence: m.mileageConfidence, type: "mod" as const })),
+        ];
 
-      const violatingIds = new Set(findMileageMonotonicityViolations(combined));
+        const violatingIds = new Set(findMileageMonotonicityViolations(combined));
 
-      // Second pass: full-tank fuel entries whose litres imply an
-      // impossible mpg against the fill immediately before them - a
-      // different kind of inconsistency to the chronological one above,
-      // so checked separately, but flagged into the same set.
-      const fuelForPlausibilityCheck: AuditableFuelLog[] = fuelLogs.map((f) => ({
-        id: f.id, date: f.date, mileage: f.mileage, mileageConfidence: f.mileageConfidence, litres: f.litres, filledToFull: f.filledToFull,
-      }));
-      for (const id of findImplausibleFuelFills(fuelForPlausibilityCheck)) violatingIds.add(id);
+        // Second pass: full-tank fuel entries whose litres imply an
+        // impossible mpg against the fill immediately before them - a
+        // different kind of inconsistency to the chronological one above,
+        // so checked separately, but flagged into the same set.
+        const fuelForPlausibilityCheck: AuditableFuelLog[] = fuelLogs.map((f) => ({
+          id: f.id, date: f.date, mileage: f.mileage, mileageConfidence: f.mileageConfidence, litres: f.litres, filledToFull: f.filledToFull,
+        }));
+        for (const id of findImplausibleFuelFills(fuelForPlausibilityCheck)) violatingIds.add(id);
 
-      let flaggedForThisBike = 0;
+        let flaggedForThisBike = 0;
 
-      for (const item of combined) {
-        if (!violatingIds.has(item.id)) continue;
-        const updates = {
-          needsReview: true,
-          mileageConfidence: "estimated" as const,
-          mileageConflictWarning: "This record's mileage looks chronologically inconsistent with another record for this bike (found by the mileage audit) - please double-check the figure.",
-        };
-        if (item.type === "serviceRecord") await updateTrackerDoc<ServiceRecordDoc>(bike.pk, item.id, updates);
-        else if (item.type === "fuelLog") await updateTrackerDoc<FuelLogDoc>(bike.pk, item.id, updates);
-        else await updateTrackerDoc<ModDoc>(bike.pk, item.id, updates);
-        flaggedForThisBike++;
-        recordsFlagged++;
+        for (const item of combined) {
+          if (!violatingIds.has(item.id)) continue;
+          const updates = {
+            needsReview: true,
+            mileageConfidence: "estimated" as const,
+            mileageConflictWarning: "This record's mileage looks chronologically inconsistent with another record for this bike (found by the mileage audit) - please double-check the figure.",
+          };
+          if (item.type === "serviceRecord") await updateTrackerDoc<ServiceRecordDoc>(bike.pk, item.id, updates);
+          else if (item.type === "fuelLog") await updateTrackerDoc<FuelLogDoc>(bike.pk, item.id, updates);
+          else await updateTrackerDoc<ModDoc>(bike.pk, item.id, updates);
+          flaggedForThisBike++;
+          recordsFlagged++;
+        }
+
+        if (flaggedForThisBike > 0) perBike.push({ email: bike.pk, bikeId: bike.id, flagged: flaggedForThisBike });
+      } catch (err) {
+        console.error(`Mileage audit failed for bike ${bike.id} (${bike.pk}):`, err);
+        errors.push({ email: bike.pk, bikeId: bike.id, error: err instanceof Error ? err.message : String(err) });
       }
-
-      if (flaggedForThisBike > 0) perBike.push({ email: bike.pk, bikeId: bike.id, flagged: flaggedForThisBike });
     }
 
-    return NextResponse.json({ bikesProcessed, recordsFlagged, perBike });
+    return NextResponse.json({ bikesProcessed, recordsFlagged, perBike, ...(errors.length ? { errors } : {}) });
   } catch (err) {
     return NextResponse.json(
       { error: "Audit failed.", detail: err instanceof Error ? err.message : String(err) },

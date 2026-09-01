@@ -64,10 +64,12 @@ describe("POST /api/cron/purge-orphaned-receipt-requests", () => {
     await expect(response.json()).resolves.toEqual({ ok: true, deletedCount: 3 });
   });
 
-  // BUG FINDING: same gap as delete-expired-share-links - no try/catch at
-  // all, so a failure propagates out of the handler instead of a JSON 500.
-  it("has no error handling: a failure in the purge propagates instead of yielding a JSON 500", async () => {
+  it("degrades to a graceful JSON 500 when the purge fails, instead of propagating", async () => {
     mocks.purgeOrphanedReceiptRequests.mockRejectedValue(new Error("Cosmos unavailable"));
-    await expect(POST(request({ authorization: "Bearer top-secret" }))).rejects.toThrow("Cosmos unavailable");
+    const response = await POST(request({ authorization: "Bearer top-secret" }));
+    expect(response.status).toBe(500);
+    const body = await response.json();
+    expect(body.error).toBe("Unexpected error purging orphaned receipt requests");
+    expect(body.detail).toBe("Cosmos unavailable");
   });
 });

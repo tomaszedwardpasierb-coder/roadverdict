@@ -131,26 +131,29 @@ describe("POST /api/cron/audit-mileage", () => {
     expect(body.perBike).toEqual([{ email: "owner1@example.com", bikeId: "bike-1", flagged: 2 }]);
   });
 
-  // BUG FINDING: there is no per-bike try/catch around the audit work, so a
-  // failure auditing one bike aborts the whole run - later bikes are never
-  // even looked at, and the caller only ever sees a bare 500.
-  it("aborts the entire run (and never reaches later bikes) when a single bike's own lookup throws", async () => {
+  it("isolates a single bike's failure and still audits every other bike in the run", async () => {
     bikesQuery([
       { id: "bike-1", pk: "owner1@example.com" },
       { id: "bike-2", pk: "owner2@example.com" },
     ]);
     mocks.getServiceRecords.mockImplementation(async (email: string) => {
       if (email === "owner1@example.com") throw new Error("Cosmos read failed");
-      return [];
+      return [
+        { id: "a1", date: "2025-01-01", mileage: 5000, mileageConfidence: "estimated" },
+        { id: "a2", date: "2025-02-01", mileage: 1000, mileageConfidence: "estimated" },
+      ];
     });
 
     const response = await POST(request({ authorization: "Bearer top-secret" }));
-    expect(response.status).toBe(500);
+    expect(response.status).toBe(200);
     const body = await response.json();
-    expect(body.error).toBe("Audit failed.");
-    expect(body.detail).toBe("Cosmos read failed");
-    // bike-2 was never reached because bike-1's failure propagated straight
-    // out of the loop instead of being isolated to that one bike.
-    expect(mocks.getServiceRecords).not.toHaveBeenCalledWith("owner2@example.com", "bike-2");
+    expect(body.bikesProcessed).toBe(2);
+    // bike-2 was still reached and flagged, despite bike-1's failure.
+    expect(mocks.getServiceRecords).toHaveBeenCalledWith("owner2@example.com", "bike-2");
+    expect(body.recordsFlagged).toBe(2);
+    expect(body.perBike).toEqual([{ email: "owner2@example.com", bikeId: "bike-2", flagged: 2 }]);
+    expect(body.errors).toEqual([
+      { email: "owner1@example.com", bikeId: "bike-1", error: "Cosmos read failed" },
+    ]);
   });
 });

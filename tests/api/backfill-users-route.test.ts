@@ -119,19 +119,18 @@ describe("POST /api/cron/backfill-users", () => {
     }));
   });
 
-  // BUG FINDING: no per-email try/catch - one failed create() aborts the
-  // whole backfill, even for emails that would otherwise have succeeded.
-  it("aborts the whole run when creating one user throws, rather than continuing to the rest", async () => {
+  it("isolates a single user's create failure and still processes the rest of the run", async () => {
     sessionsQuery(["broken@example.com", "fine@example.com"]);
     mocks.create.mockImplementation(async (doc: { email: string }) => {
       if (doc.email === "broken@example.com") throw new Error("Cosmos write failed");
     });
 
     const response = await POST(request({ authorization: "Bearer top-secret" }));
-    expect(response.status).toBe(500);
+    expect(response.status).toBe(200);
     const body = await response.json();
-    expect(body.error).toBe("Unexpected error running user backfill");
-    expect(body.detail).toBe("Cosmos write failed");
-    expect(mocks.create).not.toHaveBeenCalledWith(expect.objectContaining({ email: "fine@example.com" }));
+    expect(mocks.create).toHaveBeenCalledWith(expect.objectContaining({ email: "fine@example.com" }));
+    expect(body.usersCreated).toBe(1);
+    expect(body.createdEmails).toEqual(["fine@example.com"]);
+    expect(body.errors).toEqual([{ email: "broken@example.com", error: "Cosmos write failed" }]);
   });
 });

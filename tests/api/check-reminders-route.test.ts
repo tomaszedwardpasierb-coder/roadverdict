@@ -147,12 +147,7 @@ describe("POST /api/cron/check-reminders", () => {
     }));
   });
 
-  // BUG FINDING: there is no per-reminder try/catch, so a single failed
-  // send aborts the ENTIRE run - later reminders in the same batch are
-  // never even checked, and no cronStatus summary is ever written for the
-  // run (unlike send-history-follow-ups, which explicitly isolates a failed
-  // send with its own try/catch and continues past it).
-  it("aborts the entire run (leaving later reminders unchecked) when a single send fails", async () => {
+  it("isolates a single failed send and still checks/sends every other reminder in the run", async () => {
     mocks.getAllReminders.mockResolvedValue([
       overdueDateReminder({ id: "r1", pk: "first@example.com" }),
       overdueDateReminder({ id: "r5", pk: "second@example.com", name: "Tax renewal" }),
@@ -162,11 +157,16 @@ describe("POST /api/cron/check-reminders", () => {
     });
 
     const response = await POST(request({ authorization: "Bearer top-secret" }));
-    expect(response.status).toBe(500);
-    await expect(response.json()).resolves.toEqual({ error: "Unexpected error checking reminders" });
-    // the second reminder was never reached
-    expect(mocks.sendReminderEmail).not.toHaveBeenCalledWith("second@example.com", expect.anything(), expect.anything());
-    expect(mocks.markReminderNotified).not.toHaveBeenCalled();
-    expect(mocks.upsert).not.toHaveBeenCalled();
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body).toEqual({ ok: true, checked: 2, sent: 1, failed: 1 });
+    // the second reminder was still reached and sent despite the first failing.
+    expect(mocks.sendReminderEmail).toHaveBeenCalledWith("second@example.com", "Tax renewal", expect.anything());
+    expect(mocks.markReminderNotified).toHaveBeenCalledWith("second@example.com", "r5");
+    // left un-notified so tomorrow's run retries it.
+    expect(mocks.markReminderNotified).not.toHaveBeenCalledWith("first@example.com", "r1");
+    expect(mocks.upsert).toHaveBeenCalledWith(expect.objectContaining({
+      id: "cronStatus::reminders", checked: 2, sent: 1, failed: 1,
+    }));
   });
 });

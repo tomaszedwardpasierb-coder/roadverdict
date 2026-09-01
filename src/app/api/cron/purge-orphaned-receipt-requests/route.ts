@@ -11,6 +11,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const deletedCount = await purgeOrphanedReceiptRequests();
-  return NextResponse.json({ ok: true, deletedCount });
+  try {
+    const deletedCount = await purgeOrphanedReceiptRequests();
+    return NextResponse.json({ ok: true, deletedCount });
+  } catch (err) {
+    return NextResponse.json(
+      { error: "Unexpected error purging orphaned receipt requests", detail: err instanceof Error ? err.message : String(err) },
+      { status: 500 }
+    );
+  }
 }

@@ -158,10 +158,7 @@ describe("POST /api/cron/backfill-bike-id", () => {
     }));
   });
 
-  // BUG FINDING: no per-doc try/catch - one bad upsert takes down the whole
-  // migration run, including bikes/docs that would otherwise have patched
-  // successfully afterward.
-  it("aborts the whole run when a single doc's upsert throws, rather than continuing to the rest", async () => {
+  it("isolates a single doc's upsert failure and still patches the rest of the run", async () => {
     setupCosmos({
       bikes: [
         { id: "bike-1", pk: "owner1@example.com" },
@@ -178,11 +175,11 @@ describe("POST /api/cron/backfill-bike-id", () => {
     });
 
     const response = await POST(request({ authorization: "Bearer top-secret" }));
-    expect(response.status).toBe(500);
+    expect(response.status).toBe(200);
     const body = await response.json();
-    expect(body.error).toBe("Unexpected error running bike-id backfill");
-    expect(body.detail).toBe("write conflict");
-    // bike-2's doc was never reached.
-    expect(mocks.upsert).not.toHaveBeenCalledWith(expect.objectContaining({ id: "s2" }));
+    // bike-2's doc was still reached and patched despite bike-1's failure.
+    expect(mocks.upsert).toHaveBeenCalledWith(expect.objectContaining({ id: "s2", bikeId: "bike-2" }));
+    expect(body.docsPatched).toBe(1);
+    expect(body.errors).toEqual([{ id: "s1", bikeId: "bike-1", error: "write conflict" }]);
   });
 });

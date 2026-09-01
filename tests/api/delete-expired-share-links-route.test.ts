@@ -64,11 +64,12 @@ describe("POST /api/cron/delete-expired-share-links", () => {
     await expect(response.json()).resolves.toEqual({ ok: true, deletedCount: 7 });
   });
 
-  // BUG FINDING: unlike most other cron routes in this app, this handler has
-  // no try/catch at all around its work. A failure here doesn't degrade to a
-  // graceful JSON 500 - it propagates out of the route handler entirely.
-  it("has no error handling: a failure in the cleanup propagates instead of yielding a JSON 500", async () => {
+  it("degrades to a graceful JSON 500 when the cleanup fails, instead of propagating", async () => {
     mocks.deleteExpiredShareLinks.mockRejectedValue(new Error("Cosmos unavailable"));
-    await expect(POST(request({ authorization: "Bearer top-secret" }))).rejects.toThrow("Cosmos unavailable");
+    const response = await POST(request({ authorization: "Bearer top-secret" }));
+    expect(response.status).toBe(500);
+    const body = await response.json();
+    expect(body.error).toBe("Unexpected error deleting expired share links");
+    expect(body.detail).toBe("Cosmos unavailable");
   });
 });

@@ -11,6 +11,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const deletedCount = await deleteExpiredShareLinks();
-  return NextResponse.json({ ok: true, deletedCount });
+  try {
+    const deletedCount = await deleteExpiredShareLinks();
+    return NextResponse.json({ ok: true, deletedCount });
+  } catch (err) {
+    return NextResponse.json(
+      { error: "Unexpected error deleting expired share links", detail: err instanceof Error ? err.message : String(err) },
+      { status: 500 }
+    );
+  }
 }
