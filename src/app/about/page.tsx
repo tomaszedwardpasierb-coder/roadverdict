@@ -1,4 +1,4 @@
-// Place at: src/app/about/page.tsx
+﻿// Place at: src/app/about/page.tsx
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
@@ -10,6 +10,14 @@ export default function AboutPage() {
   return (
     <div className="hero">
       <h1>About RoadVerdict</h1>
+      <video
+        src="/api/video/promo"
+        controls
+        muted
+        loop
+        playsInline
+        style={{ width: '100%', borderRadius: '12px', marginBottom: '1.5rem' }}
+      />
       <p style={{ maxWidth: 'none', margin: '0 0 1.5rem' }}>
         RoadVerdict is run independently, not by a large company - built to fix a genuinely
         annoying problem: not knowing whether a motorcycle service quote is fair, and not
