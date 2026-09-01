@@ -41,6 +41,8 @@ jobs:
         run: npm run lint
       - name: Unit tests
         run: npm test
+      - name: Component tests
+        run: npm run test:components
       - name: Wait for Cosmos DB Emulator
         run: |
           for i in $(seq 1 60); do
