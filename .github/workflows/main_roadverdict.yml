@@ -51,8 +51,58 @@ jobs:
           done
           echo "Cosmos DB Emulator did not become ready in time." >&2
           exit 1
-      - name: Integration tests (Cosmos DB Emulator)
-        run: npm run test:integration
+      # Same known, unresolved upstream bug already documented in the
+      # authenticated-e2e job below (a "Last Chance"/SIGHUP fatal crash
+      # deep in the Linux emulator's sqlpal.dll, under write load, on
+      # GitHub Actions runners specifically) - this time hitting the
+      # services:-managed container here instead. Unlike that job, this
+      # container isn't one we create ourselves, so recovery is a
+      # `docker restart` on the same container Actions already manages,
+      # not a `docker rm`+`docker run` replacement - restarting keeps
+      # Actions' own service-lifecycle bookkeeping intact. A full re-run
+      # of the whole suite on retry (not just the files that hadn't
+      # reached yet) is deliberate: vitest.integration.config.ts runs
+      # every file against ONE shared container by design, so nothing
+      # is provisioned per-file to resume from partway through.
+      - name: Integration tests (Cosmos DB Emulator), with a restart-and-retry for the emulator's known crash bug
+        run: |
+          set +e
+          MAX_ATTEMPTS=3
+          SUCCESS=0
+          for attempt in $(seq 1 $MAX_ATTEMPTS); do
+            echo "::group::Attempt $attempt/$MAX_ATTEMPTS"
+            npm run test:integration
+            if [ $? -eq 0 ]; then
+              SUCCESS=1
+              echo "::endgroup::"
+              break
+            fi
+
+            echo "Integration tests failed on attempt $attempt - restarting the Cosmos emulator container and retrying."
+            CONTAINER_ID=$(docker ps -aq --filter "ancestor=mcr.microsoft.com/cosmosdb/linux/azure-cosmos-emulator:latest")
+            if [ -n "$CONTAINER_ID" ]; then
+              docker restart "$CONTAINER_ID" >/dev/null 2>&1
+            fi
+
+            READY=0
+            for i in $(seq 1 60); do
+              if curl -sk --fail https://localhost:8081/_explorer/emulator.pem -o /dev/null; then
+                READY=1
+                break
+              fi
+              sleep 5
+            done
+            if [ "$READY" != "1" ]; then
+              echo "Cosmos DB Emulator did not come back up after restart on attempt $attempt."
+            fi
+            echo "::endgroup::"
+          done
+
+          if [ "$SUCCESS" != "1" ]; then
+            echo "Integration tests did not succeed after $MAX_ATTEMPTS attempts."
+            exit 1
+          fi
+          echo "Integration tests succeeded."
       - name: Build (proves the app actually compiles before anything downstream bothers)
         run: npm run build
 
