@@ -16,6 +16,7 @@ const mocks = vi.hoisted(() => ({
   computeSellerReportRowsAndMetrics: vi.fn(),
   computeSellerVerdict: vi.fn(),
   upsert: vi.fn(),
+  isPro: vi.fn(),
 }));
 
 vi.mock("@/lib/cosmos", () => ({
@@ -41,6 +42,7 @@ vi.mock("@/lib/tracker/sellerReportData", () => ({
 vi.mock("@/lib/tracker/sellerReportVerdict", () => ({
   computeSellerVerdict: mocks.computeSellerVerdict,
 }));
+vi.mock("@/lib/subscriptions", () => ({ isPro: mocks.isPro }));
 
 import { transferBike } from "@/lib/tracker/bikeTransfer";
 
@@ -118,6 +120,16 @@ describe("transferBike", () => {
     const result = await transferBike(fromEmail, bikeId, toEmail, false);
     expect(result).toMatchObject({ ok: false, reason: "recipient_limit_reached", limit: 2 });
     expect(mocks.upsert).not.toHaveBeenCalled();
+  });
+
+  // Pro accounts skip the cap entirely, per subscriptions.ts's isPro()
+  // (temporarily true for everyone while no payment platform is wired
+  // in - see that file's own comment).
+  it("lets a transfer through past the recipient's free bike cap when the recipient is Pro", async () => {
+    mocks.countActiveBikes.mockReturnValue(2); // MAX_FREE_BIKES = 2
+    mocks.isPro.mockResolvedValue(true);
+    const result = await transferBike(fromEmail, bikeId, toEmail, false);
+    expect(result.ok).toBe(true);
   });
 
   it("returns recipient_already_has_bike when the recipient's own bikes already include this registration", async () => {

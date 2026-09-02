@@ -31,6 +31,15 @@ describe("AddAnotherBikeSection", () => {
     expect(screen.getByText(/Free accounts can track up to 2 bikes/)).toBeInTheDocument();
   });
 
+  // Temporary: Pro is unlocked for everyone right now (see isPro() in
+  // subscriptions.ts) - a Pro account must never see the free-tier cap
+  // notice, no matter how many bikes it already has.
+  it("skips the cap notice entirely for a Pro account, even past the cap", () => {
+    render(<AddAnotherBikeSection bikeCount={5} maxFreeBikes={2} isPro />);
+    expect(screen.queryByText(/Free accounts can track up to/)).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "+ Add another bike" })).toBeInTheDocument();
+  });
+
   it("under the cap, shows the add button instead of the form or the notice", () => {
     render(<AddAnotherBikeSection bikeCount={1} maxFreeBikes={2} />);
     expect(screen.getByRole("button", { name: "+ Add another bike" })).toBeInTheDocument();

@@ -1,14 +1,13 @@
 // Place at: src/lib/tracker/bike.ts
 import { cookies } from "next/headers";
 import { getContainer } from "@/lib/cosmos";
+import { isPro } from "@/lib/subscriptions";
 import type { BikeClass, Region } from "@/lib/priceData";
 import type { DistanceUnit, FuelEconomyUnit } from "@/lib/tracker/unitFormat";
 import type { Currency } from "@/lib/tracker/currency";
 import type { BikeIdentity, CategorySpend } from "@/lib/tracker/storyFacts";
 
-// Free-tier cap. No paid tier exists yet - when it does, the natural
-// extension point is a `plan` field on some account-level doc, checked
-// alongside this constant, not a rewrite of the cap logic itself.
+// Free-tier cap - Pro accounts (see isPro() below) skip it entirely.
 export const MAX_FREE_BIKES = 2;
 
 // Which bike a browser is currently "looking at" - set by the bike
@@ -358,7 +357,7 @@ export async function createBike(
   }
 ): Promise<CreateBikeResult> {
   const existing = await getBikesForUser(email);
-  if (countActiveBikes(existing) >= MAX_FREE_BIKES) {
+  if (!(await isPro(email)) && countActiveBikes(existing) >= MAX_FREE_BIKES) {
     return { ok: false, reason: "limit_reached", limit: MAX_FREE_BIKES };
   }
 

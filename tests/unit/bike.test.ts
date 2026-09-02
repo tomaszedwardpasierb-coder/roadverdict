@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => ({
   deleteFn: vi.fn(),
   fetchAll: vi.fn(),
   cookieGet: vi.fn(),
+  isPro: vi.fn(),
 }));
 
 const mockContainer = {
@@ -22,6 +23,7 @@ const mockContainer = {
 
 vi.mock("@/lib/cosmos", () => ({ getContainer: () => mockContainer }));
 vi.mock("next/headers", () => ({ cookies: vi.fn(async () => ({ get: mocks.cookieGet })) }));
+vi.mock("@/lib/subscriptions", () => ({ isPro: mocks.isPro }));
 
 import {
   MAX_FREE_BIKES,
@@ -350,6 +352,19 @@ describe("createBike", () => {
 
     expect(result).toEqual({ ok: false, reason: "limit_reached", limit: MAX_FREE_BIKES });
     expect(mocks.upsert).not.toHaveBeenCalled();
+  });
+
+  // Pro accounts skip the cap entirely, per subscriptions.ts's isPro()
+  // (temporarily true for everyone while no payment platform is wired
+  // in - see that file's own comment).
+  it("lets a Pro account create a bike past the free-tier cap", async () => {
+    mocks.fetchAll.mockResolvedValue({ resources: [makeBike({ id: "a" }), makeBike({ id: "b" })] });
+    mocks.isPro.mockResolvedValue(true);
+
+    const result = await createBike("owner@example.com", newBikeData);
+
+    expect(result.ok).toBe(true);
+    expect(mocks.upsert).toHaveBeenCalled();
   });
 
   // Mirrors countActiveBikes: a transferred (read-only) bike must not

@@ -8,11 +8,12 @@ import styles from './garage.module.css';
 interface Props {
   bikeCount: number;
   maxFreeBikes: number;
+  isPro?: boolean;
 }
 
-export function AddAnotherBikeSection({ bikeCount, maxFreeBikes }: Props) {
+export function AddAnotherBikeSection({ bikeCount, maxFreeBikes, isPro = false }: Props) {
   const [showForm, setShowForm] = useState(false);
-  const atCap = bikeCount >= maxFreeBikes;
+  const atCap = !isPro && bikeCount >= maxFreeBikes;
 
   if (atCap) {
     return (

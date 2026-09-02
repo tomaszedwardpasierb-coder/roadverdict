@@ -18,6 +18,7 @@
 // changing hands. Attachments (receipt/invoice images) travel with
 // whichever records copy, since blob storage isn't owner-scoped.
 import { getContainer } from "@/lib/cosmos";
+import { isPro } from "@/lib/subscriptions";
 import { getBike, getBikesForUser, generateBikeId, countActiveBikes, getCurrentRegistration, MAX_FREE_BIKES, type BikeDoc } from "@/lib/tracker/bike";
 import { normalizePlate, allKnownPlates } from "@/lib/tracker/reportAccess";
 import { getServiceRecords } from "@/lib/tracker/serviceRecord";
@@ -61,7 +62,7 @@ export async function transferBike(
   // recipient already has doesn't cost them an active slot, so it
   // shouldn't block them from accepting a genuinely new one either.
   const recipientBikes = await getBikesForUser(toEmail);
-  if (countActiveBikes(recipientBikes) >= MAX_FREE_BIKES) {
+  if (!(await isPro(toEmail)) && countActiveBikes(recipientBikes) >= MAX_FREE_BIKES) {
     return { ok: false, reason: "recipient_limit_reached", limit: MAX_FREE_BIKES };
   }
 

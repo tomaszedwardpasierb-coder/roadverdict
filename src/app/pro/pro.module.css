@@ -140,8 +140,6 @@
 .planCtaPro {
   background: var(--amber);
   color: #000;
-  opacity: 0.6;
-  cursor: not-allowed;
   width: 100%;
 }
 

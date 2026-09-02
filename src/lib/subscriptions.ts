@@ -1,9 +1,13 @@
 // Place at: src/lib/subscriptions.ts
 //
 // Single source of truth for plan checks throughout the app.
-// Right now everyone is on the free plan - when Stripe is wired up,
-// replace isPro() with a real DB/Stripe lookup. Nothing else in the app
-// needs to change: every gate already calls this function.
+//
+// TEMPORARY: everyone is unlocked as Pro right now, deliberately, while
+// no payment platform is wired in yet - a real launch decision, not a
+// bug or an accidental leftover. When Stripe (or another platform) is
+// wired up, replace the `return true` below with a real DB/Stripe
+// lookup. Nothing else in the app needs to change: every gate already
+// calls this function.
 //
 // Future shape:
 //   export async function isPro(email: string): Promise<boolean> {
@@ -12,8 +16,9 @@
 //   }
 
 export async function isPro(_email: string): Promise<boolean> {
-  // TODO: replace with real Stripe subscription check
-  return false;
+  // TODO: replace with a real Stripe (or other platform) subscription
+  // check once one is wired in - see the TEMPORARY note above.
+  return true;
 }
 
 export const PRO_MONTHLY_PRICE = "£4.99";

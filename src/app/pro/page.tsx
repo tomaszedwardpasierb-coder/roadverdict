@@ -52,12 +52,18 @@ export default function ProPage() {
               <li key={f}>{f}</li>
             ))}
           </ul>
-          {/* TODO: replace this href with Stripe checkout URL */}
-          <button className={styles.planCta + ' ' + styles.planCtaPro} disabled>
-            Coming soon
-          </button>
+          {/* TEMPORARY: Pro is unlocked for everyone right now (see
+              isPro() in subscriptions.ts) while no payment platform is
+              wired in - this goes straight to the dashboard rather than
+              a checkout flow. Replace this href with the real Stripe
+              (or other platform) checkout URL once one exists, and this
+              note/button reverts to a real "Upgrade" purchase flow
+              rather than a same-as-free redirect. */}
+          <Link href="/dashboard" className={styles.planCta + ' ' + styles.planCtaPro}>
+            Upgrade
+          </Link>
           <p className={styles.planCtaNote}>
-            Pro is launching soon. Your data is safe and your account is ready.
+            Pro is free to everyone for now while we finish payments. Your account already has full access.
           </p>
         </div>
       </div>
