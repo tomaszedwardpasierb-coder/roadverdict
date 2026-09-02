@@ -10,10 +10,17 @@
 // no deterministic fallback text for this, so nothing shows rather than
 // something broken.
 
-// Reverted to the exact model already proven live in production - see
-// receiptParse.ts's GEMINI_MODEL comment for why the
-// AI-Models-for-Different-Tasks.docx tier split broke on deploy.
-const GEMINI_MODEL = "gemini-3.5-flash-lite";
+// CANARY - deliberately the one call site testing gemini-3.7-flash
+// before it's rolled out anywhere else. Google's own models guide lists
+// it as the current stable/GA flash-tier model (unlike gemini-2.5-flash,
+// which is on the deprecation path that broke this app once already -
+// see receiptParse.ts's GEMINI_MODEL comment). This file was picked as
+// the canary specifically because it's fail-soft by design (line 8
+// above: a failed call just omits the briefing, nothing else breaks) -
+// if this turns out wrong too, it degrades quietly rather than breaking
+// a live feature again. Do not copy this model onto another call site
+// until this one's been confirmed working against the real API key.
+const GEMINI_MODEL = "gemini-3.7-flash";
 
 export interface BuyingGuideBriefingInput {
   make: string;
