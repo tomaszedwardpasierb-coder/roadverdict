@@ -169,4 +169,29 @@ describe("POST /api/cron/check-reminders", () => {
       id: "cronStatus::reminders", checked: 2, sent: 1, failed: 1,
     }));
   });
+
+  // Idempotency: a scheduler retry, a duplicate trigger, or an admin
+  // re-running this via RunCronButton must never re-notify someone who
+  // was already emailed. This isn't asserting anything the route
+  // computes specially for a "second run" - it's proving the ordinary
+  // `if (reminder.notifiedAt) continue` skip, combined with
+  // markReminderNotified genuinely persisting, is enough on its own: a
+  // stateful fake (not a fresh mock per call) is what makes the second
+  // POST actually see the first POST's write, the same way two real
+  // invocations against real Cosmos would.
+  it("running the cron twice in a row only ever sends the same overdue reminder's email once", async () => {
+    const reminder = overdueDateReminder() as Omit<ReturnType<typeof overdueDateReminder>, "notifiedAt"> & { notifiedAt: string | null };
+    mocks.getAllReminders.mockImplementation(async () => [reminder]);
+    mocks.markReminderNotified.mockImplementation(async (_email: string, id: string) => {
+      if (id === reminder.id) reminder.notifiedAt = new Date().toISOString();
+    });
+
+    const first = await POST(request({ authorization: "Bearer top-secret" }));
+    expect(await first.json()).toEqual({ ok: true, checked: 1, sent: 1 });
+
+    const second = await POST(request({ authorization: "Bearer top-secret" }));
+    expect(await second.json()).toEqual({ ok: true, checked: 1, sent: 0 });
+
+    expect(mocks.sendReminderEmail).toHaveBeenCalledTimes(1);
+  });
 });

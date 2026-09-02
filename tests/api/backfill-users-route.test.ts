@@ -133,4 +133,28 @@ describe("POST /api/cron/backfill-users", () => {
     expect(body.createdEmails).toEqual(["fine@example.com"]);
     expect(body.errors).toEqual([{ email: "broken@example.com", error: "Cosmos write failed" }]);
   });
+
+  // Idempotency: proves the source's own "re-running this is always
+  // safe" claim for real, rather than just asserting it in a comment. A
+  // stateful fake (itemRead/create sharing one Set) is what makes the
+  // second POST actually see the first POST's write - same shape as
+  // the real .item(email, email).read() existence check.
+  it("running the cron twice in a row only ever creates each user once", async () => {
+    const existingUsers = new Set<string>();
+    sessionsQuery(["rider@example.com"]);
+    mocks.itemRead.mockImplementation(async (id: string) => ({
+      resource: existingUsers.has(id) ? { id } : undefined,
+    }));
+    mocks.create.mockImplementation(async (doc: { email: string }) => {
+      existingUsers.add(doc.email);
+    });
+
+    const first = await POST(request({ authorization: "Bearer top-secret" }));
+    expect(await first.json()).toMatchObject({ usersCreated: 1, alreadyExisted: 0 });
+
+    const second = await POST(request({ authorization: "Bearer top-secret" }));
+    expect(await second.json()).toMatchObject({ usersCreated: 0, alreadyExisted: 1 });
+
+    expect(mocks.create).toHaveBeenCalledTimes(1);
+  });
 });

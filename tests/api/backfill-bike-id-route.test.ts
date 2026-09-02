@@ -182,4 +182,50 @@ describe("POST /api/cron/backfill-bike-id", () => {
     expect(body.docsPatched).toBe(1);
     expect(body.errors).toEqual([{ id: "s1", bikeId: "bike-1", error: "write conflict" }]);
   });
+
+  // Idempotency: the source's own comment claims re-running this is
+  // always safe because the query explicitly excludes docs that already
+  // have a bikeId. A stateful fake (not setupCosmos's static return) is
+  // what actually proves that claim - the query has to genuinely stop
+  // returning a doc once upsert has "patched" it, the same way Cosmos's
+  // real NOT IS_DEFINED(c.bikeId) filter would once the field exists.
+  it("running the cron twice in a row only ever patches each doc once - a real proof of the 'idempotent by design' claim", async () => {
+    const serviceDoc: { id: string; type: string; bikeId?: string } = { id: "s1", type: "serviceRecord" };
+    const shareLinkDoc: { id: string; email: string; bikeId?: string } = { id: "token-1", email: "owner@example.com" };
+    const bikes = [{ id: "bike-1", pk: "owner@example.com" }];
+
+    mocks.query.mockImplementation((q: QueryCall, options?: { partitionKey?: string }) => {
+      const text = q.query;
+      if (text.includes("c.type = 'bike'") && text.includes("ORDER BY c.dateAdded ASC")) {
+        return { fetchAll: () => Promise.resolve({ resources: [{ id: "bike-1", dateAdded: "2024-01-01" }] }) };
+      }
+      if (text === "SELECT * FROM c WHERE c.type = 'bike'") {
+        return { fetchAll: () => Promise.resolve({ resources: bikes }) };
+      }
+      if (text.includes("NOT IS_DEFINED(c.bikeId)") && text.includes("@type")) {
+        const type = q.parameters?.find((p) => p.name === "@type")?.value as string;
+        const email = options?.partitionKey as string;
+        const match = email === "owner@example.com" && type === "serviceRecord" && !serviceDoc.bikeId;
+        return { fetchAll: () => Promise.resolve({ resources: match ? [serviceDoc] : [] }) };
+      }
+      if (text.includes("c.type = 'shareLink' AND NOT IS_DEFINED(c.bikeId)")) {
+        return { fetchAll: () => Promise.resolve({ resources: shareLinkDoc.bikeId ? [] : [shareLinkDoc] }) };
+      }
+      return { fetchAll: () => Promise.resolve({ resources: [] }) };
+    });
+    mocks.upsert.mockImplementation(async (doc: { id: string; bikeId?: string }) => {
+      if (doc.id === serviceDoc.id) serviceDoc.bikeId = doc.bikeId;
+      if (doc.id === shareLinkDoc.id) shareLinkDoc.bikeId = doc.bikeId;
+    });
+
+    const first = await POST(request({ authorization: "Bearer top-secret" }));
+    const firstBody = await first.json();
+    expect(firstBody.docsPatched).toBe(1);
+    expect(firstBody.shareLinksPatched).toBe(1);
+
+    const second = await POST(request({ authorization: "Bearer top-secret" }));
+    const secondBody = await second.json();
+    expect(secondBody.docsPatched).toBe(0);
+    expect(secondBody.shareLinksPatched).toBe(0);
+  });
 });

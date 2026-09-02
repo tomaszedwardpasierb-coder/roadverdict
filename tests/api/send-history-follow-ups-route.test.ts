@@ -159,4 +159,29 @@ describe("POST /api/cron/send-history-follow-ups", () => {
     expect(mocks.markShareLinkFollowUpSent).not.toHaveBeenCalledWith("token-fail");
     expect(mocks.markShareLinkFollowUpSent).toHaveBeenCalledWith("token-ok");
   });
+
+  // Idempotency: a scheduler retry or a duplicate trigger must never
+  // send the same buyer a second follow-up email. A stateful fake (not
+  // a fresh mock per call) is what makes this a genuine test of that -
+  // getShareLinksNeedingFollowUp's real query excludes anything with
+  // followUpSentAt already set, so the fake re-filters the same
+  // underlying array on every call exactly like the real IS_DEFINED
+  // check would, and markShareLinkFollowUpSent's fake actually persists
+  // that field onto it.
+  it("running the cron twice in a row only ever emails the same eligible link once", async () => {
+    const links = [link() as ReturnType<typeof link> & { followUpSentAt?: string }];
+    mocks.getShareLinksNeedingFollowUp.mockImplementation(async () => links.filter((l) => !l.followUpSentAt));
+    mocks.markShareLinkFollowUpSent.mockImplementation(async (token: string) => {
+      const match = links.find((l) => l.id === token);
+      if (match) match.followUpSentAt = new Date().toISOString();
+    });
+
+    const first = await POST(request({ authorization: "Bearer top-secret" }));
+    await expect(first.json()).resolves.toEqual({ checked: 1, sent: 1, skipped: 0 });
+
+    const second = await POST(request({ authorization: "Bearer top-secret" }));
+    await expect(second.json()).resolves.toEqual({ checked: 0, sent: 0, skipped: 0 });
+
+    expect(mocks.sendHistoryFollowUpEmail).toHaveBeenCalledTimes(1);
+  });
 });

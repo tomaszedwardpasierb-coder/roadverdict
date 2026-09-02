@@ -138,6 +138,14 @@ describe("receiptRequest.ts against a real Cosmos container (emulator)", () => {
     expect(orphanedStillThere.find((r) => r.id === orphaned.doc.id)).toBeUndefined();
     const notOrphanedStillThere = await getReceiptRequestsForShareToken(owner, "still-here");
     expect(notOrphanedStillThere.find((r) => r.id === notOrphaned.doc.id)).toBeDefined();
+
+    // Idempotency: this is explicitly documented as "safe to re-run" in
+    // the source's own comment - running it again immediately must not
+    // error or touch the non-orphaned request, since there's genuinely
+    // nothing left of this test's own orphan to purge a second time.
+    await purgeOrphanedReceiptRequests();
+    const notOrphanedAfterSecondRun = await getReceiptRequestsForShareToken(owner, "still-here");
+    expect(notOrphanedAfterSecondRun.find((r) => r.id === notOrphaned.doc.id)).toBeDefined();
   });
 
   it("canSendReminder/recordReminderSent enforce a real cooldown against the actual stored timestamp", async () => {

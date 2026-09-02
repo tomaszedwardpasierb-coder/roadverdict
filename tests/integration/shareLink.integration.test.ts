@@ -130,6 +130,16 @@ describe("shareLink.ts against a real Cosmos container (emulator)", () => {
     expect(expiredGone).toBeUndefined();
     const { resource: validStillThere } = await container.item(stillValid.id, stillValid.id).read();
     expect(validStillThere).toBeDefined();
+
+    // Idempotency: a scheduler retry running this again immediately
+    // must not error, resurrect the deleted link, or touch the valid
+    // one - there's genuinely nothing left of this test's own work to
+    // redo, the same as a real duplicate cron trigger would find.
+    await deleteExpiredShareLinks();
+    const { resource: stillGoneAfterSecondRun } = await container.item(expired.id, expired.id).read();
+    expect(stillGoneAfterSecondRun).toBeUndefined();
+    const { resource: stillValidAfterSecondRun } = await container.item(stillValid.id, stillValid.id).read();
+    expect(stillValidAfterSecondRun).toBeDefined();
   });
 
   it("getShareLinksNeedingFollowUp finds an old-enough link with a recipient, via IS_DEFINED/NOT IS_DEFINED", async () => {
