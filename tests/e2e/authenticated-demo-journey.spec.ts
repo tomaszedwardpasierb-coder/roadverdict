@@ -14,15 +14,20 @@
 import { test, expect } from "@playwright/test";
 import { loginAsDemo, resetDemoAccount, DEMO_REGISTRATION } from "./helpers/demoAuth";
 
-// The first test's reset rebuilds a real ~10-year dataset via sequential
-// Cosmos writes (deliberately not parallel - see runDemoSeed's own
-// comment on why), then every later test still has to complete its own
-// real request against a server that just did all that work. On a
-// dedicated dev machine that comfortably fits Playwright's 30s default;
-// on GitHub's shared, resource-constrained CI runner it doesn't always -
-// a real speed difference, not a logic bug, so the fix is more time, not
-// different behaviour.
-test.describe.configure({ mode: "serial", timeout: 90_000 });
+// The very first sign-in against a fresh/reset demo account runs
+// runDemoSeed() inline, before responding - a real ~150-document
+// dataset written strictly sequentially (deliberately, to avoid RU
+// throttling - see runDemoSeed's own comment). On a dedicated dev
+// machine that's a matter of seconds; on GitHub's shared, CPU-
+// constrained runner it has been observed taking well over 90s for the
+// exact same, unmodified operation - a genuine throughput difference in
+// that environment, not a hang (the error is always "test timeout
+// exceeded" while still waiting on the very first navigation, never a
+// crash or a different error). 5 minutes is a deliberately generous
+// ceiling so a real hang (which this would NOT fix) is still
+// distinguishable from this - if it fails even at this budget, look at
+// the "Print app server log" CI step's output next, not this number.
+test.describe.configure({ mode: "serial", timeout: 300_000 });
 
 test.describe("Authenticated demo journeys", () => {
   test("signs in via the real login form and lands on a seeded dashboard", async ({ page }) => {
