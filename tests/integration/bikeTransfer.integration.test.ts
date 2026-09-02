@@ -8,7 +8,18 @@
 // findBikeByRegistrationAcrossAccounts collision check are exactly the
 // things a mocked container can prove pass without proving they'd
 // actually work.
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+// isPro() is temporarily true for everyone (see subscriptions.ts's own
+// comment) while no payment platform is wired in - real, deliberate,
+// unrelated to Cosmos. Left un-mocked, it would defeat the recipient-cap
+// test below entirely, which isn't what this file is for: the point
+// here is proving transferBike's own cap check queries the recipient's
+// real documents correctly, not re-litigating isPro() itself (already
+// covered in tests/unit/bikeTransfer.test.ts, mocked the same way).
+const mocks = vi.hoisted(() => ({ isPro: vi.fn(async () => false) }));
+vi.mock("@/lib/subscriptions", () => ({ isPro: mocks.isPro }));
+
 import { transferBike } from "@/lib/tracker/bikeTransfer";
 import { createBike, getBike, MAX_FREE_BIKES } from "@/lib/tracker/bike";
 import { createServiceRecord, getServiceRecords } from "@/lib/tracker/serviceRecord";
@@ -34,6 +45,7 @@ describe("bikeTransfer.ts against a real Cosmos container (emulator)", () => {
 
   beforeEach(() => {
     pks = [];
+    mocks.isPro.mockReset().mockResolvedValue(false);
   });
 
   afterEach(async () => {
@@ -145,6 +157,19 @@ describe("bikeTransfer.ts against a real Cosmos container (emulator)", () => {
       reason: "recipient_limit_reached",
       limit: MAX_FREE_BIKES,
     });
+  });
+
+  it("lets a transfer through past the recipient's free-tier cap when the recipient is Pro, against a real Cosmos container", async () => {
+    const fromEmail = trackPk("recipient-pro-from");
+    const toEmail = trackPk("recipient-pro-to");
+    const { bike } = (await createBike(fromEmail, newBikeData())) as { ok: true; bike: { id: string } };
+    for (let i = 0; i < MAX_FREE_BIKES; i++) {
+      await createBike(toEmail, newBikeData({ registration: `PROCAP${i}-${Date.now()}` }));
+    }
+
+    mocks.isPro.mockResolvedValue(true);
+    const result = await transferBike(fromEmail, bike.id, toEmail, false);
+    expect(result.ok).toBe(true);
   });
 
   it("refuses when the recipient already owns a bike under this exact registration - a real cross-partition collision check", async () => {

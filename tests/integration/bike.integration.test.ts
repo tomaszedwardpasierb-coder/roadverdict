@@ -16,7 +16,18 @@
 // they call next/headers' cookies(), which requires a real Next.js
 // request scope this plain Node test process doesn't have. That's
 // already covered by the unit suite.
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+// isPro() is temporarily true for everyone (see subscriptions.ts's own
+// comment) while no payment platform is wired in - real, deliberate,
+// unrelated to Cosmos. Left un-mocked, it would defeat the cap test
+// below entirely, which isn't what this file is for: the point here is
+// proving the cap counts genuinely separate Cosmos documents correctly,
+// not re-litigating isPro() itself (already covered in
+// tests/unit/bike.test.ts, mocked the same way).
+const mocks = vi.hoisted(() => ({ isPro: vi.fn(async () => false) }));
+vi.mock("@/lib/subscriptions", () => ({ isPro: mocks.isPro }));
+
 import {
   addRegistrationChange,
   createBike,
@@ -57,6 +68,7 @@ describe("bike.ts against a real Cosmos container (emulator)", () => {
 
   beforeEach(() => {
     pks = [];
+    mocks.isPro.mockReset().mockResolvedValue(false);
   });
 
   afterEach(async () => {
@@ -96,6 +108,20 @@ describe("bike.ts against a real Cosmos container (emulator)", () => {
 
     const bikes = await getBikesForUser(email);
     expect(bikes.length).toBe(MAX_FREE_BIKES);
+  });
+
+  it("lets a Pro account create a bike past the free-tier cap, against a real Cosmos container", async () => {
+    const email = trackPk("pro-past-cap");
+    mocks.isPro.mockResolvedValue(true);
+    for (let i = 0; i < MAX_FREE_BIKES; i++) {
+      const result = await createBike(email, newBikeData({ registration: `PROCAP${i}-${Date.now()}` }));
+      expect(result.ok).toBe(true);
+    }
+    const result = await createBike(email, newBikeData({ registration: `PROCAP-OVER-${Date.now()}` }));
+    expect(result.ok).toBe(true);
+
+    const bikes = await getBikesForUser(email);
+    expect(bikes.length).toBe(MAX_FREE_BIKES + 1);
   });
 
   it("updates mileage in place, and a read afterward reflects it", async () => {
