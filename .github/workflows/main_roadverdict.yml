@@ -97,14 +97,23 @@ jobs:
           SUCCESS=0
           CONNECTION_STRING="AccountEndpoint=https://localhost:8081/;AccountKey=C2y6yDjf5/R+ob0N8A7Cgv30VRDJIWEHLM+4QDU5DE2nQ9nDuVTqobD4b8mGGyPMbIZnqyMsEcaGQy67XIw/Jw==;"
 
+          # `kill "$SERVER_PID"` alone only kills the nohup'd shell, not the
+          # actual `next-server` child it spawns - a prior attempt's real
+          # listener survives and keeps port 3000 bound, so the next
+          # attempt dies instantly with EADDRINUSE before ever touching
+          # Cosmos, wasting the retry entirely. Killing by PORT rather than
+          # by guessing the listener's process name/cmdline is the
+          # reliable version of this - a previous attempt at the latter
+          # (pkill -f "next start") still let this recur, likely because
+          # the real listener's argv doesn't literally contain that text.
+          free_port_3000() {
+            fuser -k 3000/tcp >/dev/null 2>&1 || true
+            lsof -ti:3000 2>/dev/null | xargs -r kill -9 2>/dev/null || true
+          }
+
           for attempt in $(seq 1 $MAX_ATTEMPTS); do
             echo "::group::Attempt $attempt/$MAX_ATTEMPTS"
-            # `kill "$SERVER_PID"` below only kills the nohup'd shell, not
-            # the actual `next-server` child it spawns - without this, a
-            # previous attempt's server keeps port 3000 bound and every
-            # retry after the first dies instantly with EADDRINUSE before
-            # ever touching Cosmos, wasting the retry entirely.
-            pkill -f "next start" >/dev/null 2>&1 || true
+            free_port_3000
             docker rm -f cosmosdb-emulator >/dev/null 2>&1
 
             docker run -d --name cosmosdb-emulator \
@@ -169,7 +178,7 @@ jobs:
             if [ "$APP_READY" != "1" ]; then
               echo "App server did not become ready on attempt $attempt."
               cat server.log
-              kill "$SERVER_PID" 2>/dev/null; pkill -f "next start" >/dev/null 2>&1 || true
+              kill "$SERVER_PID" 2>/dev/null; free_port_3000
               docker rm -f cosmosdb-emulator >/dev/null 2>&1
               echo "::endgroup::"
               continue
@@ -180,7 +189,7 @@ jobs:
 
             if [ "$TEST_EXIT" -eq 0 ]; then
               SUCCESS=1
-              kill "$SERVER_PID" 2>/dev/null; pkill -f "next start" >/dev/null 2>&1 || true
+              kill "$SERVER_PID" 2>/dev/null; free_port_3000
               docker rm -f cosmosdb-emulator >/dev/null 2>&1
               echo "::endgroup::"
               break
@@ -190,7 +199,7 @@ jobs:
             cat server.log
             echo "Cosmos emulator container log (tail):"
             docker logs cosmosdb-emulator 2>&1 | tail -80
-            kill "$SERVER_PID" 2>/dev/null
+            kill "$SERVER_PID" 2>/dev/null; free_port_3000
             docker rm -f cosmosdb-emulator >/dev/null 2>&1
             echo "::endgroup::"
           done
