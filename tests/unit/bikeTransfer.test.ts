@@ -6,7 +6,6 @@ const mocks = vi.hoisted(() => ({
   getBikesForUser: vi.fn(),
   generateBikeId: vi.fn(),
   countActiveBikes: vi.fn(),
-  findBikeByRegistrationAcrossAccounts: vi.fn(),
   getCurrentRegistration: vi.fn(),
   getServiceRecords: vi.fn(),
   getMods: vi.fn(),
@@ -27,7 +26,6 @@ vi.mock("@/lib/tracker/bike", () => ({
   getBikesForUser: mocks.getBikesForUser,
   generateBikeId: mocks.generateBikeId,
   countActiveBikes: mocks.countActiveBikes,
-  findBikeByRegistrationAcrossAccounts: mocks.findBikeByRegistrationAcrossAccounts,
   getCurrentRegistration: mocks.getCurrentRegistration,
   MAX_FREE_BIKES: 2,
 }));
@@ -76,7 +74,6 @@ beforeEach(() => {
   mocks.getBikesForUser.mockResolvedValue([]);
   mocks.countActiveBikes.mockReturnValue(0);
   mocks.getCurrentRegistration.mockReturnValue("AB20YAM");
-  mocks.findBikeByRegistrationAcrossAccounts.mockResolvedValue(null);
   mocks.generateBikeId.mockReturnValue("new-bike-id");
   mocks.getServiceRecords.mockResolvedValue([]);
   mocks.getMods.mockResolvedValue([]);
@@ -123,21 +120,43 @@ describe("transferBike", () => {
     expect(mocks.upsert).not.toHaveBeenCalled();
   });
 
-  it("returns recipient_already_has_bike when the recipient already has this registration", async () => {
-    mocks.findBikeByRegistrationAcrossAccounts.mockResolvedValue({
-      ownerEmail: toEmail,
-      id: "existing-bike",
-    });
+  it("returns recipient_already_has_bike when the recipient's own bikes already include this registration", async () => {
+    // Checked directly against the recipient's own bikes (getBikesForUser),
+    // not a cross-account search - see the source comment on why: a
+    // cross-account search has no way to exclude the bike actually being
+    // transferred, so it could return the SOURCE bike's own trivial
+    // self-match instead of the recipient's.
+    mocks.getBikesForUser.mockResolvedValue([
+      { originalRegistration: "AB20YAM", registrationChanges: [] },
+    ]);
     const result = await transferBike(fromEmail, bikeId, toEmail, false);
     expect(result).toEqual({ ok: false, reason: "recipient_already_has_bike" });
     expect(mocks.upsert).not.toHaveBeenCalled();
   });
 
-  it("does not check registration collision when the bike has no current registration", async () => {
-    mocks.getCurrentRegistration.mockReturnValue(null);
+  it("matches a registration the recipient's bike has only ever held via a later registrationChanges entry, not just its original plate", async () => {
+    mocks.getBikesForUser.mockResolvedValue([
+      { originalRegistration: "OLDPLATE", registrationChanges: [{ plate: "AB20YAM", reason: "correction", changedAt: "2025-01-01" }] },
+    ]);
+    const result = await transferBike(fromEmail, bikeId, toEmail, false);
+    expect(result).toEqual({ ok: false, reason: "recipient_already_has_bike" });
+  });
+
+  it("does not flag a collision when the recipient's bikes have a genuinely different registration", async () => {
+    mocks.getBikesForUser.mockResolvedValue([
+      { originalRegistration: "DIFFERENT1", registrationChanges: [] },
+    ]);
     const result = await transferBike(fromEmail, bikeId, toEmail, false);
     expect(result).toMatchObject({ ok: true });
-    expect(mocks.findBikeByRegistrationAcrossAccounts).not.toHaveBeenCalled();
+  });
+
+  it("does not check registration collision when the bike has no current registration", async () => {
+    mocks.getCurrentRegistration.mockReturnValue(null);
+    mocks.getBikesForUser.mockResolvedValue([
+      { originalRegistration: "AB20YAM", registrationChanges: [] }, // would collide if checked, but shouldn't be
+    ]);
+    const result = await transferBike(fromEmail, bikeId, toEmail, false);
+    expect(result).toMatchObject({ ok: true });
   });
 
   // ── Happy path ──────────────────────────────────────────────────────────

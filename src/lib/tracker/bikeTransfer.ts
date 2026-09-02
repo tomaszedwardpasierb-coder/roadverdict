@@ -18,7 +18,8 @@
 // changing hands. Attachments (receipt/invoice images) travel with
 // whichever records copy, since blob storage isn't owner-scoped.
 import { getContainer } from "@/lib/cosmos";
-import { getBike, getBikesForUser, generateBikeId, countActiveBikes, findBikeByRegistrationAcrossAccounts, getCurrentRegistration, MAX_FREE_BIKES, type BikeDoc } from "@/lib/tracker/bike";
+import { getBike, getBikesForUser, generateBikeId, countActiveBikes, getCurrentRegistration, MAX_FREE_BIKES, type BikeDoc } from "@/lib/tracker/bike";
+import { normalizePlate, allKnownPlates } from "@/lib/tracker/reportAccess";
 import { getServiceRecords } from "@/lib/tracker/serviceRecord";
 import { getMods } from "@/lib/tracker/mod";
 import { getBills } from "@/lib/tracker/bill";
@@ -78,10 +79,19 @@ export async function transferBike(
   // person needs to sort out which record should actually continue
   // (most likely by deleting the fresh one) before the transfer can go
   // through, rather than the system guessing which one should win.
+  //
+  // Checked directly against the recipient's own bikes (recipientBikes,
+  // already fetched above), not via findBikeByRegistrationAcrossAccounts
+  // - that function returns a single best-effort cross-account match
+  // with no way to exclude the bike actually being transferred, so a
+  // real cross-partition scan could return oldBike's own trivial
+  // self-match instead of the recipient's, silently letting a genuine
+  // collision through depending on scan order.
   const currentReg = getCurrentRegistration(oldBike);
   if (currentReg) {
-    const existingRecipientMatch = await findBikeByRegistrationAcrossAccounts(currentReg);
-    if (existingRecipientMatch && existingRecipientMatch.ownerEmail === toEmail) {
+    const normalizedCurrentReg = normalizePlate(currentReg);
+    const recipientAlreadyHasThisBike = recipientBikes.some((b) => allKnownPlates(b).includes(normalizedCurrentReg));
+    if (recipientAlreadyHasThisBike) {
       return { ok: false, reason: "recipient_already_has_bike" };
     }
   }
