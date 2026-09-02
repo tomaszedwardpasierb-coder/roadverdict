@@ -58,6 +58,45 @@ jobs:
         run: npm run test:integration
       - name: Build
         run: npm run build
+      # Authenticated E2E runs against the just-built app, served locally
+      # on this runner and backed by the same Cosmos emulator the
+      # integration tests already used - never against production. This
+      # is what makes it safe to gate the deploy on: a real browser
+      # driving the real demo account (see tests/e2e/helpers/demoAuth.ts)
+      # through real forms and a real backend, without ever touching
+      # live user data. If this fails, the deploy below never runs.
+      - name: Start app server (Cosmos DB Emulator backend)
+        # Calls `next start` directly rather than through the `npm run
+        # start` script (which resolves its port via `$PORT` in the
+        # script string itself) - avoids depending on npm's own
+        # script-shell behavior for something this step already controls
+        # explicitly.
+        run: |
+          APP_URL=http://localhost:3000 NODE_TLS_REJECT_UNAUTHORIZED=0 \
+          COSMOS_CONNECTION_STRING="AccountEndpoint=https://localhost:8081/;AccountKey=C2y6yDjf5/R+ob0N8A7Cgv30VRDJIWEHLM+4QDU5DE2nQ9nDuVTqobD4b8mGGyPMbIZnqyMsEcaGQy67XIw/Jw==;" \
+          nohup npx next start -p 3000 > server.log 2>&1 &
+          echo $! > server.pid
+      - name: Wait for app server to be ready
+        run: |
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:3000/login -o /dev/null; then
+              echo "App server is ready."
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "App server did not become ready in time." >&2
+          cat server.log
+          exit 1
+      - name: Install Playwright browser
+        run: npx playwright install --with-deps chromium
+      - name: Authenticated E2E tests (demo account, local server + Cosmos emulator)
+        run: npx playwright test tests/e2e/authenticated-demo-journey.spec.ts
+        env:
+          PLAYWRIGHT_BASE_URL: http://localhost:3000
+      - name: Stop app server
+        if: always()
+        run: kill "$(cat server.pid)" 2>/dev/null || true
       - name: Login to Azure
         uses: azure/login@v2
         with:
@@ -73,9 +112,13 @@ jobs:
           package: .
       - name: Wait for the deployed instance to finish restarting
         run: sleep 20
-      - name: Install Playwright browser
-        run: npx playwright install --with-deps chromium
       - name: Post-deploy smoke test
-        run: npm run test:e2e
+        # Public/unauthenticated only, against the real live site - a
+        # failure here means the deploy already happened, it's reporting
+        # the live site looks broken, not blocking anything (see the
+        # original commit that added this step). The authenticated demo
+        # journeys are a pre-deploy gate above instead, against the
+        # emulator, on purpose - never against real production data.
+        run: npx playwright test tests/e2e/public-smoke.spec.ts
         env:
           PLAYWRIGHT_BASE_URL: https://roadverdict.co.uk
