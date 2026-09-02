@@ -77,20 +77,19 @@ jobs:
       # on-Linux compatibility layer) reported against GitHub Actions
       # runners specifically: see
       # https://github.com/Azure/azure-cosmos-db-emulator-docker/issues/142
-      # and #56. A run here previously hit this crash 3/3 times in a row,
-      # always at the same point (right after the first test's two full
-      # sequential demo-seed writes - auto-seed-on-login plus the reset
-      # button - land on the emulator), which pointed at a real
-      # contributing cause rather than pure chance: this job had
-      # AZURE_COSMOS_EMULATOR_PARTITION_COUNT set to 1, an untested
-      # configuration, where the `test` job's services-block emulator
-      # (which reliably survives the Cosmos integration suite's own write
-      # load) uses 3. Matched that here. The manual `docker run` plus
-      # retry loop stays regardless, as defense in depth against whatever
-      # genuine intermittency remains per those upstream reports - but a
-      # failure that repeats identically on every attempt again points at
-      # something still-systemic, not chance, and is worth re-diagnosing
-      # rather than just re-running.
+      # and #56. Two real runs here hit this crash on every attempt,
+      # always at the same point: right after the first test's two full
+      # sequential demo-seed writes (auto-seed-on-login, then the reset
+      # button) land on a container that only just started. Partition
+      # count (1 vs the `test` job's 3) made no difference - ruled out.
+      # What's actually changed to address it: authenticated-demo-
+      # journey.spec.ts now runs that heavy double-seed test last, not
+      # immediately against a freshly-started container, and there's an
+      # explicit settle delay after provisioning below. The manual
+      # `docker run` plus retry loop stays as defense in depth regardless
+      # - but a failure repeating identically on every attempt again
+      # means something still-systemic, worth re-diagnosing rather than
+      # just re-running.
       - name: Authenticated E2E tests, with retry for the Cosmos DB Emulator's known Docker/CI flakiness
         run: |
           set +e
@@ -100,6 +99,12 @@ jobs:
 
           for attempt in $(seq 1 $MAX_ATTEMPTS); do
             echo "::group::Attempt $attempt/$MAX_ATTEMPTS"
+            # `kill "$SERVER_PID"` below only kills the nohup'd shell, not
+            # the actual `next-server` child it spawns - without this, a
+            # previous attempt's server keeps port 3000 bound and every
+            # retry after the first dies instantly with EADDRINUSE before
+            # ever touching Cosmos, wasting the retry entirely.
+            pkill -f "next start" >/dev/null 2>&1 || true
             docker rm -f cosmosdb-emulator >/dev/null 2>&1
 
             docker run -d --name cosmosdb-emulator \
@@ -139,6 +144,16 @@ jobs:
               continue
             fi
 
+            # The readiness curl above only proves the HTTPS gateway is up,
+            # not that the emulator's own storage engine has finished
+            # stabilising after "Started" - every real crash seen from this
+            # job so far happened within roughly the first two minutes of
+            # container life, right as the first test's two back-to-back
+            # full demo-seed writes (auto-seed-on-login, then the reset
+            # button) landed on it. Giving the engine a little idle runway
+            # before hitting it with that burst is a cheap thing to try.
+            sleep 15
+
             APP_URL=http://localhost:3000 NODE_TLS_REJECT_UNAUTHORIZED=0 COSMOS_CONNECTION_STRING="$CONNECTION_STRING" \
               nohup npx next start -p 3000 > server.log 2>&1 &
             SERVER_PID=$!
@@ -154,7 +169,7 @@ jobs:
             if [ "$APP_READY" != "1" ]; then
               echo "App server did not become ready on attempt $attempt."
               cat server.log
-              kill "$SERVER_PID" 2>/dev/null
+              kill "$SERVER_PID" 2>/dev/null; pkill -f "next start" >/dev/null 2>&1 || true
               docker rm -f cosmosdb-emulator >/dev/null 2>&1
               echo "::endgroup::"
               continue
@@ -165,7 +180,7 @@ jobs:
 
             if [ "$TEST_EXIT" -eq 0 ]; then
               SUCCESS=1
-              kill "$SERVER_PID" 2>/dev/null
+              kill "$SERVER_PID" 2>/dev/null; pkill -f "next start" >/dev/null 2>&1 || true
               docker rm -f cosmosdb-emulator >/dev/null 2>&1
               echo "::endgroup::"
               break

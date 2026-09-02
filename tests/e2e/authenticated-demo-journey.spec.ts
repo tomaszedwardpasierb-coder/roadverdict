@@ -9,35 +9,27 @@
 // Runs serially and shares no browser state between tests (each test
 // signs in independently, cheaply, since the demo bypass has no real
 // email round-trip) - but all tests DO share the same underlying demo
-// account data in the backend, so ordering matters: the reset in the
-// first test establishes a known baseline for everything after it.
+// account data in the backend, so ordering matters.
+//
+// The reset-button test runs LAST on purpose, not first. Every real CI
+// run against the Linux Cosmos DB Emulator so far has crashed the
+// container at the same point: right after two full sequential ~150-
+// document demo-seed writes (auto-seed-on-first-login, immediately
+// followed by the reset button re-seeding again) landed back-to-back on
+// a container that had only just started. The very first login of this
+// file already triggers one full auto-seed cycle on its own - that
+// alone is a legitimate, deterministic starting point for the tests
+// that don't care about the reset button specifically, so they don't
+// need to wait for it. Deferring the second, redundant seed burst until
+// after the container/app have already handled a couple of lighter
+// round-trips is a cheap way to stop stacking two heavy write bursts at
+// the most fragile point in the emulator's lifetime.
 import { test, expect } from "@playwright/test";
-import { loginAsDemo, resetDemoAccount, DEMO_REGISTRATION } from "./helpers/demoAuth";
+import { loginAsDemo, resetDemoAccount, DEMO_REGISTRATION, DEMO_NICKNAME } from "./helpers/demoAuth";
 
-// The very first sign-in against a fresh/reset demo account runs
-// runDemoSeed() inline, before responding - a real ~150-document
-// dataset written strictly sequentially (deliberately, to avoid RU
-// throttling - see runDemoSeed's own comment), typically a handful of
-// seconds. A previous CI run appeared to hang well past even a 5-minute
-// budget on this same step - that turned out to be a real bug in the CI
-// workflow (a freshly-started emulator container with no "roadverdict"
-// database/"app" container ever provisioned, so every Cosmos query
-// failed outright with "Owner resource does not exist" - a permanent
-// error, not something more time could ever have fixed), now fixed
-// there. 60s here is just reasonable slack for CI being generally slower
-// than a dedicated dev machine, not a workaround for that bug.
 test.describe.configure({ mode: "serial", timeout: 60_000 });
 
 test.describe("Authenticated demo journeys", () => {
-  test("signs in via the real login form and lands on a seeded dashboard", async ({ page }) => {
-    await loginAsDemo(page);
-    await resetDemoAccount(page);
-    // Re-confirm the bike is still there (and correctly re-seeded, not
-    // just "not crashed") after the reset this test deliberately runs
-    // first, so every later test in this file starts from a known state.
-    await expect(page.getByText("Demo MT-07").first()).toBeVisible();
-  });
-
   test("logs a new fuel fill-up through the real form and sees it reflected in fuel history", async ({ page }) => {
     await loginAsDemo(page);
     await page.getByRole("button", { name: "Fuel" }).click();
@@ -97,5 +89,13 @@ test.describe("Authenticated demo journeys", () => {
     } finally {
       await anonContext.close();
     }
+  });
+
+  test("signs in via the real login form, resets the demo account, and lands back on a freshly seeded dashboard", async ({ page }) => {
+    await loginAsDemo(page);
+    await resetDemoAccount(page);
+    // Re-confirm the bike is still there (and correctly re-seeded, not
+    // just "not crashed") after the reset.
+    await expect(page.getByText(DEMO_NICKNAME).first()).toBeVisible();
   });
 });
