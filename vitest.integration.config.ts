@@ -11,8 +11,15 @@ export default defineConfig({
     environment: "node",
     include: ["tests/integration/**/*.test.ts"],
     globalSetup: ["./tests/integration/globalSetup.ts"],
-    testTimeout: 20_000,
-    hookTimeout: 20_000,
+    // 20s was too tight for the CI runner specifically: bikeTransfer's
+    // tests (the heaviest in this suite - up to 5 parallel Cosmos calls
+    // per transferBike() call, plus more for record-copying) passed
+    // instantly against a local emulator but hung at exactly 20s on every
+    // single test AND every afterEach in a real CI run - consistent with
+    // the resource-constrained-runner risk this file already warned
+    // about above, not a code bug (nothing here reproduces locally).
+    testTimeout: 60_000,
+    hookTimeout: 60_000,
     // Every test file here shares the SAME single Cosmos emulator
     // container - there's no per-file isolation like the mocked unit
     // suite has. Running files in parallel (vitest's default) means 3+
