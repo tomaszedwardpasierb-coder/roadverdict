@@ -67,6 +67,7 @@ function makeItem(overrides: Partial<ParsedReceiptItem> = {}): ParsedReceiptItem
     vehicleModelOnReceipt: null,
     attachment: { blobName: "blob-1", fileName: "receipt.jpg", fileType: "image/jpeg", uploadedAt: "2025-06-15T00:00:00.000Z" },
     forceReview: false,
+    aiLowConfidence: false,
     ...overrides,
   };
 }
@@ -205,6 +206,20 @@ describe("service category", () => {
 
   it("flags the notes with a currency caveat when the item was forced for review", async () => {
     const result: any = await commitReceiptItem(email, bike, makeItem({ description: "Basic service", mileageOnReceipt: 15000, forceReview: true }));
+    expect(result.notes).toBe("Basic service (currency could not be auto-converted - please check the amount)");
+  });
+
+  // Stage 3 of the AI model strategy: even the escalated (Pro) read can
+  // still come back unsure. Distinct wording from the currency caveat
+  // above - this means the numbers themselves might be wrong, not just
+  // unconverted.
+  it("flags the notes with an AI-confidence caveat when even the escalated read was still unsure", async () => {
+    const result: any = await commitReceiptItem(email, bike, makeItem({ description: "Basic service", mileageOnReceipt: 15000, aiLowConfidence: true }));
+    expect(result.notes).toBe("Basic service (AI wasn't fully confident reading this receipt - please double-check the details)");
+  });
+
+  it("prefers the currency caveat over the AI-confidence one when both apply", async () => {
+    const result: any = await commitReceiptItem(email, bike, makeItem({ description: "Basic service", mileageOnReceipt: 15000, forceReview: true, aiLowConfidence: true }));
     expect(result.notes).toBe("Basic service (currency could not be auto-converted - please check the amount)");
   });
 
@@ -348,6 +363,12 @@ describe("mods category", () => {
     expect(result.notes).toBe("Currency could not be auto-converted - please check the amount");
   });
 
+  it("notes the AI-confidence caveat, also without repeating the description", async () => {
+    const item = makeItem({ category: "mods", description: "Heated grips", mileageOnReceipt: 15000, aiLowConfidence: true });
+    const result: any = await commitReceiptItem(email, bike, item);
+    expect(result.notes).toBe("AI wasn't fully confident reading this receipt - please double-check the details");
+  });
+
   it("re-estimates nearby fuel mileage when the mileage came directly off the receipt, same as service", async () => {
     await commitReceiptItem(email, bike, makeItem({ category: "mods", description: "Heated grips", mileageOnReceipt: 15000 }));
     expect(mocks.queryTrackerDocs).toHaveBeenCalledTimes(8);
@@ -370,6 +391,11 @@ describe("bills category", () => {
     await commitReceiptItem(email, bike, makeItem({ category: "bills", description: "Annual insurance renewal" }));
     const [, , , payload] = callsFor("reminder")[0];
     expect(payload).toMatchObject({ name: "Insurance renewal", intervalType: "months", intervalValue: 12, baseMileage: 20000, sourceKey: "bill:insurance" });
+  });
+
+  it("flags the notes with an AI-confidence caveat, same wording as service", async () => {
+    const result: any = await commitReceiptItem(email, bike, makeItem({ category: "bills", description: "Annual insurance renewal", aiLowConfidence: true }));
+    expect(result.notes).toBe("Annual insurance renewal (AI wasn't fully confident reading this receipt - please double-check the details)");
   });
 
   it("never attempts a mileage estimate, and never triggers fuel re-estimation, for a bill", async () => {

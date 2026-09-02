@@ -16,7 +16,10 @@
 // different per use case, so it stays with each caller rather than
 // being forced in here.
 
-const GEMINI_MODEL = "gemini-3.5-flash-lite";
+// Routine structured-JSON extraction (quoteAdvice.ts, costAdvice.ts),
+// not premium narrative - kept on the cheapest tier per
+// AI-Models-for-Different-Tasks.docx.
+const GEMINI_MODEL = "gemini-2.5-flash-lite";
 
 export async function callGeminiForJson<T>(
   systemPrompt: string,

@@ -18,7 +18,10 @@ import { hasReportAccess } from "@/lib/tracker/reportAccess";
 
 export const dynamic = "force-dynamic";
 
-const GEMINI_MODEL = "gemini-3.5-flash-lite"; // same model storyProse.ts already uses
+// Routine chat routing, not premium narrative - kept on the cheapest
+// tier per AI-Models-for-Different-Tasks.docx (storyProse.ts and
+// buyingGuideBriefing.ts have since moved up to gemini-2.5-flash).
+const GEMINI_MODEL = "gemini-2.5-flash-lite";
 const MAX_MESSAGES = 20; // conversation-length guard, not a hard product limit
 const MAX_MESSAGE_LENGTH = 2000;
 const MAX_TOOL_ROUNDS = 4; // safety cap against a runaway tool-call loop
@@ -31,7 +34,7 @@ interface ChatMessage {
 // Covers all shapes the Gemini API actually uses across a tool-calling
 // round trip - typing this properly up front avoids the unsafe casts
 // that would otherwise creep in further down. thoughtSignature is an
-// opaque token "thinking" models like gemini-3.5-flash-lite attach to
+// opaque token "thinking" models like gemini-2.5-flash-lite attach to
 // a function-call part - it must be echoed back unchanged on the
 // follow-up turn, or the API rejects the request with a 400. See
 // https://ai.google.dev/gemini-api/docs/thought-signatures

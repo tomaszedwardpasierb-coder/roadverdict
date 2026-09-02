@@ -414,6 +414,11 @@ function isDirty(entry: ReviewQueueEntry, original: ParsedReceiptItem): boolean 
   if (entry.duplicate) return true;
   if (entry.plateMismatch || entry.vehicleMismatch) return true;
   if (original.forceReview) return true;
+  // Even the escalated (Pro) re-read was still unsure about this receipt
+  // - see receiptParse.ts's Stage 3 escalation. Distinct from
+  // forceReview (currency-specific): this means the numbers themselves
+  // might be wrong, not just unconverted.
+  if (original.aiLowConfidence) return true;
   if (entry.category !== 'bills' && entry.mileageNeedsManualEntry) return true;
   // commitReceiptItem doesn't reject on implausible litres the way the
   // manual write routes do - it only ever surfaces as a live warning in

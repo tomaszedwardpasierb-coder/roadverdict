@@ -18,7 +18,11 @@
 import type { SellerReportCore } from "@/lib/tracker/sellerReportData";
 import type { BikeIdentity, CategorySpend, ServiceRhythm, MpgTrend } from "@/lib/tracker/storyFacts";
 
-const GEMINI_MODEL = "gemini-3.5-flash-lite";
+// Narrative, not routine extraction - a mid-tier model per
+// AI-Models-for-Different-Tasks.docx, one step up from receiptParse.ts's
+// flash-lite, for clearer tone without paying for buyerOpinionProse.ts's
+// premium tier on every Story So Far generation.
+const GEMINI_MODEL = "gemini-2.5-flash";
 
 export interface StoryProseInput {
   identity: BikeIdentity;

@@ -254,6 +254,82 @@ describe("parseReceiptFile", () => {
       status: 500,
     });
   });
+  // Stage 3 of the AI model strategy (AI-Models-for-Different-Tasks.docx):
+  // the cheap flash-lite pass can flag its own uncertainty, in which case
+  // the same receipt gets one re-read with the strongest model before
+  // anything reaches a human.
+  describe("low-confidence escalation", () => {
+    it("makes only one Gemini call, and sets aiLowConfidence: false, when the model is confident", async () => {
+      const fetchMock = vi.fn().mockResolvedValue(geminiResponse(JSON.stringify(validGeminiPayload)));
+      vi.stubGlobal("fetch", fetchMock);
+
+      const result = await parseReceiptFile(fakeFile(), "key", bike);
+
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect((result as any).items[0].aiLowConfidence).toBe(false);
+    });
+
+    it("escalates to the pro model when the model reports low confidence, and uses the escalated read", async () => {
+      const fetchMock = vi.fn()
+        .mockResolvedValueOnce(geminiResponse(JSON.stringify({
+          ...validGeminiPayload, lowConfidence: true,
+          items: [{ ...validGeminiPayload.items[0], cost: 999 }],
+        })))
+        .mockResolvedValueOnce(geminiResponse(JSON.stringify({
+          ...validGeminiPayload, lowConfidence: false,
+          items: [{ ...validGeminiPayload.items[0], cost: 40 }],
+        })));
+      vi.stubGlobal("fetch", fetchMock);
+
+      const result = await parseReceiptFile(fakeFile(), "key", bike);
+
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+      const escalatedUrl = String(fetchMock.mock.calls[1][0]);
+      expect(escalatedUrl).toContain("gemini-2.5-pro");
+      const item = (result as any).items[0];
+      // The escalated (confident) read replaced the flash-lite one outright.
+      expect(item.costGbp).toBe(40);
+      expect(item.aiLowConfidence).toBe(false);
+    });
+
+    it("falls back to the flash-lite read, still flagged low-confidence, when the escalation call itself fails", async () => {
+      const fetchMock = vi.fn()
+        .mockResolvedValueOnce(geminiResponse(JSON.stringify({ ...validGeminiPayload, lowConfidence: true })))
+        .mockResolvedValueOnce({ ok: false });
+      vi.stubGlobal("fetch", fetchMock);
+
+      const result = await parseReceiptFile(fakeFile(), "key", bike);
+
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+      expect((result as any).ok).toBe(true);
+      expect((result as any).items[0].aiLowConfidence).toBe(true);
+    });
+
+    it("stays low-confidence when even the escalated read is still unsure", async () => {
+      const fetchMock = vi.fn()
+        .mockResolvedValueOnce(geminiResponse(JSON.stringify({ ...validGeminiPayload, lowConfidence: true })))
+        .mockResolvedValueOnce(geminiResponse(JSON.stringify({ ...validGeminiPayload, lowConfidence: true })));
+      vi.stubGlobal("fetch", fetchMock);
+
+      const result = await parseReceiptFile(fakeFile(), "key", bike);
+
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+      expect((result as any).items[0].aiLowConfidence).toBe(true);
+    });
+
+    it("never escalates when the model confidently says this isn't a receipt at all", async () => {
+      const fetchMock = vi.fn().mockResolvedValue(geminiResponse(JSON.stringify({
+        isReceipt: false, lowConfidence: true, rejectionReason: "Not a receipt.",
+      })));
+      vi.stubGlobal("fetch", fetchMock);
+
+      const result = await parseReceiptFile(fakeFile(), "key", bike);
+
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect((result as any).ok).toBe(false);
+    });
+  });
+
   it('accepts a PDF, skips sharp, sends PDF bytes to Gemini with application/pdf mime type, and stores attachment as application/pdf', async () => {
     const fetchMock = vi.fn().mockResolvedValue(
       geminiResponse(JSON.stringify({ ...validGeminiPayload, items: [{ category: 'service', date: '2025-06-12', cost: 80, description: 'Service' }] }))

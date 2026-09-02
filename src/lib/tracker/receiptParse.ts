@@ -19,7 +19,17 @@ import { isBeforeProduction } from "@/lib/tracker/productionYearCheck";
 import type { Attachment, CurrencyConversionInfo } from "@/lib/tracker/cosmosHelpers";
 import type { BikeDoc } from "@/lib/tracker/bike";
 
-const GEMINI_MODEL = "gemini-3.5-flash-lite";
+// Fast/cheap on purpose: this is the highest-volume Gemini call in the
+// app (every uploaded receipt, every item on it) and the job itself -
+// OCR-style extraction, not judgment - doesn't need a stronger model.
+// See AI-Models-for-Different-Tasks.docx for the full per-task split.
+const GEMINI_MODEL = "gemini-2.5-flash-lite";
+// Escalation path for the ambiguous minority (Stage 3 in the doc above):
+// the flash-lite pass can self-report low confidence, in which case the
+// SAME receipt is re-read once with the strongest model available before
+// anything is shown to the person - not on every upload, only when the
+// cheap pass wasn't sure. Never used as the default, only the fallback.
+const GEMINI_ESCALATION_MODEL = "gemini-2.5-pro";
 const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024;
 const ALLOWED_TYPES = new Set(["image/jpeg", "image/png", "application/pdf"]);
 
@@ -27,6 +37,7 @@ const PROMPT = `You are extracting structured data from a photo that is claimed 
 {
   "isReceipt": true or false - false if the image clearly isn't a receipt/invoice of any kind,
   "rejectionReason": if isReceipt is false, a short (max 15 words) plain explanation of why (e.g. "This looks like a photo of a motorcycle, not a receipt."), otherwise null,
+  "lowConfidence": true or false - true if you are meaningfully unsure about the category, cost, date, or any other field you're returning on this receipt, because of poor image quality, ambiguous or contradictory wording, or genuinely illegible handwriting. false if you're reasonably confident in every item you're returning. When unsure whether you're unsure, prefer true - a second, more careful read is cheap; a wrong figure silently logged is not. Only relevant if isReceipt is true, otherwise false.,
   "summary": a single brief sentence (max ~20 words) confirming what this receipt/invoice actually is - the business or petrol station name if visible, the country if you can tell, and the date. Written for a human to quickly confirm "yes, that's the right receipt". If something isn't legible, say so briefly rather than guessing confidently. Only relevant if isReceipt is true, otherwise null.,
   "currency": the ISO currency code this receipt is priced in (e.g. "GBP", "EUR", "PLN"), based on symbols or text visible on the receipt - your best guess, default to "GBP" only if there is genuinely no clue at all. Only relevant if isReceipt is true, otherwise null.,
   "merchantName": the name of the business/garage/petrol station this receipt is from, if visible - otherwise null. Only relevant if isReceipt is true.,
@@ -68,6 +79,7 @@ interface GeminiItem {
 interface GeminiResponse {
   isReceipt?: boolean;
   rejectionReason?: string;
+  lowConfidence?: boolean;
   summary?: string;
   currency?: string;
   merchantName?: string | null;
@@ -97,6 +109,11 @@ export interface ParsedReceiptItem {
   attachment: Attachment;
   currencyConversion?: CurrencyConversionInfo;
   forceReview: boolean;
+  // Set when even the escalated (Pro) read was still unsure - a separate
+  // signal from forceReview (which is currency-specific), so the review
+  // queue can tell a human WHY an item needs their eyes rather than
+  // lumping every reason into one caveat.
+  aiLowConfidence: boolean;
 }
 
 export type ParseReceiptResult =
@@ -110,6 +127,38 @@ export type ParseReceiptResult =
       skippedUnreadableLitres: number;
     }
   | { ok: false; fileName: string; error: string; status: number };
+
+// Shared by the primary (flash-lite) read and the low-confidence
+// escalation (pro) re-read below - same request shape either way, only
+// the model in the URL differs. Returns null on any failure (network,
+// non-200, unparseable JSON) so the caller can fall back to whatever
+// earlier result it already has rather than losing the whole scan.
+async function callGeminiReceiptModel(
+  model: string,
+  apiKey: string,
+  mimeTypeForGemini: string,
+  base64: string
+): Promise<GeminiResponse | null> {
+  try {
+    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-goog-api-key": apiKey },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: PROMPT }, { inline_data: { mime_type: mimeTypeForGemini, data: base64 } }] }],
+        generationConfig: { responseMimeType: "application/json" },
+      }),
+    });
+    if (!res.ok) return null;
+
+    const data = await res.json();
+    const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+    if (!rawText) return null;
+
+    return JSON.parse(rawText) as GeminiResponse;
+  } catch {
+    return null;
+  }
+}
 
 export async function parseReceiptFile(file: File, apiKey: string, bike: BikeDoc): Promise<ParseReceiptResult> {
   const fileName = file.name || "receipt.jpg";
@@ -153,30 +202,25 @@ export async function parseReceiptFile(file: File, apiKey: string, bike: BikeDoc
       uploadExtension = "jpg";
     }
 
-    const geminiRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "X-goog-api-key": apiKey },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: PROMPT }, { inline_data: { mime_type: mimeTypeForGemini, data: base64 } }] }],
-        generationConfig: { responseMimeType: "application/json" },
-      }),
-    });
-
-    if (!geminiRes.ok) {
+    let parsed = await callGeminiReceiptModel(GEMINI_MODEL, apiKey, mimeTypeForGemini, base64);
+    if (!parsed) {
       return { ok: false, fileName, error: "Could not read the receipt. Please try again or enter it manually.", status: 502 };
     }
 
-    const geminiData = await geminiRes.json();
-    const rawText = geminiData?.candidates?.[0]?.content?.parts?.[0]?.text;
-    if (!rawText) {
-      return { ok: false, fileName, error: "Could not read the receipt. Please try again or enter it manually.", status: 502 };
-    }
-
-    let parsed: GeminiResponse;
-    try {
-      parsed = JSON.parse(rawText);
-    } catch {
-      return { ok: false, fileName, error: "Could not read the receipt. Please try again or enter it manually.", status: 502 };
+    // The cheap pass wasn't confident - re-read the same receipt once
+    // with the strongest model before this ever reaches a human. If the
+    // escalated read comes back confident, it replaces the flash-lite
+    // one outright (it's the better read); if it also fails or is still
+    // unsure, keep going with what's already in hand rather than losing
+    // the scan entirely - aiLowConfidence below is what actually routes
+    // this to a human either way.
+    let aiLowConfidence = parsed.isReceipt !== false && parsed.lowConfidence === true;
+    if (aiLowConfidence) {
+      const escalated = await callGeminiReceiptModel(GEMINI_ESCALATION_MODEL, apiKey, mimeTypeForGemini, base64);
+      if (escalated) {
+        parsed = escalated;
+        aiLowConfidence = escalated.isReceipt !== false && escalated.lowConfidence === true;
+      }
     }
 
     if (parsed.isReceipt === false) {
@@ -284,6 +328,7 @@ export async function parseReceiptFile(file: File, apiKey: string, bike: BikeDoc
         attachment,
         currencyConversion,
         forceReview,
+        aiLowConfidence,
       });
     }
 

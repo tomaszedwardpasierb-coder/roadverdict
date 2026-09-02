@@ -14,7 +14,11 @@
 // this section - unlike Story So Far there's no deterministic fallback
 // text for an opinion, so nothing shows rather than something broken.
 
-const GEMINI_MODEL = "gemini-3.5-flash-lite";
+// The most trust-sensitive AI output in the app - a stranger may spend
+// real money partly on the strength of this opinion - so it gets the
+// strongest model available, not the routing/extraction default. See
+// AI-Models-for-Different-Tasks.docx.
+const GEMINI_MODEL = "gemini-2.5-pro";
 
 export interface BuyerOpinionInput {
   make: string;

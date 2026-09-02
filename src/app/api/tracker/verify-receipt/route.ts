@@ -7,9 +7,12 @@ import { convertDisplayToGbp, ALL_CURRENCIES, type Currency } from "@/lib/tracke
 
 export const dynamic = "force-dynamic";
 
-// Same pinned model as the main scanner, for the same reason - a
-// "-latest" alias could be silently repointed by Google at any time.
-const GEMINI_MODEL = "gemini-3.5-flash-lite";
+// Deliberately a tier above receiptParse.ts's flash-lite, not the same
+// model - this is the judgment/cross-check pass (does this receipt's
+// cost/date genuinely match what was already entered), not raw
+// extraction. Pinned rather than a "-latest" alias, which Google could
+// silently repoint at any time. See AI-Models-for-Different-Tasks.docx.
+const GEMINI_MODEL = "gemini-2.5-flash";
 
 // A discrepancy only gets flagged past this margin - rounding and
 // currency-conversion noise is expected and shouldn't produce a false

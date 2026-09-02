@@ -10,7 +10,9 @@
 // no deterministic fallback text for this, so nothing shows rather than
 // something broken.
 
-const GEMINI_MODEL = "gemini-3.5-flash-lite";
+// Narrative, not routine extraction - same mid-tier as storyProse.ts,
+// per AI-Models-for-Different-Tasks.docx.
+const GEMINI_MODEL = "gemini-2.5-flash";
 
 export interface BuyingGuideBriefingInput {
   make: string;

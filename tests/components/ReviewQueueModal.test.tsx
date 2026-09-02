@@ -52,6 +52,7 @@ function makeItem(overrides: Partial<ParsedReceiptItem> & { category: ParsedRece
     vehicleModelOnReceipt: null,
     attachment: makeAttachment(),
     forceReview: false,
+    aiLowConfidence: false,
     ...overrides,
   };
 }
@@ -174,6 +175,28 @@ describe("ReviewQueueModal", () => {
     // purely to clear its needsReview flag - never touched by the human.
     const calls = patchCallsTo(fetchMock, "/api/tracker/services/svc-1");
     expect(calls).toEqual([{ jobType: "oil-filter", cost: 80, mileage: 500, date: "2024-01-01", notes: "", mileageAcknowledged: true }]);
+  });
+
+  // Stage 3 of the AI model strategy (AI-Models-for-Different-Tasks.docx):
+  // an item the model (even after escalation) is still unsure about must
+  // stop in front of a human, exactly like forceReview above - a
+  // separate signal, not a currency problem, but the same "don't
+  // auto-commit this" outcome.
+  it("keeps a clean tier-1 item under human review when the AI flagged it as low-confidence, instead of auto-committing", async () => {
+    const item = makeItem({ category: "service", mileageOnReceipt: 500, description: "Oil change", aiLowConfidence: true });
+    const fetchMock = createFetchMock({
+      commitItem: (i) =>
+        i.description === "Oil change"
+          ? { entry: { id: "svc-1", category: "service", aiDescription: "Oil change AI", duplicate: null, jobType: "oil-filter", cost: 80, mileage: 500, mileageNeedsManualEntry: false, plateMismatch: null, vehicleMismatch: null, date: "2024-01-01", notes: "Oil change (AI wasn't fully confident reading this receipt - please double-check the details)", attachment: makeAttachment() } }
+          : undefined,
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<ReviewQueueModal parsedItems={[item]} onFinished={vi.fn()} />);
+
+    expect(await screen.findByText("Oil change AI")).toBeInTheDocument();
+    expect(screen.getByText("Reviewing 1 of 1")).toBeInTheDocument();
+    expect(screen.queryByText("All caught up")).not.toBeInTheDocument();
   });
 
   it("a fuel item with a printed mileage (tier 4) still requires human review when its litres reading is physically implausible", async () => {

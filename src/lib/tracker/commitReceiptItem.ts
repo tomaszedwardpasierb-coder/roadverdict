@@ -47,6 +47,29 @@ function vehicleNamesMatch(a: string, b: string): boolean {
   return na.includes(nb) || nb.includes(na);
 }
 
+// Two independent reasons a description might need a caveat prepended -
+// checked separately (rather than one combined flag) because they're
+// genuinely different problems with different fixes: a currency that
+// couldn't be auto-converted still has a real, correctly-read number
+// behind it, while low AI confidence means the number itself might be
+// wrong. forceReview wins when both are true since it's the more
+// actionable of the two callouts.
+function withAiCaveat(description: string, forceReview: boolean, aiLowConfidence: boolean): string {
+  if (forceReview) return `${description} (currency could not be auto-converted - please check the amount)`;
+  if (aiLowConfidence) return `${description} (AI wasn't fully confident reading this receipt - please double-check the details)`;
+  return description;
+}
+
+// Same two caveats as withAiCaveat above, but without the description
+// prefix - mods notes never carry the bare description at all (it's
+// already the record's own `name`), so the un-flagged case must stay
+// null, not fall back to repeating it.
+function aiCaveatOnly(forceReview: boolean, aiLowConfidence: boolean): string | null {
+  if (forceReview) return "Currency could not be auto-converted - please check the amount";
+  if (aiLowConfidence) return "AI wasn't fully confident reading this receipt - please double-check the details";
+  return null;
+}
+
 // Best-effort, non-blocking - only ever called when mileageConfidence
 // ended up undefined, meaning the printed mileage on the receipt was
 // trusted directly rather than estimated. That's the one moment a new
@@ -102,7 +125,7 @@ export async function commitReceiptItem(
   // file has always deliberately avoided.
   boundsOnlyHints: { date: string; mileage: number; batchIndex?: number }[] = []
 ): Promise<ReviewQueueEntry> {
-  const { category, date, costGbp, description, litres, mileageOnReceipt, registrationOnReceipt, merchantName, address, city, vehicleMakeOnReceipt, vehicleModelOnReceipt, attachment, currencyConversion, forceReview } = item;
+  const { category, date, costGbp, description, litres, mileageOnReceipt, registrationOnReceipt, merchantName, address, city, vehicleMakeOnReceipt, vehicleModelOnReceipt, attachment, currencyConversion, forceReview, aiLowConfidence } = item;
 
   // The very first thing checked, before anything category- or
   // mileage-specific: does this receipt even claim to be for THIS bike?
@@ -300,7 +323,7 @@ export async function commitReceiptItem(
   if (category === "service") {
     const jobType = guessJobType(description) ?? "other";
     const notes = [
-      forceReview ? `${description} (currency could not be auto-converted - please check the amount)` : description,
+      withAiCaveat(description, forceReview, aiLowConfidence),
       mileageWarning ? `⚠ ${mileageWarning}` : null,
     ].filter(Boolean).join(" - ");
     const jobLabel = JOB_LABELS[jobType] ?? jobType;
@@ -357,7 +380,7 @@ export async function commitReceiptItem(
   if (category === "mods") {
     const modCategory = guessModCategory(description) ?? "other-accessory";
     const modNotes = [
-      forceReview ? "Currency could not be auto-converted - please check the amount" : null,
+      aiCaveatOnly(forceReview, aiLowConfidence),
       mileageWarning ? `⚠ ${mileageWarning}` : null,
     ].filter(Boolean).join(" - ");
     const aiDescription = buildAiDescription({ description, merchantName, address, city, categoryLabel: "Parts & Accessories" });
@@ -371,7 +394,7 @@ export async function commitReceiptItem(
   }
 
   const billType = guessBillType(description) ?? "insurance";
-  const billNotes = forceReview ? `${description} (currency could not be auto-converted - please check the amount)` : description;
+  const billNotes = withAiCaveat(description, forceReview, aiLowConfidence);
   const billLabel = BILL_LABELS[billType] ?? billType;
   const aiDescription = buildAiDescription({ description: billLabel, merchantName, address, city, categoryLabel: "Insurance, tax & MOT" });
   const duplicate = findPossibleDuplicate(date, costGbp, billCandidates, description);
