@@ -14,7 +14,15 @@
 import { test, expect } from "@playwright/test";
 import { loginAsDemo, resetDemoAccount, DEMO_REGISTRATION } from "./helpers/demoAuth";
 
-test.describe.configure({ mode: "serial" });
+// The first test's reset rebuilds a real ~10-year dataset via sequential
+// Cosmos writes (deliberately not parallel - see runDemoSeed's own
+// comment on why), then every later test still has to complete its own
+// real request against a server that just did all that work. On a
+// dedicated dev machine that comfortably fits Playwright's 30s default;
+// on GitHub's shared, resource-constrained CI runner it doesn't always -
+// a real speed difference, not a logic bug, so the fix is more time, not
+// different behaviour.
+test.describe.configure({ mode: "serial", timeout: 90_000 });
 
 test.describe("Authenticated demo journeys", () => {
   test("signs in via the real login form and lands on a seeded dashboard", async ({ page }) => {
