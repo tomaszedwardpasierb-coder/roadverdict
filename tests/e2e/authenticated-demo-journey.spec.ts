@@ -17,17 +17,16 @@ import { loginAsDemo, resetDemoAccount, DEMO_REGISTRATION } from "./helpers/demo
 // The very first sign-in against a fresh/reset demo account runs
 // runDemoSeed() inline, before responding - a real ~150-document
 // dataset written strictly sequentially (deliberately, to avoid RU
-// throttling - see runDemoSeed's own comment). On a dedicated dev
-// machine that's a matter of seconds; on GitHub's shared, CPU-
-// constrained runner it has been observed taking well over 90s for the
-// exact same, unmodified operation - a genuine throughput difference in
-// that environment, not a hang (the error is always "test timeout
-// exceeded" while still waiting on the very first navigation, never a
-// crash or a different error). 5 minutes is a deliberately generous
-// ceiling so a real hang (which this would NOT fix) is still
-// distinguishable from this - if it fails even at this budget, look at
-// the "Print app server log" CI step's output next, not this number.
-test.describe.configure({ mode: "serial", timeout: 300_000 });
+// throttling - see runDemoSeed's own comment), typically a handful of
+// seconds. A previous CI run appeared to hang well past even a 5-minute
+// budget on this same step - that turned out to be a real bug in the CI
+// workflow (a freshly-started emulator container with no "roadverdict"
+// database/"app" container ever provisioned, so every Cosmos query
+// failed outright with "Owner resource does not exist" - a permanent
+// error, not something more time could ever have fixed), now fixed
+// there. 60s here is just reasonable slack for CI being generally slower
+// than a dedicated dev machine, not a workaround for that bug.
+test.describe.configure({ mode: "serial", timeout: 60_000 });
 
 test.describe("Authenticated demo journeys", () => {
   test("signs in via the real login form and lands on a seeded dashboard", async ({ page }) => {

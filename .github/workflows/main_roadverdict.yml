@@ -102,6 +102,27 @@ jobs:
           done
           echo "Cosmos DB Emulator did not become ready in time." >&2
           exit 1
+      # The `test` job's emulator gets the "roadverdict" database and
+      # "app" container created for it by tests/integration/globalSetup.ts
+      # before any integration test runs. This job's emulator is a
+      # separate, fresh container with no such setup step, so without
+      # this the app's very first real Cosmos query fails outright with
+      # "Owner resource does not exist" (404/1003) - not a timeout, a
+      # permanent error, which is exactly what a hang that never
+      # resolves even at a 5-minute budget turned out to be.
+      - name: Provision Cosmos DB Emulator (roadverdict database + app container)
+        env:
+          NODE_TLS_REJECT_UNAUTHORIZED: '0'
+        run: |
+          node -e "
+          const { CosmosClient } = require('@azure/cosmos');
+          const client = new CosmosClient('AccountEndpoint=https://localhost:8081/;AccountKey=C2y6yDjf5/R+ob0N8A7Cgv30VRDJIWEHLM+4QDU5DE2nQ9nDuVTqobD4b8mGGyPMbIZnqyMsEcaGQy67XIw/Jw==;');
+          (async () => {
+            const { database } = await client.databases.createIfNotExists({ id: 'roadverdict' });
+            await database.containers.createIfNotExists({ id: 'app', partitionKey: { paths: ['/pk'] } });
+            console.log('Cosmos emulator provisioned: roadverdict/app.');
+          })().catch((err) => { console.error(err); process.exit(1); });
+          "
       # Runs against the just-built app, served locally on this runner
       # and backed by this job's own Cosmos emulator - never against
       # production. This is what makes it safe to gate the deploy on: a
