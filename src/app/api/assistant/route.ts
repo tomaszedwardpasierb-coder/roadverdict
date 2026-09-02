@@ -51,7 +51,31 @@ interface GeminiContent {
   parts: GeminiPart[];
 }
 
-function buildSystemInstruction(config: AssistantConfigDoc, signedIn: boolean, privacyPolicyText: string | null, reportOpen: boolean): string {
+// Server-owned labels for every dashboard tab, keyed by the same
+// Section values DashboardShell.tsx's own NAV_ITEMS uses. The client
+// only ever sends the KEY (e.g. "shareLinks"), never a label - this map
+// is what turns that into text that actually reaches the model's
+// system prompt, so a request can never inject arbitrary text there by
+// sending something unexpected as dashboardTab. Anything not a key
+// here is treated as no tab open at all (see the route handler below).
+const DASHBOARD_TAB_LABELS: Record<string, string> = {
+  dashboard: "Dashboard",
+  service: "Service",
+  fuel: "Fuel",
+  mods: "Parts & Accessories",
+  bills: "Tax & Insurance",
+  reminders: "Reminders",
+  reports: "Reports",
+  story: "The Story So Far",
+  shareLinks: "Shareable Links",
+  quoteChecker: "Quote Checker",
+  costCalculator: "Cost calculator",
+  buyingGuide: "Buying a used bike",
+  privacy: "Privacy",
+  transferOwnership: "Transfer ownership",
+};
+
+function buildSystemInstruction(config: AssistantConfigDoc, signedIn: boolean, privacyPolicyText: string | null, reportOpen: boolean, dashboardTabLabel: string | null): string {
   const parts = [config.knowledgeBase];
 
   // Appended right after the knowledge base, before the more
@@ -82,6 +106,12 @@ function buildSystemInstruction(config: AssistantConfigDoc, signedIn: boolean, p
     );
   }
 
+  if (dashboardTabLabel) {
+    parts.push(
+      `\n\n---\n\nCURRENT DASHBOARD TAB: the signed-in user currently has the "${dashboardTabLabel}" tab open on their dashboard. If they ask a vague, pronoun-only, or unqualified question about what something is or does - e.g. "what's this for?", "what's that?", "not sure what this does" - with no other clearer subject in the conversation, assume they mean the "${dashboardTabLabel}" tab specifically, using the document above's own description of that feature. Answer in ONE short, plain paragraph - what it's for, nothing more - then ask a brief follow-up like "want me to go into more detail?" rather than immediately explaining everything about it. Only go deeper than that first short answer if they actually say yes to that follow-up (or ask a specific follow-up question) - don't front-load the full explanation before they've asked for it.`
+    );
+  }
+
   parts.push(
     privacyPolicyText
       ? `\n\n---\n\nLIVE PRIVACY POLICY (current text, fetched just now - use this directly for any data-handling or privacy question per section 8.3 of the document above, never your own reasoning):\n\n${privacyPolicyText}`
@@ -106,7 +136,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Assistant is not configured." }, { status: 503 });
   }
 
-  let body: { messages?: ChatMessage[]; reportToken?: string };
+  let body: { messages?: ChatMessage[]; reportToken?: string; dashboardTab?: string };
   try {
     body = await req.json();
   } catch {
@@ -156,6 +186,15 @@ export async function POST(req: Request) {
     }
   }
 
+  // Only meaningful while signed in - the dashboard itself requires a
+  // session, so a tab claim on an anonymous request is never trusted.
+  // Looked up against DASHBOARD_TAB_LABELS rather than used directly,
+  // same reasoning as reportToken above: the client sends a bare key,
+  // never free text, so nothing it sends can inject arbitrary content
+  // into the system prompt below.
+  const dashboardTabLabel =
+    signedIn && typeof body.dashboardTab === "string" ? DASHBOARD_TAB_LABELS[body.dashboardTab] ?? null : null;
+
   // The client always appends the new message before sending, so this
   // is the actual question being asked right now - not the full
   // history, which would have already been logged on earlier requests.
@@ -174,7 +213,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Assistant is temporarily unavailable." }, { status: 503 });
   }
 
-  const systemInstruction = buildSystemInstruction(config, signedIn, privacyPolicyText, !!reportToken);
+  const systemInstruction = buildSystemInstruction(config, signedIn, privacyPolicyText, !!reportToken, dashboardTabLabel);
 
   const contents: GeminiContent[] = toGeminiContents(messages);
   const toolDeclarations = [

@@ -1,7 +1,7 @@
 // Place at: src/app/dashboard/DashboardShell.tsx
 'use client';
 
-import { useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import { UpdateMileageButton } from './UpdateMileageButton';
 import { RefreshVehicleDataButton } from './RefreshVehicleDataButton';
@@ -9,6 +9,7 @@ import { BikeSwitcher, type SwitcherBike } from './BikeSwitcher';
 import LogoutButton from './LogoutButton';
 import { formatDistance, type DistanceUnit } from '@/lib/tracker/unitFormat';
 import { TabSwitchProvider, type ReviewCategory } from './TabSwitchContext';
+import { useActiveSection } from '@/components/ActiveSectionContext';
 import { ResetDemoButton } from './ResetDemoButton';
 import { DEMO_EMAIL } from '@/lib/tracker/demoSeed';
 import { Icon, type IconName } from './Icon';
@@ -132,6 +133,19 @@ export function DashboardShell({
 }: Props) {
   const [active, setActive] = useState<Section>('dashboard');
   const [showMore, setShowMore] = useState(false);
+  const { setActiveSection } = useActiveSection();
+
+  // Publishes which tab is open to the globally-mounted assistant widget
+  // (see ActiveSectionContext.tsx's own comment for why this can't just
+  // read `active` directly) - sends the raw Section key, not a label;
+  // the assistant route maps it to a real, server-owned label itself
+  // rather than trusting client-supplied text describing the tab.
+  // Cleared on unmount so leaving the dashboard doesn't leave a stale
+  // tab reference behind for whatever page comes next.
+  useEffect(() => {
+    setActiveSection(active);
+    return () => setActiveSection(null);
+  }, [active, setActiveSection]);
 
   const contentMap: Record<Section, ReactNode> = {
     dashboard: dashboardContent,

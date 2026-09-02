@@ -6,6 +6,7 @@ import { cookies } from 'next/headers';
 import { getAdminSession } from '@/lib/admin/session';
 import { ImpersonationBanner } from './ImpersonationBanner';
 import { AssistantWidget } from '@/components/AssistantWidget';
+import { ActiveSectionProvider } from '@/components/ActiveSectionContext';
 import { SiteHeaderNav } from './SiteHeaderNav';
 import './globals.css';
 const bigShouldersDisplay = Big_Shoulders_Display({
@@ -57,22 +58,24 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   return (
     <html lang="en" className={`${bigShouldersDisplay.variable} ${inter.variable} ${plexMono.variable}`}>
       <body>
-        {showImpersonationBanner && <ImpersonationBanner email={impersonatingEmail!} />}
-        <header className="site-header">
-          <Link href="/" className="site-header__logo">
-            <img src="/logo-dark.png" alt="RoadVerdict" className="site-header__logo-img" />
-          </Link>
-          <SiteHeaderNav />
-        </header>
-        <main>{children}</main>
-        <footer className="site-footer">
-          <p>
-            RoadVerdict is guidance benchmarked against typical prices, not a professional
-            inspection. <Link href="/privacy">Privacy</Link> · <Link href="/about">About us</Link> ·{' '}
-            <a href="mailto:hello@roadverdict.co.uk">hello@roadverdict.co.uk</a>
-          </p>
-        </footer>
-        <AssistantWidget />
+        <ActiveSectionProvider>
+          {showImpersonationBanner && <ImpersonationBanner email={impersonatingEmail!} />}
+          <header className="site-header">
+            <Link href="/" className="site-header__logo">
+              <img src="/logo-dark.png" alt="RoadVerdict" className="site-header__logo-img" />
+            </Link>
+            <SiteHeaderNav />
+          </header>
+          <main>{children}</main>
+          <footer className="site-footer">
+            <p>
+              RoadVerdict is guidance benchmarked against typical prices, not a professional
+              inspection. <Link href="/privacy">Privacy</Link> · <Link href="/about">About us</Link> ·{' '}
+              <a href="mailto:hello@roadverdict.co.uk">hello@roadverdict.co.uk</a>
+            </p>
+          </footer>
+          <AssistantWidget />
+        </ActiveSectionProvider>
       </body>
     </html>
   );

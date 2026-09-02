@@ -3,6 +3,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { usePathname } from 'next/navigation';
+import { useActiveSection } from './ActiveSectionContext';
 import styles from './AssistantWidget.module.css';
 
 interface Message {
@@ -54,20 +55,23 @@ function isRetryable(status: number | null): boolean {
 
 type SendResult = { ok: true; reply: string } | { ok: false; error: string; retryable: boolean };
 
-async function attemptSend(payload: Message[], reportToken: string | null): Promise<SendResult> {
+async function attemptSend(payload: Message[], reportToken: string | null, dashboardTab: string | null): Promise<SendResult> {
   let status: number | null = null;
   try {
     const res = await fetch('/api/assistant', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      // Only role/content (and, if a report page is open, that report's
-      // token) goes over the wire - nothing else about the user is sent
-      // from here; anything the assistant knows about their own
-      // account, it gets server-side from their own session, never
-      // from this request body.
+      // Only role/content (and, if a report page or a dashboard tab is
+      // open, that context) goes over the wire - nothing else about the
+      // user is sent from here; anything the assistant knows about
+      // their own account, it gets server-side from their own session,
+      // never from this request body. dashboardTab is just the raw
+      // Section key (e.g. "shareLinks"), not a label - the server maps
+      // it to a real, server-owned label itself.
       body: JSON.stringify({
         messages: payload.map((m) => ({ role: m.role, content: m.content })),
         ...(reportToken ? { reportToken } : {}),
+        ...(dashboardTab ? { dashboardTab } : {}),
       }),
     });
     status = res.status;
@@ -90,6 +94,7 @@ async function attemptSend(payload: Message[], reportToken: string | null): Prom
 export function AssistantWidget() {
   const pathname = usePathname();
   const reportToken = extractReportToken(pathname ?? '');
+  const { activeSection: dashboardTab } = useActiveSection();
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([GREETING]);
   const [input, setInput] = useState('');
@@ -108,19 +113,19 @@ export function AssistantWidget() {
     listRef.current?.scrollTo({ top: listRef.current.scrollHeight, behavior: 'smooth' });
   }, [messages, sending]);
 
-  async function sendWithRetry(payload: Message[], reportToken: string | null) {
+  async function sendWithRetry(payload: Message[], reportToken: string | null, dashboardTab: string | null) {
     setSending(true);
     setError(null);
     setLastFailedMessages(null);
 
-    let result = await attemptSend(payload, reportToken);
+    let result = await attemptSend(payload, reportToken, dashboardTab);
     let attempts = 1;
     // Retries silently, still inside the same "sending" state - the
     // person just sees the normal typing indicator for slightly longer
     // if this happens, never a flash of an error that then recovers.
     while (!result.ok && result.retryable && attempts <= MAX_AUTO_RETRIES) {
       await sleep(RETRY_DELAY_MS);
-      result = await attemptSend(payload, reportToken);
+      result = await attemptSend(payload, reportToken, dashboardTab);
       attempts++;
     }
 
@@ -140,12 +145,12 @@ export function AssistantWidget() {
     const nextMessages = [...messages, { role: 'user' as const, content: text }];
     setMessages(nextMessages);
     setInput('');
-    await sendWithRetry(nextMessages, reportToken);
+    await sendWithRetry(nextMessages, reportToken, dashboardTab);
   }
 
   function handleRetry() {
     if (!lastFailedMessages || sending) return;
-    void sendWithRetry(lastFailedMessages, reportToken);
+    void sendWithRetry(lastFailedMessages, reportToken, dashboardTab);
   }
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {

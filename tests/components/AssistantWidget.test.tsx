@@ -6,6 +6,7 @@
 // real rather than assuming. Only `fetch` and next/navigation's
 // usePathname are mocked - the retry timing itself runs for real using
 // vi's fake timers rather than a stubbed-out sleep().
+import { useEffect } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -16,6 +17,16 @@ vi.mock("next/navigation", () => ({
 }));
 
 import { AssistantWidget } from "@/components/AssistantWidget";
+import { ActiveSectionProvider, useActiveSection } from "@/components/ActiveSectionContext";
+
+// Mirrors how DashboardShell actually publishes the open tab in
+// production (a useEffect syncing local state into the shared context)
+// - a real child calling the real setter, not a mock.
+function SetActiveSection({ section }: { section: string }) {
+  const { setActiveSection } = useActiveSection();
+  useEffect(() => setActiveSection(section), [section, setActiveSection]);
+  return null;
+}
 
 async function openWidgetAndSend(user: ReturnType<typeof userEvent.setup>, text: string) {
   await user.click(screen.getByRole("button", { name: "Open assistant" }));
@@ -78,6 +89,27 @@ describe("AssistantWidget", () => {
     await screen.findByText("This bike has a clean documented history.");
     const body = JSON.parse((fetch as ReturnType<typeof vi.fn>).mock.calls[0][1].body);
     expect(body.reportToken).toBe("abc123");
+  });
+
+  it("includes the currently-open dashboard tab, published via the shared ActiveSectionContext, in the request body", async () => {
+    (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ reply: "Shareable Links let you send a buyer your bike's history." }),
+    });
+
+    const user = userEvent.setup();
+    render(
+      <ActiveSectionProvider>
+        <SetActiveSection section="shareLinks" />
+        <AssistantWidget />
+      </ActiveSectionProvider>
+    );
+    await openWidgetAndSend(user, "what's this for?");
+
+    await screen.findByText("Shareable Links let you send a buyer your bike's history.");
+    const body = JSON.parse((fetch as ReturnType<typeof vi.fn>).mock.calls[0][1].body);
+    expect(body.dashboardTab).toBe("shareLinks");
   });
 
   it("never treats /report/receipt-request/decide as a report-token page", async () => {

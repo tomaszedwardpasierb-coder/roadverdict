@@ -21,6 +21,7 @@ vi.mock("next/navigation", () => ({
 
 import { DashboardShell } from "@/app/dashboard/DashboardShell";
 import { useTabSwitch } from "@/app/dashboard/TabSwitchContext";
+import { ActiveSectionProvider, useActiveSection } from "@/components/ActiveSectionContext";
 import { DEMO_EMAIL } from "@/lib/tracker/demoSeed";
 
 const emptyPendingIds = { service: [], fuel: [], mods: [], bills: [] };
@@ -125,6 +126,31 @@ describe("DashboardShell", () => {
   it("shows the request dot next to Transfer ownership only when hasIncomingRequest is true", () => {
     render(<DashboardShell {...baseProps({ hasIncomingRequest: true })} />);
     expect(screen.getByLabelText("Someone is requesting this bike's history")).toBeInTheDocument();
+  });
+
+  // This is the other side of ActiveSectionContext.tsx's own reasoning:
+  // the globally-mounted AssistantWidget lives outside DashboardShell's
+  // own tree entirely, so it can only learn which tab is open if
+  // DashboardShell actually publishes it to the shared context - not
+  // just tracks it in its own local `active` state.
+  it("publishes the active tab to the shared ActiveSectionContext so the assistant widget (mounted elsewhere) can read it", async () => {
+    function ShowActiveSection() {
+      const { activeSection } = useActiveSection();
+      return <div>Active section: {activeSection ?? "none"}</div>;
+    }
+
+    const user = userEvent.setup();
+    render(
+      <ActiveSectionProvider>
+        <DashboardShell {...baseProps()} />
+        <ShowActiveSection />
+      </ActiveSectionProvider>
+    );
+
+    expect(screen.getByText("Active section: dashboard")).toBeInTheDocument();
+
+    await user.click(screen.getAllByRole("button", { name: "Fuel" })[0]);
+    expect(screen.getByText("Active section: fuel")).toBeInTheDocument();
   });
 
   it("shows the Reset Demo button only for the real demo account email", () => {
