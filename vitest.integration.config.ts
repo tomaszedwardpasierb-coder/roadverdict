@@ -13,6 +13,16 @@ export default defineConfig({
     globalSetup: ["./tests/integration/globalSetup.ts"],
     testTimeout: 20_000,
     hookTimeout: 20_000,
+    // Every test file here shares the SAME single Cosmos emulator
+    // container - there's no per-file isolation like the mocked unit
+    // suite has. Running files in parallel (vitest's default) means 3+
+    // files hammer that one container's connections at once; on a
+    // resource-constrained CI runner this saturates it until requests
+    // start timing out at Cosmos's own ~10s server-side limit, not just
+    // running slower. Serializing file execution removes the
+    // cross-file contention entirely - each file gets the whole
+    // container to itself.
+    fileParallelism: false,
   },
   resolve: {
     alias: {
