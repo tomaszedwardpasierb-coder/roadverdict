@@ -1,15 +1,12 @@
-﻿name: Build and deploy Node.js app to Azure Web App - roadverdict
+name: Build and deploy Node.js app to Azure Web App - roadverdict
 on:
   push:
     branches:
       - main
   workflow_dispatch:
 jobs:
-  build-and-deploy:
+  test:
     runs-on: ubuntu-latest
-    permissions:
-      id-token: write
-      contents: read
     # Started at job start, in parallel with checkout/setup/typecheck/lint/
     # unit-tests below - by the time the "Wait for Cosmos DB Emulator" step
     # runs, most of its startup time has likely already elapsed in the
@@ -56,15 +53,62 @@ jobs:
           exit 1
       - name: Integration tests (Cosmos DB Emulator)
         run: npm run test:integration
+      - name: Build (proves the app actually compiles before anything downstream bothers)
+        run: npm run build
+
+  authenticated-e2e:
+    needs: test
+    runs-on: ubuntu-latest
+    # A deliberately SEPARATE, fresh emulator container from the `test`
+    # job's - that one has already absorbed a full integration-test
+    # suite's worth of writes by the time it finishes, and this job's
+    # demo-account reset does another real, ~150-document sequential
+    # write burst on top (see runDemoSeed's own comment on why it's
+    # sequential). Sharing one container across both was exactly what
+    # caused a real, reproducible hang in practice - this isolates the
+    # heavy write burst onto its own container instead of layering it on
+    # top of an already-worn one.
+    services:
+      cosmosdb-emulator:
+        image: mcr.microsoft.com/cosmosdb/linux/azure-cosmos-emulator:latest
+        ports:
+          - 8081:8081
+          - 10250:10250
+          - 10251:10251
+          - 10252:10252
+          - 10253:10253
+          - 10254:10254
+        env:
+          AZURE_COSMOS_EMULATOR_PARTITION_COUNT: '3'
+          AZURE_COSMOS_EMULATOR_ENABLE_DATA_PERSISTENCE: 'false'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Node.js version
+        uses: actions/setup-node@v3
+        with:
+          node-version: '24.x'
+      - name: Install dependencies
+        run: npm ci
       - name: Build
         run: npm run build
-      # Authenticated E2E runs against the just-built app, served locally
-      # on this runner and backed by the same Cosmos emulator the
-      # integration tests already used - never against production. This
-      # is what makes it safe to gate the deploy on: a real browser
-      # driving the real demo account (see tests/e2e/helpers/demoAuth.ts)
-      # through real forms and a real backend, without ever touching
-      # live user data. If this fails, the deploy below never runs.
+      - name: Wait for Cosmos DB Emulator
+        run: |
+          for i in $(seq 1 60); do
+            if curl -sk --fail https://localhost:8081/_explorer/emulator.pem -o /dev/null; then
+              echo "Cosmos DB Emulator is ready."
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "Cosmos DB Emulator did not become ready in time." >&2
+          exit 1
+      # Runs against the just-built app, served locally on this runner
+      # and backed by this job's own Cosmos emulator - never against
+      # production. This is what makes it safe to gate the deploy on: a
+      # real browser driving the real demo account (see
+      # tests/e2e/helpers/demoAuth.ts) through real forms and a real
+      # backend, without ever touching live user data. If this fails,
+      # neither the deploy job nor its Azure credentials ever run.
       - name: Start app server (Cosmos DB Emulator backend)
         # Calls `next start` directly rather than through the `npm run
         # start` script (which resolves its port via `$PORT` in the
@@ -94,9 +138,29 @@ jobs:
         run: npx playwright test tests/e2e/authenticated-demo-journey.spec.ts
         env:
           PLAYWRIGHT_BASE_URL: http://localhost:3000
+      - name: Print app server log (only on failure - the server's own stdout/stderr for whatever the test above hit)
+        if: failure()
+        run: cat server.log || true
       - name: Stop app server
         if: always()
         run: kill "$(cat server.pid)" 2>/dev/null || true
+
+  deploy:
+    needs: [test, authenticated-e2e]
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Node.js version
+        uses: actions/setup-node@v3
+        with:
+          node-version: '24.x'
+      - name: Install dependencies
+        run: npm ci
+      - name: Build
+        run: npm run build
       - name: Login to Azure
         uses: azure/login@v2
         with:
@@ -112,13 +176,16 @@ jobs:
           package: .
       - name: Wait for the deployed instance to finish restarting
         run: sleep 20
+      - name: Install Playwright browser
+        run: npx playwright install --with-deps chromium
       - name: Post-deploy smoke test
         # Public/unauthenticated only, against the real live site - a
         # failure here means the deploy already happened, it's reporting
         # the live site looks broken, not blocking anything (see the
         # original commit that added this step). The authenticated demo
-        # journeys are a pre-deploy gate above instead, against the
-        # emulator, on purpose - never against real production data.
+        # journeys are a pre-deploy gate in the authenticated-e2e job
+        # instead, against an emulator, on purpose - never against real
+        # production data.
         run: npx playwright test tests/e2e/public-smoke.spec.ts
         env:
           PLAYWRIGHT_BASE_URL: https://roadverdict.co.uk
