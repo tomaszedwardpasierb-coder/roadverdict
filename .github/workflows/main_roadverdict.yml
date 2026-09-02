@@ -77,15 +77,20 @@ jobs:
       # on-Linux compatibility layer) reported against GitHub Actions
       # runners specifically: see
       # https://github.com/Azure/azure-cosmos-db-emulator-docker/issues/142
-      # and #56 ("success occurring about once every three to four
-      # attempts"). That's not something fixable from this side - the
-      # emulator is run manually via `docker run` here (not the
-      # declarative `services:` block used in the `test` job) precisely
-      # so a crash can be detected and retried with a genuinely fresh
-      # container, rather than the whole job just failing outright on
-      # what upstream itself describes as expected, intermittent
-      # behavior. A real app-level bug would fail identically on every
-      # attempt; this crash, per those reports, usually doesn't.
+      # and #56. A run here previously hit this crash 3/3 times in a row,
+      # always at the same point (right after the first test's two full
+      # sequential demo-seed writes - auto-seed-on-login plus the reset
+      # button - land on the emulator), which pointed at a real
+      # contributing cause rather than pure chance: this job had
+      # AZURE_COSMOS_EMULATOR_PARTITION_COUNT set to 1, an untested
+      # configuration, where the `test` job's services-block emulator
+      # (which reliably survives the Cosmos integration suite's own write
+      # load) uses 3. Matched that here. The manual `docker run` plus
+      # retry loop stays regardless, as defense in depth against whatever
+      # genuine intermittency remains per those upstream reports - but a
+      # failure that repeats identically on every attempt again points at
+      # something still-systemic, not chance, and is worth re-diagnosing
+      # rather than just re-running.
       - name: Authenticated E2E tests, with retry for the Cosmos DB Emulator's known Docker/CI flakiness
         run: |
           set +e
@@ -99,7 +104,7 @@ jobs:
 
             docker run -d --name cosmosdb-emulator \
               -p 8081:8081 -p 10250:10250 -p 10251:10251 -p 10252:10252 -p 10253:10253 -p 10254:10254 \
-              -e AZURE_COSMOS_EMULATOR_PARTITION_COUNT=1 \
+              -e AZURE_COSMOS_EMULATOR_PARTITION_COUNT=3 \
               -e AZURE_COSMOS_EMULATOR_ENABLE_DATA_PERSISTENCE=false \
               mcr.microsoft.com/cosmosdb/linux/azure-cosmos-emulator:latest
 
