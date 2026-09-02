@@ -19,17 +19,26 @@ import { isBeforeProduction } from "@/lib/tracker/productionYearCheck";
 import type { Attachment, CurrencyConversionInfo } from "@/lib/tracker/cosmosHelpers";
 import type { BikeDoc } from "@/lib/tracker/bike";
 
-// Fast/cheap on purpose: this is the highest-volume Gemini call in the
-// app (every uploaded receipt, every item on it) and the job itself -
-// OCR-style extraction, not judgment - doesn't need a stronger model.
-// See AI-Models-for-Different-Tasks.docx for the full per-task split.
-const GEMINI_MODEL = "gemini-2.5-flash-lite";
+// Pinned to the exact model already proven live in production - the
+// gemini-2.5-* family this app briefly moved to (per
+// AI-Models-for-Different-Tasks.docx) turned out to already be on
+// Google's deprecation path (2.5 Flash/Flash-Lite shutting down October
+// 2026, with some accounts reportedly losing access even earlier than
+// that date) and broke real usage immediately on deploy. Reverted here
+// rather than guessing another exact model string blind - the Gemini
+// model line-up is moving fast enough that a guess isn't safe without
+// verifying it against a real API key first.
+const GEMINI_MODEL = "gemini-3.5-flash-lite";
 // Escalation path for the ambiguous minority (Stage 3 in the doc above):
 // the flash-lite pass can self-report low confidence, in which case the
-// SAME receipt is re-read once with the strongest model available before
-// anything is shown to the person - not on every upload, only when the
-// cheap pass wasn't sure. Never used as the default, only the fallback.
-const GEMINI_ESCALATION_MODEL = "gemini-2.5-pro";
+// SAME receipt is re-read once before anything is shown to the person -
+// not on every upload, only when the first pass wasn't sure. Re-reads
+// with the same pinned model for now (see GEMINI_MODEL above) rather
+// than a separate, unverified "stronger" model - a second, independent
+// look still catches a one-off misread even without a genuine model-
+// tier upgrade, and this can be pointed at a verified stronger model
+// later once one's actually confirmed live.
+const GEMINI_ESCALATION_MODEL = GEMINI_MODEL;
 const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024;
 const ALLOWED_TYPES = new Set(["image/jpeg", "image/png", "application/pdf"]);
 

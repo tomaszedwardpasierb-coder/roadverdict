@@ -10,9 +10,10 @@
 // no deterministic fallback text for this, so nothing shows rather than
 // something broken.
 
-// Narrative, not routine extraction - same mid-tier as storyProse.ts,
-// per AI-Models-for-Different-Tasks.docx.
-const GEMINI_MODEL = "gemini-2.5-flash";
+// Reverted to the exact model already proven live in production - see
+// receiptParse.ts's GEMINI_MODEL comment for why the
+// AI-Models-for-Different-Tasks.docx tier split broke on deploy.
+const GEMINI_MODEL = "gemini-3.5-flash-lite";
 
 export interface BuyingGuideBriefingInput {
   make: string;

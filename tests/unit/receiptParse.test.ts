@@ -285,7 +285,7 @@ describe("parseReceiptFile", () => {
 
       expect(fetchMock).toHaveBeenCalledTimes(2);
       const escalatedUrl = String(fetchMock.mock.calls[1][0]);
-      expect(escalatedUrl).toContain("gemini-2.5-pro");
+      expect(escalatedUrl).toContain("gemini-3.5-flash-lite");
       const item = (result as any).items[0];
       // The escalated (confident) read replaced the flash-lite one outright.
       expect(item.costGbp).toBe(40);

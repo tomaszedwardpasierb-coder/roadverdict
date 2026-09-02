@@ -7,12 +7,13 @@ import { convertDisplayToGbp, ALL_CURRENCIES, type Currency } from "@/lib/tracke
 
 export const dynamic = "force-dynamic";
 
-// Deliberately a tier above receiptParse.ts's flash-lite, not the same
-// model - this is the judgment/cross-check pass (does this receipt's
-// cost/date genuinely match what was already entered), not raw
-// extraction. Pinned rather than a "-latest" alias, which Google could
-// silently repoint at any time. See AI-Models-for-Different-Tasks.docx.
-const GEMINI_MODEL = "gemini-2.5-flash";
+// Reverted to the exact model already proven live in production - see
+// receiptParse.ts's GEMINI_MODEL comment. The per-task tier split from
+// AI-Models-for-Different-Tasks.docx (this was meant to sit a tier above
+// receiptParse.ts's flash-lite) broke real usage on deploy: gemini-2.5-*
+// is on Google's deprecation path. Pinned rather than a "-latest" alias,
+// which Google could silently repoint at any time.
+const GEMINI_MODEL = "gemini-3.5-flash-lite";
 
 // A discrepancy only gets flagged past this margin - rounding and
 // currency-conversion noise is expected and shouldn't produce a false

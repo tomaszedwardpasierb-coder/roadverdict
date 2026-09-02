@@ -14,11 +14,12 @@
 // this section - unlike Story So Far there's no deterministic fallback
 // text for an opinion, so nothing shows rather than something broken.
 
-// The most trust-sensitive AI output in the app - a stranger may spend
-// real money partly on the strength of this opinion - so it gets the
-// strongest model available, not the routing/extraction default. See
-// AI-Models-for-Different-Tasks.docx.
-const GEMINI_MODEL = "gemini-2.5-pro";
+// Reverted to the exact model already proven live in production - see
+// receiptParse.ts's GEMINI_MODEL comment for why the
+// AI-Models-for-Different-Tasks.docx tier split (this was meant to be
+// the premium tier) broke on deploy. Worth revisiting once a genuinely
+// stronger model is confirmed live against a real API key.
+const GEMINI_MODEL = "gemini-3.5-flash-lite";
 
 export interface BuyerOpinionInput {
   make: string;
