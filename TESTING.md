@@ -24,9 +24,16 @@ npm run test:e2e
 - Integration tests should use a dedicated isolated Cosmos database or emulator. Never point them at production data.
 - End-to-end tests cover a small number of user journeys. External services should be replaced by deterministic fixtures or test doubles.
 
-## Integration tests (Cosmos DB Emulator)
+## Integration tests (real Cosmos DB, not a mock)
 
-`tests/integration/**/*.test.ts` runs against a real (local, non-production) Cosmos container instead of a mock - proving actual query shape, partition-key scoping, and upsert/point-read behavior that a mocked `@/lib/cosmos` can't verify. Not part of `npm test` - its own command locally, and its own CI job step (backed by the `cosmosdb-emulator` service container defined in the workflow, gating the deploy before `npm run build`).
+`tests/integration/**/*.test.ts` runs against a real, non-production Cosmos container instead of a mock - proving actual query shape, partition-key scoping, and upsert/point-read behavior that a mocked `@/lib/cosmos` can't verify. Not part of `npm test` - its own command, and its own CI job step, gating the deploy before `npm run build`.
+
+Two different real backends, depending on where this runs:
+
+- **Locally**: the Cosmos DB Emulator (see setup below).
+- **In CI**: a dedicated, test-only Azure Cosmos DB account (a Serverless account, `roadverdict-test-cosmos`), via the `COSMOS_TEST_CONNECTION_STRING` repository secret. This replaced the Linux Docker emulator that CI used to run here - that image has a real, unresolved upstream crash bug under write load that repeatedly took the job down on GitHub Actions runners specifically. A real Cosmos DB account doesn't have that bug, and needs no container to start, wait for, or restart.
+
+`tests/integration/globalSetup.ts` picks whichever of the two `COSMOS_TEST_CONNECTION_STRING` (if set) or the local emulator applies - nothing about writing a test, or running it locally, changes either way.
 
 Setup (one-time):
 
@@ -46,7 +53,7 @@ First launch after install can take several minutes to finish provisioning - sub
 npm run test:integration
 ```
 
-`vitest.integration.config.ts`'s `globalSetup` (`tests/integration/globalSetup.ts`) points `COSMOS_CONNECTION_STRING` at the emulator's well-known local key, disables TLS verification for that process only (the emulator's cert is self-signed and machine-local - never done for anything that talks to production), and creates the `roadverdict` database / `app` container if they don't already exist. Every test must clean up the partition(s) it created via `tests/integration/testCosmos.ts`'s `cleanupPartition` helper (see the `afterEach` pattern in `cosmosHelpers.integration.test.ts`), since the emulator's on-disk store persists across runs. `fileParallelism: false` is set deliberately - every test file shares this one emulator container, and running files in parallel was enough to saturate it and cause real request timeouts in CI.
+`vitest.integration.config.ts`'s `globalSetup` (`tests/integration/globalSetup.ts`) points `COSMOS_CONNECTION_STRING` at whichever backend applies (see above) and creates the `roadverdict` database / `app` container if they don't already exist. Only the local emulator path disables TLS verification for that process (its cert is self-signed and machine-local); the real test account's cert is properly CA-signed, so verification stays on there, same as it would against production. Every test must clean up the partition(s) it created via `tests/integration/testCosmos.ts`'s `cleanupPartition` helper (see the `afterEach` pattern in `cosmosHelpers.integration.test.ts`), since both backends' stores persist across runs. `fileParallelism: false` is set deliberately - every test file shares this one Cosmos container/account, and running files in parallel was enough to saturate the emulator and cause real request timeouts in CI.
 
 ## Authenticated E2E journeys
 
@@ -64,7 +71,7 @@ npm run start &
 PLAYWRIGHT_BASE_URL=http://localhost:3000 npx playwright test tests/e2e/authenticated-demo-journey.spec.ts
 ```
 
-In CI, this runs as its own pre-deploy gate (after `npm run build`, before the Azure login step) against a locally-started server backed by the same `cosmosdb-emulator` service container the integration tests use - `public-smoke.spec.ts` remains the only spec run post-deploy, against the real live site, since that one is genuinely safe to run unauthenticated and repeatedly.
+In CI, this runs as its own pre-deploy gate (after `npm run build`, before the Azure login step) against a locally-started server pointed at the same dedicated test-only Cosmos DB account the integration tests use (`COSMOS_TEST_CONNECTION_STRING`) - `public-smoke.spec.ts` remains the only spec run post-deploy, against the real live site, since that one is genuinely safe to run unauthenticated and repeatedly.
 
 ## Required production gates
 

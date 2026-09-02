@@ -7,23 +7,6 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
-    # Started at job start, in parallel with checkout/setup/typecheck/lint/
-    # unit-tests below - by the time the "Wait for Cosmos DB Emulator" step
-    # runs, most of its startup time has likely already elapsed in the
-    # background, rather than being pure added latency.
-    services:
-      cosmosdb-emulator:
-        image: mcr.microsoft.com/cosmosdb/linux/azure-cosmos-emulator:latest
-        ports:
-          - 8081:8081
-          - 10250:10250
-          - 10251:10251
-          - 10252:10252
-          - 10253:10253
-          - 10254:10254
-        env:
-          AZURE_COSMOS_EMULATOR_PARTITION_COUNT: '3'
-          AZURE_COSMOS_EMULATOR_ENABLE_DATA_PERSISTENCE: 'false'
     steps:
       - uses: actions/checkout@v4
       - name: Set up Node.js version
@@ -40,69 +23,19 @@ jobs:
         run: npm test
       - name: Component tests
         run: npm run test:components
-      - name: Wait for Cosmos DB Emulator
-        run: |
-          for i in $(seq 1 60); do
-            if curl -sk --fail https://localhost:8081/_explorer/emulator.pem -o /dev/null; then
-              echo "Cosmos DB Emulator is ready."
-              exit 0
-            fi
-            sleep 5
-          done
-          echo "Cosmos DB Emulator did not become ready in time." >&2
-          exit 1
-      # Same known, unresolved upstream bug already documented in the
-      # authenticated-e2e job below (a "Last Chance"/SIGHUP fatal crash
-      # deep in the Linux emulator's sqlpal.dll, under write load, on
-      # GitHub Actions runners specifically) - this time hitting the
-      # services:-managed container here instead. Unlike that job, this
-      # container isn't one we create ourselves, so recovery is a
-      # `docker restart` on the same container Actions already manages,
-      # not a `docker rm`+`docker run` replacement - restarting keeps
-      # Actions' own service-lifecycle bookkeeping intact. A full re-run
-      # of the whole suite on retry (not just the files that hadn't
-      # reached yet) is deliberate: vitest.integration.config.ts runs
-      # every file against ONE shared container by design, so nothing
-      # is provisioned per-file to resume from partway through.
-      - name: Integration tests (Cosmos DB Emulator), with a restart-and-retry for the emulator's known crash bug
-        run: |
-          set +e
-          MAX_ATTEMPTS=3
-          SUCCESS=0
-          for attempt in $(seq 1 $MAX_ATTEMPTS); do
-            echo "::group::Attempt $attempt/$MAX_ATTEMPTS"
-            npm run test:integration
-            if [ $? -eq 0 ]; then
-              SUCCESS=1
-              echo "::endgroup::"
-              break
-            fi
-
-            echo "Integration tests failed on attempt $attempt - restarting the Cosmos emulator container and retrying."
-            CONTAINER_ID=$(docker ps -aq --filter "ancestor=mcr.microsoft.com/cosmosdb/linux/azure-cosmos-emulator:latest")
-            if [ -n "$CONTAINER_ID" ]; then
-              docker restart "$CONTAINER_ID" >/dev/null 2>&1
-            fi
-
-            READY=0
-            for i in $(seq 1 60); do
-              if curl -sk --fail https://localhost:8081/_explorer/emulator.pem -o /dev/null; then
-                READY=1
-                break
-              fi
-              sleep 5
-            done
-            if [ "$READY" != "1" ]; then
-              echo "Cosmos DB Emulator did not come back up after restart on attempt $attempt."
-            fi
-            echo "::endgroup::"
-          done
-
-          if [ "$SUCCESS" != "1" ]; then
-            echo "Integration tests did not succeed after $MAX_ATTEMPTS attempts."
-            exit 1
-          fi
-          echo "Integration tests succeeded."
+      # Against a real, dedicated test-only Azure Cosmos DB account, not
+      # the Linux Docker emulator this used to run against - that image
+      # has a real, unresolved upstream crash bug (a "Last Chance"/
+      # SIGHUP fatal fault under write load) that repeatedly took this
+      # whole job down on GitHub Actions runners. A real Cosmos DB
+      # account doesn't have that bug, and needs no container to start,
+      # wait for, or restart. tests/integration/globalSetup.ts prefers
+      # this connection string over the local emulator whenever it's
+      # set, so nothing changes for local development.
+      - name: Integration tests (real Cosmos DB test account)
+        run: npm run test:integration
+        env:
+          COSMOS_TEST_CONNECTION_STRING: ${{ secrets.COSMOS_TEST_CONNECTION_STRING }}
       - name: Build (proves the app actually compiles before anything downstream bothers)
         run: npm run build
 
@@ -121,144 +54,59 @@ jobs:
         run: npm run build
       - name: Install Playwright browser
         run: npx playwright install --with-deps chromium
-      # The Cosmos DB Emulator's Linux/Docker image is documented,
-      # unresolved-upstream flaky software - it has a real, known crash
-      # bug (a "Last Chance" fatal error deep in sqlpal.dll, its Windows-
-      # on-Linux compatibility layer) reported against GitHub Actions
-      # runners specifically: see
-      # https://github.com/Azure/azure-cosmos-db-emulator-docker/issues/142
-      # and #56. Two real runs here hit this crash on every attempt,
-      # always at the same point: right after the first test's two full
-      # sequential demo-seed writes (auto-seed-on-login, then the reset
-      # button) land on a container that only just started. Partition
-      # count (1 vs the `test` job's 3) made no difference - ruled out.
-      # What's actually changed to address it: authenticated-demo-
-      # journey.spec.ts now runs that heavy double-seed test last, not
-      # immediately against a freshly-started container, and there's an
-      # explicit settle delay after provisioning below. The manual
-      # `docker run` plus retry loop stays as defense in depth regardless
-      # - but a failure repeating identically on every attempt again
-      # means something still-systemic, worth re-diagnosing rather than
-      # just re-running.
-      - name: Authenticated E2E tests, with retry for the Cosmos DB Emulator's known Docker/CI flakiness
+      # Against the same real, dedicated test-only Azure Cosmos DB
+      # account the `test` job's integration suite uses above - not the
+      # Linux Docker emulator, which had a real, unresolved upstream
+      # crash bug that repeatedly took this exact job down (see this
+      # file's git history for the docker-run/restart/retry machinery
+      # this replaced). roadverdict/app is created here if missing, same
+      # shape (partition key /pk) production uses - idempotent, so safe
+      # to run on every push.
+      - name: Provision the roadverdict/app database+container on the real test Cosmos account
         run: |
-          set +e
-          MAX_ATTEMPTS=3
-          SUCCESS=0
-          CONNECTION_STRING="AccountEndpoint=https://localhost:8081/;AccountKey=C2y6yDjf5/R+ob0N8A7Cgv30VRDJIWEHLM+4QDU5DE2nQ9nDuVTqobD4b8mGGyPMbIZnqyMsEcaGQy67XIw/Jw==;"
+          node -e "
+          const { CosmosClient } = require('@azure/cosmos');
+          const client = new CosmosClient(process.env.COSMOS_CONNECTION_STRING);
+          (async () => {
+            const { database } = await client.databases.createIfNotExists({ id: 'roadverdict' });
+            await database.containers.createIfNotExists({ id: 'app', partitionKey: { paths: ['/pk'] } });
+          })().catch((err) => { console.error(err); process.exit(1); });
+          "
+        env:
+          COSMOS_CONNECTION_STRING: ${{ secrets.COSMOS_TEST_CONNECTION_STRING }}
+      # Backgrounded and detached (nohup + &) so it survives past this
+      # step's own shell into the "Authenticated E2E tests" step below -
+      # a real Cosmos account needs no readiness wait of its own (unlike
+      # the emulator, it's always already up), so the only thing this
+      # loop is actually waiting on is Next.js itself starting.
+      - name: Start the app server
+        run: |
+          nohup npx next start -p 3000 > server.log 2>&1 &
+          echo $! > server.pid
 
-          # `kill "$SERVER_PID"` alone only kills the nohup'd shell, not the
-          # actual `next-server` child it spawns - a prior attempt's real
-          # listener survives and keeps port 3000 bound, so the next
-          # attempt dies instantly with EADDRINUSE before ever touching
-          # Cosmos, wasting the retry entirely. Killing by PORT rather than
-          # by guessing the listener's process name/cmdline is the
-          # reliable version of this - a previous attempt at the latter
-          # (pkill -f "next start") still let this recur, likely because
-          # the real listener's argv doesn't literally contain that text.
-          free_port_3000() {
-            fuser -k 3000/tcp >/dev/null 2>&1 || true
-            lsof -ti:3000 2>/dev/null | xargs -r kill -9 2>/dev/null || true
-          }
-
-          for attempt in $(seq 1 $MAX_ATTEMPTS); do
-            echo "::group::Attempt $attempt/$MAX_ATTEMPTS"
-            free_port_3000
-            docker rm -f cosmosdb-emulator >/dev/null 2>&1
-
-            docker run -d --name cosmosdb-emulator \
-              -p 8081:8081 -p 10250:10250 -p 10251:10251 -p 10252:10252 -p 10253:10253 -p 10254:10254 \
-              -e AZURE_COSMOS_EMULATOR_PARTITION_COUNT=3 \
-              -e AZURE_COSMOS_EMULATOR_ENABLE_DATA_PERSISTENCE=false \
-              mcr.microsoft.com/cosmosdb/linux/azure-cosmos-emulator:latest
-
-            READY=0
-            for i in $(seq 1 60); do
-              if curl -sk --fail https://localhost:8081/_explorer/emulator.pem -o /dev/null; then
-                READY=1
-                break
-              fi
-              sleep 5
-            done
-            if [ "$READY" != "1" ]; then
-              echo "Emulator did not become ready on attempt $attempt."
-              docker logs cosmosdb-emulator 2>&1 | tail -60
-              docker rm -f cosmosdb-emulator >/dev/null 2>&1
-              echo "::endgroup::"
-              continue
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:3000/login -o /dev/null; then
+              echo "App server ready."
+              exit 0
             fi
-
-            NODE_TLS_REJECT_UNAUTHORIZED=0 node -e "
-            const { CosmosClient } = require('@azure/cosmos');
-            const client = new CosmosClient('$CONNECTION_STRING');
-            (async () => {
-              const { database } = await client.databases.createIfNotExists({ id: 'roadverdict' });
-              await database.containers.createIfNotExists({ id: 'app', partitionKey: { paths: ['/pk'] } });
-            })().catch((err) => { console.error(err); process.exit(1); });
-            "
-            if [ $? -ne 0 ]; then
-              echo "Provisioning the emulator's database/container failed on attempt $attempt."
-              docker rm -f cosmosdb-emulator >/dev/null 2>&1
-              echo "::endgroup::"
-              continue
-            fi
-
-            # The readiness curl above only proves the HTTPS gateway is up,
-            # not that the emulator's own storage engine has finished
-            # stabilising after "Started" - every real crash seen from this
-            # job so far happened within roughly the first two minutes of
-            # container life, right as the first test's two back-to-back
-            # full demo-seed writes (auto-seed-on-login, then the reset
-            # button) landed on it. Giving the engine a little idle runway
-            # before hitting it with that burst is a cheap thing to try.
-            sleep 15
-
-            APP_URL=http://localhost:3000 NODE_TLS_REJECT_UNAUTHORIZED=0 COSMOS_CONNECTION_STRING="$CONNECTION_STRING" \
-              nohup npx next start -p 3000 > server.log 2>&1 &
-            SERVER_PID=$!
-
-            APP_READY=0
-            for i in $(seq 1 30); do
-              if curl -sf http://localhost:3000/login -o /dev/null; then
-                APP_READY=1
-                break
-              fi
-              sleep 2
-            done
-            if [ "$APP_READY" != "1" ]; then
-              echo "App server did not become ready on attempt $attempt."
-              cat server.log
-              kill "$SERVER_PID" 2>/dev/null; free_port_3000
-              docker rm -f cosmosdb-emulator >/dev/null 2>&1
-              echo "::endgroup::"
-              continue
-            fi
-
-            PLAYWRIGHT_BASE_URL=http://localhost:3000 npx playwright test tests/e2e/authenticated-demo-journey.spec.ts
-            TEST_EXIT=$?
-
-            if [ "$TEST_EXIT" -eq 0 ]; then
-              SUCCESS=1
-              kill "$SERVER_PID" 2>/dev/null; free_port_3000
-              docker rm -f cosmosdb-emulator >/dev/null 2>&1
-              echo "::endgroup::"
-              break
-            fi
-
-            echo "Authenticated E2E failed on attempt $attempt - app server log:"
-            cat server.log
-            echo "Cosmos emulator container log (tail):"
-            docker logs cosmosdb-emulator 2>&1 | tail -80
-            kill "$SERVER_PID" 2>/dev/null; free_port_3000
-            docker rm -f cosmosdb-emulator >/dev/null 2>&1
-            echo "::endgroup::"
+            sleep 2
           done
-
-          if [ "$SUCCESS" != "1" ]; then
-            echo "Authenticated E2E did not succeed after $MAX_ATTEMPTS attempts."
-            exit 1
+          echo "App server did not become ready in time." >&2
+          cat server.log
+          exit 1
+        env:
+          APP_URL: http://localhost:3000
+          COSMOS_CONNECTION_STRING: ${{ secrets.COSMOS_TEST_CONNECTION_STRING }}
+      - name: Authenticated E2E tests
+        run: npx playwright test tests/e2e/authenticated-demo-journey.spec.ts
+        env:
+          PLAYWRIGHT_BASE_URL: http://localhost:3000
+      - name: Stop the app server
+        if: always()
+        run: |
+          if [ -f server.pid ]; then
+            kill "$(cat server.pid)" 2>/dev/null || true
           fi
-          echo "Authenticated E2E succeeded."
 
   deploy:
     needs: [test, authenticated-e2e]
@@ -299,8 +147,8 @@ jobs:
         # the live site looks broken, not blocking anything (see the
         # original commit that added this step). The authenticated demo
         # journeys are a pre-deploy gate in the authenticated-e2e job
-        # instead, against an emulator, on purpose - never against real
-        # production data.
+        # instead, against a dedicated test-only Cosmos DB account, on
+        # purpose - never against real production data.
         run: npx playwright test tests/e2e/public-smoke.spec.ts
         env:
           PLAYWRIGHT_BASE_URL: https://roadverdict.co.uk
