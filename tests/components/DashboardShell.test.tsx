@@ -196,4 +196,21 @@ describe("DashboardShell", () => {
     render(<DashboardShell {...baseProps()} />);
     expect(screen.getAllByText("2020 · 15,000 miles").length).toBe(2);
   });
+
+  it("shows the disclaimer footer at the bottom of the active tab's own scrollable content", () => {
+    render(<DashboardShell {...baseProps()} />);
+    expect(
+      screen.getByText(/RoadVerdict is guidance benchmarked against typical prices, not a professional inspection\./)
+    ).toBeInTheDocument();
+  });
+
+  it("also shows the disclaimer footer inside the mobile More sheet", async () => {
+    const user = userEvent.setup();
+    render(<DashboardShell {...baseProps()} />);
+    await user.click(screen.getByRole("button", { name: /More/ }));
+
+    expect(
+      screen.getAllByText(/RoadVerdict is guidance benchmarked against typical prices, not a professional inspection\./).length
+    ).toBeGreaterThan(1);
+  });
 });
