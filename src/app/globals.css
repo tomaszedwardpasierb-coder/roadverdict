@@ -726,3 +726,16 @@ body:has(main [data-admin-shell]) .site-footer,
 body:has(main [data-admin-shell]) [data-assistant-widget] {
   display: none;
 }
+
+/* Same technique as the admin opt-out above, for a narrower case: the
+   assistant widget's default bottom offset is fine on every page, but
+   needs pushing up further on mobile specifically when the dashboard's
+   own fixed bottom tab bar (data-mobile-bottom-nav) is on screen, or
+   the widget sits on top of it. Scoped to just that case rather than
+   applied to every page, since the same offset used to land on real
+   content elsewhere (see AssistantWidget.module.css's own comment). */
+@media (max-width: 900px) {
+  body:has(main [data-mobile-bottom-nav]) [data-assistant-widget] {
+    bottom: calc(1.25rem + 5rem);
+  }
+}

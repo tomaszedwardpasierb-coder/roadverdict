@@ -156,16 +156,15 @@
   cursor: default;
 }
 
-/* Clears the dashboard's mobile bottom tab bar - dashboard.module.css's
-   .mobileBottomNav appears at this same 900px breakpoint and reserves
-   5rem of space for exactly this reason. Applied globally on mobile
-   since this widget sits on every page, not just the dashboard - a
-   little extra bottom margin on pages without that bar is a harmless
-   trade-off against actually covering navigation on the ones that
-   have it. */
-@media (max-width: 900px) {
-  .wrap { bottom: calc(1.25rem + 5rem); }
-}
+/* The dashboard's mobile bottom tab bar (data-mobile-bottom-nav) needs
+   this widget pushed up out of its way - see globals.css's
+   body:has(main [data-mobile-bottom-nav]) rule for the actual offset.
+   That used to be applied unconditionally to every page at this
+   breakpoint on the theory that a little extra bottom margin elsewhere
+   was a harmless trade-off - it wasn't: on pages without that bar, the
+   same offset put the widget right on top of real content (e.g. the
+   login page's "Send sign-in link" button, the homepage's first
+   feature card). */
 
 @media (max-width: 480px) {
   .wrap { right: 0.75rem; }

@@ -248,7 +248,7 @@ export function DashboardShell({
 
         <div className={styles.content}>{contentMap[active]}</div>
 
-        <nav className={styles.mobileBottomNav}>
+        <nav data-mobile-bottom-nav className={styles.mobileBottomNav}>
           {MOBILE_NAV_ITEMS.map((item) => {
             const reviewCategory = asReviewCategory(item.key);
             const hasPending = reviewCategory ? pendingReviewIds[reviewCategory].length > 0 : (item.key === 'shareLinks' && hasPendingReceiptRequests);
