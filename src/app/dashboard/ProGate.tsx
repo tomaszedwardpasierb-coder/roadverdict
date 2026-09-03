@@ -1,12 +1,12 @@
 // Place at: src/app/dashboard/ProGate.tsx
 //
-// Wraps any Pro-only section. When the user isn't on Pro, renders a
-// friendly upsell card instead of the real content. The "Upgrade"
-// button links to /pro - no payment flow yet, just a pricing page.
-// When Stripe is ready, /pro becomes the checkout entry point.
+// Wraps any Pro-only section. When the user isn't on Pro, renders the
+// same Free vs Pro comparison shown on /pro instead of the real content -
+// one subscription unlocks every locked feature together, so the gate
+// shouldn't look like this one feature has its own separate price.
 'use client';
 
-import Link from 'next/link';
+import { PlanComparisonCards } from '@/components/PlanComparisonCards';
 import styles from './dashboard.module.css';
 
 interface Props {
@@ -26,12 +26,12 @@ export function ProGate({ featureName, description, children, isPro }: Props) {
       <div className={styles.proGateBadge}>Pro</div>
       <h3 className={styles.proGateTitle}>{featureName}</h3>
       <p className={styles.proGateDesc}>{description}</p>
-      <Link href="/pro" className={styles.proGateBtn}>
-        Upgrade to Pro - £4.99/month
-      </Link>
-      <p className={styles.proGateAnnual}>
-        Or £49/year (saves £10.88 - that&apos;s two months free)
+      <p className={styles.proGateUnlockNote}>
+        One Pro subscription unlocks every locked feature across RoadVerdict together, not just this one.
       </p>
+      <div style={{ width: '100%' }}>
+        <PlanComparisonCards userIsPro={false} showFreeCta={false} />
+      </div>
     </div>
   );
 }

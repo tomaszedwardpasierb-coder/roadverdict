@@ -1044,21 +1044,11 @@
   max-width: 380px;
   margin: 0;
 }
-.proGateBtn {
-  display: inline-block;
-  margin-top: 0.4rem;
-  background: var(--amber);
-  color: #000;
-  font-weight: 700;
-  font-size: 0.95rem;
-  padding: 0.7rem 1.4rem;
-  border-radius: 8px;
-  text-decoration: none;
-}
-.proGateBtn:hover { background: var(--amber-dark); }
-.proGateAnnual {
-  font-size: 0.8rem;
-  color: var(--ink-soft);
+.proGateUnlockNote {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--amber-dark);
+  max-width: 460px;
   margin: 0;
 }
 

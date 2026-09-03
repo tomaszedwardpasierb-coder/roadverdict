@@ -70,6 +70,7 @@ import { Icon } from "./Icon";
 import { LockedStatCard } from "./LockedStatCard";
 import { isPro } from "@/lib/subscriptions";
 import { ProGate } from "./ProGate";
+import { PlanComparisonCards } from "@/components/PlanComparisonCards";
 
 export const dynamic = "force-dynamic";
 
@@ -425,9 +426,15 @@ export default async function DashboardPage() {
       </div>
       <p className={styles.subtext}>RoadVerdict remembers so you don&apos;t have to. Nothing missed, nothing lapsed.</p>
       {!userIsPro && (
-        <p className={styles.subtext} style={{ marginBottom: "1rem" }}>
-          <Icon name="lock" size={13} /> Free plan: every reminder is tracked here with its OK/Overdue status, but the exact due date/mileage is Premium, and we won&apos;t email or notify you automatically when one&apos;s due - check back here.
-        </p>
+        <>
+          <p className={styles.subtext} style={{ marginBottom: "1rem" }}>
+            <Icon name="lock" size={13} /> Free plan: every reminder is tracked here with its OK/Overdue status, but the exact due date/mileage is Premium, and we won&apos;t email or notify you automatically when one&apos;s due - check back here.
+          </p>
+          <div className={styles.proGateUnlockNote} style={{ marginBottom: "1rem" }}>
+            One Pro subscription unlocks exact reminder dates and every other locked feature across RoadVerdict together, not just this one.
+          </div>
+          <PlanComparisonCards userIsPro={false} showFreeCta={false} />
+        </>
       )}
       {reminders.length === 0 ? (
         <div className={styles.card}><p className={styles.cardBody}>No reminders set yet. Tick &quot;Remind me&quot; when logging a service or a bill to add one.</p></div>
