@@ -65,7 +65,7 @@ export function ReminderFields({ checked, onCheckedChange, triggers, onTriggersC
             const availableTypes = ALL_TYPES.filter((t) => t === trigger.intervalType || !usedByOthers.has(t));
             return (
               <div key={i} style={{ display: 'flex', gap: '0.5rem', alignItems: 'flex-end', marginBottom: '0.9rem' }}>
-                <div className="field" style={{ marginTop: 0, flex: 1 }}>
+                <div className="field" style={{ marginTop: 0, flex: 1, minWidth: 0 }}>
                   {i === 0 && <label htmlFor={`${idPrefix}-type-${i}`}>Track by</label>}
                   <select
                     id={`${idPrefix}-type-${i}`}
@@ -77,7 +77,7 @@ export function ReminderFields({ checked, onCheckedChange, triggers, onTriggersC
                     ))}
                   </select>
                 </div>
-                <div className="field" style={{ marginTop: 0, flex: 1 }}>
+                <div className="field" style={{ marginTop: 0, flex: 1, minWidth: 0 }}>
                   {trigger.intervalType === 'date' ? (
                     <input
                       id={`${idPrefix}-value-${i}`}

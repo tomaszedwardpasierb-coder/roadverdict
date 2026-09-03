@@ -234,7 +234,7 @@
 }
 .affiliateNudge a { display: inline-block; margin-right: 0.9rem; font-weight: 500; }
 
-.cardActions { display: flex; gap: 0.5rem; margin-top: 0.6rem; }
+.cardActions { display: flex; gap: 0.5rem; margin-top: 0.6rem; flex-wrap: wrap; }
 .iconBtn {
   background: none;
   border: 1px solid var(--border);
