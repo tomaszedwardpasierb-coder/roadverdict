@@ -24,6 +24,15 @@ describe("CostBreakdownResult", () => {
     expect(screen.getByText("not included")).toBeInTheDocument();
   });
 
+  it("points the insurance CTA at a real search, not a dead '#' link, in a new tab", () => {
+    render(
+      <CostBreakdownResult breakdown={breakdown} brandLabel="Honda" regionLabel="Scotland & Northern Ireland" advice={null} />
+    );
+    const link = screen.getByRole("link", { name: "Compare insurance quotes" });
+    expect(link).toHaveAttribute("href", "https://www.google.com/search?q=motorcycle+insurance+quotes+UK");
+    expect(link).toHaveAttribute("target", "_blank");
+  });
+
   it("renders advice with watch-out-for points when present", () => {
     render(
       <CostBreakdownResult

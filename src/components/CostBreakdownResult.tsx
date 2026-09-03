@@ -50,11 +50,12 @@ export function CostBreakdownResult({
           no-claims, postcode), not just the bike, so a generic estimate here would be more
           misleading than useful.
         </p>
-        {/* Affiliate slot — currently a dead link. Join Awin (or another UK insurance
-            affiliate programme) and swap this href for the real tracked link once approved.
-            This is the account you actually need to create for this feature, not for
-            anything else on the site. */}
-        <a href="#" className="submit-button insurance-cta__link">
+        {/* Affiliate slot - no Awin (or other UK insurance affiliate programme)
+            account exists yet, so this points at a plain Google search rather
+            than a dead "#" link, same fallback pattern as the buying guide's
+            own "Search for a local inspector" link below. Swap for the real
+            tracked link once an affiliate account is approved. */}
+        <a href="https://www.google.com/search?q=motorcycle+insurance+quotes+UK" target="_blank" rel="noopener noreferrer" className="btn-primary insurance-cta__link">
           Compare insurance quotes
         </a>
       </div>
