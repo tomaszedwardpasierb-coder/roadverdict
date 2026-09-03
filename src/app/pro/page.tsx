@@ -34,10 +34,10 @@ export default async function ProPage() {
             <li>1 bike</li>
             <li>Service, fuel, mods &amp; bills logging</li>
             <li>Receipt scanning (one at a time)</li>
-            <li>Reminders</li>
+            <li>Reminders (OK/overdue status - exact dates are Pro)</li>
+            <li>Total spend &amp; current mileage at a glance</li>
             <li>Basic history timeline</li>
             <li>Shareable buyer report link</li>
-            <li>Spend summary</li>
           </ul>
           <Link href="/dashboard" className={styles.planCta + ' ' + styles.planCtaSecondary}>
             Go to dashboard

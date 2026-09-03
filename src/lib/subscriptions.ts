@@ -35,9 +35,12 @@ export const PRO_ANNUAL_MONTHLY_EQUIV = "£4.08";
 export const PRO_FEATURES = [
   "Additional bikes beyond your first",
   "Multi-bike overview and cost comparison",
+  "Full Reports - fuel economy, running costs, and spend trends over time",
+  "Category-by-category spend breakdown (which category, and how much)",
+  "Exact reminder due dates, plus automatic reminder emails",
+  "Quote Checker, Cost Calculator & Buying Guide, pre-filled with your bike's own details",
   "AI-generated \"Story So Far\" summary",
   "Detailed buyer/seller verdict report",
   "Export your full history as CSV",
   "Batch receipt scanning (multiple files at once)",
-  "Advanced cost trends and analytics",
 ] as const;

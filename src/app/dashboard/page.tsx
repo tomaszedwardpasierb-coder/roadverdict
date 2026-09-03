@@ -613,36 +613,36 @@ export default async function DashboardPage() {
   };
 
   const quoteCheckerContent = (
-    <>
+    <ProGate featureName="Quote Checker" description="Check whether a quote you've been given is fair, benchmarked against real UK motorcycle service and repair prices." isPro={userIsPro}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "0.75rem" }}>
         <h1 className={styles.heading}>Quote Checker{bikeTag}</h1>
         {mileagePill}
       </div>
       <p className={styles.subtext}>Three quick questions. One honest answer, benchmarked against typical UK prices.</p>
       <QuoteForm signedIn initialBrand={toolInitialBrand} initialBikeClass={toolInitialBikeClass} />
-    </>
+    </ProGate>
   );
 
   const costCalculatorContent = (
-    <>
+    <ProGate featureName="Cost Calculator" description="Work out what a bike really costs to run a year - servicing, tyres, MOT, tax, and fuel, benchmarked against typical UK prices." isPro={userIsPro}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "0.75rem" }}>
         <h1 className={styles.heading}>Cost calculator{bikeTag}</h1>
         {mileagePill}
       </div>
       <p className={styles.subtext}>Servicing, tyres, MOT, tax, and fuel - one honest number, benchmarked against typical UK prices.</p>
       <CostCalculatorForm signedIn initialBrand={toolInitialBrand} initialModel={toolInitialModel} initialBikeClass={toolInitialBikeClass} />
-    </>
+    </ProGate>
   );
 
   const buyingGuideContent = (
-    <>
+    <ProGate featureName="Buying a Used Bike" description="A buyer's checklist weighted by how old the bike actually is, so you know exactly what to check before handing any money over." isPro={userIsPro}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "0.75rem" }}>
         <h1 className={styles.heading}>Buying a used bike{bikeTag}</h1>
         {mileagePill}
       </div>
       <p className={styles.subtext}>A buyer checklist weighted by how old the bike actually is - not a generic list.</p>
       <BuyingGuideForm signedIn />
-    </>
+    </ProGate>
   );
 
   // No bikeTag/mileagePill header wrapper here, unlike the other
