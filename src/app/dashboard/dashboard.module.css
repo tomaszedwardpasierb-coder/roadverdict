@@ -654,6 +654,11 @@
 .sidebarUserAvatar { width: 28px; height: 28px; border-radius: 50%; background: var(--amber); color: var(--asphalt); display: flex; align-items: center; justify-content: center; font-size: 0.7rem; font-weight: 600; flex-shrink: 0; }
 .sidebarUserEmail { font-size: 0.75rem; color: rgba(255, 255, 255, 0.55); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
+.sidebarFooterNote { margin-top: 0.8rem; padding-top: 0.6rem; border-top: 1px solid rgba(255, 255, 255, 0.12); font-size: 0.68rem; line-height: 1.5; color: rgba(255, 255, 255, 0.45); }
+.sidebarFooterNote a { color: rgba(255, 255, 255, 0.65); }
+
+.mobileMoreFooterNote { margin-top: 0.8rem; padding-top: 0.6rem; border-top: 1px solid var(--border); font-size: 0.68rem; line-height: 1.5; color: var(--ink-soft); }
+
 /* Scoped overrides for the shared button styles when they render inside
    the dark sidebar (mileage/refresh/logout/reset buttons) - covers both
    possible class conventions those buttons use (styles.iconBtn is

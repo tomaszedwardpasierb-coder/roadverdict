@@ -234,6 +234,17 @@ export function DashboardShell({
               <span>Privacy</span>
             </button>
           </div>
+          {/* The dashboard's .shell is a fixed, full-viewport overlay (see
+              dashboard.module.css) - the public site's own <footer> below
+              it in the DOM is never reachable by scrolling from in here,
+              on any tab or screen size. This is the one place inside the
+              dashboard that's reliably visible, so the same disclaimer
+              lives here too instead of only in the public footer. */}
+          <div className={styles.sidebarFooterNote}>
+            RoadVerdict is guidance benchmarked against typical prices, not a professional inspection.{' '}
+            <Link href="/privacy">Privacy</Link> · <Link href="/about">About us</Link> ·{' '}
+            <a href="mailto:hello@roadverdict.co.uk">hello@roadverdict.co.uk</a>
+          </div>
         </aside>
 
         <div className={styles.mobileTopBar}>
@@ -334,6 +345,12 @@ export function DashboardShell({
               )}
               <div style={{ marginTop: '0.5rem' }}>
                 <LogoutButton />
+              </div>
+              <div className={styles.mobileMoreFooterNote}>
+                RoadVerdict is guidance benchmarked against typical prices, not a professional inspection.{' '}
+                <Link href="/privacy" onClick={() => setShowMore(false)}>Privacy</Link> ·{' '}
+                <Link href="/about" onClick={() => setShowMore(false)}>About us</Link> ·{' '}
+                <a href="mailto:hello@roadverdict.co.uk">hello@roadverdict.co.uk</a>
               </div>
             </div>
           </>
