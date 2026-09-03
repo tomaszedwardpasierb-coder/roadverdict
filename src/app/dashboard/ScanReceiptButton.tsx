@@ -160,7 +160,7 @@ export function ScanReceiptButton({ isPro = false }: { isPro?: boolean }) {
           <span className={styles.scanAiBadge}>AI</span>
         </div>
         <p className={styles.scanCardSubtitle}>
-          Photo or PDF — our AI reads it, categorises it, and adds it to your history. You just review and confirm.
+          Photo or PDF - our AI reads it, categorises it, and adds it to your history. You just review and confirm.
         </p>
       </div>
 
@@ -217,7 +217,7 @@ export function ScanReceiptButton({ isPro = false }: { isPro?: boolean }) {
       {isPro && (
         <p className={styles.scanReceiptTip}>
           <strong>Tip:</strong> mixing fuel receipts with a service or parts receipt in the same batch
-          helps the AI pin mileage more accurately — service receipts usually have a mileage printed on them.
+          helps the AI pin mileage more accurately - service receipts usually have a mileage printed on them.
         </p>
       )}
 
@@ -239,13 +239,13 @@ export function ScanReceiptButton({ isPro = false }: { isPro?: boolean }) {
           {totalSkippedNonPetrol > 0 && (
             <p className={styles.scanSkipNote}>
               {totalSkippedNonPetrol} fuel item{totalSkippedNonPetrol === 1 ? '' : 's'} looked like diesel
-              and {totalSkippedNonPetrol === 1 ? "wasn't" : "weren't"} logged — motorcycles run on petrol.
+              and {totalSkippedNonPetrol === 1 ? "wasn't" : "weren't"} logged - motorcycles run on petrol.
             </p>
           )}
           {totalSkippedUnreadableLitres > 0 && (
             <p className={styles.scanSkipNote}>
               {totalSkippedUnreadableLitres} fuel item{totalSkippedUnreadableLitres === 1 ? '' : 's'} couldn&apos;t
-              be read clearly enough — please add {totalSkippedUnreadableLitres === 1 ? 'it' : 'them'} manually.
+              be read clearly enough - please add {totalSkippedUnreadableLitres === 1 ? 'it' : 'them'} manually.
             </p>
           )}
           {failCount > 0 && (

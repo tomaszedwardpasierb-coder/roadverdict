@@ -50,14 +50,14 @@ export function BuyingGuideResult({
               ))}
             </ul>
             <p className="brand-notes-caveat">
-              From owner-forum reports, not a manufacturer bulletin — treat as a lead to check, not a confirmed fault.
+              From owner-forum reports, not a manufacturer bulletin - treat as a lead to check, not a confirmed fault.
             </p>
           </>
         )}
       </div>
 
       <p className="no-verdict-note">
-        No &quot;is the asking price fair&quot; verdict here yet — that needs real UK resale
+        No &quot;is the asking price fair&quot; verdict here yet - that needs real UK resale
         price research this checklist didn&apos;t require, and it isn&apos;t built until that
         research is real, not guessed.
       </p>

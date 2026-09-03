@@ -27,10 +27,10 @@ export function ProGate({ featureName, description, children, isPro }: Props) {
       <h3 className={styles.proGateTitle}>{featureName}</h3>
       <p className={styles.proGateDesc}>{description}</p>
       <Link href="/pro" className={styles.proGateBtn}>
-        Upgrade to Pro — £4.99/month
+        Upgrade to Pro - £4.99/month
       </Link>
       <p className={styles.proGateAnnual}>
-        Or £49/year (saves £10.88 — that&apos;s two months free)
+        Or £49/year (saves £10.88 - that&apos;s two months free)
       </p>
     </div>
   );

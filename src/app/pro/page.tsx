@@ -96,11 +96,11 @@ export default async function ProPage() {
         </div>
         <div className={styles.faqItem}>
           <strong>What happens to my second bike if I cancel Pro?</strong>
-          <p>It becomes read-only — you can still view your history, just not add new entries until you resubscribe or remove a bike.</p>
+          <p>It becomes read-only - you can still view your history, just not add new entries until you resubscribe or remove a bike.</p>
         </div>
         <div className={styles.faqItem}>
           <strong>Is there a trial?</strong>
-          <p>Not yet — but at £4.99/month you can try it for a month and cancel if it&apos;s not for you.</p>
+          <p>Not yet - but at £4.99/month you can try it for a month and cancel if it&apos;s not for you.</p>
         </div>
       </div>
     </main>

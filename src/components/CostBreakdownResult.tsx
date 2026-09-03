@@ -46,7 +46,7 @@ export function CostBreakdownResult({
       </p>
       <div className="insurance-cta">
         <p>
-          Insurance isn&apos;t included above on purpose — it depends on you (age, licence,
+          Insurance isn&apos;t included above on purpose - it depends on you (age, licence,
           no-claims, postcode), not just the bike, so a generic estimate here would be more
           misleading than useful.
         </p>

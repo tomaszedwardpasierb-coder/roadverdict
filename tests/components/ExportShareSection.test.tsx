@@ -31,7 +31,7 @@ describe("ExportShareSection", () => {
     render(<ExportShareSection isPro={false} />);
     expect(screen.queryByRole("link", { name: "Download CSV" })).not.toBeInTheDocument();
     expect(screen.getByText("Export as CSV")).toBeInTheDocument();
-    expect(screen.getByText("Upgrade to Pro — £4.99/month")).toBeInTheDocument();
+    expect(screen.getByText("Upgrade to Pro - £4.99/month")).toBeInTheDocument();
   });
 
   it("pro plan: the real CSV link is shown, pointing at the export route, with no upsell", () => {
