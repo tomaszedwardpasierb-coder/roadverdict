@@ -3,6 +3,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { ReviewQueueModal } from './ReviewQueueModal';
 import type { ParsedReceiptItem } from '@/lib/tracker/receiptParse';
 import { classifyReceiptTier, receiptTierSortWeight } from '@/lib/tracker/receiptTiering';
@@ -22,22 +23,10 @@ interface FileParseOutcome {
 
 export function ScanReceiptButton({ isPro = false }: { isPro?: boolean }) {
   const router = useRouter();
-  const [open, setOpen] = useState(false);
   const [scanning, setScanning] = useState(false);
   const [progress, setProgress] = useState<{ current: number; total: number } | null>(null);
   const [outcomes, setOutcomes] = useState<FileParseOutcome[] | null>(null);
-  // Scoped to exactly what THIS scan read, sorted into true chronological
-  // order, not yet saved anywhere - the review queue commits each one
-  // lazily as it's reached. Never the app-wide needsReview snapshot, so
-  // a leftover unreviewed item from an earlier, abandoned session never
-  // gets mixed into it - those stay reachable the normal way, via the
-  // pulsing tab dot and clicking Edit on the flagged card.
   const [queueItems, setQueueItems] = useState<ParsedReceiptItem[] | null>(null);
-  // Loaded once on mount - a batch left over from a previous visit that
-  // was interrupted before every item got reviewed. null while still
-  // checking or once nothing's found; an empty-but-checked array is
-  // never a real state here, since the server deletes the document the
-  // moment a batch's last item is committed.
   const [pendingBatch, setPendingBatch] = useState<ParsedReceiptItem[] | null>(null);
   const [checkingResume, setCheckingResume] = useState(true);
   const [discarding, setDiscarding] = useState(false);
@@ -52,16 +41,12 @@ export function ScanReceiptButton({ isPro = false }: { isPro?: boolean }) {
           setPendingBatch(data.batch.items);
         }
       } catch {
-        // Silently proceed as if there's nothing to resume - a failed
-        // check here shouldn't block the normal scan button from
-        // working.
+        // Silently proceed — a failed check here shouldn't block scanning.
       } finally {
         if (!cancelled) setCheckingResume(false);
       }
     })();
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, []);
 
   async function handleDiscardPending() {
@@ -103,9 +88,6 @@ export function ScanReceiptButton({ isPro = false }: { isPro?: boolean }) {
     setOutcomes(null);
     setScanning(true);
 
-    // Read every file first. Sequential, not parallel - keeps progress
-    // reporting honest and avoids a burst of simultaneous requests at
-    // the AI API. Nothing is saved anywhere yet at this point.
     const results: FileParseOutcome[] = [];
     for (let i = 0; i < files.length; i++) {
       setProgress({ current: i + 1, total: files.length });
@@ -113,18 +95,6 @@ export function ScanReceiptButton({ isPro = false }: { isPro?: boolean }) {
     }
     setOutcomes(results);
 
-    // Combine everything read across every file, and sort into TRUE
-    // processing order - not upload order, not file-selection order.
-    // Every non-fuel receipt (service, mods, bills) goes before every
-    // fuel receipt, full stop; within each of those two groups, the
-    // stronger-anchor tier (a printed date and mileage, needing no
-    // estimation at all) goes first, then chronologically. By the time
-    // the weakest tier (fuel with no mileage) is reached, every anchor
-    // from every earlier tier already exists to interpolate between.
-    // The review queue still commits each one lazily, right as it's
-    // reached, so a correction to an early item can genuinely improve
-    // the estimate for a later one instead of every item being guessed
-    // from the same stale, pre-review snapshot.
     const allItems = results.flatMap((r) => r.items ?? []);
     allItems.sort((a, b) => {
       const tierDiff = receiptTierSortWeight(classifyReceiptTier(a)) - receiptTierSortWeight(classifyReceiptTier(b));
@@ -137,10 +107,6 @@ export function ScanReceiptButton({ isPro = false }: { isPro?: boolean }) {
     e.target.value = '';
 
     if (allItems.length > 0) {
-      // Persisted before the queue even opens, not after - if the owner
-      // closes the tab in the two seconds between parsing finishing and
-      // the queue's first render, this is still the difference between
-      // losing the whole scan and losing nothing.
       try {
         await fetch('/api/tracker/pending-scan-batch', {
           method: 'POST',
@@ -148,9 +114,7 @@ export function ScanReceiptButton({ isPro = false }: { isPro?: boolean }) {
           body: JSON.stringify({ items: allItems }),
         });
       } catch {
-        // Not fatal to starting the review - worst case, this specific
-        // scan just isn't resumable if the owner leaves mid-way, same
-        // as before this feature existed at all.
+        // Not fatal — worst case this scan isn't resumable if they leave mid-review.
       }
       setQueueItems(allItems);
     }
@@ -169,105 +133,136 @@ export function ScanReceiptButton({ isPro = false }: { isPro?: boolean }) {
   const totalSkippedUnreadableLitres = outcomes?.reduce((sum, o) => sum + (o.skippedUnreadableLitres ?? 0), 0) ?? 0;
 
   return (
-    <div className={styles.scanReceiptWrap}>
+    <div className={styles.scanCard}>
+
+      {/* Resume banner — leftover from a previous interrupted session */}
       {!checkingResume && pendingBatch && !queueItems && (
-        <div className={styles.reviewQueueDuplicateWarning} style={{ marginBottom: '0.8rem' }}>
-          <p>
-            You have {pendingBatch.length} {pendingBatch.length === 1 ? 'receipt' : 'receipts'} from an earlier scan still
-            waiting to be reviewed - looks like you left before finishing.
-          </p>
-          <div style={{ display: 'flex', gap: '0.5rem' }}>
-            <button type="button" className="submit-button" onClick={() => setQueueItems(pendingBatch)}>
-              Resume reviewing
-            </button>
-            <button type="button" className={styles.iconBtn} disabled={discarding} onClick={handleDiscardPending}>
-              {discarding ? 'Discarding…' : 'Discard instead'}
-            </button>
-          </div>
+        <div className={styles.scanResumeBanner}>
+          <Icon name="camera" size={15} />
+          <span>
+            You have <strong>{pendingBatch.length} {pendingBatch.length === 1 ? 'receipt' : 'receipts'}</strong> from
+            an earlier scan waiting to be reviewed.
+          </span>
+          <button type="button" className={styles.scanResumeBtn} onClick={() => setQueueItems(pendingBatch)}>
+            Resume
+          </button>
+          <button type="button" className={styles.scanDiscardBtn} disabled={discarding} onClick={handleDiscardPending}>
+            {discarding ? 'Discarding…' : 'Discard'}
+          </button>
         </div>
       )}
-      <button type="button" className={styles.scanReceiptBtn} onClick={() => setOpen((o) => !o)}>
-        <Icon name="camera" size={18} /> Scan a receipt
-      </button>
-      <p className={styles.scanReceiptCaption}>Turn a shoebox of receipts into a proper history, in minutes, not hours.</p>
-      {open && (
-        <div className={styles.scanReceiptPanel}>
-          <p>
-            Upload everything you&apos;ve got, old paper receipts, screenshots, a whole stack at once. Our AI reads
-            each one, works out what it is and when it happened, and sorts it all into the right order automatically,
-            so old and new receipts don&apos;t get mixed up. Effortless, mostly, occasionally it&apos;ll ask you to
-            confirm a mileage it can&apos;t be sure of, but that&apos;s the exception, not the rule. Each one is
-            checked against what you&apos;ve already logged in case it&apos;s a duplicate, and a quick review opens
-            for anything created so you can check the details before it&apos;s done.
+
+      {/* Header row */}
+      <div className={styles.scanCardHeader}>
+        <div className={styles.scanCardTitleRow}>
+          <span className={styles.scanCardIcon}><Icon name="camera" size={20} /></span>
+          <h3 className={styles.scanCardTitle}>AI receipt scanning</h3>
+          <span className={styles.scanAiBadge}>AI</span>
+        </div>
+        <p className={styles.scanCardSubtitle}>
+          Photo or PDF — our AI reads it, categorises it, and adds it to your history. You just review and confirm.
+        </p>
+      </div>
+
+      {/* How it works — three steps */}
+      <div className={styles.scanSteps}>
+        <div className={styles.scanStep}>
+          <span className={styles.scanStepNum}>1</span>
+          <span className={styles.scanStepLabel}>Choose files</span>
+        </div>
+        <div className={styles.scanStepArrow}>→</div>
+        <div className={styles.scanStep}>
+          <span className={styles.scanStepNum}>2</span>
+          <span className={styles.scanStepLabel}>AI reads them</span>
+        </div>
+        <div className={styles.scanStepArrow}>→</div>
+        <div className={styles.scanStep}>
+          <span className={styles.scanStepNum}>3</span>
+          <span className={styles.scanStepLabel}>You review &amp; confirm</span>
+        </div>
+      </div>
+
+      {/* Upload zone */}
+      <div className={styles.scanUploadZone}>
+        <label className={styles.scanUploadLabel} htmlFor="scan-file-input">
+          <Icon name="upload" size={18} />
+          <span>{scanning ? 'Reading…' : isPro ? 'Choose files (images or PDFs)' : 'Choose a file (image or PDF)'}</span>
+        </label>
+        <input
+          id="scan-file-input"
+          type="file"
+          accept="image/jpeg,image/png,application/pdf"
+          multiple={isPro}
+          onChange={handleFilesSelected}
+          disabled={scanning}
+          className={styles.scanFileInput}
+        />
+        {progress && (
+          <p className={styles.scanProgress}>
+            Reading receipt {progress.current} of {progress.total}…
           </p>
-          <p className={styles.scanReceiptTip}>
-            Tip: if you&apos;re scanning a batch of fuel receipts, including a service or parts receipt or two in
-            the same batch helps a lot, they usually have a mileage printed on them, which gives the AI a much
-            stronger starting point for working out mileage on the fuel receipts that don&apos;t.
-          </p>
-          <input
-            type="file"
-            accept="image/jpeg,image/png,application/pdf"
-            multiple={isPro}
-            onChange={handleFilesSelected}
-            disabled={scanning}
-            style={{ marginTop: '0.7rem' }}
-          />
-          {!isPro && (
-            <p className="field-note" style={{ marginTop: '0.4rem' }}>
-              Free plan: one file at a time. <a href="/pro" style={{ color: 'var(--amber-ink)', fontWeight: 600 }}>Upgrade to Pro</a> to scan a whole batch at once.
+        )}
+      </div>
+
+      {/* Free plan nudge */}
+      {!isPro && (
+        <p className={styles.scanFreeNote}>
+          Free plan scans one file at a time.{' '}
+          <Link href="/pro" className={styles.scanFreeLink}>Upgrade to Pro</Link>
+          {' '}to scan a whole batch at once.
+        </p>
+      )}
+
+      {/* Pro tip — only shown to Pro users, less clutter for free */}
+      {isPro && (
+        <p className={styles.scanReceiptTip}>
+          <strong>Tip:</strong> mixing fuel receipts with a service or parts receipt in the same batch
+          helps the AI pin mileage more accurately — service receipts usually have a mileage printed on them.
+        </p>
+      )}
+
+      {/* Outcomes */}
+      {outcomes && !scanning && (
+        <div className={styles.scanOutcomes}>
+          {successCount > 0 && (
+            <p className={styles.scanReceiptSuccess}>
+              ✓ Read {successCount} receipt{successCount === 1 ? '' : 's'} successfully.
             </p>
           )}
-          {progress && (
-            <p className="field-note">
-              Reading receipt {progress.current} of {progress.total}…
+          {totalSkippedBeforeProduction > 0 && (
+            <p className={styles.scanSkipNote}>
+              {totalSkippedBeforeProduction} item{totalSkippedBeforeProduction === 1 ? '' : 's'}{' '}
+              {totalSkippedBeforeProduction === 1 ? 'was' : 'were'} dated
+              before your bike was made and {totalSkippedBeforeProduction === 1 ? "wasn't" : "weren't"} logged.
             </p>
           )}
-          {outcomes && !scanning && (
-            <div style={{ marginTop: '0.6rem' }}>
-              {successCount > 0 && (
-                <p className={styles.scanReceiptSuccess}>
-                  ✓ Read {successCount} receipt{successCount === 1 ? '' : 's'}.
-                </p>
-              )}
-              {totalSkippedBeforeProduction > 0 && (
-                <p className="field-note" style={{ color: 'var(--amber-ink)', marginTop: '0.4rem' }}>
-                  {totalSkippedBeforeProduction} item{totalSkippedBeforeProduction === 1 ? '' : 's'} {totalSkippedBeforeProduction === 1 ? 'was' : 'were'} dated
-                  before your bike was made, so {totalSkippedBeforeProduction === 1 ? "it wasn't" : "they weren't"} logged.
-                </p>
-              )}
-              {totalSkippedNonPetrol > 0 && (
-                <p className="field-note" style={{ color: 'var(--amber-ink)', marginTop: '0.4rem' }}>
-                  {totalSkippedNonPetrol} fuel item{totalSkippedNonPetrol === 1 ? '' : 's'} looked like diesel (or
-                  another non-petrol fuel) - motorcycles run on petrol, so {totalSkippedNonPetrol === 1 ? "it wasn't" : "they weren't"} logged.
-                </p>
-              )}
-              {totalSkippedUnreadableLitres > 0 && (
-                <p className="field-note" style={{ color: 'var(--amber-ink)', marginTop: '0.4rem' }}>
-                  {totalSkippedUnreadableLitres} fuel item{totalSkippedUnreadableLitres === 1 ? '' : 's'} couldn&apos;t
-                  be read clearly enough to know how much fuel was bought, so {totalSkippedUnreadableLitres === 1 ? "it wasn't" : "they weren't"} logged
-                  automatically - please add {totalSkippedUnreadableLitres === 1 ? 'it' : 'them'} manually.
-                </p>
-              )}
-              {failCount > 0 && (
-                <div style={{ marginTop: '0.4rem' }}>
-                  <p className="error-text" role="alert">
-                    {failCount} of {outcomes.length} file{outcomes.length === 1 ? '' : 's'} couldn&apos;t be read:
-                  </p>
-                  <ul style={{ margin: '0.3rem 0 0 1.1rem', fontSize: '0.82rem', color: 'var(--ink-soft)' }}>
-                    {outcomes.filter((o) => !o.ok).map((o, i) => (
-                      <li key={i}>
-                        {o.fileName}: {o.error}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
+          {totalSkippedNonPetrol > 0 && (
+            <p className={styles.scanSkipNote}>
+              {totalSkippedNonPetrol} fuel item{totalSkippedNonPetrol === 1 ? '' : 's'} looked like diesel
+              and {totalSkippedNonPetrol === 1 ? "wasn't" : "weren't"} logged — motorcycles run on petrol.
+            </p>
+          )}
+          {totalSkippedUnreadableLitres > 0 && (
+            <p className={styles.scanSkipNote}>
+              {totalSkippedUnreadableLitres} fuel item{totalSkippedUnreadableLitres === 1 ? '' : 's'} couldn&apos;t
+              be read clearly enough — please add {totalSkippedUnreadableLitres === 1 ? 'it' : 'them'} manually.
+            </p>
+          )}
+          {failCount > 0 && (
+            <div className={styles.scanFailBlock}>
+              <p className="error-text" role="alert">
+                {failCount} of {outcomes.length} file{outcomes.length === 1 ? '' : 's'} couldn&apos;t be read:
+              </p>
+              <ul className={styles.scanFailList}>
+                {outcomes.filter((o) => !o.ok).map((o, i) => (
+                  <li key={i}>{o.fileName}: {o.error}</li>
+                ))}
+              </ul>
             </div>
           )}
-
         </div>
       )}
+
       {queueItems && <ReviewQueueModal parsedItems={queueItems} onFinished={handleQueueFinished} />}
     </div>
   );

@@ -7,6 +7,10 @@
 // upload order), persists that combined batch, then hands it to the real
 // ReviewQueueModal. Only `fetch` and next/navigation's useRouter are
 // mocked - the sequencing, sorting and message copy all run for real.
+//
+// The card itself is always visible now (no button-to-reveal toggle),
+// so every test can go straight for the file input - no "open the
+// panel" step needed first.
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -82,11 +86,15 @@ function jpgFile(name: string) {
   return new File(["fake-image-bytes"], name, { type: "image/jpeg" });
 }
 
-async function openPanel(user: ReturnType<typeof userEvent.setup>) {
-  await user.click(screen.getByRole("button", { name: /Scan a receipt/ }));
+function fileInput(): HTMLInputElement {
+  return document.querySelector('input[type="file"]') as HTMLInputElement;
 }
 
 describe("ScanReceiptButton", () => {
+  beforeEach(() => {
+    vi.stubGlobal("fetch", makeFetch({}));
+  });
+
   afterEach(() => {
     vi.unstubAllGlobals();
   });
@@ -97,10 +105,10 @@ describe("ScanReceiptButton", () => {
 
     render(<ScanReceiptButton />);
     await waitFor(() => expect(fetchMock).toHaveBeenCalledWith("/api/tracker/pending-scan-batch"));
-    expect(screen.queryByText(/still waiting to be reviewed/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/waiting to be reviewed/)).not.toBeInTheDocument();
   });
 
-  it("shows a resume banner with the real pending count, and Resume reviewing opens the queue with exactly those items", async () => {
+  it("shows a resume banner with the real pending count, and Resume opens the queue with exactly those items", async () => {
     const pendingItems = [
       makeItem({ description: "Chain lube", category: "service", mileageOnReceipt: null, date: "2024-01-01" }),
       makeItem({ description: "Air filter", category: "mods", mileageOnReceipt: null, date: "2024-01-02" }),
@@ -111,9 +119,10 @@ describe("ScanReceiptButton", () => {
     const user = userEvent.setup();
     render(<ScanReceiptButton />);
 
-    expect(await screen.findByText(/You have 2 receipts from an earlier scan/)).toBeInTheDocument();
+    expect(await screen.findByText(/from an earlier scan waiting to be reviewed/)).toBeInTheDocument();
+    expect(screen.getByText("2 receipts")).toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: "Resume reviewing" }));
+    await user.click(screen.getByRole("button", { name: "Resume" }));
     expect(await screen.findByText("Reviewing 1 of 2")).toBeInTheDocument();
   });
 
@@ -122,46 +131,41 @@ describe("ScanReceiptButton", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     render(<ScanReceiptButton />);
-    expect(await screen.findByText(/You have 1 receipt from an earlier scan/)).toBeInTheDocument();
+    expect(await screen.findByText(/from an earlier scan waiting to be reviewed/)).toBeInTheDocument();
+    expect(screen.getByText("1 receipt")).toBeInTheDocument();
   });
 
-  it("Discard instead deletes the pending batch server-side and clears the banner", async () => {
+  it("Discard deletes the pending batch server-side and clears the banner", async () => {
     const fetchMock = makeFetch({ pendingBatchGet: { batch: { items: [makeItem()] } } });
     vi.stubGlobal("fetch", fetchMock);
 
     const user = userEvent.setup();
     render(<ScanReceiptButton />);
-    await screen.findByText(/still waiting to be reviewed/);
+    await screen.findByText(/waiting to be reviewed/);
 
-    await user.click(screen.getByRole("button", { name: "Discard instead" }));
+    await user.click(screen.getByRole("button", { name: "Discard" }));
 
     await waitFor(() =>
       expect(fetchMock).toHaveBeenCalledWith("/api/tracker/pending-scan-batch", expect.objectContaining({ method: "DELETE" }))
     );
-    await waitFor(() => expect(screen.queryByText(/still waiting to be reviewed/)).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.queryByText(/waiting to be reviewed/)).not.toBeInTheDocument());
   });
 
   it("free plan: the file input does not accept multiple files, and shows the upgrade note", async () => {
-    vi.stubGlobal("fetch", makeFetch({}));
-    const user = userEvent.setup();
     render(<ScanReceiptButton isPro={false} />);
-    await openPanel(user);
 
-    const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+    const input = fileInput();
     expect(input).not.toBeNull();
     expect(input.multiple).toBe(false);
-    expect(screen.getByText(/Free plan: one file at a time\./)).toBeInTheDocument();
+    expect(screen.getByText(/Free plan scans one file at a time\./)).toBeInTheDocument();
   });
 
   it("pro plan: the file input accepts multiple files, and hides the upgrade note", async () => {
-    vi.stubGlobal("fetch", makeFetch({}));
-    const user = userEvent.setup();
     render(<ScanReceiptButton isPro={true} />);
-    await openPanel(user);
 
-    const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+    const input = fileInput();
     expect(input.multiple).toBe(true);
-    expect(screen.queryByText(/Free plan: one file at a time\./)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Free plan scans one file at a time\./)).not.toBeInTheDocument();
   });
 
   it("uploads a selected file to /api/tracker/scan-receipt as FormData and reports how many were read", async () => {
@@ -175,12 +179,9 @@ describe("ScanReceiptButton", () => {
 
     const user = userEvent.setup();
     render(<ScanReceiptButton isPro={true} />);
-    await openPanel(user);
+    await user.upload(fileInput(), jpgFile("receipt1.jpg"));
 
-    const input = document.querySelector('input[type="file"]') as HTMLInputElement;
-    await user.upload(input, jpgFile("receipt1.jpg"));
-
-    expect(await screen.findByText("✓ Read 1 receipt.")).toBeInTheDocument();
+    expect(await screen.findByText("✓ Read 1 receipt successfully.")).toBeInTheDocument();
     const scanCall = fetchMock.mock.calls.find((c) => c[0] === "/api/tracker/scan-receipt");
     expect(scanCall).toBeTruthy();
     expect(scanCall![1]!.method).toBe("POST");
@@ -199,11 +200,9 @@ describe("ScanReceiptButton", () => {
 
     const user = userEvent.setup();
     render(<ScanReceiptButton isPro={true} />);
-    await openPanel(user);
-    const input = document.querySelector('input[type="file"]') as HTMLInputElement;
-    await user.upload(input, [jpgFile("bad.jpg"), jpgFile("good.jpg")]);
+    await user.upload(fileInput(), [jpgFile("bad.jpg"), jpgFile("good.jpg")]);
 
-    expect(await screen.findByText("✓ Read 1 receipt.")).toBeInTheDocument();
+    expect(await screen.findByText("✓ Read 1 receipt successfully.")).toBeInTheDocument();
     expect(screen.getByText("1 of 2 files couldn't be read:")).toBeInTheDocument();
     expect(screen.getByText(/bad\.jpg: Blurry - could not read the total\./)).toBeInTheDocument();
   });
@@ -223,9 +222,7 @@ describe("ScanReceiptButton", () => {
 
     const user = userEvent.setup();
     render(<ScanReceiptButton />);
-    await openPanel(user);
-    const input = document.querySelector('input[type="file"]') as HTMLInputElement;
-    await user.upload(input, jpgFile("receipt.jpg"));
+    await user.upload(fileInput(), jpgFile("receipt.jpg"));
 
     expect(await screen.findByText(/receipt\.jpg: Could not reach the server\./)).toBeInTheDocument();
   });
@@ -246,11 +243,12 @@ describe("ScanReceiptButton", () => {
 
     const user = userEvent.setup();
     render(<ScanReceiptButton />);
-    await openPanel(user);
-    const input = document.querySelector('input[type="file"]') as HTMLInputElement;
-    await user.upload(input, jpgFile("old.jpg"));
+    await user.upload(fileInput(), jpgFile("old.jpg"));
 
-    expect(await screen.findByText(/1 item was dated before your bike was made, so it wasn't logged\./)).toBeInTheDocument();
+    // Singular subject ("1 item") must take the singular verb ("was
+    // dated"), not "were dated" - a real grammar bug caught in an
+    // earlier version of this redesign.
+    expect(await screen.findByText(/1 item was dated before your bike was made and wasn't logged\./)).toBeInTheDocument();
     expect(screen.getByText(/2 fuel items looked like diesel/)).toBeInTheDocument();
     expect(screen.getByText(/1 fuel item couldn't be read clearly enough/)).toBeInTheDocument();
   });
@@ -276,11 +274,9 @@ describe("ScanReceiptButton", () => {
 
     const user = userEvent.setup();
     render(<ScanReceiptButton isPro={true} />);
-    await openPanel(user);
-    const input = document.querySelector('input[type="file"]') as HTMLInputElement;
-    await user.upload(input, [jpgFile("file1.jpg"), jpgFile("file2.jpg")]);
+    await user.upload(fileInput(), [jpgFile("file1.jpg"), jpgFile("file2.jpg")]);
 
-    await screen.findByText("✓ Read 2 receipts.");
+    await screen.findByText("✓ Read 2 receipts successfully.");
 
     const postBatchCall = fetchMock.mock.calls.find(
       (c) => c[0] === "/api/tracker/pending-scan-batch" && c[1]?.method === "POST"
@@ -311,9 +307,7 @@ describe("ScanReceiptButton", () => {
 
     const user = userEvent.setup();
     render(<ScanReceiptButton />);
-    await openPanel(user);
-    const input = document.querySelector('input[type="file"]') as HTMLInputElement;
-    await user.upload(input, jpgFile("empty.jpg"));
+    await user.upload(fileInput(), jpgFile("empty.jpg"));
 
     await waitFor(() =>
       expect(fetchMock.mock.calls.some((c) => c[0] === "/api/tracker/scan-receipt")).toBe(true)
