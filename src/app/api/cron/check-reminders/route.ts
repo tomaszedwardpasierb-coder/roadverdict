@@ -4,6 +4,7 @@ import { getAllReminders, computeReminderStatus, reminderDetailLabel, markRemind
 import { getBike } from "@/lib/tracker/bike";
 import { sendReminderEmail } from "@/lib/resend";
 import { getContainer } from "@/lib/cosmos";
+import { isPro } from "@/lib/subscriptions";
 
 export const dynamic = "force-dynamic";
 
@@ -40,6 +41,13 @@ export async function POST(req: NextRequest) {
 
         const status = computeReminderStatus(reminder, currentMileage);
         if (status !== "overdue") continue;
+
+        // Automated reminder emails are a Premium perk - free accounts
+        // still see the reminder (partially obscured) on the dashboard,
+        // but nothing gets sent on their behalf. Left un-notified (not
+        // marked) so the email goes out the day they upgrade, rather
+        // than being silently lost.
+        if (!(await isPro(email))) continue;
 
         await sendReminderEmail(email, reminder.name, reminderDetailLabel(reminder));
         await markReminderNotified(email, reminder.id);

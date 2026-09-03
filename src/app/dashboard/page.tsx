@@ -424,10 +424,15 @@ export default async function DashboardPage() {
         {mileagePill}
       </div>
       <p className={styles.subtext}>RoadVerdict remembers so you don&apos;t have to. Nothing missed, nothing lapsed.</p>
+      {!userIsPro && (
+        <p className={styles.subtext} style={{ marginBottom: "1rem" }}>
+          <Icon name="lock" size={13} /> Free plan: every reminder is tracked here with its OK/Overdue status, but the exact due date/mileage is Premium, and we won&apos;t email or notify you automatically when one&apos;s due - check back here.
+        </p>
+      )}
       {reminders.length === 0 ? (
         <div className={styles.card}><p className={styles.cardBody}>No reminders set yet. Tick &quot;Remind me&quot; when logging a service or a bill to add one.</p></div>
       ) : (
-        reminders.map((r) => <ReminderItem key={r.id} reminder={r} status={computeReminderStatus(r, bike.currentMileage)} />)
+        reminders.map((r) => <ReminderItem key={r.id} reminder={r} status={computeReminderStatus(r, bike.currentMileage)} isPro={userIsPro} />)
       )}
     </>
   );

@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   getBike: vi.fn(),
   sendReminderEmail: vi.fn(),
   upsert: vi.fn(),
+  isPro: vi.fn(),
 }));
 
 // computeReminderStatus/reminderDetailLabel are the route's own pure
@@ -27,6 +28,7 @@ vi.mock("@/lib/resend", () => ({ sendReminderEmail: mocks.sendReminderEmail }));
 vi.mock("@/lib/cosmos", () => ({
   getContainer: () => ({ items: { upsert: mocks.upsert } }),
 }));
+vi.mock("@/lib/subscriptions", () => ({ isPro: mocks.isPro }));
 
 import { POST } from "@/app/api/cron/check-reminders/route";
 
@@ -64,6 +66,10 @@ describe("POST /api/cron/check-reminders", () => {
     mocks.markReminderNotified.mockResolvedValue(undefined);
     mocks.sendReminderEmail.mockResolvedValue(undefined);
     mocks.upsert.mockResolvedValue(undefined);
+    // Default every account to Pro so the pre-existing send-path tests
+    // below don't need to know about the Premium gate at all - only the
+    // tests specifically about that gate override this.
+    mocks.isPro.mockResolvedValue(true);
   });
 
   afterEach(() => {
@@ -145,6 +151,17 @@ describe("POST /api/cron/check-reminders", () => {
     expect(mocks.upsert).toHaveBeenCalledWith(expect.objectContaining({
       id: "cronStatus::reminders", pk: "system", type: "cronStatus", checked: 1, sent: 1,
     }));
+  });
+
+  it("checks but does not email a free account's overdue reminder, and leaves it un-notified so upgrading later still sends it", async () => {
+    mocks.isPro.mockResolvedValue(false);
+    mocks.getAllReminders.mockResolvedValue([overdueDateReminder()]);
+    const response = await POST(request({ authorization: "Bearer top-secret" }));
+    const body = await response.json();
+
+    expect(body).toEqual({ ok: true, checked: 1, sent: 0 });
+    expect(mocks.sendReminderEmail).not.toHaveBeenCalled();
+    expect(mocks.markReminderNotified).not.toHaveBeenCalled();
   });
 
   it("isolates a single failed send and still checks/sends every other reminder in the run", async () => {

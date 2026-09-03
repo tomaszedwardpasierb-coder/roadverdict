@@ -38,11 +38,24 @@ describe("ReminderItem", () => {
     vi.restoreAllMocks();
   });
 
-  it("renders the name, real detail label, and status text/class", () => {
-    render(<ReminderItem reminder={makeReminder()} status="due-soon" />);
+  it("renders the name, real detail label, and status text/class when Pro", () => {
+    render(<ReminderItem reminder={makeReminder()} status="due-soon" isPro />);
     expect(screen.getByText("Chain lube")).toBeInTheDocument();
     expect(screen.getByText(/due around 1,500 miles \(every 500 mi\)/)).toBeInTheDocument();
     expect(screen.getByText("Due soon")).toBeInTheDocument();
+  });
+
+  it("obscures the exact due date/mileage (but still shows name and status) when not Pro", () => {
+    render(<ReminderItem reminder={makeReminder()} status="due-soon" isPro={false} />);
+    expect(screen.getByText("Chain lube")).toBeInTheDocument();
+    expect(screen.getByText("Due soon")).toBeInTheDocument();
+    expect(screen.queryByText(/due around 1,500 miles/)).not.toBeInTheDocument();
+    expect(screen.getByText(/Exact due date\/mileage - Premium/)).toBeInTheDocument();
+  });
+
+  it("defaults to obscured when isPro isn't passed at all", () => {
+    render(<ReminderItem reminder={makeReminder()} status="ok" />);
+    expect(screen.getByText(/Exact due date\/mileage - Premium/)).toBeInTheDocument();
   });
 
   it("a mileage/months reminder's Done just PATCHes - no confirmation needed since it rolls forward", async () => {

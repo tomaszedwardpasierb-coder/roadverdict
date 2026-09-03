@@ -5,9 +5,22 @@ import { useState } from 'react';
 import type { ReminderDoc } from '@/lib/tracker/reminder';
 import { reminderDetailLabel } from '@/lib/tracker/reminderStatus';
 import { useTrackerFormSubmit } from './useTrackerFormSubmit';
+import { Icon } from './Icon';
 import styles from './dashboard.module.css';
 
-export function ReminderItem({ reminder, status }: { reminder: ReminderDoc; status: 'ok' | 'due-soon' | 'overdue' }) {
+export function ReminderItem({
+  reminder,
+  status,
+  isPro = false,
+}: {
+  reminder: ReminderDoc;
+  status: 'ok' | 'due-soon' | 'overdue';
+  // Free accounts still see every reminder and its OK/Overdue status -
+  // only the exact due date/mileage is Premium (that's the part that
+  // makes the automated email actually useful, so it's the part worth
+  // paying for).
+  isPro?: boolean;
+}) {
   const { submit, submitting } = useTrackerFormSubmit(`/api/tracker/reminders/${encodeURIComponent(reminder.id)}`);
   const [hidden, setHidden] = useState(false);
 
@@ -38,7 +51,13 @@ export function ReminderItem({ reminder, status }: { reminder: ReminderDoc; stat
     <div className={styles.reminderItem}>
       <div>
         <div className={styles.reminderItemName}>{reminder.name}</div>
-        <div className={styles.reminderItemDetail}>{reminderDetailLabel(reminder)}</div>
+        {isPro ? (
+          <div className={styles.reminderItemDetail}>{reminderDetailLabel(reminder)}</div>
+        ) : (
+          <div className={styles.reminderItemDetailLocked}>
+            <Icon name="lock" size={12} /> Exact due date/mileage - Premium
+          </div>
+        )}
       </div>
       <div className={styles.reminderItemActions}>
         <span className={`${styles.reminderStatus} ${statusClass}`}>{statusLabel}</span>
