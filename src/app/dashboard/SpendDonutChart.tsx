@@ -1,6 +1,7 @@
 // Place at: src/app/dashboard/SpendDonutChart.tsx
 'use client';
 
+import Link from 'next/link';
 import { Doughnut, Bar } from 'react-chartjs-2';
 import { Chart as ChartJS, ArcElement, BarElement, CategoryScale, LinearScale, Tooltip, Legend } from 'chart.js';
 import { convertGbpToDisplay, CURRENCY_SYMBOLS, type Currency, type ExchangeRates } from '@/lib/tracker/currency';
@@ -9,6 +10,7 @@ import { useChartTypePreference } from './useChartTypePreference';
 import { ChartTypeToggle } from './ChartTypeToggle';
 import { barGradient, BAR_BORDER_RADIUS } from './chartStyle';
 import { useChartFilter } from './ChartFilterContext';
+import { Icon } from './Icon';
 import styles from './dashboard.module.css';
 
 ChartJS.register(ArcElement, BarElement, CategoryScale, LinearScale, Tooltip, Legend);
@@ -45,6 +47,11 @@ interface Props {
   currency: Currency;
   rates: ExchangeRates | null;
   initialChartType?: 'bar' | 'pie';
+  // Free plan keeps the shape (relative bar heights / ring proportions)
+  // and the grand total visible - that's the "yes, this actually works"
+  // proof. Only the category breakdown itself (which category, and how
+  // much each one cost) is Premium.
+  isPro?: boolean;
 }
 
 function sumCost(items: CostItem[]): number {
@@ -57,7 +64,7 @@ function sumCost(items: CostItem[]): number {
 // now take raw arrays instead of pre-summed totals: a pre-summed number
 // computed once on the server has no way to react to the client-side
 // Range control changing after the page has already loaded.
-export function SpendDonutChart({ records, mods, fuelLogs, bills, currency, rates, initialChartType }: Props) {
+export function SpendDonutChart({ records, mods, fuelLogs, bills, currency, rates, initialChartType, isPro = false }: Props) {
   const { range } = useChartFilter();
   const { kind, changeKind } = useChartTypePreference(CHART_ID, initialChartType ?? 'pie');
   const symbol = CURRENCY_SYMBOLS[currency];
@@ -77,6 +84,11 @@ export function SpendDonutChart({ records, mods, fuelLogs, bills, currency, rate
         <span className={styles.chartCardTitle}>Spend by category</span>
         <ChartTypeToggle value={kind === 'bar' ? 'bar' : 'pie'} onChange={changeKind} options={['pie', 'bar']} />
       </div>
+      {grandTotal > 0 && (
+        <div className={styles.chartCardTotalLine}>
+          Total: <strong>{symbol}{Math.round(values.reduce((a, b) => a + b, 0))}</strong>
+        </div>
+      )}
       {grandTotal <= 0 ? (
         <p className={styles.emptyNote}>Nothing logged in this range.</p>
       ) : (
@@ -97,17 +109,31 @@ export function SpendDonutChart({ records, mods, fuelLogs, bills, currency, rate
                 maintainAspectRatio: false,
                 plugins: {
                   legend: { display: false },
-                  tooltip: { callbacks: { label: (ctx) => `${symbol}${Math.round(ctx.parsed.y as number)}` } },
+                  // The category breakdown (which one, and how much) is
+                  // Premium - free plan keeps the bars' relative heights
+                  // visible (that's the chart/shape), but the tooltip
+                  // and axis ticks that would name a category or read
+                  // off its exact value are switched off entirely.
+                  tooltip: isPro
+                    ? { callbacks: { label: (ctx) => `${symbol}${Math.round(ctx.parsed.y as number)}` } }
+                    : { enabled: false },
                 },
                 scales: {
-                  x: { grid: { display: false }, ticks: { font: { size: 10 } } },
-                  y: { grid: { color: '#00000012' }, ticks: { callback: (value) => `${symbol}${value}` } },
+                  x: {
+                    grid: { display: false },
+                    ticks: { font: { size: 10 }, callback: (_value, index) => (isPro ? LABELS[index] : '🔒') },
+                  },
+                  y: {
+                    grid: { color: '#00000012' },
+                    ticks: isPro ? { callback: (value) => `${symbol}${value}` } : { display: false },
+                  },
                 },
               }}
             />
           ) : (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '1.4rem' }}>
-              <div style={{ position: 'relative', width: `${DONUT_BOX_SIZE}px`, height: `${DONUT_BOX_SIZE}px`, flexShrink: 0 }}>
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '1.4rem' }}>
+                <div style={{ position: 'relative', width: `${DONUT_BOX_SIZE}px`, height: `${DONUT_BOX_SIZE}px`, flexShrink: 0 }}>
                 <Doughnut
                   data={{
                     // No border/stroke between segments per the design
@@ -123,7 +149,9 @@ export function SpendDonutChart({ records, mods, fuelLogs, bills, currency, rate
                       // the canvas - see the note on DONUT_BOX_SIZE
                       // above for why.
                       legend: { display: false },
-                      tooltip: { callbacks: { label: (ctx) => `${ctx.label}: ${symbol}${Math.round(ctx.parsed as number)}` } },
+                      tooltip: isPro
+                        ? { callbacks: { label: (ctx) => `${ctx.label}: ${symbol}${Math.round(ctx.parsed as number)}` } }
+                        : { enabled: false },
                     },
                     maintainAspectRatio: false,
                   }}
@@ -159,18 +187,34 @@ export function SpendDonutChart({ records, mods, fuelLogs, bills, currency, rate
               </div>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.55rem', flex: 1, minWidth: 0 }}>
-                {LABELS.map((label, i) => (
-                  <div key={label} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.78rem' }}>
-                    <span style={{ width: '9px', height: '9px', borderRadius: '3px', background: COLORS[i], flexShrink: 0 }} />
-                    <span style={{ flex: 1, color: 'var(--ink-soft)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {label}
-                    </span>
-                    <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 600, color: 'var(--ink)', whiteSpace: 'nowrap' }}>
-                      {symbol}{Math.round(values[i])}
-                    </span>
-                  </div>
-                ))}
+                {isPro ? (
+                  LABELS.map((label, i) => (
+                    <div key={label} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.78rem' }}>
+                      <span style={{ width: '9px', height: '9px', borderRadius: '3px', background: COLORS[i], flexShrink: 0 }} />
+                      <span style={{ flex: 1, color: 'var(--ink-soft)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {label}
+                      </span>
+                      <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 600, color: 'var(--ink)', whiteSpace: 'nowrap' }}>
+                        {symbol}{Math.round(values[i])}
+                      </span>
+                    </div>
+                  ))
+                ) : (
+                  LABELS.map((_, i) => (
+                    <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.78rem' }}>
+                      <span style={{ width: '9px', height: '9px', borderRadius: '3px', background: COLORS[i], flexShrink: 0 }} />
+                      <span style={{ flex: 1, color: 'var(--ink-soft)' }}>••••••••</span>
+                      <Icon name="lock" size={11} />
+                    </div>
+                  ))
+                )}
               </div>
+            </div>
+              {!isPro && (
+                <Link href="/pro" className={styles.categoryLockedNote}>
+                  <Icon name="lock" size={12} /> Category breakdown - Premium
+                </Link>
+              )}
             </div>
           )}
         </div>

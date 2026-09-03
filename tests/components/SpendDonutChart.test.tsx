@@ -57,16 +57,35 @@ describe("SpendDonutChart", () => {
     expect(props.options.cutout).toBe("68%");
   });
 
-  it("renders the real HTML legend and centre total, not just the chart data", () => {
-    render(<SpendDonutChart records={records} mods={mods} fuelLogs={fuelLogs} bills={bills} currency="GBP" rates={null} />);
+  it("renders the real HTML legend and centre total, not just the chart data, when Pro", () => {
+    render(<SpendDonutChart records={records} mods={mods} fuelLogs={fuelLogs} bills={bills} currency="GBP" rates={null} isPro />);
 
     expect(screen.getByText("Servicing & repairs")).toBeInTheDocument();
     expect(screen.getByText("£100")).toBeInTheDocument();
     expect(screen.getByText("£50")).toBeInTheDocument();
     expect(screen.getByText("£30")).toBeInTheDocument();
     expect(screen.getByText("£20")).toBeInTheDocument();
-    expect(screen.getByText("£200")).toBeInTheDocument(); // grand total
+    expect(screen.getAllByText("£200").length).toBeGreaterThan(0); // grand total (header line + ring centre)
     expect(screen.getByText("Total")).toBeInTheDocument();
+  });
+
+  it("obscures category names and per-category amounts when not Pro, but keeps the grand total visible", () => {
+    render(<SpendDonutChart records={records} mods={mods} fuelLogs={fuelLogs} bills={bills} currency="GBP" rates={null} />);
+
+    expect(screen.queryByText("Servicing & repairs")).not.toBeInTheDocument();
+    expect(screen.queryByText("£100")).not.toBeInTheDocument();
+    expect(screen.queryByText("£50")).not.toBeInTheDocument();
+    // Grand total still shows, in the always-visible header line and the ring's own centre.
+    expect(screen.getAllByText("£200").length).toBeGreaterThan(0);
+    const upsell = screen.getByRole("link", { name: /Category breakdown - Premium/ });
+    expect(upsell).toHaveAttribute("href", "/pro");
+  });
+
+  it("disables the chart tooltip and hides the axis ticks that would reveal a category's name or amount when not Pro", () => {
+    render(<SpendDonutChart records={records} mods={mods} fuelLogs={fuelLogs} bills={bills} currency="GBP" rates={null} />);
+
+    const props = chartMocks.doughnut.mock.calls[0][0] as any;
+    expect(props.options.plugins.tooltip.enabled).toBe(false);
   });
 
   it("honours initialChartType='bar' by rendering the mocked Bar chart from the start", () => {
@@ -97,7 +116,7 @@ describe("SpendDonutChart", () => {
 
   it("converts every real total to the display currency before handing it to the chart", () => {
     const rates = { base: "GBP" as const, rates: { EUR: 1.15 }, fetchedAt: "2024-01-01T00:00:00.000Z" };
-    render(<SpendDonutChart records={records} mods={mods} fuelLogs={fuelLogs} bills={bills} currency="EUR" rates={rates} />);
+    render(<SpendDonutChart records={records} mods={mods} fuelLogs={fuelLogs} bills={bills} currency="EUR" rates={rates} isPro />);
 
     const props = chartMocks.doughnut.mock.calls[0][0] as any;
     const [servicing, modsVal, fuelVal, billsVal] = props.data.datasets[0].data;
@@ -106,5 +125,23 @@ describe("SpendDonutChart", () => {
     expect(fuelVal).toBeCloseTo(34.5);
     expect(billsVal).toBeCloseTo(23);
     expect(screen.getByText("€115")).toBeInTheDocument();
+  });
+
+  it("in bar view, replaces category tick labels with a lock and hides the value axis when not Pro, but shows both when Pro", () => {
+    render(
+      <SpendDonutChart records={records} mods={mods} fuelLogs={fuelLogs} bills={bills} currency="GBP" rates={null} initialChartType="bar" />
+    );
+    const freeProps = chartMocks.bar.mock.calls[0][0] as any;
+    expect(freeProps.options.plugins.tooltip.enabled).toBe(false);
+    expect(freeProps.options.scales.x.ticks.callback(100, 0)).toBe("🔒");
+    expect(freeProps.options.scales.y.ticks.display).toBe(false);
+
+    chartMocks.bar.mockClear();
+    render(
+      <SpendDonutChart records={records} mods={mods} fuelLogs={fuelLogs} bills={bills} currency="GBP" rates={null} initialChartType="bar" isPro />
+    );
+    const proProps = chartMocks.bar.mock.calls[0][0] as any;
+    expect(proProps.options.scales.x.ticks.callback(100, 0)).toBe("Servicing & repairs");
+    expect(proProps.options.scales.y.ticks.callback(50)).toBe("£50");
   });
 });

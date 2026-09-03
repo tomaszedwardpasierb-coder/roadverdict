@@ -334,6 +334,10 @@
 .chartCardTitle { font-family: var(--font-display); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.7rem; color: var(--asphalt); }
 .chartCardHeader { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.7rem; }
 .chartCardHeader .chartCardTitle { margin-bottom: 0; }
+.chartCardTotalLine { font-size: 0.85rem; color: var(--ink-soft); margin-bottom: 0.7rem; }
+.chartCardTotalLine strong { color: var(--asphalt); font-family: var(--font-mono); }
+.categoryLockedNote { display: flex; align-items: center; gap: 0.35rem; margin-top: 0.8rem; font-size: 0.78rem; color: var(--amber-ink); text-decoration: none; }
+.categoryLockedNote:hover { text-decoration: underline; }
 .chartTypeToggle { display: flex; gap: 0.25rem; }
 .chartTypeToggleBtn { font-family: var(--font-mono); font-size: 0.65rem; padding: 0.2rem 0.5rem; border: 1px solid var(--border); border-radius: 20px; background: #fff; cursor: pointer; color: var(--ink-soft); }
 .chartTypeToggleBtnActive { background: var(--amber); color: var(--amber-ink); border-color: var(--amber); }
