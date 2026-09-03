@@ -1,4 +1,8 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+const mocks = vi.hoisted(() => ({ logGeminiUsage: vi.fn() }));
+vi.mock("@/lib/tracker/geminiUsageLog", () => ({ logGeminiUsage: mocks.logGeminiUsage }));
+
 import { generateStoryProse, type StoryProseInput } from "@/lib/tracker/storyProse";
 
 function geminiResponse(bodyText: string) {
@@ -24,7 +28,20 @@ const baseInput: StoryProseInput = {
 };
 
 describe("generateStoryProse", () => {
+  beforeEach(() => mocks.logGeminiUsage.mockReset());
   afterEach(() => vi.unstubAllGlobals());
+
+  it("logs Gemini usage under the storyProse task on success", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(geminiResponse(JSON.stringify(validResult))));
+    await generateStoryProse(baseInput, "key");
+    expect(mocks.logGeminiUsage).toHaveBeenCalledWith("storyProse", expect.any(String), true);
+  });
+
+  it("logs Gemini usage as a failure on a non-ok HTTP response", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false, json: async () => ({}) }));
+    await generateStoryProse(baseInput, "key");
+    expect(mocks.logGeminiUsage).toHaveBeenCalledWith("storyProse", expect.any(String), false);
+  });
 
   it("returns the parsed story on a well-formed response", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(geminiResponse(JSON.stringify(validResult))));

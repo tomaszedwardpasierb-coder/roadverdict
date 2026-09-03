@@ -5,6 +5,7 @@ const mocks = vi.hoisted(() => ({
   getAttachmentContainer: vi.fn(),
   uploadData: vi.fn(),
   getExchangeRates: vi.fn(),
+  logGeminiUsage: vi.fn(),
 }));
 
 vi.mock("sharp", () => ({
@@ -18,6 +19,7 @@ vi.mock("sharp", () => ({
 }));
 vi.mock("@/lib/blobStorage", () => ({ getAttachmentContainer: mocks.getAttachmentContainer }));
 vi.mock("@/lib/tracker/currencyRates", () => ({ getExchangeRates: mocks.getExchangeRates }));
+vi.mock("@/lib/tracker/geminiUsageLog", () => ({ logGeminiUsage: mocks.logGeminiUsage }));
 // currency.ts and productionYearCheck.ts are deliberately NOT mocked -
 // both pure, no I/O, and their real behaviour (including the
 // mods-category carve-out from the production-year check) is exactly
@@ -267,6 +269,21 @@ describe("parseReceiptFile", () => {
 
       expect(fetchMock).toHaveBeenCalledTimes(1);
       expect((result as any).items[0].aiLowConfidence).toBe(false);
+      expect(mocks.logGeminiUsage).toHaveBeenCalledTimes(1);
+      expect(mocks.logGeminiUsage).toHaveBeenCalledWith("receiptScan", expect.any(String), true);
+    });
+
+    it("logs Gemini usage once per real call - twice total when escalation actually fires", async () => {
+      const fetchMock = vi.fn()
+        .mockResolvedValueOnce(geminiResponse(JSON.stringify({ ...validGeminiPayload, lowConfidence: true })))
+        .mockResolvedValueOnce(geminiResponse(JSON.stringify({ ...validGeminiPayload, lowConfidence: false })));
+      vi.stubGlobal("fetch", fetchMock);
+
+      await parseReceiptFile(fakeFile(), "key", bike);
+
+      expect(mocks.logGeminiUsage).toHaveBeenCalledTimes(2);
+      expect(mocks.logGeminiUsage).toHaveBeenNthCalledWith(1, "receiptScan", expect.any(String), true);
+      expect(mocks.logGeminiUsage).toHaveBeenNthCalledWith(2, "receiptScan", expect.any(String), true);
     });
 
     it("escalates to the pro model when the model reports low confidence, and uses the escalated read", async () => {

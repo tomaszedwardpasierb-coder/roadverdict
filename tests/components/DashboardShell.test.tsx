@@ -33,6 +33,7 @@ function baseProps(overrides: Partial<Parameters<typeof DashboardShell>[0]> = {}
     currentMileage: 15000,
     distanceUnit: "mi" as const,
     userEmail: "rider@example.com",
+    isPro: false,
     bikes: [{ id: "bike-1", name: "Trusty Steed", year: 2020, currentMileage: 15000 }],
     activeBikeId: "bike-1",
     pendingReviewIds: emptyPendingIds,
@@ -151,6 +152,14 @@ describe("DashboardShell", () => {
 
     await user.click(screen.getAllByRole("button", { name: "Fuel" })[0]);
     expect(screen.getByText("Active section: fuel")).toBeInTheDocument();
+  });
+
+  it("shows a Premium badge next to the user's email only when isPro is true", () => {
+    const { rerender } = render(<DashboardShell {...baseProps({ isPro: false })} />);
+    expect(screen.queryByText("Premium")).not.toBeInTheDocument();
+
+    rerender(<DashboardShell {...baseProps({ isPro: true })} />);
+    expect(screen.getByText("Premium")).toBeInTheDocument();
   });
 
   it("shows the Reset Demo button only for the real demo account email", () => {

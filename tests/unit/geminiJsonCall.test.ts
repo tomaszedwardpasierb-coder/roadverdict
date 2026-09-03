@@ -1,4 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+const mocks = vi.hoisted(() => ({ logGeminiUsage: vi.fn() }));
+vi.mock("@/lib/tracker/geminiUsageLog", () => ({ logGeminiUsage: mocks.logGeminiUsage }));
+
 import { callGeminiForJson } from "@/lib/tracker/geminiJsonCall";
 
 function geminiResponse(bodyText: string) {
@@ -16,6 +20,7 @@ describe("callGeminiForJson", () => {
 
   beforeEach(() => {
     validate.mockClear();
+    mocks.logGeminiUsage.mockReset();
   });
 
   afterEach(() => {
@@ -25,7 +30,7 @@ describe("callGeminiForJson", () => {
   it("returns the validated result on a well-formed successful response", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(geminiResponse(JSON.stringify({ summary: "Looks fair." }))));
 
-    const result = await callGeminiForJson("system prompt", "facts", "key", validate);
+    const result = await callGeminiForJson("system prompt", "facts", "key", validate, "testTask");
 
     expect(result).toEqual({ summary: "Looks fair." });
   });
@@ -33,7 +38,7 @@ describe("callGeminiForJson", () => {
   it("passes the actually-parsed JSON object to validate, not the raw string", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(geminiResponse(JSON.stringify({ summary: "x" }))));
 
-    await callGeminiForJson("system prompt", "facts", "key", validate);
+    await callGeminiForJson("system prompt", "facts", "key", validate, "testTask");
 
     expect(validate).toHaveBeenCalledWith({ summary: "x" });
   });
@@ -42,7 +47,7 @@ describe("callGeminiForJson", () => {
     const fetchMock = vi.fn().mockResolvedValue(geminiResponse(JSON.stringify({ summary: "x" })));
     vi.stubGlobal("fetch", fetchMock);
 
-    await callGeminiForJson("Be helpful.", "FACT: bike is fine.", "my-api-key", validate);
+    await callGeminiForJson("Be helpful.", "FACT: bike is fine.", "my-api-key", validate, "testTask");
 
     const [url, init] = fetchMock.mock.calls[0];
     expect(url).toContain("generateContent");
@@ -61,7 +66,7 @@ describe("callGeminiForJson", () => {
   it("fails soft to null on a non-ok HTTP response, without calling validate", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false, json: async () => ({}) }));
 
-    const result = await callGeminiForJson("p", "f", "k", validate);
+    const result = await callGeminiForJson("p", "f", "k", validate, "testTask");
 
     expect(result).toBeNull();
     expect(validate).not.toHaveBeenCalled();
@@ -70,25 +75,25 @@ describe("callGeminiForJson", () => {
   it("fails soft to null when fetch itself throws, e.g. a network error", async () => {
     vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("network unreachable")));
 
-    await expect(callGeminiForJson("p", "f", "k", validate)).resolves.toBeNull();
+    await expect(callGeminiForJson("p", "f", "k", validate, "testTask")).resolves.toBeNull();
   });
 
   it("fails soft to null when the response has no text in the expected shape", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true, json: async () => ({ candidates: [] }) }));
 
-    expect(await callGeminiForJson("p", "f", "k", validate)).toBeNull();
+    expect(await callGeminiForJson("p", "f", "k", validate, "testTask")).toBeNull();
   });
 
   it("fails soft to null when the model's own text isn't valid JSON", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(geminiResponse("not actually json")));
 
-    expect(await callGeminiForJson("p", "f", "k", validate)).toBeNull();
+    expect(await callGeminiForJson("p", "f", "k", validate, "testTask")).toBeNull();
   });
 
   it("returns null when validate itself rejects the parsed shape", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(geminiResponse(JSON.stringify({ wrongShape: true }))));
 
-    expect(await callGeminiForJson("p", "f", "k", validate)).toBeNull();
+    expect(await callGeminiForJson("p", "f", "k", validate, "testTask")).toBeNull();
     expect(validate).toHaveBeenCalledWith({ wrongShape: true });
   });
 
@@ -98,6 +103,36 @@ describe("callGeminiForJson", () => {
       json: async () => { throw new Error("malformed response body"); },
     }));
 
-    expect(await callGeminiForJson("p", "f", "k", validate)).toBeNull();
+    expect(await callGeminiForJson("p", "f", "k", validate, "testTask")).toBeNull();
+  });
+
+  // Usage logging - the caller's own task label reaches the log, not a
+  // generic name for this shared helper, since /tomasz's Gemini usage
+  // breakdown needs to attribute each call to the real caller
+  // (quoteAdvice.ts, costAdvice.ts), not to geminiJsonCall.ts itself.
+  describe("usage logging", () => {
+    it("logs success under the caller's own task name when validate accepts the result", async () => {
+      vi.stubGlobal("fetch", vi.fn().mockResolvedValue(geminiResponse(JSON.stringify({ summary: "x" }))));
+
+      await callGeminiForJson("p", "f", "k", validate, "quoteAdvice");
+
+      expect(mocks.logGeminiUsage).toHaveBeenCalledWith("quoteAdvice", expect.any(String), true);
+    });
+
+    it("logs failure when validate rejects the parsed shape, even though the HTTP call itself succeeded", async () => {
+      vi.stubGlobal("fetch", vi.fn().mockResolvedValue(geminiResponse(JSON.stringify({ wrongShape: true }))));
+
+      await callGeminiForJson("p", "f", "k", validate, "costAdvice");
+
+      expect(mocks.logGeminiUsage).toHaveBeenCalledWith("costAdvice", expect.any(String), false);
+    });
+
+    it("logs failure on a non-ok HTTP response", async () => {
+      vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false, json: async () => ({}) }));
+
+      await callGeminiForJson("p", "f", "k", validate, "quoteAdvice");
+
+      expect(mocks.logGeminiUsage).toHaveBeenCalledWith("quoteAdvice", expect.any(String), false);
+    });
   });
 });

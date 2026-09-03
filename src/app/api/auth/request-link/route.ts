@@ -6,6 +6,7 @@ import { sendMagicLinkEmail } from "@/lib/resend";
 import { createSessionForEmail } from "@/lib/auth/session";
 import { getSafeRedirectPath } from "@/lib/auth/safeRedirect";
 import { demoBikeExists, runDemoSeed } from "@/lib/tracker/demoSeedRunner";
+import { isAccountBlocked } from "@/lib/tracker/userDoc";
 
 const lastRequestByEmail = new Map<string, number>();
 const RATE_LIMIT_MS = 60_000;
@@ -36,6 +37,16 @@ export async function POST(req: NextRequest) {
   // actually clicked - see safeRedirect.ts for why it isn't trusted
   // just because it passed this first check.
   const safeRedirect = getSafeRedirectPath(redirect);
+
+  // Checked before either branch below - a blocked account can't get
+  // back in at all, not even the demo bypass. getSession() also checks
+  // this independently (so an already-active session dies immediately
+  // once blocked), but rejecting here too means a blocked person never
+  // gets a working session in the first place, rather than one that
+  // silently no-ops everywhere.
+  if (await isAccountBlocked(normalizedEmail)) {
+    return NextResponse.json({ error: "This account is no longer able to sign in." }, { status: 403 });
+  }
 
   if (normalizedEmail === DEMO_EMAIL) {
     const alreadySeeded = await demoBikeExists();

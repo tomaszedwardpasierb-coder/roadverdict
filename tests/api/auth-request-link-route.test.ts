@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   createSessionForEmail: vi.fn(),
   demoBikeExists: vi.fn(),
   runDemoSeed: vi.fn(),
+  isAccountBlocked: vi.fn(),
 }));
 
 vi.mock("@/lib/cosmos", () => ({
@@ -18,6 +19,7 @@ vi.mock("@/lib/tracker/demoSeedRunner", () => ({
   demoBikeExists: mocks.demoBikeExists,
   runDemoSeed: mocks.runDemoSeed,
 }));
+vi.mock("@/lib/tracker/userDoc", () => ({ isAccountBlocked: mocks.isAccountBlocked }));
 // generateToken/encodeEmail (auth/crypto) and getSafeRedirectPath
 // (auth/safeRedirect) are deliberately NOT mocked - both are pure,
 // deterministic helpers, so exercising the real implementation is both
@@ -41,6 +43,7 @@ describe("POST /api/auth/request-link", () => {
     mocks.createSessionForEmail.mockResolvedValue({ cookieValue: "session-cookie-value", maxAge: 123 });
     mocks.demoBikeExists.mockResolvedValue(true);
     mocks.runDemoSeed.mockResolvedValue({ fuel: 0, service: 0, mods: 0, bills: 0 });
+    mocks.isAccountBlocked.mockResolvedValue(false);
   });
 
   it("rejects a request with no email at all", async () => {
@@ -55,6 +58,27 @@ describe("POST /api/auth/request-link", () => {
     const response = await POST(req(JSON.stringify({ email: "not-an-email" })));
     expect(response.status).toBe(400);
     expect(mocks.itemsCreate).not.toHaveBeenCalled();
+  });
+
+  it("rejects a blocked account before either branch, even the demo bypass", async () => {
+    mocks.isAccountBlocked.mockResolvedValue(true);
+
+    const response = await POST(req(JSON.stringify({ email: "blocked@example.com" })));
+
+    expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toEqual({ error: "This account is no longer able to sign in." });
+    expect(mocks.createSessionForEmail).not.toHaveBeenCalled();
+    expect(mocks.itemsCreate).not.toHaveBeenCalled();
+    expect(mocks.sendMagicLinkEmail).not.toHaveBeenCalled();
+  });
+
+  it("rejects the demo account too if it's ever blocked", async () => {
+    mocks.isAccountBlocked.mockResolvedValue(true);
+
+    const response = await POST(req(JSON.stringify({ email: "demo@roadverdict.co.uk" })));
+
+    expect(response.status).toBe(403);
+    expect(mocks.createSessionForEmail).not.toHaveBeenCalled();
   });
 
   it("sends no email and creates no magic-link document for the demo account", async () => {

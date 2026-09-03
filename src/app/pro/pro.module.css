@@ -143,6 +143,11 @@
   width: 100%;
 }
 
+.planCtaPro:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 .planCtaNote {
   font-size: 0.8rem;
   color: var(--ink-soft);

@@ -7,11 +7,13 @@ const mocks = vi.hoisted(() => ({
   download: vi.fn(),
   getExchangeRates: vi.fn(),
   fetch: vi.fn(),
+  logGeminiUsage: vi.fn(),
 }));
 
 vi.mock("@/lib/auth/session", () => ({ getSession: mocks.getSession }));
 vi.mock("@/lib/blobStorage", () => ({ getAttachmentContainer: mocks.getAttachmentContainer }));
 vi.mock("@/lib/tracker/currencyRates", () => ({ getExchangeRates: mocks.getExchangeRates }));
+vi.mock("@/lib/tracker/geminiUsageLog", () => ({ logGeminiUsage: mocks.logGeminiUsage }));
 // currency.ts (convertDisplayToGbp, ALL_CURRENCIES) is deliberately NOT
 // mocked - it's pure, already covered by currency.test.ts, and exercising
 // the real conversion math here proves the route's own wiring is correct.
@@ -101,6 +103,13 @@ describe("POST /api/tracker/verify-receipt", () => {
     mocks.fetch.mockResolvedValue(geminiTextResponse("", false));
     const response = await POST(request(JSON.stringify(validBody)));
     await expect(response.json()).resolves.toEqual({ discrepancies: [], checked: false });
+    expect(mocks.logGeminiUsage).toHaveBeenCalledWith("verifyReceipt", expect.any(String), false);
+  });
+
+  it("logs Gemini usage under the verifyReceipt task on a successful check", async () => {
+    mocks.getSession.mockResolvedValue({ email: "owner@example.com" });
+    await POST(request(JSON.stringify(validBody)));
+    expect(mocks.logGeminiUsage).toHaveBeenCalledWith("verifyReceipt", expect.any(String), true);
   });
 
   it("returns unchecked when Gemini's response has no text content", async () => {

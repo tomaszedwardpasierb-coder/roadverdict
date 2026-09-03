@@ -15,17 +15,22 @@
 // it down to known-string arrays - the one part that's genuinely
 // different per use case, so it stays with each caller rather than
 // being forced in here.
+import { logGeminiUsage } from "@/lib/tracker/geminiUsageLog";
 
 // Reverted to the exact model already proven live in production - see
 // receiptParse.ts's GEMINI_MODEL comment for why the
 // AI-Models-for-Different-Tasks.docx tier split broke on deploy.
 const GEMINI_MODEL = "gemini-3.5-flash-lite";
 
+// task identifies the actual caller (e.g. "quoteAdvice", "costAdvice")
+// for Gemini usage logging - this helper is shared, so it has no task
+// of its own, unlike every other Gemini-backed module in this app.
 export async function callGeminiForJson<T>(
   systemPrompt: string,
   factsBlock: string,
   apiKey: string,
-  validate: (parsed: unknown) => T | null
+  validate: (parsed: unknown) => T | null,
+  task: string
 ): Promise<T | null> {
   try {
     const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`, {
@@ -36,14 +41,23 @@ export async function callGeminiForJson<T>(
         generationConfig: { responseMimeType: "application/json" },
       }),
     });
-    if (!res.ok) return null;
+    if (!res.ok) {
+      await logGeminiUsage(task, GEMINI_MODEL, false);
+      return null;
+    }
 
     const data = await res.json();
     const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-    if (!rawText) return null;
+    if (!rawText) {
+      await logGeminiUsage(task, GEMINI_MODEL, false);
+      return null;
+    }
 
-    return validate(JSON.parse(rawText));
+    const result = validate(JSON.parse(rawText));
+    await logGeminiUsage(task, GEMINI_MODEL, result !== null);
+    return result;
   } catch {
+    await logGeminiUsage(task, GEMINI_MODEL, false);
     return null;
   }
 }

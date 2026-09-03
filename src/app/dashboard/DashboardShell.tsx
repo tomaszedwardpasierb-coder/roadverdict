@@ -64,6 +64,7 @@ interface Props {
   currentMileage: number;
   distanceUnit: DistanceUnit;
   userEmail: string;
+  isPro: boolean;
   bikes: SwitcherBike[];
   activeBikeId: string;
   // Real, server-computed counts of needsReview records per category -
@@ -110,6 +111,7 @@ export function DashboardShell({
   currentMileage,
   distanceUnit,
   userEmail,
+  isPro,
   bikes,
   activeBikeId,
   pendingReviewIds,
@@ -208,6 +210,11 @@ export function DashboardShell({
           <div className={styles.sidebarUserFooter}>
             <div className={styles.sidebarUserAvatar}>{userEmail.slice(0, 2).toUpperCase()}</div>
             <div className={styles.sidebarUserEmail}>{userEmail}</div>
+            {isPro && (
+              <span className={styles.proGateBadge} style={{ marginLeft: '0.4rem' }}>
+                Premium
+              </span>
+            )}
           </div>
           {userEmail === DEMO_EMAIL && (
             <div style={{ marginTop: '0.6rem' }}>

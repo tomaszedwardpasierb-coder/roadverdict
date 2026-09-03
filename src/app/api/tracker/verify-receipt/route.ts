@@ -4,6 +4,7 @@ import { getSession } from "@/lib/auth/session";
 import { getAttachmentContainer } from "@/lib/blobStorage";
 import { getExchangeRates } from "@/lib/tracker/currencyRates";
 import { convertDisplayToGbp, ALL_CURRENCIES, type Currency } from "@/lib/tracker/currency";
+import { logGeminiUsage } from "@/lib/tracker/geminiUsageLog";
 
 export const dynamic = "force-dynamic";
 
@@ -89,19 +90,23 @@ export async function POST(request: NextRequest) {
     });
 
     if (!geminiRes.ok) {
+      await logGeminiUsage("verifyReceipt", GEMINI_MODEL, false);
       return NextResponse.json({ discrepancies: [], checked: false });
     }
 
     const geminiData = await geminiRes.json();
     const rawText = geminiData?.candidates?.[0]?.content?.parts?.[0]?.text;
     if (!rawText) {
+      await logGeminiUsage("verifyReceipt", GEMINI_MODEL, false);
       return NextResponse.json({ discrepancies: [], checked: false });
     }
 
     let parsed: { cost?: number; currency?: string; date?: string };
     try {
       parsed = JSON.parse(rawText);
+      await logGeminiUsage("verifyReceipt", GEMINI_MODEL, true);
     } catch {
+      await logGeminiUsage("verifyReceipt", GEMINI_MODEL, false);
       return NextResponse.json({ discrepancies: [], checked: false });
     }
 

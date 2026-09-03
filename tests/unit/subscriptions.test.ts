@@ -1,27 +1,50 @@
 // Place at: tests/unit/subscriptions.test.ts
 //
-// subscriptions.ts is almost entirely static pricing/feature copy (left
-// untested here, per this repo's convention of not padding tests around
-// content with no logic - see modTypes.ts for the same pattern). isPro
-// is the one real function, and the only actual gate every Pro-only
-// feature in the app calls through - currently a deliberate TEMPORARY
-// stub that unlocks everyone as Pro while no payment platform is wired
-// up yet (see the comment on isPro() itself). Pinned here so a future
-// change to its return value - in either direction - only happens on
-// purpose.
-import { describe, expect, it } from "vitest";
+// isPro() is the one real gate every Pro-only feature in the app calls
+// through - real per-account Premium now, granted manually by the
+// admin (userAccount.ts's grantPremium(), used from /tomasz) until a
+// real payment platform exists. It reads the same `plan` field that
+// admin tool writes on the `type: "user"` doc (userDoc.ts).
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+const mocks = vi.hoisted(() => ({ getUserDoc: vi.fn() }));
+vi.mock("@/lib/tracker/userDoc", () => ({ getUserDoc: mocks.getUserDoc }));
+
 import { isPro } from "@/lib/subscriptions";
 
 describe("isPro", () => {
-  it("returns true for a normal account email - the temporary everyone-is-Pro unlock", async () => {
+  beforeEach(() => {
+    mocks.getUserDoc.mockReset();
+  });
+
+  it("returns false when the account has no user doc at all", async () => {
+    mocks.getUserDoc.mockResolvedValue(null);
+    await expect(isPro("rider@example.com")).resolves.toBe(false);
+  });
+
+  it("returns false when the account has a user doc but no plan", async () => {
+    mocks.getUserDoc.mockResolvedValue({ email: "rider@example.com" });
+    await expect(isPro("rider@example.com")).resolves.toBe(false);
+  });
+
+  it("returns true when the plan's expiry is in the future", async () => {
+    mocks.getUserDoc.mockResolvedValue({
+      email: "rider@example.com",
+      plan: { grantedAt: "2025-01-01T00:00:00.000Z", expiresAt: new Date(Date.now() + 86_400_000).toISOString() },
+    });
     await expect(isPro("rider@example.com")).resolves.toBe(true);
   });
 
-  it("returns true regardless of which email is passed - no account is special-cased in the current stub", async () => {
-    await expect(isPro("someone-else@example.com")).resolves.toBe(true);
+  it("returns false once the plan's expiry has passed", async () => {
+    mocks.getUserDoc.mockResolvedValue({
+      email: "rider@example.com",
+      plan: { grantedAt: "2025-01-01T00:00:00.000Z", expiresAt: new Date(Date.now() - 1000).toISOString() },
+    });
+    await expect(isPro("rider@example.com")).resolves.toBe(false);
   });
 
-  it("never throws on unusual input, since every caller awaits this directly inline in a render/gate path", async () => {
-    await expect(isPro("")).resolves.toBe(true);
+  it("fails closed (never Pro) if the underlying lookup throws", async () => {
+    mocks.getUserDoc.mockRejectedValue(new Error("Cosmos unavailable"));
+    await expect(isPro("rider@example.com")).resolves.toBe(false);
   });
 });

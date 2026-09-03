@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   resolveShareToken: vi.fn(),
   hasReportAccess: vi.fn(),
   fetch: vi.fn(),
+  logGeminiUsage: vi.fn(),
 }));
 
 vi.mock("@/lib/auth/session", () => ({ getSession: mocks.getSession }));
@@ -22,6 +23,7 @@ vi.mock("@/lib/tracker/assistantTools", () => ({
 vi.mock("@/lib/tracker/assistantQuestionLog", () => ({ logAssistantQuestion: mocks.logAssistantQuestion }));
 vi.mock("@/lib/tracker/shareLink", () => ({ resolveShareToken: mocks.resolveShareToken }));
 vi.mock("@/lib/tracker/reportAccess", () => ({ hasReportAccess: mocks.hasReportAccess }));
+vi.mock("@/lib/tracker/geminiUsageLog", () => ({ logGeminiUsage: mocks.logGeminiUsage }));
 vi.stubGlobal("fetch", mocks.fetch);
 
 import { POST } from "@/app/api/assistant/route";
@@ -252,6 +254,17 @@ describe("POST /api/assistant", () => {
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({ reply: "Here's your answer." });
     expect(mocks.logAssistantQuestion).toHaveBeenCalledWith("hi", false, false, undefined);
+  });
+
+  it("logs Gemini usage under the assistant task for a successful call", async () => {
+    await POST(request({ messages: [{ role: "user", content: "hi" }] }));
+    expect(mocks.logGeminiUsage).toHaveBeenCalledWith("assistant", expect.any(String), true);
+  });
+
+  it("logs Gemini usage as a failure when Gemini itself returns an error status", async () => {
+    mocks.fetch.mockResolvedValue({ ok: false, status: 500, statusText: "Internal Error", text: () => Promise.resolve("boom") });
+    await POST(request({ messages: [{ role: "user", content: "hi" }] }));
+    expect(mocks.logGeminiUsage).toHaveBeenCalledWith("assistant", expect.any(String), false);
   });
 
   it("logs the signed-in user's own email alongside their question", async () => {

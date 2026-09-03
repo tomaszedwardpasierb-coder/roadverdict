@@ -27,7 +27,7 @@ describe("generateQuoteAdvice", () => {
 
   it("passes the api key straight through", async () => {
     await generateQuoteAdvice(baseInput, "my-key");
-    expect(mocks.callGeminiForJson).toHaveBeenCalledWith(expect.any(String), expect.any(String), "my-key", expect.any(Function));
+    expect(mocks.callGeminiForJson).toHaveBeenCalledWith(expect.any(String), expect.any(String), "my-key", expect.any(Function), "quoteAdvice");
   });
 
   it("returns exactly whatever callGeminiForJson resolves to, including null", async () => {

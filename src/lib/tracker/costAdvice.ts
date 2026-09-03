@@ -71,5 +71,5 @@ function validate(parsed: unknown): CostAdviceResult | null {
 }
 
 export async function generateCostAdvice(input: CostAdviceInput, apiKey: string): Promise<CostAdviceResult | null> {
-  return callGeminiForJson(SYSTEM_PROMPT, buildFactsBlock(input), apiKey, validate);
+  return callGeminiForJson(SYSTEM_PROMPT, buildFactsBlock(input), apiKey, validate, "costAdvice");
 }

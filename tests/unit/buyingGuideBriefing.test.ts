@@ -1,4 +1,8 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+const mocks = vi.hoisted(() => ({ logGeminiUsage: vi.fn() }));
+vi.mock("@/lib/tracker/geminiUsageLog", () => ({ logGeminiUsage: mocks.logGeminiUsage }));
+
 import { generateBuyingGuideBriefing, type BuyingGuideBriefingInput } from "@/lib/tracker/buyingGuideBriefing";
 
 function geminiResponse(bodyText: string) {
@@ -16,11 +20,18 @@ const baseInput: BuyingGuideBriefingInput = {
 };
 
 describe("generateBuyingGuideBriefing", () => {
+  beforeEach(() => mocks.logGeminiUsage.mockReset());
   afterEach(() => vi.unstubAllGlobals());
 
   it("returns the parsed briefing on a well-formed response", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(geminiResponse(JSON.stringify(validResult))));
     expect(await generateBuyingGuideBriefing(baseInput, "key")).toEqual(validResult);
+  });
+
+  it("logs Gemini usage under the buyingGuideBriefing task on success", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(geminiResponse(JSON.stringify(validResult))));
+    await generateBuyingGuideBriefing(baseInput, "key");
+    expect(mocks.logGeminiUsage).toHaveBeenCalledWith("buyingGuideBriefing", expect.any(String), true);
   });
 
   it("fails soft to null on a non-ok HTTP response", async () => {

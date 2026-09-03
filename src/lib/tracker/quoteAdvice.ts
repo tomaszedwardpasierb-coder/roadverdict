@@ -77,5 +77,5 @@ function validate(parsed: unknown): QuoteAdviceResult | null {
 }
 
 export async function generateQuoteAdvice(input: QuoteAdviceInput, apiKey: string): Promise<QuoteAdviceResult | null> {
-  return callGeminiForJson(SYSTEM_PROMPT, buildFactsBlock(input), apiKey, validate);
+  return callGeminiForJson(SYSTEM_PROMPT, buildFactsBlock(input), apiKey, validate, "quoteAdvice");
 }

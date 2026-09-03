@@ -646,6 +646,7 @@ export default async function DashboardPage() {
       currentMileage={bike.currentMileage}
       distanceUnit={distanceUnit}
       userEmail={session.email}
+      isPro={userIsPro}
       bikes={switcherBikes}
       activeBikeId={bike.id}
       pendingReviewIds={pendingReviewIds}

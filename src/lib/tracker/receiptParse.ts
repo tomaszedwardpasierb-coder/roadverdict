@@ -16,6 +16,7 @@ import { getAttachmentContainer } from "@/lib/blobStorage";
 import { getExchangeRates } from "@/lib/tracker/currencyRates";
 import { convertDisplayToGbp, ALL_CURRENCIES, type Currency } from "@/lib/tracker/currency";
 import { isBeforeProduction } from "@/lib/tracker/productionYearCheck";
+import { logGeminiUsage } from "@/lib/tracker/geminiUsageLog";
 import type { Attachment, CurrencyConversionInfo } from "@/lib/tracker/cosmosHelpers";
 import type { BikeDoc } from "@/lib/tracker/bike";
 
@@ -157,14 +158,23 @@ async function callGeminiReceiptModel(
         generationConfig: { responseMimeType: "application/json" },
       }),
     });
-    if (!res.ok) return null;
+    if (!res.ok) {
+      await logGeminiUsage("receiptScan", model, false);
+      return null;
+    }
 
     const data = await res.json();
     const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-    if (!rawText) return null;
+    if (!rawText) {
+      await logGeminiUsage("receiptScan", model, false);
+      return null;
+    }
 
-    return JSON.parse(rawText) as GeminiResponse;
+    const parsed = JSON.parse(rawText) as GeminiResponse;
+    await logGeminiUsage("receiptScan", model, true);
+    return parsed;
   } catch {
+    await logGeminiUsage("receiptScan", model, false);
     return null;
   }
 }

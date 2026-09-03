@@ -2,23 +2,30 @@
 //
 // Single source of truth for plan checks throughout the app.
 //
-// TEMPORARY: everyone is unlocked as Pro right now, deliberately, while
-// no payment platform is wired in yet - a real launch decision, not a
-// bug or an accidental leftover. When Stripe (or another platform) is
-// wired up, replace the `return true` below with a real DB/Stripe
-// lookup. Nothing else in the app needs to change: every gate already
-// calls this function.
+// Real per-account Premium, granted manually by the admin (see
+// src/lib/tracker/userAccount.ts's grantPremium(), used from /tomasz)
+// until a real payment platform exists - not a blanket unlock. Checks
+// the same `plan` field that admin tool writes, on the `type: "user"`
+// Cosmos doc (src/lib/tracker/userDoc.ts).
 //
-// Future shape:
+// Future shape once Stripe (or another platform) is wired up:
 //   export async function isPro(email: string): Promise<boolean> {
 //     const sub = await getSubscriptionForUser(email); // your Stripe check
-//     return sub?.status === 'active';
+//     return sub?.status === 'active' || (existing admin-grant check);
 //   }
+import { getUserDoc } from "@/lib/tracker/userDoc";
 
-export async function isPro(_email: string): Promise<boolean> {
-  // TODO: replace with a real Stripe (or other platform) subscription
-  // check once one is wired in - see the TEMPORARY note above.
-  return true;
+export async function isPro(email: string): Promise<boolean> {
+  try {
+    const user = await getUserDoc(email);
+    if (!user?.plan) return false;
+    return new Date(user.plan.expiresAt).getTime() > Date.now();
+  } catch {
+    // Fail closed - same direction getSession() already fails in for
+    // any other auth-adjacent check gone wrong (a network blip, a
+    // permissions issue). Never grant Pro access on an error.
+    return false;
+  }
 }
 
 export const PRO_MONTHLY_PRICE = "£4.99";

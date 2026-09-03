@@ -13,6 +13,7 @@
 // If this call fails or returns nothing usable, the caller simply omits
 // this section - unlike Story So Far there's no deterministic fallback
 // text for an opinion, so nothing shows rather than something broken.
+import { logGeminiUsage } from "@/lib/tracker/geminiUsageLog";
 
 // Reverted to the exact model already proven live in production - see
 // receiptParse.ts's GEMINI_MODEL comment for why the
@@ -134,21 +135,32 @@ export async function generateBuyerOpinion(input: BuyerOpinionInput, apiKey: str
         generationConfig: { responseMimeType: "application/json" },
       }),
     });
-    if (!res.ok) return null;
+    if (!res.ok) {
+      await logGeminiUsage("buyerOpinion", GEMINI_MODEL, false);
+      return null;
+    }
 
     const data = await res.json();
     const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-    if (!rawText) return null;
+    if (!rawText) {
+      await logGeminiUsage("buyerOpinion", GEMINI_MODEL, false);
+      return null;
+    }
 
     const parsed = JSON.parse(rawText);
-    if (!Array.isArray(parsed.strengths) || !Array.isArray(parsed.concerns) || typeof parsed.honestRead !== "string") return null;
+    if (!Array.isArray(parsed.strengths) || !Array.isArray(parsed.concerns) || typeof parsed.honestRead !== "string") {
+      await logGeminiUsage("buyerOpinion", GEMINI_MODEL, false);
+      return null;
+    }
 
+    await logGeminiUsage("buyerOpinion", GEMINI_MODEL, true);
     return {
       strengths: parsed.strengths.filter((s: unknown): s is string => typeof s === "string"),
       concerns: parsed.concerns.filter((s: unknown): s is string => typeof s === "string"),
       honestRead: parsed.honestRead,
     };
   } catch {
+    await logGeminiUsage("buyerOpinion", GEMINI_MODEL, false);
     return null;
   }
 }

@@ -17,6 +17,7 @@
 
 import type { SellerReportCore } from "@/lib/tracker/sellerReportData";
 import type { BikeIdentity, CategorySpend, ServiceRhythm, MpgTrend } from "@/lib/tracker/storyFacts";
+import { logGeminiUsage } from "@/lib/tracker/geminiUsageLog";
 
 // Reverted to the exact model already proven live in production - see
 // receiptParse.ts's GEMINI_MODEL comment for why the
@@ -132,20 +133,31 @@ export async function generateStoryProse(input: StoryProseInput, apiKey: string)
         generationConfig: { responseMimeType: "application/json" },
       }),
     });
-    if (!res.ok) return null;
+    if (!res.ok) {
+      await logGeminiUsage("storyProse", GEMINI_MODEL, false);
+      return null;
+    }
 
     const data = await res.json();
     const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-    if (!rawText) return null;
+    if (!rawText) {
+      await logGeminiUsage("storyProse", GEMINI_MODEL, false);
+      return null;
+    }
 
     const parsed = JSON.parse(rawText);
-    if (!Array.isArray(parsed.sharedStory) || !Array.isArray(parsed.ownerNotes)) return null;
+    if (!Array.isArray(parsed.sharedStory) || !Array.isArray(parsed.ownerNotes)) {
+      await logGeminiUsage("storyProse", GEMINI_MODEL, false);
+      return null;
+    }
 
+    await logGeminiUsage("storyProse", GEMINI_MODEL, true);
     return {
       sharedStory: parsed.sharedStory.filter((s: unknown): s is string => typeof s === "string"),
       ownerNotes: parsed.ownerNotes.filter((s: unknown): s is string => typeof s === "string"),
     };
   } catch {
+    await logGeminiUsage("storyProse", GEMINI_MODEL, false);
     return null;
   }
 }

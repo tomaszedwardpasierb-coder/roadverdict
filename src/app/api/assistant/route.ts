@@ -13,6 +13,7 @@ import { getLivePrivacyPolicyText } from "@/lib/tracker/assistantKnowledge";
 import { getAssistantConfig, type AssistantConfigDoc } from "@/lib/tracker/assistantConfig";
 import { ASSISTANT_TOOL_DECLARATIONS, REPORT_TOOL_DECLARATIONS, runAssistantTool } from "@/lib/tracker/assistantTools";
 import { logAssistantQuestion } from "@/lib/tracker/assistantQuestionLog";
+import { logGeminiUsage } from "@/lib/tracker/geminiUsageLog";
 import { resolveShareToken } from "@/lib/tracker/shareLink";
 import { hasReportAccess } from "@/lib/tracker/reportAccess";
 
@@ -240,9 +241,11 @@ export async function POST(req: Request) {
       if (!res.ok) {
         const errBody = await res.text().catch(() => "(could not read response body)");
         console.error(`Assistant: Gemini API returned ${res.status} ${res.statusText}:`, errBody);
+        await logGeminiUsage("assistant", GEMINI_MODEL, false);
         await logAssistantQuestion(question, signedIn, true, session?.email);
         return NextResponse.json({ error: "Assistant is temporarily unavailable." }, { status: 502 });
       }
+      await logGeminiUsage("assistant", GEMINI_MODEL, true);
 
       const data = await res.json();
       const parts: GeminiPart[] = data?.candidates?.[0]?.content?.parts ?? [];

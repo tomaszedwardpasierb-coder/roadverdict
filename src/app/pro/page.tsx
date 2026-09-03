@@ -1,6 +1,7 @@
 // Place at: src/app/pro/page.tsx
 import Link from 'next/link';
-import { PRO_FEATURES } from '@/lib/subscriptions';
+import { getSession } from '@/lib/auth/session';
+import { isPro, PRO_FEATURES } from '@/lib/subscriptions';
 import styles from './pro.module.css';
 
 export const metadata = {
@@ -8,7 +9,10 @@ export const metadata = {
   description: 'Upgrade to RoadVerdict Pro for multi-bike tracking, AI summaries, CSV export, and more.',
 };
 
-export default function ProPage() {
+export default async function ProPage() {
+  const session = await getSession();
+  const userIsPro = session ? await isPro(session.email) : false;
+
   return (
     <main className={styles.main}>
       <div className={styles.hero}>
@@ -52,19 +56,31 @@ export default function ProPage() {
               <li key={f}>{f}</li>
             ))}
           </ul>
-          {/* TEMPORARY: Pro is unlocked for everyone right now (see
-              isPro() in subscriptions.ts) while no payment platform is
-              wired in - this goes straight to the dashboard rather than
-              a checkout flow. Replace this href with the real Stripe
-              (or other platform) checkout URL once one exists, and this
-              note/button reverts to a real "Upgrade" purchase flow
-              rather than a same-as-free redirect. */}
-          <Link href="/dashboard" className={styles.planCta + ' ' + styles.planCtaPro}>
-            Upgrade
-          </Link>
-          <p className={styles.planCtaNote}>
-            Pro is free to everyone for now while we finish payments. Your account already has full access.
-          </p>
+          {/* Real per-account Premium now (see isPro() in
+              subscriptions.ts) - granted manually by the admin from
+              /tomasz until a real payment platform is wired in. There's
+              no self-serve checkout yet, so a non-Premium visitor sees
+              a disabled "Coming soon" state rather than a purchase flow
+              that doesn't actually exist. Replace this whole branch
+              with a real Stripe (or other platform) checkout link once
+              one exists. */}
+          {userIsPro ? (
+            <>
+              <div className={styles.planCta + ' ' + styles.planCtaPro} style={{ cursor: 'default' }}>
+                You&apos;re on Premium
+              </div>
+              <p className={styles.planCtaNote}>Your account already has full Premium access.</p>
+            </>
+          ) : (
+            <>
+              <button type="button" className={styles.planCta + ' ' + styles.planCtaPro} disabled>
+                Coming soon
+              </button>
+              <p className={styles.planCtaNote}>
+                Pro isn&apos;t available to purchase yet. Your data is safe and your account is ready.
+              </p>
+            </>
+          )}
         </div>
       </div>
 

@@ -1,4 +1,8 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+const mocks = vi.hoisted(() => ({ logGeminiUsage: vi.fn() }));
+vi.mock("@/lib/tracker/geminiUsageLog", () => ({ logGeminiUsage: mocks.logGeminiUsage }));
+
 import { generateBuyerOpinion, type BuyerOpinionInput } from "@/lib/tracker/buyerOpinionProse";
 
 function geminiResponse(bodyText: string) {
@@ -37,11 +41,18 @@ const baseInput: BuyerOpinionInput = {
 };
 
 describe("generateBuyerOpinion", () => {
+  beforeEach(() => mocks.logGeminiUsage.mockReset());
   afterEach(() => vi.unstubAllGlobals());
 
   it("returns the parsed opinion on a well-formed response", async () => {
     mockFetchReturning(JSON.stringify(validResult));
     expect(await generateBuyerOpinion(baseInput, "key")).toEqual(validResult);
+  });
+
+  it("logs Gemini usage under the buyerOpinion task on success", async () => {
+    mockFetchReturning(JSON.stringify(validResult));
+    await generateBuyerOpinion(baseInput, "key");
+    expect(mocks.logGeminiUsage).toHaveBeenCalledWith("buyerOpinion", expect.any(String), true);
   });
 
   // This file carries its own independent copy of the fail-soft

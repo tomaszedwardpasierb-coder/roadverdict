@@ -9,6 +9,7 @@
 // caller simply omits the briefing - same as buyerOpinionProse, there's
 // no deterministic fallback text for this, so nothing shows rather than
 // something broken.
+import { logGeminiUsage } from "@/lib/tracker/geminiUsageLog";
 
 // CANARY - deliberately the one call site testing gemini-3.7-flash
 // before it's rolled out anywhere else. Google's own models guide lists
@@ -99,21 +100,32 @@ export async function generateBuyingGuideBriefing(
         generationConfig: { responseMimeType: "application/json" },
       }),
     });
-    if (!res.ok) return null;
+    if (!res.ok) {
+      await logGeminiUsage("buyingGuideBriefing", GEMINI_MODEL, false);
+      return null;
+    }
 
     const data = await res.json();
     const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-    if (!rawText) return null;
+    if (!rawText) {
+      await logGeminiUsage("buyingGuideBriefing", GEMINI_MODEL, false);
+      return null;
+    }
 
     const parsed = JSON.parse(rawText);
-    if (!Array.isArray(parsed.motFlags) || !Array.isArray(parsed.modelNotes) || typeof parsed.summary !== "string") return null;
+    if (!Array.isArray(parsed.motFlags) || !Array.isArray(parsed.modelNotes) || typeof parsed.summary !== "string") {
+      await logGeminiUsage("buyingGuideBriefing", GEMINI_MODEL, false);
+      return null;
+    }
 
+    await logGeminiUsage("buyingGuideBriefing", GEMINI_MODEL, true);
     return {
       motFlags: parsed.motFlags.filter((s: unknown): s is string => typeof s === "string"),
       modelNotes: parsed.modelNotes.filter((s: unknown): s is string => typeof s === "string"),
       summary: parsed.summary,
     };
   } catch {
+    await logGeminiUsage("buyingGuideBriefing", GEMINI_MODEL, false);
     return null;
   }
 }

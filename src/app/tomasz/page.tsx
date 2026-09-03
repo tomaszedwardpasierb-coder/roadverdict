@@ -22,6 +22,9 @@ import { getSiteStats, type SiteStats } from '@/lib/monitoring/appInsights';
 import { getAllAssistantQuestions, groupSimilarQuestions, type AssistantQuestionLogDoc } from '@/lib/tracker/assistantQuestionLog';
 import { getAllUserEmails } from '@/lib/tracker/notification';
 import { getAssistantConfig } from '@/lib/tracker/assistantConfig';
+import { getAllUserAccounts } from '@/lib/tracker/userAccount';
+import { getGeminiUsageByTask, type GeminiUsageByTask } from '@/lib/tracker/geminiUsageLog';
+import type { UserDoc } from '@/lib/tracker/userDoc';
 import { AdminShell } from './AdminShell';
 import { KnowledgeBaseEditor } from './KnowledgeBaseEditor';
 import styles from './adminShell.module.css';
@@ -30,6 +33,10 @@ import { DeleteQuestionButton } from './DeleteQuestionButton';
 import { ImpersonateButton } from './ImpersonateButton';
 import { AdminLogoutButton } from './AdminLogoutButton';
 import { SendNotificationForm } from './SendNotificationForm';
+import { BlockAccountButton } from './BlockAccountButton';
+import { GrantPremiumForm } from './GrantPremiumForm';
+import { DeleteAccountButton } from './DeleteAccountButton';
+import { ResetStoryCooldownButton } from './ResetStoryCooldownButton';
 
 export const dynamic = 'force-dynamic';
 
@@ -93,6 +100,24 @@ async function getAllUserEmailsSafe(): Promise<string[]> {
   }
 }
 
+async function getAllUserAccountsSafe(): Promise<UserDoc[]> {
+  try {
+    return await getAllUserAccounts();
+  } catch (err) {
+    console.error('Failed to load user accounts for /tomasz:', err);
+    return [];
+  }
+}
+
+async function getGeminiUsageByTaskSafe(): Promise<GeminiUsageByTask[]> {
+  try {
+    return await getGeminiUsageByTask();
+  } catch (err) {
+    console.error('Failed to load Gemini usage for /tomasz:', err);
+    return [];
+  }
+}
+
 function sparklinePoints(values: number[], width = 120, height = 32): string {
   if (values.length === 0) return '';
   const max = Math.max(...values, 1);
@@ -151,6 +176,8 @@ export default async function AdminDashboardPage({
     assistantQuestions,
     allUserEmails,
     assistantConfig,
+    allUserAccounts,
+    geminiUsageByTask,
   ] = await Promise.all([
     getDbStats(),
     getActiveSessionCount(),
@@ -169,6 +196,8 @@ export default async function AdminDashboardPage({
     getAssistantQuestionsSafe(),
     getAllUserEmailsSafe(),
     getAssistantConfig(),
+    getAllUserAccountsSafe(),
+    getGeminiUsageByTaskSafe(),
   ]);
   const health = getServerHealth();
   const commonQuestions = groupSimilarQuestions(assistantQuestions);
@@ -459,6 +488,44 @@ export default async function AdminDashboardPage({
         </div>
       </div>
 
+      <h2 className={styles.sectionHeading}>All accounts</h2>
+      <p className={styles.warnNote} style={{ marginBottom: '0.6rem' }}>
+        Premium is granted manually here, not via real payment yet - see subscriptions.ts. Grants are capped at 3
+        years; blocking signs the account out immediately, not just on their next login attempt. Delete is
+        permanent - every bike, record, and share link tied to that email is gone, with no undo.
+      </p>
+      {allUserAccounts.length === 0 ? (
+        <p className={styles.warnNote}>No accounts found.</p>
+      ) : (
+        <table className={styles.table}>
+          <thead>
+            <tr>
+              <th>Email</th>
+              <th>Created</th>
+              <th>Status</th>
+              <th>Premium</th>
+              <th>Story cooldown</th>
+              <th>Delete</th>
+            </tr>
+          </thead>
+          <tbody>
+            {allUserAccounts.map((u) => (
+              <tr key={u.email}>
+                <td>{u.email}</td>
+                <td>{fmtDate(u.createdAt)}</td>
+                <td>
+                  {u.blocked ? <span style={{ color: 'var(--admin-danger)' }}>Blocked</span> : 'Active'}{' '}
+                  <BlockAccountButton email={u.email} blocked={!!u.blocked} />
+                </td>
+                <td><GrantPremiumForm email={u.email} plan={u.plan ?? null} /></td>
+                <td><ResetStoryCooldownButton email={u.email} /></td>
+                <td><DeleteAccountButton email={u.email} /></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+
       <h2 className={styles.sectionHeading}>Magic link requests (every email, ever - including ones that never completed sign-in)</h2>
       {magicLinkRequests.length === 0 ? (
         <p className={styles.warnNote}>No magic link requests recorded.</p>
@@ -543,6 +610,31 @@ export default async function AdminDashboardPage({
 
   const assistantContent = (
     <>
+      <h2 className={styles.sectionHeading}>Gemini API usage</h2>
+      <p className={styles.note} style={{ marginBottom: '0.6rem' }}>
+        Real Gemini API calls, by task, over the last 90 days (older entries expire automatically).
+      </p>
+      {geminiUsageByTask.length === 0 ? (
+        <p className={styles.warnNote}>No Gemini calls logged yet.</p>
+      ) : (
+        <table className={styles.table}>
+          <thead>
+            <tr>
+              <th>Task</th>
+              <th>Calls</th>
+            </tr>
+          </thead>
+          <tbody>
+            {geminiUsageByTask.map((u) => (
+              <tr key={u.task}>
+                <td>{u.task}</td>
+                <td>{u.count}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+
       <h2 className={styles.sectionHeading}>Assistant configuration</h2>
       {assistantConfig ? (
         <KnowledgeBaseEditor

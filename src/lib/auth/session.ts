@@ -2,6 +2,7 @@
 import { cookies } from "next/headers";
 import { getContainer } from "@/lib/cosmos";
 import { hashToken, decodeEmail, generateToken, encodeEmail } from "@/lib/auth/crypto";
+import { isAccountBlocked } from "@/lib/tracker/userDoc";
 
 export async function getSession(): Promise<{ email: string } | null> {
   const container = getContainer();
@@ -19,6 +20,12 @@ export async function getSession(): Promise<{ email: string } | null> {
     const { resource } = await container.item(sessionHash, email).read();
     if (!resource || resource.type !== "session") return null;
     if (new Date(resource.expiresAt) < new Date()) return null;
+    // A blocked account's existing session cookie resolves to "not
+    // signed in," the same as if it never existed - this is the one
+    // choke point every dashboard page and API route already goes
+    // through, so blocking takes effect immediately, not just on the
+    // account's next login attempt.
+    if (await isAccountBlocked(email)) return null;
     return { email };
   } catch {
     return null;
