@@ -312,6 +312,22 @@
 .statCardValue { font-family: var(--font-display); font-size: 1.4rem; color: var(--asphalt); line-height: 1.1; }
 .statCardLabel { font-family: var(--font-mono); font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.03em; color: var(--ink-soft); margin-top: 0.3rem; }
 
+.statCardLocked {
+  display: block;
+  text-decoration: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.statCardLocked:hover { border-color: var(--amber); box-shadow: var(--shadow-pop); }
+.statCardLockedValue {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-family: var(--font-display);
+  font-size: 1rem;
+  color: var(--amber-ink);
+  line-height: 1.1;
+}
+
 .chartsGrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem; margin-bottom: 1.6rem; }
 .chartCard { background: var(--paper); border: 1px solid var(--line); border-radius: var(--radius-lg); box-shadow: var(--shadow-card); padding: 1rem 1.1rem; }
 .chartCardTitle { font-family: var(--font-display); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.7rem; color: var(--asphalt); }

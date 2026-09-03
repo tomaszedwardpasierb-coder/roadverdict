@@ -32,6 +32,7 @@ describe("DashboardStatCards", () => {
         rates={null}
         distanceUnit="mi"
         fuelEconomyUnit="mpg"
+        isPro
       />
     );
     expect(screen.getByText("Total spend")).toBeInTheDocument();
@@ -58,6 +59,7 @@ describe("DashboardStatCards", () => {
         rates={null}
         distanceUnit="mi"
         fuelEconomyUnit="mpg"
+        isPro
       />
     );
     // 100 miles on 1 UK gallon (4.546L) between the two full fill-ups = 100.0 mpg
@@ -78,6 +80,7 @@ describe("DashboardStatCards", () => {
         rates={{ base: "GBP", rates: { EUR: 2 }, fetchedAt: "2026-01-01T00:00:00.000Z" }}
         distanceUnit="km"
         fuelEconomyUnit="mpg"
+        isPro
       />
     );
     expect(screen.getByText("€100")).toBeInTheDocument(); // £50 * rate 2
@@ -101,6 +104,7 @@ describe("DashboardStatCards", () => {
         rates={null}
         distanceUnit="mi"
         fuelEconomyUnit="mpg"
+        isPro
       />
     );
     expect(screen.getByText("£20")).toBeInTheDocument();
@@ -132,5 +136,47 @@ describe("DashboardStatCards", () => {
     );
     expect(screen.getByText("£50")).toBeInTheDocument();
     expect(screen.queryByText("£550")).not.toBeInTheDocument();
+  });
+
+  it("locks Actual economy and Per mile behind Premium when isPro is false, while Total spend stays real", () => {
+    render(
+      <DashboardStatCards
+        records={[{ date: "2026-01-01", cost: 100, mileage: 500 }]}
+        mods={[]}
+        bills={[]}
+        fuelLogs={[]}
+        currentMileage={1000}
+        startingMileage={0}
+        currency="GBP"
+        rates={null}
+        distanceUnit="mi"
+        fuelEconomyUnit="mpg"
+      />
+    );
+    expect(screen.getByText("Total spend")).toBeInTheDocument();
+    expect(screen.getByText("£100")).toBeInTheDocument();
+    expect(screen.getByText("Actual economy")).toBeInTheDocument();
+    expect(screen.getByText("Per mile")).toBeInTheDocument();
+    expect(screen.getAllByText("Premium")).toHaveLength(2);
+    // Real computed values must not leak out from behind the lock.
+    expect(screen.queryByText("-")).not.toBeInTheDocument();
+  });
+
+  it("defaults to locked when isPro isn't passed at all", () => {
+    render(
+      <DashboardStatCards
+        records={[]}
+        mods={[]}
+        bills={[]}
+        fuelLogs={[]}
+        currentMileage={100}
+        startingMileage={0}
+        currency="GBP"
+        rates={null}
+        distanceUnit="mi"
+        fuelEconomyUnit="mpg"
+      />
+    );
+    expect(screen.getAllByText("Premium")).toHaveLength(2);
   });
 });

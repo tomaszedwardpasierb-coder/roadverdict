@@ -26,6 +26,11 @@ const ICONS = {
   spendThisYear: Calendar,
   camera: Camera,
   upload: Upload,
+  // Same underlying icon as `privacy` below (Lock) - a genuinely
+  // different meaning here (a Premium-gated stat, not the privacy nav
+  // item), same reuse-the-lucide-component convention as the rest of
+  // this map.
+  lock: Lock,
   // Secondary sidebar menu (Cost Calculator / Buying a Used Bike /
   // Privacy) - deliberately not reusing Shield or BookOpen, both
   // already meaning something else above (Tax & Insurance, Story So

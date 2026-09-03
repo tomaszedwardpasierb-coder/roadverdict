@@ -67,6 +67,7 @@ import { CustomFilterPanel } from "./CustomFilterPanel";
 import { ScanReceiptButton } from "./ScanReceiptButton";
 import { RegistrationBackfillBanner } from "./RegistrationBackfillBanner";
 import { Icon } from "./Icon";
+import { LockedStatCard } from "./LockedStatCard";
 import { isPro } from "@/lib/subscriptions";
 import { ProGate } from "./ProGate";
 
@@ -273,6 +274,7 @@ export default async function DashboardPage() {
           rates={rates}
           distanceUnit={distanceUnit}
           fuelEconomyUnit={fuelEconomyUnit}
+          isPro={userIsPro}
         />
         <div className={styles.statCard}>
           <div className={`${styles.statCardIcon} ${styles.statCardIconNeutral}`}>
@@ -281,13 +283,17 @@ export default async function DashboardPage() {
           <div className={styles.statCardValue}>{Math.round(convertMilesToDisplay(bike.currentMileage, distanceUnit)).toLocaleString()}</div>
           <div className={styles.statCardLabel}>Current {distanceUnit === "km" ? "km" : "miles"}</div>
         </div>
-        <div className={styles.statCard}>
-          <div className={`${styles.statCardIcon} ${styles.statCardIconNeutral}`}>
-            <Icon name="spendThisYear" size={16} />
+        {userIsPro ? (
+          <div className={styles.statCard}>
+            <div className={`${styles.statCardIcon} ${styles.statCardIconNeutral}`}>
+              <Icon name="spendThisYear" size={16} />
+            </div>
+            <div className={styles.statCardValue}>{formatCurrency(yearSpend, currency, rates)}</div>
+            <div className={styles.statCardLabel}>Spend this year</div>
           </div>
-          <div className={styles.statCardValue}>{formatCurrency(yearSpend, currency, rates)}</div>
-          <div className={styles.statCardLabel}>Spend this year</div>
-        </div>
+        ) : (
+          <LockedStatCard icon="spendThisYear" iconClass={styles.statCardIconNeutral} label="Spend this year" />
+        )}
       </div>
 
       <div className={`${styles.dashboardTwoCol} ${styles.equalHeightRow}`}>
@@ -427,6 +433,7 @@ export default async function DashboardPage() {
   );
 
   const reportsContent = (
+    <ProGate featureName="Reports" description="Every chart in one place - fuel economy, running costs, and category spend trends over the life of your bike." isPro={userIsPro}>
     <ChartFilterProvider>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "0.75rem" }}>
         <h1 className={styles.heading}>Reports{bikeTag}</h1>
@@ -499,6 +506,7 @@ export default async function DashboardPage() {
         <CustomFilterPanel records={records} mods={mods} bills={bills} fuelLogs={fuelLogs} currency={currency} rates={rates} fuelEconomyUnit={fuelEconomyUnit} />
       </div>
     </ChartFilterProvider>
+    </ProGate>
   );
 
   const pendingTransferRequests = await getPendingTransferRequestsForOwner(session.email);

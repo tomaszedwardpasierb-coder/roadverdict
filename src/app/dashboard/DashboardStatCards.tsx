@@ -7,6 +7,7 @@ import { computeMPGSeries, type MpgCalcInput } from '@/lib/tracker/mpgCalc';
 import { formatCurrency, convertGbpToDisplay, CURRENCY_SYMBOLS, type Currency, type ExchangeRates } from '@/lib/tracker/currency';
 import { formatFuelEconomy, formatCostPerDistance, KM_PER_MILE, type DistanceUnit, type FuelEconomyUnit } from '@/lib/tracker/unitFormat';
 import { Icon } from './Icon';
+import { LockedStatCard } from './LockedStatCard';
 import styles from './dashboard.module.css';
 
 interface CostItem {
@@ -26,6 +27,9 @@ interface Props {
   rates: ExchangeRates | null;
   distanceUnit: DistanceUnit;
   fuelEconomyUnit: FuelEconomyUnit;
+  // Total spend stays free (the "yes, this actually works" proof) -
+  // only the two more analytical stats here are Premium-gated.
+  isPro?: boolean;
 }
 
 export function DashboardStatCards({
@@ -39,6 +43,7 @@ export function DashboardStatCards({
   rates,
   distanceUnit,
   fuelEconomyUnit,
+  isPro = false,
 }: Props) {
   const { range } = useChartFilter();
 
@@ -91,26 +96,34 @@ export function DashboardStatCards({
         <div className={styles.statCardValue}>{formatCurrency(totalSpend, currency, rates)}</div>
         <div className={styles.statCardLabel}>Total spend</div>
       </div>
-      <div className={styles.statCard}>
-        <div className={`${styles.statCardIcon} ${styles.statCardIconGreen}`}>
-          <Icon name="economy" size={16} />
+      {isPro ? (
+        <div className={styles.statCard}>
+          <div className={`${styles.statCardIcon} ${styles.statCardIconGreen}`}>
+            <Icon name="economy" size={16} />
+          </div>
+          <div className={styles.statCardValue}>{actualMpg ? formatFuelEconomy(actualMpg, fuelEconomyUnit) : '-'}</div>
+          <div className={styles.statCardLabel}>Actual economy</div>
         </div>
-        <div className={styles.statCardValue}>{actualMpg ? formatFuelEconomy(actualMpg, fuelEconomyUnit) : '-'}</div>
-        <div className={styles.statCardLabel}>Actual economy</div>
-      </div>
-      <div className={styles.statCard}>
-        <div className={`${styles.statCardIcon} ${styles.statCardIconAmber}`}>
-          <Icon name="perMile" size={16} />
+      ) : (
+        <LockedStatCard icon="economy" iconClass={styles.statCardIconGreen} label="Actual economy" />
+      )}
+      {isPro ? (
+        <div className={styles.statCard}>
+          <div className={`${styles.statCardIcon} ${styles.statCardIconAmber}`}>
+            <Icon name="perMile" size={16} />
+          </div>
+          <div className={styles.statCardValue}>
+            {costPerMileDisplay == null
+              ? '-'
+              : currency === 'GBP'
+                ? formatCostPerDistance(costPerMileDisplay * 100, distanceUnit)
+                : `${CURRENCY_SYMBOLS[currency]}${(distanceUnit === 'km' ? costPerMileDisplay / KM_PER_MILE : costPerMileDisplay).toFixed(2)}`}
+          </div>
+          <div className={styles.statCardLabel}>Per {distanceUnit === 'km' ? 'km' : 'mile'}</div>
         </div>
-        <div className={styles.statCardValue}>
-          {costPerMileDisplay == null
-            ? '-'
-            : currency === 'GBP'
-              ? formatCostPerDistance(costPerMileDisplay * 100, distanceUnit)
-              : `${CURRENCY_SYMBOLS[currency]}${(distanceUnit === 'km' ? costPerMileDisplay / KM_PER_MILE : costPerMileDisplay).toFixed(2)}`}
-        </div>
-        <div className={styles.statCardLabel}>Per {distanceUnit === 'km' ? 'km' : 'mile'}</div>
-      </div>
+      ) : (
+        <LockedStatCard icon="perMile" iconClass={styles.statCardIconAmber} label={`Per ${distanceUnit === 'km' ? 'km' : 'mile'}`} />
+      )}
     </>
   );
 }
