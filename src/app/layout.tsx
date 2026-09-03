@@ -7,6 +7,7 @@ import { getAdminSession } from '@/lib/admin/session';
 import { ImpersonationBanner } from './ImpersonationBanner';
 import { AssistantWidget } from '@/components/AssistantWidget';
 import { ActiveSectionProvider } from '@/components/ActiveSectionContext';
+import { SocialLinks } from '@/components/SocialLinks';
 import { SiteHeaderNav } from './SiteHeaderNav';
 import './globals.css';
 const bigShouldersDisplay = Big_Shoulders_Display({
@@ -73,6 +74,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
               inspection. <Link href="/privacy">Privacy</Link> · <Link href="/about">About us</Link> ·{' '}
               <a href="mailto:hello@roadverdict.co.uk">hello@roadverdict.co.uk</a>
             </p>
+            <SocialLinks />
           </footer>
           <AssistantWidget />
         </ActiveSectionProvider>

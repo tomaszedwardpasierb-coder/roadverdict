@@ -611,6 +611,22 @@ main {
   color: var(--ink-soft);
 }
 
+.site-footer__social {
+  display: flex;
+  justify-content: center;
+  gap: 1rem;
+  margin-top: 0.9rem;
+}
+
+.site-footer__social-link {
+  color: var(--ink-soft);
+  display: inline-flex;
+}
+
+.site-footer__social-link:hover {
+  color: var(--amber-ink);
+}
+
 /* --- Tracker landing page --- */
 .problem-grid, .feature-grid, .benefit-grid {
   display: grid;
