@@ -663,6 +663,9 @@
 
 .mobileMoreFooterNote { margin-top: 0.8rem; padding-top: 0.6rem; border-top: 1px solid var(--border); font-size: 0.68rem; line-height: 1.5; color: var(--ink-soft); }
 
+.contentFooterNote { text-align: center; padding: 2.5rem 1rem 1rem; font-size: 0.8rem; color: var(--ink-soft); }
+.contentFooterNote a { color: var(--ink-soft); }
+
 /* Scoped overrides for the shared button styles when they render inside
    the dark sidebar (mileage/refresh/logout/reset buttons) - covers both
    possible class conventions those buttons use (styles.iconBtn is

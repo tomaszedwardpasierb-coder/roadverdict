@@ -257,7 +257,21 @@ export function DashboardShell({
           <UpdateMileageButton currentMileage={currentMileage} distanceUnit={distanceUnit} />
         </div>
 
-        <div className={styles.content}>{contentMap[active]}</div>
+        <div className={styles.content}>
+          {contentMap[active]}
+          {/* Every tab renders through this one container, so adding it
+              here once - rather than into all 13 tab-content blocks in
+              page.tsx - puts it at the true bottom of whichever tab is
+              open, reachable by scrolling .content itself (the actually
+              scrollable region - see the sidebarFooterNote/
+              mobileMoreFooterNote comments above for why the public
+              site's own <footer> can't be scrolled to from in here). */}
+          <div className={styles.contentFooterNote}>
+            RoadVerdict is guidance benchmarked against typical prices, not a professional inspection.{' '}
+            <Link href="/privacy">Privacy</Link> · <Link href="/about">About us</Link> ·{' '}
+            <a href="mailto:hello@roadverdict.co.uk">hello@roadverdict.co.uk</a>
+          </div>
+        </div>
 
         <nav data-mobile-bottom-nav className={styles.mobileBottomNav}>
           {MOBILE_NAV_ITEMS.map((item) => {
