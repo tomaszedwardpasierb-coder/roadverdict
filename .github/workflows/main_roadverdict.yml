@@ -101,6 +101,21 @@ jobs:
         run: npx playwright test tests/e2e/authenticated-demo-journey.spec.ts
         env:
           PLAYWRIGHT_BASE_URL: http://localhost:3000
+      # Playwright already writes trace.zip/error-context.md/the failure
+      # screenshot under test-results/ on failure (trace:
+      # "retain-on-failure", screenshot: "only-on-failure" in
+      # playwright.config.ts) - without this step they only ever exist on
+      # the runner's disk and are gone the moment the job ends, which is
+      # why a failure log names a file path with nothing to actually
+      # download. if: failure() only, so a normal green run uploads
+      # nothing.
+      - name: Upload Playwright failure artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: test-results/
+          retention-days: 14
       - name: Stop the app server
         if: always()
         run: |
