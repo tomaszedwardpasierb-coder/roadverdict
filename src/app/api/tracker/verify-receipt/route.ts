@@ -5,6 +5,7 @@ import { getAttachmentContainer } from "@/lib/blobStorage";
 import { getExchangeRates } from "@/lib/tracker/currencyRates";
 import { convertDisplayToGbp, ALL_CURRENCIES, type Currency } from "@/lib/tracker/currency";
 import { logGeminiUsage } from "@/lib/tracker/geminiUsageLog";
+import { ownsAttachment } from "@/lib/tracker/attachmentOwnership";
 
 export const dynamic = "force-dynamic";
 
@@ -63,6 +64,14 @@ export async function POST(request: NextRequest) {
   const { blobName, expectedCost, expectedDate } = body as { blobName?: string; expectedCost?: number; expectedDate?: string };
   if (!blobName || expectedCost == null || !expectedDate) {
     return NextResponse.json({ error: "Missing required fields." }, { status: 400 });
+  }
+
+  // Without this, any signed-in account could point blobName at a
+  // stranger's receipt and have the discrepancy message read its real
+  // cost/date back to them - a data-exfiltration oracle, not just an
+  // unauthorized view. See attachmentOwnership.ts.
+  if (!(await ownsAttachment(session.email, blobName))) {
+    return NextResponse.json({ error: "Attachment not found." }, { status: 404 });
   }
 
   try {

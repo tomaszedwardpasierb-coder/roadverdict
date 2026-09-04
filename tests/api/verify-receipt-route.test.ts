@@ -8,12 +8,14 @@ const mocks = vi.hoisted(() => ({
   getExchangeRates: vi.fn(),
   fetch: vi.fn(),
   logGeminiUsage: vi.fn(),
+  ownsAttachment: vi.fn(),
 }));
 
 vi.mock("@/lib/auth/session", () => ({ getSession: mocks.getSession }));
 vi.mock("@/lib/blobStorage", () => ({ getAttachmentContainer: mocks.getAttachmentContainer }));
 vi.mock("@/lib/tracker/currencyRates", () => ({ getExchangeRates: mocks.getExchangeRates }));
 vi.mock("@/lib/tracker/geminiUsageLog", () => ({ logGeminiUsage: mocks.logGeminiUsage }));
+vi.mock("@/lib/tracker/attachmentOwnership", () => ({ ownsAttachment: mocks.ownsAttachment }));
 // currency.ts (convertDisplayToGbp, ALL_CURRENCIES) is deliberately NOT
 // mocked - it's pure, already covered by currency.test.ts, and exercising
 // the real conversion math here proves the route's own wiring is correct.
@@ -53,6 +55,7 @@ describe("POST /api/tracker/verify-receipt", () => {
     mocks.getAttachmentContainer.mockResolvedValue({ getBlockBlobClient: () => ({ download: mocks.download }) });
     mocks.download.mockResolvedValue({ contentType: "image/jpeg", readableStreamBody: fakeStream([Buffer.from("img")]) });
     mocks.fetch.mockResolvedValue(geminiTextResponse(JSON.stringify({ cost: 50, currency: "GBP", date: "2025-01-01" })));
+    mocks.ownsAttachment.mockResolvedValue(true);
   });
 
   afterEach(() => {
@@ -87,6 +90,28 @@ describe("POST /api/tracker/verify-receipt", () => {
     const response = await POST(request(JSON.stringify({ blobName: "abc.jpg" })));
     expect(response.status).toBe(400);
     await expect(response.json()).resolves.toEqual({ error: "Missing required fields." });
+  });
+
+  // The actual security fix: this route used to fetch and OCR ANY
+  // blobName a caller supplied, then echo the receipt's real cost/date
+  // back in the discrepancy text - a data-exfiltration oracle against
+  // another account's private receipt. It must now refuse a blobName
+  // that isn't among the caller's own records before ever touching blob
+  // storage or Gemini.
+  it("returns 404 without touching blob storage or Gemini when the caller doesn't own the attachment", async () => {
+    mocks.getSession.mockResolvedValue({ email: "attacker@example.com" });
+    mocks.ownsAttachment.mockResolvedValue(false);
+    const response = await POST(request(JSON.stringify({ blobName: "victims-receipt.jpg", expectedCost: 0.01, expectedDate: "1900-01-01" })));
+    expect(response.status).toBe(404);
+    await expect(response.json()).resolves.toEqual({ error: "Attachment not found." });
+    expect(mocks.getAttachmentContainer).not.toHaveBeenCalled();
+    expect(mocks.fetch).not.toHaveBeenCalled();
+  });
+
+  it("checks ownership against the signed-in session's own email, not any client-supplied value", async () => {
+    mocks.getSession.mockResolvedValue({ email: "owner@example.com" });
+    await POST(request(JSON.stringify(validBody)));
+    expect(mocks.ownsAttachment).toHaveBeenCalledWith("owner@example.com", "abc.jpg");
   });
 
   it("returns unchecked, not an error, for a PDF (out of scope for this first version)", async () => {

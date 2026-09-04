@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/session";
 import { getAttachmentContainer } from "@/lib/blobStorage";
+import { ownsAttachment } from "@/lib/tracker/attachmentOwnership";
 
 export const dynamic = "force-dynamic";
 
@@ -14,11 +15,13 @@ async function streamToBuffer(readableStream: NodeJS.ReadableStream | undefined)
   return Buffer.concat(chunks);
 }
 
-// Every attachment is only ever fetched by an authenticated user - there is
-// no public/anonymous access to blob storage at all (see blobStorage.ts).
-// The blob name itself is an unguessable random token, same trust model as
-// the share-link tokens elsewhere in this app, but gated behind a real
-// session check too - stricter than that precedent, not looser.
+// A blobName alone doesn't prove the requester owns the file it points to
+// - this app's own sharing features (report links, receipt-request
+// emails) deliberately hand blobNames to low-trust third parties who have
+// no RoadVerdict account, so "any signed-in session" is a weaker gate
+// than it looks: anyone who's ever seen a blobName can sign up free and
+// pass this check. ownsAttachment closes that gap the same way the
+// anonymous report-attachment route already does for its own case.
 export async function GET(request: NextRequest, { params }: { params: { blobName: string } }) {
   const session = await getSession();
   if (!session) {
@@ -26,6 +29,10 @@ export async function GET(request: NextRequest, { params }: { params: { blobName
   }
 
   const blobName = decodeURIComponent(params.blobName);
+
+  if (!(await ownsAttachment(session.email, blobName))) {
+    return NextResponse.json({ error: "Attachment not found." }, { status: 404 });
+  }
 
   try {
     const container = await getAttachmentContainer();

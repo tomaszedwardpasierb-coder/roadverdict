@@ -5,10 +5,12 @@ const mocks = vi.hoisted(() => ({
   getSession: vi.fn(),
   getAttachmentContainer: vi.fn(),
   download: vi.fn(),
+  ownsAttachment: vi.fn(),
 }));
 
 vi.mock("@/lib/auth/session", () => ({ getSession: mocks.getSession }));
 vi.mock("@/lib/blobStorage", () => ({ getAttachmentContainer: mocks.getAttachmentContainer }));
+vi.mock("@/lib/tracker/attachmentOwnership", () => ({ ownsAttachment: mocks.ownsAttachment }));
 
 import { GET } from "@/app/api/tracker/attachment/[blobName]/route";
 
@@ -30,6 +32,7 @@ describe("GET /api/tracker/attachment/[blobName]", () => {
     mocks.getAttachmentContainer.mockResolvedValue({
       getBlockBlobClient: () => ({ download: mocks.download }),
     });
+    mocks.ownsAttachment.mockResolvedValue(true);
   });
 
   it("rejects unauthenticated requests without ever touching blob storage", async () => {
@@ -37,6 +40,26 @@ describe("GET /api/tracker/attachment/[blobName]", () => {
     const response = await GET(request(), { params: { blobName: "abc.jpg" } });
     expect(response.status).toBe(401);
     expect(mocks.getAttachmentContainer).not.toHaveBeenCalled();
+  });
+
+  // The actual security fix: any signed-in account used to be enough to
+  // fetch ANY blob by name, regardless of whose it was. A blobName that
+  // isn't among the caller's own records must now be refused before
+  // blob storage is ever touched.
+  it("returns 404 without touching blob storage when the caller doesn't own the attachment", async () => {
+    mocks.getSession.mockResolvedValue({ email: "attacker@example.com" });
+    mocks.ownsAttachment.mockResolvedValue(false);
+    const response = await GET(request(), { params: { blobName: "victims-receipt.jpg" } });
+    expect(response.status).toBe(404);
+    await expect(response.json()).resolves.toEqual({ error: "Attachment not found." });
+    expect(mocks.getAttachmentContainer).not.toHaveBeenCalled();
+  });
+
+  it("checks ownership against the signed-in session's own email, not any client-supplied value", async () => {
+    mocks.getSession.mockResolvedValue({ email: "owner@example.com" });
+    mocks.download.mockResolvedValue({ contentType: "image/jpeg", readableStreamBody: fakeStream([]) });
+    await GET(request(), { params: { blobName: "abc.jpg" } });
+    expect(mocks.ownsAttachment).toHaveBeenCalledWith("owner@example.com", "abc.jpg");
   });
 
   it("streams the blob back with its content type, inline disposition, and a private cache header", async () => {
