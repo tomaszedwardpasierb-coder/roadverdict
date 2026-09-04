@@ -130,6 +130,21 @@ jobs:
           client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_58CD24E8269D4F86A21D229F1D16C1BC }}
           tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_5AC1E6A88B8D4BD083D4EF5FB1C56E5B }}
           subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_9AEFEAE0070247B48082559465350A6A }}
+      # The Build step above already produced a fully installed
+      # node_modules and a built .next directory - without this, Azure's
+      # Oryx build system runs npm install/build AGAIN on the uploaded
+      # package (package: . below includes both already), which is most
+      # of why "Package deployment using OneDeploy" can sit for 5-15
+      # minutes doing fully redundant work. Idempotent, safe on every
+      # deploy. Resource group is looked up dynamically rather than
+      # hardcoded, since nothing in this file needed one before now.
+      - name: Skip Azure's redundant server-side rebuild on deploy
+        run: |
+          RESOURCE_GROUP=$(az webapp list --query "[?name=='roadverdict'].resourceGroup" -o tsv)
+          az webapp config appsettings set \
+            --name roadverdict \
+            --resource-group "$RESOURCE_GROUP" \
+            --settings SCM_DO_BUILD_DURING_DEPLOYMENT=false
       - name: 'Deploy to Azure Web App'
         id: deploy-to-webapp
         uses: azure/webapps-deploy@v3
