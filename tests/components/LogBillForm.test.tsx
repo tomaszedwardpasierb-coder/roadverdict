@@ -41,6 +41,18 @@ describe("LogBillForm", () => {
     expect(document.getElementById("remind-bill-value-0")).toHaveValue(12);
   });
 
+  it("shows the insurance-not-in-report note by default (insurance is the default type)", () => {
+    render(<LogBillForm currency="GBP" rates={null} />);
+    expect(screen.getByText(/won't appear in your shareable report by default/)).toBeInTheDocument();
+  });
+
+  it("hides the insurance note once a non-insurance type is selected", async () => {
+    const user = userEvent.setup();
+    render(<LogBillForm currency="GBP" rates={null} />);
+    await user.selectOptions(screen.getByLabelText("Type"), "road-tax");
+    expect(screen.queryByText(/won't appear in your shareable report by default/)).not.toBeInTheDocument();
+  });
+
   it("blocks submission with an error when the date is before the bike's own production year", async () => {
     const user = userEvent.setup();
     render(<LogBillForm currency="GBP" rates={null} bikeYear={2020} isCustomBuild={false} />);

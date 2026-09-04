@@ -165,6 +165,13 @@ export function LogBillForm({
               <option key={value} value={value}>{label}</option>
             ))}
           </select>
+          {billType === 'insurance' && (
+            <p className="field-note" style={{ color: 'var(--amber-ink)' }}>
+              Insurance costs are personal to you and won&apos;t appear in your shareable report by default - a new
+              owner&apos;s premium will be different. You can change this in your Insurance, Tax &amp; MOT settings
+              if you&apos;d rather show it anyway.
+            </p>
+          )}
         </div>
 
         {isPlanEligible && (

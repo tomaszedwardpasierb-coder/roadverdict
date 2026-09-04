@@ -103,6 +103,15 @@ export interface BikeDoc {
   fuelEconomyUnit?: FuelEconomyUnit;
   currency?: Currency;
   chartTypes?: Record<string, ChartKind>;
+  // Optional, additive - undefined/false (the default) means insurance
+  // history is left out of this bike's buyer-facing report. A future
+  // owner's own insurance premium depends on things specific to THEM
+  // (age, licence history, no-claims record), never on the bike, so it
+  // isn't predictive of what they'll actually pay - unlike road tax or
+  // MOT, which are genuinely tied to the vehicle and always shown. Only
+  // affects the two buyer report surfaces, never the owner's own
+  // dashboard/spend charts/cost-per-mile, which keep including it.
+  includeInsuranceInReport?: boolean;
   // Set once, at creation (or backfilled once for bikes added before this
   // existed) - never editable after that through any normal flow, not
   // even "edit bike". Optional on the type only because bikes created
@@ -474,6 +483,15 @@ export async function updateBikeCurrency(email: string, bikeId: string, currency
   const { resource } = await container.item(bikeId, email).read<BikeDoc>();
   if (!resource) return null;
   resource.currency = currency;
+  await container.items.upsert(resource);
+  return resource;
+}
+
+export async function updateBikeIncludeInsuranceInReport(email: string, bikeId: string, includeInsuranceInReport: boolean): Promise<BikeDoc | null> {
+  const container = getContainer();
+  const { resource } = await container.item(bikeId, email).read<BikeDoc>();
+  if (!resource) return null;
+  resource.includeInsuranceInReport = includeInsuranceInReport;
   await container.items.upsert(resource);
   return resource;
 }

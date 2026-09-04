@@ -9,6 +9,7 @@ import {
   updateBikeBudget,
   updateBikeUnits,
   updateBikeCurrency,
+  updateBikeIncludeInsuranceInReport,
   updateBikeChartType,
   updateBikeDvlaData,
   isBikeReadOnly,
@@ -113,7 +114,7 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
   }
 
-  const { currentMileage, region, annualBudget, distanceUnit, fuelEconomyUnit, currency, chartType } = body as {
+  const { currentMileage, region, annualBudget, distanceUnit, fuelEconomyUnit, currency, chartType, includeInsuranceInReport } = body as {
     currentMileage?: number;
     region?: Region;
     annualBudget?: number;
@@ -121,6 +122,7 @@ export async function PATCH(request: NextRequest) {
     fuelEconomyUnit?: FuelEconomyUnit;
     currency?: Currency;
     chartType?: { chartId: string; kind: ChartKind };
+    includeInsuranceInReport?: boolean;
   };
 
   if (
@@ -130,7 +132,8 @@ export async function PATCH(request: NextRequest) {
     !distanceUnit &&
     !fuelEconomyUnit &&
     !currency &&
-    !chartType
+    !chartType &&
+    includeInsuranceInReport === undefined
   ) {
     return NextResponse.json({ error: "Nothing to update." }, { status: 400 });
   }
@@ -172,6 +175,9 @@ export async function PATCH(request: NextRequest) {
   }
   if (chartType?.chartId && chartType?.kind) {
     bike = await updateBikeChartType(session.email, bikeId, chartType.chartId, chartType.kind);
+  }
+  if (includeInsuranceInReport !== undefined) {
+    bike = await updateBikeIncludeInsuranceInReport(session.email, bikeId, includeInsuranceInReport);
   }
 
   if (!bike) {

@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
   updateBikeBudget: vi.fn(),
   updateBikeUnits: vi.fn(),
   updateBikeCurrency: vi.fn(),
+  updateBikeIncludeInsuranceInReport: vi.fn(),
   updateBikeChartType: vi.fn(),
   updateBikeDvlaData: vi.fn(),
   isBikeReadOnly: vi.fn(),
@@ -25,6 +26,7 @@ vi.mock("@/lib/tracker/bike", () => ({
   updateBikeBudget: mocks.updateBikeBudget,
   updateBikeUnits: mocks.updateBikeUnits,
   updateBikeCurrency: mocks.updateBikeCurrency,
+  updateBikeIncludeInsuranceInReport: mocks.updateBikeIncludeInsuranceInReport,
   updateBikeChartType: mocks.updateBikeChartType,
   updateBikeDvlaData: mocks.updateBikeDvlaData,
   isBikeReadOnly: mocks.isBikeReadOnly,
@@ -283,6 +285,25 @@ describe("PATCH /api/tracker/bike", () => {
     const response = await PATCH(request("PATCH", JSON.stringify({ currency: "eur" })));
     expect(response.status).toBe(200);
     expect(mocks.updateBikeCurrency).toHaveBeenCalledWith("owner@example.com", "bike-1", "eur");
+  });
+
+  it("updates includeInsuranceInReport when set to true", async () => {
+    mocks.getSession.mockResolvedValue({ email: "owner@example.com" });
+    mocks.updateBikeIncludeInsuranceInReport.mockResolvedValue({ id: "bike-1", includeInsuranceInReport: true });
+    const response = await PATCH(request("PATCH", JSON.stringify({ includeInsuranceInReport: true })));
+    expect(response.status).toBe(200);
+    expect(mocks.updateBikeIncludeInsuranceInReport).toHaveBeenCalledWith("owner@example.com", "bike-1", true);
+  });
+
+  // Explicitly setting it back to false must still count as "something
+  // to update", not be treated the same as omitting the field entirely -
+  // false is a real, meaningful value here, not an empty one.
+  it("updates includeInsuranceInReport when explicitly set to false", async () => {
+    mocks.getSession.mockResolvedValue({ email: "owner@example.com" });
+    mocks.updateBikeIncludeInsuranceInReport.mockResolvedValue({ id: "bike-1", includeInsuranceInReport: false });
+    const response = await PATCH(request("PATCH", JSON.stringify({ includeInsuranceInReport: false })));
+    expect(response.status).toBe(200);
+    expect(mocks.updateBikeIncludeInsuranceInReport).toHaveBeenCalledWith("owner@example.com", "bike-1", false);
   });
 
   it("updates a chart's type only when both chartId and kind are supplied", async () => {

@@ -25,12 +25,14 @@ export function BillCard({
   rates,
   pendingReviewIds,
   distanceUnit,
+  includeInsuranceInReport = false,
 }: {
   bill: BillDoc;
   currency: Currency;
   rates: ExchangeRates | null;
   pendingReviewIds: Record<ReviewCategory, string[]>;
   distanceUnit: DistanceUnit;
+  includeInsuranceInReport?: boolean;
 }) {
   const { switchTo, focusId, setFocusId, highlightIds } = useTabSwitch();
   const [isEditing, setIsEditing] = useState(false);
@@ -186,6 +188,9 @@ export function BillCard({
       </div>
       <div className={styles.jobCardMeta}>{fmtDate(bill.date)}</div>
       {bill.seriesId && <div className={styles.jobCardMeta}>📄 Instalment plan</div>}
+      {bill.billType === 'insurance' && !includeInsuranceInReport && (
+        <div className={styles.jobCardMeta}>Not shown in buyer report</div>
+      )}
       {bill.mileage != null && (
         <div className={styles.jobCardMeta}>DVSA-recorded mileage: {formatDistance(bill.mileage, distanceUnit)}</div>
       )}

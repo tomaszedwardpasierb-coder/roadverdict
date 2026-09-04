@@ -39,6 +39,7 @@ import { FuelLogCard } from "./FuelLogCard";
 import { ModCard } from "./ModCard";
 import { BillCard } from "./BillCard";
 import { BillSeriesSummary } from "./BillSeriesSummary";
+import { InsuranceReportSetting } from "./InsuranceReportSetting";
 import { ReminderItem } from "./ReminderItem";
 import { BudgetWidget } from "./BudgetWidget";
 import { SpendDonutChart } from "./SpendDonutChart";
@@ -424,11 +425,22 @@ export default async function DashboardPage() {
       <p className={styles.subtext}>The paperwork you genuinely can&apos;t afford to forget, tracked in one place, automatically.</p>
       <LogBillForm currency={currency} rates={rates} bikeYear={bike.year} isCustomBuild={bike.isCustomBuild} />
       {billSeries.length > 0 && <BillSeriesSummary series={billSeries} currency={currency} rates={rates} />}
+      <InsuranceReportSetting includeInsuranceInReport={Boolean(bike.includeInsuranceInReport)} />
       <h2 className={styles.sectionHeading}>History</h2>
       {bills.length === 0 ? (
         <div className={styles.card}><p className={styles.cardBody}>No insurance, tax, or MOT payments logged yet.</p></div>
       ) : (
-        bills.map((b) => <BillCard key={b.id} bill={b} currency={currency} rates={rates} pendingReviewIds={pendingReviewIds} distanceUnit={distanceUnit} />)
+        bills.map((b) => (
+          <BillCard
+            key={b.id}
+            bill={b}
+            currency={currency}
+            rates={rates}
+            pendingReviewIds={pendingReviewIds}
+            distanceUnit={distanceUnit}
+            includeInsuranceInReport={Boolean(bike.includeInsuranceInReport)}
+          />
+        ))
       )}
     </>
   );

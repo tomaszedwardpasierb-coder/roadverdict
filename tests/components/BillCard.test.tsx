@@ -84,6 +84,24 @@ describe("BillCard", () => {
     expect(screen.getByText(/12,345 miles/)).toBeInTheDocument();
   });
 
+  it("shows a 'not shown in buyer report' tag for insurance when includeInsuranceInReport is false", () => {
+    const bill = makeBill({ billType: "insurance" });
+    render(<BillCard bill={bill} currency="GBP" rates={null} pendingReviewIds={emptyPendingReviewIds} distanceUnit="mi" includeInsuranceInReport={false} />);
+    expect(screen.getByText("Not shown in buyer report")).toBeInTheDocument();
+  });
+
+  it("hides the tag once includeInsuranceInReport is true", () => {
+    const bill = makeBill({ billType: "insurance" });
+    render(<BillCard bill={bill} currency="GBP" rates={null} pendingReviewIds={emptyPendingReviewIds} distanceUnit="mi" includeInsuranceInReport />);
+    expect(screen.queryByText("Not shown in buyer report")).not.toBeInTheDocument();
+  });
+
+  it("never shows the tag for a non-insurance bill type, regardless of the setting", () => {
+    const bill = makeBill({ billType: "road-tax" });
+    render(<BillCard bill={bill} currency="GBP" rates={null} pendingReviewIds={emptyPendingReviewIds} distanceUnit="mi" includeInsuranceInReport={false} />);
+    expect(screen.queryByText("Not shown in buyer report")).not.toBeInTheDocument();
+  });
+
   it("shows the currency-conversion note when the bill was auto-converted", () => {
     const bill = makeBill({
       currencyConversion: { originalCurrency: "EUR", originalAmount: 350, rate: 0.85, ratedAt: "2024-01-14" },

@@ -46,6 +46,7 @@ import {
   updateBikeShareToken,
   updateBikeUnits,
   updateBikeCurrency,
+  updateBikeIncludeInsuranceInReport,
   setOriginalRegistration,
   addRegistrationChange,
   deleteBike,
@@ -610,6 +611,35 @@ describe("updateBikeCurrency", () => {
     mocks.read.mockResolvedValue({ resource: makeBike() });
     const result = await updateBikeCurrency("owner@example.com", "bike-1", "eur" as any);
     expect(result?.currency).toBe("eur");
+  });
+});
+
+// ---------------------------------------------------------------------
+// updateBikeIncludeInsuranceInReport
+// ---------------------------------------------------------------------
+
+describe("updateBikeIncludeInsuranceInReport", () => {
+  beforeEach(() => {
+    resetAllMocks();
+    mocks.upsert.mockResolvedValue(undefined);
+  });
+
+  it("returns null when the bike doesn't exist", async () => {
+    mocks.read.mockResolvedValue({ resource: undefined });
+    expect(await updateBikeIncludeInsuranceInReport("owner@example.com", "missing", true)).toBeNull();
+  });
+
+  it("sets includeInsuranceInReport to true and upserts", async () => {
+    mocks.read.mockResolvedValue({ resource: makeBike() });
+    const result = await updateBikeIncludeInsuranceInReport("owner@example.com", "bike-1", true);
+    expect(result?.includeInsuranceInReport).toBe(true);
+    expect(mocks.upsert).toHaveBeenCalledTimes(1);
+  });
+
+  it("sets includeInsuranceInReport back to false and upserts", async () => {
+    mocks.read.mockResolvedValue({ resource: makeBike({ includeInsuranceInReport: true }) });
+    const result = await updateBikeIncludeInsuranceInReport("owner@example.com", "bike-1", false);
+    expect(result?.includeInsuranceInReport).toBe(false);
   });
 });
 

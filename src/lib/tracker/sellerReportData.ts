@@ -152,9 +152,17 @@ export function computeSellerReportRowsAndMetrics(
   fuelLogs: FuelLogDoc[],
   reminders: ReminderDoc[]
 ) {
-  const rows: ReportRow[] = [
-    ...records.map((r) => ({ id: r.id, date: r.date, createdAt: r.createdAt, category: "Service", description: JOB_LABELS[r.jobType] ?? r.jobType, cost: r.cost, attachment: r.attachments?.[0] ?? null })),
-    ...mods.map((m) => ({ id: m.id, date: m.date, createdAt: m.createdAt, category: "Modification", description: `${MOD_LABELS[m.category] ?? m.category}: ${m.name}`, cost: m.cost, attachment: m.attachments?.[0] ?? null })),
+  // Insurance is owner-specific, not bike-specific - a future buyer's own
+  // premium depends on THEM (age, licence history, no-claims record),
+  // never on this bike, so its cost isn't predictive the way a service,
+  // an MOT, or road tax is. Hidden from the buyer-facing rows/total below
+  // by default (bike.includeInsuranceInReport opts back in), but still
+  // counted in every trust/documentation metric further down - a
+  // diligently-logged, receipted insurance payment is still real evidence
+  // of careful record-keeping, even though its amount isn't shown.
+  const allRows: (ReportRow & { hiddenFromBuyer: boolean })[] = [
+    ...records.map((r) => ({ id: r.id, date: r.date, createdAt: r.createdAt, category: "Service", description: JOB_LABELS[r.jobType] ?? r.jobType, cost: r.cost, attachment: r.attachments?.[0] ?? null, hiddenFromBuyer: false })),
+    ...mods.map((m) => ({ id: m.id, date: m.date, createdAt: m.createdAt, category: "Modification", description: `${MOD_LABELS[m.category] ?? m.category}: ${m.name}`, cost: m.cost, attachment: m.attachments?.[0] ?? null, hiddenFromBuyer: false })),
     ...bills.map((b) => ({
       id: b.id,
       date: b.date,
@@ -169,16 +177,23 @@ export function computeSellerReportRowsAndMetrics(
       description: b.source === "auto" && b.notes ? `${BILL_LABELS[b.billType] ?? b.billType} (${b.notes.toLowerCase()})` : BILL_LABELS[b.billType] ?? b.billType,
       cost: b.cost,
       attachment: b.attachments?.[0] ?? null,
+      hiddenFromBuyer: b.billType === "insurance" && !bike.includeInsuranceInReport,
     })),
   ].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
+  // What a buyer actually sees, and what "Total logged spend" adds up
+  // to - never includes a hidden row, so the displayed total always
+  // matches the sum of the rows on screen.
+  const rows: ReportRow[] = allRows.filter((r) => !r.hiddenFromBuyer).map(({ hiddenFromBuyer, ...row }) => row);
   const total = rows.reduce((sum, r) => sum + r.cost, 0);
 
-  const backdateItems: BackdateCheckItem[] = rows.map((r) => ({ id: r.id, date: r.date, createdAt: r.createdAt, hasAttachment: !!r.attachment }));
+  // Trust/documentation signals below are computed from EVERY logged
+  // entry, hidden-from-buyer ones included - see the comment above allRows.
+  const backdateItems: BackdateCheckItem[] = allRows.map((r) => ({ id: r.id, date: r.date, createdAt: r.createdAt, hasAttachment: !!r.attachment }));
   const clusters = detectBulkBackdating(backdateItems);
-  const backdatedCount = rows.filter((r) => isBackdated(r.date, r.createdAt)).length;
-  const realTimeCount = rows.length - backdatedCount;
-  const receiptCount = rows.filter((r) => r.attachment).length;
+  const backdatedCount = allRows.filter((r) => isBackdated(r.date, r.createdAt)).length;
+  const realTimeCount = allRows.length - backdatedCount;
+  const receiptCount = allRows.filter((r) => r.attachment).length;
 
   const registrationChanges = bike.registrationChanges ?? [];
   const currentRegistration = getCurrentRegistration(bike);
@@ -197,7 +212,7 @@ export function computeSellerReportRowsAndMetrics(
   ];
   const mileageViolationCount = findMileageMonotonicityViolations(mileagePoints).length;
 
-  const sortedRowDates = rows.map((r) => new Date(r.date).getTime()).sort((a, b) => a - b);
+  const sortedRowDates = allRows.map((r) => new Date(r.date).getTime()).sort((a, b) => a - b);
   let longestGapDays = 0;
   for (let i = 1; i < sortedRowDates.length; i++) {
     longestGapDays = Math.max(longestGapDays, Math.round((sortedRowDates[i] - sortedRowDates[i - 1]) / 86400000));
@@ -207,7 +222,7 @@ export function computeSellerReportRowsAndMetrics(
   const overdueReminderCount = reminders.filter((r) => computeReminderStatus(r, bike.currentMileage) === "overdue").length;
 
   const verdictMetrics: SellerVerdictMetrics = {
-    totalEntries: rows.length,
+    totalEntries: allRows.length,
     receiptCount,
     entriesInBulkClusters,
     largestClusterSpanDays,

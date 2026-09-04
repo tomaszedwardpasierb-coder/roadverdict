@@ -89,7 +89,10 @@ describe("computeSellerReportRowsAndMetrics", () => {
   it("builds rows from service records, mods, and bills only - not fuel logs", () => {
     const records = [makeRecord()];
     const mods = [{ id: "m-1", pk: "x", type: "mod", category: "exhaust", name: "Akrapovic can", cost: 300, mileage: 5000, notes: "", date: "2025-02-01", createdAt: "2025-02-02T00:00:00.000Z" } as ModDoc];
-    const bills = [{ id: "b-1", pk: "x", type: "bill", billType: "insurance", cost: 200, notes: "", date: "2025-03-01", createdAt: "2025-03-02T00:00:00.000Z" } as BillDoc];
+    // road-tax, not insurance - insurance's own default-hidden behaviour
+    // is covered separately below, this test is only about fuel logs
+    // never becoming a row at all.
+    const bills = [{ id: "b-1", pk: "x", type: "bill", billType: "road-tax", cost: 200, notes: "", date: "2025-03-01", createdAt: "2025-03-02T00:00:00.000Z" } as BillDoc];
     const fuelLogs = [{ id: "f-1", pk: "x", type: "fuelLog", litres: 10, cost: 15, mileage: 5000, filledToFull: true, date: "2025-04-01", createdAt: "2025-04-02T00:00:00.000Z" } as FuelLogDoc];
 
     const result = computeSellerReportRowsAndMetrics(bike, records, mods, bills, fuelLogs, []);
@@ -185,6 +188,51 @@ describe("computeSellerReportRowsAndMetrics", () => {
     const result = computeSellerReportRowsAndMetrics(bike, records, [], [], [], []);
     expect(result.verdictMetrics.mileageViolationCount).toBe(0);
     expect(result.clusters).toEqual([]);
+  });
+
+  describe("hiding insurance from the buyer-facing rows and total", () => {
+    const insuranceBill = { id: "b-ins", pk: "x", type: "bill" as const, billType: "insurance", cost: 200, notes: "", date: "2025-03-01", createdAt: "2025-03-02T00:00:00.000Z" } as BillDoc;
+    const roadTaxBill = { id: "b-tax", pk: "x", type: "bill" as const, billType: "road-tax", cost: 90, notes: "", date: "2025-04-01", createdAt: "2025-04-02T00:00:00.000Z" } as BillDoc;
+    const motBill = { id: "b-mot", pk: "x", type: "bill" as const, billType: "mot-test", cost: 55, notes: "", date: "2025-05-01", createdAt: "2025-05-02T00:00:00.000Z" } as BillDoc;
+
+    it("excludes insurance from rows and total by default (bike.includeInsuranceInReport unset)", () => {
+      const result = computeSellerReportRowsAndMetrics(makeBike(), [], [], [insuranceBill, roadTaxBill], [], []);
+      expect(result.rows.map((r) => r.id)).toEqual(["b-tax"]);
+      expect(result.total).toBe(90);
+    });
+
+    it("excludes insurance when includeInsuranceInReport is explicitly false", () => {
+      const result = computeSellerReportRowsAndMetrics(makeBike({ includeInsuranceInReport: false }), [], [], [insuranceBill], [], []);
+      expect(result.rows).toEqual([]);
+      expect(result.total).toBe(0);
+    });
+
+    it("shows insurance once includeInsuranceInReport is true", () => {
+      const result = computeSellerReportRowsAndMetrics(makeBike({ includeInsuranceInReport: true }), [], [], [insuranceBill, roadTaxBill], [], []);
+      expect(result.rows.map((r) => r.id).sort()).toEqual(["b-ins", "b-tax"]);
+      expect(result.total).toBe(290);
+    });
+
+    it("never hides road tax or MOT, regardless of the setting", () => {
+      const result = computeSellerReportRowsAndMetrics(makeBike({ includeInsuranceInReport: false }), [], [], [roadTaxBill, motBill], [], []);
+      expect(result.rows.map((r) => r.id).sort()).toEqual(["b-mot", "b-tax"]);
+    });
+
+    it("still counts a hidden insurance entry toward totalEntries and receiptCount - documentation trust signals aren't affected by buyer-facing visibility", () => {
+      const insuranceWithReceipt = { ...insuranceBill, attachments: [{ blobName: "a.jpg", fileName: "a.jpg", fileType: "image/jpeg" as const, uploadedAt: "2025-03-01" }] };
+      const result = computeSellerReportRowsAndMetrics(makeBike(), [], [], [insuranceWithReceipt], [], []);
+      expect(result.rows).toEqual([]); // hidden from the buyer-facing table
+      expect(result.verdictMetrics.totalEntries).toBe(1); // but still counted as real, documented history
+      expect(result.verdictMetrics.receiptCount).toBe(1);
+    });
+
+    it("still counts a hidden insurance entry's date toward backdatedCount/realTimeCount and longestGapDays", () => {
+      const backdatedInsurance = { ...insuranceBill, date: "2025-01-01", createdAt: "2025-04-01T00:00:00.000Z" };
+      const result = computeSellerReportRowsAndMetrics(makeBike(), [], [], [backdatedInsurance], [], []);
+      expect(result.rows).toEqual([]);
+      expect(result.backdatedCount).toBe(1);
+      expect(result.realTimeCount).toBe(0);
+    });
   });
 });
 
