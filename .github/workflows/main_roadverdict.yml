@@ -135,16 +135,34 @@ jobs:
       # Oryx build system runs npm install/build AGAIN on the uploaded
       # package (package: . below includes both already), which is most
       # of why "Package deployment using OneDeploy" can sit for 5-15
-      # minutes doing fully redundant work. Idempotent, safe on every
-      # deploy. Resource group is looked up dynamically rather than
-      # hardcoded, since nothing in this file needed one before now.
+      # minutes doing fully redundant work. Resource group is looked up
+      # dynamically rather than hardcoded, since nothing in this file
+      # needed one before now.
+      #
+      # Only WRITES the setting (and only then waits) when it isn't
+      # already correct - changing an App Service setting restarts its
+      # SCM/Kudu container, and starting a deploy while that restart is
+      # still in flight fails outright ("Deployment has been stopped due
+      # to SCM container restart... do not perform a management
+      # operation and a deployment operation in quick succession" - the
+      # exact failure this caused the first time this step ran). Once
+      # it's set correctly, every later deploy skips the write entirely,
+      # so there's no restart and no wait needed on the common path.
       - name: Skip Azure's redundant server-side rebuild on deploy
         run: |
           RESOURCE_GROUP=$(az webapp list --query "[?name=='roadverdict'].resourceGroup" -o tsv)
-          az webapp config appsettings set \
+          CURRENT=$(az webapp config appsettings list \
             --name roadverdict \
             --resource-group "$RESOURCE_GROUP" \
-            --settings SCM_DO_BUILD_DURING_DEPLOYMENT=false
+            --query "[?name=='SCM_DO_BUILD_DURING_DEPLOYMENT'].value" -o tsv)
+          if [ "$CURRENT" != "false" ]; then
+            az webapp config appsettings set \
+              --name roadverdict \
+              --resource-group "$RESOURCE_GROUP" \
+              --settings SCM_DO_BUILD_DURING_DEPLOYMENT=false
+            echo "Setting changed - waiting for the SCM container restart it triggers to settle before deploying."
+            sleep 45
+          fi
       - name: 'Deploy to Azure Web App'
         id: deploy-to-webapp
         uses: azure/webapps-deploy@v3
