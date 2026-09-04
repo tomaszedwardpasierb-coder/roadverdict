@@ -697,20 +697,21 @@ describe("deleteBike", () => {
     });
   }
 
-  it("queries and deletes every matching record across all five record types", async () => {
+  it("queries and deletes every matching record across all six record types", async () => {
     mocks.read.mockResolvedValue({ resource: makeBike({ shareToken: undefined }) });
     mockRecordsByType({
       serviceRecord: [{ id: "sr-1" }],
       fuelLog: [{ id: "fl-1" }, { id: "fl-2" }],
       mod: [],
       bill: [{ id: "bl-1" }],
+      billSeries: [],
       reminder: [],
     });
 
     await deleteBike("owner@example.com", "bike-1");
 
     const queriedTypes = mockContainer.items.query.mock.calls.map((call: any) => call[0].parameters.find((p: any) => p.name === "@type").value);
-    expect(queriedTypes.sort()).toEqual(["bill", "fuelLog", "mod", "reminder", "serviceRecord"].sort());
+    expect(queriedTypes.sort()).toEqual(["bill", "billSeries", "fuelLog", "mod", "reminder", "serviceRecord"].sort());
     // 4 real records deleted, plus the bike document itself = 5 deletes.
     expect(mocks.deleteFn).toHaveBeenCalledTimes(5);
   });

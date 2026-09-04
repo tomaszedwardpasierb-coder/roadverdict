@@ -10,6 +10,16 @@ export interface BillDoc extends TrackerDocBase {
   // MOT history, where DVSA's own odometer reading doubles as a genuine
   // mileage anchor point. Existing bills simply have none.
   mileage?: number;
+  // Optional, additive - set only on a bill that belongs to a recurring
+  // instalment plan (see billSeries.ts). seriesIndex is 0 for the first/
+  // deposit payment, incrementing from there. Existing bills, and any
+  // one-off bill logged the normal way, simply have neither field.
+  seriesId?: string;
+  seriesIndex?: number;
+  // Default 'manual' in effect (i.e. whenever absent) - 'auto' only for
+  // an instalment written by materializeDueInstalments, never by a
+  // normal "Log it" submission.
+  source?: "manual" | "auto";
 }
 
 export async function createBill(

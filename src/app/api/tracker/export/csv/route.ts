@@ -5,7 +5,8 @@ import { getServiceRecords } from "@/lib/tracker/serviceRecord";
 import { getFuelLogs } from "@/lib/tracker/fuelLog";
 import { getMods } from "@/lib/tracker/mod";
 import { getBills } from "@/lib/tracker/bill";
-import { getPrimaryBike } from "@/lib/tracker/bike";
+import { materializeAllDueForBike } from "@/lib/tracker/billSeries";
+import { getPrimaryBike, isBikeReadOnly } from "@/lib/tracker/bike";
 import { JOB_LABELS } from "@/lib/tracker/jobTypes";
 import { MOD_LABELS } from "@/lib/tracker/modTypes";
 import { BILL_LABELS } from "@/lib/tracker/billTypes";
@@ -29,6 +30,14 @@ export async function GET() {
   const bike = await getPrimaryBike(session.email);
   if (!bike) {
     return NextResponse.json({ error: "No bike found for this account." }, { status: 404 });
+  }
+
+  // Same lazy-materialisation call as the dashboard, so an export taken
+  // without ever loading the dashboard first still includes whatever an
+  // instalment plan owes by today. Skipped for a transferred (read-only)
+  // bike, same reasoning as the dashboard's own call.
+  if (!isBikeReadOnly(bike)) {
+    await materializeAllDueForBike(session.email, bike.id);
   }
 
   const [records, fuelLogs, mods, bills] = await Promise.all([

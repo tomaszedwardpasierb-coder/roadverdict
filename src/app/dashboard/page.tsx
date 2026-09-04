@@ -8,6 +8,7 @@ import { getServiceRecords } from "@/lib/tracker/serviceRecord";
 import { getFuelLogs, computeActualMPG, computeMPGSeries } from "@/lib/tracker/fuelLog";
 import { getMods } from "@/lib/tracker/mod";
 import { getBills } from "@/lib/tracker/bill";
+import { getBillSeriesForBike, materializeAllDueForBike } from "@/lib/tracker/billSeries";
 import { getReminders, computeReminderStatus } from "@/lib/tracker/reminder";
 import { getShareLinksForUser } from "@/lib/tracker/shareLink";
 import { getPendingReceiptRequestsForOwner } from "@/lib/tracker/receiptRequest";
@@ -37,6 +38,7 @@ import { ServiceHistoryCard } from "./ServiceHistoryCard";
 import { FuelLogCard } from "./FuelLogCard";
 import { ModCard } from "./ModCard";
 import { BillCard } from "./BillCard";
+import { BillSeriesSummary } from "./BillSeriesSummary";
 import { ReminderItem } from "./ReminderItem";
 import { BudgetWidget } from "./BudgetWidget";
 import { SpendDonutChart } from "./SpendDonutChart";
@@ -119,11 +121,23 @@ export default async function DashboardPage() {
   const fuelEconomyUnit: FuelEconomyUnit = bike.fuelEconomyUnit ?? "mpg";
   const currency: Currency = bike.currency ?? "GBP";
 
-  const [records, fuelLogs, mods, bills, reminders, rates] = await Promise.all([
+  // Lazy materialisation - writes any instalment plan's due payments as
+  // real bills before they're read below, rather than relying on a cron
+  // that doesn't exist. Must run before getBills, not in parallel with
+  // it, since it's what a fresh dashboard load depends on being current.
+  // Skipped for a transferred (read-only) bike - once sold, its previous
+  // owner's frozen copy shouldn't keep growing new insurance payments
+  // for a bike they no longer own.
+  if (!isBikeReadOnly(bike)) {
+    await materializeAllDueForBike(session.email, bike.id);
+  }
+
+  const [records, fuelLogs, mods, bills, billSeries, reminders, rates] = await Promise.all([
     getServiceRecords(session.email, bike.id),
     getFuelLogs(session.email, bike.id),
     getMods(session.email, bike.id),
     getBills(session.email, bike.id),
+    getBillSeriesForBike(session.email, bike.id),
     getReminders(session.email, bike.id),
     getExchangeRates(),
   ]);
@@ -409,6 +423,7 @@ export default async function DashboardPage() {
       </div>
       <p className={styles.subtext}>The paperwork you genuinely can&apos;t afford to forget, tracked in one place, automatically.</p>
       <LogBillForm currency={currency} rates={rates} bikeYear={bike.year} isCustomBuild={bike.isCustomBuild} />
+      {billSeries.length > 0 && <BillSeriesSummary series={billSeries} currency={currency} rates={rates} />}
       <h2 className={styles.sectionHeading}>History</h2>
       {bills.length === 0 ? (
         <div className={styles.card}><p className={styles.cardBody}>No insurance, tax, or MOT payments logged yet.</p></div>

@@ -12,6 +12,7 @@ const mocks = vi.hoisted(() => ({
   getReminders: vi.fn(),
   resolveShareToken: vi.fn(),
   getReceiptRequestsForShareToken: vi.fn(),
+  materializeAllDueForBike: vi.fn(),
 }));
 
 vi.mock("next/navigation", () => ({ notFound: mocks.notFound }));
@@ -30,6 +31,7 @@ vi.mock("@/lib/tracker/bill", () => ({ getBills: mocks.getBills }));
 vi.mock("@/lib/tracker/fuelLog", () => ({ getFuelLogs: mocks.getFuelLogs }));
 vi.mock("@/lib/tracker/reminder", () => ({ getReminders: mocks.getReminders }));
 vi.mock("@/lib/tracker/shareLink", () => ({ resolveShareToken: mocks.resolveShareToken }));
+vi.mock("@/lib/tracker/billSeries", () => ({ materializeAllDueForBike: mocks.materializeAllDueForBike }));
 
 // Only getReceiptRequestsForShareToken is a genuine I/O boundary -
 // canSendReminder is pure and already covered by receiptRequest.test.ts.

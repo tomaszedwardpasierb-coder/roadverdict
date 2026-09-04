@@ -1,10 +1,11 @@
 // Place at: src/lib/tracker/sellerReportData.ts
 import { notFound } from "next/navigation";
 import { resolveShareToken } from "@/lib/tracker/shareLink";
-import { getBike, getCurrentRegistration } from "@/lib/tracker/bike";
+import { getBike, getCurrentRegistration, isBikeReadOnly } from "@/lib/tracker/bike";
 import { getServiceRecords } from "@/lib/tracker/serviceRecord";
 import { getMods } from "@/lib/tracker/mod";
 import { getBills } from "@/lib/tracker/bill";
+import { materializeAllDueForBike } from "@/lib/tracker/billSeries";
 import { getFuelLogs } from "@/lib/tracker/fuelLog";
 import { getReminders, type ReminderDoc } from "@/lib/tracker/reminder";
 import { computeReminderStatus } from "@/lib/tracker/reminderStatus";
@@ -154,7 +155,21 @@ export function computeSellerReportRowsAndMetrics(
   const rows: ReportRow[] = [
     ...records.map((r) => ({ id: r.id, date: r.date, createdAt: r.createdAt, category: "Service", description: JOB_LABELS[r.jobType] ?? r.jobType, cost: r.cost, attachment: r.attachments?.[0] ?? null })),
     ...mods.map((m) => ({ id: m.id, date: m.date, createdAt: m.createdAt, category: "Modification", description: `${MOD_LABELS[m.category] ?? m.category}: ${m.name}`, cost: m.cost, attachment: m.attachments?.[0] ?? null })),
-    ...bills.map((b) => ({ id: b.id, date: b.date, createdAt: b.createdAt, category: "Bill", description: BILL_LABELS[b.billType] ?? b.billType, cost: b.cost, attachment: b.attachments?.[0] ?? null })),
+    ...bills.map((b) => ({
+      id: b.id,
+      date: b.date,
+      createdAt: b.createdAt,
+      category: "Bill",
+      // A series-derived instalment gets its position folded into the
+      // description (e.g. "Insurance (instalment 4 of 12)") so a run of
+      // them reads as one continuous obligation rather than looking like
+      // clutter - without actually collapsing the rows, which would
+      // break per-entry receipt requests and understate how many real,
+      // individually-dated entries genuinely back this history.
+      description: b.source === "auto" && b.notes ? `${BILL_LABELS[b.billType] ?? b.billType} (${b.notes.toLowerCase()})` : BILL_LABELS[b.billType] ?? b.billType,
+      cost: b.cost,
+      attachment: b.attachments?.[0] ?? null,
+    })),
   ].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
   const total = rows.reduce((sum, r) => sum + r.cost, 0);
@@ -222,6 +237,16 @@ export function computeSellerReportRowsAndMetrics(
 export async function getSellerReportCore(email: string, bikeId: string): Promise<SellerReportCore> {
   const bike = await getBike(email, bikeId);
   if (!bike) notFound();
+
+  // Same lazy-materialisation call as the dashboard - a buyer opening a
+  // share link (or the owner's own Story/Reports tabs, which reuse this
+  // exact core) should never see an instalment plan stuck showing stale,
+  // un-materialised payments just because nobody happened to load the
+  // dashboard first. Skipped for a transferred (read-only) bike, same
+  // reasoning as the dashboard's own call.
+  if (!isBikeReadOnly(bike)) {
+    await materializeAllDueForBike(email, bikeId);
+  }
 
   const [records, mods, bills, fuelLogs, reminders] = await Promise.all([
     getServiceRecords(email, bikeId),

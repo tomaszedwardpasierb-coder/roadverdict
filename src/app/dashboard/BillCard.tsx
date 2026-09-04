@@ -185,6 +185,7 @@ export function BillCard({
         <span className={styles.jobCardCost}>{formatCurrency(bill.cost, currency, rates)}</span>
       </div>
       <div className={styles.jobCardMeta}>{fmtDate(bill.date)}</div>
+      {bill.seriesId && <div className={styles.jobCardMeta}>📄 Instalment plan</div>}
       {bill.mileage != null && (
         <div className={styles.jobCardMeta}>DVSA-recorded mileage: {formatDistance(bill.mileage, distanceUnit)}</div>
       )}

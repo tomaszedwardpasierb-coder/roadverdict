@@ -3,18 +3,21 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   getSession: vi.fn(),
   getPrimaryBike: vi.fn(),
+  isBikeReadOnly: vi.fn(),
   getServiceRecords: vi.fn(),
   getFuelLogs: vi.fn(),
   getMods: vi.fn(),
   getBills: vi.fn(),
+  materializeAllDueForBike: vi.fn(),
 }));
 
 vi.mock("@/lib/auth/session", () => ({ getSession: mocks.getSession }));
-vi.mock("@/lib/tracker/bike", () => ({ getPrimaryBike: mocks.getPrimaryBike }));
+vi.mock("@/lib/tracker/bike", () => ({ getPrimaryBike: mocks.getPrimaryBike, isBikeReadOnly: mocks.isBikeReadOnly }));
 vi.mock("@/lib/tracker/serviceRecord", () => ({ getServiceRecords: mocks.getServiceRecords }));
 vi.mock("@/lib/tracker/fuelLog", () => ({ getFuelLogs: mocks.getFuelLogs }));
 vi.mock("@/lib/tracker/mod", () => ({ getMods: mocks.getMods }));
 vi.mock("@/lib/tracker/bill", () => ({ getBills: mocks.getBills }));
+vi.mock("@/lib/tracker/billSeries", () => ({ materializeAllDueForBike: mocks.materializeAllDueForBike }));
 
 import { GET } from "@/app/api/tracker/export/csv/route";
 
@@ -24,6 +27,8 @@ beforeEach(() => {
   Object.values(mocks).forEach((m) => m.mockReset());
   mocks.getSession.mockResolvedValue({ email: "rider@example.com" });
   mocks.getPrimaryBike.mockResolvedValue(bike);
+  mocks.isBikeReadOnly.mockReturnValue(false);
+  mocks.materializeAllDueForBike.mockResolvedValue(undefined);
   mocks.getServiceRecords.mockResolvedValue([]);
   mocks.getFuelLogs.mockResolvedValue([]);
   mocks.getMods.mockResolvedValue([]);

@@ -539,7 +539,7 @@ export async function deleteBike(email: string, bikeId: string): Promise<void> {
   // real history (hundreds of fuel logs, say), sequential deletes here
   // could genuinely take long enough to risk a request timeout; this
   // does the same work in a fraction of the wall-clock time.
-  const recordTypes = ["serviceRecord", "fuelLog", "mod", "bill", "reminder"];
+  const recordTypes = ["serviceRecord", "fuelLog", "mod", "bill", "billSeries", "reminder"];
   await Promise.all(
     recordTypes.map(async (type) => {
       const { resources } = await container.items
