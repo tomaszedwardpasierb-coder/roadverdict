@@ -43,6 +43,24 @@ export async function unblockAccount(email: string): Promise<void> {
   await container.items.upsert(user);
 }
 
+// Signs a user out everywhere immediately, without blocking or deleting
+// the account - the same point-delete-by-type query deleteAccount()
+// below already runs for "session" docs as part of its full cascade,
+// standalone here so an admin can force a re-login (e.g. a suspected
+// compromised session) without the much stronger, irreversible effects
+// blocking or deleting would also carry.
+export async function revokeAllSessions(email: string): Promise<number> {
+  const container = getContainer();
+  const { resources } = await container.items
+    .query<{ id: string }>(
+      { query: "SELECT c.id FROM c WHERE c.type = 'session'" },
+      { partitionKey: email }
+    )
+    .fetchAll();
+  await Promise.all(resources.map((r) => container.item(r.id, email).delete()));
+  return resources.length;
+}
+
 // expiresAt is capped at MAX_GRANT_YEARS from now, enforced here (not
 // just in the admin form) - this is the one real limit on how much
 // free access a single grant can hand out.

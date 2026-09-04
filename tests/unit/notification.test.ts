@@ -5,6 +5,7 @@ const mocks = vi.hoisted(() => ({
   query: vi.fn(),
   item: vi.fn(),
   patch: vi.fn(),
+  deleteItem: vi.fn(),
 }));
 
 vi.mock("@/lib/cosmos", () => ({
@@ -24,14 +25,17 @@ import {
   getUnreadNotificationCount,
   markNotificationRead,
   markAllNotificationsRead,
+  getBroadcastSummaries,
+  clearNotifications,
 } from "@/lib/tracker/notification";
 
 beforeEach(() => {
   Object.values(mocks).forEach((m) => m.mockReset());
   mocks.create.mockResolvedValue(undefined);
   mocks.query.mockReturnValue({ fetchAll: () => Promise.resolve({ resources: [] }) });
-  mocks.item.mockReturnValue({ patch: mocks.patch });
+  mocks.item.mockReturnValue({ patch: mocks.patch, delete: mocks.deleteItem });
   mocks.patch.mockResolvedValue(undefined);
+  mocks.deleteItem.mockResolvedValue(undefined);
 });
 
 describe("createBroadcastNotifications", () => {
@@ -188,5 +192,100 @@ describe("markAllNotificationsRead", () => {
     await markAllNotificationsRead("rider@example.com");
     const timestamps = mocks.patch.mock.calls.map((c: any[]) => c[0][0].value);
     expect(new Set(timestamps).size).toBe(1);
+  });
+});
+
+describe("getBroadcastSummaries", () => {
+  it("groups per-recipient docs into distinct broadcasts by (title, body, createdAt), counting recipients", async () => {
+    mocks.query.mockReturnValue({
+      fetchAll: () =>
+        Promise.resolve({
+          resources: [
+            { title: "Hi", body: "World", createdAt: "2025-01-01T00:00:00.000Z" },
+            { title: "Hi", body: "World", createdAt: "2025-01-01T00:00:00.000Z" },
+            { title: "Other", body: "Msg", createdAt: "2025-02-01T00:00:00.000Z" },
+          ],
+        }),
+    });
+    const result = await getBroadcastSummaries();
+    expect(result).toEqual([
+      { title: "Other", body: "Msg", createdAt: "2025-02-01T00:00:00.000Z", recipientCount: 1 },
+      { title: "Hi", body: "World", createdAt: "2025-01-01T00:00:00.000Z", recipientCount: 2 },
+    ]);
+  });
+
+  it("returns an empty array when nothing has been sent", async () => {
+    const result = await getBroadcastSummaries();
+    expect(result).toEqual([]);
+  });
+});
+
+describe("clearNotifications", () => {
+  it("deletes every notification for a recipient when broadcasts is 'all'", async () => {
+    mocks.query.mockReturnValue({
+      fetchAll: () =>
+        Promise.resolve({
+          resources: [
+            { id: "n1", title: "A", body: "B", createdAt: "2025-01-01" },
+            { id: "n2", title: "C", body: "D", createdAt: "2025-01-02" },
+          ],
+        }),
+    });
+    const count = await clearNotifications({ broadcasts: "all", recipients: ["rider@example.com"] });
+    expect(mocks.deleteItem).toHaveBeenCalledTimes(2);
+    expect(count).toBe(2);
+  });
+
+  it("only deletes notifications matching a selected broadcast, leaving others untouched", async () => {
+    mocks.query.mockReturnValue({
+      fetchAll: () =>
+        Promise.resolve({
+          resources: [
+            { id: "n1", title: "Match", body: "B", createdAt: "2025-01-01T00:00:00.000Z" },
+            { id: "n2", title: "NoMatch", body: "D", createdAt: "2025-01-02T00:00:00.000Z" },
+          ],
+        }),
+    });
+    const count = await clearNotifications({
+      broadcasts: [{ title: "Match", body: "B", createdAt: "2025-01-01T00:00:00.000Z" }],
+      recipients: ["rider@example.com"],
+    });
+    expect(mocks.deleteItem).toHaveBeenCalledTimes(1);
+    expect(count).toBe(1);
+  });
+
+  it("resolves recipients: 'all' via getAllUserEmails and processes each one", async () => {
+    mocks.query.mockImplementation((q: { query: string }) => ({
+      fetchAll: () => {
+        if (q.query.includes("c.email")) {
+          return Promise.resolve({ resources: [{ email: "a@example.com" }, { email: "b@example.com" }] });
+        }
+        return Promise.resolve({ resources: [{ id: "n1", title: "T", body: "B", createdAt: "x" }] });
+      },
+    }));
+    const count = await clearNotifications({ broadcasts: "all", recipients: "all" });
+    expect(count).toBe(2);
+  });
+
+  it("is best-effort per document - one failed delete doesn't stop the rest", async () => {
+    mocks.query.mockReturnValue({
+      fetchAll: () =>
+        Promise.resolve({
+          resources: [
+            { id: "n1", title: "A", body: "B", createdAt: "x" },
+            { id: "n2", title: "A", body: "B", createdAt: "x" },
+          ],
+        }),
+    });
+    mocks.deleteItem.mockResolvedValueOnce(undefined).mockRejectedValueOnce(new Error("boom"));
+    const count = await clearNotifications({ broadcasts: "all", recipients: ["rider@example.com"] });
+    expect(count).toBe(1);
+  });
+
+  it("returns 0 and deletes nothing when a recipient has no matching notifications", async () => {
+    mocks.query.mockReturnValue({ fetchAll: () => Promise.resolve({ resources: [] }) });
+    const count = await clearNotifications({ broadcasts: "all", recipients: ["rider@example.com"] });
+    expect(count).toBe(0);
+    expect(mocks.deleteItem).not.toHaveBeenCalled();
   });
 });

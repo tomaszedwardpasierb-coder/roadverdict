@@ -20,7 +20,7 @@ import {
 } from '@/lib/admin/stats';
 import { getSiteStats, type SiteStats } from '@/lib/monitoring/appInsights';
 import { getAllAssistantQuestions, groupSimilarQuestions, type AssistantQuestionLogDoc } from '@/lib/tracker/assistantQuestionLog';
-import { getAllUserEmails } from '@/lib/tracker/notification';
+import { getAllUserEmails, getBroadcastSummaries, type BroadcastSummary } from '@/lib/tracker/notification';
 import { getAssistantConfig } from '@/lib/tracker/assistantConfig';
 import { getAllUserAccounts } from '@/lib/tracker/userAccount';
 import { getGeminiUsageByTask, type GeminiUsageByTask } from '@/lib/tracker/geminiUsageLog';
@@ -29,14 +29,16 @@ import { AdminShell } from './AdminShell';
 import { KnowledgeBaseEditor } from './KnowledgeBaseEditor';
 import styles from './adminShell.module.css';
 import { RunCronButton } from './RunCronButton';
-import { DeleteQuestionButton } from './DeleteQuestionButton';
+import { AssistantQuestionsTable } from './AssistantQuestionsTable';
 import { ImpersonateButton } from './ImpersonateButton';
 import { AdminLogoutButton } from './AdminLogoutButton';
 import { SendNotificationForm } from './SendNotificationForm';
+import { ClearNotificationsForm } from './ClearNotificationsForm';
 import { BlockAccountButton } from './BlockAccountButton';
 import { GrantPremiumForm } from './GrantPremiumForm';
 import { DeleteAccountButton } from './DeleteAccountButton';
 import { ResetStoryCooldownButton } from './ResetStoryCooldownButton';
+import { RevokeSessionsButton } from './RevokeSessionsButton';
 
 export const dynamic = 'force-dynamic';
 
@@ -118,6 +120,15 @@ async function getGeminiUsageByTaskSafe(): Promise<GeminiUsageByTask[]> {
   }
 }
 
+async function getBroadcastSummariesSafe(): Promise<BroadcastSummary[]> {
+  try {
+    return await getBroadcastSummaries();
+  } catch (err) {
+    console.error('Failed to load broadcast summaries for /tomasz:', err);
+    return [];
+  }
+}
+
 function sparklinePoints(values: number[], width = 120, height = 32): string {
   if (values.length === 0) return '';
   const max = Math.max(...values, 1);
@@ -178,6 +189,7 @@ export default async function AdminDashboardPage({
     assistantConfig,
     allUserAccounts,
     geminiUsageByTask,
+    broadcastSummaries,
   ] = await Promise.all([
     getDbStats(),
     getActiveSessionCount(),
@@ -198,6 +210,7 @@ export default async function AdminDashboardPage({
     getAssistantConfig(),
     getAllUserAccountsSafe(),
     getGeminiUsageByTaskSafe(),
+    getBroadcastSummariesSafe(),
   ]);
   const health = getServerHealth();
   const commonQuestions = groupSimilarQuestions(assistantQuestions);
@@ -491,8 +504,9 @@ export default async function AdminDashboardPage({
       <h2 className={styles.sectionHeading}>All accounts</h2>
       <p className={styles.warnNote} style={{ marginBottom: '0.6rem' }}>
         Premium is granted manually here, not via real payment yet - see subscriptions.ts. Grants are capped at 3
-        years; blocking signs the account out immediately, not just on their next login attempt. Delete is
-        permanent - every bike, record, and share link tied to that email is gone, with no undo.
+        years; blocking signs the account out immediately, not just on their next login attempt. Sessions forces
+        a re-authentication without blocking - every device signed out now, but they can sign straight back in.
+        Delete is permanent - every bike, record, and share link tied to that email is gone, with no undo.
       </p>
       {allUserAccounts.length === 0 ? (
         <p className={styles.warnNote}>No accounts found.</p>
@@ -505,6 +519,7 @@ export default async function AdminDashboardPage({
               <th>Status</th>
               <th>Premium</th>
               <th>Story cooldown</th>
+              <th>Sessions</th>
               <th>Delete</th>
             </tr>
           </thead>
@@ -519,6 +534,7 @@ export default async function AdminDashboardPage({
                 </td>
                 <td><GrantPremiumForm email={u.email} plan={u.plan ?? null} /></td>
                 <td><ResetStoryCooldownButton email={u.email} /></td>
+                <td><RevokeSessionsButton email={u.email} /></td>
                 <td><DeleteAccountButton email={u.email} /></td>
               </tr>
             ))}
@@ -606,7 +622,14 @@ export default async function AdminDashboardPage({
     </>
   );
 
-  const notificationsContent = <SendNotificationForm allEmails={allUserEmails} />;
+  const notificationsContent = (
+    <>
+      <SendNotificationForm allEmails={allUserEmails} />
+      <div style={{ marginTop: '1.2rem' }}>
+        <ClearNotificationsForm broadcasts={broadcastSummaries} allEmails={allUserEmails} />
+      </div>
+    </>
+  );
 
   const assistantContent = (
     <>
@@ -683,32 +706,7 @@ export default async function AdminDashboardPage({
       )}
 
       <h3 className={styles.cardTitle} style={{ marginTop: '1.2rem', marginBottom: '0.6rem' }}>Most recent</h3>
-      {assistantQuestions.length === 0 ? (
-        <p className={styles.warnNote}>No questions logged yet.</p>
-      ) : (
-        <table className={styles.table}>
-          <thead>
-            <tr>
-              <th>Asked</th>
-              <th>Question</th>
-              <th>Asked by</th>
-              <th>Result</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {assistantQuestions.slice(0, 100).map((q) => (
-              <tr key={q.id}>
-                <td>{fmtDate(q.askedAt)}</td>
-                <td>{q.question}</td>
-                <td>{q.email ?? (q.signedIn ? 'Signed in (no email captured)' : 'Anonymous')}</td>
-                <td style={q.hadError ? { color: 'var(--admin-danger)' } : undefined}>{q.hadError ? 'Error' : 'Answered'}</td>
-                <td><DeleteQuestionButton id={q.id} /></td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
+      <AssistantQuestionsTable questions={assistantQuestions.slice(0, 100)} />
     </>
   );
 

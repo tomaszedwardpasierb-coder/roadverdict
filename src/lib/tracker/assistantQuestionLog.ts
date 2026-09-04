@@ -106,3 +106,17 @@ export async function deleteAssistantQuestion(id: string): Promise<void> {
   const container = getContainer();
   await container.item(id, LOG_PARTITION_KEY).delete();
 }
+
+// Same fixed-partition point-delete as above, just for many ids in one
+// admin action instead of one at a time. Best-effort, not all-or-
+// nothing - one failed delete among many shouldn't block the rest from
+// actually clearing.
+export async function deleteAssistantQuestions(ids: string[]): Promise<number> {
+  const container = getContainer();
+  const results = await Promise.allSettled(ids.map((id) => container.item(id, LOG_PARTITION_KEY).delete()));
+  const failures = results.filter((r) => r.status === "rejected");
+  if (failures.length > 0) {
+    console.error(`deleteAssistantQuestions: ${failures.length} of ${ids.length} failed to delete:`, failures);
+  }
+  return results.filter((r) => r.status === "fulfilled").length;
+}

@@ -25,7 +25,7 @@ vi.mock("@/lib/tracker/bike", () => ({
   deleteBike: mocks.deleteBike,
 }));
 
-import { getAllUserAccounts, blockAccount, unblockAccount, grantPremium, revokePremium, deleteAccount, MAX_GRANT_YEARS } from "@/lib/tracker/userAccount";
+import { getAllUserAccounts, blockAccount, unblockAccount, grantPremium, revokePremium, deleteAccount, revokeAllSessions, MAX_GRANT_YEARS } from "@/lib/tracker/userAccount";
 
 const email = "rider@example.com";
 
@@ -162,5 +162,22 @@ describe("deleteAccount", () => {
     });
 
     await expect(deleteAccount(email)).resolves.toBeUndefined();
+  });
+});
+
+describe("revokeAllSessions", () => {
+  it("queries every session doc in this email's partition and deletes each one", async () => {
+    mocks.query.mockResolvedValue({ resources: [{ id: "session-1" }, { id: "session-2" }] });
+    const count = await revokeAllSessions(email);
+    expect(mocks.query).toHaveBeenCalledWith(expect.objectContaining({ query: expect.stringContaining("c.type = 'session'") }));
+    expect(mocks.itemDelete).toHaveBeenCalledTimes(2);
+    expect(count).toBe(2);
+  });
+
+  it("returns 0 and deletes nothing when there are no sessions to revoke", async () => {
+    mocks.query.mockResolvedValue({ resources: [] });
+    const count = await revokeAllSessions(email);
+    expect(count).toBe(0);
+    expect(mocks.itemDelete).not.toHaveBeenCalled();
   });
 });

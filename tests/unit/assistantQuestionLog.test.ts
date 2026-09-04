@@ -20,6 +20,7 @@ import {
   getAllAssistantQuestions,
   groupSimilarQuestions,
   deleteAssistantQuestion,
+  deleteAssistantQuestions,
   type AssistantQuestionLogDoc,
 } from "@/lib/tracker/assistantQuestionLog";
 
@@ -81,6 +82,33 @@ describe("deleteAssistantQuestion", () => {
     mocks.deleteItem.mockResolvedValue(undefined);
     await deleteAssistantQuestion("q1");
     expect(mockContainer.item).toHaveBeenCalledWith("q1", "assistant-question-log");
+  });
+});
+
+describe("deleteAssistantQuestions", () => {
+  beforeEach(() => mocks.deleteItem.mockReset());
+
+  it("point-deletes every given id using the fixed partition key", async () => {
+    mocks.deleteItem.mockResolvedValue(undefined);
+    const count = await deleteAssistantQuestions(["q1", "q2", "q3"]);
+    expect(mockContainer.item).toHaveBeenCalledWith("q1", "assistant-question-log");
+    expect(mockContainer.item).toHaveBeenCalledWith("q2", "assistant-question-log");
+    expect(mockContainer.item).toHaveBeenCalledWith("q3", "assistant-question-log");
+    expect(count).toBe(3);
+  });
+
+  it("is best-effort - one failed delete doesn't stop the rest, and only counts real successes", async () => {
+    mocks.deleteItem
+      .mockResolvedValueOnce(undefined)
+      .mockRejectedValueOnce(new Error("boom"))
+      .mockResolvedValueOnce(undefined);
+    const count = await deleteAssistantQuestions(["q1", "q2", "q3"]);
+    expect(count).toBe(2);
+  });
+
+  it("returns 0 for an empty id list", async () => {
+    const count = await deleteAssistantQuestions([]);
+    expect(count).toBe(0);
   });
 });
 
