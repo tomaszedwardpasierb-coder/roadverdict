@@ -19,10 +19,14 @@ import type { SellerReportCore } from "@/lib/tracker/sellerReportData";
 import type { BikeIdentity, CategorySpend, ServiceRhythm, MpgTrend } from "@/lib/tracker/storyFacts";
 import { logGeminiUsage } from "@/lib/tracker/geminiUsageLog";
 
-// Reverted to the exact model already proven live in production - see
-// receiptParse.ts's GEMINI_MODEL comment for why the
-// AI-Models-for-Different-Tasks.docx tier split broke on deploy.
-const GEMINI_MODEL = "gemini-3.5-flash-lite";
+// Promoted from gemini-3.5-flash-lite to gemini-3.7-flash - the
+// AI-Models-for-Different-Tasks.docx tier split originally wanted a
+// stronger model here, but broke on deploy the first time it was tried
+// with the (now-deprecating) gemini-2.5-* family - see receiptParse.ts's
+// GEMINI_MODEL comment. gemini-3.7-flash has since run live in this app
+// without issue as buyingGuideBriefing.ts's own canary, which is what
+// makes this a verified promotion rather than a second blind guess.
+const GEMINI_MODEL = "gemini-3.7-flash";
 
 export interface StoryProseInput {
   identity: BikeIdentity;

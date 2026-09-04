@@ -15,12 +15,15 @@
 // text for an opinion, so nothing shows rather than something broken.
 import { logGeminiUsage } from "@/lib/tracker/geminiUsageLog";
 
-// Reverted to the exact model already proven live in production - see
-// receiptParse.ts's GEMINI_MODEL comment for why the
-// AI-Models-for-Different-Tasks.docx tier split (this was meant to be
-// the premium tier) broke on deploy. Worth revisiting once a genuinely
-// stronger model is confirmed live against a real API key.
-const GEMINI_MODEL = "gemini-3.5-flash-lite";
+// Promoted from gemini-3.5-flash-lite to gemini-3.7-flash - this call
+// site was always meant to be the premium tier in
+// AI-Models-for-Different-Tasks.docx, but that broke on deploy the
+// first time it was tried with the (now-deprecating) gemini-2.5-*
+// family (see receiptParse.ts's GEMINI_MODEL comment). gemini-3.7-flash
+// has since run live in this app without issue as buyingGuideBriefing.ts's
+// own canary - the "genuinely stronger model confirmed live" this
+// comment used to be waiting on.
+const GEMINI_MODEL = "gemini-3.7-flash";
 
 export interface BuyerOpinionInput {
   make: string;
