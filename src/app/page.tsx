@@ -5,6 +5,7 @@
 // just redirects here permanently; see src/app/track/page.tsx.
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import Image from 'next/image';
 import { redirect } from 'next/navigation';
 import { headers } from 'next/headers';
 import { getSession } from '@/lib/auth/session';
@@ -12,9 +13,9 @@ import { getSession } from '@/lib/auth/session';
 export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = {
-  title: 'Free Motorcycle Maintenance & Fuel Tracker | RoadVerdict',
+  title: 'Know What Your Vehicle Really Costs | RoadVerdict',
   description:
-    'Log services, fuel, modifications, and running costs for your motorcycle - free, with reminders and real UK price checks. No password, just your email.',
+    'Log every service, fill-up, and repair. Check if a quote is fair before you pay. Know exactly what you\'re looking at before you buy. Free for motorcycles and cars.',
   alternates: { canonical: '/' },
 };
 
@@ -30,7 +31,7 @@ const jsonLd = {
     priceCurrency: 'GBP',
   },
   description:
-    'Free motorcycle maintenance and running-cost tracker for UK riders - services, fuel, modifications, reminders, and real price checks in one place.',
+    'Vehicle ownership tracker and quote checker for UK drivers and riders. Services, fuel, mods, MOT history, and real UK price benchmarks in one place.',
 };
 
 export default async function HomePage() {
@@ -46,114 +47,204 @@ export default async function HomePage() {
         // eslint-disable-next-line react/no-danger
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
-      <div className="hero">
-        <h1>Know exactly what your bike costs you</h1>
-        <p style={{ maxWidth: 'none', margin: '0 0 1.5rem' }}>
-          Log every service, fill-up, and modification - free, for as long as you own the
-          bike. Sign in with just your email, no password to remember.
+
+      {/* ── HERO ─────────────────────────────────────────────────────── */}
+      <section className="rv-hero" aria-label="Hero">
+        {/* Comic panel grid */}
+        <div className="rv-hero-panels" aria-hidden="true">
+          <div className="rv-panel rv-panel-left">
+            <Image
+              src="/images/hero/panel-01.png"
+              alt=""
+              fill
+              style={{ objectFit: 'cover', objectPosition: 'center top' }}
+              priority
+            />
+            <div className="rv-panel-overlay" />
+            <span className="rv-panel-tag">Panel 01</span>
+          </div>
+          <div className="rv-panel-right-col">
+            <div className="rv-panel rv-panel-rt">
+              <Image
+                src="/images/hero/panel-02.png"
+                alt=""
+                fill
+                style={{ objectFit: 'cover', objectPosition: 'center center' }}
+                priority
+              />
+              <div className="rv-panel-overlay" />
+              <span className="rv-panel-tag">Panel 02</span>
+            </div>
+            <div className="rv-panel rv-panel-rb">
+              <Image
+                src="/images/hero/panel-03.png"
+                alt=""
+                fill
+                style={{ objectFit: 'cover', objectPosition: 'center top' }}
+              />
+              <div className="rv-panel-overlay" />
+              <span className="rv-panel-tag">Panel 03</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Content */}
+        <div className="rv-hero-content">
+          <div className="rv-hero-eyebrow">
+            <span className="rv-eyebrow-dot" aria-hidden="true" />
+            Motorcycles &amp; Cars · UK
+          </div>
+          <h1 className="rv-hero-headline">
+            Know what<br />
+            your vehicle<br />
+            <span className="rv-hl-amber">really costs.</span>
+          </h1>
+          <p className="rv-hero-sub">
+            Log every fill-up, service, and repair.{' '}
+            <strong>Check if a quote is fair before you pay.</strong>{' '}
+            Know exactly what you&apos;re looking at before you buy.
+          </p>
+          <div className="rv-hero-actions">
+            <Link href="/login" className="rv-cta-primary">
+              Start tracking free
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M2 7h10M8 3l4 4-4 4"/></svg>
+            </Link>
+            <Link href="/quote-checker" className="rv-cta-secondary">
+              Check a quote →
+            </Link>
+          </div>
+          <ul className="rv-hero-proof" aria-label="Key facts">
+            <li className="rv-proof-item">
+              <span className="rv-proof-check" aria-hidden="true">✓</span>
+              No password — email only
+            </li>
+            <li className="rv-proof-item">
+              <span className="rv-proof-check" aria-hidden="true">✓</span>
+              Free to start
+            </li>
+            <li className="rv-proof-item">
+              <span className="rv-proof-check" aria-hidden="true">✓</span>
+              Real UK price data
+            </li>
+          </ul>
+        </div>
+      </section>
+
+      {/* ── DIAGONAL CUT ─────────────────────────────────────────────── */}
+      <div className="rv-cut" aria-hidden="true" />
+
+      {/* ── PROBLEMS ─────────────────────────────────────────────────── */}
+      <section className="rv-problems" aria-labelledby="problems-heading">
+        <p className="rv-section-eyebrow">Sound familiar?</p>
+        <h2 className="rv-section-heading" id="problems-heading">
+          Every vehicle owner knows these moments.
+        </h2>
+        <p className="rv-section-sub">
+          The ones that cost you money because you didn&apos;t have the right information.
         </p>
-        <p style={{ marginBottom: '2.5rem' }}>
-          <Link href="/login" className="btn-primary" style={{ textDecoration: 'none', display: 'inline-block' }}>
-            Start tracking free
-          </Link>
+        <div className="rv-problem-grid">
+          <div className="rv-problem-card">
+            <div className="rv-problem-num" aria-hidden="true">01</div>
+            <h3 className="rv-problem-title">The quote you can&apos;t verify</h3>
+            <p className="rv-problem-body">Mechanic says £480. Sounds plausible. You pay. Weeks later you find out it should have been £220.</p>
+          </div>
+          <div className="rv-problem-card">
+            <div className="rv-problem-num" aria-hidden="true">02</div>
+            <h3 className="rv-problem-title">The receipt you can&apos;t find</h3>
+            <p className="rv-problem-body">Work gets done. Receipt gets binned. Six months later: no idea what was done, when, or by whom.</p>
+          </div>
+          <div className="rv-problem-card">
+            <div className="rv-problem-num" aria-hidden="true">03</div>
+            <h3 className="rv-problem-title">The cost you never added up</h3>
+            <p className="rv-problem-body">Fuel, insurance, tax, tyres, services. Add it all up once and you&apos;ll never ignore it again.</p>
+          </div>
+          <div className="rv-problem-card">
+            <div className="rv-problem-num" aria-hidden="true">04</div>
+            <h3 className="rv-problem-title">The buy you&apos;ll regret</h3>
+            <p className="rv-problem-body">Seller says &ldquo;immaculate history.&rdquo; The MOT data tells a different story. Only if you know to look.</p>
+          </div>
+        </div>
+      </section>
+
+      {/* ── SOLUTIONS ────────────────────────────────────────────────── */}
+      <section className="rv-solutions" aria-labelledby="solutions-heading">
+        <p className="rv-section-eyebrow">One place for all of it</p>
+        <h2 className="rv-section-heading rv-section-heading--light" id="solutions-heading">
+          Built for vehicle owners, not spreadsheets.
+        </h2>
+        <p className="rv-section-sub rv-section-sub--light">
+          Everything in one place. No app to install. Just your email.
         </p>
-
-        <h2>Sound familiar?</h2>
-        <div className="problem-grid">
-          <div className="info-card">
-            <h3>No idea what fuel really costs</h3>
-            <p>You fill up, pay, and forget. No record of what it actually costs you per month, or what your bike really does per gallon.</p>
+        <div className="rv-solution-grid">
+          <div className="rv-sol-card">
+            <div className="rv-sol-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2M9 5a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2M9 5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2m-6 9 2 2 4-4"/></svg>
+            </div>
+            <h3 className="rv-sol-title">Quote checker</h3>
+            <p className="rv-sol-body">See if your service quote is fair for your vehicle, engine size, and region. Before you agree to anything.</p>
           </div>
-          <div className="info-card">
-            <h3>Lost receipts, forgotten services</h3>
-            <p>Work gets done, receipts get binned. Six months later you can&apos;t remember what was actually done, or when.</p>
+          <div className="rv-sol-card">
+            <div className="rv-sol-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
+            </div>
+            <h3 className="rv-sol-title">Full history log</h3>
+            <p className="rv-sol-body">Services, fuel, mods, insurance, tax — all in one timeline. Scan receipts with your camera. AI reads them.</p>
           </div>
-          <div className="info-card">
-            <h3>Reminders live in your head</h3>
-            <p>Until something breaks and you wish you&apos;d remembered sooner. Chains, brake fluid, valve clearances - easy to lose track of.</p>
+          <div className="rv-sol-card">
+            <div className="rv-sol-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+            </div>
+            <h3 className="rv-sol-title">Buying guide</h3>
+            <p className="rv-sol-body">Enter a plate or paste a listing. Get a real verdict — buy, negotiate, or walk away — before you hand over money.</p>
           </div>
-          <div className="info-card">
-            <h3>No real picture of the cost</h3>
-            <p>Servicing, fuel, insurance, tax, mods - add it all up and most riders genuinely don&apos;t know what a bike costs them a year.</p>
+          <div className="rv-sol-card">
+            <div className="rv-sol-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M18 20V10M12 20V4M6 20v-6"/></svg>
+            </div>
+            <h3 className="rv-sol-title">True running cost</h3>
+            <p className="rv-sol-body">What does your vehicle actually cost per mile? Per month? Per year? You&apos;ll know exactly.</p>
           </div>
-          <div className="info-card">
-            <h3>Mods and bills, scattered everywhere</h3>
-            <p>Insurance renewal in one place, an MOT reminder in your calendar, a mod receipt buried in an email somewhere - nothing lives together.</p>
+          <div className="rv-sol-card">
+            <div className="rv-sol-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+            </div>
+            <h3 className="rv-sol-title">Sell with proof</h3>
+            <p className="rv-sol-body">Share a verified history link with buyers. Full receipts, confirmed mileage. Gets better prices.</p>
           </div>
-          <div className="info-card">
-            <h3>Nothing to show when you sell</h3>
-            <p>Full service history adds real value to a used bike - but only if you can actually produce it, not just remember it existed.</p>
-          </div>
-        </div>
-
-        <h2>One place for all of it</h2>
-        <div className="feature-grid">
-          <div className="info-card">
-            <h3>Service log</h3>
-            <p>17 job types from oil changes to valve clearances. The five most common jobs get checked against the same real UK price data as our <Link href="/quote-checker">Quote Checker</Link>.</p>
-          </div>
-          <div className="info-card">
-            <h3>Parts & Accessories</h3>
-            <p>Exhausts, tank pads, crash protection, custom work - tracked separately from maintenance, since it&apos;s spend, not upkeep.</p>
-          </div>
-          <div className="info-card">
-            <h3>Real fuel economy</h3>
-            <p>Log fill-ups and we calculate your bike&apos;s actual MPG from real data - not a generic assumption.</p>
-          </div>
-          <div className="info-card">
-            <h3>Insurance, tax & MOT</h3>
-            <p>Logged as real payments, with renewal reminders offered automatically.</p>
-          </div>
-          <div className="info-card">
-            <h3>Reminders that fit how you think</h3>
-            <p>By mileage, by time, or an exact date - whichever makes sense for the job.</p>
-          </div>
-          <div className="info-card">
-            <h3>Annual budget</h3>
-            <p>Set a number for the year. We&apos;ll tell you plainly if you go over it.</p>
+          <div className="rv-sol-card">
+            <div className="rv-sol-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+            </div>
+            <h3 className="rv-sol-title">Smart reminders</h3>
+            <p className="rv-sol-body">MOT, insurance, service intervals. Reminders fire at the right time — not when it&apos;s already overdue.</p>
           </div>
         </div>
+      </section>
 
-        <h2>Why RoadVerdict&apos;s tracker</h2>
-        <div className="benefit-grid">
-          <div className="info-card">
-            <h3>Checked against real UK prices</h3>
-            <p>The only tracker that compares what you actually paid against real UK motorcycle service prices.</p>
-          </div>
-          <div className="info-card">
-            <h3>Built for UK motorcycles specifically</h3>
-            <p>Not a car app with a motorbike icon bolted on. Job types, intervals, and prices all reflect actual bikes.</p>
-          </div>
-          <div className="info-card">
-            <h3>Genuinely free</h3>
-            <p>No premium tier, no paywall on features. Free the same way the rest of RoadVerdict is free.</p>
-          </div>
+      {/* ── VERDICT PANEL ────────────────────────────────────────────── */}
+      <section className="rv-verdict-strip" aria-labelledby="verdict-cta-heading">
+        <div className="rv-verdict-panel-img" aria-hidden="true">
+          <Image
+            src="/images/hero/panel-04.png"
+            alt=""
+            fill
+            style={{ objectFit: 'cover', objectPosition: 'center center' }}
+          />
+          <div className="rv-verdict-img-overlay" />
         </div>
-
-        <h2>Get started in a minute</h2>
-        <ol className="steps-list">
-          <li>
-            <strong>Sign in with your email</strong>
-            <p>We send a magic link - click it, you&apos;re in. No password to create.</p>
-          </li>
-          <li>
-            <strong>Add your bike</strong>
-            <p>Make, model, year, current mileage. Takes under a minute.</p>
-          </li>
-          <li>
-            <strong>Start logging</strong>
-            <p>Reports, charts, and reminders take care of themselves from there.</p>
-          </li>
-        </ol>
-
-        <div className="tracker-cta">
-          <h2>Start tracking your bike, free</h2>
-          <p style={{ maxWidth: 'none', margin: '0 auto' }}>No credit card, no premium tier, no catch.</p>
-          <Link href="/login" className="btn-primary" style={{ textDecoration: 'none', display: 'inline-block', marginTop: '0.5rem' }}>
-            Start tracking free
+        <div className="rv-verdict-content">
+          <h2 className="rv-verdict-heading" id="verdict-cta-heading">
+            The verdict is in.
+          </h2>
+          <p className="rv-verdict-p">
+            Free to start. No password. Works for motorcycles and cars.<br />
+            Your data is yours — export it any time.
+          </p>
+          <Link href="/login" className="rv-cta-dark">
+            Start tracking free — takes 30 seconds
           </Link>
         </div>
-      </div>
+      </section>
     </>
   );
 }
