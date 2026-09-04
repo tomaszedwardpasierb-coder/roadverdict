@@ -7,9 +7,6 @@ import { usePathname } from 'next/navigation';
 import { Menu, X } from 'lucide-react';
 
 const NAV_ITEMS = [
-  { href: '/quote-checker', label: 'Quote Checker' },
-  { href: '/cost-calculator', label: 'Cost calculator' },
-  { href: '/buying-guide', label: 'Buying a used bike' },
   { href: '/privacy', label: 'Privacy' },
 ];
 

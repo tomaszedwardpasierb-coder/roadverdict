@@ -205,7 +205,7 @@ a {
 main {
   max-width: 900px;
   margin: 0 auto;
-  padding: 3rem 1.5rem 4rem;
+  padding: 0 1.5rem 4rem;
 }
 
 .hero h1 {
@@ -1147,7 +1147,7 @@ body:has(main [data-admin-shell]) [data-assistant-widget] {
   width: 100vw;
 }
 
-/* Full-bleed override — break homepage sections out of main's 900px cap */
+/* Full-bleed override ï¿½ break homepage sections out of main's 900px cap */
 .rv-hero,
 .rv-cut,
 .rv-problems,
@@ -1159,4 +1159,15 @@ body:has(main [data-admin-shell]) [data-assistant-widget] {
   right: 50%;
   margin-left: -50vw;
   margin-right: -50vw;
+}
+
+.rv-panel-tag { display: none; }
+
+.rv-solution-grid {
+  grid-template-columns: repeat(3, 1fr) !important;
+}
+@media (max-width: 768px) {
+  .rv-solution-grid {
+    grid-template-columns: 1fr !important;
+  }
 }

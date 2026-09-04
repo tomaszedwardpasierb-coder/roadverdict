@@ -109,14 +109,11 @@ export default async function HomePage() {
               Start tracking free
               <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M2 7h10M8 3l4 4-4 4"/></svg>
             </Link>
-            <Link href="/quote-checker" className="rv-cta-secondary">
-              Check a quote →
-            </Link>
           </div>
           <ul className="rv-hero-proof" aria-label="Key facts">
             <li className="rv-proof-item">
               <span className="rv-proof-check" aria-hidden="true">✓</span>
-              No password — email only
+              No password - email only
             </li>
             <li className="rv-proof-item">
               <span className="rv-proof-check" aria-hidden="true">✓</span>
@@ -188,14 +185,14 @@ export default async function HomePage() {
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
             </div>
             <h3 className="rv-sol-title">Full history log</h3>
-            <p className="rv-sol-body">Services, fuel, mods, insurance, tax — all in one timeline. Scan receipts with your camera. AI reads them.</p>
+            <p className="rv-sol-body">Services, fuel, mods, insurance, tax - all in one timeline. Scan receipts with your camera. AI reads them.</p>
           </div>
           <div className="rv-sol-card">
             <div className="rv-sol-icon" aria-hidden="true">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
             </div>
             <h3 className="rv-sol-title">Buying guide</h3>
-            <p className="rv-sol-body">Enter a plate or paste a listing. Get a real verdict — buy, negotiate, or walk away — before you hand over money.</p>
+            <p className="rv-sol-body">Enter a plate or paste a listing. Get a real verdict - buy, negotiate, or walk away - before you hand over money.</p>
           </div>
           <div className="rv-sol-card">
             <div className="rv-sol-icon" aria-hidden="true">
@@ -216,7 +213,7 @@ export default async function HomePage() {
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
             </div>
             <h3 className="rv-sol-title">Smart reminders</h3>
-            <p className="rv-sol-body">MOT, insurance, service intervals. Reminders fire at the right time — not when it&apos;s already overdue.</p>
+            <p className="rv-sol-body">MOT, insurance, service intervals. Reminders fire at the right time - not when it&apos;s already overdue.</p>
           </div>
         </div>
       </section>
@@ -238,10 +235,10 @@ export default async function HomePage() {
           </h2>
           <p className="rv-verdict-p">
             Free to start. No password. Works for motorcycles and cars.<br />
-            Your data is yours — export it any time.
+            Your data is yours - export it any time.
           </p>
           <Link href="/login" className="rv-cta-dark">
-            Start tracking free — takes 30 seconds
+            Start tracking free - takes 30 seconds
           </Link>
         </div>
       </section>
