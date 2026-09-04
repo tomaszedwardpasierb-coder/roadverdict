@@ -15,6 +15,7 @@
 // is an additive log for things that don't already have a natural home
 // elsewhere, starting with admin-sent messages.
 import { getContainer } from "@/lib/cosmos";
+import { stripCosmosMetadata } from "@/lib/tracker/cosmosHelpers";
 
 export interface NotificationDoc {
   id: string;
@@ -93,7 +94,7 @@ export async function getNotificationsForUser(email: string, limit = 20): Promis
       { partitionKey: email }
     )
     .fetchAll();
-  return resources;
+  return resources.map(stripCosmosMetadata);
 }
 
 export async function getUnreadNotificationCount(email: string): Promise<number> {

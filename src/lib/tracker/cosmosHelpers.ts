@@ -1,6 +1,20 @@
 ﻿// Place at: src/lib/tracker/cosmosHelpers.ts
 import { getContainer } from "@/lib/cosmos";
 
+// Cosmos attaches these system-generated properties to every stored
+// item and returns them from both point reads and SELECT * queries.
+// Nothing in this app ever reads them - stripping them here, once,
+// keeps them from leaking into API responses (visible in any client's
+// devtools) for zero benefit: they only reveal that this is Cosmos DB
+// plus internal resource ids/timestamps no UI has any use for.
+const COSMOS_SYSTEM_KEYS = ["_rid", "_self", "_etag", "_attachments", "_ts"] as const;
+
+export function stripCosmosMetadata<T extends object>(doc: T): T {
+  const clean = { ...doc } as Record<string, unknown>;
+  for (const key of COSMOS_SYSTEM_KEYS) delete clean[key];
+  return clean as T;
+}
+
 // A single uploaded receipt/invoice. blobName is the unguessable random
 // path in blob storage (never the full URL) - the actual file is only ever
 // served through the authenticated /api/tracker/attachment/[blobName]
@@ -160,7 +174,7 @@ export async function queryTrackerDocs<TDoc extends TrackerDocBase>(
       { partitionKey: email }
     )
     .fetchAll();
-  return resources;
+  return resources.map(stripCosmosMetadata);
 }
 
 // Updates an existing tracker doc in place (read, merge, upsert). email
@@ -175,7 +189,7 @@ export async function updateTrackerDoc<TDoc extends TrackerDocBase>(
   const container = getContainer();
   const { resource } = await container.item(id, email).read<TDoc>();
   if (!resource) return null;
-  const updated = { ...resource, ...updates } as TDoc;
+  const updated = { ...stripCosmosMetadata(resource), ...updates } as TDoc;
   await container.items.upsert(updated);
   return updated;
 }

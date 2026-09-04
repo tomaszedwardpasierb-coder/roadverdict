@@ -286,14 +286,14 @@ describe("getPrimaryBike", () => {
     mocks.cookieGet.mockReturnValue(undefined);
     const bikes = [makeBike({ id: "a" }), makeBike({ id: "b" })];
     mocks.fetchAll.mockResolvedValue({ resources: bikes });
-    expect(await getPrimaryBike("owner@example.com")).toBe(bikes[0]);
+    expect(await getPrimaryBike("owner@example.com")).toStrictEqual(bikes[0]);
   });
 
   it("resolves whichever bike the switcher cookie names", async () => {
     mocks.cookieGet.mockReturnValue({ value: "b" });
     const bikes = [makeBike({ id: "a" }), makeBike({ id: "b" })];
     mocks.fetchAll.mockResolvedValue({ resources: bikes });
-    expect(await getPrimaryBike("owner@example.com")).toBe(bikes[1]);
+    expect(await getPrimaryBike("owner@example.com")).toStrictEqual(bikes[1]);
   });
 });
 

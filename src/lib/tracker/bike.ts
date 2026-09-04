@@ -1,6 +1,7 @@
 // Place at: src/lib/tracker/bike.ts
 import { cookies } from "next/headers";
 import { getContainer } from "@/lib/cosmos";
+import { stripCosmosMetadata } from "@/lib/tracker/cosmosHelpers";
 import { isPro } from "@/lib/subscriptions";
 import type { BikeClass, Region } from "@/lib/priceData";
 import type { DistanceUnit, FuelEconomyUnit } from "@/lib/tracker/unitFormat";
@@ -270,7 +271,7 @@ export async function getBikesForUser(email: string): Promise<BikeDoc[]> {
       { partitionKey: email }
     )
     .fetchAll();
-  return resources;
+  return resources.map(stripCosmosMetadata);
 }
 
 // Cross-partition, same accepted exception used elsewhere in this app
@@ -346,7 +347,7 @@ export async function getBike(email: string, bikeId: string): Promise<BikeDoc | 
   try {
     const container = getContainer();
     const { resource } = await container.item(bikeId, email).read<BikeDoc>();
-    return resource ?? null;
+    return resource ? stripCosmosMetadata(resource) : null;
   } catch {
     return null;
   }
