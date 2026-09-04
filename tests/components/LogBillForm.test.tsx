@@ -71,6 +71,71 @@ describe("LogBillForm", () => {
     expect(screen.getByLabelText(/Regular instalment amount/)).toBeInTheDocument();
   });
 
+  it("never shows 'instalments already paid' for a plan starting today", async () => {
+    const user = userEvent.setup();
+    render(<LogBillForm currency="GBP" rates={null} />);
+    await user.selectOptions(screen.getByLabelText("How do you pay?"), "plan");
+    expect(screen.queryByLabelText(/Instalments already paid/)).not.toBeInTheDocument();
+  });
+
+  it("never shows 'instalments already paid' for a backdated one-off (only plans have it)", async () => {
+    const user = userEvent.setup();
+    render(<LogBillForm currency="GBP" rates={null} />);
+    const dateInput = screen.getByLabelText("Date");
+    const past = new Date(Date.now() - 100 * 86400000).toISOString().slice(0, 10);
+    await user.clear(dateInput);
+    await user.type(dateInput, past);
+    expect(screen.queryByLabelText(/Instalments already paid/)).not.toBeInTheDocument();
+  });
+
+  it("shows 'instalments already paid' once a plan's start date is backdated", async () => {
+    const user = userEvent.setup();
+    render(<LogBillForm currency="GBP" rates={null} />);
+    const past = new Date(Date.now() - 100 * 86400000).toISOString().slice(0, 10);
+
+    // Switch to plan mode first (the label changes to "Start date
+    // (first payment)" at that point), then re-query and backdate it.
+    await user.selectOptions(screen.getByLabelText("How do you pay?"), "plan");
+    const dateInput = screen.getByLabelText("Start date (first payment)");
+    await user.clear(dateInput);
+    await user.type(dateInput, past);
+
+    expect(screen.getByLabelText(/Instalments already paid/)).toBeInTheDocument();
+  });
+
+  it("includes instalmentsAlreadyPaid in the plan submission body when filled in", async () => {
+    (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({ ok: true, status: 200, json: async () => ({}) });
+    const user = userEvent.setup();
+    render(<LogBillForm currency="GBP" rates={null} />);
+
+    await user.selectOptions(screen.getByLabelText("How do you pay?"), "plan");
+    const dateInput = screen.getByLabelText("Start date (first payment)");
+    const past = new Date(Date.now() - 100 * 86400000).toISOString().slice(0, 10);
+    await user.clear(dateInput);
+    await user.type(dateInput, past);
+    await user.type(screen.getByLabelText(/Regular instalment amount/), "42.50");
+    await user.type(screen.getByLabelText(/Instalments already paid/), "3");
+    await user.click(screen.getByRole("button", { name: "Start this plan" }));
+
+    await waitFor(() => expect(fetch).toHaveBeenCalledWith("/api/tracker/bill-series", expect.anything()));
+    const body = JSON.parse((fetch as ReturnType<typeof vi.fn>).mock.calls[0][1].body);
+    expect(body.instalmentsAlreadyPaid).toBe(3);
+  });
+
+  it("omits instalmentsAlreadyPaid from the submission body when left blank", async () => {
+    (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({ ok: true, status: 200, json: async () => ({}) });
+    const user = userEvent.setup();
+    render(<LogBillForm currency="GBP" rates={null} />);
+
+    await user.selectOptions(screen.getByLabelText("How do you pay?"), "plan");
+    await user.type(screen.getByLabelText(/Regular instalment amount/), "42.50");
+    await user.click(screen.getByRole("button", { name: "Start this plan" }));
+
+    await waitFor(() => expect(fetch).toHaveBeenCalledWith("/api/tracker/bill-series", expect.anything()));
+    const body = JSON.parse((fetch as ReturnType<typeof vi.fn>).mock.calls[0][1].body);
+    expect(body.instalmentsAlreadyPaid).toBeUndefined();
+  });
+
   it("blocks submission with an error when the date is before the bike's own production year", async () => {
     const user = userEvent.setup();
     render(<LogBillForm currency="GBP" rates={null} bikeYear={2020} isCustomBuild={false} />);

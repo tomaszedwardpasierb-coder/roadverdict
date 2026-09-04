@@ -52,6 +52,12 @@ export function LogBillForm({
   const [instalmentDisplay, setInstalmentDisplay] = useState('');
   const [instalmentCount, setInstalmentCount] = useState(String(BILL_SERIES_DEFAULT_INSTALMENT_COUNT['insurance:monthly']));
   const [collectionDay, setCollectionDay] = useState(() => String(Math.min(Number(new Date().toISOString().slice(8, 10)), 28)));
+  // Only meaningful, and only shown, once the plan's start date is
+  // backdated - stated directly by the owner rather than left for
+  // RoadVerdict to infer from collection-day arithmetic, which can be
+  // wrong if a payment was skipped or landed a day or two off the
+  // nominal collection day.
+  const [alreadyPaidDisplay, setAlreadyPaidDisplay] = useState('');
 
   const { submit, submitting, error } = useTrackerFormSubmit('/api/tracker/bills');
   const { submit: submitPlan, submitting: submittingPlan, error: planError } = useTrackerFormSubmit('/api/tracker/bill-series');
@@ -105,11 +111,13 @@ export function LogBillForm({
         instalmentAmount: instalmentGbp,
         instalmentCount: Number(instalmentCount),
         notes,
+        instalmentsAlreadyPaid: alreadyPaidDisplay ? Number(alreadyPaidDisplay) : undefined,
       });
       if (ok) {
         setNotes('');
         setDepositDisplay('');
         setInstalmentDisplay('');
+        setAlreadyPaidDisplay('');
       }
       return;
     }
@@ -139,6 +147,7 @@ export function LogBillForm({
 
   const symbol = CURRENCY_SYMBOLS[currency];
   const isPlan = paymentMethod === 'plan';
+  const isBackdatedPlan = isPlan && !!date && isBackdated(date, new Date().toISOString());
 
   return (
     <form className="ticket" onSubmit={handleSubmit}>
@@ -267,9 +276,29 @@ export function LogBillForm({
               <label htmlFor="bill-plan-notes">Notes (optional)</label>
               <textarea id="bill-plan-notes" rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="e.g. fully comprehensive, Bennetts" />
             </div>
+            {isBackdatedPlan && (
+              <div className="field" style={{ marginTop: '0.9rem' }}>
+                <label htmlFor="bill-plan-already-paid">Instalments already paid (optional)</label>
+                <input
+                  id="bill-plan-already-paid"
+                  type="number"
+                  min="0"
+                  max={instalmentCount}
+                  value={alreadyPaidDisplay}
+                  onChange={(e) => setAlreadyPaidDisplay(e.target.value)}
+                />
+                <p className="field-note">
+                  Since this plan started in the past, RoadVerdict would otherwise work out how many payments are
+                  due by now itself. If that&apos;s not quite right - a payment was skipped, or landed on a different
+                  day than usual - enter the real number here instead and that&apos;s what gets logged.
+                </p>
+              </div>
+            )}
             <p className="field-note" style={{ marginTop: '0.6rem' }}>
-              The first payment is logged on {date || 'the date above'}. RoadVerdict logs each later payment
-              automatically as it comes due - nothing to log by hand.
+              {alreadyPaidDisplay
+                ? `${alreadyPaidDisplay} instalment${Number(alreadyPaidDisplay) === 1 ? '' : 's'} will be logged immediately as already paid.`
+                : `The first payment is logged on ${date || 'the date above'}.`}{' '}
+              RoadVerdict logs each later payment automatically as it comes due - nothing to log by hand.
             </p>
           </>
         ) : (

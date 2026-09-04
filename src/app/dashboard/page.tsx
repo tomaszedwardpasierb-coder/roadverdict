@@ -71,7 +71,7 @@ import { ScanReceiptButton } from "./ScanReceiptButton";
 import { RegistrationBackfillBanner } from "./RegistrationBackfillBanner";
 import { Icon } from "./Icon";
 import { LockedStatCard } from "./LockedStatCard";
-import { isPro } from "@/lib/subscriptions";
+import { getProStatus } from "@/lib/subscriptions";
 import { ProGate } from "./ProGate";
 import { PlanComparisonCards } from "@/components/PlanComparisonCards";
 
@@ -84,7 +84,8 @@ export default async function DashboardPage() {
   const bikes = await getBikesForUser(session.email);
   const bike = await pickActiveBike(bikes);
   const shareLinks = await getShareLinksForUser(session.email);
-  const userIsPro = await isPro(session.email);
+  const proStatus = await getProStatus(session.email);
+  const userIsPro = proStatus.isPro;
   const pendingReceiptRequests = await getPendingReceiptRequestsForOwner(session.email);
   const bikeNames: Record<string, string> = {};
   for (const b of bikes) {
@@ -708,6 +709,7 @@ export default async function DashboardPage() {
       distanceUnit={distanceUnit}
       userEmail={session.email}
       isPro={userIsPro}
+      proDaysRemaining={proStatus.daysRemaining}
       bikes={switcherBikes}
       activeBikeId={bike.id}
       pendingReviewIds={pendingReviewIds}

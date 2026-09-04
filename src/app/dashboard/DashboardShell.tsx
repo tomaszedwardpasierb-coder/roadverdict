@@ -65,6 +65,9 @@ interface Props {
   distanceUnit: DistanceUnit;
   userEmail: string;
   isPro: boolean;
+  // Null whenever isPro is false - only ever shown alongside the
+  // Premium badge itself, never on its own.
+  proDaysRemaining?: number | null;
   bikes: SwitcherBike[];
   activeBikeId: string;
   // Real, server-computed counts of needsReview records per category -
@@ -112,6 +115,7 @@ export function DashboardShell({
   distanceUnit,
   userEmail,
   isPro,
+  proDaysRemaining = null,
   bikes,
   activeBikeId,
   pendingReviewIds,
@@ -216,6 +220,14 @@ export function DashboardShell({
               </span>
             )}
           </div>
+          {isPro && proDaysRemaining != null && (
+            <div
+              className={styles.sidebarUserEmail}
+              style={{ marginTop: '0.2rem', color: proDaysRemaining <= 7 ? 'var(--amber-ink)' : undefined }}
+            >
+              {proDaysRemaining} day{proDaysRemaining === 1 ? '' : 's'} left
+            </div>
+          )}
           {userEmail === DEMO_EMAIL && (
             <div style={{ marginTop: '0.6rem' }}>
               <ResetDemoButton />

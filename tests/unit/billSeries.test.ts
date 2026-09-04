@@ -22,6 +22,7 @@ import {
   getBillSeriesForBike,
   endBillSeries,
   materializeDueInstalments,
+  materializeExactCount,
   materializeAllDueForBike,
   type BillSeriesDoc,
 } from "@/lib/tracker/billSeries";
@@ -174,6 +175,58 @@ describe("materializeDueInstalments", () => {
     const series = { ...baseSeries, lastMaterializedIndex: 0 };
     await materializeDueInstalments(email, series, new Date("2025-01-01"));
     expect(mocks.upsert).not.toHaveBeenCalled();
+  });
+});
+
+describe("materializeExactCount", () => {
+  it("materialises exactly the given count, ignoring today's date entirely", async () => {
+    // Backdated plan started 2025-01-01, "today" would only put us at
+    // instalment 1 by collection-day arithmetic - but the owner says 3
+    // have genuinely been paid, and that's what gets trusted.
+    const created = await materializeExactCount(email, baseSeries, 3);
+    expect(created).toHaveLength(3);
+    const indices = mocks.upsert.mock.calls.map((c) => c[0].seriesIndex).sort();
+    expect(indices).toEqual([0, 1, 2]);
+  });
+
+  it("advances lastMaterializedIndex to count - 1", async () => {
+    await materializeExactCount(email, baseSeries, 3);
+    expect(mocks.updateTrackerDoc).toHaveBeenCalledWith(email, baseSeries.id, { lastMaterializedIndex: 2, status: "active" });
+  });
+
+  it("does nothing when count is at or below what's already materialised", async () => {
+    const series = { ...baseSeries, lastMaterializedIndex: 2 };
+    const created = await materializeExactCount(email, series, 2);
+    expect(created).toEqual([]);
+    expect(mocks.upsert).not.toHaveBeenCalled();
+  });
+
+  it("only materialises the NEW indices when count exceeds what's already materialised", async () => {
+    const series = { ...baseSeries, lastMaterializedIndex: 1 };
+    await materializeExactCount(email, series, 4);
+    const indices = mocks.upsert.mock.calls.map((c) => c[0].seriesIndex).sort();
+    expect(indices).toEqual([2, 3]);
+  });
+
+  it("clamps to instalmentCount rather than materialising more payments than the plan actually has", async () => {
+    const series = { ...baseSeries, instalmentCount: 3 };
+    await materializeExactCount(email, series, 12);
+    const indices = mocks.upsert.mock.calls.map((c) => c[0].seriesIndex).sort();
+    expect(indices).toEqual([0, 1, 2]);
+    expect(mocks.updateTrackerDoc).toHaveBeenCalledWith(email, series.id, { lastMaterializedIndex: 2, status: "completed" });
+  });
+
+  it("marks the series completed once count reaches the final instalment", async () => {
+    const series = { ...baseSeries, instalmentCount: 3 };
+    await materializeExactCount(email, series, 3);
+    expect(mocks.updateTrackerDoc).toHaveBeenCalledWith(email, series.id, { lastMaterializedIndex: 2, status: "completed" });
+  });
+
+  it("uses the same deterministic id scheme as normal materialisation - no separate, divergent id format", async () => {
+    await materializeExactCount(email, baseSeries, 1);
+    const doc = mocks.upsert.mock.calls[0][0];
+    expect(doc.id).toBe(`${email}::bill::series::${baseSeries.id}::0`);
+    expect(doc.source).toBe("auto");
   });
 });
 

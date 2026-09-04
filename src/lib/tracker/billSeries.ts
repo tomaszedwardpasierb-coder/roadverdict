@@ -9,7 +9,15 @@
 // "pending confirmation" state for it.
 import { getContainer } from "@/lib/cosmos";
 import { createTrackerDoc, queryTrackerDocs, updateTrackerDoc, type TrackerDocBase } from "./cosmosHelpers";
-import { computeDueInstalments, instalmentNote, type BillSeriesBillType, type BillSeriesFrequency, type DueInstalment } from "./billSeriesSchedule";
+import {
+  computeDueInstalments,
+  instalmentNote,
+  paymentDateForIndex,
+  paymentAmountForIndex,
+  type BillSeriesBillType,
+  type BillSeriesFrequency,
+  type DueInstalment,
+} from "./billSeriesSchedule";
 import type { BillDoc } from "./bill";
 
 export interface BillSeriesDoc extends TrackerDocBase {
@@ -101,18 +109,13 @@ async function upsertMaterializedBill(email: string, series: BillSeriesDoc, due:
   return doc;
 }
 
-// The actual read-triggers-write step. Materialises whatever's due,
-// advances lastMaterializedIndex past every instalment just created
-// (whether or not a human later deletes one - deletion never rewinds
-// this counter, which is what stops a deleted instalment reappearing on
-// the next read), and flips the series to "completed" once its final
-// instalment has been materialised.
-export async function materializeDueInstalments(
-  email: string,
-  series: BillSeriesDoc,
-  today: Date = new Date()
-): Promise<BillDoc[]> {
-  const due = computeDueInstalments(series, today);
+// Shared tail for both materialisation entry points below - writes
+// every given instalment, advances lastMaterializedIndex past the
+// highest one just created (whether or not a human later deletes one -
+// deletion never rewinds this counter, which is what stops a deleted
+// instalment reappearing on the next read), and flips the series to
+// "completed" once its final instalment has been materialised.
+async function materializeInstalments(email: string, series: BillSeriesDoc, due: DueInstalment[]): Promise<BillDoc[]> {
   if (due.length === 0) return [];
 
   const created = await Promise.all(due.map((d) => upsertMaterializedBill(email, series, d)));
@@ -125,6 +128,37 @@ export async function materializeDueInstalments(
   });
 
   return created;
+}
+
+// The actual read-triggers-write step - due instalments decided purely
+// by collection-day arithmetic against `today`.
+export async function materializeDueInstalments(
+  email: string,
+  series: BillSeriesDoc,
+  today: Date = new Date()
+): Promise<BillDoc[]> {
+  return materializeInstalments(email, series, computeDueInstalments(series, today));
+}
+
+// Materialises exactly `count` instalments (indices 0..count-1),
+// ignoring today's date entirely - for backdating a plan that's already
+// been running a while, where the owner tells RoadVerdict directly how
+// many payments they've actually made rather than trusting collection-
+// day arithmetic to infer it (which can be wrong if a payment was
+// skipped, or landed a day or two off the nominal collection day). Only
+// ever moves lastMaterializedIndex forward - calling this again with a
+// count at or below what's already materialised does nothing, same
+// idempotency guarantee as materializeDueInstalments.
+export async function materializeExactCount(email: string, series: BillSeriesDoc, count: number): Promise<BillDoc[]> {
+  const targetIndex = Math.min(count, series.instalmentCount) - 1;
+  if (targetIndex <= series.lastMaterializedIndex) return [];
+
+  const due: DueInstalment[] = [];
+  for (let index = series.lastMaterializedIndex + 1; index <= targetIndex; index++) {
+    due.push({ index, date: paymentDateForIndex(series, index), cost: paymentAmountForIndex(series, index) });
+  }
+
+  return materializeInstalments(email, series, due);
 }
 
 // Call this once, right before reading a bike's bills, from every place

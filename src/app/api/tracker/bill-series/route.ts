@@ -1,7 +1,7 @@
 // Place at: src/app/api/tracker/bill-series/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/session";
-import { createBillSeries, materializeDueInstalments, seriesEndDate, type BillSeriesBillType, type BillSeriesFrequency } from "@/lib/tracker/billSeries";
+import { createBillSeries, materializeDueInstalments, materializeExactCount, seriesEndDate, type BillSeriesBillType, type BillSeriesFrequency } from "@/lib/tracker/billSeries";
 import { createReminder, deleteRemindersBySourceKey } from "@/lib/tracker/reminder";
 import { getPrimaryBike, isBikeReadOnly, BIKE_READ_ONLY_MESSAGE } from "@/lib/tracker/bike";
 import { isBeforeProduction } from "@/lib/tracker/productionYearCheck";
@@ -22,7 +22,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
   }
 
-  const { billType, frequency, startDate, collectionDay, depositAmount, instalmentAmount, instalmentCount, notes } = body as {
+  const { billType, frequency, startDate, collectionDay, depositAmount, instalmentAmount, instalmentCount, notes, instalmentsAlreadyPaid } = body as {
     billType?: string;
     frequency?: string;
     startDate?: string;
@@ -31,6 +31,12 @@ export async function POST(request: NextRequest) {
     instalmentAmount?: number;
     instalmentCount?: number;
     notes?: string;
+    // Backdating a plan that's already been running a while - lets the
+    // owner state directly how many payments they've actually made,
+    // rather than trusting collection-day arithmetic against today's
+    // date to infer it (see materializeExactCount's own comment for why
+    // that inference can be wrong).
+    instalmentsAlreadyPaid?: number;
   };
 
   if (!billType || !(BILL_SERIES_ELIGIBLE_TYPES as readonly string[]).includes(billType)) {
@@ -47,6 +53,9 @@ export async function POST(request: NextRequest) {
   }
   if (instalmentCount < 1) {
     return NextResponse.json({ error: "A plan needs at least one payment." }, { status: 400 });
+  }
+  if (instalmentsAlreadyPaid != null && (instalmentsAlreadyPaid < 0 || instalmentsAlreadyPaid > instalmentCount)) {
+    return NextResponse.json({ error: "Instalments already paid can't be negative or more than the total number of payments." }, { status: 400 });
   }
   // Road tax has no deposit concept - DVLA's monthly/6-monthly VED is
   // equal instalments plus a flat surcharge, never a front-loaded first
@@ -83,11 +92,18 @@ export async function POST(request: NextRequest) {
     notes,
   });
 
-  // Materialise whatever's due as of today immediately, so the first
-  // payment appears right away - the same felt behaviour as logging a
-  // one-off bill today, rather than making someone wait for a page
-  // reload or a cron that doesn't exist.
-  await materializeDueInstalments(session.email, series);
+  // Explicit count takes priority over date arithmetic when backdating
+  // a plan that's already been running a while - it's the owner's own
+  // stated fact about what's actually happened, not an inference.
+  // Without it, materialise whatever's due as of today immediately, so
+  // the first payment appears right away - the same felt behaviour as
+  // logging a one-off bill today, rather than making someone wait for a
+  // page reload or a cron that doesn't exist.
+  if (instalmentsAlreadyPaid != null && instalmentsAlreadyPaid > 0) {
+    await materializeExactCount(session.email, series, instalmentsAlreadyPaid);
+  } else {
+    await materializeDueInstalments(session.email, series);
+  }
 
   // Anchored to the plan's natural end date, not a fixed months-from-now
   // offset - one renewal reminder per series, in the same sourceKey

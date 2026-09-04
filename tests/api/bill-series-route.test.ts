@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   isBikeReadOnly: vi.fn(),
   createBillSeries: vi.fn(),
   materializeDueInstalments: vi.fn(),
+  materializeExactCount: vi.fn(),
   seriesEndDate: vi.fn(),
   createReminder: vi.fn(),
   deleteRemindersBySourceKey: vi.fn(),
@@ -21,6 +22,7 @@ vi.mock("@/lib/tracker/bike", () => ({
 vi.mock("@/lib/tracker/billSeries", () => ({
   createBillSeries: mocks.createBillSeries,
   materializeDueInstalments: mocks.materializeDueInstalments,
+  materializeExactCount: mocks.materializeExactCount,
   seriesEndDate: mocks.seriesEndDate,
 }));
 vi.mock("@/lib/tracker/reminder", () => ({
@@ -57,6 +59,7 @@ describe("POST /api/tracker/bill-series", () => {
     mocks.isBikeReadOnly.mockReturnValue(false);
     mocks.createBillSeries.mockResolvedValue({ id: "series-1", bikeId: "bike-1" });
     mocks.materializeDueInstalments.mockResolvedValue([]);
+    mocks.materializeExactCount.mockResolvedValue([]);
     mocks.seriesEndDate.mockReturnValue("2026-06-01");
   });
 
@@ -147,6 +150,37 @@ describe("POST /api/tracker/bill-series", () => {
       exactDate: "2026-06-01",
       sourceKey: "bill-series:series-1",
     }));
+  });
+
+  it("rejects a negative instalmentsAlreadyPaid", async () => {
+    mocks.getSession.mockResolvedValue({ email: "owner@example.com" });
+    const response = await POST(request(JSON.stringify({ ...validInsurancePlan, instalmentsAlreadyPaid: -1 })));
+    expect(response.status).toBe(400);
+    expect(mocks.createBillSeries).not.toHaveBeenCalled();
+  });
+
+  it("rejects instalmentsAlreadyPaid greater than the plan's own instalmentCount", async () => {
+    mocks.getSession.mockResolvedValue({ email: "owner@example.com" });
+    const response = await POST(request(JSON.stringify({ ...validInsurancePlan, instalmentsAlreadyPaid: 13 })));
+    expect(response.status).toBe(400);
+    expect(mocks.createBillSeries).not.toHaveBeenCalled();
+  });
+
+  it("materialises by explicit count, not date arithmetic, when instalmentsAlreadyPaid is given", async () => {
+    mocks.getSession.mockResolvedValue({ email: "owner@example.com" });
+    const response = await POST(request(JSON.stringify({ ...validInsurancePlan, instalmentsAlreadyPaid: 3 })));
+
+    expect(response.status).toBe(200);
+    expect(mocks.materializeExactCount).toHaveBeenCalledWith("owner@example.com", { id: "series-1", bikeId: "bike-1" }, 3);
+    expect(mocks.materializeDueInstalments).not.toHaveBeenCalled();
+  });
+
+  it("falls back to date-arithmetic materialisation when instalmentsAlreadyPaid is 0 or omitted", async () => {
+    mocks.getSession.mockResolvedValue({ email: "owner@example.com" });
+    await POST(request(JSON.stringify({ ...validInsurancePlan, instalmentsAlreadyPaid: 0 })));
+
+    expect(mocks.materializeDueInstalments).toHaveBeenCalledWith("owner@example.com", { id: "series-1", bikeId: "bike-1" });
+    expect(mocks.materializeExactCount).not.toHaveBeenCalled();
   });
 
   it("never sends a deposit through for a road-tax plan, even if the client didn't", async () => {

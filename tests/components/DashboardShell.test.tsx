@@ -162,6 +162,20 @@ describe("DashboardShell", () => {
     expect(screen.getByText("Premium")).toBeInTheDocument();
   });
 
+  it("shows days remaining alongside Premium only when both isPro and a real count are given", () => {
+    const { rerender } = render(<DashboardShell {...baseProps({ isPro: true, proDaysRemaining: 23 })} />);
+    expect(screen.getByText("23 days left")).toBeInTheDocument();
+
+    rerender(<DashboardShell {...baseProps({ isPro: true, proDaysRemaining: 1 })} />);
+    expect(screen.getByText("1 day left")).toBeInTheDocument();
+
+    rerender(<DashboardShell {...baseProps({ isPro: true, proDaysRemaining: null })} />);
+    expect(screen.queryByText(/day.* left/)).not.toBeInTheDocument();
+
+    rerender(<DashboardShell {...baseProps({ isPro: false, proDaysRemaining: 23 })} />);
+    expect(screen.queryByText(/day.* left/)).not.toBeInTheDocument();
+  });
+
   it("shows the Reset Demo button only for the real demo account email", () => {
     const { rerender } = render(<DashboardShell {...baseProps({ userEmail: DEMO_EMAIL })} />);
     expect(screen.getAllByRole("button", { name: "↺ Reset Demo" }).length).toBeGreaterThan(0);
