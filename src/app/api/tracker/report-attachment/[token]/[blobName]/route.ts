@@ -5,6 +5,7 @@ import { getServiceRecords } from "@/lib/tracker/serviceRecord";
 import { getMods } from "@/lib/tracker/mod";
 import { getBills } from "@/lib/tracker/bill";
 import { getAttachmentContainer } from "@/lib/blobStorage";
+import { getReceiptRequestsForShareToken } from "@/lib/tracker/receiptRequest";
 
 export const dynamic = "force-dynamic";
 
@@ -19,9 +20,14 @@ async function streamToBuffer(readableStream: NodeJS.ReadableStream | undefined)
 
 // Deliberately no session check - the whole point of a share link is that
 // a prospective buyer, who has no RoadVerdict account, can view it. What
-// makes this safe instead is the ownership check below: a blobName is
-// only ever served if it genuinely belongs to a record on THIS bike's own
-// report. A share token alone doesn't grant access to arbitrary blobs.
+// makes this safe instead is two checks: a blobName must genuinely belong
+// to a record on THIS bike's own report, AND that record's own receipt
+// request must actually be approved - ReportHistoryTable.tsx only ever
+// renders a link once status is 'approved' (never for no request yet,
+// pending, or declined), and this route has to enforce the same gate
+// server-side. Otherwise the real blobName sitting in the report page's
+// own props for every row - approved or not - would let anyone who reads
+// the page's HTML fetch a receipt the owner never agreed to share.
 export async function GET(request: NextRequest, { params }: { params: { token: string; blobName: string } }) {
   const resolved = await resolveShareToken(params.token);
   if (!resolved) {
@@ -30,17 +36,30 @@ export async function GET(request: NextRequest, { params }: { params: { token: s
   const { email, bikeId } = resolved;
   const blobName = decodeURIComponent(params.blobName);
 
-  const [records, mods, bills] = await Promise.all([
+  const [records, mods, bills, requests] = await Promise.all([
     getServiceRecords(email, bikeId),
     getMods(email, bikeId),
     getBills(email, bikeId),
+    getReceiptRequestsForShareToken(email, params.token),
   ]);
 
-  const allAttachmentBlobNames = new Set(
-    [...records, ...mods, ...bills].flatMap((r) => r.attachments?.map((a) => a.blobName) ?? [])
+  // Most recent request wins per entry - same tie-break sellerReportData.ts
+  // uses for the same data, so a newer decision (e.g. approved after an
+  // earlier decline) is the one that governs here too.
+  const latestStatusByEntryId = new Map<string, string>();
+  for (const r of [...requests].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())) {
+    for (const item of r.items) {
+      latestStatusByEntryId.set(item.entryId, item.status);
+    }
+  }
+
+  const approvedBlobNames = new Set(
+    [...records, ...mods, ...bills]
+      .filter((r) => latestStatusByEntryId.get(r.id) === "approved")
+      .flatMap((r) => r.attachments?.map((a) => a.blobName) ?? [])
   );
 
-  if (!allAttachmentBlobNames.has(blobName)) {
+  if (!approvedBlobNames.has(blobName)) {
     return NextResponse.json({ error: "Attachment not found." }, { status: 404 });
   }
 
