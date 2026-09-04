@@ -1,10 +1,15 @@
 ﻿// Place at: src/app/api/admin/login-password/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import { verifyAdminPassword, createPendingTotp } from "@/lib/admin/session";
+import { verifyAdminPassword, createPendingTotp, checkAdminLoginRateLimit, recordAdminLoginAttempt } from "@/lib/admin/session";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(request: NextRequest) {
+  const { allowed } = await checkAdminLoginRateLimit("password");
+  if (!allowed) {
+    return NextResponse.json({ error: "Too many attempts. Try again later." }, { status: 429 });
+  }
+
   let body: unknown;
   try {
     body = await request.json();
@@ -13,6 +18,7 @@ export async function POST(request: NextRequest) {
   }
   const { password } = body as { password?: string };
   if (!password || !verifyAdminPassword(password)) {
+    await recordAdminLoginAttempt("password");
     return NextResponse.json({ error: "Incorrect password." }, { status: 401 });
   }
 

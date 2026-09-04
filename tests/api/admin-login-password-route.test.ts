@@ -4,11 +4,15 @@ import { NextRequest } from "next/server";
 const mocks = vi.hoisted(() => ({
   verifyAdminPassword: vi.fn(),
   createPendingTotp: vi.fn(),
+  checkAdminLoginRateLimit: vi.fn(),
+  recordAdminLoginAttempt: vi.fn(),
 }));
 
 vi.mock("@/lib/admin/session", () => ({
   verifyAdminPassword: mocks.verifyAdminPassword,
   createPendingTotp: mocks.createPendingTotp,
+  checkAdminLoginRateLimit: mocks.checkAdminLoginRateLimit,
+  recordAdminLoginAttempt: mocks.recordAdminLoginAttempt,
 }));
 
 import { POST } from "@/app/api/admin/login-password/route";
@@ -25,6 +29,26 @@ describe("POST /api/admin/login-password", () => {
   beforeEach(() => {
     Object.values(mocks).forEach((mock) => mock.mockReset());
     mocks.createPendingTotp.mockResolvedValue("pending-raw-token");
+    mocks.checkAdminLoginRateLimit.mockResolvedValue({ allowed: true });
+  });
+
+  it("rejects every attempt once the rate limit is hit, without even checking the password", async () => {
+    mocks.checkAdminLoginRateLimit.mockResolvedValue({ allowed: false });
+    const response = await POST(req(JSON.stringify({ password: "correct-horse-battery-staple" })));
+    expect(response.status).toBe(429);
+    expect(mocks.verifyAdminPassword).not.toHaveBeenCalled();
+  });
+
+  it("records a failed attempt against the rate limiter on an incorrect password", async () => {
+    mocks.verifyAdminPassword.mockReturnValue(false);
+    await POST(req(JSON.stringify({ password: "wrong" })));
+    expect(mocks.recordAdminLoginAttempt).toHaveBeenCalledWith("password");
+  });
+
+  it("does not record an attempt against the rate limiter on a correct password", async () => {
+    mocks.verifyAdminPassword.mockReturnValue(true);
+    await POST(req(JSON.stringify({ password: "correct-horse-battery-staple" })));
+    expect(mocks.recordAdminLoginAttempt).not.toHaveBeenCalled();
   });
 
   it("rejects malformed JSON", async () => {

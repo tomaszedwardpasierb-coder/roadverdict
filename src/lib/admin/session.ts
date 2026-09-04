@@ -40,6 +40,60 @@ export async function consumePendingTotp(raw: string): Promise<boolean> {
   }
 }
 
+// Burns the pending token on a wrong TOTP guess, same as a successful
+// one - without this, a single correct password gave an attacker the
+// whole 5-minute PENDING_TTL to try codes against one static token
+// instead of needing to re-prove the password for every fresh attempt.
+export async function invalidatePendingTotp(raw: string): Promise<void> {
+  const container = getContainer();
+  const hash = hashToken(raw);
+  try {
+    await container.item(hash, ADMIN_PK).delete();
+  } catch {
+    // already gone - fine
+  }
+}
+
+// Same one-document-per-attempt, Cosmos-TTL-expired pattern as
+// reportAccess.ts's checkPlateRateLimit/recordPlateAttempt (see that
+// file's comment for why - no read-modify-write race). Global rather
+// than per-IP: there is exactly one legitimate admin, so a small global
+// cap on both the password and TOTP steps is a simpler and at least as
+// effective mitigation than trying to key it off a client IP that a
+// proxy header can't be fully trusted to report anyway.
+const LOGIN_RATE_LIMIT_WINDOW_SECONDS = 15 * 60;
+const MAX_LOGIN_ATTEMPTS_PER_WINDOW = 10;
+
+function loginAttemptIdPrefix(kind: "password" | "totp"): string {
+  return `admin-login-attempt:${kind}:`;
+}
+
+export async function checkAdminLoginRateLimit(kind: "password" | "totp"): Promise<{ allowed: boolean }> {
+  const container = getContainer();
+  const { resources } = await container.items
+    .query<{ id: string }>(
+      {
+        query: "SELECT c.id FROM c WHERE c.type = 'adminLoginAttempt' AND STARTSWITH(c.id, @prefix)",
+        parameters: [{ name: "@prefix", value: loginAttemptIdPrefix(kind) }],
+      },
+      { partitionKey: ADMIN_PK }
+    )
+    .fetchAll();
+  return { allowed: resources.length < MAX_LOGIN_ATTEMPTS_PER_WINDOW };
+}
+
+export async function recordAdminLoginAttempt(kind: "password" | "totp"): Promise<void> {
+  const container = getContainer();
+  const suffix = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  await container.items.create({
+    id: `${loginAttemptIdPrefix(kind)}${suffix}`,
+    pk: ADMIN_PK,
+    type: "adminLoginAttempt",
+    createdAt: new Date().toISOString(),
+    ttl: LOGIN_RATE_LIMIT_WINDOW_SECONDS,
+  });
+}
+
 export async function createAdminSession(): Promise<string> {
   const { raw, hash } = generateToken();
   const container = getContainer();
