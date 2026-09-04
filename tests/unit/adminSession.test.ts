@@ -83,6 +83,16 @@ describe("createPendingTotp", () => {
     expect(expiresAt).toBeGreaterThan(before + 4 * 60 * 1000);
     expect(expiresAt).toBeLessThan(before + 6 * 60 * 1000);
   });
+
+  // A doc abandoned mid-login (password entered, TOTP step never
+  // reached) must still self-clean via Cosmos ttl, not rely solely on
+  // the app-level expiresAt check nothing enforces once nobody ever
+  // reads it again.
+  it("sets a Cosmos ttl matching the 5-minute expiry", async () => {
+    await createPendingTotp();
+    const doc = mocks.upsert.mock.calls[0][0];
+    expect(doc.ttl).toBe(5 * 60);
+  });
 });
 
 describe("consumePendingTotp", () => {
@@ -143,6 +153,12 @@ describe("createAdminSession", () => {
     const twelveHours = 12 * 60 * 60 * 1000;
     expect(expiresAt).toBeGreaterThan(before + twelveHours - 60 * 1000);
     expect(expiresAt).toBeLessThan(before + twelveHours + 60 * 1000);
+  });
+
+  it("sets a Cosmos ttl matching the 12-hour expiry", async () => {
+    await createAdminSession();
+    const doc = mocks.upsert.mock.calls[0][0];
+    expect(doc.ttl).toBe(12 * 60 * 60);
   });
 });
 

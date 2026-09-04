@@ -22,6 +22,11 @@ export async function createPendingTotp(): Promise<string> {
     pk: ADMIN_PK,
     type: "adminPendingTotp",
     expiresAt: new Date(Date.now() + PENDING_TTL_MS).toISOString(),
+    // Every sibling short-lived doc in this file self-cleans via Cosmos
+    // ttl - this one didn't, so a pending login abandoned mid-flow (tab
+    // closed before the TOTP step) sat here forever despite being
+    // functionally dead after PENDING_TTL_MS.
+    ttl: Math.ceil(PENDING_TTL_MS / 1000),
   });
   return raw;
 }
@@ -102,6 +107,11 @@ export async function createAdminSession(): Promise<string> {
     pk: ADMIN_PK,
     type: "adminSession",
     expiresAt: new Date(Date.now() + SESSION_TTL_MS).toISOString(),
+    // Same gap as createPendingTotp above - without this, an admin who
+    // never explicitly logs out (closes the browser, clears cookies)
+    // leaves this doc behind forever despite being dead after
+    // SESSION_TTL_MS, unlike the regular user `session` doc type.
+    ttl: Math.ceil(SESSION_TTL_MS / 1000),
   });
   return raw;
 }
