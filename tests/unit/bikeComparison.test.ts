@@ -160,6 +160,84 @@ describe("buildBikeComparisonEntry", () => {
   });
 });
 
+describe("buildBikeComparisonEntry with a date-range period", () => {
+  it("filters spend to only entries dated within the period", async () => {
+    mocks.getServiceRecords.mockResolvedValue([
+      { id: "sr-1", cost: 100, date: "2024-06-01", mileage: 2000 }, // before period
+      { id: "sr-2", cost: 200, date: "2025-03-01", mileage: 4000 }, // in period
+    ]);
+    mocks.getBills.mockResolvedValue([
+      { id: "bl-1", cost: 300, date: "2025-08-01" }, // after period
+    ]);
+    const entry = await buildBikeComparisonEntry(email, "bike-1", { from: "2025-01-01", to: "2025-06-01" });
+    expect(entry?.spend.servicingTotal).toBe(200);
+    expect(entry?.spend.billsTotal).toBe(0);
+    expect(entry?.spend.grandTotal).toBe(200);
+  });
+
+  it("returns yearSpend null once a custom period is active, rather than a second, confusing spend figure", async () => {
+    const entry = await buildBikeComparisonEntry(email, "bike-1", { from: "2025-01-01" });
+    expect(entry?.yearSpend).toBeNull();
+  });
+
+  it("returns yearSpend as a real number when no period is given", async () => {
+    const entry = await buildBikeComparisonEntry(email, "bike-1");
+    expect(entry?.yearSpend).not.toBeNull();
+  });
+
+  it("resolves milesRidden from the nearest logged mileage around each boundary, not the raw current/starting mileage", async () => {
+    mocks.getBike.mockResolvedValue(makeBike({ currentMileage: 20000, startingMileage: 2000 }));
+    mocks.getServiceRecords.mockResolvedValue([
+      { id: "sr-1", cost: 50, date: "2025-01-01", mileage: 5000 },
+      { id: "sr-2", cost: 50, date: "2025-06-01", mileage: 9000 },
+    ]);
+    // "Since 2025-01-01" should start from the mileage logged nearest
+    // that date (5000), not the bike's lifetime startingMileage (2000) -
+    // and "up to 2025-06-01" should end at 9000, not today's 20000.
+    const entry = await buildBikeComparisonEntry(email, "bike-1", { from: "2025-01-01", to: "2025-06-01" });
+    expect(entry?.milesRidden).toBe(4000);
+  });
+
+  it("falls back to startingMileage/currentMileage when a boundary has no logged entry to anchor to", async () => {
+    mocks.getBike.mockResolvedValue(makeBike({ currentMileage: 12000, startingMileage: 3000 }));
+    const entry = await buildBikeComparisonEntry(email, "bike-1", { from: "2025-01-01" });
+    // No records/fuel/mods/bills logged at all - from-boundary falls
+    // back to startingMileage, to-boundary (unset) is today's currentMileage.
+    expect(entry?.milesRidden).toBe(9000);
+  });
+
+  it("restricts serviceCount and lastService to the period", async () => {
+    mocks.getServiceRecords.mockResolvedValue([
+      { id: "sr-1", cost: 50, date: "2024-01-01", mileage: 1000 },
+      { id: "sr-2", cost: 60, date: "2025-03-01", mileage: 4000 },
+      { id: "sr-3", cost: 70, date: "2025-09-01", mileage: 6000 },
+    ]);
+    const entry = await buildBikeComparisonEntry(email, "bike-1", { from: "2025-01-01", to: "2025-06-01" });
+    expect(entry?.serviceCount).toBe(1);
+    expect(entry?.lastServiceDate).toBe("2025-03-01");
+  });
+
+  it("computes MPG from the full fill-up chain, but averages only the segments dated inside the period", async () => {
+    mocks.getFuelLogs.mockResolvedValue([
+      { id: "f1", date: "2025-01-01", mileage: 1000, litres: 40, filledToFull: true },
+      { id: "f2", date: "2025-02-01", mileage: 1200, litres: 40, filledToFull: true }, // segment dated 2025-02-01, excluded below
+      { id: "f3", date: "2025-04-01", mileage: 1500, litres: 45.46, filledToFull: true }, // segment dated 2025-04-01, 300mi/10gal = 30mpg
+    ]);
+    const entry = await buildBikeComparisonEntry(email, "bike-1", { from: "2025-03-01" });
+    expect(entry?.actualMpg).toBeCloseTo(30, 1);
+  });
+
+  it("keeps documentationPct and nextDue as all-time facts, unaffected by the period filter", async () => {
+    mocks.getSellerReportCore.mockResolvedValue(makeCore({
+      evidenceQuality: { totalRecords: 4, receiptCount: 2, receiptCoveragePct: 50, realTimeCount: 4, realTimePct: 100, longestGapDays: 0, mileageInternallyConsistent: true },
+      upcomingReminders: [{ reminder: { name: "MOT due" }, status: "due-soon" }],
+    }));
+    const entry = await buildBikeComparisonEntry(email, "bike-1", { from: "2025-01-01", to: "2025-02-01" });
+    expect(entry?.documentationPct).toBe(50);
+    expect(entry?.nextDue).toEqual({ name: "MOT due", status: "due-soon" });
+  });
+});
+
 describe("buildBikeComparison", () => {
   it("fetches every requested bike and filters out ones that didn't resolve", async () => {
     mocks.getBike.mockImplementation(async (_email: string, bikeId: string) =>

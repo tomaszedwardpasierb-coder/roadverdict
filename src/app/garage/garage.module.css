@@ -114,6 +114,14 @@
   margin-bottom: 1rem;
 }
 
+.comparePeriodFields {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.8rem;
+  width: 100%;
+  margin: 0.6rem 0;
+}
+
 .compareVerdict {
   font-size: 1.15rem;
   font-weight: 600;

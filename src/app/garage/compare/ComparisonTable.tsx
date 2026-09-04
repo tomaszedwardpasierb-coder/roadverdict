@@ -4,11 +4,21 @@ import { CURRENCY_SYMBOLS, convertGbpToDisplay, formatCurrency, type Currency, t
 import { formatDistance, KM_PER_MILE, type DistanceUnit } from "@/lib/tracker/unitFormat";
 import { buildCostPerMileVerdict, pickWinnerId } from "@/lib/tracker/bikeComparisonVerdict";
 import type { BikeComparisonEntry } from "@/lib/tracker/bikeComparison";
+import type { ComparisonPeriod } from "@/lib/tracker/bikeComparisonPeriod";
 import styles from "../garage.module.css";
 
 function fmtDate(d: string | null): string {
   if (!d) return "-";
   return new Date(d).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+}
+
+// "Overall", "since a date", or a specific period all fold into the same
+// one label - matches how isDateInRange treats the same from/to pair.
+function periodLabel(period: ComparisonPeriod | null): string {
+  if (!period || (!period.from && !period.to)) return "overall";
+  if (period.from && period.to) return `${fmtDate(period.from)} to ${fmtDate(period.to)}`;
+  if (period.from) return `since ${fmtDate(period.from)}`;
+  return `up to ${fmtDate(period.to as string)}`;
 }
 
 // Cost/mile needs pence-level precision (£0.15/mi, say) - formatCurrency
@@ -34,14 +44,18 @@ export function ComparisonTable({
   currency,
   rates,
   distanceUnit,
+  period,
 }: {
   entries: BikeComparisonEntry[];
   currency: Currency;
   rates: ExchangeRates | null;
   distanceUnit: DistanceUnit;
+  period: ComparisonPeriod | null;
 }) {
   const money = (gbp: number | null) => (gbp == null ? "-" : formatCurrency(gbp, currency, rates));
   const distance = (miles: number | null) => (miles == null ? "-" : formatDistance(miles, distanceUnit));
+  const hasCustomPeriod = Boolean(period && (period.from || period.to));
+  const label = periodLabel(period);
 
   const costPerMileWinner = pickWinnerId(entries.map((e) => ({ bikeId: e.bikeId, value: e.costPerMile })), "lower");
   const mpgWinner = pickWinnerId(entries.map((e) => ({ bikeId: e.bikeId, value: e.actualMpg })), "higher");
@@ -55,13 +69,15 @@ export function ComparisonTable({
       title: "Cost",
       rows: [
         {
-          label: "Cost per mile",
+          label: `Cost per mile (${label})`,
           values: entries.map((e) => (e.costPerMile == null ? "Not enough data" : formatCostPerDistanceUnit(e.costPerMile, currency, rates, distanceUnit))),
           winnerBikeId: costPerMileWinner,
           badge: "Cheaper to run",
         },
-        { label: "Total spend to date", values: entries.map((e) => money(e.spend.grandTotal)), winnerBikeId: null },
-        { label: "Spend this year", values: entries.map((e) => money(e.yearSpend)), winnerBikeId: null },
+        { label: `Total spend (${label})`, values: entries.map((e) => money(e.spend.grandTotal)), winnerBikeId: null },
+        // Redundant once a custom period is already the spend window
+        // being shown above - only shown for the default, unfiltered view.
+        ...(hasCustomPeriod ? [] : [{ label: "Spend this year", values: entries.map((e) => money(e.yearSpend)), winnerBikeId: null }]),
         { label: "Servicing & repairs", values: entries.map((e) => money(e.spend.servicingTotal)), winnerBikeId: null },
         { label: "Parts & accessories", values: entries.map((e) => money(e.spend.modsTotal)), winnerBikeId: null },
         { label: "Insurance / tax / MOT", values: entries.map((e) => money(e.spend.billsTotal)), winnerBikeId: null },
@@ -73,7 +89,7 @@ export function ComparisonTable({
       rows: [
         { label: "Current mileage", values: entries.map((e) => distance(e.currentMileage)), winnerBikeId: null },
         {
-          label: "Miles ridden since owned",
+          label: `Miles ridden (${label})`,
           values: entries.map((e) => distance(e.milesRidden)),
           winnerBikeId: mostRiddenId,
           badge: "Most ridden",
@@ -127,6 +143,14 @@ export function ComparisonTable({
       <p className="field-note" style={{ marginBottom: "0.8rem" }}>
         Shown in {currency} / {distanceUnit === "km" ? "kilometres" : "miles"}, so every bike is directly comparable regardless of its own display setting.
       </p>
+      {hasCustomPeriod && (
+        <p className="field-note" style={{ marginBottom: "0.8rem" }}>
+          Cost, usage, and servicing rows reflect {label} only. Documentation and what&apos;s due soonest are always
+          shown across each bike&apos;s full history, regardless of this filter. Mileage at a specific date is
+          approximated from the nearest logged entry around that date, since odometer readings aren&apos;t logged
+          continuously.
+        </p>
+      )}
       <div className={styles.compareTableWrap}>
         <table className={styles.compareTable}>
           <thead>

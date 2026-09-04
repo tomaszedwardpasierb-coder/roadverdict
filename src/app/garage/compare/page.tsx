@@ -5,6 +5,7 @@ import { getSession } from "@/lib/auth/session";
 import { isPro } from "@/lib/subscriptions";
 import { getBikesForUser, isBikeReadOnly } from "@/lib/tracker/bike";
 import { buildBikeComparison } from "@/lib/tracker/bikeComparison";
+import type { ComparisonPeriod } from "@/lib/tracker/bikeComparisonPeriod";
 import { getExchangeRates } from "@/lib/tracker/currencyRates";
 import dashboardStyles from "@/app/dashboard/dashboard.module.css";
 import { ProGate } from "@/app/dashboard/ProGate";
@@ -22,10 +23,17 @@ function toIdArray(value: string | string[] | undefined): string[] {
   return Array.isArray(value) ? value : [value];
 }
 
+// searchParams values are always single strings here - a date input
+// only ever submits one value, unlike the repeated `bikes` checkboxes.
+function toSingleValue(value: string | string[] | undefined): string | undefined {
+  const v = Array.isArray(value) ? value[0] : value;
+  return v ? v : undefined;
+}
+
 export default async function ComparePage({
   searchParams,
 }: {
-  searchParams: { bikes?: string | string[] };
+  searchParams: { bikes?: string | string[]; from?: string | string[]; to?: string | string[] };
 }) {
   const session = await getSession();
   if (!session) redirect("/login");
@@ -39,15 +47,21 @@ export default async function ComparePage({
   const userIsPro = await isPro(session.email);
 
   const requestedIds = toIdArray(searchParams.bikes).filter((id) => comparableBikes.some((b) => b.id === id));
+  const from = toSingleValue(searchParams.from);
+  const to = toSingleValue(searchParams.to);
+
   const selectionError =
     requestedIds.length > 0 && requestedIds.length < MIN_COMPARE
       ? `Pick at least ${MIN_COMPARE} bikes to compare.`
       : requestedIds.length > MAX_COMPARE
         ? `You can compare up to ${MAX_COMPARE} bikes at once.`
-        : null;
+        : from && to && new Date(from).getTime() > new Date(to).getTime()
+          ? `The "From" date must be before the "To" date.`
+          : null;
 
-  const showComparison = userIsPro && requestedIds.length >= MIN_COMPARE && requestedIds.length <= MAX_COMPARE;
-  const entries = showComparison ? await buildBikeComparison(session.email, requestedIds) : [];
+  const showComparison = userIsPro && requestedIds.length >= MIN_COMPARE && requestedIds.length <= MAX_COMPARE && !selectionError;
+  const period: ComparisonPeriod | undefined = from || to ? { from, to } : undefined;
+  const entries = showComparison ? await buildBikeComparison(session.email, requestedIds, period) : [];
   const rates = showComparison ? await getExchangeRates() : null;
   // The first selected bike's own display settings become the whole
   // table's shared unit - every value shown is converted to match, so
@@ -87,6 +101,8 @@ export default async function ComparePage({
               selectedIds={requestedIds}
               minCompare={MIN_COMPARE}
               maxCompare={MAX_COMPARE}
+              from={from}
+              to={to}
             />
             {selectionError && (
               <p className="error-text" role="alert" style={{ marginTop: "0.6rem" }}>{selectionError}</p>
@@ -98,6 +114,7 @@ export default async function ComparePage({
                   currency={primaryBike.currency ?? "GBP"}
                   rates={rates}
                   distanceUnit={primaryBike.distanceUnit ?? "mi"}
+                  period={period ?? null}
                 />
               </div>
             )}
