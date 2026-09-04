@@ -8,25 +8,34 @@
 // This mirrors the check report-attachment/[token]/[blobName]/route.ts
 // already does for anonymous buyer links (scoped to one bike there),
 // just scoped to the whole account here.
-import { getBikesForUser } from "@/lib/tracker/bike";
-import { getServiceRecords } from "@/lib/tracker/serviceRecord";
-import { getFuelLogs } from "@/lib/tracker/fuelLog";
-import { getMods } from "@/lib/tracker/mod";
-import { getBills } from "@/lib/tracker/bill";
+//
+// One partition-scoped COUNT query, with the blobName match done
+// server-side by Cosmos (ARRAY_CONTAINS' partial-match mode) - not one
+// fetch per record type per bike, pulling full documents down just to
+// filter them in JS. This runs once per attachment thumbnail rendered
+// anywhere in the app, so its cost has to stay flat regardless of how
+// many bikes or records an account has, not multiply with them - see
+// demoSeedRunner.ts's own comment on the 1000 RU/s ceiling this app
+// runs under for why that multiplication is a real, not theoretical,
+// risk.
+import { getContainer } from "@/lib/cosmos";
+
+const ATTACHMENT_BEARING_TYPES = ["serviceRecord", "fuelLog", "mod", "bill"];
 
 export async function ownsAttachment(email: string, blobName: string): Promise<boolean> {
-  const bikes = await getBikesForUser(email);
-  for (const bike of bikes) {
-    const [records, fuelLogs, mods, bills] = await Promise.all([
-      getServiceRecords(email, bike.id),
-      getFuelLogs(email, bike.id),
-      getMods(email, bike.id),
-      getBills(email, bike.id),
-    ]);
-    const hasIt = [...records, ...fuelLogs, ...mods, ...bills].some((r) =>
-      r.attachments?.some((a) => a.blobName === blobName)
-    );
-    if (hasIt) return true;
-  }
-  return false;
+  const container = getContainer();
+  const { resources } = await container.items
+    .query<number>(
+      {
+        query:
+          "SELECT VALUE COUNT(1) FROM c WHERE ARRAY_CONTAINS(@types, c.type) AND ARRAY_CONTAINS(c.attachments, {\"blobName\": @blobName}, true)",
+        parameters: [
+          { name: "@types", value: ATTACHMENT_BEARING_TYPES },
+          { name: "@blobName", value: blobName },
+        ],
+      },
+      { partitionKey: email }
+    )
+    .fetchAll();
+  return (resources[0] ?? 0) > 0;
 }
