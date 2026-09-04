@@ -1,8 +1,8 @@
 // Place at: src/components/AssistantWidget.tsx
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
-import { usePathname } from 'next/navigation';
+import { Suspense, useEffect, useRef, useState } from 'react';
+import { usePathname, useSearchParams } from 'next/navigation';
 import { useActiveSection } from './ActiveSectionContext';
 import styles from './AssistantWidget.module.css';
 
@@ -53,25 +53,45 @@ function isRetryable(status: number | null): boolean {
   return status === null || status >= 500;
 }
 
+interface CompareContext {
+  bikeIds: string[];
+  from: string | null;
+  to: string | null;
+}
+
 type SendResult = { ok: true; reply: string } | { ok: false; error: string; retryable: boolean };
 
-async function attemptSend(payload: Message[], reportToken: string | null, dashboardTab: string | null): Promise<SendResult> {
+async function attemptSend(
+  payload: Message[],
+  reportToken: string | null,
+  dashboardTab: string | null,
+  compareContext: CompareContext | null
+): Promise<SendResult> {
   let status: number | null = null;
   try {
     const res = await fetch('/api/assistant', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      // Only role/content (and, if a report page or a dashboard tab is
-      // open, that context) goes over the wire - nothing else about the
-      // user is sent from here; anything the assistant knows about
-      // their own account, it gets server-side from their own session,
-      // never from this request body. dashboardTab is just the raw
-      // Section key (e.g. "shareLinks"), not a label - the server maps
-      // it to a real, server-owned label itself.
+      // Only role/content (and, if a report page, dashboard tab, or the
+      // compare page is open, that context) goes over the wire - nothing
+      // else about the user is sent from here; anything the assistant
+      // knows about their own account, it gets server-side from their
+      // own session, never from this request body. dashboardTab is just
+      // the raw Section key (e.g. "shareLinks"), not a label, and
+      // compareContext's bike ids are just what's currently in this
+      // page's own URL - the server independently re-validates both
+      // against the real session before trusting either for anything.
       body: JSON.stringify({
         messages: payload.map((m) => ({ role: m.role, content: m.content })),
         ...(reportToken ? { reportToken } : {}),
         ...(dashboardTab ? { dashboardTab } : {}),
+        ...(compareContext
+          ? {
+              compareBikeIds: compareContext.bikeIds,
+              ...(compareContext.from ? { compareFrom: compareContext.from } : {}),
+              ...(compareContext.to ? { compareTo: compareContext.to } : {}),
+            }
+          : {}),
       }),
     });
     status = res.status;
@@ -91,10 +111,20 @@ async function attemptSend(payload: Message[], reportToken: string | null, dashb
   }
 }
 
-export function AssistantWidget() {
+function AssistantWidgetInner() {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const reportToken = extractReportToken(pathname ?? '');
   const { activeSection: dashboardTab } = useActiveSection();
+  // Read fresh from the URL on every render rather than stored in state -
+  // this only ever needs to reflect whatever's currently on screen, the
+  // same "just a hint, server re-validates it" role reportToken already
+  // plays above. Only meaningful on this one page; everywhere else it's
+  // simply null, same as reportToken/dashboardTab elsewhere.
+  const compareContext =
+    pathname === '/garage/compare'
+      ? { bikeIds: searchParams.getAll('bikes'), from: searchParams.get('from'), to: searchParams.get('to') }
+      : null;
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([GREETING]);
   const [input, setInput] = useState('');
@@ -113,19 +143,19 @@ export function AssistantWidget() {
     listRef.current?.scrollTo({ top: listRef.current.scrollHeight, behavior: 'smooth' });
   }, [messages, sending]);
 
-  async function sendWithRetry(payload: Message[], reportToken: string | null, dashboardTab: string | null) {
+  async function sendWithRetry(payload: Message[], reportToken: string | null, dashboardTab: string | null, compareContext: CompareContext | null) {
     setSending(true);
     setError(null);
     setLastFailedMessages(null);
 
-    let result = await attemptSend(payload, reportToken, dashboardTab);
+    let result = await attemptSend(payload, reportToken, dashboardTab, compareContext);
     let attempts = 1;
     // Retries silently, still inside the same "sending" state - the
     // person just sees the normal typing indicator for slightly longer
     // if this happens, never a flash of an error that then recovers.
     while (!result.ok && result.retryable && attempts <= MAX_AUTO_RETRIES) {
       await sleep(RETRY_DELAY_MS);
-      result = await attemptSend(payload, reportToken, dashboardTab);
+      result = await attemptSend(payload, reportToken, dashboardTab, compareContext);
       attempts++;
     }
 
@@ -145,12 +175,12 @@ export function AssistantWidget() {
     const nextMessages = [...messages, { role: 'user' as const, content: text }];
     setMessages(nextMessages);
     setInput('');
-    await sendWithRetry(nextMessages, reportToken, dashboardTab);
+    await sendWithRetry(nextMessages, reportToken, dashboardTab, compareContext);
   }
 
   function handleRetry() {
     if (!lastFailedMessages || sending) return;
-    void sendWithRetry(lastFailedMessages, reportToken, dashboardTab);
+    void sendWithRetry(lastFailedMessages, reportToken, dashboardTab, compareContext);
   }
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
@@ -216,5 +246,20 @@ export function AssistantWidget() {
         {open ? '✕' : <img src="/assistant-icon.png" alt="" width={28} height={28} className={styles.launcherIcon} />}
       </button>
     </div>
+  );
+}
+
+// useSearchParams() (needed for the compare-page context above) opts a
+// component out of static rendering unless it's wrapped in Suspense -
+// this widget is mounted once, globally, in the root layout, so without
+// this wrapper every single page in the app (including fully static
+// public ones) would lose static rendering just for this one page's
+// worth of context. fallback=null is fine here: before hydration
+// finishes this widget renders nothing visible anyway.
+export function AssistantWidget() {
+  return (
+    <Suspense fallback={null}>
+      <AssistantWidgetInner />
+    </Suspense>
   );
 }

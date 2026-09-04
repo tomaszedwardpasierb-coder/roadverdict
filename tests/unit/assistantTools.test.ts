@@ -15,6 +15,7 @@ const mocks = vi.hoisted(() => ({
   getShareLinksForUser: vi.fn(),
   getPendingReceiptRequestsForOwner: vi.fn(),
   getSellerReportData: vi.fn(),
+  buildBikeComparison: vi.fn(),
 }));
 
 vi.mock("@/lib/tracker/bike", () => ({ getPrimaryBike: mocks.getPrimaryBike }));
@@ -35,7 +36,11 @@ vi.mock("@/lib/tracker/summary", () => ({ gatherMileagePoints: mocks.gatherMilea
 vi.mock("@/lib/tracker/shareLink", () => ({ getShareLinksForUser: mocks.getShareLinksForUser }));
 vi.mock("@/lib/tracker/receiptRequest", () => ({ getPendingReceiptRequestsForOwner: mocks.getPendingReceiptRequestsForOwner }));
 vi.mock("@/lib/tracker/sellerReportData", () => ({ getSellerReportData: mocks.getSellerReportData }));
+vi.mock("@/lib/tracker/bikeComparison", () => ({ buildBikeComparison: mocks.buildBikeComparison }));
 // jobTypes.ts (JOB_LABELS) is deliberately NOT mocked - pure static data.
+// bikeComparisonVerdict.ts (buildCostPerMileVerdict) is deliberately NOT
+// mocked either - it's pure, no I/O, so this exercises the real
+// "which bike is cheapest" logic rather than a stand-in for it.
 
 import {
   runAssistantTool,
@@ -48,6 +53,7 @@ import {
   toolGetShareLinks,
   toolGetStorySoFar,
   toolGetViewedReport,
+  toolGetViewedComparison,
   ASSISTANT_TOOL_DECLARATIONS,
 } from "@/lib/tracker/assistantTools";
 
@@ -107,6 +113,67 @@ describe("runAssistantTool - the core security dispatch layer", () => {
     await runAssistantTool("getViewedReport", { shareToken: "attacker-supplied-token" } as any, "", "real-verified-token");
 
     expect(mocks.getSellerReportData).toHaveBeenCalledWith("real-verified-token");
+  });
+
+  it("getViewedComparison refuses to run at all when no compareContext was independently verified by the caller", async () => {
+    const result: any = await runAssistantTool("getViewedComparison", {}, "owner@example.com");
+    expect(result).toEqual({ error: "No comparison is currently open." });
+    expect(mocks.buildBikeComparison).not.toHaveBeenCalled();
+  });
+
+  // Same "never trust model-supplied identity" principle as
+  // getViewedReport above - even if args somehow carried bike ids, only
+  // the separate, server-verified compareContext parameter is ever used.
+  it("getViewedComparison uses only the server-verified compareContext parameter, never one from args", async () => {
+    mocks.buildBikeComparison.mockResolvedValue([]);
+
+    await runAssistantTool(
+      "getViewedComparison",
+      { bikeIds: ["attacker-supplied-id"] } as any,
+      "real-owner@example.com",
+      undefined,
+      { bikeIds: ["real-bike-1", "real-bike-2"] }
+    );
+
+    expect(mocks.buildBikeComparison).toHaveBeenCalledWith("real-owner@example.com", ["real-bike-1", "real-bike-2"], undefined);
+  });
+});
+
+describe("toolGetViewedComparison", () => {
+  const bikeA = { bikeId: "b-1", name: "Africa Twin", costPerMile: 0.1, spend: { grandTotal: 500 }, milesRidden: 5000, actualMpg: 55, serviceCount: 3, documentationPct: 80, nextDue: null };
+  const bikeB = { bikeId: "b-2", name: "Tiger 900", costPerMile: 0.2, spend: { grandTotal: 800 }, milesRidden: 4000, actualMpg: 45, serviceCount: 2, documentationPct: 60, nextDue: { name: "MOT", status: "due-soon" } };
+
+  it("returns an error when fewer than two bikes could be loaded", async () => {
+    mocks.buildBikeComparison.mockResolvedValue([bikeA]);
+    const result = await toolGetViewedComparison("owner@example.com", { bikeIds: ["b-1", "b-2"] });
+    expect(result).toEqual({ error: "Couldn't load this comparison right now." });
+  });
+
+  it("returns the computed cheapest-to-run verdict alongside each bike's own figures", async () => {
+    mocks.buildBikeComparison.mockResolvedValue([bikeA, bikeB]);
+    const result: any = await toolGetViewedComparison("owner@example.com", { bikeIds: ["b-1", "b-2"] });
+
+    expect(result.period).toBe("overall");
+    expect(result.cheapestToRunVerdict).toContain("Africa Twin");
+    expect(result.bikes).toEqual([
+      { name: "Africa Twin", costPerMile: 0.1, totalSpend: 500, milesRidden: 5000, actualMpg: 55, servicesLogged: 3, documentationCoveragePct: 80, dueSoonest: null },
+      { name: "Tiger 900", costPerMile: 0.2, totalSpend: 800, milesRidden: 4000, actualMpg: 45, servicesLogged: 2, documentationCoveragePct: 60, dueSoonest: { name: "MOT", status: "due-soon" } },
+    ]);
+  });
+
+  it("passes a from/to period through to buildBikeComparison and reports it back, rather than always 'overall'", async () => {
+    mocks.buildBikeComparison.mockResolvedValue([bikeA, bikeB]);
+    await toolGetViewedComparison("owner@example.com", { bikeIds: ["b-1", "b-2"], from: "2025-01-01" });
+    expect(mocks.buildBikeComparison).toHaveBeenCalledWith("owner@example.com", ["b-1", "b-2"], { from: "2025-01-01", to: undefined });
+
+    const result: any = await toolGetViewedComparison("owner@example.com", { bikeIds: ["b-1", "b-2"], from: "2025-01-01" });
+    expect(result.period).toEqual({ from: "2025-01-01", to: null });
+  });
+
+  it("fails safely with a plain tool error, never an unhandled throw, if the underlying lookup rejects", async () => {
+    mocks.buildBikeComparison.mockRejectedValue(new Error("Cosmos unavailable"));
+    const result = await toolGetViewedComparison("owner@example.com", { bikeIds: ["b-1", "b-2"] });
+    expect(result).toEqual({ error: "Couldn't load this comparison right now." });
   });
 });
 

@@ -10,6 +10,9 @@ const mocks = vi.hoisted(() => ({
   hasReportAccess: vi.fn(),
   fetch: vi.fn(),
   logGeminiUsage: vi.fn(),
+  getBikesForUser: vi.fn(),
+  isBikeReadOnly: vi.fn(),
+  isPro: vi.fn(),
 }));
 
 vi.mock("@/lib/auth/session", () => ({ getSession: mocks.getSession }));
@@ -18,12 +21,18 @@ vi.mock("@/lib/tracker/assistantConfig", () => ({ getAssistantConfig: mocks.getA
 vi.mock("@/lib/tracker/assistantTools", () => ({
   ASSISTANT_TOOL_DECLARATIONS: [{ name: "getSpendTotal" }],
   REPORT_TOOL_DECLARATIONS: [{ name: "getViewedReport" }],
+  COMPARISON_TOOL_DECLARATIONS: [{ name: "getViewedComparison" }],
   runAssistantTool: mocks.runAssistantTool,
 }));
 vi.mock("@/lib/tracker/assistantQuestionLog", () => ({ logAssistantQuestion: mocks.logAssistantQuestion }));
 vi.mock("@/lib/tracker/shareLink", () => ({ resolveShareToken: mocks.resolveShareToken }));
 vi.mock("@/lib/tracker/reportAccess", () => ({ hasReportAccess: mocks.hasReportAccess }));
 vi.mock("@/lib/tracker/geminiUsageLog", () => ({ logGeminiUsage: mocks.logGeminiUsage }));
+vi.mock("@/lib/tracker/bike", () => ({ getBikesForUser: mocks.getBikesForUser, isBikeReadOnly: mocks.isBikeReadOnly }));
+vi.mock("@/lib/subscriptions", () => ({ isPro: mocks.isPro }));
+// bikeComparison.ts (MIN_COMPARE_BIKES/MAX_COMPARE_BIKES) is deliberately
+// NOT mocked - both are plain constants, no I/O, so this exercises the
+// real bounds rather than a stand-in for them.
 vi.stubGlobal("fetch", mocks.fetch);
 
 import { POST } from "@/app/api/assistant/route";
@@ -82,7 +91,13 @@ beforeEach(() => {
   mocks.resolveShareToken.mockResolvedValue(null);
   mocks.hasReportAccess.mockResolvedValue(false);
   mocks.fetch.mockResolvedValue(geminiTextResponse("Here's your answer."));
+  mocks.isPro.mockResolvedValue(false);
+  mocks.getBikesForUser.mockResolvedValue([]);
+  mocks.isBikeReadOnly.mockReturnValue(false);
 });
+
+const bikeA = { id: "bike-1", make: "Honda", model: "Africa Twin", nickname: "" };
+const bikeB = { id: "bike-2", make: "Triumph", model: "Tiger 900", nickname: "" };
 
 describe("POST /api/assistant", () => {
   it("returns 503 when the Gemini API key isn't configured, without calling anything else", async () => {
@@ -190,7 +205,8 @@ describe("POST /api/assistant", () => {
       "getSpendTotal",
       { email: "attacker@example.com" },
       "rider@example.com",
-      "tok-a"
+      "tok-a",
+      undefined
     );
   });
 
@@ -220,6 +236,96 @@ describe("POST /api/assistant", () => {
 
     const callBody = JSON.parse(mocks.fetch.mock.calls[0][1].body);
     expect(callBody.systemInstruction.parts[0].text).not.toContain("CURRENT DASHBOARD TAB");
+  });
+
+  it("attaches the comparison tool and names the bikes in the prompt when signed in, Pro, and every bike genuinely belongs to this account", async () => {
+    mocks.getSession.mockResolvedValue({ email: "rider@example.com" });
+    mocks.isPro.mockResolvedValue(true);
+    mocks.getBikesForUser.mockResolvedValue([bikeA, bikeB]);
+
+    await POST(request({ messages: [{ role: "user", content: "which is cheaper?" }], compareBikeIds: ["bike-1", "bike-2"] }));
+
+    const callBody = JSON.parse(mocks.fetch.mock.calls[0][1].body);
+    const names = callBody.tools[0].functionDeclarations.map((d: { name: string }) => d.name);
+    expect(names).toContain("getViewedComparison");
+    expect(callBody.systemInstruction.parts[0].text).toContain("Africa Twin");
+    expect(callBody.systemInstruction.parts[0].text).toContain("Tiger 900");
+  });
+
+  it("never attaches the comparison tool when the account isn't Pro, even with valid bike ids", async () => {
+    mocks.getSession.mockResolvedValue({ email: "rider@example.com" });
+    mocks.isPro.mockResolvedValue(false);
+    mocks.getBikesForUser.mockResolvedValue([bikeA, bikeB]);
+
+    await POST(request({ messages: [{ role: "user", content: "which is cheaper?" }], compareBikeIds: ["bike-1", "bike-2"] }));
+
+    const callBody = JSON.parse(mocks.fetch.mock.calls[0][1].body);
+    const names = callBody.tools[0].functionDeclarations.map((d: { name: string }) => d.name);
+    expect(names).not.toContain("getViewedComparison");
+  });
+
+  it("never trusts a bike id that doesn't actually belong to this account, even if the client sent it", async () => {
+    mocks.getSession.mockResolvedValue({ email: "rider@example.com" });
+    mocks.isPro.mockResolvedValue(true);
+    mocks.getBikesForUser.mockResolvedValue([bikeA]); // only owns one real bike
+
+    await POST(request({
+      messages: [{ role: "user", content: "which is cheaper?" }],
+      compareBikeIds: ["bike-1", "someone-elses-bike"],
+    }));
+
+    const callBody = JSON.parse(mocks.fetch.mock.calls[0][1].body);
+    const names = callBody.tools[0].functionDeclarations.map((d: { name: string }) => d.name);
+    // Only one id actually matched a real, owned bike - below the
+    // 2-bike minimum, so the tool never gets attached at all.
+    expect(names).not.toContain("getViewedComparison");
+  });
+
+  it("never attaches the comparison tool for a transferred (read-only) bike", async () => {
+    mocks.getSession.mockResolvedValue({ email: "rider@example.com" });
+    mocks.isPro.mockResolvedValue(true);
+    mocks.getBikesForUser.mockResolvedValue([bikeA, bikeB]);
+    mocks.isBikeReadOnly.mockImplementation((b: { id: string }) => b.id === "bike-2");
+
+    await POST(request({ messages: [{ role: "user", content: "which is cheaper?" }], compareBikeIds: ["bike-1", "bike-2"] }));
+
+    const callBody = JSON.parse(mocks.fetch.mock.calls[0][1].body);
+    const names = callBody.tools[0].functionDeclarations.map((d: { name: string }) => d.name);
+    expect(names).not.toContain("getViewedComparison");
+  });
+
+  it("never attaches the comparison tool when nobody is signed in, regardless of what compareBikeIds claims", async () => {
+    mocks.getSession.mockResolvedValue(null);
+
+    await POST(request({ messages: [{ role: "user", content: "hi" }], compareBikeIds: ["bike-1", "bike-2"] }));
+
+    const callBody = JSON.parse(mocks.fetch.mock.calls[0][1].body);
+    expect(callBody.tools).toBeUndefined();
+    expect(mocks.getBikesForUser).not.toHaveBeenCalled();
+  });
+
+  it("passes the validated compareContext (never raw client ids) through to a tool call", async () => {
+    mocks.getSession.mockResolvedValue({ email: "rider@example.com" });
+    mocks.isPro.mockResolvedValue(true);
+    mocks.getBikesForUser.mockResolvedValue([bikeA, bikeB]);
+    mocks.fetch
+      .mockResolvedValueOnce(geminiFunctionCallResponse("getViewedComparison", { bikeIds: ["attacker-id"] }))
+      .mockResolvedValueOnce(geminiTextResponse("The Africa Twin is cheaper."));
+    mocks.runAssistantTool.mockResolvedValue({ cheapestToRunVerdict: "The Africa Twin is cheaper." });
+
+    await POST(request({
+      messages: [{ role: "user", content: "which is cheaper?" }],
+      compareBikeIds: ["bike-1", "bike-2"],
+      compareFrom: "2025-01-01",
+    }));
+
+    expect(mocks.runAssistantTool).toHaveBeenCalledWith(
+      "getViewedComparison",
+      { bikeIds: ["attacker-id"] },
+      "rider@example.com",
+      undefined,
+      { bikeIds: ["bike-1", "bike-2"], from: "2025-01-01", to: undefined }
+    );
   });
 
   it("returns 503 and logs an error question when the assistant config can't be loaded", async () => {

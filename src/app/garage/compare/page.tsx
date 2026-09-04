@@ -4,7 +4,7 @@ import Link from "next/link";
 import { getSession } from "@/lib/auth/session";
 import { isPro } from "@/lib/subscriptions";
 import { getBikesForUser, isBikeReadOnly } from "@/lib/tracker/bike";
-import { buildBikeComparison } from "@/lib/tracker/bikeComparison";
+import { buildBikeComparison, MIN_COMPARE_BIKES as MIN_COMPARE, MAX_COMPARE_BIKES as MAX_COMPARE } from "@/lib/tracker/bikeComparison";
 import type { ComparisonPeriod } from "@/lib/tracker/bikeComparisonPeriod";
 import { getExchangeRates } from "@/lib/tracker/currencyRates";
 import dashboardStyles from "@/app/dashboard/dashboard.module.css";
@@ -14,9 +14,6 @@ import { ComparisonPicker } from "./ComparisonPicker";
 import { ComparisonTable } from "./ComparisonTable";
 
 export const dynamic = "force-dynamic";
-
-const MIN_COMPARE = 2;
-const MAX_COMPARE = 4;
 
 function toIdArray(value: string | string[] | undefined): string[] {
   if (!value) return [];

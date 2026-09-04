@@ -23,6 +23,9 @@ import { JOB_LABELS } from "./jobTypes";
 import { getShareLinksForUser } from "./shareLink";
 import { getPendingReceiptRequestsForOwner } from "./receiptRequest";
 import { getSellerReportData } from "./sellerReportData";
+import { buildBikeComparison } from "./bikeComparison";
+import { buildCostPerMileVerdict } from "./bikeComparisonVerdict";
+import type { ComparisonPeriod } from "./bikeComparisonPeriod";
 
 type CostItem = { date: string; cost: number };
 
@@ -411,10 +414,73 @@ export async function toolGetViewedReport(shareToken: string) {
   }
 }
 
+// ---- The specific bike comparison currently open, if any ----
+//
+// Deliberately its own separate declaration, same reasoning as
+// REPORT_TOOL_DECLARATIONS above - this needs its own extra gate beyond
+// plain "is signed in" (Pro, and every bike genuinely belongs to this
+// account and isn't read-only), evaluated once by route.ts before this
+// is ever offered to the model. bikeIds/from/to here are never
+// model-supplied - they're the server-validated CompareContext route.ts
+// built from the client's OWN current page state, cross-checked against
+// this session's real bikes, exactly like reportToken above.
+export interface CompareContext {
+  bikeIds: string[];
+  from?: string;
+  to?: string;
+}
+
+export const COMPARISON_TOOL_DECLARATIONS = [
+  {
+    name: "getViewedComparison",
+    description: "Get a summary of the bike comparison currently open on the Compare bikes page - cost per mile for each bike (and which one is cheapest to run), total spend, mileage ridden, actual fuel economy, servicing history, documentation completeness, and what's due soonest on each. Use this for any question about 'this comparison', 'these bikes', 'which one', 'which is cheaper', or a vague question asked while this page is open. Never use the signed-in user's other personal-data tools to answer a question about this specific comparison, and never use this tool to answer a general question about their account outside of it.",
+    parameters: { type: "OBJECT", properties: {} },
+  },
+] as const;
+
+export async function toolGetViewedComparison(email: string, compareContext: CompareContext) {
+  try {
+    const period: ComparisonPeriod | undefined =
+      compareContext.from || compareContext.to ? { from: compareContext.from, to: compareContext.to } : undefined;
+    const entries = await buildBikeComparison(email, compareContext.bikeIds, period);
+    if (entries.length < 2) return { error: "Couldn't load this comparison right now." };
+
+    const verdict = buildCostPerMileVerdict(entries.map((e) => ({ bikeId: e.bikeId, name: e.name, costPerMile: e.costPerMile })));
+
+    return {
+      period: period ? { from: period.from ?? null, to: period.to ?? null } : "overall",
+      // Computed here, not left for the model to work out from the raw
+      // numbers below - a plain sentence the model can relay verbatim is
+      // far less likely to be wrong than the model doing its own "which
+      // is cheaper" arithmetic across several bikes' figures.
+      cheapestToRunVerdict: verdict,
+      bikes: entries.map((e) => ({
+        name: e.name,
+        costPerMile: e.costPerMile,
+        totalSpend: e.spend.grandTotal,
+        milesRidden: e.milesRidden,
+        actualMpg: e.actualMpg,
+        servicesLogged: e.serviceCount,
+        documentationCoveragePct: e.documentationPct,
+        dueSoonest: e.nextDue,
+      })),
+    };
+  } catch (err) {
+    console.error("toolGetViewedComparison failed:", err);
+    return { error: "Couldn't load this comparison right now." };
+  }
+}
+
 // Single dispatch point - the API route calls this instead of a
 // hand-written switch of its own, so the set of callable tools is
 // defined in exactly one place.
-export async function runAssistantTool(name: string, args: Record<string, unknown>, email: string, reportToken?: string) {
+export async function runAssistantTool(
+  name: string,
+  args: Record<string, unknown>,
+  email: string,
+  reportToken?: string,
+  compareContext?: CompareContext
+) {
   // Checked before the session-scoped switch below, and independent of
   // it - this tool works with no session at all, as long as route.ts
   // already validated the report token. reportToken here is always the
@@ -424,6 +490,13 @@ export async function runAssistantTool(name: string, args: Record<string, unknow
   if (name === "getViewedReport") {
     if (!reportToken) return { error: "No report is currently open." };
     return toolGetViewedReport(reportToken);
+  }
+
+  // Same pattern as getViewedReport above - compareContext is always
+  // route.ts's own validated value, never read from `args`.
+  if (name === "getViewedComparison") {
+    if (!compareContext) return { error: "No comparison is currently open." };
+    return toolGetViewedComparison(email, compareContext);
   }
 
   switch (name as ToolName) {

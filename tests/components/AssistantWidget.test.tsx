@@ -12,8 +12,10 @@ import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 const mockPathname = vi.hoisted(() => ({ current: "/" }));
+const mockSearchParams = vi.hoisted(() => ({ current: new URLSearchParams() }));
 vi.mock("next/navigation", () => ({
   usePathname: () => mockPathname.current,
+  useSearchParams: () => mockSearchParams.current,
 }));
 
 import { AssistantWidget } from "@/components/AssistantWidget";
@@ -37,6 +39,7 @@ async function openWidgetAndSend(user: ReturnType<typeof userEvent.setup>, text:
 describe("AssistantWidget", () => {
   beforeEach(() => {
     mockPathname.current = "/";
+    mockSearchParams.current = new URLSearchParams();
     vi.stubGlobal("fetch", vi.fn());
   });
 
@@ -110,6 +113,44 @@ describe("AssistantWidget", () => {
     await screen.findByText("Shareable Links let you send a buyer your bike's history.");
     const body = JSON.parse((fetch as ReturnType<typeof vi.fn>).mock.calls[0][1].body);
     expect(body.dashboardTab).toBe("shareLinks");
+  });
+
+  it("on /garage/compare, includes the currently-selected bike ids and date filter in the request body", async () => {
+    mockPathname.current = "/garage/compare";
+    mockSearchParams.current = new URLSearchParams([["bikes", "bike-1"], ["bikes", "bike-2"], ["from", "2025-01-01"]]);
+    (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ reply: "The Africa Twin is cheaper to run." }),
+    });
+
+    const user = userEvent.setup();
+    render(<AssistantWidget />);
+    await openWidgetAndSend(user, "which is cheaper?");
+
+    await screen.findByText("The Africa Twin is cheaper to run.");
+    const body = JSON.parse((fetch as ReturnType<typeof vi.fn>).mock.calls[0][1].body);
+    expect(body.compareBikeIds).toEqual(["bike-1", "bike-2"]);
+    expect(body.compareFrom).toBe("2025-01-01");
+    expect(body.compareTo).toBeUndefined();
+  });
+
+  it("never includes compare context on a page other than /garage/compare, even if the URL happens to have a bikes param", async () => {
+    mockPathname.current = "/garage";
+    mockSearchParams.current = new URLSearchParams([["bikes", "bike-1"], ["bikes", "bike-2"]]);
+    (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ reply: "ok" }),
+    });
+
+    const user = userEvent.setup();
+    render(<AssistantWidget />);
+    await openWidgetAndSend(user, "hello");
+
+    await screen.findByText("ok");
+    const body = JSON.parse((fetch as ReturnType<typeof vi.fn>).mock.calls[0][1].body);
+    expect(body.compareBikeIds).toBeUndefined();
   });
 
   it("never treats /report/receipt-request/decide as a report-token page", async () => {

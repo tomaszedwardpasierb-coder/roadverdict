@@ -19,6 +19,12 @@ import { getSellerReportCore } from "./sellerReportData";
 import { monthsBetween } from "./reminderStatus";
 import { isDateInRange, mileageAsOf, type ComparisonPeriod } from "./bikeComparisonPeriod";
 
+// Shared with the garage compare page AND the assistant's own
+// "which bikes are currently being compared" validation - kept in one
+// place so the two can never quietly drift apart.
+export const MIN_COMPARE_BIKES = 2;
+export const MAX_COMPARE_BIKES = 4;
+
 export interface BikeComparisonEntry {
   bikeId: string;
   name: string;

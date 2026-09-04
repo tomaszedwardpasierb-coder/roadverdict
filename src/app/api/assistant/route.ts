@@ -11,11 +11,20 @@ import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/session";
 import { getLivePrivacyPolicyText } from "@/lib/tracker/assistantKnowledge";
 import { getAssistantConfig, type AssistantConfigDoc } from "@/lib/tracker/assistantConfig";
-import { ASSISTANT_TOOL_DECLARATIONS, REPORT_TOOL_DECLARATIONS, runAssistantTool } from "@/lib/tracker/assistantTools";
+import {
+  ASSISTANT_TOOL_DECLARATIONS,
+  REPORT_TOOL_DECLARATIONS,
+  COMPARISON_TOOL_DECLARATIONS,
+  runAssistantTool,
+  type CompareContext,
+} from "@/lib/tracker/assistantTools";
 import { logAssistantQuestion } from "@/lib/tracker/assistantQuestionLog";
 import { logGeminiUsage } from "@/lib/tracker/geminiUsageLog";
 import { resolveShareToken } from "@/lib/tracker/shareLink";
 import { hasReportAccess } from "@/lib/tracker/reportAccess";
+import { getBikesForUser, isBikeReadOnly } from "@/lib/tracker/bike";
+import { isPro } from "@/lib/subscriptions";
+import { MIN_COMPARE_BIKES, MAX_COMPARE_BIKES } from "@/lib/tracker/bikeComparison";
 
 export const dynamic = "force-dynamic";
 
@@ -76,7 +85,7 @@ const DASHBOARD_TAB_LABELS: Record<string, string> = {
   transferOwnership: "Transfer ownership",
 };
 
-function buildSystemInstruction(config: AssistantConfigDoc, signedIn: boolean, privacyPolicyText: string | null, reportOpen: boolean, dashboardTabLabel: string | null): string {
+function buildSystemInstruction(config: AssistantConfigDoc, signedIn: boolean, privacyPolicyText: string | null, reportOpen: boolean, dashboardTabLabel: string | null, compareBikeNames: string[] | null): string {
   const parts = [config.knowledgeBase];
 
   // Appended right after the knowledge base, before the more
@@ -113,6 +122,12 @@ function buildSystemInstruction(config: AssistantConfigDoc, signedIn: boolean, p
     );
   }
 
+  if (compareBikeNames) {
+    parts.push(
+      `\n\n---\n\nCURRENT PAGE: the signed-in user has the Compare bikes page open, currently comparing: ${compareBikeNames.join(", ")}. The getViewedComparison tool is available now. Call it BEFORE answering any question that could plausibly be about this comparison, even a vague, pronoun-only, or unqualified question with no explicit mention of "this comparison" - e.g. "which is cheaper?", "what does this show?", "is that right?". While this page is open, an unqualified question about "these bikes" or "which one" defaults to being about THIS specific comparison, not a generic account-wide question - never fall back to a different personal-data tool without checking this one first just because the question didn't use those exact words.`
+    );
+  }
+
   parts.push(
     privacyPolicyText
       ? `\n\n---\n\nLIVE PRIVACY POLICY (current text, fetched just now - use this directly for any data-handling or privacy question per section 8.3 of the document above, never your own reasoning):\n\n${privacyPolicyText}`
@@ -137,7 +152,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Assistant is not configured." }, { status: 503 });
   }
 
-  let body: { messages?: ChatMessage[]; reportToken?: string; dashboardTab?: string };
+  let body: { messages?: ChatMessage[]; reportToken?: string; dashboardTab?: string; compareBikeIds?: string[]; compareFrom?: string; compareTo?: string };
   try {
     body = await req.json();
   } catch {
@@ -196,6 +211,37 @@ export async function POST(req: Request) {
   const dashboardTabLabel =
     signedIn && typeof body.dashboardTab === "string" ? DASHBOARD_TAB_LABELS[body.dashboardTab] ?? null : null;
 
+  // Only ever trusted after being cross-checked against this session's
+  // own real bikes and Pro status below - the client sends raw ids read
+  // straight from its own URL, which is just a hint about what's on
+  // screen, never enough on its own to decide what the assistant can
+  // see (same reasoning as reportToken above). Silently ends up null
+  // (no tool offered) for anything that doesn't check out, rather than
+  // erroring the whole request over a stale or tampered hint.
+  let compareContext: CompareContext | null = null;
+  let compareBikeNames: string[] | null = null;
+  if (signedIn && session && Array.isArray(body.compareBikeIds) && body.compareBikeIds.length > 0) {
+    try {
+      const userIsPro = await isPro(session.email);
+      if (userIsPro) {
+        const bikes = await getBikesForUser(session.email);
+        const ownActiveBikes = bikes.filter((b) => !isBikeReadOnly(b));
+        const requestedIds = body.compareBikeIds.filter((id): id is string => typeof id === "string");
+        const matched = requestedIds
+          .map((id) => ownActiveBikes.find((b) => b.id === id))
+          .filter((b): b is NonNullable<typeof b> => !!b);
+        if (matched.length >= MIN_COMPARE_BIKES && matched.length <= MAX_COMPARE_BIKES) {
+          const from = typeof body.compareFrom === "string" && body.compareFrom ? body.compareFrom : undefined;
+          const to = typeof body.compareTo === "string" && body.compareTo ? body.compareTo : undefined;
+          compareContext = { bikeIds: matched.map((b) => b.id), from, to };
+          compareBikeNames = matched.map((b) => (b.nickname ? `${b.nickname} (${b.make} ${b.model})` : `${b.make} ${b.model}`));
+        }
+      }
+    } catch (err) {
+      console.error("Assistant: compare-context validation failed, continuing without it:", err);
+    }
+  }
+
   // The client always appends the new message before sending, so this
   // is the actual question being asked right now - not the full
   // history, which would have already been logged on earlier requests.
@@ -214,12 +260,13 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Assistant is temporarily unavailable." }, { status: 503 });
   }
 
-  const systemInstruction = buildSystemInstruction(config, signedIn, privacyPolicyText, !!reportToken, dashboardTabLabel);
+  const systemInstruction = buildSystemInstruction(config, signedIn, privacyPolicyText, !!reportToken, dashboardTabLabel, compareBikeNames);
 
   const contents: GeminiContent[] = toGeminiContents(messages);
   const toolDeclarations = [
     ...(signedIn ? ASSISTANT_TOOL_DECLARATIONS : []),
     ...(reportToken ? REPORT_TOOL_DECLARATIONS : []),
+    ...(compareContext ? COMPARISON_TOOL_DECLARATIONS : []),
   ];
   const tools = toolDeclarations.length > 0 ? [{ functionDeclarations: toolDeclarations }] : undefined;
 
@@ -257,7 +304,7 @@ export async function POST(req: Request) {
         // model-supplied and therefore untrusted for identity purposes.
         // reportToken is this same request's own server-validated value
         // from above, for the same reason.
-        const toolResult = await runAssistantTool(name, args ?? {}, session?.email ?? "", reportToken ?? undefined);
+        const toolResult = await runAssistantTool(name, args ?? {}, session?.email ?? "", reportToken ?? undefined, compareContext ?? undefined);
 
         // Echo back every part from the model's actual turn, verbatim -
         // not a rebuilt {functionCall: {name, args}}, which silently
