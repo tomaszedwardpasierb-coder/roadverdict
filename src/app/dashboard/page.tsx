@@ -250,7 +250,7 @@ export default async function DashboardPage() {
         return (
           <p className={styles.subtext} style={{ marginBottom: "1rem" }}>
             Euro {bike.dvlaData.euroStatus} emissions standard - {likelyCompliant ? "likely compliant with London's ULEZ" : "likely does NOT meet London's ULEZ requirement (Euro 3+)"}.{" "}
-            <a href="https://tfl.gov.uk/modes/driving/check-your-vehicle" target="_blank" rel="noopener">Check definitively on TfL&apos;s own site ↗</a>
+            <a href="https://tfl.gov.uk/modes/driving/check-your-vehicle/" target="_blank" rel="noopener">Check definitively on TfL&apos;s own site ↗</a>
           </p>
         );
       })()}
