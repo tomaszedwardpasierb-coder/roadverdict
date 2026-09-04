@@ -1135,3 +1135,28 @@ body:has(main [data-admin-shell]) [data-assistant-widget] {
   .rv-solutions { padding: 3rem 1.2rem; }
   .rv-verdict-content { padding: 2.5rem 1.2rem; }
 }
+
+/* Break hero sections out of main's max-width constraint */
+.rv-hero,
+.rv-cut,
+.rv-problems,
+.rv-solutions,
+.rv-verdict-strip {
+  margin-left: calc(-1.5rem - ((100vw - 900px) / 2));
+  margin-right: calc(-1.5rem - ((100vw - 900px) / 2));
+  width: 100vw;
+}
+
+/* Full-bleed override — break homepage sections out of main's 900px cap */
+.rv-hero,
+.rv-cut,
+.rv-problems,
+.rv-solutions,
+.rv-verdict-strip {
+  width: 100vw;
+  position: relative;
+  left: 50%;
+  right: 50%;
+  margin-left: -50vw;
+  margin-right: -50vw;
+}
