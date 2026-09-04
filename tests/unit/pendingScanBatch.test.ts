@@ -6,11 +6,12 @@ const mocks = vi.hoisted(() => ({
   read: vi.fn(),
   deleteFn: vi.fn(),
   upsert: vi.fn(),
+  query: vi.fn(),
 }));
 
 vi.mock("@/lib/cosmos", () => ({ getContainer: mocks.getContainer }));
 
-import { getPendingScanBatch, savePendingScanBatch, deletePendingScanBatch } from "@/lib/tracker/pendingScanBatch";
+import { getPendingScanBatch, savePendingScanBatch, deletePendingScanBatch, purgeStalePendingScanBatches } from "@/lib/tracker/pendingScanBatch";
 
 const email = "rider@example.com";
 const bikeId = "bike-1";
@@ -25,9 +26,11 @@ beforeEach(() => {
   mocks.read.mockReset();
   mocks.deleteFn.mockReset();
   mocks.upsert.mockReset();
+  mocks.query.mockReset();
 
   mocks.item.mockReturnValue({ read: mocks.read, delete: mocks.deleteFn });
-  mocks.getContainer.mockReturnValue({ item: mocks.item, items: { upsert: mocks.upsert } });
+  mocks.query.mockReturnValue({ fetchAll: () => Promise.resolve({ resources: [] }) });
+  mocks.getContainer.mockReturnValue({ item: mocks.item, items: { upsert: mocks.upsert, query: mocks.query } });
 
   mocks.read.mockResolvedValue({ resource: undefined });
   mocks.deleteFn.mockResolvedValue(undefined);
@@ -104,5 +107,38 @@ describe("deletePendingScanBatch", () => {
   it("swallows a delete failure (e.g. already gone) rather than throwing", async () => {
     mocks.deleteFn.mockRejectedValue(new Error("404 Not Found"));
     await expect(deletePendingScanBatch(email, bikeId)).resolves.toBeUndefined();
+  });
+});
+
+describe("purgeStalePendingScanBatches", () => {
+  it("deletes docs matched by the query and reports how many succeeded", async () => {
+    mocks.query.mockReturnValue({
+      fetchAll: () => Promise.resolve({ resources: [{ id: "b1", pk: "a@example.com" }, { id: "b2", pk: "b@example.com" }] }),
+    });
+    const count = await purgeStalePendingScanBatches();
+    expect(mocks.deleteFn).toHaveBeenCalledTimes(2);
+    expect(count).toBe(2);
+  });
+
+  it("queries by type and a createdAt cutoff, cross-partition", async () => {
+    await purgeStalePendingScanBatches();
+    const [queryObj] = mocks.query.mock.calls[0];
+    expect(queryObj.query).toContain("c.type = 'pendingScanBatch'");
+    expect(queryObj.query).toContain("c.createdAt < @cutoff");
+  });
+
+  it("is best-effort - one failed delete doesn't stop the rest", async () => {
+    mocks.query.mockReturnValue({
+      fetchAll: () => Promise.resolve({ resources: [{ id: "b1", pk: "a@example.com" }, { id: "b2", pk: "b@example.com" }] }),
+    });
+    mocks.deleteFn.mockResolvedValueOnce(undefined).mockRejectedValueOnce(new Error("boom"));
+    const count = await purgeStalePendingScanBatches();
+    expect(count).toBe(1);
+  });
+
+  it("returns 0 when nothing is stale", async () => {
+    const count = await purgeStalePendingScanBatches();
+    expect(count).toBe(0);
+    expect(mocks.deleteFn).not.toHaveBeenCalled();
   });
 });

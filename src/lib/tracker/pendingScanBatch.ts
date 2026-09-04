@@ -60,3 +60,30 @@ export async function deletePendingScanBatch(email: string, bikeId: string): Pro
     // redundant cleanup call) - not an error worth surfacing.
   }
 }
+
+const STALE_BATCH_HOURS = 48;
+
+// Cross-partition, same accepted exception used elsewhere in this app
+// for periodic cleanup crons - only ever called from a scheduled purge,
+// never a hot path. A batch this old was never going to be resumed (a
+// closed tab mid-review, not an in-progress one), and there's no
+// Cosmos ttl here since a genuinely active review can legitimately sit
+// for a while as items are committed one at a time.
+export async function purgeStalePendingScanBatches(): Promise<number> {
+  const container = getContainer();
+  const cutoff = new Date();
+  cutoff.setHours(cutoff.getHours() - STALE_BATCH_HOURS);
+  const { resources } = await container.items
+    .query<{ id: string; pk: string }>({
+      query: "SELECT c.id, c.pk FROM c WHERE c.type = 'pendingScanBatch' AND c.createdAt < @cutoff",
+      parameters: [{ name: "@cutoff", value: cutoff.toISOString() }],
+    })
+    .fetchAll();
+
+  const results = await Promise.allSettled(resources.map((r) => container.item(r.id, r.pk).delete()));
+  const failures = results.filter((r) => r.status === "rejected");
+  if (failures.length > 0) {
+    console.error(`purgeStalePendingScanBatches: ${failures.length} of ${resources.length} failed to delete:`, failures);
+  }
+  return results.filter((r) => r.status === "fulfilled").length;
+}

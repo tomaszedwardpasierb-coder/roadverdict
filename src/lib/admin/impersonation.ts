@@ -38,3 +38,31 @@ export async function logImpersonation(targetEmail: string, ip: string, action: 
     ip,
   });
 }
+
+const IMPERSONATION_LOG_RETENTION_DAYS = 365;
+
+// No Cosmos ttl here on purpose - unlike the app's other short-lived
+// docs, this is an audit trail meant to support a later fraud/incident
+// review, so it should outlive a normal session by a long way rather
+// than silently expire on a fixed short clock. A year is a standard
+// audit-log retention floor, not a technical necessity.
+export async function purgeOldImpersonationLogs(): Promise<number> {
+  const container = getContainer();
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - IMPERSONATION_LOG_RETENTION_DAYS);
+  const { resources } = await container.items
+    .query<{ id: string }>(
+      {
+        query: "SELECT c.id FROM c WHERE c.type = 'adminImpersonation' AND c.at < @cutoff",
+        parameters: [{ name: "@cutoff", value: cutoff.toISOString() }],
+      },
+      { partitionKey: ADMIN_PK }
+    )
+    .fetchAll();
+  const results = await Promise.allSettled(resources.map((r) => container.item(r.id, ADMIN_PK).delete()));
+  const failures = results.filter((r) => r.status === "rejected");
+  if (failures.length > 0) {
+    console.error(`purgeOldImpersonationLogs: ${failures.length} of ${resources.length} failed to delete:`, failures);
+  }
+  return results.filter((r) => r.status === "fulfilled").length;
+}

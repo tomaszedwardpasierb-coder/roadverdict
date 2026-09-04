@@ -27,6 +27,7 @@ import {
   markAllNotificationsRead,
   getBroadcastSummaries,
   clearNotifications,
+  purgeOldNotifications,
 } from "@/lib/tracker/notification";
 
 beforeEach(() => {
@@ -285,6 +286,47 @@ describe("clearNotifications", () => {
   it("returns 0 and deletes nothing when a recipient has no matching notifications", async () => {
     mocks.query.mockReturnValue({ fetchAll: () => Promise.resolve({ resources: [] }) });
     const count = await clearNotifications({ broadcasts: "all", recipients: ["rider@example.com"] });
+    expect(count).toBe(0);
+    expect(mocks.deleteItem).not.toHaveBeenCalled();
+  });
+});
+
+describe("purgeOldNotifications", () => {
+  it("deletes docs matched by the query and reports how many succeeded", async () => {
+    mocks.query.mockReturnValue({
+      fetchAll: () =>
+        Promise.resolve({
+          resources: [
+            { id: "n1", pk: "a@example.com" },
+            { id: "n2", pk: "b@example.com" },
+          ],
+        }),
+    });
+    const count = await purgeOldNotifications();
+    expect(mocks.deleteItem).toHaveBeenCalledTimes(2);
+    expect(count).toBe(2);
+  });
+
+  it("queries across the whole container, matching read-and-old or ancient-regardless-of-read-status", async () => {
+    mocks.query.mockReturnValue({ fetchAll: () => Promise.resolve({ resources: [] }) });
+    await purgeOldNotifications();
+    const [queryObj, options] = mocks.query.mock.calls[0];
+    expect(queryObj.query).toContain("c.type = 'notification'");
+    expect(queryObj.query).toContain("IS_DEFINED(c.readAt)");
+    expect(options).toBeUndefined();
+  });
+
+  it("is best-effort - one failed delete doesn't stop the rest", async () => {
+    mocks.query.mockReturnValue({
+      fetchAll: () => Promise.resolve({ resources: [{ id: "n1", pk: "a@example.com" }, { id: "n2", pk: "b@example.com" }] }),
+    });
+    mocks.deleteItem.mockResolvedValueOnce(undefined).mockRejectedValueOnce(new Error("boom"));
+    const count = await purgeOldNotifications();
+    expect(count).toBe(1);
+  });
+
+  it("returns 0 when nothing matches", async () => {
+    const count = await purgeOldNotifications();
     expect(count).toBe(0);
     expect(mocks.deleteItem).not.toHaveBeenCalled();
   });

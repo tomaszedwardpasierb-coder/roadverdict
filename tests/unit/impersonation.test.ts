@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   fetchAll: vi.fn(),
   create: vi.fn(),
+  deleteFn: vi.fn(),
 }));
 
 const mockContainer = {
@@ -10,15 +11,18 @@ const mockContainer = {
     query: vi.fn(() => ({ fetchAll: mocks.fetchAll })),
     create: mocks.create,
   },
+  item: vi.fn(() => ({ delete: mocks.deleteFn })),
 };
 
 vi.mock("@/lib/cosmos", () => ({ getContainer: () => mockContainer }));
 
-import { userExists, logImpersonation } from "@/lib/admin/impersonation";
+import { userExists, logImpersonation, purgeOldImpersonationLogs } from "@/lib/admin/impersonation";
 
 beforeEach(() => {
   mocks.fetchAll.mockReset();
   mocks.create.mockReset();
+  mocks.deleteFn.mockReset();
+  mocks.deleteFn.mockResolvedValue(undefined);
   mockContainer.items.query.mockClear();
 });
 
@@ -90,5 +94,32 @@ describe("logImpersonation", () => {
   it("propagates the 'end' action distinctly from 'start'", async () => {
     await logImpersonation("target@example.com", "1.2.3.4", "end");
     expect(mocks.create.mock.calls[0][0].action).toBe("end");
+  });
+});
+
+describe("purgeOldImpersonationLogs", () => {
+  it("deletes docs matched by the query, scoped to the admin partition", async () => {
+    mocks.fetchAll.mockResolvedValue({ resources: [{ id: "impersonation-1" }, { id: "impersonation-2" }] });
+    const count = await purgeOldImpersonationLogs();
+    expect(mocks.deleteFn).toHaveBeenCalledTimes(2);
+    expect(count).toBe(2);
+    const [query, options] = mockContainer.items.query.mock.calls.at(-1) as any[];
+    expect(query.query).toContain("c.type = 'adminImpersonation'");
+    expect(query.query).toContain("c.at < @cutoff");
+    expect(options).toEqual({ partitionKey: "admin" });
+  });
+
+  it("is best-effort - one failed delete doesn't stop the rest", async () => {
+    mocks.fetchAll.mockResolvedValue({ resources: [{ id: "impersonation-1" }, { id: "impersonation-2" }] });
+    mocks.deleteFn.mockResolvedValueOnce(undefined).mockRejectedValueOnce(new Error("boom"));
+    const count = await purgeOldImpersonationLogs();
+    expect(count).toBe(1);
+  });
+
+  it("returns 0 when nothing is old enough", async () => {
+    mocks.fetchAll.mockResolvedValue({ resources: [] });
+    const count = await purgeOldImpersonationLogs();
+    expect(count).toBe(0);
+    expect(mocks.deleteFn).not.toHaveBeenCalled();
   });
 });

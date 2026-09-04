@@ -155,3 +155,48 @@ export async function getPersonalityVersions(limit = 20): Promise<PersonalityVer
     .fetchAll();
   return resources;
 }
+
+// Append-only version history has no natural expiry by age - a
+// knowledge base or personality config that's rarely edited should
+// still keep its whole history, however old. Retention here is by
+// count instead, same idea most version-history systems use: keep the
+// most recent MAX_VERSIONS_KEPT snapshots, drop anything older.
+const MAX_VERSIONS_KEPT = 50;
+
+export async function pruneKnowledgeBaseVersions(): Promise<number> {
+  const container = getContainer();
+  const { resources } = await container.items
+    .query<{ id: string }>(
+      {
+        query: "SELECT c.id FROM c WHERE c.type = 'knowledgeBaseVersion' ORDER BY c.savedAt DESC OFFSET @keep LIMIT 10000",
+        parameters: [{ name: "@keep", value: MAX_VERSIONS_KEPT }],
+      },
+      { partitionKey: "system" }
+    )
+    .fetchAll();
+  const results = await Promise.allSettled(resources.map((r) => container.item(r.id, "system").delete()));
+  const failures = results.filter((r) => r.status === "rejected");
+  if (failures.length > 0) {
+    console.error(`pruneKnowledgeBaseVersions: ${failures.length} of ${resources.length} failed to delete:`, failures);
+  }
+  return results.filter((r) => r.status === "fulfilled").length;
+}
+
+export async function prunePersonalityVersions(): Promise<number> {
+  const container = getContainer();
+  const { resources } = await container.items
+    .query<{ id: string }>(
+      {
+        query: "SELECT c.id FROM c WHERE c.type = 'personalityVersion' ORDER BY c.savedAt DESC OFFSET @keep LIMIT 10000",
+        parameters: [{ name: "@keep", value: MAX_VERSIONS_KEPT }],
+      },
+      { partitionKey: "system" }
+    )
+    .fetchAll();
+  const results = await Promise.allSettled(resources.map((r) => container.item(r.id, "system").delete()));
+  const failures = results.filter((r) => r.status === "rejected");
+  if (failures.length > 0) {
+    console.error(`prunePersonalityVersions: ${failures.length} of ${resources.length} failed to delete:`, failures);
+  }
+  return results.filter((r) => r.status === "fulfilled").length;
+}

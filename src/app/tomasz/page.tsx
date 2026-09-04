@@ -389,6 +389,17 @@ export default async function AdminDashboardPage({
             <RunCronButton name="delete-expired-share-links" label="Run now" />
           </div>
         </div>
+        <div className={styles.card}>
+          <div className={styles.cardTitle}>Purge stale data</div>
+          <p className={styles.note}>
+            Notifications (read &amp; 90+ days old, or any age past a year), abandoned receipt-scan batches (48h+),
+            knowledge base/personality version history beyond the most recent 50, and impersonation log entries
+            over a year old.
+          </p>
+          <div style={{ marginTop: '0.6rem' }}>
+            <RunCronButton name="purge-stale-data" label="Run now" />
+          </div>
+        </div>
       </div>
 
       <h2 className={styles.sectionHeading}>Migrations (one-time, safe to re-run)</h2>
