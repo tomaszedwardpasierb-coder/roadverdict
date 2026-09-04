@@ -105,3 +105,72 @@
   padding-top: 0.9rem;
   border-top: 1px solid var(--border);
 }
+
+.comparePickerForm {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem 1.2rem;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.compareVerdict {
+  font-size: 1.15rem;
+  font-weight: 600;
+  background: var(--stone);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.9rem 1.1rem;
+  margin-bottom: 0.8rem;
+}
+
+/* Horizontal scroll, not a reflowed stacked layout, once there are more
+   columns than a narrow screen can show - simplest mobile-safe pattern
+   that still works whether 2 or 4 bikes are being compared. */
+.compareTableWrap {
+  overflow-x: auto;
+  margin-bottom: 1.5rem;
+}
+
+.compareTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.88rem;
+}
+
+.compareTable th,
+.compareTable td {
+  padding: 0.55rem 0.8rem;
+  text-align: right;
+  border-bottom: 1px solid var(--line);
+  white-space: nowrap;
+}
+
+.compareTable th:first-child,
+.compareTable td:first-child {
+  text-align: left;
+  white-space: normal;
+  color: var(--ink-soft);
+}
+
+.compareSectionRow td {
+  background: var(--stone);
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--ink-soft);
+}
+
+.compareWinnerCell {
+  color: var(--verdict-green);
+  font-weight: 600;
+}
+
+.compareBadge {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  text-transform: uppercase;
+  color: var(--verdict-green);
+}

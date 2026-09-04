@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { getSession } from "@/lib/auth/session";
 import { isPro } from "@/lib/subscriptions";
-import { getBikesForUser, pickActiveBike, getCurrentRegistration, countActiveBikes, MAX_FREE_BIKES } from "@/lib/tracker/bike";
+import { getBikesForUser, pickActiveBike, getCurrentRegistration, countActiveBikes, isBikeReadOnly, MAX_FREE_BIKES } from "@/lib/tracker/bike";
 import LogoutButton from "@/app/dashboard/LogoutButton";
 import dashboardStyles from "@/app/dashboard/dashboard.module.css";
 import styles from "./garage.module.css";
@@ -38,6 +38,14 @@ export default async function GaragePage() {
           ? `${countActiveBikes(bikes)} bike${countActiveBikes(bikes) === 1 ? "" : "s"} tracked - no limit on Pro.`
           : `${countActiveBikes(bikes)} of ${MAX_FREE_BIKES} free bikes used.`}
       </p>
+
+      {bikes.filter((b) => !isBikeReadOnly(b)).length >= 2 && (
+        <p style={{ marginBottom: "1.3rem" }}>
+          <Link href="/garage/compare" className="submit-button" style={{ textDecoration: "none", display: "inline-block" }}>
+            Compare bikes
+          </Link>
+        </p>
+      )}
 
       <div className={styles.grid}>
         {bikes.map((bike) => (
