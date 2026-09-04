@@ -21,7 +21,7 @@ const CHART_ID = 'spend-donut';
 // not a style choice - slate is correct even when this segment is £0,
 // which is why it's never dropped from the ring or legend.
 const COLORS = ['#1C1D20', '#EE9A2E', '#21815A', '#8A867D'];
-const LABELS = ['Servicing & repairs', 'Modifications', 'Fuel', 'Insurance/tax/MOT'];
+const LABELS = ['Servicing & repairs', 'Modifications', 'Fuel', 'Insurance/tax/MOT/finance'];
 const DONUT_CUTOUT = '68%';
 // Fixed box size matching the reference design exactly (132px, ~68%
 // cutout) - the legend used to be drawn by Chart.js inside the same

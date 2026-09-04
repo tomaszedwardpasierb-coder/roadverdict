@@ -396,7 +396,7 @@ export async function commitReceiptItem(
   const billType = guessBillType(description) ?? "insurance";
   const billNotes = withAiCaveat(description, forceReview, aiLowConfidence);
   const billLabel = BILL_LABELS[billType] ?? billType;
-  const aiDescription = buildAiDescription({ description: billLabel, merchantName, address, city, categoryLabel: "Insurance, tax & MOT" });
+  const aiDescription = buildAiDescription({ description: billLabel, merchantName, address, city, categoryLabel: "Insurance, tax, MOT & finance" });
   const duplicate = findPossibleDuplicate(date, costGbp, billCandidates, description);
   const record = await createBill(email, {
     bikeId: bike.id, billType, cost: costGbp, date, notes: billNotes, attachments: [attachment], needsReview: true, currencyConversion, aiDescription,

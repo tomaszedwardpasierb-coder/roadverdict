@@ -218,6 +218,22 @@ describe("computeSellerReportRowsAndMetrics", () => {
       expect(result.rows.map((r) => r.id).sort()).toEqual(["b-mot", "b-tax"]);
     });
 
+    const financeBill = { id: "b-fin", pk: "x", type: "bill" as const, billType: "finance", cost: 300, notes: "", date: "2025-06-01", createdAt: "2025-06-02T00:00:00.000Z" } as BillDoc;
+
+    it("excludes finance from rows and total by default, independently of the insurance setting", () => {
+      const result = computeSellerReportRowsAndMetrics(makeBike({ includeInsuranceInReport: true }), [], [], [financeBill, insuranceBill], [], []);
+      // Insurance shown (its own setting is true), finance still hidden
+      // (its own setting is unset) - the two toggles don't affect each other.
+      expect(result.rows.map((r) => r.id)).toEqual(["b-ins"]);
+      expect(result.total).toBe(200);
+    });
+
+    it("shows finance once includeFinanceInReport is true", () => {
+      const result = computeSellerReportRowsAndMetrics(makeBike({ includeFinanceInReport: true }), [], [], [financeBill, roadTaxBill], [], []);
+      expect(result.rows.map((r) => r.id).sort()).toEqual(["b-fin", "b-tax"]);
+      expect(result.total).toBe(390);
+    });
+
     it("still counts a hidden insurance entry toward totalEntries and receiptCount - documentation trust signals aren't affected by buyer-facing visibility", () => {
       const insuranceWithReceipt = { ...insuranceBill, attachments: [{ blobName: "a.jpg", fileName: "a.jpg", fileType: "image/jpeg" as const, uploadedAt: "2025-03-01" }] };
       const result = computeSellerReportRowsAndMetrics(makeBike(), [], [], [insuranceWithReceipt], [], []);

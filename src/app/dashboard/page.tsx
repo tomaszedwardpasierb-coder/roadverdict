@@ -39,7 +39,7 @@ import { FuelLogCard } from "./FuelLogCard";
 import { ModCard } from "./ModCard";
 import { BillCard } from "./BillCard";
 import { BillSeriesSummary } from "./BillSeriesSummary";
-import { InsuranceReportSetting } from "./InsuranceReportSetting";
+import { ExcludeFromReportToggle } from "./ExcludeFromReportToggle";
 import { ReminderItem } from "./ReminderItem";
 import { BudgetWidget } from "./BudgetWidget";
 import { SpendDonutChart } from "./SpendDonutChart";
@@ -180,7 +180,7 @@ export default async function DashboardPage() {
       id: b.id, reviewCategory: "bills" as const,
       date: b.date, icon: "📄", type: "Bill",
       description: BILL_LABELS[b.billType] ?? b.billType,
-      category: "Insurance/tax/MOT", cost: b.cost,
+      category: "Insurance/tax/MOT/finance", cost: b.cost,
     })),
   ]
     .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
@@ -419,16 +419,29 @@ export default async function DashboardPage() {
   const billsContent = (
     <>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "0.75rem" }}>
-        <h1 className={styles.heading}>Insurance, tax & MOT{bikeTag}</h1>
+        <h1 className={styles.heading}>Insurance, Tax, MOT &amp; Finance{bikeTag}</h1>
         {mileagePill}
       </div>
       <p className={styles.subtext}>The paperwork you genuinely can&apos;t afford to forget, tracked in one place, automatically.</p>
       <LogBillForm currency={currency} rates={rates} bikeYear={bike.year} isCustomBuild={bike.isCustomBuild} />
       {billSeries.length > 0 && <BillSeriesSummary series={billSeries} currency={currency} rates={rates} />}
-      <InsuranceReportSetting includeInsuranceInReport={Boolean(bike.includeInsuranceInReport)} />
+      <ExcludeFromReportToggle
+        fieldName="includeInsuranceInReport"
+        included={Boolean(bike.includeInsuranceInReport)}
+        checkboxLabel="Show insurance history in my buyer report"
+        confirmMessage="A future buyer will have their own insurance costs - showing yours could make your bike look pricier to run than it will actually be for them. Show anyway?"
+        noteText="Off by default - insurance depends on who's holding the policy, not the bike, so a future buyer's own premium will be different regardless of what you've paid. Road tax and MOT are always shown, since those are tied to the bike itself."
+      />
+      <ExcludeFromReportToggle
+        fieldName="includeFinanceInReport"
+        included={Boolean(bike.includeFinanceInReport)}
+        checkboxLabel="Show finance history in my buyer report"
+        confirmMessage="A future buyer would have their own finance agreement, or none at all - showing yours could make your bike look pricier to run than it will actually be for them. Show anyway?"
+        noteText="Off by default - a finance agreement is personal to whoever took it out, not the bike, so a future buyer's own deal (if they have one) will be completely different. Road tax and MOT are always shown, since those are tied to the bike itself."
+      />
       <h2 className={styles.sectionHeading}>History</h2>
       {bills.length === 0 ? (
-        <div className={styles.card}><p className={styles.cardBody}>No insurance, tax, or MOT payments logged yet.</p></div>
+        <div className={styles.card}><p className={styles.cardBody}>No insurance, tax, MOT, or finance payments logged yet.</p></div>
       ) : (
         bills.map((b) => (
           <BillCard
@@ -439,6 +452,7 @@ export default async function DashboardPage() {
             pendingReviewIds={pendingReviewIds}
             distanceUnit={distanceUnit}
             includeInsuranceInReport={Boolean(bike.includeInsuranceInReport)}
+            includeFinanceInReport={Boolean(bike.includeFinanceInReport)}
           />
         ))
       )}
@@ -534,10 +548,10 @@ export default async function DashboardPage() {
         </div>
         <div className={styles.chartCard}>
           {bills.length > 0 ? (
-            <CategorySpendChart chartId="bills-spend" title="Insurance, tax & MOT spend over time" items={bills} category="bills" color="#8A867D" currency={currency} rates={rates} distanceUnit={distanceUnit} supportsMileageView={false} initialChartType={bike.chartTypes?.["bills-spend"] === "line" ? "line" : "bar"} />
+            <CategorySpendChart chartId="bills-spend" title="Insurance, tax, MOT & finance spend over time" items={bills} category="bills" color="#8A867D" currency={currency} rates={rates} distanceUnit={distanceUnit} supportsMileageView={false} initialChartType={bike.chartTypes?.["bills-spend"] === "line" ? "line" : "bar"} />
           ) : (
             <>
-              <div className={styles.chartCardTitle}>Insurance, tax & MOT spend over time</div>
+              <div className={styles.chartCardTitle}>Insurance, tax, MOT & finance spend over time</div>
               <p className={styles.emptyNote}>No insurance, tax, or MOT payments logged yet.</p>
             </>
           )}

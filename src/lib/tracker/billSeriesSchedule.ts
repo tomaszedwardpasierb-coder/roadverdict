@@ -9,7 +9,7 @@
 // without that cost. Same split, same reasoning, as reminderStatus.ts vs
 // reminder.ts.
 
-export type BillSeriesBillType = "insurance" | "road-tax";
+export type BillSeriesBillType = "insurance" | "road-tax" | "finance";
 export type BillSeriesFrequency = "monthly" | "six-monthly";
 
 interface SeriesScheduleInput {

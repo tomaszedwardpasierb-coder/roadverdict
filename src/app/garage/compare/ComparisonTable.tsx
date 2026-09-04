@@ -74,14 +74,17 @@ export function ComparisonTable({
           winnerBikeId: costPerMileWinner,
           badge: "Cheaper to run",
         },
-        { label: `Total spend (${label})`, values: entries.map((e) => money(e.spend.grandTotal)), winnerBikeId: null },
+        // Breakdown rows first, then the totals they add up to - the
+        // standard "components, then the sum" reading order, rather
+        // than leading with the total before anyone's seen what's in it.
+        { label: "Servicing & repairs", values: entries.map((e) => money(e.spend.servicingTotal)), winnerBikeId: null },
+        { label: "Parts & accessories", values: entries.map((e) => money(e.spend.modsTotal)), winnerBikeId: null },
+        { label: "Insurance / tax / MOT / finance", values: entries.map((e) => money(e.spend.billsTotal)), winnerBikeId: null },
+        { label: "Fuel", values: entries.map((e) => money(e.spend.fuelTotal)), winnerBikeId: null },
         // Redundant once a custom period is already the spend window
         // being shown above - only shown for the default, unfiltered view.
         ...(hasCustomPeriod ? [] : [{ label: "Spend this year", values: entries.map((e) => money(e.yearSpend)), winnerBikeId: null }]),
-        { label: "Servicing & repairs", values: entries.map((e) => money(e.spend.servicingTotal)), winnerBikeId: null },
-        { label: "Parts & accessories", values: entries.map((e) => money(e.spend.modsTotal)), winnerBikeId: null },
-        { label: "Insurance / tax / MOT", values: entries.map((e) => money(e.spend.billsTotal)), winnerBikeId: null },
-        { label: "Fuel", values: entries.map((e) => money(e.spend.fuelTotal)), winnerBikeId: null },
+        { label: `Total spend (${label})`, values: entries.map((e) => money(e.spend.grandTotal)), winnerBikeId: null },
       ],
     },
     {

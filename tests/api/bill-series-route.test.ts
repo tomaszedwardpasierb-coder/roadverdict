@@ -158,4 +158,17 @@ describe("POST /api/tracker/bill-series", () => {
     const payload = mocks.createBillSeries.mock.calls[0][1];
     expect(payload.depositAmount).toBeUndefined();
   });
+
+  it("accepts finance as a plannable bill type, deposit included - vehicle finance commonly has a down payment", async () => {
+    mocks.getSession.mockResolvedValue({ email: "owner@example.com" });
+    const response = await POST(request(JSON.stringify({
+      billType: "finance", frequency: "monthly", startDate: "2025-06-01",
+      collectionDay: 1, depositAmount: 500, instalmentAmount: 220, instalmentCount: 36,
+    })));
+
+    expect(response.status).toBe(200);
+    expect(mocks.createBillSeries).toHaveBeenCalledWith("owner@example.com", expect.objectContaining({
+      billType: "finance", depositAmount: 500, instalmentAmount: 220,
+    }));
+  });
 });

@@ -64,7 +64,7 @@ const DASHBOARD_TAB_LABELS: Record<string, string> = {
   service: "Service",
   fuel: "Fuel",
   mods: "Parts & Accessories",
-  bills: "Tax & Insurance",
+  bills: "Insurance, Tax, MOT & Finance",
   reminders: "Reminders",
   reports: "Reports",
   story: "The Story So Far",

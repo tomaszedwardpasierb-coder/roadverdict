@@ -37,6 +37,7 @@ describe("LogBillForm", () => {
     expect(screen.getByText("Insurance")).toBeInTheDocument();
     expect(screen.getByText("Road tax (VED)")).toBeInTheDocument();
     expect(screen.getByText("MOT test")).toBeInTheDocument();
+    expect(screen.getByText("Finance")).toBeInTheDocument();
     expect(screen.getByRole("checkbox", { name: /Remind me when this is due/ })).toBeChecked();
     expect(document.getElementById("remind-bill-value-0")).toHaveValue(12);
   });
@@ -51,6 +52,23 @@ describe("LogBillForm", () => {
     render(<LogBillForm currency="GBP" rates={null} />);
     await user.selectOptions(screen.getByLabelText("Type"), "road-tax");
     expect(screen.queryByText(/won't appear in your shareable report by default/)).not.toBeInTheDocument();
+  });
+
+  it("shows a finance-specific not-in-report note once finance is selected", async () => {
+    const user = userEvent.setup();
+    render(<LogBillForm currency="GBP" rates={null} />);
+    await user.selectOptions(screen.getByLabelText("Type"), "finance");
+    expect(screen.getByText(/Finance costs are personal to you/)).toBeInTheDocument();
+    expect(screen.queryByText(/Insurance costs are personal to you/)).not.toBeInTheDocument();
+  });
+
+  it("allows a finance plan with a deposit, same as insurance", async () => {
+    const user = userEvent.setup();
+    render(<LogBillForm currency="GBP" rates={null} />);
+    await user.selectOptions(screen.getByLabelText("Type"), "finance");
+    await user.selectOptions(screen.getByLabelText("How do you pay?"), "plan");
+    expect(screen.getByLabelText(/^Deposit/)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Regular instalment amount/)).toBeInTheDocument();
   });
 
   it("blocks submission with an error when the date is before the bike's own production year", async () => {

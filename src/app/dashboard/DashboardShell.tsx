@@ -27,7 +27,7 @@ const NAV_ITEMS: { key: Section; label: string; icon: IconName }[] = [
   { key: 'service', label: 'Service', icon: 'service' },
   { key: 'fuel', label: 'Fuel', icon: 'fuel' },
   { key: 'mods', label: 'Parts & Accessories', icon: 'mods' },
-  { key: 'bills', label: 'Tax & Insurance', icon: 'bills' },
+  { key: 'bills', label: 'Insurance, Tax, MOT & Finance', icon: 'bills' },
   { key: 'reminders', label: 'Reminders', icon: 'reminders' },
   { key: 'reports', label: 'Reports', icon: 'reports' },
   { key: 'story', label: 'The Story So Far', icon: 'story' },
@@ -46,7 +46,7 @@ const MOBILE_NAV_ITEMS: { key: Section; label: string; icon: IconName }[] = [
 ];
 
 const MORE_ITEMS: { key: Section; label: string; icon: IconName }[] = [
-  { key: 'bills', label: 'Tax & Insurance', icon: 'bills' },
+  { key: 'bills', label: 'Insurance, Tax, MOT & Finance', icon: 'bills' },
   { key: 'reminders', label: 'Reminders', icon: 'reminders' },
   { key: 'reports', label: 'Reports', icon: 'reports' },
   { key: 'story', label: 'The Story So Far', icon: 'story' },

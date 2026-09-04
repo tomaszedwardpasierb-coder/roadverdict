@@ -51,7 +51,7 @@ describe("SpendDonutChart", () => {
 
     expect(chartMocks.doughnut).toHaveBeenCalledTimes(1);
     const props = chartMocks.doughnut.mock.calls[0][0] as any;
-    expect(props.data.labels).toEqual(["Servicing & repairs", "Modifications", "Fuel", "Insurance/tax/MOT"]);
+    expect(props.data.labels).toEqual(["Servicing & repairs", "Modifications", "Fuel", "Insurance/tax/MOT/finance"]);
     expect(props.data.datasets[0].data).toEqual([100, 50, 30, 20]);
     expect(props.data.datasets[0].backgroundColor).toEqual(["#1C1D20", "#EE9A2E", "#21815A", "#8A867D"]);
     expect(props.options.cutout).toBe("68%");

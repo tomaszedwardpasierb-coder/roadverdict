@@ -178,9 +178,9 @@ describe("DashboardShell", () => {
     await user.click(screen.getByRole("button", { name: /More/ }));
     expect(screen.getByText(/Signed in as rider@example\.com/)).toBeInTheDocument();
 
-    // "Tax & Insurance" also appears in the always-mounted sidebar nav -
+    // "Insurance, Tax, MOT & Finance" also appears in the always-mounted sidebar nav -
     // the sheet's own copy (rendered later in the DOM) is the last match.
-    const taxAndInsuranceButtons = screen.getAllByRole("button", { name: /Tax & Insurance/ });
+    const taxAndInsuranceButtons = screen.getAllByRole("button", { name: /Insurance, Tax, MOT & Finance/ });
     await user.click(taxAndInsuranceButtons[taxAndInsuranceButtons.length - 1]);
     expect(screen.getByText("Bills content")).toBeInTheDocument();
     expect(screen.queryByText(/Signed in as/)).not.toBeInTheDocument();

@@ -381,7 +381,7 @@ describe("bills category", () => {
     const result: any = await commitReceiptItem(email, bike, item);
 
     expect(result.billType).toBe("insurance");
-    expect(result.aiDescription).toBe("Insurance at Dave's Motorcycles - 14 High Street, Colchester (Insurance, tax & MOT)");
+    expect(result.aiDescription).toBe("Insurance at Dave's Motorcycles - 14 High Street, Colchester (Insurance, tax, MOT & finance)");
     const [, , , payload] = callsFor("bill")[0];
     expect(payload).toMatchObject({ bikeId: "bike-1", billType: "insurance", cost: 250, needsReview: true });
     expect(payload.mileage).toBeUndefined();

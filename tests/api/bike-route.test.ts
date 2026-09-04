@@ -11,6 +11,7 @@ const mocks = vi.hoisted(() => ({
   updateBikeUnits: vi.fn(),
   updateBikeCurrency: vi.fn(),
   updateBikeIncludeInsuranceInReport: vi.fn(),
+  updateBikeIncludeFinanceInReport: vi.fn(),
   updateBikeChartType: vi.fn(),
   updateBikeDvlaData: vi.fn(),
   isBikeReadOnly: vi.fn(),
@@ -27,6 +28,7 @@ vi.mock("@/lib/tracker/bike", () => ({
   updateBikeUnits: mocks.updateBikeUnits,
   updateBikeCurrency: mocks.updateBikeCurrency,
   updateBikeIncludeInsuranceInReport: mocks.updateBikeIncludeInsuranceInReport,
+  updateBikeIncludeFinanceInReport: mocks.updateBikeIncludeFinanceInReport,
   updateBikeChartType: mocks.updateBikeChartType,
   updateBikeDvlaData: mocks.updateBikeDvlaData,
   isBikeReadOnly: mocks.isBikeReadOnly,
@@ -304,6 +306,15 @@ describe("PATCH /api/tracker/bike", () => {
     const response = await PATCH(request("PATCH", JSON.stringify({ includeInsuranceInReport: false })));
     expect(response.status).toBe(200);
     expect(mocks.updateBikeIncludeInsuranceInReport).toHaveBeenCalledWith("owner@example.com", "bike-1", false);
+  });
+
+  it("updates includeFinanceInReport independently of includeInsuranceInReport", async () => {
+    mocks.getSession.mockResolvedValue({ email: "owner@example.com" });
+    mocks.updateBikeIncludeFinanceInReport.mockResolvedValue({ id: "bike-1", includeFinanceInReport: true });
+    const response = await PATCH(request("PATCH", JSON.stringify({ includeFinanceInReport: true })));
+    expect(response.status).toBe(200);
+    expect(mocks.updateBikeIncludeFinanceInReport).toHaveBeenCalledWith("owner@example.com", "bike-1", true);
+    expect(mocks.updateBikeIncludeInsuranceInReport).not.toHaveBeenCalled();
   });
 
   it("updates a chart's type only when both chartId and kind are supplied", async () => {

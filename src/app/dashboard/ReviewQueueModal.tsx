@@ -24,7 +24,7 @@ const CATEGORY_LABEL: Record<ReviewQueueEntry['category'], string> = {
   service: 'Service',
   fuel: 'Fuel',
   mods: 'Parts & Accessories',
-  bills: 'Tax & Insurance',
+  bills: 'Insurance, Tax, MOT & Finance',
 };
 
 async function patchEntry(entry: ReviewQueueEntry, body: Record<string, unknown>): Promise<{ ok: boolean; error?: string }> {

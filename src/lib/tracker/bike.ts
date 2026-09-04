@@ -112,6 +112,13 @@ export interface BikeDoc {
   // affects the two buyer report surfaces, never the owner's own
   // dashboard/spend charts/cost-per-mile, which keep including it.
   includeInsuranceInReport?: boolean;
+  // Same reasoning and same off-by-default behaviour as
+  // includeInsuranceInReport above, but for finance/loan payments - a
+  // future owner would have their own finance agreement (or none at
+  // all), not this one. A separate flag rather than reusing the
+  // insurance one deliberately - someone may want to show one but not
+  // the other.
+  includeFinanceInReport?: boolean;
   // Set once, at creation (or backfilled once for bikes added before this
   // existed) - never editable after that through any normal flow, not
   // even "edit bike". Optional on the type only because bikes created
@@ -492,6 +499,15 @@ export async function updateBikeIncludeInsuranceInReport(email: string, bikeId: 
   const { resource } = await container.item(bikeId, email).read<BikeDoc>();
   if (!resource) return null;
   resource.includeInsuranceInReport = includeInsuranceInReport;
+  await container.items.upsert(resource);
+  return resource;
+}
+
+export async function updateBikeIncludeFinanceInReport(email: string, bikeId: string, includeFinanceInReport: boolean): Promise<BikeDoc | null> {
+  const container = getContainer();
+  const { resource } = await container.item(bikeId, email).read<BikeDoc>();
+  if (!resource) return null;
+  resource.includeFinanceInReport = includeFinanceInReport;
   await container.items.upsert(resource);
   return resource;
 }

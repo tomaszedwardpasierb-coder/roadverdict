@@ -7,6 +7,7 @@ import {
   BILL_REMINDER_DEFAULTS,
   BILL_SERIES_ELIGIBLE_TYPES,
   BILL_SERIES_DEFAULT_INSTALMENT_COUNT,
+  OWNER_SPECIFIC_BILL_TYPES,
 } from '@/lib/tracker/billTypes';
 import { convertDisplayToGbp, CURRENCY_SYMBOLS, type Currency, type ExchangeRates } from '@/lib/tracker/currency';
 import { useTrackerFormSubmit } from './useTrackerFormSubmit';
@@ -42,9 +43,9 @@ export function LogBillForm({
   ]);
   const [attachment, setAttachment] = useState<Attachment | null>(null);
 
-  // Only insurance and road tax can be a recurring plan - MOT stays a
-  // one-off with zero UI change, so this question never even renders
-  // for it.
+  // Only insurance, road tax, and finance can be a recurring plan - MOT
+  // stays a one-off with zero UI change, so this question never even
+  // renders for it.
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('one-off');
   const [frequency, setFrequency] = useState<BillSeriesFrequency>('monthly');
   const [depositDisplay, setDepositDisplay] = useState('');
@@ -66,10 +67,10 @@ export function LogBillForm({
     if (!(BILL_SERIES_ELIGIBLE_TYPES as readonly string[]).includes(newType)) {
       setPaymentMethod('one-off');
     }
-    // Insurance plans are always monthly - only road tax offers a choice
-    // of frequency, since DVLA's own scheme is the only one with two
-    // real cadences.
-    const nextFrequency: BillSeriesFrequency = newType === 'insurance' ? 'monthly' : frequency;
+    // Insurance and finance plans are always monthly - only road tax
+    // offers a choice of frequency, since DVLA's own scheme is the only
+    // one with two real cadences.
+    const nextFrequency: BillSeriesFrequency = (OWNER_SPECIFIC_BILL_TYPES as readonly string[]).includes(newType) ? 'monthly' : frequency;
     setFrequency(nextFrequency);
     const def = BILL_SERIES_DEFAULT_INSTALMENT_COUNT[`${newType}:${nextFrequency}`];
     if (def) setInstalmentCount(String(def));
@@ -92,11 +93,12 @@ export function LogBillForm({
     if (date && isBeforeProduction(date, { year: bikeYear, isCustomBuild })) return;
 
     if (paymentMethod === 'plan') {
-      const depositGbp = billType === 'insurance' && depositDisplay ? convertDisplayToGbp(Number(depositDisplay), currency, rates) : undefined;
+      const isOwnerSpecific = (OWNER_SPECIFIC_BILL_TYPES as readonly string[]).includes(billType);
+      const depositGbp = isOwnerSpecific && depositDisplay ? convertDisplayToGbp(Number(depositDisplay), currency, rates) : undefined;
       const instalmentGbp = convertDisplayToGbp(Number(instalmentDisplay), currency, rates);
       const ok = await submitPlan({
         billType,
-        frequency: billType === 'insurance' ? 'monthly' : frequency,
+        frequency: isOwnerSpecific ? 'monthly' : frequency,
         startDate: date,
         collectionDay: Number(collectionDay),
         depositAmount: depositGbp,
@@ -141,7 +143,7 @@ export function LogBillForm({
   return (
     <form className="ticket" onSubmit={handleSubmit}>
       <div className="ticket__section">
-        <span className="ticket__label">Log insurance, tax, or an MOT</span>
+        <span className="ticket__label">Log insurance, tax, MOT, or finance</span>
         <div className="field">
           <label htmlFor="bill-date">{isPlan ? 'Start date (first payment)' : 'Date'}</label>
           <input id="bill-date" type="date" value={date} onChange={(e) => setDate(e.target.value)} required />
@@ -168,8 +170,15 @@ export function LogBillForm({
           {billType === 'insurance' && (
             <p className="field-note" style={{ color: 'var(--amber-ink)' }}>
               Insurance costs are personal to you and won&apos;t appear in your shareable report by default - a new
-              owner&apos;s premium will be different. You can change this in your Insurance, Tax &amp; MOT settings
-              if you&apos;d rather show it anyway.
+              owner&apos;s premium will be different. You can change this in your Insurance, Tax, MOT &amp; Finance
+              settings if you&apos;d rather show it anyway.
+            </p>
+          )}
+          {billType === 'finance' && (
+            <p className="field-note" style={{ color: 'var(--amber-ink)' }}>
+              Finance costs are personal to you and won&apos;t appear in your shareable report by default - a new
+              owner would have their own finance agreement (or none at all), not yours. You can change this in your
+              Insurance, Tax, MOT &amp; Finance settings if you&apos;d rather show it anyway.
             </p>
           )}
         </div>
@@ -203,7 +212,7 @@ export function LogBillForm({
                 </select>
               </div>
             )}
-            {billType === 'insurance' && (
+            {(OWNER_SPECIFIC_BILL_TYPES as readonly string[]).includes(billType) && (
               <div className="field" style={{ marginTop: '0.9rem' }}>
                 <label htmlFor="bill-plan-deposit">Deposit ({symbol}) - optional, leave blank if there isn&apos;t one</label>
                 <input
@@ -218,7 +227,7 @@ export function LogBillForm({
             )}
             <div className="field" style={{ marginTop: '0.9rem' }}>
               <label htmlFor="bill-plan-instalment">
-                {billType === 'insurance' ? 'Regular instalment' : 'Instalment'} amount ({symbol})
+                {(OWNER_SPECIFIC_BILL_TYPES as readonly string[]).includes(billType) ? 'Regular instalment' : 'Instalment'} amount ({symbol})
               </label>
               <input
                 id="bill-plan-instalment"

@@ -152,14 +152,20 @@ export function computeSellerReportRowsAndMetrics(
   fuelLogs: FuelLogDoc[],
   reminders: ReminderDoc[]
 ) {
-  // Insurance is owner-specific, not bike-specific - a future buyer's own
-  // premium depends on THEM (age, licence history, no-claims record),
-  // never on this bike, so its cost isn't predictive the way a service,
-  // an MOT, or road tax is. Hidden from the buyer-facing rows/total below
-  // by default (bike.includeInsuranceInReport opts back in), but still
-  // counted in every trust/documentation metric further down - a
-  // diligently-logged, receipted insurance payment is still real evidence
-  // of careful record-keeping, even though its amount isn't shown.
+  // Insurance and finance are owner-specific, not bike-specific - a
+  // future buyer's own insurance premium or finance deal depends on
+  // THEM (age, licence history, no-claims record, their own credit
+  // agreement), never on this bike, so neither cost is predictive the
+  // way a service, an MOT, or road tax is. Each is hidden from the
+  // buyer-facing rows/total below by its own independent, off-by-default
+  // toggle (bike.includeInsuranceInReport / includeFinanceInReport), but
+  // both still count in every trust/documentation metric further down -
+  // a diligently-logged, receipted payment is still real evidence of
+  // careful record-keeping, even when its amount isn't shown to a buyer.
+  const isHiddenFromBuyer = (billType: string): boolean =>
+    (billType === "insurance" && !bike.includeInsuranceInReport) ||
+    (billType === "finance" && !bike.includeFinanceInReport);
+
   const allRows: (ReportRow & { hiddenFromBuyer: boolean })[] = [
     ...records.map((r) => ({ id: r.id, date: r.date, createdAt: r.createdAt, category: "Service", description: JOB_LABELS[r.jobType] ?? r.jobType, cost: r.cost, attachment: r.attachments?.[0] ?? null, hiddenFromBuyer: false })),
     ...mods.map((m) => ({ id: m.id, date: m.date, createdAt: m.createdAt, category: "Modification", description: `${MOD_LABELS[m.category] ?? m.category}: ${m.name}`, cost: m.cost, attachment: m.attachments?.[0] ?? null, hiddenFromBuyer: false })),
@@ -177,7 +183,7 @@ export function computeSellerReportRowsAndMetrics(
       description: b.source === "auto" && b.notes ? `${BILL_LABELS[b.billType] ?? b.billType} (${b.notes.toLowerCase()})` : BILL_LABELS[b.billType] ?? b.billType,
       cost: b.cost,
       attachment: b.attachments?.[0] ?? null,
-      hiddenFromBuyer: b.billType === "insurance" && !bike.includeInsuranceInReport,
+      hiddenFromBuyer: isHiddenFromBuyer(b.billType),
     })),
   ].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 

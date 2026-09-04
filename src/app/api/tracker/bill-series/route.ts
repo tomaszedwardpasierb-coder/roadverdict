@@ -73,7 +73,11 @@ export async function POST(request: NextRequest) {
     frequency: frequency as BillSeriesFrequency,
     startDate,
     collectionDay,
-    depositAmount: billType === "insurance" ? depositAmount : undefined,
+    // Insurance premium finance and vehicle finance (HP/PCP) both
+    // commonly front-load a deposit; road tax never does (rejected
+    // above before reaching here), so this is the only other type that
+    // can ever carry one.
+    depositAmount: billType === "insurance" || billType === "finance" ? depositAmount : undefined,
     instalmentAmount,
     instalmentCount,
     notes,

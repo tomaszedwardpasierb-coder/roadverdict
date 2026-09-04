@@ -96,9 +96,21 @@ describe("BillCard", () => {
     expect(screen.queryByText("Not shown in buyer report")).not.toBeInTheDocument();
   });
 
-  it("never shows the tag for a non-insurance bill type, regardless of the setting", () => {
+  it("never shows the tag for a non-insurance, non-finance bill type, regardless of the setting", () => {
     const bill = makeBill({ billType: "road-tax" });
-    render(<BillCard bill={bill} currency="GBP" rates={null} pendingReviewIds={emptyPendingReviewIds} distanceUnit="mi" includeInsuranceInReport={false} />);
+    render(<BillCard bill={bill} currency="GBP" rates={null} pendingReviewIds={emptyPendingReviewIds} distanceUnit="mi" includeInsuranceInReport={false} includeFinanceInReport={false} />);
+    expect(screen.queryByText("Not shown in buyer report")).not.toBeInTheDocument();
+  });
+
+  it("shows the tag for finance when includeFinanceInReport is false, independently of the insurance setting", () => {
+    const bill = makeBill({ billType: "finance" });
+    render(<BillCard bill={bill} currency="GBP" rates={null} pendingReviewIds={emptyPendingReviewIds} distanceUnit="mi" includeInsuranceInReport includeFinanceInReport={false} />);
+    expect(screen.getByText("Not shown in buyer report")).toBeInTheDocument();
+  });
+
+  it("hides the finance tag once includeFinanceInReport is true", () => {
+    const bill = makeBill({ billType: "finance" });
+    render(<BillCard bill={bill} currency="GBP" rates={null} pendingReviewIds={emptyPendingReviewIds} distanceUnit="mi" includeFinanceInReport />);
     expect(screen.queryByText("Not shown in buyer report")).not.toBeInTheDocument();
   });
 

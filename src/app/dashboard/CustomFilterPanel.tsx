@@ -152,7 +152,7 @@ export function CustomFilterPanel({ records, mods, bills, fuelLogs, currency, ra
         <select id="lookup-category" value={category} onChange={(e) => handleCategoryChange(e.target.value as Category)}>
           <option value="service">Service</option>
           <option value="mods">Parts & Accessories</option>
-          <option value="bills">Insurance, tax & MOT</option>
+          <option value="bills">Insurance, tax, MOT & finance</option>
           <option value="fuel">Fuel</option>
         </select>
       </div>
