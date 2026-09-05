@@ -15,8 +15,10 @@ import {
   ASSISTANT_TOOL_DECLARATIONS,
   REPORT_TOOL_DECLARATIONS,
   COMPARISON_TOOL_DECLARATIONS,
+  LOG_ENTRY_TOOL_DECLARATIONS,
   runAssistantTool,
   type CompareContext,
+  type ProposedEntry,
 } from "@/lib/tracker/assistantTools";
 import { logAssistantQuestion } from "@/lib/tracker/assistantQuestionLog";
 import { logGeminiUsage } from "@/lib/tracker/geminiUsageLog";
@@ -85,7 +87,7 @@ const DASHBOARD_TAB_LABELS: Record<string, string> = {
   transferOwnership: "Transfer ownership",
 };
 
-function buildSystemInstruction(config: AssistantConfigDoc, signedIn: boolean, privacyPolicyText: string | null, reportOpen: boolean, dashboardTabLabel: string | null, compareBikeNames: string[] | null): string {
+function buildSystemInstruction(config: AssistantConfigDoc, signedIn: boolean, privacyPolicyText: string | null, reportOpen: boolean, dashboardTabLabel: string | null, compareBikeNames: string[] | null, logEntryAccess: "available" | "upsell" | "none"): string {
   const parts = [config.knowledgeBase];
 
   // Appended right after the knowledge base, before the more
@@ -119,6 +121,16 @@ function buildSystemInstruction(config: AssistantConfigDoc, signedIn: boolean, p
   if (dashboardTabLabel) {
     parts.push(
       `\n\n---\n\nCURRENT DASHBOARD TAB: the signed-in user currently has the "${dashboardTabLabel}" tab open on their dashboard. If they ask a vague, pronoun-only, or unqualified question about what something is or does - e.g. "what's this for?", "what's that?", "not sure what this does" - with no other clearer subject in the conversation, assume they mean the "${dashboardTabLabel}" tab specifically, using the document above's own description of that feature. Answer in ONE short, plain paragraph - what it's for, nothing more - then ask a brief follow-up like "want me to go into more detail?" rather than immediately explaining everything about it. Only go deeper than that first short answer if they actually say yes to that follow-up (or ask a specific follow-up question) - don't front-load the full explanation before they've asked for it.`
+    );
+  }
+
+  if (logEntryAccess === "available") {
+    parts.push(
+      "\n\n---\n\nLOGGING VIA CHAT (Pro feature, active now): if the signed-in user describes something they want to log - a consumable, a small maintenance item, or an insurance/road-tax/MOT/finance payment - use the proposeLogEntry tool to draft it, rather than telling them to go find the right form themselves. Only call it when they're clearly asking you to add/log something, never speculatively. This never saves anything by itself - it hands back a draft that appears on screen for them to review, edit, and confirm with their own click. If asked to log a fuel fill-up or a vehicle modification/accessory, say that's not supported via chat yet and point them to the Fuel or Parts & Accessories tab instead - never attempt to force one of those into a service or bill draft."
+    );
+  } else if (logEntryAccess === "upsell") {
+    parts.push(
+      "\n\n---\n\nLOGGING VIA CHAT: adding or logging a new entry by describing it in chat is a Pro feature, not available on this account. If asked to add/log something, say so plainly, and mention they can still add it themselves from the dashboard in a few seconds, or upgrade to Pro to have the assistant do it for them next time. Never attempt to draft or describe an entry as if it were being logged when this isn't available."
     );
   }
 
@@ -242,6 +254,18 @@ export async function POST(req: Request) {
     }
   }
 
+  // Same fail-open-to-"none" reasoning as compareContext above - an
+  // isPro() hiccup should just mean the feature isn't offered this
+  // request, never a broken/hanging chat.
+  let logEntryAccess: "available" | "upsell" | "none" = "none";
+  if (signedIn && session) {
+    try {
+      logEntryAccess = (await isPro(session.email)) ? "available" : "upsell";
+    } catch (err) {
+      console.error("Assistant: isPro() failed for log-entry gating, continuing without it:", err);
+    }
+  }
+
   // The client always appends the new message before sending, so this
   // is the actual question being asked right now - not the full
   // history, which would have already been logged on earlier requests.
@@ -260,15 +284,23 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Assistant is temporarily unavailable." }, { status: 503 });
   }
 
-  const systemInstruction = buildSystemInstruction(config, signedIn, privacyPolicyText, !!reportToken, dashboardTabLabel, compareBikeNames);
+  const systemInstruction = buildSystemInstruction(config, signedIn, privacyPolicyText, !!reportToken, dashboardTabLabel, compareBikeNames, logEntryAccess);
 
   const contents: GeminiContent[] = toGeminiContents(messages);
   const toolDeclarations = [
     ...(signedIn ? ASSISTANT_TOOL_DECLARATIONS : []),
     ...(reportToken ? REPORT_TOOL_DECLARATIONS : []),
     ...(compareContext ? COMPARISON_TOOL_DECLARATIONS : []),
+    ...(logEntryAccess === "available" ? LOG_ENTRY_TOOL_DECLARATIONS : []),
   ];
   const tools = toolDeclarations.length > 0 ? [{ functionDeclarations: toolDeclarations }] : undefined;
+
+  // Set only by a successful (no .error) proposeLogEntry call, and only
+  // ever read once, on the final reply below - if the model calls it
+  // more than once in the same request, the latest draft wins, matching
+  // "the last thing it proposed is what's on screen" rather than
+  // stacking multiple cards from one exchange.
+  let proposedEntry: ProposedEntry | null = null;
 
   try {
     // Bounded rather than while(true) - a tool-call loop that somehow
@@ -306,6 +338,10 @@ export async function POST(req: Request) {
         // from above, for the same reason.
         const toolResult = await runAssistantTool(name, args ?? {}, session?.email ?? "", reportToken ?? undefined, compareContext ?? undefined);
 
+        if (name === "proposeLogEntry" && toolResult && typeof toolResult === "object" && !("error" in toolResult)) {
+          proposedEntry = toolResult as ProposedEntry;
+        }
+
         // Echo back every part from the model's actual turn, verbatim -
         // not a rebuilt {functionCall: {name, args}}, which silently
         // dropped thoughtSignature and any other part (e.g. accompanying
@@ -322,7 +358,7 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: "Assistant is temporarily unavailable." }, { status: 502 });
       }
       await logAssistantQuestion(question, signedIn, false, session?.email);
-      return NextResponse.json({ reply: replyText });
+      return NextResponse.json({ reply: replyText, ...(proposedEntry ? { proposedEntry } : {}) });
     }
 
     await logAssistantQuestion(question, signedIn, true, session?.email);

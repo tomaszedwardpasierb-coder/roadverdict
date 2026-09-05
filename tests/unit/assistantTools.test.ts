@@ -54,6 +54,7 @@ import {
   toolGetStorySoFar,
   toolGetViewedReport,
   toolGetViewedComparison,
+  toolProposeLogEntry,
   ASSISTANT_TOOL_DECLARATIONS,
 } from "@/lib/tracker/assistantTools";
 
@@ -401,5 +402,83 @@ describe("toolGetViewedReport", () => {
   it("fails soft with a plain tool error if the report stops resolving, rather than an unhandled throw", async () => {
     mocks.getSellerReportData.mockRejectedValue(new Error("token expired between check and use"));
     expect(await toolGetViewedReport("tok-1")).toEqual({ error: "Couldn't load this report right now." });
+  });
+});
+
+describe("toolProposeLogEntry", () => {
+  it("returns an error when the account has no bike", async () => {
+    mocks.getPrimaryBike.mockResolvedValue(null);
+    const result = await toolProposeLogEntry("owner@example.com", { category: "service", description: "Oil", cost: 20 });
+    expect(result).toEqual({ error: "No bike found on this account." });
+  });
+
+  it("rejects a missing or unsupported category, e.g. fuel or mods", async () => {
+    const result: any = await toolProposeLogEntry("owner@example.com", { category: "fuel", description: "Petrol", cost: 20 } as any);
+    expect(result.error).toMatch(/service record or a bill/);
+  });
+
+  it("rejects a missing description", async () => {
+    const result: any = await toolProposeLogEntry("owner@example.com", { category: "service", cost: 20 });
+    expect(result.error).toMatch(/description/i);
+  });
+
+  it("rejects a blank/whitespace-only description", async () => {
+    const result: any = await toolProposeLogEntry("owner@example.com", { category: "service", description: "   ", cost: 20 });
+    expect(result.error).toMatch(/description/i);
+  });
+
+  it("rejects a missing, non-numeric, or non-positive cost", async () => {
+    expect((await toolProposeLogEntry("owner@example.com", { category: "service", description: "Oil" }) as any).error).toMatch(/cost/i);
+    expect((await toolProposeLogEntry("owner@example.com", { category: "service", description: "Oil", cost: 0 }) as any).error).toMatch(/cost/i);
+    expect((await toolProposeLogEntry("owner@example.com", { category: "service", description: "Oil", cost: -5 }) as any).error).toMatch(/cost/i);
+    expect((await toolProposeLogEntry("owner@example.com", { category: "service", description: "Oil", cost: NaN }) as any).error).toMatch(/cost/i);
+  });
+
+  it("rejects a date in the future rather than logging something that hasn't happened yet", async () => {
+    const tomorrow = new Date(Date.now() + 2 * 86_400_000).toISOString().slice(0, 10);
+    const result: any = await toolProposeLogEntry("owner@example.com", { category: "service", description: "Oil", cost: 20, date: tomorrow });
+    expect(result.error).toMatch(/future/);
+  });
+
+  it("defaults to today's date when none is given or the given one is unparseable", async () => {
+    const today = new Date().toISOString().slice(0, 10);
+    const result: any = await toolProposeLogEntry("owner@example.com", { category: "service", description: "Oil", cost: 20 });
+    expect(result.date).toBe(today);
+
+    const result2: any = await toolProposeLogEntry("owner@example.com", { category: "service", description: "Oil", cost: 20, date: "not-a-date" });
+    expect(result2.date).toBe(today);
+  });
+
+  it("drafts a service entry with the recognized jobType and the account's current mileage", async () => {
+    const result: any = await toolProposeLogEntry("owner@example.com", {
+      category: "service", description: "Valve cleaner", cost: 4, date: "2026-01-01", jobType: "oil-filter",
+    });
+    expect(result).toEqual({
+      category: "service", jobType: "oil-filter", jobLabel: expect.any(String),
+      description: "Valve cleaner", cost: 4, date: "2026-01-01", mileage: 15000,
+    });
+  });
+
+  it("defaults an unrecognized or missing jobType to 'other' rather than rejecting the draft", async () => {
+    const result: any = await toolProposeLogEntry("owner@example.com", { category: "service", description: "Valve cleaner", cost: 4, jobType: "not-a-real-job" });
+    expect(result.jobType).toBe("other");
+
+    const result2: any = await toolProposeLogEntry("owner@example.com", { category: "service", description: "Valve cleaner", cost: 4 });
+    expect(result2.jobType).toBe("other");
+  });
+
+  it("drafts a bill entry with a valid billType", async () => {
+    const result: any = await toolProposeLogEntry("owner@example.com", {
+      category: "bill", description: "Annual renewal", cost: 300, date: "2026-01-01", billType: "insurance",
+    });
+    expect(result).toEqual({ category: "bill", billType: "insurance", billLabel: expect.any(String), description: "Annual renewal", cost: 300, date: "2026-01-01" });
+  });
+
+  it("asks a clarifying question rather than guessing when billType is missing or invalid, since bills have no safe 'other' fallback", async () => {
+    const result: any = await toolProposeLogEntry("owner@example.com", { category: "bill", description: "Annual renewal", cost: 300 });
+    expect(result.error).toMatch(/insurance, road tax, MOT test, or finance/);
+
+    const result2: any = await toolProposeLogEntry("owner@example.com", { category: "bill", description: "Annual renewal", cost: 300, billType: "not-real" });
+    expect(result2.error).toMatch(/insurance, road tax, MOT test, or finance/);
   });
 });

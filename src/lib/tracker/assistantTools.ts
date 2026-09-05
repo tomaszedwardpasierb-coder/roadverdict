@@ -20,6 +20,7 @@ import { computeReminderStatus, reminderDetailLabel } from "./reminderStatus";
 import { computeActualMPG, computeMPGSeries } from "./mpgCalc";
 import { gatherMileagePoints } from "./summary";
 import { JOB_LABELS } from "./jobTypes";
+import { BILL_LABELS } from "./billTypes";
 import { getShareLinksForUser } from "./shareLink";
 import { getPendingReceiptRequestsForOwner } from "./receiptRequest";
 import { getSellerReportData } from "./sellerReportData";
@@ -471,6 +472,100 @@ export async function toolGetViewedComparison(email: string, compareContext: Com
   }
 }
 
+// ---- Draft a new service record or bill from a description - Pro only ----
+//
+// Deliberately still read-only in the sense that matters: this never
+// writes to Cosmos. It validates and cleans up the model's guess and
+// hands back a draft for the widget to show as an editable, on-screen
+// confirmation card - committing it is a separate, ordinary POST to the
+// exact same /api/tracker/services or /api/tracker/bills endpoint the
+// manual forms already use, triggered by the user's own click, never by
+// this tool or the model. Scoped to service/bill only for now - fuel
+// needs a genuinely different shape (litres, no free-text field) and
+// mods have 250+ category keys, unenumerable here without either
+// bloating the schema or needing fuzzy matching; both are left for a
+// later pass rather than guessed at half-built.
+export interface ProposeLogEntryArgs {
+  category?: string;
+  description?: string;
+  cost?: number;
+  date?: string;
+  jobType?: string;
+  billType?: string;
+}
+
+export type ProposedEntry =
+  | { category: "service"; jobType: string; jobLabel: string; description: string; cost: number; date: string; mileage: number }
+  | { category: "bill"; billType: string; billLabel: string; description: string; cost: number; date: string };
+
+export async function toolProposeLogEntry(email: string, args: ProposeLogEntryArgs) {
+  const bike = await getPrimaryBike(email);
+  if (!bike) return { error: "No bike found on this account." };
+
+  if (args.category !== "service" && args.category !== "bill") {
+    return { error: "This can only draft a service record or a bill right now - not a fuel fill-up or a modification/accessory." };
+  }
+  if (typeof args.description !== "string" || !args.description.trim()) {
+    return { error: "Needs a short description of what this is." };
+  }
+  if (typeof args.cost !== "number" || !Number.isFinite(args.cost) || args.cost <= 0) {
+    return { error: "Needs a valid, positive cost." };
+  }
+
+  const parsedDate = typeof args.date === "string" ? new Date(args.date) : null;
+  const date = parsedDate && !Number.isNaN(parsedDate.getTime()) ? args.date! : new Date().toISOString().slice(0, 10);
+  if (new Date(date).getTime() > Date.now() + 86_400_000) {
+    return { error: "That date is in the future - this can only log something that's already happened." };
+  }
+
+  const description = args.description.trim();
+
+  if (args.category === "service") {
+    const jobType = typeof args.jobType === "string" && args.jobType in JOB_LABELS ? args.jobType : "other";
+    const entry: ProposedEntry = { category: "service", jobType, jobLabel: JOB_LABELS[jobType], description, cost: args.cost, date, mileage: bike.currentMileage };
+    return entry;
+  }
+
+  const billType = typeof args.billType === "string" ? args.billType : undefined;
+  if (!billType || !(billType in BILL_LABELS)) {
+    return { error: "Which of these is this for: insurance, road tax, MOT test, or finance?" };
+  }
+  const entry: ProposedEntry = { category: "bill", billType, billLabel: BILL_LABELS[billType], description, cost: args.cost, date };
+  return entry;
+}
+
+export const LOG_ENTRY_TOOL_DECLARATIONS = [
+  {
+    name: "proposeLogEntry",
+    description:
+      "Draft a new service record or insurance/road-tax/MOT/finance bill for the signed-in user's bike, from their description of what they want to log - e.g. a consumable, a small maintenance item, or a payment. This only prepares a draft for the user to review, edit, and confirm themselves on screen - it NEVER saves anything by itself. Not for fuel fill-ups or vehicle modifications/accessories (say those aren't supported via chat yet, and point to the Fuel or Parts & Accessories tab, if asked) and never for changing or deleting an existing entry.",
+    parameters: {
+      type: "OBJECT",
+      properties: {
+        category: {
+          type: "STRING",
+          enum: ["service", "bill"],
+          description: "Whether this is a maintenance/service item (including general consumables and small parts) or an insurance/road-tax/MOT/finance payment.",
+        },
+        description: { type: "STRING", description: "A short, plain label for what this is, e.g. 'Valve cleaner' or 'Annual insurance renewal'." },
+        cost: { type: "NUMBER", description: "The amount paid, in GBP, as a plain number." },
+        date: { type: "STRING", description: "ISO date (YYYY-MM-DD) this was paid/done. Use today's date if the user didn't say otherwise." },
+        jobType: {
+          type: "STRING",
+          enum: Object.keys(JOB_LABELS),
+          description: "Only for category 'service' - the closest matching job type, or 'other' if genuinely nothing fits.",
+        },
+        billType: {
+          type: "STRING",
+          enum: ["insurance", "road-tax", "mot-test", "finance"],
+          description: "Only for category 'bill'.",
+        },
+      },
+      required: ["category", "description", "cost"],
+    },
+  },
+] as const;
+
 // Single dispatch point - the API route calls this instead of a
 // hand-written switch of its own, so the set of callable tools is
 // defined in exactly one place.
@@ -497,6 +592,14 @@ export async function runAssistantTool(
   if (name === "getViewedComparison") {
     if (!compareContext) return { error: "No comparison is currently open." };
     return toolGetViewedComparison(email, compareContext);
+  }
+
+  // Not part of ASSISTANT_TOOL_DECLARATIONS/ToolName below (which is
+  // typed straight off that array) - same reason as the two tools
+  // above, kept as its own explicit branch rather than folded into the
+  // switch with a lying type cast.
+  if (name === "proposeLogEntry") {
+    return toolProposeLogEntry(email, args as ProposeLogEntryArgs);
   }
 
   switch (name as ToolName) {

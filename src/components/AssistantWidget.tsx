@@ -4,11 +4,13 @@
 import { Suspense, useEffect, useRef, useState } from 'react';
 import { usePathname, useSearchParams } from 'next/navigation';
 import { useActiveSection } from './ActiveSectionContext';
+import { AssistantProposedEntryCard, type ProposedEntry } from './AssistantProposedEntryCard';
 import styles from './AssistantWidget.module.css';
 
 interface Message {
   role: 'user' | 'assistant';
   content: string;
+  proposedEntry?: ProposedEntry;
 }
 
 const GREETING: Message = {
@@ -59,7 +61,7 @@ interface CompareContext {
   to: string | null;
 }
 
-type SendResult = { ok: true; reply: string } | { ok: false; error: string; retryable: boolean };
+type SendResult = { ok: true; reply: string; proposedEntry?: ProposedEntry } | { ok: false; error: string; retryable: boolean };
 
 async function attemptSend(
   payload: Message[],
@@ -97,7 +99,7 @@ async function attemptSend(
     status = res.status;
     const data = await res.json().catch(() => null);
     if (res.ok && data?.reply) {
-      return { ok: true, reply: data.reply };
+      return { ok: true, reply: data.reply, ...(data.proposedEntry ? { proposedEntry: data.proposedEntry } : {}) };
     }
     return {
       ok: false,
@@ -161,7 +163,7 @@ function AssistantWidgetInner() {
 
     setSending(false);
     if (result.ok) {
-      setMessages((prev) => [...prev, { role: 'assistant', content: result.reply }]);
+      setMessages((prev) => [...prev, { role: 'assistant', content: result.reply, ...(result.proposedEntry ? { proposedEntry: result.proposedEntry } : {}) }]);
     } else {
       setError(result.retryable ? `${result.error} Try again.` : result.error);
       if (result.retryable) setLastFailedMessages(payload);
@@ -203,8 +205,9 @@ function AssistantWidgetInner() {
 
           <div className={styles.messages} ref={listRef}>
             {messages.map((m, i) => (
-              <div key={i} className={m.role === 'user' ? styles.bubbleUser : styles.bubbleAssistant}>
-                {m.content}
+              <div key={i} style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', alignItems: m.role === 'user' ? 'flex-end' : 'flex-start' }}>
+                <div className={m.role === 'user' ? styles.bubbleUser : styles.bubbleAssistant}>{m.content}</div>
+                {m.proposedEntry && <AssistantProposedEntryCard entry={m.proposedEntry} />}
               </div>
             ))}
             {sending && <div className={styles.bubbleAssistant}>…</div>}

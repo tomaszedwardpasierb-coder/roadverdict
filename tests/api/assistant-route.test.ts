@@ -22,6 +22,7 @@ vi.mock("@/lib/tracker/assistantTools", () => ({
   ASSISTANT_TOOL_DECLARATIONS: [{ name: "getSpendTotal" }],
   REPORT_TOOL_DECLARATIONS: [{ name: "getViewedReport" }],
   COMPARISON_TOOL_DECLARATIONS: [{ name: "getViewedComparison" }],
+  LOG_ENTRY_TOOL_DECLARATIONS: [{ name: "proposeLogEntry" }],
   runAssistantTool: mocks.runAssistantTool,
 }));
 vi.mock("@/lib/tracker/assistantQuestionLog", () => ({ logAssistantQuestion: mocks.logAssistantQuestion }));
@@ -409,5 +410,96 @@ describe("POST /api/assistant", () => {
 
     expect(response.status).toBe(502);
     expect(mocks.logAssistantQuestion).toHaveBeenCalledWith("hi", false, true, undefined);
+  });
+
+  // ── proposeLogEntry (Pro-only) ─────────────────────────────────────────
+
+  it("attaches the log-entry tool when signed in and Pro", async () => {
+    mocks.getSession.mockResolvedValue({ email: "rider@example.com" });
+    mocks.isPro.mockResolvedValue(true);
+
+    await POST(request({ messages: [{ role: "user", content: "Add an entry: valve cleaner, £4, today." }] }));
+
+    const callBody = JSON.parse(mocks.fetch.mock.calls[0][1].body);
+    const names = callBody.tools[0].functionDeclarations.map((d: { name: string }) => d.name);
+    expect(names).toContain("proposeLogEntry");
+  });
+
+  it("does not attach the log-entry tool when signed in but not Pro", async () => {
+    mocks.getSession.mockResolvedValue({ email: "rider@example.com" });
+    mocks.isPro.mockResolvedValue(false);
+
+    await POST(request({ messages: [{ role: "user", content: "Add an entry: valve cleaner, £4, today." }] }));
+
+    const callBody = JSON.parse(mocks.fetch.mock.calls[0][1].body);
+    const names = callBody.tools[0].functionDeclarations.map((d: { name: string }) => d.name);
+    expect(names).not.toContain("proposeLogEntry");
+  });
+
+  it("does not attach the log-entry tool for a signed-out visitor, regardless of isPro", async () => {
+    mocks.getSession.mockResolvedValue(null);
+    mocks.isPro.mockResolvedValue(true);
+
+    const response = await POST(request({ messages: [{ role: "user", content: "hi" }] }));
+
+    expect(response.status).toBe(200);
+    const callBody = JSON.parse(mocks.fetch.mock.calls[0][1].body);
+    expect(callBody.tools).toBeUndefined();
+    expect(mocks.isPro).not.toHaveBeenCalled();
+  });
+
+  it("continues offering the tool set without the log-entry tool if isPro() itself throws", async () => {
+    mocks.getSession.mockResolvedValue({ email: "rider@example.com" });
+    mocks.isPro.mockRejectedValue(new Error("Cosmos unavailable"));
+
+    const response = await POST(request({ messages: [{ role: "user", content: "hi" }] }));
+
+    expect(response.status).toBe(200);
+    const callBody = JSON.parse(mocks.fetch.mock.calls[0][1].body);
+    const names = callBody.tools[0].functionDeclarations.map((d: { name: string }) => d.name);
+    expect(names).not.toContain("proposeLogEntry");
+  });
+
+  it("includes the draft in the response when proposeLogEntry returns a valid entry", async () => {
+    mocks.getSession.mockResolvedValue({ email: "rider@example.com" });
+    mocks.isPro.mockResolvedValue(true);
+    mocks.fetch
+      .mockResolvedValueOnce(geminiFunctionCallResponse("proposeLogEntry", { category: "service", description: "Valve cleaner", cost: 4 }))
+      .mockResolvedValueOnce(geminiTextResponse("Here's what I've drafted - take a look below."));
+    const draft = { category: "service", jobType: "other", jobLabel: "Other", description: "Valve cleaner", cost: 4, date: "2026-09-05", mileage: 12000 };
+    mocks.runAssistantTool.mockResolvedValue(draft);
+
+    const response = await POST(request({ messages: [{ role: "user", content: "Add an entry: valve cleaner, £4, today." }] }));
+
+    await expect(response.json()).resolves.toEqual({
+      reply: "Here's what I've drafted - take a look below.",
+      proposedEntry: draft,
+    });
+  });
+
+  it("omits proposedEntry from the response when the tool call returns an error instead of a draft", async () => {
+    mocks.getSession.mockResolvedValue({ email: "rider@example.com" });
+    mocks.isPro.mockResolvedValue(true);
+    mocks.fetch
+      .mockResolvedValueOnce(geminiFunctionCallResponse("proposeLogEntry", { category: "bill", description: "Renewal", cost: 50 }))
+      .mockResolvedValueOnce(geminiTextResponse("Which of these is this for?"));
+    mocks.runAssistantTool.mockResolvedValue({ error: "Which of these is this for: insurance, road tax, MOT test, or finance?" });
+
+    const response = await POST(request({ messages: [{ role: "user", content: "Add a bill" }] }));
+
+    await expect(response.json()).resolves.toEqual({ reply: "Which of these is this for?" });
+  });
+
+  it("does not leak a proposedEntry into the response for an unrelated tool call", async () => {
+    mocks.getSession.mockResolvedValue({ email: "rider@example.com" });
+    mocks.isPro.mockResolvedValue(true);
+    mocks.fetch
+      .mockResolvedValueOnce(geminiFunctionCallResponse("getSpendTotal", {}))
+      .mockResolvedValueOnce(geminiTextResponse("You've spent £400."));
+    mocks.runAssistantTool.mockResolvedValue({ total: 400 });
+
+    const response = await POST(request({ messages: [{ role: "user", content: "How much have I spent?" }] }));
+
+    await expect(response.json()).resolves.toEqual({ reply: "You've spent £400." });
   });
 });

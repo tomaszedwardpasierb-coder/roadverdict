@@ -13,9 +13,11 @@ import userEvent from "@testing-library/user-event";
 
 const mockPathname = vi.hoisted(() => ({ current: "/" }));
 const mockSearchParams = vi.hoisted(() => ({ current: new URLSearchParams() }));
+const mockRouterRefresh = vi.hoisted(() => vi.fn());
 vi.mock("next/navigation", () => ({
   usePathname: () => mockPathname.current,
   useSearchParams: () => mockSearchParams.current,
+  useRouter: () => ({ refresh: mockRouterRefresh }),
 }));
 
 import { AssistantWidget } from "@/components/AssistantWidget";
@@ -40,6 +42,7 @@ describe("AssistantWidget", () => {
   beforeEach(() => {
     mockPathname.current = "/";
     mockSearchParams.current = new URLSearchParams();
+    mockRouterRefresh.mockReset();
     vi.stubGlobal("fetch", vi.fn());
   });
 
@@ -251,5 +254,84 @@ describe("AssistantWidget", () => {
 
     expect(await screen.findByText("Third time lucky.")).toBeInTheDocument();
     expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+
+  it("renders a proposed service entry card, pre-filled from the draft, alongside the assistant's reply", async () => {
+    (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        reply: "Here's a draft for that.",
+        proposedEntry: {
+          category: "service", jobType: "oil-filter", jobLabel: "Oil & filter change",
+          description: "Valve cleaner", cost: 4, date: "2026-01-01", mileage: 15000,
+        },
+      }),
+    });
+
+    const user = userEvent.setup();
+    render(<AssistantWidget />);
+    await openWidgetAndSend(user, "log a valve cleaner for £4 today");
+
+    await screen.findByText("Here's a draft for that.");
+    expect(screen.getByText("New service record")).toBeInTheDocument();
+    expect(screen.getByDisplayValue("Valve cleaner")).toBeInTheDocument();
+    expect(screen.getByDisplayValue("4")).toBeInTheDocument();
+    expect(screen.getByDisplayValue("2026-01-01")).toBeInTheDocument();
+    expect(screen.getByDisplayValue("15000")).toBeInTheDocument();
+  });
+
+  it("confirming a proposed entry POSTs the edited draft to the services endpoint and shows it as logged", async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce({
+        ok: true, status: 200,
+        json: async () => ({
+          reply: "Here's a draft for that.",
+          proposedEntry: {
+            category: "service", jobType: "oil-filter", jobLabel: "Oil & filter change",
+            description: "Valve cleaner", cost: 4, date: "2026-01-01", mileage: 15000,
+          },
+        }),
+      })
+      .mockResolvedValueOnce({ ok: true, status: 200, json: async () => ({ record: { id: "svc-1" } }) });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const user = userEvent.setup();
+    render(<AssistantWidget />);
+    await openWidgetAndSend(user, "log a valve cleaner for £4 today");
+    await screen.findByText("Here's a draft for that.");
+
+    await user.clear(screen.getByLabelText("Cost (£)"));
+    await user.type(screen.getByLabelText("Cost (£)"), "4.5");
+    await user.click(screen.getByRole("button", { name: "Log it" }));
+
+    await screen.findByText(/Logged/);
+    expect(fetchMock).toHaveBeenLastCalledWith("/api/tracker/services", expect.objectContaining({ method: "POST" }));
+    const body = JSON.parse(fetchMock.mock.calls[1][1].body);
+    expect(body).toEqual({ jobType: "oil-filter", cost: 4.5, mileage: 15000, date: "2026-01-01", notes: "Valve cleaner", mileageAcknowledged: false });
+    expect(mockRouterRefresh).toHaveBeenCalled();
+  });
+
+  it("shows the server's error inline on the card, without disturbing the surrounding chat, when confirming fails", async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce({
+        ok: true, status: 200,
+        json: async () => ({
+          reply: "Here's a draft for that.",
+          proposedEntry: { category: "bill", billType: "insurance", billLabel: "Insurance", description: "Annual renewal", cost: 300, date: "2026-01-01" },
+        }),
+      })
+      .mockResolvedValueOnce({ ok: false, status: 400, json: async () => ({ error: "Please fill in all required fields." }) });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const user = userEvent.setup();
+    render(<AssistantWidget />);
+    await openWidgetAndSend(user, "log my insurance renewal, £300 today");
+    await screen.findByText("Here's a draft for that.");
+
+    await user.click(screen.getByRole("button", { name: "Log it" }));
+
+    expect(await screen.findByText("Please fill in all required fields.")).toBeInTheDocument();
+    expect(screen.queryByText(/Logged/)).not.toBeInTheDocument();
   });
 });
