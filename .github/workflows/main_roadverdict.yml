@@ -186,7 +186,23 @@ jobs:
           slot-name: 'Production'
           package: .
       - name: Wait for the deployed instance to finish restarting
-        run: sleep 20
+        # A fixed sleep 20 sat here before - long enough for a routine
+        # deploy's restart, not long enough for a slower one (e.g. a
+        # bigger bundle from a Next.js major-version upgrade), which is
+        # exactly what caused the post-deploy smoke test below to
+        # false-alarm once. Polls instead, same pattern as the
+        # authenticated-e2e job's own "Start the app server" step -
+        # returns as soon as the site responds, so a normal deploy isn't
+        # slowed down, but a slow one gets up to 90s instead of 20.
+        run: |
+          for i in $(seq 1 30); do
+            if curl -sf https://roadverdict.co.uk/ -o /dev/null; then
+              echo "Live site is responding."
+              exit 0
+            fi
+            sleep 3
+          done
+          echo "Live site did not respond within the wait window - proceeding anyway; the smoke test below will report the real state." >&2
       - name: Install Playwright browser
         run: npx playwright install --with-deps chromium
       - name: Post-deploy smoke test
