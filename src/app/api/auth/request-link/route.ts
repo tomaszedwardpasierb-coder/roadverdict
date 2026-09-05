@@ -8,9 +8,29 @@ import { getSafeRedirectPath } from "@/lib/auth/safeRedirect";
 import { demoBikeExists, runDemoSeed } from "@/lib/tracker/demoSeedRunner";
 import { isAccountBlocked } from "@/lib/tracker/userDoc";
 
-const lastRequestByEmail = new Map<string, number>();
 const RATE_LIMIT_MS = 60_000;
 const MAGIC_LINK_TTL_SECONDS = 15 * 60;
+
+// Cosmos-backed rather than an in-process Map - a Map only rate-limits
+// within one server instance, and resets on every cold start, both of
+// which are real gaps on Azure App Service. Reuses the magicLink docs
+// already written below rather than a second doc type just for this -
+// one query for "was a link requested for this email in the last
+// minute", scoped to the same partition every other query for this
+// email already uses.
+async function isRateLimited(container: ReturnType<typeof getContainer>, email: string): Promise<boolean> {
+  const cutoff = new Date(Date.now() - RATE_LIMIT_MS).toISOString();
+  const { resources } = await container.items
+    .query<{ id: string }>(
+      {
+        query: "SELECT TOP 1 c.id FROM c WHERE c.type = 'magicLink' AND c.createdAt > @cutoff",
+        parameters: [{ name: "@cutoff", value: cutoff }],
+      },
+      { partitionKey: email }
+    )
+    .fetchAll();
+  return resources.length > 0;
+}
 
 // Exact, hardcoded, case-normalised match only - deliberately not a
 // pattern, a prefix check, or anything derived from user input. This is
@@ -74,14 +94,12 @@ export async function POST(req: NextRequest) {
     return response;
   }
 
-  const lastRequest = lastRequestByEmail.get(normalizedEmail);
-  if (lastRequest && Date.now() - lastRequest < RATE_LIMIT_MS) {
+  if (await isRateLimited(container, normalizedEmail)) {
     return NextResponse.json(
       { error: "Please wait a moment before requesting another link" },
       { status: 429 }
     );
   }
-  lastRequestByEmail.set(normalizedEmail, Date.now());
 
   const { raw, hash } = generateToken();
   const now = new Date();

@@ -3,6 +3,7 @@ import { NextRequest } from "next/server";
 
 const mocks = vi.hoisted(() => ({
   itemsCreate: vi.fn(),
+  itemsQuery: vi.fn(),
   sendMagicLinkEmail: vi.fn(),
   createSessionForEmail: vi.fn(),
   demoBikeExists: vi.fn(),
@@ -11,7 +12,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("@/lib/cosmos", () => ({
-  getContainer: () => ({ items: { create: mocks.itemsCreate } }),
+  getContainer: () => ({ items: { create: mocks.itemsCreate, query: mocks.itemsQuery } }),
 }));
 vi.mock("@/lib/resend", () => ({ sendMagicLinkEmail: mocks.sendMagicLinkEmail }));
 vi.mock("@/lib/auth/session", () => ({ createSessionForEmail: mocks.createSessionForEmail }));
@@ -39,6 +40,7 @@ describe("POST /api/auth/request-link", () => {
   beforeEach(() => {
     Object.values(mocks).forEach((mock) => mock.mockReset());
     mocks.itemsCreate.mockResolvedValue({ resource: {} });
+    mocks.itemsQuery.mockReturnValue({ fetchAll: () => Promise.resolve({ resources: [] }) });
     mocks.sendMagicLinkEmail.mockResolvedValue(undefined);
     mocks.createSessionForEmail.mockResolvedValue({ cookieValue: "session-cookie-value", maxAge: 123 });
     mocks.demoBikeExists.mockResolvedValue(true);
@@ -166,6 +168,10 @@ describe("POST /api/auth/request-link", () => {
     const first = await POST(req(JSON.stringify({ email })));
     expect(first.status).toBe(200);
 
+    // Simulates what the real Cosmos query would now find: the magicLink
+    // doc the first request just created, still inside the cooldown window.
+    mocks.itemsQuery.mockReturnValue({ fetchAll: () => Promise.resolve({ resources: [{ id: "existing" }] }) });
+
     const second = await POST(req(JSON.stringify({ email })));
 
     expect(second.status).toBe(429);
@@ -174,6 +180,20 @@ describe("POST /api/auth/request-link", () => {
     });
     expect(mocks.itemsCreate).toHaveBeenCalledTimes(1);
     expect(mocks.sendMagicLinkEmail).toHaveBeenCalledTimes(1);
+  });
+
+  it("checks the rate limit scoped to the requesting email's own partition", async () => {
+    await POST(req(JSON.stringify({ email: "Rider@Example.com" })));
+    const [queryObj, options] = mocks.itemsQuery.mock.calls[0];
+    expect(queryObj.query).toContain("c.type = 'magicLink'");
+    expect(queryObj.query).toContain("c.createdAt > @cutoff");
+    expect(options).toEqual({ partitionKey: "rider@example.com" });
+  });
+
+  it("does not rate-limit two different addresses off the same check", async () => {
+    await POST(req(JSON.stringify({ email: "first@example.com" })));
+    const response = await POST(req(JSON.stringify({ email: "second@example.com" })));
+    expect(response.status).toBe(200);
   });
 
   // Documents current behaviour rather than asserting it's ideal: unlike
