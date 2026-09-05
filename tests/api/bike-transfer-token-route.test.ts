@@ -39,13 +39,13 @@ const pendingDoc = {
 describe("GET /api/tracker/bike-transfer/[token]", () => {
   it("returns not found for an unknown or expired token", async () => {
     mocks.getBikeTransferRequestByToken.mockResolvedValue(null);
-    const response = await GET(new NextRequest("http://localhost/x"), { params: { token: "bad" } });
+    const response = await GET(new NextRequest("http://localhost/x"), { params: Promise.resolve({ token: "bad" }) });
     expect(response.status).toBe(404);
   });
 
   it("returns the offer's public details for a real token, with no auth required", async () => {
     mocks.getBikeTransferRequestByToken.mockResolvedValue(pendingDoc);
-    const response = await GET(new NextRequest("http://localhost/x"), { params: { token: "tok-1" } });
+    const response = await GET(new NextRequest("http://localhost/x"), { params: Promise.resolve({ token: "tok-1" }) });
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({
       ownerEmail: "seller@example.com",
@@ -67,21 +67,21 @@ describe("POST /api/tracker/bike-transfer/[token]/accept", () => {
 
   it("rejects unauthenticated requests - unlike decline, accept requires sign-in", async () => {
     mocks.getSession.mockResolvedValue(null);
-    const response = await ACCEPT(req(), { params: { token: "tok-1" } });
+    const response = await ACCEPT(req(), { params: Promise.resolve({ token: "tok-1" }) });
     expect(response.status).toBe(401);
   });
 
   it("returns not found for an unknown or expired token", async () => {
     mocks.getSession.mockResolvedValue({ email: "buyer@example.com" });
     mocks.getBikeTransferRequestByToken.mockResolvedValue(null);
-    const response = await ACCEPT(req(), { params: { token: "bad" } });
+    const response = await ACCEPT(req(), { params: Promise.resolve({ token: "bad" }) });
     expect(response.status).toBe(404);
   });
 
   it("refuses an offer that's already been decided", async () => {
     mocks.getSession.mockResolvedValue({ email: "buyer@example.com" });
     mocks.getBikeTransferRequestByToken.mockResolvedValue({ ...pendingDoc, status: "declined" });
-    const response = await ACCEPT(req(), { params: { token: "tok-1" } });
+    const response = await ACCEPT(req(), { params: Promise.resolve({ token: "tok-1" }) });
     expect(response.status).toBe(409);
     await expect(response.json()).resolves.toEqual({ error: "This offer has already been declined." });
   });
@@ -93,7 +93,7 @@ describe("POST /api/tracker/bike-transfer/[token]/accept", () => {
   it("refuses to let anyone but the addressed recipient accept, even with a valid pending token", async () => {
     mocks.getSession.mockResolvedValue({ email: "someone-else@example.com" });
 
-    const response = await ACCEPT(req(), { params: { token: "tok-1" } });
+    const response = await ACCEPT(req(), { params: Promise.resolve({ token: "tok-1" }) });
 
     expect(response.status).toBe(403);
     expect(mocks.transferBike).not.toHaveBeenCalled();
@@ -110,7 +110,7 @@ describe("POST /api/tracker/bike-transfer/[token]/accept", () => {
     mocks.getSession.mockResolvedValue({ email: "buyer@example.com" });
     mocks.transferBike.mockResolvedValue({ ok: false, reason });
 
-    const response = await ACCEPT(req(), { params: { token: "tok-1" } });
+    const response = await ACCEPT(req(), { params: Promise.resolve({ token: "tok-1" }) });
 
     expect(response.status).toBe(status);
     await expect(response.json()).resolves.toEqual({ error: message });
@@ -121,7 +121,7 @@ describe("POST /api/tracker/bike-transfer/[token]/accept", () => {
     mocks.getSession.mockResolvedValue({ email: "buyer@example.com" });
     mocks.transferBike.mockResolvedValue({ ok: false, reason: "recipient_limit_reached", limit: 3 });
 
-    const response = await ACCEPT(req(), { params: { token: "tok-1" } });
+    const response = await ACCEPT(req(), { params: Promise.resolve({ token: "tok-1" }) });
 
     expect(response.status).toBe(403);
     await expect(response.json()).resolves.toEqual({
@@ -132,7 +132,7 @@ describe("POST /api/tracker/bike-transfer/[token]/accept", () => {
   it("marks the request accepted and returns the new bike on success", async () => {
     mocks.getSession.mockResolvedValue({ email: "buyer@example.com" });
 
-    const response = await ACCEPT(req(), { params: { token: "tok-1" } });
+    const response = await ACCEPT(req(), { params: Promise.resolve({ token: "tok-1" }) });
 
     expect(mocks.transferBike).toHaveBeenCalledWith("seller@example.com", "bike-1", "buyer@example.com", true);
     expect(mocks.decideBikeTransferRequest).toHaveBeenCalledWith("req-1", "seller@example.com", "accepted");
@@ -147,7 +147,7 @@ describe("POST /api/tracker/bike-transfer/[token]/accept", () => {
     mocks.getSession.mockResolvedValue({ email: "buyer@example.com" });
     mocks.sendBikeTransferAcceptedEmail.mockRejectedValue(new Error("send failed"));
 
-    const response = await ACCEPT(req(), { params: { token: "tok-1" } });
+    const response = await ACCEPT(req(), { params: Promise.resolve({ token: "tok-1" }) });
 
     expect(response.status).toBe(200);
   });
@@ -165,7 +165,7 @@ describe("POST /api/tracker/bike-transfer/[token]/decline", () => {
   it("requires no sign-in at all, unlike accept", async () => {
     mocks.getSession.mockResolvedValue(null); // even if this were checked, it isn't called
 
-    const response = await DECLINE(req(), { params: { token: "tok-1" } });
+    const response = await DECLINE(req(), { params: Promise.resolve({ token: "tok-1" }) });
 
     expect(response.status).toBe(200);
     expect(mocks.getSession).not.toHaveBeenCalled();
@@ -173,18 +173,18 @@ describe("POST /api/tracker/bike-transfer/[token]/decline", () => {
 
   it("returns not found for an unknown or expired token", async () => {
     mocks.getBikeTransferRequestByToken.mockResolvedValue(null);
-    const response = await DECLINE(req(), { params: { token: "bad" } });
+    const response = await DECLINE(req(), { params: Promise.resolve({ token: "bad" }) });
     expect(response.status).toBe(404);
   });
 
   it("refuses an offer that's already been decided", async () => {
     mocks.getBikeTransferRequestByToken.mockResolvedValue({ ...pendingDoc, status: "accepted" });
-    const response = await DECLINE(req(), { params: { token: "tok-1" } });
+    const response = await DECLINE(req(), { params: Promise.resolve({ token: "tok-1" }) });
     expect(response.status).toBe(409);
   });
 
   it("marks a valid pending offer as declined", async () => {
-    const response = await DECLINE(req(), { params: { token: "tok-1" } });
+    const response = await DECLINE(req(), { params: Promise.resolve({ token: "tok-1" }) });
     expect(mocks.decideBikeTransferRequest).toHaveBeenCalledWith("req-1", "seller@example.com", "declined");
     expect(response.status).toBe(200);
   });

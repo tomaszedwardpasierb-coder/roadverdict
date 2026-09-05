@@ -14,7 +14,8 @@ import { sendOwnershipRequestApprovedEmail } from "@/lib/resend";
 
 export const dynamic = "force-dynamic";
 
-export async function POST(request: NextRequest, { params }: { params: { requestId: string } }) {
+export async function POST(request: NextRequest, props: { params: Promise<{ requestId: string }> }) {
+  const params = await props.params;
   const session = await getSession();
   if (!session) {
     return NextResponse.json({ error: "Not signed in." }, { status: 401 });

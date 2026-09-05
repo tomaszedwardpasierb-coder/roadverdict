@@ -11,7 +11,8 @@ function formatBikeName(summary: { make: string; model: string; year?: number; i
   return `${prefix} ${summary.make} ${summary.model}`.trim();
 }
 
-export default async function BikeTransferOfferPage({ params }: { params: { token: string } }) {
+export default async function BikeTransferOfferPage(props: { params: Promise<{ token: string }> }) {
+  const params = await props.params;
   const doc = await getBikeTransferRequestByToken(params.token);
   if (!doc) {
     return (

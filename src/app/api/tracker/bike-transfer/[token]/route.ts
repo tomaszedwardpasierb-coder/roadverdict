@@ -4,7 +4,8 @@ import { getBikeTransferRequestByToken } from "@/lib/tracker/bikeTransferRequest
 
 export const dynamic = "force-dynamic";
 
-export async function GET(request: NextRequest, { params }: { params: { token: string } }) {
+export async function GET(request: NextRequest, props: { params: Promise<{ token: string }> }) {
+  const params = await props.params;
   const doc = await getBikeTransferRequestByToken(params.token);
   if (!doc) {
     return NextResponse.json({ error: "This offer doesn't exist or has expired." }, { status: 404 });

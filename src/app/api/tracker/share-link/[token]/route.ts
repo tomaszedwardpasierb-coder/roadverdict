@@ -5,7 +5,8 @@ import { getShareLink, deleteShareLink } from "@/lib/tracker/shareLink";
 
 export const dynamic = "force-dynamic";
 
-export async function DELETE(request: NextRequest, { params }: { params: { token: string } }) {
+export async function DELETE(request: NextRequest, props: { params: Promise<{ token: string }> }) {
+  const params = await props.params;
   const session = await getSession();
   if (!session) {
     return NextResponse.json({ error: "Not signed in." }, { status: 401 });

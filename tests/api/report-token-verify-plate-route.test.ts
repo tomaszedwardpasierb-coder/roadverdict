@@ -41,7 +41,7 @@ describe("POST /api/report/[token]/verify-plate", () => {
   it("returns 429 when the per-token rate limit has been exhausted, without checking the plate at all", async () => {
     mocks.checkPlateRateLimit.mockResolvedValue({ allowed: false });
 
-    const response = await POST(request(JSON.stringify({ plate: "AB12CDE" })), { params: { token: "tok-a" } });
+    const response = await POST(request(JSON.stringify({ plate: "AB12CDE" })), { params: Promise.resolve({ token: "tok-a" }) });
 
     expect(response.status).toBe(429);
     expect(mocks.verifyPlate).not.toHaveBeenCalled();
@@ -49,32 +49,32 @@ describe("POST /api/report/[token]/verify-plate", () => {
   });
 
   it("checks the rate limit scoped to this token specifically", async () => {
-    await POST(request(JSON.stringify({ plate: "AB12CDE" })), { params: { token: "tok-a" } });
+    await POST(request(JSON.stringify({ plate: "AB12CDE" })), { params: Promise.resolve({ token: "tok-a" }) });
     expect(mocks.checkPlateRateLimit).toHaveBeenCalledWith("tok-a");
   });
 
   it("rejects malformed JSON", async () => {
-    const response = await POST(request("not-json"), { params: { token: "tok-a" } });
+    const response = await POST(request("not-json"), { params: Promise.resolve({ token: "tok-a" }) });
     expect(response.status).toBe(400);
     await expect(response.json()).resolves.toEqual({ error: "Invalid request." });
     expect(mocks.recordPlateAttempt).not.toHaveBeenCalled();
   });
 
   it("rejects a missing plate", async () => {
-    const response = await POST(request(JSON.stringify({})), { params: { token: "tok-a" } });
+    const response = await POST(request(JSON.stringify({})), { params: Promise.resolve({ token: "tok-a" }) });
     expect(response.status).toBe(400);
     await expect(response.json()).resolves.toEqual({ error: "Please enter the registration number." });
   });
 
   it("rejects a non-string plate", async () => {
-    const response = await POST(request(JSON.stringify({ plate: 12345 })), { params: { token: "tok-a" } });
+    const response = await POST(request(JSON.stringify({ plate: 12345 })), { params: Promise.resolve({ token: "tok-a" }) });
     expect(response.status).toBe(400);
   });
 
   it("records the attempt against this token even when the plate turns out to be wrong", async () => {
     mocks.verifyPlate.mockResolvedValue(false);
 
-    const response = await POST(request(JSON.stringify({ plate: "WRONG1" })), { params: { token: "tok-a" } });
+    const response = await POST(request(JSON.stringify({ plate: "WRONG1" })), { params: Promise.resolve({ token: "tok-a" }) });
 
     expect(mocks.recordPlateAttempt).toHaveBeenCalledWith("tok-a");
     expect(response.status).toBe(403);
@@ -85,12 +85,12 @@ describe("POST /api/report/[token]/verify-plate", () => {
   });
 
   it("verifies the plate against this specific token's bike, not any other", async () => {
-    await POST(request(JSON.stringify({ plate: "AB12CDE" })), { params: { token: "tok-a" } });
+    await POST(request(JSON.stringify({ plate: "AB12CDE" })), { params: Promise.resolve({ token: "tok-a" }) });
     expect(mocks.verifyPlate).toHaveBeenCalledWith("tok-a", "AB12CDE");
   });
 
   it("grants access and sets the per-report cookie on a correct plate", async () => {
-    const response = await POST(request(JSON.stringify({ plate: "AB12CDE" })), { params: { token: "tok-a" } });
+    const response = await POST(request(JSON.stringify({ plate: "AB12CDE" })), { params: Promise.resolve({ token: "tok-a" }) });
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({ ok: true });
@@ -100,7 +100,7 @@ describe("POST /api/report/[token]/verify-plate", () => {
   });
 
   it("sets the access cookie as httpOnly, secure, sameSite lax, and path '/' so it also reaches /api/report/[token]/* calls", async () => {
-    const response = await POST(request(JSON.stringify({ plate: "AB12CDE" })), { params: { token: "tok-a" } });
+    const response = await POST(request(JSON.stringify({ plate: "AB12CDE" })), { params: Promise.resolve({ token: "tok-a" }) });
 
     const cookie = response.cookies.get("rv_report_abc123");
     expect(cookie?.httpOnly).toBe(true);
@@ -117,7 +117,7 @@ describe("POST /api/report/[token]/verify-plate", () => {
       maxAge: 100,
     });
 
-    const response = await POST(request(JSON.stringify({ plate: "AB12CDE" })), { params: { token: "tok-b" } });
+    const response = await POST(request(JSON.stringify({ plate: "AB12CDE" })), { params: Promise.resolve({ token: "tok-b" }) });
 
     expect(response.cookies.get("rv_report_abc123")).toBeUndefined();
     expect(response.cookies.get("rv_report_different_hash")?.value).toBe("other-raw-value");

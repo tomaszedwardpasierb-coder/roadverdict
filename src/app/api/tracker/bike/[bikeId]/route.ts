@@ -5,7 +5,8 @@ import { getBikesForUser, deleteBike, isBikeReadOnly, BIKE_READ_ONLY_MESSAGE } f
 
 export const dynamic = "force-dynamic";
 
-export async function DELETE(request: NextRequest, { params }: { params: { bikeId: string } }) {
+export async function DELETE(request: NextRequest, props: { params: Promise<{ bikeId: string }> }) {
+  const params = await props.params;
   const session = await getSession();
   if (!session) {
     return NextResponse.json({ error: "Not signed in." }, { status: 401 });

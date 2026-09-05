@@ -9,7 +9,8 @@ import { getBikeTransferRequestByToken, decideBikeTransferRequest } from "@/lib/
 
 export const dynamic = "force-dynamic";
 
-export async function POST(request: NextRequest, { params }: { params: { token: string } }) {
+export async function POST(request: NextRequest, props: { params: Promise<{ token: string }> }) {
+  const params = await props.params;
   const doc = await getBikeTransferRequestByToken(params.token);
   if (!doc) {
     return NextResponse.json({ error: "This offer doesn't exist or has expired." }, { status: 404 });

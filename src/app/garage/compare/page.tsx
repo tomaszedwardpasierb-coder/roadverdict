@@ -27,11 +27,12 @@ function toSingleValue(value: string | string[] | undefined): string | undefined
   return v ? v : undefined;
 }
 
-export default async function ComparePage({
-  searchParams,
-}: {
-  searchParams: { bikes?: string | string[]; from?: string | string[]; to?: string | string[] };
-}) {
+export default async function ComparePage(
+  props: {
+    searchParams: Promise<{ bikes?: string | string[]; from?: string | string[]; to?: string | string[] }>;
+  }
+) {
+  const searchParams = await props.searchParams;
   const session = await getSession();
   if (!session) redirect("/login");
 

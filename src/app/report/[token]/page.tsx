@@ -19,7 +19,8 @@ function fmtDate(d: string): string {
 // the verdict/upcoming-costs/questions work. The detailed report (its
 // own separate route) is the paid upsell: a distinct destination, not a
 // toggle on this page, so gating it later never means touching this one.
-export default async function SaleReportPage({ params }: { params: { token: string } }) {
+export default async function SaleReportPage(props: { params: Promise<{ token: string }> }) {
+  const params = await props.params;
   // Checked before deciding whether to show the plate gate, so a bogus
   // or expired token gets a real 404 immediately rather than a gate
   // form that would only fail later, once someone bothers to guess a plate.

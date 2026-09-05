@@ -55,7 +55,7 @@ describe("GET /api/tracker/report-attachment/[token]/[blobName]", () => {
 
   it("returns 404 for an invalid or expired share token, without even looking up records", async () => {
     mocks.resolveShareToken.mockResolvedValue(null);
-    const response = await GET(request(), { params: { token: "bad-token", blobName: "abc.jpg" } });
+    const response = await GET(request(), { params: Promise.resolve({ token: "bad-token", blobName: "abc.jpg" }) });
     expect(response.status).toBe(404);
     await expect(response.json()).resolves.toEqual({ error: "Invalid or expired link." });
     expect(mocks.getServiceRecords).not.toHaveBeenCalled();
@@ -63,7 +63,7 @@ describe("GET /api/tracker/report-attachment/[token]/[blobName]", () => {
 
   it("returns 404 when the blob doesn't belong to any record on this bike's report", async () => {
     mocks.getServiceRecords.mockResolvedValue([{ id: "sr-1", attachments: [{ blobName: "other.jpg" }] }]);
-    const response = await GET(request(), { params: { token: "t", blobName: "abc.jpg" } });
+    const response = await GET(request(), { params: Promise.resolve({ token: "t", blobName: "abc.jpg" }) });
     expect(response.status).toBe(404);
     expect(mocks.getAttachmentContainer).not.toHaveBeenCalled();
   });
@@ -71,7 +71,7 @@ describe("GET /api/tracker/report-attachment/[token]/[blobName]", () => {
   it("serves the blob when it belongs to an approved service record on this bike", async () => {
     mocks.getServiceRecords.mockResolvedValue([{ id: "sr-1", attachments: [{ blobName: "abc.jpg" }] }]);
     mocks.getReceiptRequestsForShareToken.mockResolvedValue([approvedRequestFor("sr-1")]);
-    const response = await GET(request(), { params: { token: "t", blobName: "abc.jpg" } });
+    const response = await GET(request(), { params: Promise.resolve({ token: "t", blobName: "abc.jpg" }) });
     expect(response.status).toBe(200);
     expect(response.headers.get("content-type")).toBe("image/jpeg");
   });
@@ -79,20 +79,20 @@ describe("GET /api/tracker/report-attachment/[token]/[blobName]", () => {
   it("serves the blob when it belongs to an approved mod", async () => {
     mocks.getMods.mockResolvedValue([{ id: "m-1", attachments: [{ blobName: "abc.jpg" }] }]);
     mocks.getReceiptRequestsForShareToken.mockResolvedValue([approvedRequestFor("m-1")]);
-    const response = await GET(request(), { params: { token: "t", blobName: "abc.jpg" } });
+    const response = await GET(request(), { params: Promise.resolve({ token: "t", blobName: "abc.jpg" }) });
     expect(response.status).toBe(200);
   });
 
   it("serves the blob when it belongs to an approved bill", async () => {
     mocks.getBills.mockResolvedValue([{ id: "bl-1", attachments: [{ blobName: "abc.jpg" }] }]);
     mocks.getReceiptRequestsForShareToken.mockResolvedValue([approvedRequestFor("bl-1")]);
-    const response = await GET(request(), { params: { token: "t", blobName: "abc.jpg" } });
+    const response = await GET(request(), { params: Promise.resolve({ token: "t", blobName: "abc.jpg" }) });
     expect(response.status).toBe(200);
   });
 
   it("copes with records that have no attachments array at all", async () => {
     mocks.getServiceRecords.mockResolvedValue([{ id: "sr-1", attachments: undefined }]);
-    const response = await GET(request(), { params: { token: "t", blobName: "abc.jpg" } });
+    const response = await GET(request(), { params: Promise.resolve({ token: "t", blobName: "abc.jpg" }) });
     expect(response.status).toBe(404);
   });
 
@@ -100,7 +100,7 @@ describe("GET /api/tracker/report-attachment/[token]/[blobName]", () => {
     mocks.getServiceRecords.mockResolvedValue([{ id: "sr-1", attachments: [{ blobName: "abc.jpg" }] }]);
     mocks.getReceiptRequestsForShareToken.mockResolvedValue([approvedRequestFor("sr-1")]);
     mocks.download.mockRejectedValue(new Error("BlobNotFound"));
-    const response = await GET(request(), { params: { token: "t", blobName: "abc.jpg" } });
+    const response = await GET(request(), { params: Promise.resolve({ token: "t", blobName: "abc.jpg" }) });
     expect(response.status).toBe(404);
   });
 
@@ -110,7 +110,7 @@ describe("GET /api/tracker/report-attachment/[token]/[blobName]", () => {
     const getBlockBlobClient = vi.fn(() => ({ download: mocks.download }));
     mocks.getAttachmentContainer.mockResolvedValue({ getBlockBlobClient });
 
-    const response = await GET(request(), { params: { token: "t", blobName: encodeURIComponent("has space.jpg") } });
+    const response = await GET(request(), { params: Promise.resolve({ token: "t", blobName: encodeURIComponent("has space.jpg") }) });
 
     expect(response.status).toBe(200);
     expect(getBlockBlobClient).toHaveBeenCalledWith("has space.jpg");
@@ -123,7 +123,7 @@ describe("GET /api/tracker/report-attachment/[token]/[blobName]", () => {
   it("returns 404 for a real attachment that has never been requested at all", async () => {
     mocks.getServiceRecords.mockResolvedValue([{ id: "sr-1", attachments: [{ blobName: "abc.jpg" }] }]);
     mocks.getReceiptRequestsForShareToken.mockResolvedValue([]);
-    const response = await GET(request(), { params: { token: "t", blobName: "abc.jpg" } });
+    const response = await GET(request(), { params: Promise.resolve({ token: "t", blobName: "abc.jpg" }) });
     expect(response.status).toBe(404);
     expect(mocks.getAttachmentContainer).not.toHaveBeenCalled();
   });
@@ -133,7 +133,7 @@ describe("GET /api/tracker/report-attachment/[token]/[blobName]", () => {
     mocks.getReceiptRequestsForShareToken.mockResolvedValue([
       { createdAt: "2025-06-01T00:00:00.000Z", items: [{ entryId: "sr-1", status: "pending" }] },
     ]);
-    const response = await GET(request(), { params: { token: "t", blobName: "abc.jpg" } });
+    const response = await GET(request(), { params: Promise.resolve({ token: "t", blobName: "abc.jpg" }) });
     expect(response.status).toBe(404);
   });
 
@@ -142,7 +142,7 @@ describe("GET /api/tracker/report-attachment/[token]/[blobName]", () => {
     mocks.getReceiptRequestsForShareToken.mockResolvedValue([
       { createdAt: "2025-06-01T00:00:00.000Z", items: [{ entryId: "sr-1", status: "declined" }] },
     ]);
-    const response = await GET(request(), { params: { token: "t", blobName: "abc.jpg" } });
+    const response = await GET(request(), { params: Promise.resolve({ token: "t", blobName: "abc.jpg" }) });
     expect(response.status).toBe(404);
   });
 
@@ -152,14 +152,14 @@ describe("GET /api/tracker/report-attachment/[token]/[blobName]", () => {
       { createdAt: "2025-01-01T00:00:00.000Z", items: [{ entryId: "sr-1", status: "declined" }] },
       { createdAt: "2025-06-01T00:00:00.000Z", items: [{ entryId: "sr-1", status: "approved" }] },
     ]);
-    const response = await GET(request(), { params: { token: "t", blobName: "abc.jpg" } });
+    const response = await GET(request(), { params: Promise.resolve({ token: "t", blobName: "abc.jpg" }) });
     expect(response.status).toBe(200);
   });
 
   it("does not let an approval on a different entry unlock this one's attachment", async () => {
     mocks.getServiceRecords.mockResolvedValue([{ id: "sr-1", attachments: [{ blobName: "abc.jpg" }] }]);
     mocks.getReceiptRequestsForShareToken.mockResolvedValue([approvedRequestFor("sr-OTHER")]);
-    const response = await GET(request(), { params: { token: "t", blobName: "abc.jpg" } });
+    const response = await GET(request(), { params: Promise.resolve({ token: "t", blobName: "abc.jpg" }) });
     expect(response.status).toBe(404);
   });
 });

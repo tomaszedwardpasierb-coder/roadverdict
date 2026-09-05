@@ -11,7 +11,8 @@ export const dynamic = "force-dynamic";
 // cancelled) - there's no "edit a series' terms" path. Ending stops all
 // future materialisation and clears the plan's renewal reminder, but
 // never touches instalments already written.
-export async function PATCH(request: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(request: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const session = await getSession();
   if (!session) {
     return NextResponse.json({ error: "Not signed in." }, { status: 401 });

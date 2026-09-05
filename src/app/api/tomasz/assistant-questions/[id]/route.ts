@@ -5,7 +5,8 @@ import { deleteAssistantQuestion } from "@/lib/tracker/assistantQuestionLog";
 
 export const dynamic = "force-dynamic";
 
-export async function DELETE(request: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(request: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const isAdmin = await getAdminSession();
   if (!isAdmin) {
     return NextResponse.json({ error: "Not signed in as admin." }, { status: 401 });

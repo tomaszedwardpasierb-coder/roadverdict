@@ -62,7 +62,8 @@ function fmtDate(d: string): string {
   return new Date(d).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
 }
 
-export default async function DetailedReportPage({ params }: { params: { token: string } }) {
+export default async function DetailedReportPage(props: { params: Promise<{ token: string }> }) {
+  const params = await props.params;
   const resolved = await resolveShareToken(params.token);
   if (!resolved) notFound();
 

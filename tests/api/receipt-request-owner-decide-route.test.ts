@@ -19,7 +19,7 @@ function request(body: string): NextRequest {
   });
 }
 
-const params = { requestId: "req-1" };
+const params = Promise.resolve({ requestId: "req-1" });
 
 describe("POST /api/tracker/receipt-request/[requestId]/decide", () => {
   beforeEach(() => {

@@ -4,7 +4,8 @@ import { verifyPlate, grantReportAccess, checkPlateRateLimit, recordPlateAttempt
 
 export const dynamic = "force-dynamic";
 
-export async function POST(req: NextRequest, { params }: { params: { token: string } }) {
+export async function POST(req: NextRequest, props: { params: Promise<{ token: string }> }) {
+  const params = await props.params;
   const { allowed } = await checkPlateRateLimit(params.token);
   if (!allowed) {
     return NextResponse.json(

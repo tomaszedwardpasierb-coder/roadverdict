@@ -24,14 +24,14 @@ describe("DELETE /api/tracker/share-link/[token]", () => {
 
   it("rejects unauthenticated requests", async () => {
     mocks.getSession.mockResolvedValue(null);
-    const response = await DELETE(req(), { params: { token: "tok-1" } });
+    const response = await DELETE(req(), { params: Promise.resolve({ token: "tok-1" }) });
     expect(response.status).toBe(401);
   });
 
   it("returns not found for a token that doesn't exist", async () => {
     mocks.getSession.mockResolvedValue({ email: "owner@example.com" });
     mocks.getShareLink.mockResolvedValue(null);
-    const response = await DELETE(req(), { params: { token: "bad" } });
+    const response = await DELETE(req(), { params: Promise.resolve({ token: "bad" }) });
     expect(response.status).toBe(404);
   });
 
@@ -43,7 +43,7 @@ describe("DELETE /api/tracker/share-link/[token]", () => {
     mocks.getSession.mockResolvedValue({ email: "attacker@example.com" });
     mocks.getShareLink.mockResolvedValue({ id: "tok-1", email: "owner@example.com" });
 
-    const response = await DELETE(req(), { params: { token: "tok-1" } });
+    const response = await DELETE(req(), { params: Promise.resolve({ token: "tok-1" }) });
 
     expect(response.status).toBe(404);
     await expect(response.json()).resolves.toEqual({ error: "Link not found." });
@@ -52,7 +52,7 @@ describe("DELETE /api/tracker/share-link/[token]", () => {
 
   it("deletes a valid, owned link", async () => {
     mocks.getSession.mockResolvedValue({ email: "owner@example.com" });
-    const response = await DELETE(req(), { params: { token: "tok-1" } });
+    const response = await DELETE(req(), { params: Promise.resolve({ token: "tok-1" }) });
     expect(response.status).toBe(200);
     expect(mocks.deleteShareLink).toHaveBeenCalledWith("tok-1");
   });

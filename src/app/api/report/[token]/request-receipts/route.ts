@@ -8,7 +8,8 @@ import { sendReceiptRequestEmail } from "@/lib/resend";
 
 export const dynamic = "force-dynamic";
 
-export async function POST(req: NextRequest, { params }: { params: { token: string } }) {
+export async function POST(req: NextRequest, props: { params: Promise<{ token: string }> }) {
+  const params = await props.params;
   // Never trust a request to name entries it hasn't already earned the
   // right to see the existence of - re-verify the plate gate server-side
   // rather than assume the client only calls this after passing it.

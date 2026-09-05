@@ -35,13 +35,13 @@ describe("PATCH /api/tracker/reminders/[id] (mark done)", () => {
 
   it("rejects unauthenticated requests", async () => {
     mocks.getSession.mockResolvedValue(null);
-    const response = await PATCH(request(), { params: { id: ownId } });
+    const response = await PATCH(request(), { params: Promise.resolve({ id: ownId }) });
     expect(response.status).toBe(401);
   });
 
   it("refuses an id prefixed with a different owner's email, without ever calling updateReminder", async () => {
     mocks.getSession.mockResolvedValue({ email: "owner@example.com" });
-    const response = await PATCH(request(), { params: { id: "attacker@example.com::reminder::x" } });
+    const response = await PATCH(request(), { params: Promise.resolve({ id: "attacker@example.com::reminder::x" }) });
     expect(response.status).toBe(404);
     expect(mocks.updateReminder).not.toHaveBeenCalled();
   });
@@ -49,7 +49,7 @@ describe("PATCH /api/tracker/reminders/[id] (mark done)", () => {
   it("blocks marking a reminder done on a transferred vehicle", async () => {
     mocks.getSession.mockResolvedValue({ email: "owner@example.com" });
     mocks.isBikeReadOnly.mockReturnValue(true);
-    const response = await PATCH(request(), { params: { id: ownId } });
+    const response = await PATCH(request(), { params: Promise.resolve({ id: ownId }) });
     expect(response.status).toBe(403);
     expect(mocks.updateReminder).not.toHaveBeenCalled();
   });
@@ -61,7 +61,7 @@ describe("PATCH /api/tracker/reminders/[id] (mark done)", () => {
     mocks.getSession.mockResolvedValue({ email: "owner@example.com" });
     const todayIso = new Date().toISOString().slice(0, 10);
 
-    await PATCH(request(), { params: { id: ownId } });
+    await PATCH(request(), { params: Promise.resolve({ id: ownId }) });
 
     expect(mocks.updateReminder).toHaveBeenCalledWith("owner@example.com", ownId, {
       baseMileage: 8000,
@@ -72,7 +72,7 @@ describe("PATCH /api/tracker/reminders/[id] (mark done)", () => {
   it("returns not found when the reminder itself doesn't exist", async () => {
     mocks.getSession.mockResolvedValue({ email: "owner@example.com" });
     mocks.updateReminder.mockResolvedValue(null);
-    const response = await PATCH(request(), { params: { id: ownId } });
+    const response = await PATCH(request(), { params: Promise.resolve({ id: ownId }) });
     expect(response.status).toBe(404);
   });
 });
@@ -86,13 +86,13 @@ describe("DELETE /api/tracker/reminders/[id]", () => {
 
   it("rejects unauthenticated requests", async () => {
     mocks.getSession.mockResolvedValue(null);
-    const response = await DELETE(request(), { params: { id: ownId } });
+    const response = await DELETE(request(), { params: Promise.resolve({ id: ownId }) });
     expect(response.status).toBe(401);
   });
 
   it("refuses an id prefixed with a different owner's email", async () => {
     mocks.getSession.mockResolvedValue({ email: "owner@example.com" });
-    const response = await DELETE(request(), { params: { id: "attacker@example.com::reminder::x" } });
+    const response = await DELETE(request(), { params: Promise.resolve({ id: "attacker@example.com::reminder::x" }) });
     expect(response.status).toBe(404);
     expect(mocks.deleteReminder).not.toHaveBeenCalled();
   });
@@ -100,13 +100,13 @@ describe("DELETE /api/tracker/reminders/[id]", () => {
   it("blocks deleting a reminder on a transferred vehicle", async () => {
     mocks.getSession.mockResolvedValue({ email: "owner@example.com" });
     mocks.isBikeReadOnly.mockReturnValue(true);
-    const response = await DELETE(request(), { params: { id: ownId } });
+    const response = await DELETE(request(), { params: Promise.resolve({ id: ownId }) });
     expect(response.status).toBe(403);
   });
 
   it("deletes a valid, owned reminder", async () => {
     mocks.getSession.mockResolvedValue({ email: "owner@example.com" });
-    const response = await DELETE(request(), { params: { id: ownId } });
+    const response = await DELETE(request(), { params: Promise.resolve({ id: ownId }) });
     expect(response.status).toBe(200);
     expect(mocks.deleteReminder).toHaveBeenCalledWith("owner@example.com", ownId);
   });

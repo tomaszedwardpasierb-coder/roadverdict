@@ -158,11 +158,12 @@ function Sparkline({ values, danger }: { values: number[]; danger?: boolean }) {
   );
 }
 
-export default async function AdminDashboardPage({
-  searchParams,
-}: {
-  searchParams: { hours?: string };
-}) {
+export default async function AdminDashboardPage(
+  props: {
+    searchParams: Promise<{ hours?: string }>;
+  }
+) {
+  const searchParams = await props.searchParams;
   const isAdmin = await getAdminSession();
   if (!isAdmin) redirect('/tomasz/login');
 

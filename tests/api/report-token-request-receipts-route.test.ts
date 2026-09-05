@@ -57,7 +57,7 @@ describe("POST /api/report/[token]/request-receipts", () => {
   it("rejects when the plate gate hasn't been passed, without resolving the token at all", async () => {
     mocks.hasReportAccess.mockResolvedValue(false);
 
-    const response = await POST(request(JSON.stringify({ entryIds: ["sr-1"] })), { params: { token: "tok-a" } });
+    const response = await POST(request(JSON.stringify({ entryIds: ["sr-1"] })), { params: Promise.resolve({ token: "tok-a" }) });
 
     expect(response.status).toBe(403);
     await expect(response.json()).resolves.toEqual({ error: "Please verify the registration first." });
@@ -67,20 +67,20 @@ describe("POST /api/report/[token]/request-receipts", () => {
   it("returns 404 for an invalid or expired share token", async () => {
     mocks.resolveShareToken.mockResolvedValue(null);
 
-    const response = await POST(request(JSON.stringify({ entryIds: ["sr-1"] })), { params: { token: "tok-a" } });
+    const response = await POST(request(JSON.stringify({ entryIds: ["sr-1"] })), { params: Promise.resolve({ token: "tok-a" }) });
 
     expect(response.status).toBe(404);
     await expect(response.json()).resolves.toEqual({ error: "This link is no longer valid." });
   });
 
   it("rejects malformed JSON", async () => {
-    const response = await POST(request("not-json"), { params: { token: "tok-a" } });
+    const response = await POST(request("not-json"), { params: Promise.resolve({ token: "tok-a" }) });
     expect(response.status).toBe(400);
     await expect(response.json()).resolves.toEqual({ error: "Invalid request." });
   });
 
   it("rejects a missing or empty entryIds array", async () => {
-    const response = await POST(request(JSON.stringify({ entryIds: [] })), { params: { token: "tok-a" } });
+    const response = await POST(request(JSON.stringify({ entryIds: [] })), { params: Promise.resolve({ token: "tok-a" }) });
     expect(response.status).toBe(400);
     await expect(response.json()).resolves.toEqual({ error: "Please select at least one entry." });
   });
@@ -88,7 +88,7 @@ describe("POST /api/report/[token]/request-receipts", () => {
   it("rejects entryIds that don't belong to any row on this token's own report (cross-report/guessed ids)", async () => {
     const response = await POST(
       request(JSON.stringify({ entryIds: ["some-other-report-entry-id"] })),
-      { params: { token: "tok-a" } }
+      { params: Promise.resolve({ token: "tok-a" }) }
     );
 
     expect(response.status).toBe(400);
@@ -99,9 +99,7 @@ describe("POST /api/report/[token]/request-receipts", () => {
   });
 
   it("rejects entries that have no attachment", async () => {
-    const response = await POST(request(JSON.stringify({ entryIds: ["no-attachment-1"] })), {
-      params: { token: "tok-a" },
-    });
+    const response = await POST(request(JSON.stringify({ entryIds: ["no-attachment-1"] })), { params: Promise.resolve({ token: "tok-a" }) });
     expect(response.status).toBe(400);
     expect(mocks.createReceiptRequest).not.toHaveBeenCalled();
   });
@@ -112,14 +110,14 @@ describe("POST /api/report/[token]/request-receipts", () => {
       entryRequestStatus: { "sr-1": { status: "pending" } },
     });
 
-    const response = await POST(request(JSON.stringify({ entryIds: ["sr-1"] })), { params: { token: "tok-a" } });
+    const response = await POST(request(JSON.stringify({ entryIds: ["sr-1"] })), { params: Promise.resolve({ token: "tok-a" }) });
 
     expect(response.status).toBe(400);
     expect(mocks.createReceiptRequest).not.toHaveBeenCalled();
   });
 
   it("creates a request scoped to this token's own owner email, bike id and share token", async () => {
-    await POST(request(JSON.stringify({ entryIds: ["sr-1"] })), { params: { token: "tok-a" } });
+    await POST(request(JSON.stringify({ entryIds: ["sr-1"] })), { params: Promise.resolve({ token: "tok-a" }) });
 
     expect(mocks.createReceiptRequest).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -132,7 +130,7 @@ describe("POST /api/report/[token]/request-receipts", () => {
   });
 
   it("maps categories from the report row labels to the internal category enum", async () => {
-    await POST(request(JSON.stringify({ entryIds: ["sr-1", "mod-1"] })), { params: { token: "tok-a" } });
+    await POST(request(JSON.stringify({ entryIds: ["sr-1", "mod-1"] })), { params: Promise.resolve({ token: "tok-a" }) });
 
     const items = mocks.createReceiptRequest.mock.calls[0][0].items;
     expect(items).toEqual(
@@ -146,15 +144,13 @@ describe("POST /api/report/[token]/request-receipts", () => {
   it("truncates an overly long buyer message to 500 characters", async () => {
     const longMessage = "x".repeat(600);
 
-    await POST(request(JSON.stringify({ entryIds: ["sr-1"], buyerMessage: longMessage })), {
-      params: { token: "tok-a" },
-    });
+    await POST(request(JSON.stringify({ entryIds: ["sr-1"], buyerMessage: longMessage })), { params: Promise.resolve({ token: "tok-a" }) });
 
     expect(mocks.createReceiptRequest.mock.calls[0][0].buyerMessage).toHaveLength(500);
   });
 
   it("leaves buyerMessage undefined when it isn't a string", async () => {
-    await POST(request(JSON.stringify({ entryIds: ["sr-1"], buyerMessage: 12345 })), { params: { token: "tok-a" } });
+    await POST(request(JSON.stringify({ entryIds: ["sr-1"], buyerMessage: 12345 })), { params: Promise.resolve({ token: "tok-a" }) });
 
     expect(mocks.createReceiptRequest.mock.calls[0][0].buyerMessage).toBeUndefined();
   });
@@ -162,16 +158,14 @@ describe("POST /api/report/[token]/request-receipts", () => {
   it("still succeeds and returns the count even when the notification email fails to send", async () => {
     mocks.sendReceiptRequestEmail.mockRejectedValue(new Error("Resend is down"));
 
-    const response = await POST(request(JSON.stringify({ entryIds: ["sr-1"] })), { params: { token: "tok-a" } });
+    const response = await POST(request(JSON.stringify({ entryIds: ["sr-1"] })), { params: Promise.resolve({ token: "tok-a" }) });
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({ ok: true, requested: 1 });
   });
 
   it("returns the number of entries actually requested", async () => {
-    const response = await POST(request(JSON.stringify({ entryIds: ["sr-1", "mod-1"] })), {
-      params: { token: "tok-a" },
-    });
+    const response = await POST(request(JSON.stringify({ entryIds: ["sr-1", "mod-1"] })), { params: Promise.resolve({ token: "tok-a" }) });
 
     await expect(response.json()).resolves.toEqual({ ok: true, requested: 2 });
   });

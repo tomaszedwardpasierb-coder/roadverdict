@@ -28,7 +28,11 @@ async function streamToBuffer(readableStream: NodeJS.ReadableStream | undefined)
 // server-side. Otherwise the real blobName sitting in the report page's
 // own props for every row - approved or not - would let anyone who reads
 // the page's HTML fetch a receipt the owner never agreed to share.
-export async function GET(request: NextRequest, { params }: { params: { token: string; blobName: string } }) {
+export async function GET(
+  request: NextRequest,
+  props: { params: Promise<{ token: string; blobName: string }> }
+) {
+  const params = await props.params;
   const resolved = await resolveShareToken(params.token);
   if (!resolved) {
     return NextResponse.json({ error: "Invalid or expired link." }, { status: 404 });

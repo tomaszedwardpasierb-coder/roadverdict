@@ -6,7 +6,8 @@ export const dynamic = "force-dynamic";
 
 const VALID_NAMES = new Set(["update-fuel-price", "check-reminders", "backfill-bike-id", "delete-expired-share-links", "audit-mileage", "purge-orphaned-receipt-requests", "update-exchange-rates", "send-history-follow-ups", "backfill-users", "seed-assistant-config", "purge-stale-data"]);
 
-export async function POST(request: Request, { params }: { params: { name: string } }) {
+export async function POST(request: Request, props: { params: Promise<{ name: string }> }) {
+  const params = await props.params;
   const isAdmin = await getAdminSession();
   if (!isAdmin) {
     return NextResponse.json({ error: "Not signed in." }, { status: 401 });

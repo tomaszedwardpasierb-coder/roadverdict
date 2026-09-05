@@ -30,7 +30,7 @@ describe("POST /api/admin/run-cron/[name]", () => {
   it("rejects a request with no admin session, and never touches the cron endpoint", async () => {
     mocks.getAdminSession.mockResolvedValue(false);
 
-    const response = await POST(req(), { params: { name: VALID_NAME } });
+    const response = await POST(req(), { params: Promise.resolve({ name: VALID_NAME }) });
 
     expect(response.status).toBe(401);
     await expect(response.json()).resolves.toEqual({ error: "Not signed in." });
@@ -40,7 +40,7 @@ describe("POST /api/admin/run-cron/[name]", () => {
   it("rejects an unknown cron name even for an authenticated admin", async () => {
     mocks.getAdminSession.mockResolvedValue(true);
 
-    const response = await POST(req(), { params: { name: "not-a-real-cron" } });
+    const response = await POST(req(), { params: Promise.resolve({ name: "not-a-real-cron" }) });
 
     expect(response.status).toBe(400);
     await expect(response.json()).resolves.toEqual({ error: "Unknown cron." });
@@ -54,7 +54,7 @@ describe("POST /api/admin/run-cron/[name]", () => {
   it("rejects a path-traversal-shaped cron name", async () => {
     mocks.getAdminSession.mockResolvedValue(true);
 
-    const response = await POST(req(), { params: { name: "../cron-secrets" } });
+    const response = await POST(req(), { params: Promise.resolve({ name: "../cron-secrets" }) });
 
     expect(response.status).toBe(400);
     expect(fetchMock).not.toHaveBeenCalled();
@@ -63,7 +63,7 @@ describe("POST /api/admin/run-cron/[name]", () => {
   it("rejects a cron name that only partially matches a real one", async () => {
     mocks.getAdminSession.mockResolvedValue(true);
 
-    const response = await POST(req(), { params: { name: "update-fuel-price-extra" } });
+    const response = await POST(req(), { params: Promise.resolve({ name: "update-fuel-price-extra" }) });
 
     expect(response.status).toBe(400);
     expect(fetchMock).not.toHaveBeenCalled();
@@ -75,7 +75,7 @@ describe("POST /api/admin/run-cron/[name]", () => {
     process.env.CRON_SECRET = "test-cron-secret";
 
     try {
-      const response = await POST(req(), { params: { name: VALID_NAME } });
+      const response = await POST(req(), { params: Promise.resolve({ name: VALID_NAME }) });
 
       expect(fetchMock).toHaveBeenCalledWith(
         `https://roadverdict.co.uk/api/cron/${VALID_NAME}`,
@@ -98,7 +98,7 @@ describe("POST /api/admin/run-cron/[name]", () => {
       json: async () => ({ error: "cron failed" }),
     });
 
-    const response = await POST(req(), { params: { name: VALID_NAME } });
+    const response = await POST(req(), { params: Promise.resolve({ name: VALID_NAME }) });
 
     expect(response.status).toBe(500);
     await expect(response.json()).resolves.toEqual({ error: "cron failed" });

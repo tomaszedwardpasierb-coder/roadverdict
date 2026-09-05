@@ -33,7 +33,7 @@ describe("DELETE /api/tracker/bike/[bikeId]", () => {
 
   it("rejects unauthenticated requests", async () => {
     mocks.getSession.mockResolvedValue(null);
-    const response = await DELETE(request(), { params: { bikeId: ownBikeId } });
+    const response = await DELETE(request(), { params: Promise.resolve({ bikeId: ownBikeId }) });
     expect(response.status).toBe(401);
     expect(mocks.deleteBike).not.toHaveBeenCalled();
   });
@@ -42,7 +42,7 @@ describe("DELETE /api/tracker/bike/[bikeId]", () => {
     mocks.getSession.mockResolvedValue({ email: "owner@example.com" });
     mocks.getBikesForUser.mockResolvedValue([{ id: "some-other-bike", transferredTo: undefined }]);
 
-    const response = await DELETE(request(), { params: { bikeId: ownBikeId } });
+    const response = await DELETE(request(), { params: Promise.resolve({ bikeId: ownBikeId }) });
 
     expect(response.status).toBe(404);
     await expect(response.json()).resolves.toEqual({ error: "Bike not found on this account." });
@@ -53,7 +53,7 @@ describe("DELETE /api/tracker/bike/[bikeId]", () => {
     mocks.getSession.mockResolvedValue({ email: "owner@example.com" });
     const encoded = encodeURIComponent(ownBikeId);
 
-    const response = await DELETE(request(), { params: { bikeId: encoded } });
+    const response = await DELETE(request(), { params: Promise.resolve({ bikeId: encoded }) });
 
     expect(response.status).toBe(200);
     expect(mocks.deleteBike).toHaveBeenCalledWith("owner@example.com", ownBikeId);
@@ -63,7 +63,7 @@ describe("DELETE /api/tracker/bike/[bikeId]", () => {
     mocks.getSession.mockResolvedValue({ email: "owner@example.com" });
     mocks.isBikeReadOnly.mockReturnValue(true);
 
-    const response = await DELETE(request(), { params: { bikeId: ownBikeId } });
+    const response = await DELETE(request(), { params: Promise.resolve({ bikeId: ownBikeId }) });
 
     expect(response.status).toBe(403);
     await expect(response.json()).resolves.toEqual({
@@ -75,7 +75,7 @@ describe("DELETE /api/tracker/bike/[bikeId]", () => {
   it("deletes the bike and returns ok when it belongs to the account and isn't read-only", async () => {
     mocks.getSession.mockResolvedValue({ email: "owner@example.com" });
 
-    const response = await DELETE(request(), { params: { bikeId: ownBikeId } });
+    const response = await DELETE(request(), { params: Promise.resolve({ bikeId: ownBikeId }) });
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({ ok: true });

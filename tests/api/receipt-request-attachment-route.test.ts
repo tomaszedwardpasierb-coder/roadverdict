@@ -40,7 +40,7 @@ describe("GET /api/report/receipt-request/attachment/[decisionToken]/[blobName]"
   it("returns not found for a token that doesn't resolve to a real request", async () => {
     mocks.getReceiptRequestByDecisionToken.mockResolvedValue(null);
 
-    const response = await GET(req(), { params: { decisionToken: "bad-token", blobName: "anything.jpg" } });
+    const response = await GET(req(), { params: Promise.resolve({ decisionToken: "bad-token", blobName: "anything.jpg" }) });
 
     expect(response.status).toBe(404);
     await expect(response.json()).resolves.toEqual({ error: "This request is no longer available." });
@@ -55,9 +55,7 @@ describe("GET /api/report/receipt-request/attachment/[decisionToken]/[blobName]"
   it("refuses a blob name that isn't actually one of this request's own items", async () => {
     mocks.getReceiptRequestByDecisionToken.mockResolvedValue(requestDocWithAttachment);
 
-    const response = await GET(req(), {
-      params: { decisionToken: "tok-1", blobName: "receipts/someone-elses-request.jpg" },
-    });
+    const response = await GET(req(), { params: Promise.resolve({ decisionToken: "tok-1", blobName: "receipts/someone-elses-request.jpg" }) });
 
     expect(response.status).toBe(404);
     await expect(response.json()).resolves.toEqual({ error: "Attachment not found." });
@@ -70,7 +68,7 @@ describe("GET /api/report/receipt-request/attachment/[decisionToken]/[blobName]"
     // e2 exists on the request but was never given a blobName, so there's
     // no legitimate value to even attempt matching against here - this
     // just confirms the missing-attachment branch, not a real lookup.
-    const response = await GET(req(), { params: { decisionToken: "tok-1", blobName: "e2" } });
+    const response = await GET(req(), { params: Promise.resolve({ decisionToken: "tok-1", blobName: "e2" }) });
 
     expect(response.status).toBe(404);
     await expect(response.json()).resolves.toEqual({ error: "Attachment not found." });
@@ -83,9 +81,7 @@ describe("GET /api/report/receipt-request/attachment/[decisionToken]/[blobName]"
       contentType: "image/jpeg",
     });
 
-    const response = await GET(req(), {
-      params: { decisionToken: "tok-1", blobName: encodeURIComponent("receipts/e1-invoice.jpg") },
-    });
+    const response = await GET(req(), { params: Promise.resolve({ decisionToken: "tok-1", blobName: encodeURIComponent("receipts/e1-invoice.jpg") }) });
 
     expect(response.status).toBe(200);
     expect(mockContainer.getBlockBlobClient).toHaveBeenCalledWith("receipts/e1-invoice.jpg");
@@ -98,7 +94,7 @@ describe("GET /api/report/receipt-request/attachment/[decisionToken]/[blobName]"
       contentType: "image/jpeg",
     });
 
-    const response = await GET(req(), { params: { decisionToken: "tok-1", blobName: "receipts/e1-invoice.jpg" } });
+    const response = await GET(req(), { params: Promise.resolve({ decisionToken: "tok-1", blobName: "receipts/e1-invoice.jpg" }) });
 
     expect(response.status).toBe(200);
     expect(response.headers.get("Content-Type")).toBe("image/jpeg");
@@ -115,7 +111,7 @@ describe("GET /api/report/receipt-request/attachment/[decisionToken]/[blobName]"
       contentType: undefined,
     });
 
-    const response = await GET(req(), { params: { decisionToken: "tok-1", blobName: "receipts/e1-invoice.jpg" } });
+    const response = await GET(req(), { params: Promise.resolve({ decisionToken: "tok-1", blobName: "receipts/e1-invoice.jpg" }) });
 
     expect(response.headers.get("Content-Type")).toBe("application/octet-stream");
   });
@@ -127,7 +123,7 @@ describe("GET /api/report/receipt-request/attachment/[decisionToken]/[blobName]"
     mocks.getReceiptRequestByDecisionToken.mockResolvedValue(requestDocWithAttachment);
     mocks.download.mockRejectedValue(new Error("blob storage unavailable"));
 
-    const response = await GET(req(), { params: { decisionToken: "tok-1", blobName: "receipts/e1-invoice.jpg" } });
+    const response = await GET(req(), { params: Promise.resolve({ decisionToken: "tok-1", blobName: "receipts/e1-invoice.jpg" }) });
 
     expect(response.status).toBe(404);
     await expect(response.json()).resolves.toEqual({ error: "Attachment not found." });

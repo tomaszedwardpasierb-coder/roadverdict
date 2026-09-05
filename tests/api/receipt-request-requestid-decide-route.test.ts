@@ -48,21 +48,19 @@ beforeEach(() => {
 describe("POST /api/tracker/receipt-request/[requestId]/decide", () => {
   it("rejects unauthenticated requests", async () => {
     mocks.getSession.mockResolvedValue(null);
-    const response = await POST(request(requestId, { decision: "approved" }), {
-      params: { requestId },
-    });
+    const response = await POST(request(requestId, { decision: "approved" }), { params: Promise.resolve({ requestId }) });
     expect(response.status).toBe(401);
     expect(mocks.decideReceiptRequestItems).not.toHaveBeenCalled();
   });
 
   it("returns 400 for malformed JSON", async () => {
-    const response = await POST(badRequest(requestId), { params: { requestId } });
+    const response = await POST(badRequest(requestId), { params: Promise.resolve({ requestId }) });
     expect(response.status).toBe(400);
     expect(mocks.decideReceiptRequestItems).not.toHaveBeenCalled();
   });
 
   it("returns 400 when decision is missing", async () => {
-    const response = await POST(request(requestId, {}), { params: { requestId } });
+    const response = await POST(request(requestId, {}), { params: Promise.resolve({ requestId }) });
     expect(response.status).toBe(400);
     expect(mocks.decideReceiptRequestItems).not.toHaveBeenCalled();
   });
@@ -70,7 +68,7 @@ describe("POST /api/tracker/receipt-request/[requestId]/decide", () => {
   it("returns 400 when decision is not a recognised value", async () => {
     const response = await POST(
       request(requestId, { decision: "maybe" }),
-      { params: { requestId } }
+      { params: Promise.resolve({ requestId }) }
     );
     expect(response.status).toBe(400);
     expect(mocks.decideReceiptRequestItems).not.toHaveBeenCalled();
@@ -79,7 +77,7 @@ describe("POST /api/tracker/receipt-request/[requestId]/decide", () => {
   it("accepts 'approved' as a valid decision", async () => {
     const response = await POST(
       request(requestId, { decision: "approved" }),
-      { params: { requestId } }
+      { params: Promise.resolve({ requestId }) }
     );
     expect(response.status).toBe(200);
   });
@@ -87,7 +85,7 @@ describe("POST /api/tracker/receipt-request/[requestId]/decide", () => {
   it("accepts 'declined' as a valid decision", async () => {
     const response = await POST(
       request(requestId, { decision: "declined" }),
-      { params: { requestId } }
+      { params: Promise.resolve({ requestId }) }
     );
     expect(response.status).toBe(200);
   });
@@ -95,7 +93,7 @@ describe("POST /api/tracker/receipt-request/[requestId]/decide", () => {
   it("accepts 'pending' as a valid decision", async () => {
     const response = await POST(
       request(requestId, { decision: "pending" }),
-      { params: { requestId } }
+      { params: Promise.resolve({ requestId }) }
     );
     expect(response.status).toBe(200);
   });
@@ -104,7 +102,7 @@ describe("POST /api/tracker/receipt-request/[requestId]/decide", () => {
     mocks.decideReceiptRequestItems.mockResolvedValue(null);
     const response = await POST(
       request(requestId, { decision: "approved" }),
-      { params: { requestId } }
+      { params: Promise.resolve({ requestId }) }
     );
     expect(response.status).toBe(404);
   });
@@ -112,14 +110,14 @@ describe("POST /api/tracker/receipt-request/[requestId]/decide", () => {
   it("returns ok:true and the updated items on success", async () => {
     const response = await POST(
       request(requestId, { decision: "approved" }),
-      { params: { requestId } }
+      { params: Promise.resolve({ requestId }) }
     );
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({ ok: true, items: updatedItems });
   });
 
   it("defaults entryIds to 'all' when not provided", async () => {
-    await POST(request(requestId, { decision: "approved" }), { params: { requestId } });
+    await POST(request(requestId, { decision: "approved" }), { params: Promise.resolve({ requestId }) });
     expect(mocks.decideReceiptRequestItems).toHaveBeenCalledWith(
       requestId,
       email,
@@ -133,7 +131,7 @@ describe("POST /api/tracker/receipt-request/[requestId]/decide", () => {
     const entryIds = ["entry-1", "entry-2"];
     await POST(
       request(requestId, { decision: "declined", entryIds }),
-      { params: { requestId } }
+      { params: Promise.resolve({ requestId }) }
     );
     expect(mocks.decideReceiptRequestItems).toHaveBeenCalledWith(
       requestId,
@@ -147,7 +145,7 @@ describe("POST /api/tracker/receipt-request/[requestId]/decide", () => {
   it("passes through a reason when provided", async () => {
     await POST(
       request(requestId, { decision: "declined", reason: "Not my bike" }),
-      { params: { requestId } }
+      { params: Promise.resolve({ requestId }) }
     );
     expect(mocks.decideReceiptRequestItems).toHaveBeenCalledWith(
       requestId,
@@ -159,7 +157,7 @@ describe("POST /api/tracker/receipt-request/[requestId]/decide", () => {
   });
 
   it("uses the requestId from the route params, not anything in the body", async () => {
-    await POST(request(requestId, { decision: "approved" }), { params: { requestId } });
+    await POST(request(requestId, { decision: "approved" }), { params: Promise.resolve({ requestId }) });
     // Just assert the first arg is the route param — the rest are already
     // covered by the specific passing tests above.
     const firstArg = mocks.decideReceiptRequestItems.mock.calls[0][0];

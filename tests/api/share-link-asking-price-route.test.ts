@@ -32,13 +32,13 @@ describe("POST /api/tracker/share-link/[token]/asking-price", () => {
 
   it("rejects unauthenticated requests", async () => {
     mocks.getSession.mockResolvedValue(null);
-    const response = await POST(req("{}"), { params: { token: "tok-1" } });
+    const response = await POST(req("{}"), { params: Promise.resolve({ token: "tok-1" }) });
     expect(response.status).toBe(401);
   });
 
   it("returns not found for a link belonging to someone else, the identical response as nonexistent", async () => {
     mocks.getSession.mockResolvedValue({ email: "attacker@example.com" });
-    const response = await POST(req(JSON.stringify({ askingPrice: 4500 })), { params: { token: "tok-1" } });
+    const response = await POST(req(JSON.stringify({ askingPrice: 4500 })), { params: Promise.resolve({ token: "tok-1" }) });
     expect(response.status).toBe(404);
   });
 
@@ -48,27 +48,27 @@ describe("POST /api/tracker/share-link/[token]/asking-price", () => {
   // a 400, since the request never gets that far.
   it("checks ownership before ever reading the body, so malformed JSON on someone else's link still returns 404", async () => {
     mocks.getSession.mockResolvedValue({ email: "attacker@example.com" });
-    const response = await POST(req("not-json"), { params: { token: "tok-1" } });
+    const response = await POST(req("not-json"), { params: Promise.resolve({ token: "tok-1" }) });
     expect(response.status).toBe(404);
   });
 
   it("rejects malformed JSON on a genuinely owned link", async () => {
     mocks.getSession.mockResolvedValue({ email: "owner@example.com" });
-    const response = await POST(req("not-json"), { params: { token: "tok-1" } });
+    const response = await POST(req("not-json"), { params: Promise.resolve({ token: "tok-1" }) });
     expect(response.status).toBe(400);
   });
 
   it("rejects a non-positive or non-finite asking price", async () => {
     mocks.getSession.mockResolvedValue({ email: "owner@example.com" });
-    expect((await POST(req(JSON.stringify({ askingPrice: -50 })), { params: { token: "tok-1" } })).status).toBe(400);
-    expect((await POST(req(JSON.stringify({ askingPrice: 0 })), { params: { token: "tok-1" } })).status).toBe(400);
-    expect((await POST(req(JSON.stringify({ askingPrice: "5000" })), { params: { token: "tok-1" } })).status).toBe(400);
+    expect((await POST(req(JSON.stringify({ askingPrice: -50 })), { params: Promise.resolve({ token: "tok-1" }) })).status).toBe(400);
+    expect((await POST(req(JSON.stringify({ askingPrice: 0 })), { params: Promise.resolve({ token: "tok-1" }) })).status).toBe(400);
+    expect((await POST(req(JSON.stringify({ askingPrice: "5000" })), { params: Promise.resolve({ token: "tok-1" }) })).status).toBe(400);
   });
 
   it("rejects an asking price above the sanity ceiling, accepts one exactly at it", async () => {
     mocks.getSession.mockResolvedValue({ email: "owner@example.com" });
-    expect((await POST(req(JSON.stringify({ askingPrice: 200001 })), { params: { token: "tok-1" } })).status).toBe(400);
-    expect((await POST(req(JSON.stringify({ askingPrice: 200000 })), { params: { token: "tok-1" } })).status).toBe(200);
+    expect((await POST(req(JSON.stringify({ askingPrice: 200001 })), { params: Promise.resolve({ token: "tok-1" }) })).status).toBe(400);
+    expect((await POST(req(JSON.stringify({ askingPrice: 200000 })), { params: Promise.resolve({ token: "tok-1" }) })).status).toBe(200);
   });
 
   // Deliberately not an error case - clearing a previously-set price is
@@ -76,17 +76,17 @@ describe("POST /api/tracker/share-link/[token]/asking-price", () => {
   it("treats an explicit null the same as an omitted field: clears the price rather than rejecting it", async () => {
     mocks.getSession.mockResolvedValue({ email: "owner@example.com" });
 
-    await POST(req(JSON.stringify({ askingPrice: null })), { params: { token: "tok-1" } });
+    await POST(req(JSON.stringify({ askingPrice: null })), { params: Promise.resolve({ token: "tok-1" }) });
     expect(mocks.updateShareLinkAskingPrice).toHaveBeenCalledWith("tok-1", null);
 
     mocks.updateShareLinkAskingPrice.mockClear();
-    await POST(req(JSON.stringify({})), { params: { token: "tok-1" } });
+    await POST(req(JSON.stringify({})), { params: Promise.resolve({ token: "tok-1" }) });
     expect(mocks.updateShareLinkAskingPrice).toHaveBeenCalledWith("tok-1", null);
   });
 
   it("updates a valid asking price", async () => {
     mocks.getSession.mockResolvedValue({ email: "owner@example.com" });
-    const response = await POST(req(JSON.stringify({ askingPrice: 4500 })), { params: { token: "tok-1" } });
+    const response = await POST(req(JSON.stringify({ askingPrice: 4500 })), { params: Promise.resolve({ token: "tok-1" }) });
     expect(mocks.updateShareLinkAskingPrice).toHaveBeenCalledWith("tok-1", 4500);
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({ askingPrice: 4500 });
@@ -95,7 +95,7 @@ describe("POST /api/tracker/share-link/[token]/asking-price", () => {
   it("returns not found if the link vanishes between the ownership check and the update itself", async () => {
     mocks.getSession.mockResolvedValue({ email: "owner@example.com" });
     mocks.updateShareLinkAskingPrice.mockResolvedValue(null);
-    const response = await POST(req(JSON.stringify({ askingPrice: 4500 })), { params: { token: "tok-1" } });
+    const response = await POST(req(JSON.stringify({ askingPrice: 4500 })), { params: Promise.resolve({ token: "tok-1" }) });
     expect(response.status).toBe(404);
   });
 });

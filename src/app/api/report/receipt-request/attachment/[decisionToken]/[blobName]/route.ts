@@ -19,7 +19,11 @@ async function streamToBuffer(readableStream: NodeJS.ReadableStream | undefined)
 // makes this safe is that a blobName is only ever served if it's one of
 // the specific items this exact request asked about; the decision token
 // doesn't grant access to any other attachment anywhere.
-export async function GET(request: NextRequest, { params }: { params: { decisionToken: string; blobName: string } }) {
+export async function GET(
+  request: NextRequest,
+  props: { params: Promise<{ decisionToken: string; blobName: string }> }
+) {
+  const params = await props.params;
   const requestDoc = await getReceiptRequestByDecisionToken(params.decisionToken);
   if (!requestDoc) {
     return NextResponse.json({ error: "This request is no longer available." }, { status: 404 });

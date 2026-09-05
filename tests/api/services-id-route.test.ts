@@ -72,13 +72,13 @@ describe("PATCH /api/tracker/services/[id]", () => {
 
   it("rejects unauthenticated requests", async () => {
     mocks.getSession.mockResolvedValue(null);
-    const response = await PATCH(request("{}"), { params: { id: ownId } });
+    const response = await PATCH(request("{}"), { params: Promise.resolve({ id: ownId }) });
     expect(response.status).toBe(401);
   });
 
   it("refuses an id prefixed with a different owner's email, without ever calling updateServiceRecord", async () => {
     mocks.getSession.mockResolvedValue({ email: "owner@example.com" });
-    const response = await PATCH(request(JSON.stringify(validPayload)), { params: { id: "attacker@example.com::service::x" } });
+    const response = await PATCH(request(JSON.stringify(validPayload)), { params: Promise.resolve({ id: "attacker@example.com::service::x" }) });
     expect(response.status).toBe(404);
     expect(mocks.updateServiceRecord).not.toHaveBeenCalled();
   });
@@ -86,7 +86,7 @@ describe("PATCH /api/tracker/services/[id]", () => {
   it("blocks writes to a transferred vehicle", async () => {
     mocks.getSession.mockResolvedValue({ email: "owner@example.com" });
     mocks.isBikeReadOnly.mockReturnValue(true);
-    const response = await PATCH(request(JSON.stringify(validPayload)), { params: { id: ownId } });
+    const response = await PATCH(request(JSON.stringify(validPayload)), { params: Promise.resolve({ id: ownId }) });
     expect(response.status).toBe(403);
     expect(mocks.updateServiceRecord).not.toHaveBeenCalled();
   });
@@ -95,7 +95,7 @@ describe("PATCH /api/tracker/services/[id]", () => {
     mocks.getSession.mockResolvedValue({ email: "owner@example.com" });
     mocks.getTrackerDocById.mockResolvedValue({ bikeId: "bike-1", mileageConfidence: confidence });
 
-    await PATCH(request(JSON.stringify(validPayload)), { params: { id: ownId } });
+    await PATCH(request(JSON.stringify(validPayload)), { params: Promise.resolve({ id: ownId }) });
 
     expect(mocks.updateServiceRecord).toHaveBeenCalledWith(
       "owner@example.com", ownId, expect.objectContaining({ mileageConfidence: "confirmed" })
@@ -104,7 +104,7 @@ describe("PATCH /api/tracker/services/[id]", () => {
 
   it("excludes the record's own id from the mileage-consistency check", async () => {
     mocks.getSession.mockResolvedValue({ email: "owner@example.com" });
-    await PATCH(request(JSON.stringify(validPayload)), { params: { id: ownId } });
+    await PATCH(request(JSON.stringify(validPayload)), { params: Promise.resolve({ id: ownId }) });
     expect(mocks.checkMileageConsistency.mock.calls[0][4]).toBe(ownId);
   });
 
@@ -112,7 +112,7 @@ describe("PATCH /api/tracker/services/[id]", () => {
     mocks.getSession.mockResolvedValue({ email: "owner@example.com" });
     mocks.checkMileageConsistency.mockReturnValue({ status: "blocked" });
     const response = await PATCH(
-      request(JSON.stringify({ ...validPayload, mileageAcknowledged: true })), { params: { id: ownId } }
+      request(JSON.stringify({ ...validPayload, mileageAcknowledged: true })), { params: Promise.resolve({ id: ownId }) }
     );
     expect(response.status).toBe(409);
     expect(mocks.updateServiceRecord).not.toHaveBeenCalled();
@@ -120,7 +120,7 @@ describe("PATCH /api/tracker/services/[id]", () => {
 
   it("bumps the bike's current mileage when the new entry is higher", async () => {
     mocks.getSession.mockResolvedValue({ email: "owner@example.com" });
-    await PATCH(request(JSON.stringify({ ...validPayload, mileage: 5200 })), { params: { id: ownId } });
+    await PATCH(request(JSON.stringify({ ...validPayload, mileage: 5200 })), { params: Promise.resolve({ id: ownId }) });
     expect(mocks.updateBikeMileage).toHaveBeenCalledWith("owner@example.com", "bike-1", 5200);
   });
 
@@ -133,7 +133,7 @@ describe("PATCH /api/tracker/services/[id]", () => {
   it("omits attachments from the update entirely when the caller doesn't send any, rather than wiping existing ones", async () => {
     mocks.getSession.mockResolvedValue({ email: "owner@example.com" });
 
-    await PATCH(request(JSON.stringify(validPayload)), { params: { id: ownId } }); // no attachments field sent
+    await PATCH(request(JSON.stringify(validPayload)), { params: Promise.resolve({ id: ownId }) }); // no attachments field sent
 
     const updatePayload = mocks.updateServiceRecord.mock.calls[0][2];
     expect("attachments" in updatePayload).toBe(false);
@@ -142,7 +142,7 @@ describe("PATCH /api/tracker/services/[id]", () => {
   it("includes attachments in the update when the caller explicitly sends them, even an empty array", async () => {
     mocks.getSession.mockResolvedValue({ email: "owner@example.com" });
 
-    await PATCH(request(JSON.stringify({ ...validPayload, attachments: [] })), { params: { id: ownId } });
+    await PATCH(request(JSON.stringify({ ...validPayload, attachments: [] })), { params: Promise.resolve({ id: ownId }) });
 
     const updatePayload = mocks.updateServiceRecord.mock.calls[0][2];
     expect(updatePayload.attachments).toEqual([]);
@@ -152,7 +152,7 @@ describe("PATCH /api/tracker/services/[id]", () => {
     mocks.getSession.mockResolvedValue({ email: "owner@example.com" });
     await PATCH(
       request(JSON.stringify({ ...validPayload, reminder: { intervalType: "mileage", intervalValue: 6000 } })),
-      { params: { id: ownId } }
+      { params: Promise.resolve({ id: ownId }) }
     );
     expect(mocks.deleteRemindersBySourceKey).toHaveBeenCalledWith("owner@example.com", "bike-1", "service:full-service");
     expect(mocks.createReminder).toHaveBeenCalledWith("owner@example.com", expect.objectContaining({ sourceKey: "service:full-service" }));
@@ -161,7 +161,7 @@ describe("PATCH /api/tracker/services/[id]", () => {
   it("returns not found when the update itself finds nothing to update", async () => {
     mocks.getSession.mockResolvedValue({ email: "owner@example.com" });
     mocks.updateServiceRecord.mockResolvedValue(null);
-    const response = await PATCH(request(JSON.stringify(validPayload)), { params: { id: ownId } });
+    const response = await PATCH(request(JSON.stringify(validPayload)), { params: Promise.resolve({ id: ownId }) });
     expect(response.status).toBe(404);
   });
 });
@@ -176,13 +176,13 @@ describe("DELETE /api/tracker/services/[id]", () => {
 
   it("rejects unauthenticated requests", async () => {
     mocks.getSession.mockResolvedValue(null);
-    const response = await DELETE(request(), { params: { id: ownId } });
+    const response = await DELETE(request(), { params: Promise.resolve({ id: ownId }) });
     expect(response.status).toBe(401);
   });
 
   it("refuses an id prefixed with a different owner's email", async () => {
     mocks.getSession.mockResolvedValue({ email: "owner@example.com" });
-    const response = await DELETE(request(), { params: { id: "attacker@example.com::service::x" } });
+    const response = await DELETE(request(), { params: Promise.resolve({ id: "attacker@example.com::service::x" }) });
     expect(response.status).toBe(404);
     expect(mocks.deleteServiceRecord).not.toHaveBeenCalled();
   });
@@ -190,14 +190,14 @@ describe("DELETE /api/tracker/services/[id]", () => {
   it("checks read-only status against the record's own bike, looked up via its stored bikeId", async () => {
     mocks.getSession.mockResolvedValue({ email: "owner@example.com" });
     mocks.isBikeReadOnly.mockReturnValue(true);
-    const response = await DELETE(request(), { params: { id: ownId } });
+    const response = await DELETE(request(), { params: Promise.resolve({ id: ownId }) });
     expect(mocks.getBike).toHaveBeenCalledWith("owner@example.com", "bike-1");
     expect(response.status).toBe(403);
   });
 
   it("deletes a valid, owned service record", async () => {
     mocks.getSession.mockResolvedValue({ email: "owner@example.com" });
-    const response = await DELETE(request(), { params: { id: ownId } });
+    const response = await DELETE(request(), { params: Promise.resolve({ id: ownId }) });
     expect(response.status).toBe(200);
     expect(mocks.deleteServiceRecord).toHaveBeenCalledWith("owner@example.com", ownId);
   });

@@ -8,7 +8,8 @@ import { sendReceiptRequestEmail } from "@/lib/resend";
 
 export const dynamic = "force-dynamic";
 
-export async function POST(req: NextRequest, { params }: { params: { token: string } }) {
+export async function POST(req: NextRequest, props: { params: Promise<{ token: string }> }) {
+  const params = await props.params;
   if (!(await hasReportAccess(params.token))) {
     return NextResponse.json({ error: "Please verify the registration first." }, { status: 403 });
   }

@@ -26,14 +26,14 @@ describe("DELETE /api/tomasz/assistant-questions/[id]", () => {
 
   it("rejects a request with no admin session", async () => {
     mocks.getAdminSession.mockResolvedValue(false);
-    const response = await DELETE(request(), { params: { id: "q1" } });
+    const response = await DELETE(request(), { params: Promise.resolve({ id: "q1" }) });
     expect(response.status).toBe(401);
     expect(mocks.deleteAssistantQuestion).not.toHaveBeenCalled();
   });
 
   it("deletes the given question id for an admin session", async () => {
     mocks.getAdminSession.mockResolvedValue(true);
-    const response = await DELETE(request(), { params: { id: "q1" } });
+    const response = await DELETE(request(), { params: Promise.resolve({ id: "q1" }) });
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({ ok: true });
     expect(mocks.deleteAssistantQuestion).toHaveBeenCalledWith("q1");
@@ -42,7 +42,7 @@ describe("DELETE /api/tomasz/assistant-questions/[id]", () => {
   it("returns 500 without leaking internals when the underlying delete throws", async () => {
     mocks.getAdminSession.mockResolvedValue(true);
     mocks.deleteAssistantQuestion.mockRejectedValue(new Error("cosmos unavailable"));
-    const response = await DELETE(request(), { params: { id: "q1" } });
+    const response = await DELETE(request(), { params: Promise.resolve({ id: "q1" }) });
     expect(response.status).toBe(500);
     await expect(response.json()).resolves.toEqual({ error: "Could not delete." });
   });

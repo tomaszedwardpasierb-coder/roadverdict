@@ -40,7 +40,7 @@ describe("PATCH /api/tracker/bill-series/[id]", () => {
 
   it("rejects unauthenticated requests", async () => {
     mocks.getSession.mockResolvedValue(null);
-    const response = await PATCH(request(JSON.stringify({ action: "end" })), { params: { id: ownId } });
+    const response = await PATCH(request(JSON.stringify({ action: "end" })), { params: Promise.resolve({ id: ownId }) });
     expect(response.status).toBe(401);
   });
 
@@ -48,7 +48,7 @@ describe("PATCH /api/tracker/bill-series/[id]", () => {
     mocks.getSession.mockResolvedValue({ email: "owner@example.com" });
     const response = await PATCH(
       request(JSON.stringify({ action: "end" })),
-      { params: { id: "attacker@example.com::billSeries::abc123" } }
+      { params: Promise.resolve({ id: "attacker@example.com::billSeries::abc123" }) }
     );
     expect(response.status).toBe(404);
     expect(mocks.endBillSeries).not.toHaveBeenCalled();
@@ -56,13 +56,13 @@ describe("PATCH /api/tracker/bill-series/[id]", () => {
 
   it("rejects malformed JSON", async () => {
     mocks.getSession.mockResolvedValue({ email: "owner@example.com" });
-    const response = await PATCH(request("not-json"), { params: { id: ownId } });
+    const response = await PATCH(request("not-json"), { params: Promise.resolve({ id: ownId }) });
     expect(response.status).toBe(400);
   });
 
   it("rejects an unsupported action", async () => {
     mocks.getSession.mockResolvedValue({ email: "owner@example.com" });
-    const response = await PATCH(request(JSON.stringify({ action: "edit" })), { params: { id: ownId } });
+    const response = await PATCH(request(JSON.stringify({ action: "edit" })), { params: Promise.resolve({ id: ownId }) });
     expect(response.status).toBe(400);
     expect(mocks.endBillSeries).not.toHaveBeenCalled();
   });
@@ -70,7 +70,7 @@ describe("PATCH /api/tracker/bill-series/[id]", () => {
   it("blocks writes to a transferred vehicle", async () => {
     mocks.getSession.mockResolvedValue({ email: "owner@example.com" });
     mocks.isBikeReadOnly.mockReturnValue(true);
-    const response = await PATCH(request(JSON.stringify({ action: "end" })), { params: { id: ownId } });
+    const response = await PATCH(request(JSON.stringify({ action: "end" })), { params: Promise.resolve({ id: ownId }) });
     expect(response.status).toBe(403);
     expect(mocks.endBillSeries).not.toHaveBeenCalled();
   });
@@ -78,13 +78,13 @@ describe("PATCH /api/tracker/bill-series/[id]", () => {
   it("returns not found when there's no such series", async () => {
     mocks.getSession.mockResolvedValue({ email: "owner@example.com" });
     mocks.endBillSeries.mockResolvedValue(null);
-    const response = await PATCH(request(JSON.stringify({ action: "end" })), { params: { id: ownId } });
+    const response = await PATCH(request(JSON.stringify({ action: "end" })), { params: Promise.resolve({ id: ownId }) });
     expect(response.status).toBe(404);
   });
 
   it("ends the plan and clears its renewal reminder", async () => {
     mocks.getSession.mockResolvedValue({ email: "owner@example.com" });
-    const response = await PATCH(request(JSON.stringify({ action: "end" })), { params: { id: ownId } });
+    const response = await PATCH(request(JSON.stringify({ action: "end" })), { params: Promise.resolve({ id: ownId }) });
     expect(response.status).toBe(200);
     expect(mocks.endBillSeries).toHaveBeenCalledWith("owner@example.com", ownId);
     expect(mocks.deleteRemindersBySourceKey).toHaveBeenCalledWith("owner@example.com", "bike-1", `bill-series:${ownId}`);

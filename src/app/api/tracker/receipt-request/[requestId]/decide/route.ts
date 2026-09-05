@@ -10,7 +10,8 @@ export const dynamic = "force-dynamic";
 // is a genuine POST from a button click inside an authenticated
 // session, not a GET link sitting in an email that a security scanner
 // could visit on the owner's behalf before they ever see it.
-export async function POST(req: NextRequest, { params }: { params: { requestId: string } }) {
+export async function POST(req: NextRequest, props: { params: Promise<{ requestId: string }> }) {
+  const params = await props.params;
   const session = await getSession();
   if (!session) {
     return NextResponse.json({ error: "Not signed in." }, { status: 401 });

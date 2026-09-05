@@ -37,7 +37,7 @@ describe("GET /api/tracker/attachment/[blobName]", () => {
 
   it("rejects unauthenticated requests without ever touching blob storage", async () => {
     mocks.getSession.mockResolvedValue(null);
-    const response = await GET(request(), { params: { blobName: "abc.jpg" } });
+    const response = await GET(request(), { params: Promise.resolve({ blobName: "abc.jpg" }) });
     expect(response.status).toBe(401);
     expect(mocks.getAttachmentContainer).not.toHaveBeenCalled();
   });
@@ -49,7 +49,7 @@ describe("GET /api/tracker/attachment/[blobName]", () => {
   it("returns 404 without touching blob storage when the caller doesn't own the attachment", async () => {
     mocks.getSession.mockResolvedValue({ email: "attacker@example.com" });
     mocks.ownsAttachment.mockResolvedValue(false);
-    const response = await GET(request(), { params: { blobName: "victims-receipt.jpg" } });
+    const response = await GET(request(), { params: Promise.resolve({ blobName: "victims-receipt.jpg" }) });
     expect(response.status).toBe(404);
     await expect(response.json()).resolves.toEqual({ error: "Attachment not found." });
     expect(mocks.getAttachmentContainer).not.toHaveBeenCalled();
@@ -58,7 +58,7 @@ describe("GET /api/tracker/attachment/[blobName]", () => {
   it("checks ownership against the signed-in session's own email, not any client-supplied value", async () => {
     mocks.getSession.mockResolvedValue({ email: "owner@example.com" });
     mocks.download.mockResolvedValue({ contentType: "image/jpeg", readableStreamBody: fakeStream([]) });
-    await GET(request(), { params: { blobName: "abc.jpg" } });
+    await GET(request(), { params: Promise.resolve({ blobName: "abc.jpg" }) });
     expect(mocks.ownsAttachment).toHaveBeenCalledWith("owner@example.com", "abc.jpg");
   });
 
@@ -69,7 +69,7 @@ describe("GET /api/tracker/attachment/[blobName]", () => {
       readableStreamBody: fakeStream([Buffer.from("hello "), Buffer.from("world")]),
     });
 
-    const response = await GET(request(), { params: { blobName: "abc.jpg" } });
+    const response = await GET(request(), { params: Promise.resolve({ blobName: "abc.jpg" }) });
 
     expect(response.status).toBe(200);
     expect(response.headers.get("content-type")).toBe("image/jpeg");
@@ -83,7 +83,7 @@ describe("GET /api/tracker/attachment/[blobName]", () => {
     mocks.getSession.mockResolvedValue({ email: "owner@example.com" });
     mocks.download.mockResolvedValue({ contentType: undefined, readableStreamBody: fakeStream([]) });
 
-    const response = await GET(request(), { params: { blobName: "abc.jpg" } });
+    const response = await GET(request(), { params: Promise.resolve({ blobName: "abc.jpg" }) });
 
     expect(response.headers.get("content-type")).toBe("application/octet-stream");
   });
@@ -94,7 +94,7 @@ describe("GET /api/tracker/attachment/[blobName]", () => {
     const getBlockBlobClient = vi.fn(() => ({ download: mocks.download }));
     mocks.getAttachmentContainer.mockResolvedValue({ getBlockBlobClient });
 
-    await GET(request(), { params: { blobName: encodeURIComponent("has space.jpg") } });
+    await GET(request(), { params: Promise.resolve({ blobName: encodeURIComponent("has space.jpg") }) });
 
     expect(getBlockBlobClient).toHaveBeenCalledWith("has space.jpg");
   });
@@ -103,7 +103,7 @@ describe("GET /api/tracker/attachment/[blobName]", () => {
     mocks.getSession.mockResolvedValue({ email: "owner@example.com" });
     mocks.download.mockRejectedValue(new Error("BlobNotFound"));
 
-    const response = await GET(request(), { params: { blobName: "missing.jpg" } });
+    const response = await GET(request(), { params: Promise.resolve({ blobName: "missing.jpg" }) });
 
     expect(response.status).toBe(404);
     await expect(response.json()).resolves.toEqual({ error: "Attachment not found." });

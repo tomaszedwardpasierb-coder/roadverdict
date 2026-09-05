@@ -5,11 +5,12 @@ import styles from "../../[token]/report.module.css";
 
 export const dynamic = "force-dynamic";
 
-export default async function DecideReceiptRequestPage({
-  searchParams,
-}: {
-  searchParams: { token?: string; action?: string; scope?: string };
-}) {
+export default async function DecideReceiptRequestPage(
+  props: {
+    searchParams: Promise<{ token?: string; action?: string; scope?: string }>;
+  }
+) {
+  const searchParams = await props.searchParams;
   const token = searchParams.token;
   if (!token) {
     return (

@@ -22,7 +22,8 @@ async function streamToBuffer(readableStream: NodeJS.ReadableStream | undefined)
 // than it looks: anyone who's ever seen a blobName can sign up free and
 // pass this check. ownsAttachment closes that gap the same way the
 // anonymous report-attachment route already does for its own case.
-export async function GET(request: NextRequest, { params }: { params: { blobName: string } }) {
+export async function GET(request: NextRequest, props: { params: Promise<{ blobName: string }> }) {
+  const params = await props.params;
   const session = await getSession();
   if (!session) {
     return NextResponse.json({ error: "Not signed in." }, { status: 401 });
