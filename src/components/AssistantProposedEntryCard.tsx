@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { JOB_GROUPS, JOB_LABELS } from '@/lib/tracker/jobTypes';
 import { BILL_LABELS } from '@/lib/tracker/billTypes';
+import { MOD_GROUPS, MOD_LABELS } from '@/lib/tracker/modTypes';
 import styles from './AssistantProposedEntryCard.module.css';
 
 export interface ProposedServiceEntry {
@@ -26,27 +27,58 @@ export interface ProposedBillEntry {
   date: string;
 }
 
-export type ProposedEntry = ProposedServiceEntry | ProposedBillEntry;
+export interface ProposedModEntry {
+  category: 'mod';
+  modCategory: string;
+  modLabel: string;
+  description: string;
+  cost: number;
+  date: string;
+  mileage: number;
+}
+
+export interface ProposedFuelEntry {
+  category: 'fuel';
+  litres: number;
+  cost: number;
+  date: string;
+  mileage: number;
+  filledToFull: boolean;
+}
+
+export type ProposedEntry = ProposedServiceEntry | ProposedBillEntry | ProposedModEntry | ProposedFuelEntry;
 
 const ENDPOINT: Record<ProposedEntry['category'], string> = {
   service: '/api/tracker/services',
   bill: '/api/tracker/bills',
+  mod: '/api/tracker/mods',
+  fuel: '/api/tracker/fuel',
 };
 
-// Renders the AI assistant's draft for a new service record or bill,
-// pre-filled but fully editable - "Log it" always POSTs to the exact
-// same endpoint the manual dashboard forms use, so every existing
-// server-side check (mileage consistency, production-year, etc.) still
-// applies. This never writes anything on its own; only the person's own
-// click does.
+const CARD_TITLE: Record<ProposedEntry['category'], string> = {
+  service: 'New service record',
+  bill: 'New bill',
+  mod: 'New modification/accessory',
+  fuel: 'New fuel log',
+};
+
+// Renders the AI assistant's draft for a new service record, bill,
+// modification/accessory, or fuel log, pre-filled but fully editable -
+// "Log it" always POSTs to the exact same endpoint the manual dashboard
+// forms use, so every existing server-side check (mileage consistency,
+// production-year, litres plausibility, etc.) still applies. This never
+// writes anything on its own; only the person's own click does.
 export function AssistantProposedEntryCard({ entry }: { entry: ProposedEntry }) {
   const router = useRouter();
   const [jobType, setJobType] = useState(entry.category === 'service' ? entry.jobType : '');
   const [billType, setBillType] = useState(entry.category === 'bill' ? entry.billType : '');
-  const [description, setDescription] = useState(entry.description);
+  const [modCategory, setModCategory] = useState(entry.category === 'mod' ? entry.modCategory : '');
+  const [description, setDescription] = useState(entry.category !== 'fuel' ? entry.description : '');
   const [cost, setCost] = useState(String(entry.cost));
   const [date, setDate] = useState(entry.date);
-  const [mileage, setMileage] = useState(entry.category === 'service' ? String(entry.mileage) : '');
+  const [mileage, setMileage] = useState(entry.category !== 'bill' ? String(entry.mileage) : '');
+  const [litres, setLitres] = useState(entry.category === 'fuel' ? String(entry.litres) : '');
+  const [filledToFull, setFilledToFull] = useState(entry.category === 'fuel' ? entry.filledToFull : false);
   const [mileageAcknowledged, setMileageAcknowledged] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -62,11 +94,21 @@ export function AssistantProposedEntryCard({ entry }: { entry: ProposedEntry }) 
       setSubmitting(false);
       return;
     }
+    if (entry.category === 'fuel' && (!Number.isFinite(Number(litres)) || Number(litres) <= 0)) {
+      setError('Enter a valid number of litres.');
+      setSubmitting(false);
+      return;
+    }
 
+    const mileageAck = acknowledgeMileage || mileageAcknowledged;
     const body =
       entry.category === 'service'
-        ? { jobType, cost: costValue, mileage: Number(mileage), date, notes: description, mileageAcknowledged: acknowledgeMileage || mileageAcknowledged }
-        : { billType, cost: costValue, date, notes: description };
+        ? { jobType, cost: costValue, mileage: Number(mileage), date, notes: description, mileageAcknowledged: mileageAck }
+        : entry.category === 'bill'
+        ? { billType, cost: costValue, date, notes: description }
+        : entry.category === 'mod'
+        ? { category: modCategory, name: description, cost: costValue, mileage: Number(mileage), date, mileageAcknowledged: mileageAck }
+        : { litres: Number(litres), cost: costValue, mileage: Number(mileage), date, filledToFull, mileageAcknowledged: mileageAck };
 
     try {
       const res = await fetch(ENDPOINT[entry.category], {
@@ -90,25 +132,28 @@ export function AssistantProposedEntryCard({ entry }: { entry: ProposedEntry }) 
   }
 
   if (logged) {
+    const label =
+      entry.category === 'service' ? (JOB_LABELS[jobType] ?? jobType)
+      : entry.category === 'bill' ? (BILL_LABELS[billType] ?? billType)
+      : entry.category === 'mod' ? (MOD_LABELS[modCategory] ?? modCategory)
+      : 'Fuel fill-up';
     return (
       <div className={styles.card}>
-        <p className={styles.loggedNote}>
-          ✓ Logged - {entry.category === 'service' ? (JOB_LABELS[jobType] ?? jobType) : (BILL_LABELS[billType] ?? billType)}
-        </p>
+        <p className={styles.loggedNote}>✓ Logged - {label}</p>
       </div>
     );
   }
 
   // A heuristic, not a status code check (fetch here doesn't carry one
   // through) - every mileage-consistency message from describeMileageCheck
-  // mentions "miles", which nothing else this endpoint returns does.
-  const offerMileageOverride = entry.category === 'service' && !!error && /miles/i.test(error) && !mileageAcknowledged;
+  // mentions "miles", which nothing else these endpoints return does.
+  const offerMileageOverride = entry.category !== 'bill' && !!error && /miles/i.test(error) && !mileageAcknowledged;
 
   return (
     <div className={styles.card}>
-      <span className={styles.cardLabel}>{entry.category === 'service' ? 'New service record' : 'New bill'}</span>
+      <span className={styles.cardLabel}>{CARD_TITLE[entry.category]}</span>
 
-      {entry.category === 'service' ? (
+      {entry.category === 'service' && (
         <div className={styles.field}>
           <label htmlFor="ai-job-type">Job</label>
           <select id="ai-job-type" value={jobType} onChange={(e) => setJobType(e.target.value)} disabled={submitting}>
@@ -121,7 +166,9 @@ export function AssistantProposedEntryCard({ entry }: { entry: ProposedEntry }) 
             ))}
           </select>
         </div>
-      ) : (
+      )}
+
+      {entry.category === 'bill' && (
         <div className={styles.field}>
           <label htmlFor="ai-bill-type">Bill type</label>
           <select id="ai-bill-type" value={billType} onChange={(e) => setBillType(e.target.value)} disabled={submitting}>
@@ -132,10 +179,40 @@ export function AssistantProposedEntryCard({ entry }: { entry: ProposedEntry }) 
         </div>
       )}
 
-      <div className={styles.field}>
-        <label htmlFor="ai-description">Description</label>
-        <input id="ai-description" type="text" value={description} onChange={(e) => setDescription(e.target.value)} disabled={submitting} />
-      </div>
+      {entry.category === 'mod' && (
+        <div className={styles.field}>
+          <label htmlFor="ai-mod-category">Category</label>
+          <select id="ai-mod-category" value={modCategory} onChange={(e) => setModCategory(e.target.value)} disabled={submitting}>
+            {MOD_GROUPS.map((g) => (
+              <optgroup key={g.group} label={g.group}>
+                {g.subgroups.flatMap((sg) => sg.mods).map((m) => (
+                  <option key={m} value={m}>{MOD_LABELS[m]}</option>
+                ))}
+              </optgroup>
+            ))}
+          </select>
+        </div>
+      )}
+
+      {entry.category !== 'fuel' && (
+        <div className={styles.field}>
+          <label htmlFor="ai-description">Description</label>
+          <input id="ai-description" type="text" value={description} onChange={(e) => setDescription(e.target.value)} disabled={submitting} />
+        </div>
+      )}
+
+      {entry.category === 'fuel' && (
+        <div className={styles.row}>
+          <div className={styles.field}>
+            <label htmlFor="ai-litres">Litres</label>
+            <input id="ai-litres" type="number" min="0" step="0.01" value={litres} onChange={(e) => setLitres(e.target.value)} disabled={submitting} />
+          </div>
+          <label className={styles.checkboxField}>
+            <input type="checkbox" checked={filledToFull} onChange={(e) => setFilledToFull(e.target.checked)} disabled={submitting} />
+            Filled to full
+          </label>
+        </div>
+      )}
 
       <div className={styles.row}>
         <div className={styles.field}>
@@ -148,7 +225,7 @@ export function AssistantProposedEntryCard({ entry }: { entry: ProposedEntry }) 
         </div>
       </div>
 
-      {entry.category === 'service' && (
+      {entry.category !== 'bill' && (
         <div className={styles.field}>
           <label htmlFor="ai-mileage">Mileage</label>
           <input id="ai-mileage" type="number" min="0" value={mileage} onChange={(e) => setMileage(e.target.value)} disabled={submitting} />

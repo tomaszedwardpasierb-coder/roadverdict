@@ -412,9 +412,9 @@ describe("toolProposeLogEntry", () => {
     expect(result).toEqual({ error: "No bike found on this account." });
   });
 
-  it("rejects a missing or unsupported category, e.g. fuel or mods", async () => {
-    const result: any = await toolProposeLogEntry("owner@example.com", { category: "fuel", description: "Petrol", cost: 20 } as any);
-    expect(result.error).toMatch(/service record or a bill/);
+  it("rejects a genuinely unrecognized category rather than guessing", async () => {
+    const result: any = await toolProposeLogEntry("owner@example.com", { category: "not-a-real-category", description: "Petrol", cost: 20 } as any);
+    expect(result.error).toMatch(/Not sure what category/);
   });
 
   it("rejects a missing description", async () => {
@@ -480,5 +480,44 @@ describe("toolProposeLogEntry", () => {
 
     const result2: any = await toolProposeLogEntry("owner@example.com", { category: "bill", description: "Annual renewal", cost: 300, billType: "not-real" });
     expect(result2.error).toMatch(/insurance, road tax, MOT test, or finance/);
+  });
+
+  it("drafts a mod/accessory entry, resolving an exact category key or label", async () => {
+    const byKey: any = await toolProposeLogEntry("owner@example.com", { category: "mod", description: "Öhlins rear shock", cost: 400, date: "2026-01-01", modCategory: "suspension-upgrade" });
+    expect(byKey).toEqual({ category: "mod", modCategory: "suspension-upgrade", modLabel: expect.any(String), description: "Öhlins rear shock", cost: 400, date: "2026-01-01", mileage: 15000 });
+
+    const byLabel: any = await toolProposeLogEntry("owner@example.com", { category: "mod", description: "Tank pads", cost: 20, modCategory: "Tank pads / protectors" });
+    expect(byLabel.modCategory).toBe("tank-pads");
+  });
+
+  it("fuzzy-matches a plain-language mod category by substring, case-insensitively", async () => {
+    const result: any = await toolProposeLogEntry("owner@example.com", { category: "mod", description: "Phone mount", cost: 15, modCategory: "PHONE mount" });
+    expect(result.modCategory).toBe("phone-mount");
+  });
+
+  it("falls back to 'other-accessory' for a mod category with no match, rather than blocking the draft, e.g. a wax or detailing product", async () => {
+    const result: any = await toolProposeLogEntry("owner@example.com", { category: "mod", description: "Szuwax detailing spray", cost: 12, modCategory: "szuwax" });
+    expect(result.modCategory).toBe("other-accessory");
+  });
+
+  it("falls back to 'other-accessory' when modCategory is missing entirely", async () => {
+    const result: any = await toolProposeLogEntry("owner@example.com", { category: "mod", description: "Mystery part", cost: 12 });
+    expect(result.modCategory).toBe("other-accessory");
+  });
+
+  it("drafts a fuel entry with litres, cost, and the account's current mileage - no description needed", async () => {
+    const result: any = await toolProposeLogEntry("owner@example.com", { category: "fuel", cost: 15, date: "2026-01-01", litres: 10 });
+    expect(result).toEqual({ category: "fuel", litres: 10, cost: 15, date: "2026-01-01", mileage: 15000, filledToFull: false });
+  });
+
+  it("only marks a fuel entry filledToFull when explicitly told true", async () => {
+    const result: any = await toolProposeLogEntry("owner@example.com", { category: "fuel", cost: 15, litres: 10, filledToFull: true });
+    expect(result.filledToFull).toBe(true);
+  });
+
+  it("rejects a missing, non-numeric, or non-positive litres for a fuel entry", async () => {
+    expect((await toolProposeLogEntry("owner@example.com", { category: "fuel", cost: 15 }) as any).error).toMatch(/litres/i);
+    expect((await toolProposeLogEntry("owner@example.com", { category: "fuel", cost: 15, litres: 0 }) as any).error).toMatch(/litres/i);
+    expect((await toolProposeLogEntry("owner@example.com", { category: "fuel", cost: 15, litres: -3 }) as any).error).toMatch(/litres/i);
   });
 });

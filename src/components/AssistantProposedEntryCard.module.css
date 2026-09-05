@@ -43,6 +43,17 @@
 .row {
   display: flex;
   gap: 0.6rem;
+  align-items: flex-end;
+}
+
+.checkboxField {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.8rem;
+  color: var(--ink);
+  white-space: nowrap;
+  padding-bottom: 0.4rem;
 }
 
 .errorNote {

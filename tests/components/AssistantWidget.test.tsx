@@ -334,4 +334,60 @@ describe("AssistantWidget", () => {
     expect(await screen.findByText("Please fill in all required fields.")).toBeInTheDocument();
     expect(screen.queryByText(/Logged/)).not.toBeInTheDocument();
   });
+
+  it("confirming a proposed mod/accessory entry POSTs to the mods endpoint with category and name fields", async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce({
+        ok: true, status: 200,
+        json: async () => ({
+          reply: "Here's a draft for that.",
+          proposedEntry: {
+            category: "mod", modCategory: "other-accessory", modLabel: "Other accessory",
+            description: "Szuwax detailing spray", cost: 12, date: "2026-01-01", mileage: 15000,
+          },
+        }),
+      })
+      .mockResolvedValueOnce({ ok: true, status: 200, json: async () => ({ mod: { id: "mod-1" } }) });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const user = userEvent.setup();
+    render(<AssistantWidget />);
+    await openWidgetAndSend(user, "add new entry, szuwax, £12");
+    await screen.findByText("Here's a draft for that.");
+    expect(screen.getByText("New modification/accessory")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Log it" }));
+
+    await screen.findByText(/Logged/);
+    expect(fetchMock).toHaveBeenLastCalledWith("/api/tracker/mods", expect.objectContaining({ method: "POST" }));
+    const body = JSON.parse(fetchMock.mock.calls[1][1].body);
+    expect(body).toEqual({ category: "other-accessory", name: "Szuwax detailing spray", cost: 12, mileage: 15000, date: "2026-01-01", mileageAcknowledged: false });
+  });
+
+  it("confirming a proposed fuel entry POSTs to the fuel endpoint with litres and no description field", async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce({
+        ok: true, status: 200,
+        json: async () => ({
+          reply: "Here's a draft for that.",
+          proposedEntry: { category: "fuel", litres: 10, cost: 15, date: "2026-01-01", mileage: 15000, filledToFull: false },
+        }),
+      })
+      .mockResolvedValueOnce({ ok: true, status: 200, json: async () => ({ log: { id: "fuel-1" } }) });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const user = userEvent.setup();
+    render(<AssistantWidget />);
+    await openWidgetAndSend(user, "log 10 litres of fuel for £15 today");
+    await screen.findByText("Here's a draft for that.");
+    expect(screen.getByText("New fuel log")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Description")).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Log it" }));
+
+    await screen.findByText(/Logged/);
+    expect(fetchMock).toHaveBeenLastCalledWith("/api/tracker/fuel", expect.objectContaining({ method: "POST" }));
+    const body = JSON.parse(fetchMock.mock.calls[1][1].body);
+    expect(body).toEqual({ litres: 10, cost: 15, mileage: 15000, date: "2026-01-01", filledToFull: false, mileageAcknowledged: false });
+  });
 });

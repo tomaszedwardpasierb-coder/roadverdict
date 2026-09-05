@@ -21,6 +21,7 @@ import { computeActualMPG, computeMPGSeries } from "./mpgCalc";
 import { gatherMileagePoints } from "./summary";
 import { JOB_LABELS } from "./jobTypes";
 import { BILL_LABELS } from "./billTypes";
+import { MOD_LABELS } from "./modTypes";
 import { getShareLinksForUser } from "./shareLink";
 import { getPendingReceiptRequestsForOwner } from "./receiptRequest";
 import { getSellerReportData } from "./sellerReportData";
@@ -472,19 +473,25 @@ export async function toolGetViewedComparison(email: string, compareContext: Com
   }
 }
 
-// ---- Draft a new service record or bill from a description - Pro only ----
+// ---- Draft a new service record, bill, mod/accessory, or fuel log from a description - Pro only ----
 //
 // Deliberately still read-only in the sense that matters: this never
 // writes to Cosmos. It validates and cleans up the model's guess and
 // hands back a draft for the widget to show as an editable, on-screen
 // confirmation card - committing it is a separate, ordinary POST to the
-// exact same /api/tracker/services or /api/tracker/bills endpoint the
-// manual forms already use, triggered by the user's own click, never by
-// this tool or the model. Scoped to service/bill only for now - fuel
-// needs a genuinely different shape (litres, no free-text field) and
-// mods have 250+ category keys, unenumerable here without either
-// bloating the schema or needing fuzzy matching; both are left for a
-// later pass rather than guessed at half-built.
+// exact same /api/tracker/services, /api/tracker/bills,
+// /api/tracker/mods, or /api/tracker/fuel endpoint the manual forms
+// already use, triggered by the user's own click, never by this tool or
+// the model.
+//
+// Mods have 250+ category keys - far too many to enumerate as a Gemini
+// enum without bloating the schema - so modCategory is free text here,
+// resolved with the same "case-insensitive substring match, always
+// falls back rather than blocking" approach toolGetLastLoggedJob already
+// uses for job types, landing on the catalog's own "other-accessory"
+// key when nothing matches. Bills have no such fallback key, so an
+// unresolvable billType still asks a clarifying question instead of
+// guessing - that asymmetry is deliberate, not an oversight.
 export interface ProposeLogEntryArgs {
   category?: string;
   description?: string;
@@ -492,21 +499,39 @@ export interface ProposeLogEntryArgs {
   date?: string;
   jobType?: string;
   billType?: string;
+  modCategory?: string;
+  litres?: number;
+  filledToFull?: boolean;
 }
 
 export type ProposedEntry =
   | { category: "service"; jobType: string; jobLabel: string; description: string; cost: number; date: string; mileage: number }
-  | { category: "bill"; billType: string; billLabel: string; description: string; cost: number; date: string };
+  | { category: "bill"; billType: string; billLabel: string; description: string; cost: number; date: string }
+  | { category: "mod"; modCategory: string; modLabel: string; description: string; cost: number; date: string; mileage: number }
+  | { category: "fuel"; litres: number; cost: number; date: string; mileage: number; filledToFull: boolean };
+
+function resolveModCategory(input: string | undefined): string {
+  const fallback = "other-accessory";
+  if (typeof input !== "string" || !input.trim()) return fallback;
+  const q = input.trim().toLowerCase();
+  if (q in MOD_LABELS) return q;
+
+  const exact = Object.entries(MOD_LABELS).find(([, label]) => label.toLowerCase() === q);
+  if (exact) return exact[0];
+
+  const substring = Object.entries(MOD_LABELS).find(([, label]) => {
+    const l = label.toLowerCase();
+    return l.includes(q) || q.includes(l);
+  });
+  return substring ? substring[0] : fallback;
+}
 
 export async function toolProposeLogEntry(email: string, args: ProposeLogEntryArgs) {
   const bike = await getPrimaryBike(email);
   if (!bike) return { error: "No bike found on this account." };
 
-  if (args.category !== "service" && args.category !== "bill") {
-    return { error: "This can only draft a service record or a bill right now - not a fuel fill-up or a modification/accessory." };
-  }
-  if (typeof args.description !== "string" || !args.description.trim()) {
-    return { error: "Needs a short description of what this is." };
+  if (args.category !== "service" && args.category !== "bill" && args.category !== "mod" && args.category !== "fuel") {
+    return { error: "Not sure what category that is - a service item, a bill (insurance/road tax/MOT/finance), a modification/accessory, or a fuel fill-up?" };
   }
   if (typeof args.cost !== "number" || !Number.isFinite(args.cost) || args.cost <= 0) {
     return { error: "Needs a valid, positive cost." };
@@ -518,11 +543,28 @@ export async function toolProposeLogEntry(email: string, args: ProposeLogEntryAr
     return { error: "That date is in the future - this can only log something that's already happened." };
   }
 
+  if (args.category === "fuel") {
+    if (typeof args.litres !== "number" || !Number.isFinite(args.litres) || args.litres <= 0) {
+      return { error: "Needs a valid, positive number of litres." };
+    }
+    const entry: ProposedEntry = { category: "fuel", litres: args.litres, cost: args.cost, date, mileage: bike.currentMileage, filledToFull: args.filledToFull === true };
+    return entry;
+  }
+
+  if (typeof args.description !== "string" || !args.description.trim()) {
+    return { error: "Needs a short description of what this is." };
+  }
   const description = args.description.trim();
 
   if (args.category === "service") {
     const jobType = typeof args.jobType === "string" && args.jobType in JOB_LABELS ? args.jobType : "other";
     const entry: ProposedEntry = { category: "service", jobType, jobLabel: JOB_LABELS[jobType], description, cost: args.cost, date, mileage: bike.currentMileage };
+    return entry;
+  }
+
+  if (args.category === "mod") {
+    const modCategory = resolveModCategory(args.modCategory);
+    const entry: ProposedEntry = { category: "mod", modCategory, modLabel: MOD_LABELS[modCategory], description, cost: args.cost, date, mileage: bike.currentMileage };
     return entry;
   }
 
@@ -538,16 +580,16 @@ export const LOG_ENTRY_TOOL_DECLARATIONS = [
   {
     name: "proposeLogEntry",
     description:
-      "Draft a new service record or insurance/road-tax/MOT/finance bill for the signed-in user's bike, from their description of what they want to log - e.g. a consumable, a small maintenance item, or a payment. This only prepares a draft for the user to review, edit, and confirm themselves on screen - it NEVER saves anything by itself. Not for fuel fill-ups or vehicle modifications/accessories (say those aren't supported via chat yet, and point to the Fuel or Parts & Accessories tab, if asked) and never for changing or deleting an existing entry.",
+      "Draft a new service record, insurance/road-tax/MOT/finance bill, modification/accessory, or fuel fill-up for the signed-in user's bike, from their description of what they want to log. This only prepares a draft for the user to review, edit, and confirm themselves on screen - it NEVER saves anything by itself, and never changes or deletes an existing entry. Doesn't need an exact category match - your best guess is fine, the user can correct it on the draft card.",
     parameters: {
       type: "OBJECT",
       properties: {
         category: {
           type: "STRING",
-          enum: ["service", "bill"],
-          description: "Whether this is a maintenance/service item (including general consumables and small parts) or an insurance/road-tax/MOT/finance payment.",
+          enum: ["service", "bill", "mod", "fuel"],
+          description: "'service' for maintenance/consumables/small parts, 'bill' for insurance/road-tax/MOT/finance, 'mod' for a modification or accessory (including general detailing products like wax/polish), 'fuel' for a fuel fill-up.",
         },
-        description: { type: "STRING", description: "A short, plain label for what this is, e.g. 'Valve cleaner' or 'Annual insurance renewal'." },
+        description: { type: "STRING", description: "Not used for 'fuel'. A short, plain label for what this is, e.g. 'Valve cleaner' or 'Annual insurance renewal'." },
         cost: { type: "NUMBER", description: "The amount paid, in GBP, as a plain number." },
         date: { type: "STRING", description: "ISO date (YYYY-MM-DD) this was paid/done. Use today's date if the user didn't say otherwise." },
         jobType: {
@@ -560,8 +602,14 @@ export const LOG_ENTRY_TOOL_DECLARATIONS = [
           enum: ["insurance", "road-tax", "mot-test", "finance"],
           description: "Only for category 'bill'.",
         },
+        modCategory: {
+          type: "STRING",
+          description: "Only for category 'mod' - your best guess at what kind of part/accessory this is, in plain words (e.g. 'wax', 'tank pad', 'phone mount'). Doesn't need to be exact - it's matched to the closest real category, or filed as 'Other accessory' if nothing fits.",
+        },
+        litres: { type: "NUMBER", description: "Only for category 'fuel' - litres put in, as a plain number." },
+        filledToFull: { type: "BOOLEAN", description: "Only for category 'fuel' - true only if they said something like 'filled up' or 'full tank', otherwise omit." },
       },
-      required: ["category", "description", "cost"],
+      required: ["category", "cost"],
     },
   },
 ] as const;
