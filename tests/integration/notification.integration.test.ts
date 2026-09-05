@@ -164,9 +164,13 @@ describe("notification.ts against a real Cosmos container (emulator)", () => {
     const all = await getNotificationsForUser(email);
     const toDelete = all.find((n) => n.title === "Delete me")!;
 
+    // recipients: "all" would resolve via getAllUserEmails(), which only
+    // returns emails with a real type:'user' doc - this test's randomly
+    // generated email has no such doc, so the explicit recipient is what
+    // actually isolates the broadcast-filter logic this test is about.
     const deleted = await clearNotifications({
       broadcasts: [{ title: toDelete.title, body: toDelete.body, createdAt: toDelete.createdAt }],
-      recipients: "all",
+      recipients: [email],
     });
     expect(deleted).toBe(1);
 
