@@ -1,6 +1,6 @@
 // Place at: src/app/layout.tsx
 import type { Metadata, Viewport } from 'next';
-import { Big_Shoulders_Display, Inter, IBM_Plex_Mono } from 'next/font/google';
+import { Big_Shoulders, Inter, IBM_Plex_Mono } from 'next/font/google';
 import Link from 'next/link';
 import { cookies } from 'next/headers';
 import { getAdminSession } from '@/lib/admin/session';
@@ -10,7 +10,12 @@ import { ActiveSectionProvider } from '@/components/ActiveSectionContext';
 import { SocialLinks } from '@/components/SocialLinks';
 import { SiteHeaderNav } from './SiteHeaderNav';
 import './globals.css';
-const bigShouldersDisplay = Big_Shoulders_Display({
+// Google's own catalog folded the old "Big Shoulders Display" static cut
+// into the "Big Shoulders" family (an upstream rename hit by the
+// next@15.5.25 dependency-vulnerability upgrade, not a choice made
+// here) - same fixed weights as before; next/font rejects axes here
+// since they only apply when weight is 'variable', not a fixed list.
+const bigShouldersDisplay = Big_Shoulders({
   subsets: ['latin'],
   weight: ['600', '700', '800'],
   variable: '--font-display',

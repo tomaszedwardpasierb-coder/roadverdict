@@ -48,7 +48,7 @@
      was no longer actually loaded as a real font. Updated to match
      what's genuinely loaded now, removing the conflict rather than
      leaving two different sources of truth for the same variable. */
-  --font-display: 'Big Shoulders Display', 'Arial Narrow', sans-serif;
+  --font-display: 'Big Shoulders', 'Arial Narrow', sans-serif;
   --font-body: 'Inter', system-ui, sans-serif;
   --font-mono: 'IBM Plex Mono', 'Courier New', monospace;
 }

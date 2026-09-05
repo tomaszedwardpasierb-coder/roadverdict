@@ -35,7 +35,7 @@ const jsonLd = {
 };
 
 export default async function QuoteCheckerPage() {
-  const nonce = headers().get('x-nonce') ?? undefined;
+  const nonce = (await headers()).get('x-nonce') ?? undefined;
 
   // Same defensive wrapping as Cost Calculator: this page previously
   // had no Cosmos dependency, and getContainer() throws unconditionally

@@ -37,7 +37,7 @@ const jsonLd = {
 export default async function HomePage() {
   const session = await getSession();
   if (session) redirect('/dashboard');
-  const nonce = headers().get('x-nonce') ?? undefined;
+  const nonce = (await headers()).get('x-nonce') ?? undefined;
 
   return (
     <>

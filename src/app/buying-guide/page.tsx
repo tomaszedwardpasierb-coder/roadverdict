@@ -24,7 +24,7 @@ const jsonLd = {
 };
 
 export default async function BuyingGuidePage() {
-  const nonce = headers().get('x-nonce') ?? undefined;
+  const nonce = (await headers()).get('x-nonce') ?? undefined;
 
   // Same defensive wrapping as Cost Calculator and Quote Checker: this
   // page previously had no Cosmos dependency, and getContainer() throws

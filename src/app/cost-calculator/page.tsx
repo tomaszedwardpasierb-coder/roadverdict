@@ -27,7 +27,7 @@ const jsonLd = {
 };
 
 export default async function CostCalculatorPage() {
-  const nonce = headers().get('x-nonce') ?? undefined;
+  const nonce = (await headers()).get('x-nonce') ?? undefined;
 
   // Wrapped rather than called directly: this page previously had no
   // Cosmos dependency at all, and getContainer() throws unconditionally
