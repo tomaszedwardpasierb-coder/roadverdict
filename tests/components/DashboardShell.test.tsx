@@ -52,6 +52,7 @@ function baseProps(overrides: Partial<Parameters<typeof DashboardShell>[0]> = {}
     buyingGuideContent: <div>BuyingGuide content</div>,
     privacyContent: <div>Privacy content</div>,
     transferOwnershipContent: <div>TransferOwnership content</div>,
+    securityContent: <div>Security content</div>,
     storyReady: false,
     hasIncomingRequest: false,
     ...overrides,

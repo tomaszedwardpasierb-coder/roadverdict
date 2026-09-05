@@ -74,6 +74,8 @@ import { LockedStatCard } from "./LockedStatCard";
 import { getProStatus } from "@/lib/subscriptions";
 import { ProGate } from "./ProGate";
 import { PlanComparisonCards } from "@/components/PlanComparisonCards";
+import { isTwoFactorEnabled } from "@/lib/auth/twoFactor";
+import { TwoFactorSettings } from "./TwoFactorSettings";
 
 export const dynamic = "force-dynamic";
 
@@ -701,6 +703,20 @@ export default async function DashboardPage() {
   // wrapping it the same way would just add a redundant second heading.
   const privacyContent = <PrivacyContent />;
 
+  // Available regardless of plan - unlike the embedded tools above,
+  // account security isn't a Premium upsell, so this deliberately isn't
+  // wrapped in ProGate. No bikeTag/mileagePill header, same reasoning as
+  // privacyContent above - this is account-level, not about this
+  // specific bike.
+  const twoFactorEnabled = await isTwoFactorEnabled(session.email);
+  const securityContent = (
+    <>
+      <h1 className={styles.heading}>Security</h1>
+      <p className={styles.subtext}>Manage how you sign in to your account.</p>
+      <TwoFactorSettings initiallyEnabled={twoFactorEnabled} />
+    </>
+  );
+
   return (
     <DashboardShell
       bikeName={bikeName}
@@ -728,6 +744,7 @@ export default async function DashboardPage() {
       buyingGuideContent={buyingGuideContent}
       privacyContent={privacyContent}
       transferOwnershipContent={transferOwnershipContent}
+      securityContent={securityContent}
       storyReady={storyReady}
       hasIncomingRequest={!!incomingRequest}
     />

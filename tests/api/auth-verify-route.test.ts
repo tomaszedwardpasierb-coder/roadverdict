@@ -6,12 +6,18 @@ const mocks = vi.hoisted(() => ({
   patch: vi.fn(),
   item: vi.fn(),
   createSessionForEmail: vi.fn(),
+  isTwoFactorEnabled: vi.fn(),
+  createPendingLogin: vi.fn(),
 }));
 
 vi.mock("@/lib/cosmos", () => ({
   getContainer: () => ({ item: mocks.item }),
 }));
 vi.mock("@/lib/auth/session", () => ({ createSessionForEmail: mocks.createSessionForEmail }));
+vi.mock("@/lib/auth/twoFactor", () => ({
+  isTwoFactorEnabled: mocks.isTwoFactorEnabled,
+  createPendingLogin: mocks.createPendingLogin,
+}));
 // hashToken/encodeEmail/decodeEmail (auth/crypto) and getSafeRedirectPath
 // (auth/safeRedirect) are deliberately NOT mocked - pure, deterministic
 // helpers that are simpler and more realistic to exercise for real.
@@ -52,6 +58,8 @@ describe("GET /api/auth/verify", () => {
     mocks.item.mockReturnValue({ read: mocks.read, patch: mocks.patch });
     mocks.patch.mockResolvedValue({ resource: {} });
     mocks.createSessionForEmail.mockResolvedValue({ cookieValue: "session-cookie-value", maxAge: 123 });
+    mocks.isTwoFactorEnabled.mockResolvedValue(false);
+    mocks.createPendingLogin.mockResolvedValue({ cookieValue: "pending-cookie-value", maxAge: 300 });
   });
 
   it("redirects to an error page when the token param is missing", async () => {
@@ -145,5 +153,41 @@ describe("GET /api/auth/verify", () => {
 
     expect(mocks.item).toHaveBeenCalledWith(hashToken(RAW_TOKEN), otherEmail);
     expect(mocks.createSessionForEmail).toHaveBeenCalledWith(otherEmail, "unknown", "unknown");
+  });
+
+  describe("when the account has 2FA enabled", () => {
+    beforeEach(() => {
+      mocks.read.mockResolvedValue({ resource: validDoc() });
+      mocks.isTwoFactorEnabled.mockResolvedValue(true);
+    });
+
+    it("does not create a real session - redirects to the code-entry page with a pending cookie instead", async () => {
+      const response = await GET(req(verifyUrl()));
+
+      expect(mocks.createSessionForEmail).not.toHaveBeenCalled();
+      expect(mocks.createPendingLogin).toHaveBeenCalledWith(EMAIL);
+      expect(response.headers.get("location")).toBe(`${APP_URL}/login/verify-2fa`);
+
+      const cookie = response.cookies.get("totp_pending");
+      expect(cookie?.value).toBe("pending-cookie-value");
+      expect(cookie?.httpOnly).toBe(true);
+      expect(cookie?.secure).toBe(true);
+      expect(response.cookies.get("session")).toBeUndefined();
+    });
+
+    it("still marks the magic link used, same as the non-2FA path", async () => {
+      await GET(req(verifyUrl()));
+      expect(mocks.patch).toHaveBeenCalledWith([{ op: "replace", path: "/used", value: true }]);
+    });
+
+    it("carries a requested safe redirect destination through to the code-entry page's own query string", async () => {
+      const response = await GET(req(verifyUrl({ redirect: "/tracker/settings" })));
+      expect(response.headers.get("location")).toBe(`${APP_URL}/login/verify-2fa?redirect=%2Ftracker%2Fsettings`);
+    });
+
+    it("drops an unsafe off-host redirect rather than carrying it through to the code-entry page", async () => {
+      const response = await GET(req(verifyUrl({ redirect: "https://evil.example/phish" })));
+      expect(response.headers.get("location")).toBe(`${APP_URL}/login/verify-2fa`);
+    });
   });
 });

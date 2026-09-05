@@ -28,6 +28,15 @@ export interface UserDoc {
   // src/lib/admin/session.ts), not a per-admin value worth tracking
   // until that changes.
   plan?: { grantedAt: string; expiresAt: string };
+  // Per-user 2FA, distinct from the admin panel's own single shared
+  // TOTP secret (src/lib/admin/session.ts) - see src/lib/auth/twoFactor.ts
+  // for the enroll/disable/verify logic that reads and writes this.
+  totp?: {
+    secretEncrypted: string;
+    enabled: boolean;
+    enrolledAt: string;
+    backupCodeHashes: string[];
+  };
 }
 
 export async function getUserDoc(email: string): Promise<UserDoc | null> {

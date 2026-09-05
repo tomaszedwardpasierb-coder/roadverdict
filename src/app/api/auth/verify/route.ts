@@ -4,6 +4,7 @@ import { getContainer } from "@/lib/cosmos";
 import { hashToken, decodeEmail } from "@/lib/auth/crypto";
 import { createSessionForEmail } from "@/lib/auth/session";
 import { getSafeRedirectPath } from "@/lib/auth/safeRedirect";
+import { isTwoFactorEnabled, createPendingLogin } from "@/lib/auth/twoFactor";
 
 export const dynamic = "force-dynamic";
 
@@ -57,6 +58,24 @@ export async function GET(req: NextRequest) {
   await container.item(tokenHash, email).patch([
     { op: "replace", path: "/used", value: true },
   ]);
+
+  // A real magic-link click is now independently confirmed - if this
+  // account has 2FA on, that's only step one. Hand off to a short-lived
+  // pending-login cookie instead of a real session; the code-entry page
+  // trades it in for the real thing (see totp/login-verify/route.ts).
+  if (await isTwoFactorEnabled(email)) {
+    const { cookieValue, maxAge } = await createPendingLogin(email);
+    const redirectParam = safeRedirect ? `?redirect=${encodeURIComponent(safeRedirect)}` : "";
+    const response = NextResponse.redirect(`${APP_URL}/login/verify-2fa${redirectParam}`);
+    response.cookies.set("totp_pending", cookieValue, {
+      httpOnly: true,
+      secure: true,
+      sameSite: "lax",
+      path: "/",
+      maxAge,
+    });
+    return response;
+  }
 
   const { cookieValue, maxAge } = await createSessionForEmail(email, getClientIp(req), req.headers.get("user-agent") ?? "unknown");
 

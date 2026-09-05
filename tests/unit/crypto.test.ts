@@ -1,5 +1,6 @@
-import { describe, expect, it } from "vitest";
-import { generateToken, hashToken, encodeEmail, decodeEmail } from "@/lib/auth/crypto";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { generateToken, hashToken, encodeEmail, decodeEmail, encryptSecret, decryptSecret } from "@/lib/auth/crypto";
+import { randomBytes } from "crypto";
 
 // generateToken/hashToken are real crypto (randomBytes/SHA-256) - exercised
 // for real here rather than mocked, per this repo's convention (see
@@ -81,5 +82,54 @@ describe("encodeEmail / decodeEmail", () => {
     // in, garbage out) rather than throwing on malformed input from a
     // tampered cookie/query string.
     expect(() => decodeEmail("not-valid-base64!!!")).not.toThrow();
+  });
+});
+
+describe("encryptSecret / decryptSecret", () => {
+  const ORIGINAL_KEY = process.env.TOTP_ENCRYPTION_KEY;
+
+  beforeEach(() => {
+    process.env.TOTP_ENCRYPTION_KEY = randomBytes(32).toString("hex");
+  });
+
+  afterEach(() => {
+    if (ORIGINAL_KEY === undefined) delete process.env.TOTP_ENCRYPTION_KEY;
+    else process.env.TOTP_ENCRYPTION_KEY = ORIGINAL_KEY;
+  });
+
+  it("round-trips a plaintext secret exactly", () => {
+    const encrypted = encryptSecret("JBSWY3DPEHPK3PXP");
+    expect(decryptSecret(encrypted)).toBe("JBSWY3DPEHPK3PXP");
+  });
+
+  it("produces a different ciphertext each time for the same plaintext (random IV per call)", () => {
+    const a = encryptSecret("same-secret");
+    const b = encryptSecret("same-secret");
+    expect(a).not.toBe(b);
+    expect(decryptSecret(a)).toBe("same-secret");
+    expect(decryptSecret(b)).toBe("same-secret");
+  });
+
+  it("fails to decrypt if the ciphertext has been tampered with", () => {
+    const encrypted = encryptSecret("JBSWY3DPEHPK3PXP");
+    const [iv, tag, data] = encrypted.split(".");
+    const tamperedData = data.slice(0, -2) + (data.slice(-2) === "AA" ? "BB" : "AA");
+    expect(() => decryptSecret([iv, tag, tamperedData].join("."))).toThrow();
+  });
+
+  it("fails to decrypt under a different key than the one it was encrypted with", () => {
+    const encrypted = encryptSecret("JBSWY3DPEHPK3PXP");
+    process.env.TOTP_ENCRYPTION_KEY = randomBytes(32).toString("hex");
+    expect(() => decryptSecret(encrypted)).toThrow();
+  });
+
+  it("throws clearly when TOTP_ENCRYPTION_KEY is not configured", () => {
+    delete process.env.TOTP_ENCRYPTION_KEY;
+    expect(() => encryptSecret("anything")).toThrow(/TOTP_ENCRYPTION_KEY/);
+  });
+
+  it("throws clearly when TOTP_ENCRYPTION_KEY is the wrong length", () => {
+    process.env.TOTP_ENCRYPTION_KEY = "tooshort";
+    expect(() => encryptSecret("anything")).toThrow(/32 bytes/);
   });
 });
