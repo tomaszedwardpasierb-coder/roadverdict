@@ -12,6 +12,8 @@ const mocks = vi.hoisted(() => ({
   getBills: vi.fn(),
   getFuelLogs: vi.fn(),
   getReminders: vi.fn(),
+  getBillSeriesForBike: vi.fn(),
+  endBillSeries: vi.fn(),
   copyTrackerDoc: vi.fn(),
   computeSellerReportRowsAndMetrics: vi.fn(),
   computeSellerVerdict: vi.fn(),
@@ -35,6 +37,10 @@ vi.mock("@/lib/tracker/mod", () => ({ getMods: mocks.getMods }));
 vi.mock("@/lib/tracker/bill", () => ({ getBills: mocks.getBills }));
 vi.mock("@/lib/tracker/fuelLog", () => ({ getFuelLogs: mocks.getFuelLogs }));
 vi.mock("@/lib/tracker/reminder", () => ({ getReminders: mocks.getReminders }));
+vi.mock("@/lib/tracker/billSeries", () => ({
+  getBillSeriesForBike: mocks.getBillSeriesForBike,
+  endBillSeries: mocks.endBillSeries,
+}));
 vi.mock("@/lib/tracker/cosmosHelpers", () => ({ copyTrackerDoc: mocks.copyTrackerDoc }));
 vi.mock("@/lib/tracker/sellerReportData", () => ({
   computeSellerReportRowsAndMetrics: mocks.computeSellerReportRowsAndMetrics,
@@ -82,6 +88,8 @@ beforeEach(() => {
   mocks.getBills.mockResolvedValue([]);
   mocks.getFuelLogs.mockResolvedValue([]);
   mocks.getReminders.mockResolvedValue([]);
+  mocks.getBillSeriesForBike.mockResolvedValue([]);
+  mocks.endBillSeries.mockResolvedValue({});
   mocks.computeSellerReportRowsAndMetrics.mockReturnValue({
     rows: [], total: 0, verdictMetrics: {},
   });
@@ -282,6 +290,60 @@ describe("transferBike", () => {
     mocks.getServiceRecords.mockResolvedValue([{ id: "sr-1" }]);
     mocks.copyTrackerDoc.mockRejectedValue(new Error("copy failed"));
     const result = await transferBike(fromEmail, bikeId, toEmail, true);
+    expect(result).toMatchObject({ ok: true });
+  });
+
+  // ── billSeries (recurring instalment plans) ────────────────────────────
+
+  it("copies an active bill series to the recipient when includeRecords is true", async () => {
+    mocks.getBillSeriesForBike.mockResolvedValue([{ id: "series-1", status: "active" }]);
+    await transferBike(fromEmail, bikeId, toEmail, true);
+    const seriesCopy = mocks.copyTrackerDoc.mock.calls.find((c: any[]) => c[1] === "billSeries");
+    expect(seriesCopy).toBeDefined();
+    expect(seriesCopy![0]).toMatchObject({ id: "series-1" });
+    expect(seriesCopy![2]).toBe(toEmail);
+    expect(seriesCopy![3]).toBe("new-bike-id");
+  });
+
+  it("does not copy an already-ended or completed bill series", async () => {
+    mocks.getBillSeriesForBike.mockResolvedValue([
+      { id: "ended-series", status: "ended" },
+      { id: "completed-series", status: "completed" },
+    ]);
+    await transferBike(fromEmail, bikeId, toEmail, true);
+    const seriesCopy = mocks.copyTrackerDoc.mock.calls.find((c: any[]) => c[1] === "billSeries");
+    expect(seriesCopy).toBeUndefined();
+  });
+
+  it("does not copy any bill series when includeRecords is false", async () => {
+    mocks.getBillSeriesForBike.mockResolvedValue([{ id: "series-1", status: "active" }]);
+    await transferBike(fromEmail, bikeId, toEmail, false);
+    expect(mocks.copyTrackerDoc).not.toHaveBeenCalled();
+  });
+
+  it("ends the previous owner's active bill series even when includeRecords is false", async () => {
+    mocks.getBillSeriesForBike.mockResolvedValue([{ id: "series-1", status: "active" }]);
+    await transferBike(fromEmail, bikeId, toEmail, false);
+    expect(mocks.endBillSeries).toHaveBeenCalledWith(fromEmail, "series-1");
+  });
+
+  it("ends every active bill series when includeRecords is true, alongside copying them", async () => {
+    mocks.getBillSeriesForBike.mockResolvedValue([{ id: "series-1", status: "active" }, { id: "series-2", status: "active" }]);
+    await transferBike(fromEmail, bikeId, toEmail, true);
+    expect(mocks.endBillSeries).toHaveBeenCalledWith(fromEmail, "series-1");
+    expect(mocks.endBillSeries).toHaveBeenCalledWith(fromEmail, "series-2");
+  });
+
+  it("does not call endBillSeries when there are no active bill series", async () => {
+    mocks.getBillSeriesForBike.mockResolvedValue([{ id: "ended-series", status: "ended" }]);
+    await transferBike(fromEmail, bikeId, toEmail, true);
+    expect(mocks.endBillSeries).not.toHaveBeenCalled();
+  });
+
+  it("still returns ok:true if ending the previous owner's bill series fails", async () => {
+    mocks.getBillSeriesForBike.mockResolvedValue([{ id: "series-1", status: "active" }]);
+    mocks.endBillSeries.mockRejectedValue(new Error("update failed"));
+    const result = await transferBike(fromEmail, bikeId, toEmail, false);
     expect(result).toMatchObject({ ok: true });
   });
 });

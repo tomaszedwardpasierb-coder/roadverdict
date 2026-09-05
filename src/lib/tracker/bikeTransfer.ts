@@ -11,12 +11,17 @@
 // Bike-level facts (identity, registration history, DVLA data, current
 // mileage) always move, along with a frozen summary of what the
 // previous owner's records added up to at the moment of transfer.
-// Whether the individual service/fuel/bill/mod/reminder records
-// themselves also move is the caller's choice via includeRecords -
-// the current owner decides this, since it's their own logged history
-// being handed over, not an automatic consequence of the bike itself
-// changing hands. Attachments (receipt/invoice images) travel with
-// whichever records copy, since blob storage isn't owner-scoped.
+// Whether the individual service/fuel/bill/mod/reminder/billSeries
+// records themselves also move is the caller's choice via
+// includeRecords - the current owner decides this, since it's their
+// own logged history being handed over, not an automatic consequence
+// of the bike itself changing hands. Attachments (receipt/invoice
+// images) travel with whichever records copy, since blob storage isn't
+// owner-scoped. An active billSeries (recurring insurance/finance
+// instalment plan) is the one exception to "includeRecords governs
+// everything": the previous owner's own copy always gets ended on
+// transfer, regardless of includeRecords, since their bike is
+// read-only from this point on either way.
 import { getContainer } from "@/lib/cosmos";
 import { isPro } from "@/lib/subscriptions";
 import { getBike, getBikesForUser, generateBikeId, countActiveBikes, getCurrentRegistration, MAX_FREE_BIKES, type BikeDoc } from "@/lib/tracker/bike";
@@ -26,6 +31,7 @@ import { getMods } from "@/lib/tracker/mod";
 import { getBills } from "@/lib/tracker/bill";
 import { getFuelLogs } from "@/lib/tracker/fuelLog";
 import { getReminders } from "@/lib/tracker/reminder";
+import { getBillSeriesForBike, endBillSeries } from "@/lib/tracker/billSeries";
 import { copyTrackerDoc } from "@/lib/tracker/cosmosHelpers";
 import { computeSellerReportRowsAndMetrics } from "@/lib/tracker/sellerReportData";
 import { computeSellerVerdict } from "@/lib/tracker/sellerReportVerdict";
@@ -101,13 +107,15 @@ export async function transferBike(
   // judged by, reused here so the frozen summary means the same thing
   // everywhere it appears rather than being computed a third, slightly
   // different way.
-  const [records, mods, bills, fuelLogs, reminders] = await Promise.all([
+  const [records, mods, bills, fuelLogs, reminders, billSeries] = await Promise.all([
     getServiceRecords(fromEmail, bikeId),
     getMods(fromEmail, bikeId),
     getBills(fromEmail, bikeId),
     getFuelLogs(fromEmail, bikeId),
     getReminders(fromEmail, bikeId),
+    getBillSeriesForBike(fromEmail, bikeId),
   ]);
+  const activeBillSeries = billSeries.filter((s) => s.status === "active");
   const { rows, total, verdictMetrics } = computeSellerReportRowsAndMetrics(oldBike, records, mods, bills, fuelLogs, reminders);
   const verdict = computeSellerVerdict(verdictMetrics);
 
@@ -183,10 +191,29 @@ export async function transferBike(
       // about anything yet, regardless of whether the previous owner
       // already was before the sale.
       ...reminders.map((rm) => copyTrackerDoc(rm, "reminder", toEmail, newBikeId, { notifiedAt: null })),
+      // An active instalment plan continues under the new owner rather
+      // than silently stopping - lastMaterializedIndex carries over
+      // unchanged, so future auto-materialized instalments keep
+      // numbering correctly from wherever the plan actually is (e.g.
+      // "6 of 12", not restarting at 1).
+      ...activeBillSeries.map((s) => copyTrackerDoc(s, "billSeries", toEmail, newBikeId)),
     ]);
     const failures = copyResults.filter((r) => r.status === "rejected");
     if (failures.length > 0) {
       console.error(`transferBike: ${failures.length} record(s) failed to copy for bike ${newBikeId}:`, failures);
+    }
+  }
+
+  // Ends the previous owner's own active instalment plan(s) regardless
+  // of includeRecords - the old bike is read-only from this point on no
+  // matter what, so a plan left "active" would otherwise keep
+  // auto-materializing new instalment bills against a bike its former
+  // owner no longer has any real reason to be paying for.
+  if (activeBillSeries.length > 0) {
+    const endResults = await Promise.allSettled(activeBillSeries.map((s) => endBillSeries(fromEmail, s.id)));
+    const endFailures = endResults.filter((r) => r.status === "rejected");
+    if (endFailures.length > 0) {
+      console.error(`transferBike: ${endFailures.length} bill series failed to end for the previous owner of bike ${bikeId}:`, endFailures);
     }
   }
 

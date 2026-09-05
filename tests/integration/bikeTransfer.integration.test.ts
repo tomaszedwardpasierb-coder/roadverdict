@@ -24,6 +24,7 @@ import { transferBike } from "@/lib/tracker/bikeTransfer";
 import { createBike, getBike, MAX_FREE_BIKES } from "@/lib/tracker/bike";
 import { createServiceRecord, getServiceRecords } from "@/lib/tracker/serviceRecord";
 import { createReminder, getReminders, markReminderNotified } from "@/lib/tracker/reminder";
+import { createBillSeries, getBillSeriesForBike } from "@/lib/tracker/billSeries";
 import { cleanupPartition, testPk } from "./testCosmos";
 
 function newBikeData(overrides: Partial<Parameters<typeof createBike>[1]> = {}) {
@@ -181,5 +182,57 @@ describe("bikeTransfer.ts against a real Cosmos container (emulator)", () => {
     await createBike(toEmail, newBikeData({ registration }));
 
     expect(await transferBike(fromEmail, bike.id, toEmail, false)).toEqual({ ok: false, reason: "recipient_already_has_bike" });
+  });
+
+  it("copies an active bill series to the recipient when includeRecords is true, and ends the previous owner's own copy", async () => {
+    const fromEmail = trackPk("billseries-transfer-from");
+    const toEmail = trackPk("billseries-transfer-to");
+    const { bike: oldBike } = (await createBike(fromEmail, newBikeData())) as { ok: true; bike: { id: string } };
+    const series = await createBillSeries(fromEmail, {
+      bikeId: oldBike.id,
+      billType: "insurance",
+      frequency: "monthly",
+      startDate: "2026-01-01",
+      collectionDay: 1,
+      instalmentAmount: 45,
+      instalmentCount: 12,
+    });
+
+    const result = await transferBike(fromEmail, oldBike.id, toEmail, true);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    const recipientSeries = await getBillSeriesForBike(toEmail, result.newBike.id);
+    expect(recipientSeries).toHaveLength(1);
+    expect(recipientSeries[0]).toMatchObject({ billType: "insurance", instalmentCount: 12, status: "active" });
+
+    // The previous owner's own copy is ended, not left active against a
+    // bike that's now read-only for them.
+    const previousOwnerSeries = await getBillSeriesForBike(fromEmail, oldBike.id);
+    expect(previousOwnerSeries).toHaveLength(1);
+    expect(previousOwnerSeries[0].status).toBe("ended");
+  });
+
+  it("ends the previous owner's active bill series even when includeRecords is false, without copying it to the recipient", async () => {
+    const fromEmail = trackPk("billseries-norecords-from");
+    const toEmail = trackPk("billseries-norecords-to");
+    const { bike: oldBike } = (await createBike(fromEmail, newBikeData())) as { ok: true; bike: { id: string } };
+    await createBillSeries(fromEmail, {
+      bikeId: oldBike.id,
+      billType: "finance",
+      frequency: "monthly",
+      startDate: "2026-01-01",
+      collectionDay: 1,
+      instalmentAmount: 120,
+      instalmentCount: 36,
+    });
+
+    const result = await transferBike(fromEmail, oldBike.id, toEmail, false);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    expect(await getBillSeriesForBike(toEmail, result.newBike.id)).toEqual([]);
+    const previousOwnerSeries = await getBillSeriesForBike(fromEmail, oldBike.id);
+    expect(previousOwnerSeries[0].status).toBe("ended");
   });
 });
