@@ -23,7 +23,11 @@
 // whether that specific feature is later toggled on) pulls in legacy
 // packages (cls-hooked, async-listener) that reference genuine Node-only
 // built-ins - crypto, os, http, net, timers - none of which exist in the
-// Edge runtime webpack also tries to bundle this file for. A plain
+// Edge runtime webpack also tries to bundle this file for. Upgraded to
+// applicationinsights v3 (OpenTelemetry-based internally) to clear a
+// real npm audit CVE - its shim re-exports the identical setup().start()
+// fluent API with the same method signatures, so the call chain below
+// is unchanged and was verified to still both build and run correctly. A plain
 // require() or import() is visible to webpack's static analysis, which
 // is exactly what triggers it trying and failing to resolve those
 // built-ins for a target that will never actually run this code at all,
