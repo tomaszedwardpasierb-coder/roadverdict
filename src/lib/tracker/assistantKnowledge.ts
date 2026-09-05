@@ -147,8 +147,12 @@ against what's actually wired up.
 - Look up, compare against, or in any way reference another account's data - see above.
 - Read or describe the contents of a receipt image or attachment itself - only the data that
   was extracted from it and saved (amount, date, category), never the document.
-- Take any action on your account. It can look things up; it cannot log, edit, or delete
-  anything for you. This is a lookup-only system by design, not a pending decision.
+- Directly change anything on your account by itself. On a Premium account, it can prepare a
+  draft of a new service record, bill, modification/accessory, or fuel entry from what you
+  describe (see 6.22) - but it never saves that draft without you reviewing it and clicking
+  confirm yourself. Everything else - editing or deleting anything already logged, changing
+  account settings like 2FA, anything at all beyond drafting a brand-new entry - is still
+  lookup/explain only, never something it does for you.
 - Never answer as if a lookup returning nothing or failing settles the question. It should
   say plainly that it doesn't see anything logged for that, rather than estimate a figure to
   avoid an empty answer.
@@ -434,6 +438,63 @@ act on the request; the current owner only ever sees the requester's email once 
 actually asked.
 **A request that's never acted on expires after 7 days**, in either direction - after that, it
 simply lapses, and the same request would need to be made again.
+
+---
+
+### 6.21 Two-factor authentication (2FA)
+**What:** An extra step when signing in - after clicking your usual sign-in email link, you also
+enter a 6-digit code from an authenticator app (or one of your backup codes) before you're let
+in.
+**Why:** A sign-in link alone only proves you can click a link in your email - if someone else
+ever got into that inbox, they could sign in as you too. Turning this on means your email alone
+stops being enough.
+**Status:** Live. Available on every account, free or Premium - this is never a paid feature.
+**How to turn it on:** Security tab (in the sidebar; under "More" on mobile) → "Set up
+two-factor authentication." A QR code appears - scan it with an authenticator app (Google
+Authenticator, Microsoft Authenticator, Authy, or a password manager like 1Password or Bitwarden
+that supports authenticator codes; on iPhone, the built-in Passwords app works too, no extra app
+needed - Settings → Passwords → set up a verification code). Can't scan it? A manual-entry code
+is shown alongside the QR for typing in by hand instead. Enter the 6-digit code the app now
+shows to confirm it worked, then save the 8 backup codes shown - each works once, and is the way
+back in if you ever lose your phone. They're shown exactly once.
+**From then on:** after clicking your sign-in email link, an "enter your code" screen appears
+before you're signed in.
+**Turning it off:** same Security tab → "Turn off" → enter your current code, or one of your
+backup codes, to confirm.
+**What the assistant can't do here:** this can only be explained, never carried out on the
+user's behalf - turning 2FA on or off always needs the person's own click and their own code, the
+same way it can't sign anyone in or out either.
+
+---
+
+### 6.22 Logging a new entry via chat
+**What:** Describe something you want to log - a service item, a bill, a modification or
+accessory, or a fuel fill-up - in plain language, and the assistant drafts it for you right there
+in the conversation, instead of you going to find the right form yourself.
+**Why:** Typing "add a valve cleaner for £4, today" is faster than opening the Service tab,
+picking a job type from a list, and filling in a form for something small. This exists for the
+quick, low-friction cases - it doesn't replace the manual forms, which still work exactly as
+before and are the only way to edit or delete something already logged.
+**Status:** Live. **Premium only** - not available on a free account. Asked to log something on
+a free account, the assistant says so plainly and points to the dashboard forms instead, rather
+than pretending to do it.
+**How:** describe what happened - what it was, the cost, and (if not today) the date - and the
+assistant replies with an editable draft card: category, description, cost, date, and mileage
+where relevant. Nothing is saved yet. Review it, change anything that's wrong, then click **Log
+it** yourself - only that click actually saves it, going through the exact same check every
+manual form already uses (so a mileage that doesn't add up against your history is flagged the
+same way, with the same option to confirm it anyway).
+**Categories it covers:** service records, bills (insurance/road tax/MOT/finance),
+modifications/accessories, and fuel fill-ups - all four, the same categories the manual forms
+cover.
+**Getting the category right:** for a bill, if it isn't clear which of the four types it is, the
+assistant asks rather than guessing, since there's no safe default for a bill. For a
+modification/accessory, an unclear or very specific item (a wax, a cleaning product, anything
+not in the exact catalog) is filed under "Other accessory" rather than blocking the draft -
+correct it on the card if the guess is wrong.
+**What this can't do:** edit or delete anything already logged - only draft a brand-new entry.
+And it's exactly as bound by the mileage/date checks as the manual forms - it can't skip past a
+check the person themselves couldn't skip past either.
 
 ---
 

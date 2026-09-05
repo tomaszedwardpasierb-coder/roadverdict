@@ -220,6 +220,23 @@ describe("POST /api/assistant", () => {
     expect(callBody.systemInstruction.parts[0].text).toContain('CURRENT DASHBOARD TAB: the signed-in user currently has the "Shareable Links" tab open');
   });
 
+  // Regression test: DASHBOARD_TAB_LABELS is a hand-maintained copy of
+  // DashboardShell.tsx's own Section keys, not derived from it - the
+  // "security" tab was added there without a matching entry here,
+  // meaning the assistant silently had no idea that tab was open at all
+  // (the dashboardTab lookup fell through to null, exactly like an
+  // unrecognised key below). Any future new tab needs an entry both
+  // here and in DashboardShell's own list, since nothing enforces that
+  // structurally.
+  it("recognizes the security tab (2FA settings)", async () => {
+    mocks.getSession.mockResolvedValue({ email: "rider@example.com" });
+
+    await POST(request({ messages: [{ role: "user", content: "what's this for?" }], dashboardTab: "security" }));
+
+    const callBody = JSON.parse(mocks.fetch.mock.calls[0][1].body);
+    expect(callBody.systemInstruction.parts[0].text).toContain('CURRENT DASHBOARD TAB: the signed-in user currently has the "Security" tab open');
+  });
+
   it("ignores an unrecognised dashboardTab key rather than passing arbitrary client text into the prompt", async () => {
     mocks.getSession.mockResolvedValue({ email: "rider@example.com" });
 

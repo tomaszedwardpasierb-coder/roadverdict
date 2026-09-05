@@ -85,6 +85,7 @@ const DASHBOARD_TAB_LABELS: Record<string, string> = {
   buyingGuide: "Buying a used bike",
   privacy: "Privacy",
   transferOwnership: "Transfer ownership",
+  security: "Security",
 };
 
 function buildSystemInstruction(config: AssistantConfigDoc, signedIn: boolean, privacyPolicyText: string | null, reportOpen: boolean, dashboardTabLabel: string | null, compareBikeNames: string[] | null, logEntryAccess: "available" | "upsell" | "none"): string {
