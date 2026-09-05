@@ -13,9 +13,38 @@ import {
   getUnreadNotificationCount,
   markAllNotificationsRead,
   markNotificationRead,
+  getBroadcastSummaries,
+  clearNotifications,
+  purgeOldNotifications,
 } from "@/lib/tracker/notification";
 import { getContainer } from "@/lib/cosmos";
 import { cleanupPartition, testPk } from "./testCosmos";
+
+// Writes a notification doc directly, bypassing createBroadcastNotifications
+// (which always stamps "now") - purgeOldNotifications needs fixtures with
+// specific past createdAt/readAt values to prove its date-cutoff logic
+// against the real query engine, not just its own generated timestamps.
+async function createRawNotification(pk: string, overrides: { createdAt: string; readAt?: string; title?: string; body?: string }) {
+  const container = getContainer();
+  const id = crypto.randomUUID();
+  await container.items.create({
+    id,
+    pk,
+    type: "notification",
+    kind: "broadcast",
+    title: overrides.title ?? "Test",
+    body: overrides.body ?? "Body",
+    createdAt: overrides.createdAt,
+    ...(overrides.readAt ? { readAt: overrides.readAt } : {}),
+  });
+  return id;
+}
+
+function daysAgo(n: number): string {
+  const d = new Date();
+  d.setDate(d.getDate() - n);
+  return d.toISOString();
+}
 
 describe("notification.ts against a real Cosmos container (emulator)", () => {
   let pks: string[];
@@ -103,5 +132,82 @@ describe("notification.ts against a real Cosmos container (emulator)", () => {
     await createBroadcastNotifications([emailA], { title: "Only for A", body: "..." });
 
     expect(await getNotificationsForUser(emailB)).toEqual([]);
+  });
+
+  it("getBroadcastSummaries groups per-recipient docs from the same send by (title, body, createdAt)", async () => {
+    const emailA = trackPk("summary-a");
+    const emailB = trackPk("summary-b");
+    await createBroadcastNotifications([emailA, emailB], { title: "Group me", body: "Same send" });
+
+    const summaries = await getBroadcastSummaries();
+    const match = summaries.find((s) => s.title === "Group me" && s.body === "Same send");
+    expect(match).toBeDefined();
+    expect(match?.recipientCount).toBe(2);
+  });
+
+  it("clearNotifications('all' broadcasts, specific recipients) only deletes for the named recipients", async () => {
+    const emailA = trackPk("clear-specific-a");
+    const emailB = trackPk("clear-specific-b");
+    await createBroadcastNotifications([emailA, emailB], { title: "Clear me", body: "..." });
+
+    const deleted = await clearNotifications({ broadcasts: "all", recipients: [emailA] });
+    expect(deleted).toBe(1);
+    expect(await getNotificationsForUser(emailA)).toEqual([]);
+    expect(await getNotificationsForUser(emailB)).toHaveLength(1);
+  });
+
+  it("clearNotifications with a specific broadcast filter leaves other notifications for the same user untouched", async () => {
+    const email = trackPk("clear-specific-broadcast");
+    await createBroadcastNotifications([email], { title: "Keep me", body: "..." });
+    await createBroadcastNotifications([email], { title: "Delete me", body: "..." });
+
+    const all = await getNotificationsForUser(email);
+    const toDelete = all.find((n) => n.title === "Delete me")!;
+
+    const deleted = await clearNotifications({
+      broadcasts: [{ title: toDelete.title, body: toDelete.body, createdAt: toDelete.createdAt }],
+      recipients: "all",
+    });
+    expect(deleted).toBe(1);
+
+    const remaining = await getNotificationsForUser(email);
+    expect(remaining).toHaveLength(1);
+    expect(remaining[0].title).toBe("Keep me");
+  });
+
+  it("purgeOldNotifications deletes a read notification past the read-retention cutoff", async () => {
+    const email = trackPk("purge-old-read");
+    await createRawNotification(email, { createdAt: daysAgo(200), readAt: daysAgo(120) });
+
+    await purgeOldNotifications();
+
+    expect(await getNotificationsForUser(email)).toEqual([]);
+  });
+
+  it("purgeOldNotifications keeps a recently-read notification", async () => {
+    const email = trackPk("purge-recent-read");
+    await createRawNotification(email, { createdAt: daysAgo(10), readAt: daysAgo(5) });
+
+    await purgeOldNotifications();
+
+    expect(await getNotificationsForUser(email)).toHaveLength(1);
+  });
+
+  it("purgeOldNotifications keeps an unread notification that isn't yet ancient", async () => {
+    const email = trackPk("purge-unread-not-ancient");
+    await createRawNotification(email, { createdAt: daysAgo(100) });
+
+    await purgeOldNotifications();
+
+    expect(await getNotificationsForUser(email)).toHaveLength(1);
+  });
+
+  it("purgeOldNotifications deletes an unread notification once it's genuinely ancient", async () => {
+    const email = trackPk("purge-unread-ancient");
+    await createRawNotification(email, { createdAt: daysAgo(400) });
+
+    await purgeOldNotifications();
+
+    expect(await getNotificationsForUser(email)).toEqual([]);
   });
 });
