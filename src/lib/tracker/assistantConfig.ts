@@ -200,3 +200,67 @@ export async function prunePersonalityVersions(): Promise<number> {
   }
   return results.filter((r) => r.status === "fulfilled").length;
 }
+
+// ---- Car assistant config - a second, separate knowledge base ----
+//
+// Deliberately its own document, own type, own version-history type -
+// never merged with the motorcycle config above, even though the shape
+// is similar (see the ADR: one shared assistant route, but two
+// knowledge bases). No personality slots here - the car assistant
+// doesn't have that concept (yet); adding it later is additive.
+//
+// No seed migration, unlike the motorcycle config: that one exists to
+// port over ASSISTANT_KNOWLEDGE_BASE, a hardcoded constant that
+// predates the database-backed config. There's no equivalent hardcoded
+// car knowledge base to migrate from - the first save from /tomasz's
+// (future) car knowledge base editor creates this document, via the
+// same upsert every later save uses.
+
+export interface CarAssistantConfigDoc {
+  id: "assistantConfig-car";
+  pk: "system";
+  type: "assistantConfigCar";
+  knowledgeBase: string;
+  knowledgeBaseUpdatedAt: string;
+}
+
+export interface CarKnowledgeBaseVersionDoc {
+  id: string;
+  pk: "system";
+  type: "knowledgeBaseVersionCar";
+  content: string;
+  savedAt: string;
+}
+
+export async function getCarAssistantConfig(): Promise<CarAssistantConfigDoc | null> {
+  const container = getContainer();
+  try {
+    const { resource } = await container.item("assistantConfig-car", "system").read<CarAssistantConfigDoc>();
+    return resource ?? null;
+  } catch {
+    return null;
+  }
+}
+
+export async function updateCarKnowledgeBase(newContent: string): Promise<void> {
+  const container = getContainer();
+  const now = new Date().toISOString();
+
+  const updated: CarAssistantConfigDoc = {
+    id: "assistantConfig-car",
+    pk: "system",
+    type: "assistantConfigCar",
+    knowledgeBase: newContent,
+    knowledgeBaseUpdatedAt: now,
+  };
+  await container.items.upsert(updated);
+
+  const version: CarKnowledgeBaseVersionDoc = {
+    id: `kbVersionCar::${Date.now()}::${randomSuffix()}`,
+    pk: "system",
+    type: "knowledgeBaseVersionCar",
+    content: newContent,
+    savedAt: now,
+  };
+  await container.items.create(version);
+}

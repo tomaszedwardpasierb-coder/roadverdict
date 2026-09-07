@@ -1,0 +1,54 @@
+// Place at: src/lib/tracker/carJobTypes.ts
+//
+// The car equivalent of jobTypes.ts's JOB_LABELS - almost no overlap
+// with the motorcycle list (see the ADR's divergence table). "other" is
+// the safe universal fallback, same role it plays for motorcycles.
+export const CAR_JOB_LABELS: Record<string, string> = {
+  "oil-filter": "Oil & filter change",
+  "interim-service": "Interim service",
+  "full-service": "Full service",
+  "brake-pads-front": "Brake pads (front)",
+  "brake-pads-rear": "Brake pads (rear)",
+  "brake-discs": "Brake discs",
+  "tyres-full-set": "Tyres (full set)",
+  "tyres-front-pair": "Tyres (front pair)",
+  "tyres-rear-pair": "Tyres (rear pair)",
+  "tyres-single": "Single tyre",
+  "cambelt": "Cambelt / timing belt replacement",
+  "timing-chain": "Timing chain service",
+  "clutch": "Clutch replacement",
+  "battery-12v": "12V battery",
+  "battery-hv": "High-voltage battery service (EV/PHEV)",
+  "aircon-regas": "Air conditioning regas",
+  "dpf-clean": "DPF cleaning",
+  "gearbox-oil": "Gearbox oil change",
+  "coolant-flush": "Coolant flush",
+  "brake-fluid-flush": "Brake fluid flush",
+  "spark-plugs": "Spark plugs",
+  "air-filter": "Air filter",
+  "cabin-filter": "Cabin / pollen filter",
+  "wheel-alignment": "Wheel alignment / tracking",
+  "mot-advisory": "MOT advisory repair",
+  "bodywork": "Bodywork / paint repair",
+  "windscreen": "Windscreen repair or replacement",
+  "other": "Other",
+};
+
+export const CAR_JOB_REMINDER_DEFAULTS: Record<string, { type: "mileage" | "months"; value: number; note?: string }> = {
+  "oil-filter": { type: "mileage", value: 10000 },
+  "interim-service": { type: "mileage", value: 6000 },
+  "full-service": { type: "mileage", value: 12000 },
+  "brake-fluid-flush": { type: "months", value: 24, note: "Time-based, not mileage - brake fluid absorbs moisture from the air regardless of use." },
+  "coolant-flush": { type: "months", value: 24 },
+  "cambelt": { type: "mileage", value: 60000, note: "Varies a lot by make/model - always check your manufacturer's handbook for the real interval." },
+  "aircon-regas": { type: "months", value: 24 },
+  "cabin-filter": { type: "mileage", value: 12000 },
+  "air-filter": { type: "mileage", value: 20000 },
+  "spark-plugs": { type: "mileage", value: 30000 },
+  "battery-12v": { type: "months", value: 48 },
+};
+
+// Deliberately empty until Phase 7a's price research lands - a job type
+// only belongs here once it has a real, sourced, dated benchmark behind
+// it (see the ADR: no guessed numbers wearing a confidence label).
+export const CAR_BENCHMARKED_JOB_TYPES: string[] = [];

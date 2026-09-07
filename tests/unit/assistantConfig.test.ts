@@ -26,6 +26,8 @@ import {
   getPersonalityVersions,
   pruneKnowledgeBaseVersions,
   prunePersonalityVersions,
+  getCarAssistantConfig,
+  updateCarKnowledgeBase,
   type PersonalitySlot,
 } from "@/lib/tracker/assistantConfig";
 
@@ -199,5 +201,77 @@ describe("pruneKnowledgeBaseVersions / prunePersonalityVersions", () => {
     mocks.fetchAll.mockResolvedValue({ resources: [{ id: "kb1" }, { id: "kb2" }] });
     mocks.deleteFn.mockResolvedValueOnce(undefined).mockRejectedValueOnce(new Error("boom"));
     expect(await pruneKnowledgeBaseVersions()).toBe(1);
+  });
+});
+
+// ---------------------------------------------------------------------
+// Car assistant config - a second, separate document and version type,
+// never merged with the motorcycle one above (see the ADR).
+// ---------------------------------------------------------------------
+
+describe("getCarAssistantConfig", () => {
+  beforeEach(() => mocks.read.mockReset());
+
+  it("reads from its own document id, distinct from the motorcycle config", async () => {
+    mocks.read.mockResolvedValue({ resource: undefined });
+    await getCarAssistantConfig();
+    expect(mockContainer.item).toHaveBeenCalledWith("assistantConfig-car", "system");
+  });
+
+  it("returns null when no car config document exists yet", async () => {
+    mocks.read.mockResolvedValue({ resource: undefined });
+    expect(await getCarAssistantConfig()).toBeNull();
+  });
+
+  it("returns the car config document when it exists", async () => {
+    const carConfig = { id: "assistantConfig-car", pk: "system", type: "assistantConfigCar", knowledgeBase: "car knowledge", knowledgeBaseUpdatedAt: "2025-01-01T00:00:00.000Z" };
+    mocks.read.mockResolvedValue({ resource: carConfig });
+    expect(await getCarAssistantConfig()).toEqual(carConfig);
+  });
+
+  it("fails soft to null if the read itself throws", async () => {
+    mockContainer.item.mockReturnValueOnce({ read: vi.fn(async () => { throw new Error("cosmos unavailable"); }), delete: mocks.deleteFn });
+    expect(await getCarAssistantConfig()).toBeNull();
+  });
+});
+
+describe("updateCarKnowledgeBase", () => {
+  beforeEach(() => {
+    Object.values(mocks).forEach((m) => m.mockReset());
+    mocks.upsert.mockResolvedValue(undefined);
+    mocks.create.mockResolvedValue(undefined);
+  });
+
+  // Unlike updateKnowledgeBase (motorcycle), this must NOT require a
+  // pre-existing document - there's no hardcoded legacy content to
+  // migrate from, so the first save from the (future) car knowledge
+  // base editor has to be the thing that creates it.
+  it("creates the document on first save, with no pre-existing config required", async () => {
+    await updateCarKnowledgeBase("first car knowledge base content");
+    expect(mocks.upsert).toHaveBeenCalledWith(expect.objectContaining({
+      id: "assistantConfig-car",
+      pk: "system",
+      type: "assistantConfigCar",
+      knowledgeBase: "first car knowledge base content",
+    }));
+  });
+
+  it("also creates a version snapshot, under its own distinct version type", async () => {
+    await updateCarKnowledgeBase("new car knowledge");
+    expect(mocks.create).toHaveBeenCalledWith(expect.objectContaining({
+      type: "knowledgeBaseVersionCar",
+      content: "new car knowledge",
+    }));
+  });
+
+  // The whole point of a separate version type: pruneKnowledgeBaseVersions
+  // (motorcycle-only, filters on type: 'knowledgeBaseVersion') must never
+  // pick up a car version snapshot, and vice versa for a future
+  // car-specific prune function.
+  it("writes a version type distinct from the motorcycle knowledgeBaseVersion type", async () => {
+    await updateCarKnowledgeBase("new car knowledge");
+    const version = mocks.create.mock.calls[0][0];
+    expect(version.type).not.toBe("knowledgeBaseVersion");
+    expect(version.type).toBe("knowledgeBaseVersionCar");
   });
 });
