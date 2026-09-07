@@ -19,7 +19,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/session";
 import { getPrimaryBike } from "@/lib/tracker/bike";
+import { getPrimaryCar } from "@/lib/tracker/car";
 import { commitReceiptItem, type ReviewQueueEntry } from "@/lib/tracker/commitReceiptItem";
+import { commitCarReceiptItem } from "@/lib/tracker/commitCarReceiptItem";
 import type { ParsedReceiptItem } from "@/lib/tracker/receiptParse";
 
 export const dynamic = "force-dynamic";
@@ -30,17 +32,25 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Not signed in." }, { status: 401 });
   }
 
-  const bike = await getPrimaryBike(session.email);
-  if (!bike) {
-    return NextResponse.json({ error: "No bike found for this account." }, { status: 404 });
-  }
-
-  let body: { items?: ParsedReceiptItem[] };
+  let body: { items?: ParsedReceiptItem[]; vehicleKind?: string };
   try {
     body = await request.json();
   } catch {
     return NextResponse.json({ error: "Invalid request." }, { status: 400 });
   }
+
+  // Not sent by the current (motorcycle-only) client yet - defaults to
+  // "motorcycle" so existing callers keep working unchanged.
+  const vehicleKind = body.vehicleKind === "car" ? "car" : "motorcycle";
+  const bike = vehicleKind === "motorcycle" ? await getPrimaryBike(session.email) : null;
+  const car = vehicleKind === "car" ? await getPrimaryCar(session.email) : null;
+  if (vehicleKind === "motorcycle" && !bike) {
+    return NextResponse.json({ error: "No bike found for this account." }, { status: 404 });
+  }
+  if (vehicleKind === "car" && !car) {
+    return NextResponse.json({ error: "No car found for this account." }, { status: 404 });
+  }
+
   if (!Array.isArray(body.items) || body.items.length === 0) {
     return NextResponse.json({ createdEntries: [], createdCount: 0, categories: [], failedItems: [], failedCount: 0 });
   }
@@ -48,13 +58,17 @@ export async function POST(request: NextRequest) {
   // Trust nothing about ordering from the client - re-sort here too.
   const items = [...body.items].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
+  const commitItem = bike
+    ? (item: ParsedReceiptItem) => commitReceiptItem(session.email, bike, item)
+    : (item: ParsedReceiptItem) => commitCarReceiptItem(session.email, car as NonNullable<typeof car>, item);
+
   const createdEntries: ReviewQueueEntry[] = [];
   const failedItems: ParsedReceiptItem[] = [];
   let lastErrorDetail: string | undefined;
 
   for (const item of items) {
     try {
-      createdEntries.push(await commitReceiptItem(session.email, bike, item));
+      createdEntries.push(await commitItem(item));
     } catch (err) {
       // Kept in the batch rather than dropped - each failed item is
       // still real, unsaved data the caller needs back so it can be

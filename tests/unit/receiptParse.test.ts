@@ -25,7 +25,7 @@ vi.mock("@/lib/tracker/geminiUsageLog", () => ({ logGeminiUsage: mocks.logGemini
 // mods-category carve-out from the production-year check) is exactly
 // what several tests below are confirming.
 
-import { parseReceiptFile } from "@/lib/tracker/receiptParse";
+import { parseReceiptFile, vehicleKindOf } from "@/lib/tracker/receiptParse";
 
 function geminiResponse(bodyText: string) {
   return { ok: true, json: async () => ({ candidates: [{ content: { parts: [{ text: bodyText }] } }] }) };
@@ -38,7 +38,8 @@ function fakeFile(overrides: Partial<{ name: string; type: string; size: number 
     arrayBuffer: async () => new ArrayBuffer(8),
   } as unknown as File;
 }
-const bike = { id: "bike-1", year: 2018 } as any; // production year 2018, used by isBeforeProduction
+const bike = { id: "bike-1", type: "bike", year: 2018 } as any; // production year 2018, used by isBeforeProduction; type: "bike" drives vehicleKindOf
+const car = { id: "car-1", type: "car", year: 2018 } as any; // same shape, but type: "car" drives vehicleKindOf the other way
 
 const validGeminiPayload = {
   isReceipt: true,
@@ -365,5 +366,95 @@ describe("parseReceiptFile", () => {
     if (result.ok) {
       expect(result.items[0].attachment?.fileType).toBe('application/pdf');
     }
+  });
+});
+
+describe("vehicleKindOf", () => {
+  it("reads 'motorcycle' off a bike doc (type: 'bike')", () => {
+    expect(vehicleKindOf(bike)).toBe("motorcycle");
+  });
+
+  it("reads 'car' off anything that isn't type: 'bike'", () => {
+    expect(vehicleKindOf(car)).toBe("car");
+  });
+});
+
+// Car-specific prompt/skip-logic differences - everything else about
+// parseReceiptFile (currency conversion, attachment sharing, low-
+// confidence escalation, mileage/registration parsing) is identical
+// vehicle-agnostic code already covered above against a bike; these
+// tests only cover the handful of places that genuinely branch on
+// vehicleKind.
+describe("car-aware prompt and skip-logic", () => {
+  beforeEach(() => {
+    Object.values(mocks).forEach((m) => m.mockReset());
+    mocks.sharpToBuffer.mockResolvedValue(Buffer.from("fake-jpeg-bytes"));
+    mocks.uploadData.mockResolvedValue(undefined);
+    mocks.getAttachmentContainer.mockResolvedValue({ getBlockBlobClient: () => ({ uploadData: mocks.uploadData }) });
+    mocks.getExchangeRates.mockResolvedValue({ rates: { EUR: 1.17 }, fetchedAt: "2025-06-01" });
+  });
+
+  afterEach(() => vi.unstubAllGlobals());
+
+  // Diesel is a normal, valid car fuel - only "other" (genuinely not
+  // engine fuel) gets refused for a car, unlike a motorcycle where
+  // diesel itself is refused outright (see the test of the same name
+  // above, against a bike).
+  it("does NOT skip a diesel fuel item for a car", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(geminiResponse(JSON.stringify({
+      isReceipt: true, items: [{ category: "fuel", date: "2025-06-01", cost: 60, fuelType: "diesel", litres: 40 }],
+    }))));
+    const result = await parseReceiptFile(fakeFile(), "key", car);
+    expect(result).toMatchObject({ ok: true, skippedNonPetrol: 0 });
+    expect((result as any).items).toHaveLength(1);
+  });
+
+  it("still skips a non-fuel-for-an-engine item (fuelType 'other') for a car", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(geminiResponse(JSON.stringify({
+      isReceipt: true, items: [{ category: "fuel", date: "2025-06-01", cost: 5, fuelType: "other", litres: 2 }],
+    }))));
+    const result = await parseReceiptFile(fakeFile(), "key", car);
+    expect(result).toMatchObject({ skippedNonPetrol: 1 });
+  });
+
+  it("still skips a fuel item with unreadable litres for a car, same as a motorcycle", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(geminiResponse(JSON.stringify({
+      isReceipt: true, items: [{ category: "fuel", date: "2025-06-01", cost: 60, fuelType: "petrol", litres: null }],
+    }))));
+    const result = await parseReceiptFile(fakeFile(), "key", car);
+    expect(result).toMatchObject({ ok: true, items: [], skippedUnreadableLitres: 1 });
+  });
+
+  it("still applies the production-year skip to a car, using the car's own year", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(geminiResponse(JSON.stringify({
+      isReceipt: true, items: [{ category: "service", date: "2010-01-01", cost: 50, description: "Oil change" }],
+    }))));
+    const result = await parseReceiptFile(fakeFile(), "key", car);
+    expect(result).toMatchObject({ ok: true, items: [], skippedBeforeProduction: 1 });
+  });
+
+  it("sends a car-worded prompt (not motorcycle wording) when scanning for a car", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(geminiResponse(JSON.stringify(validGeminiPayload)));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await parseReceiptFile(fakeFile(), "key", car);
+
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body);
+    const promptText = body.contents[0].parts[0].text as string;
+    expect(promptText).toContain("UK car-related receipt");
+    expect(promptText).toContain("cambelt");
+    expect(promptText).not.toContain("UK motorcycle-related receipt");
+  });
+
+  it("sends the original motorcycle-worded prompt when scanning for a bike", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(geminiResponse(JSON.stringify(validGeminiPayload)));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await parseReceiptFile(fakeFile(), "key", bike);
+
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body);
+    const promptText = body.contents[0].parts[0].text as string;
+    expect(promptText).toContain("UK motorcycle-related receipt");
+    expect(promptText).toContain("valve clearance");
   });
 });

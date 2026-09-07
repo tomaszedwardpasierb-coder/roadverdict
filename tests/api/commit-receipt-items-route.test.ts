@@ -4,12 +4,16 @@ import { NextRequest } from "next/server";
 const mocks = vi.hoisted(() => ({
   getSession: vi.fn(),
   getPrimaryBike: vi.fn(),
+  getPrimaryCar: vi.fn(),
   commitReceiptItem: vi.fn(),
+  commitCarReceiptItem: vi.fn(),
 }));
 
 vi.mock("@/lib/auth/session", () => ({ getSession: mocks.getSession }));
 vi.mock("@/lib/tracker/bike", () => ({ getPrimaryBike: mocks.getPrimaryBike }));
+vi.mock("@/lib/tracker/car", () => ({ getPrimaryCar: mocks.getPrimaryCar }));
 vi.mock("@/lib/tracker/commitReceiptItem", () => ({ commitReceiptItem: mocks.commitReceiptItem }));
+vi.mock("@/lib/tracker/commitCarReceiptItem", () => ({ commitCarReceiptItem: mocks.commitCarReceiptItem }));
 
 import { POST } from "@/app/api/tracker/commit-receipt-items/route";
 
@@ -22,6 +26,7 @@ function request(body: string): NextRequest {
 }
 
 const bike = { id: "bike-1" };
+const car = { id: "car-1" };
 const itemLater = { category: "fuel", cost: 20, date: "2025-01-05" } as any;
 const itemEarlier = { category: "service", cost: 50, date: "2025-01-01" } as any;
 
@@ -29,6 +34,7 @@ describe("POST /api/tracker/commit-receipt-items", () => {
   beforeEach(() => {
     Object.values(mocks).forEach((m) => m.mockReset());
     mocks.getPrimaryBike.mockResolvedValue(bike);
+    mocks.getPrimaryCar.mockResolvedValue(car);
   });
 
   it("rejects unauthenticated requests", async () => {
@@ -121,5 +127,44 @@ describe("POST /api/tracker/commit-receipt-items", () => {
     const body = await response.json();
     expect(body.error).toBeUndefined();
     expect(body.detail).toBeUndefined();
+  });
+
+  // vehicleKind isn't sent by the current (motorcycle-only) client yet -
+  // every test above omits it and must keep hitting the bike path
+  // unchanged. These cover the car branch once vehicleKind: "car" is sent.
+  describe("vehicleKind: car", () => {
+    it("returns 404 with a car-specific message when the account has no car yet, without ever looking up a bike", async () => {
+      mocks.getSession.mockResolvedValue({ email: "owner@example.com" });
+      mocks.getPrimaryCar.mockResolvedValue(null);
+      const response = await POST(request(JSON.stringify({ items: [itemLater], vehicleKind: "car" })));
+      expect(response.status).toBe(404);
+      await expect(response.json()).resolves.toEqual({ error: "No car found for this account." });
+      expect(mocks.getPrimaryBike).not.toHaveBeenCalled();
+    });
+
+    it("routes every item to commitCarReceiptItem (not commitReceiptItem), still in chronological order", async () => {
+      mocks.getSession.mockResolvedValue({ email: "owner@example.com" });
+      mocks.commitCarReceiptItem.mockImplementation(async (_email, _car, item) => ({ id: `entry-${item.date}`, category: item.category }));
+
+      await POST(request(JSON.stringify({ items: [itemLater, itemEarlier], vehicleKind: "car" })));
+
+      expect(mocks.commitCarReceiptItem).toHaveBeenNthCalledWith(1, "owner@example.com", car, itemEarlier);
+      expect(mocks.commitCarReceiptItem).toHaveBeenNthCalledWith(2, "owner@example.com", car, itemLater);
+      expect(mocks.commitReceiptItem).not.toHaveBeenCalled();
+    });
+
+    it("still continues past a single failed item on the car path", async () => {
+      mocks.getSession.mockResolvedValue({ email: "owner@example.com" });
+      mocks.commitCarReceiptItem
+        .mockResolvedValueOnce({ id: "entry-1", category: "service" })
+        .mockRejectedValueOnce(new Error("bad OCR read"));
+
+      const response = await POST(request(JSON.stringify({ items: [itemEarlier, itemLater], vehicleKind: "car" })));
+
+      expect(response.status).toBe(200);
+      const body = await response.json();
+      expect(body.createdEntries).toEqual([{ id: "entry-1", category: "service" }]);
+      expect(body.failedItems).toEqual([itemLater]);
+    });
   });
 });

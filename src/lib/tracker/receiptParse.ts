@@ -19,6 +19,14 @@ import { isBeforeProduction } from "@/lib/tracker/productionYearCheck";
 import { logGeminiUsage } from "@/lib/tracker/geminiUsageLog";
 import type { Attachment, CurrencyConversionInfo } from "@/lib/tracker/cosmosHelpers";
 import type { BikeDoc } from "@/lib/tracker/bike";
+import type { CarDoc } from "@/lib/tracker/car";
+
+export type ScanVehicle = BikeDoc | CarDoc;
+export type VehicleKind = "motorcycle" | "car";
+
+export function vehicleKindOf(vehicle: ScanVehicle): VehicleKind {
+  return vehicle.type === "bike" ? "motorcycle" : "car";
+}
 
 // Pinned to the exact model already proven live in production - the
 // gemini-2.5-* family this app briefly moved to (per
@@ -43,7 +51,30 @@ const GEMINI_ESCALATION_MODEL = GEMINI_MODEL;
 const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024;
 const ALLOWED_TYPES = new Set(["image/jpeg", "image/png", "application/pdf"]);
 
-const PROMPT = `You are extracting structured data from a photo that is claimed to be a UK motorcycle-related receipt or invoice. First, check whether the image genuinely looks like a receipt or invoice at all (a till receipt, an emailed/printed invoice, a garage work order, etc.) - not a random photo of something else. Then, this receipt may contain ONE purchase, or it may contain SEVERAL distinct items that belong to different categories (for example, an oil change AND a padlock bought at the same garage visit, or fuel AND a snack). Respond with ONLY a JSON object (no markdown, no explanation) matching this exact shape:
+// Only the handful of spots that are genuinely vehicle-specific are
+// parametrised - the rest of the prompt (JSON shape, field-by-field
+// guidance, the illegible-value fallback rule) is identical either way,
+// so it stays one shared template rather than two near-duplicate ~50-
+// line strings that could quietly drift apart.
+function buildPrompt(vehicleKind: VehicleKind): string {
+  const noun = vehicleKind === "motorcycle" ? "motorcycle" : "car";
+  const serviceExamples =
+    vehicleKind === "motorcycle"
+      ? "oil change, brake pads, tyres, chain, valve clearance, etc."
+      : "oil change, brake pads, tyres, cambelt, clutch, etc.";
+  // Petrol genuinely is the overwhelming default for a UK motorcycle
+  // with no fuel-type wording at all - it is NOT for a car (diesel is
+  // common too), so that reasoning would be actively misleading here.
+  // fuelType is only ever used to decide whether a fuel item gets
+  // skipped as "not this vehicle's fuel" (see parseReceiptFile below) -
+  // for a car, nothing is skipped on fuel type alone, so an unclear
+  // guess costs nothing either way.
+  const fuelTypeFallback =
+    vehicleKind === "motorcycle"
+      ? `If there's truly no indication either way, use "petrol", since that's overwhelmingly the common case for a UK motorcycle receipt with no fuel-type wording at all.`
+      : `If there's truly no indication either way, use "petrol" as a neutral placeholder - this only affects motorcycle receipts, so an unclear guess here never changes whether a car's fuel entry gets logged.`;
+
+  return `You are extracting structured data from a photo that is claimed to be a UK ${noun}-related receipt or invoice. First, check whether the image genuinely looks like a receipt or invoice at all (a till receipt, an emailed/printed invoice, a garage work order, etc.) - not a random photo of something else. Then, this receipt may contain ONE purchase, or it may contain SEVERAL distinct items that belong to different categories (for example, an oil change AND a padlock bought at the same garage visit, or fuel AND a snack). Respond with ONLY a JSON object (no markdown, no explanation) matching this exact shape:
 {
   "isReceipt": true or false - false if the image clearly isn't a receipt/invoice of any kind,
   "rejectionReason": if isReceipt is false, a short (max 15 words) plain explanation of why (e.g. "This looks like a photo of a motorcycle, not a receipt."), otherwise null,
@@ -53,7 +84,7 @@ const PROMPT = `You are extracting structured data from a photo that is claimed 
   "merchantName": the name of the business/garage/petrol station this receipt is from, if visible - otherwise null. Only relevant if isReceipt is true.,
   "address": the street address printed on the receipt, if visible (e.g. "14 High Street") - otherwise null. Only relevant if isReceipt is true.,
   "city": the town or city printed on the receipt, if visible - otherwise null. Only relevant if isReceipt is true.,
-  "vehicleMakeOnReceipt": the motorcycle's make/brand, ONLY if this specific receipt or invoice explicitly states which vehicle it is FOR (e.g. a garage invoice header reading "Vehicle: Honda CB500F", or a work order listing the customer's bike) - do NOT return a brand name that just happens to appear as the shop's own name, a parts manufacturer, or an unrelated product on the receipt (e.g. a shop called "Royal Enfield of Manchester", or a "Yamaha" branded oil filter bought for a different bike, do not count - only the vehicle the invoice is actually about). This is genuinely rare - most receipts (fuel, parts, tax, insurance) never state it at all. Otherwise null. Only relevant if isReceipt is true.,
+  "vehicleMakeOnReceipt": the ${noun}'s make/brand, ONLY if this specific receipt or invoice explicitly states which vehicle it is FOR (e.g. a garage invoice header reading "Vehicle: Honda CB500F", or a work order listing the customer's vehicle) - do NOT return a brand name that just happens to appear as the shop's own name, a parts manufacturer, or an unrelated product on the receipt (e.g. a shop called "Royal Enfield of Manchester", or a "Yamaha" branded oil filter bought for a different vehicle, do not count - only the vehicle the invoice is actually about). This is genuinely rare - most receipts (fuel, parts, tax, insurance) never state it at all. Otherwise null. Only relevant if isReceipt is true.,
   "vehicleModelOnReceipt": the specific model, ONLY if named alongside the make above in that same "this is the vehicle" context (e.g. "CB500F", "Meteor 350") - otherwise null. Only relevant if isReceipt is true.,
   "items": [
     {
@@ -62,18 +93,19 @@ const PROMPT = `You are extracting structured data from a photo that is claimed 
       "cost": the cost of just THIS item, in whatever currency you identified above, as a plain number with no currency symbol - not the receipt's grand total, unless there is genuinely only one item,
       "description": a short (max 6 words) plain-English description of this specific item,
       "litres": if category is "fuel" AND you can genuinely read a litres figure, that number as a plain number - otherwise null. Do not guess a number here; a fuel entry with no readable litres is skipped entirely by the caller rather than logged with a made-up amount, so returning null when you're not confident is the correct, safe answer, not a failure.,
-      "fuelType": if category is "fuel", your best read of the fuel type from wording on the receipt (e.g. "unleaded", "premium", "diesel", "super") - one of "petrol", "diesel", "other" (anything that isn't fuel for an engine, e.g. AdBlue). If there's truly no indication either way, use "petrol", since that's overwhelmingly the common case for a UK motorcycle receipt with no fuel-type wording at all. Otherwise null.,
-      "mileageOnReceipt": an odometer/mileage reading, ONLY if you are genuinely confident a specific number on this receipt represents the bike's mileage - e.g. explicit wording like "mileage:", "odometer:", "miles:", or a number clearly logged against a service/inspection for that reason. Do NOT return a number just because it looks plausible as a mileage - order numbers, invoice numbers, part/SKU codes, phone numbers, postcodes, prices, and quantities all commonly appear on receipts and are NOT mileage readings even when they happen to be a few digits long. If there is no clearly-labelled mileage/odometer figure, or if you are not confident, return null rather than guessing - a missing value is far better than a wrong one, since a fallback estimate is used instead when this is null.,
+      "fuelType": if category is "fuel", your best read of the fuel type from wording on the receipt (e.g. "unleaded", "premium", "diesel", "super") - one of "petrol", "diesel", "other" (anything that isn't fuel for an engine, e.g. AdBlue). ${fuelTypeFallback} Otherwise null.,
+      "mileageOnReceipt": an odometer/mileage reading, ONLY if you are genuinely confident a specific number on this receipt represents the vehicle's mileage - e.g. explicit wording like "mileage:", "odometer:", "miles:", or a number clearly logged against a service/inspection for that reason. Do NOT return a number just because it looks plausible as a mileage - order numbers, invoice numbers, part/SKU codes, phone numbers, postcodes, prices, and quantities all commonly appear on receipts and are NOT mileage readings even when they happen to be a few digits long. If there is no clearly-labelled mileage/odometer figure, or if you are not confident, return null rather than guessing - a missing value is far better than a wrong one, since a fallback estimate is used instead when this is null.,
       "registrationOnReceipt": a UK vehicle registration plate, ONLY if one is genuinely printed on this specific receipt or invoice (e.g. a garage work order listing the customer's reg, or a fuel receipt with a numberplate recognition line) - normalise to remove spaces (e.g. "AB12CDE" not "AB12 CDE"). This is genuinely rare on most receipts - only return a value when one is actually visible, never guess or infer one. Otherwise null.
     }
   ]
 }
 Category guide:
-- "service": motorcycle servicing, repairs, or parts fitted as a labour job (oil change, brake pads, tyres, chain, valve clearance, etc.)
+- "service": ${noun} servicing, repairs, or parts fitted as a labour job (${serviceExamples})
 - "fuel": a petrol or diesel fill-up
 - "mods": accessories, gear, luggage, or electronics bought (not fitted as a labour job)
 - "bills": insurance, road tax (VED), or an MOT test
 If isReceipt is false, return an empty items array. If the receipt only really contains one purchase, return a single-item array rather than trying to invent a split. If you cannot confidently read a value on a genuine receipt, make your best reasonable estimate rather than leaving it out - every field on every item must have a value, except merchantName/address/city (genuinely null if not visible) and litres (genuinely null if you can't read it - see above).`;
+}
 
 interface GeminiItem {
   category?: string;
@@ -147,14 +179,15 @@ async function callGeminiReceiptModel(
   model: string,
   apiKey: string,
   mimeTypeForGemini: string,
-  base64: string
+  base64: string,
+  vehicleKind: VehicleKind
 ): Promise<GeminiResponse | null> {
   try {
     const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
       method: "POST",
       headers: { "Content-Type": "application/json", "X-goog-api-key": apiKey },
       body: JSON.stringify({
-        contents: [{ parts: [{ text: PROMPT }, { inline_data: { mime_type: mimeTypeForGemini, data: base64 } }] }],
+        contents: [{ parts: [{ text: buildPrompt(vehicleKind) }, { inline_data: { mime_type: mimeTypeForGemini, data: base64 } }] }],
         generationConfig: { responseMimeType: "application/json" },
       }),
     });
@@ -179,8 +212,9 @@ async function callGeminiReceiptModel(
   }
 }
 
-export async function parseReceiptFile(file: File, apiKey: string, bike: BikeDoc): Promise<ParseReceiptResult> {
+export async function parseReceiptFile(file: File, apiKey: string, vehicle: ScanVehicle): Promise<ParseReceiptResult> {
   const fileName = file.name || "receipt.jpg";
+  const vehicleKind = vehicleKindOf(vehicle);
 
   if (!ALLOWED_TYPES.has(file.type)) {
     return { ok: false, fileName, error: "Only JPG, PNG, or PDF files are supported for scanning.", status: 400 };
@@ -221,7 +255,7 @@ export async function parseReceiptFile(file: File, apiKey: string, bike: BikeDoc
       uploadExtension = "jpg";
     }
 
-    let parsed = await callGeminiReceiptModel(GEMINI_MODEL, apiKey, mimeTypeForGemini, base64);
+    let parsed = await callGeminiReceiptModel(GEMINI_MODEL, apiKey, mimeTypeForGemini, base64, vehicleKind);
     if (!parsed) {
       return { ok: false, fileName, error: "Could not read the receipt. Please try again or enter it manually.", status: 502 };
     }
@@ -235,7 +269,7 @@ export async function parseReceiptFile(file: File, apiKey: string, bike: BikeDoc
     // this to a human either way.
     let aiLowConfidence = parsed.isReceipt !== false && parsed.lowConfidence === true;
     if (aiLowConfidence) {
-      const escalated = await callGeminiReceiptModel(GEMINI_ESCALATION_MODEL, apiKey, mimeTypeForGemini, base64);
+      const escalated = await callGeminiReceiptModel(GEMINI_ESCALATION_MODEL, apiKey, mimeTypeForGemini, base64, vehicleKind);
       if (escalated) {
         parsed = escalated;
         aiLowConfidence = escalated.isReceipt !== false && escalated.lowConfidence === true;
@@ -286,15 +320,18 @@ export async function parseReceiptFile(file: File, apiKey: string, bike: BikeDoc
       const category = item.category as "service" | "fuel" | "mods" | "bills";
       const date = item.date ?? new Date().toISOString().slice(0, 10);
 
-      if (category !== "mods" && isBeforeProduction(date, bike)) {
+      if (category !== "mods" && isBeforeProduction(date, vehicle)) {
         skippedBeforeProduction++;
         continue;
       }
 
       // Motorcycles run on petrol - a diesel (or other non-fuel-for-an-
-      // engine) receipt is refused outright rather than logged, since
-      // it almost certainly belongs to a different vehicle entirely.
-      if (category === "fuel" && item.fuelType === "diesel") {
+      // engine) receipt is refused outright rather than logged, since it
+      // almost certainly belongs to a different vehicle entirely. Cars
+      // run on either, so only "other" (genuinely not engine fuel, e.g.
+      // AdBlue or screenwash) is refused for them - diesel is a normal,
+      // valid car fuel entry.
+      if (category === "fuel" && item.fuelType === "diesel" && vehicleKind === "motorcycle") {
         skippedNonPetrol++;
         continue;
       }

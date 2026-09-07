@@ -4,18 +4,21 @@ import { NextRequest } from "next/server";
 const mocks = vi.hoisted(() => ({
   getSession: vi.fn(),
   getPrimaryBike: vi.fn(),
+  getPrimaryCar: vi.fn(),
   parseReceiptFile: vi.fn(),
 }));
 
 vi.mock("@/lib/auth/session", () => ({ getSession: mocks.getSession }));
 vi.mock("@/lib/tracker/bike", () => ({ getPrimaryBike: mocks.getPrimaryBike }));
+vi.mock("@/lib/tracker/car", () => ({ getPrimaryCar: mocks.getPrimaryCar }));
 vi.mock("@/lib/tracker/receiptParse", () => ({ parseReceiptFile: mocks.parseReceiptFile }));
 
 import { POST } from "@/app/api/tracker/scan-receipt/route";
 
-function requestWithFile(): NextRequest {
+function requestWithFile(vehicleKind?: string): NextRequest {
   const fd = new FormData();
   fd.set("file", new File([new Uint8Array([1, 2, 3])], "receipt.jpg", { type: "image/jpeg" }));
+  if (vehicleKind) fd.set("vehicleKind", vehicleKind);
   return new NextRequest("http://localhost/api/tracker/scan-receipt", { method: "POST", body: fd });
 }
 
@@ -32,12 +35,14 @@ function requestBadBody(): NextRequest {
 }
 
 const bike = { id: "bike-1", year: 2019 };
+const car = { id: "car-1", year: 2020 };
 
 describe("POST /api/tracker/scan-receipt", () => {
   beforeEach(() => {
     Object.values(mocks).forEach((m) => m.mockReset());
     vi.stubEnv("GEMINI_API_KEY", "test-key");
     mocks.getPrimaryBike.mockResolvedValue(bike);
+    mocks.getPrimaryCar.mockResolvedValue(car);
   });
 
   afterEach(() => {
@@ -122,6 +127,43 @@ describe("POST /api/tracker/scan-receipt", () => {
     await expect(response.json()).resolves.toEqual({
       error:
         "Nothing to log from this receipt: dated before 2019, when this bike was made; not petrol - motorcycles run on petrol, so this wasn't logged; the litres couldn't be read clearly enough to log automatically.",
+    });
+  });
+
+  // vehicleKind isn't sent by the current (motorcycle-only) upload UI
+  // yet - every test above omits it and must keep hitting the bike path
+  // unchanged. These cover the car branch once vehicleKind: "car" is
+  // sent.
+  describe("vehicleKind: car", () => {
+    it("returns 404 with a car-specific message when the account has no car yet", async () => {
+      mocks.getSession.mockResolvedValue({ email: "owner@example.com" });
+      mocks.getPrimaryCar.mockResolvedValue(null);
+      const response = await POST(requestWithFile("car"));
+      expect(response.status).toBe(404);
+      await expect(response.json()).resolves.toEqual({ error: "No car found for this account." });
+      expect(mocks.getPrimaryBike).not.toHaveBeenCalled();
+    });
+
+    it("passes the signed-in email's car (not bike) through to the parser", async () => {
+      mocks.getSession.mockResolvedValue({ email: "owner@example.com" });
+      mocks.parseReceiptFile.mockResolvedValue({ ok: true, fileName: "receipt.jpg", summary: null, items: [], skippedBeforeProduction: 0, skippedNonPetrol: 0, skippedUnreadableLitres: 0 });
+      await POST(requestWithFile("car"));
+      expect(mocks.parseReceiptFile).toHaveBeenCalledWith(expect.any(File), "test-key", car);
+      expect(mocks.getPrimaryBike).not.toHaveBeenCalled();
+    });
+
+    it("builds a car-worded combined reason message from every applicable skip count", async () => {
+      mocks.getSession.mockResolvedValue({ email: "owner@example.com" });
+      mocks.parseReceiptFile.mockResolvedValue({
+        ok: true, fileName: "receipt.jpg", summary: null, items: [],
+        skippedBeforeProduction: 1, skippedNonPetrol: 1, skippedUnreadableLitres: 1,
+      });
+      const response = await POST(requestWithFile("car"));
+      expect(response.status).toBe(422);
+      await expect(response.json()).resolves.toEqual({
+        error:
+          "Nothing to log from this receipt: dated before 2020, when this car was made; not a valid fuel type for a car, so this wasn't logged; the litres couldn't be read clearly enough to log automatically.",
+      });
     });
   });
 });
