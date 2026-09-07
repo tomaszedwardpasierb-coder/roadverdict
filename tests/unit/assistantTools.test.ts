@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
-  getPrimaryBike: vi.fn(),
+  resolveActiveVehicle: vi.fn(),
   getServiceRecords: vi.fn(),
   getMods: vi.fn(),
   getBills: vi.fn(),
@@ -16,9 +16,22 @@ const mocks = vi.hoisted(() => ({
   getPendingReceiptRequestsForOwner: vi.fn(),
   getSellerReportData: vi.fn(),
   buildBikeComparison: vi.fn(),
+  getCarServiceRecords: vi.fn(),
+  getCarMods: vi.fn(),
+  getCarBills: vi.fn(),
+  getCarFuelLogs: vi.fn(),
+  getCarReminders: vi.fn(),
+  computeCarReminderStatus: vi.fn(),
+  carReminderDetailLabel: vi.fn(),
+  gatherCarMileagePoints: vi.fn(),
 }));
 
-vi.mock("@/lib/tracker/bike", () => ({ getPrimaryBike: mocks.getPrimaryBike }));
+// resolveActiveVehicle (activeVehicle.ts) is the one boundary every tool
+// below actually calls now - mocked directly here rather than mocking
+// the bike.ts/car.ts/next-headers functions it's built on internally,
+// same "mock at the boundary the code under test directly calls"
+// convention used throughout this suite.
+vi.mock("@/lib/tracker/activeVehicle", () => ({ resolveActiveVehicle: mocks.resolveActiveVehicle }));
 vi.mock("@/lib/tracker/serviceRecord", () => ({ getServiceRecords: mocks.getServiceRecords }));
 vi.mock("@/lib/tracker/mod", () => ({ getMods: mocks.getMods }));
 vi.mock("@/lib/tracker/bill", () => ({ getBills: mocks.getBills }));
@@ -37,10 +50,21 @@ vi.mock("@/lib/tracker/shareLink", () => ({ getShareLinksForUser: mocks.getShare
 vi.mock("@/lib/tracker/receiptRequest", () => ({ getPendingReceiptRequestsForOwner: mocks.getPendingReceiptRequestsForOwner }));
 vi.mock("@/lib/tracker/sellerReportData", () => ({ getSellerReportData: mocks.getSellerReportData }));
 vi.mock("@/lib/tracker/bikeComparison", () => ({ buildBikeComparison: mocks.buildBikeComparison }));
-// jobTypes.ts (JOB_LABELS) is deliberately NOT mocked - pure static data.
-// bikeComparisonVerdict.ts (buildCostPerMileVerdict) is deliberately NOT
-// mocked either - it's pure, no I/O, so this exercises the real
-// "which bike is cheapest" logic rather than a stand-in for it.
+vi.mock("@/lib/tracker/carServiceRecord", () => ({ getCarServiceRecords: mocks.getCarServiceRecords }));
+vi.mock("@/lib/tracker/carMod", () => ({ getCarMods: mocks.getCarMods }));
+vi.mock("@/lib/tracker/carBill", () => ({ getCarBills: mocks.getCarBills }));
+vi.mock("@/lib/tracker/carFuelLog", () => ({ getCarFuelLogs: mocks.getCarFuelLogs }));
+vi.mock("@/lib/tracker/carReminder", () => ({ getCarReminders: mocks.getCarReminders }));
+vi.mock("@/lib/tracker/carReminderStatus", () => ({
+  computeCarReminderStatus: mocks.computeCarReminderStatus,
+  carReminderDetailLabel: mocks.carReminderDetailLabel,
+}));
+vi.mock("@/lib/tracker/carSummary", () => ({ gatherCarMileagePoints: mocks.gatherCarMileagePoints }));
+// jobTypes.ts/carJobTypes.ts (JOB_LABELS/CAR_JOB_LABELS) etc. are
+// deliberately NOT mocked - pure static data. bikeComparisonVerdict.ts
+// (buildCostPerMileVerdict) is deliberately NOT mocked either - it's
+// pure, no I/O, so this exercises the real "which bike is cheapest"
+// logic rather than a stand-in for it.
 
 import {
   runAssistantTool,
@@ -60,10 +84,18 @@ import {
 } from "@/lib/tracker/assistantTools";
 
 const bike = { id: "bike-1", currentMileage: 15000, currency: "GBP", annualBudget: null as number | null };
+const car = { id: "car-1", currentMileage: 20000, currency: "GBP", annualBudget: null as number | null, fuelType: "petrol" as "petrol" | "diesel" | "hybrid" | "phev" | "electric" };
+
+function bikeActive(overrides: Partial<typeof bike> = {}) {
+  return { kind: "bike" as const, bike: { ...bike, ...overrides }, hasAnyCar: false };
+}
+function carActive(overrides: Partial<typeof car> = {}) {
+  return { kind: "car" as const, car: { ...car, ...overrides }, hasAnyBike: false };
+}
 
 beforeEach(() => {
   Object.values(mocks).forEach((m) => m.mockReset());
-  mocks.getPrimaryBike.mockResolvedValue(bike);
+  mocks.resolveActiveVehicle.mockResolvedValue(bikeActive());
   mocks.getServiceRecords.mockResolvedValue([]);
   mocks.getMods.mockResolvedValue([]);
   mocks.getBills.mockResolvedValue([]);
@@ -71,6 +103,11 @@ beforeEach(() => {
   mocks.getReminders.mockResolvedValue([]);
   mocks.getShareLinksForUser.mockResolvedValue([]);
   mocks.getPendingReceiptRequestsForOwner.mockResolvedValue([]);
+  mocks.getCarServiceRecords.mockResolvedValue([]);
+  mocks.getCarMods.mockResolvedValue([]);
+  mocks.getCarBills.mockResolvedValue([]);
+  mocks.getCarFuelLogs.mockResolvedValue([]);
+  mocks.getCarReminders.mockResolvedValue([]);
 });
 
 describe("runAssistantTool - the core security dispatch layer", () => {
@@ -92,7 +129,7 @@ describe("runAssistantTool - the core security dispatch layer", () => {
   // the separately-passed, server-derived email parameter.
   it("uses only the server-derived email parameter, ignoring any account identifier the model-supplied args might contain", async () => {
     await runAssistantTool("getSpendTotal", { email: "attacker@example.com", userId: "someone-else" } as any, "real-owner@example.com");
-    expect(mocks.getPrimaryBike).toHaveBeenCalledWith("real-owner@example.com");
+    expect(mocks.resolveActiveVehicle).toHaveBeenCalledWith("real-owner@example.com");
   });
 
   it("getViewedReport refuses to run at all when no report token was independently verified by the caller", async () => {
@@ -180,9 +217,9 @@ describe("toolGetViewedComparison", () => {
 });
 
 describe("toolGetSpendTotal", () => {
-  it("returns an error when the account has no bike", async () => {
-    mocks.getPrimaryBike.mockResolvedValue(null);
-    expect(await toolGetSpendTotal("owner@example.com", {})).toEqual({ error: "No bike found on this account." });
+  it("returns an error when the account has no vehicle at all", async () => {
+    mocks.resolveActiveVehicle.mockResolvedValue(null);
+    expect(await toolGetSpendTotal("owner@example.com", {})).toEqual({ error: "No vehicle found on this account." });
   });
 
   it("totals across all categories when none is specified", async () => {
@@ -209,6 +246,19 @@ describe("toolGetSpendTotal", () => {
     expect(result.total).toBe(50);
     expect(result.entryCount).toBe(1);
   });
+
+  describe("car-active session", () => {
+    beforeEach(() => mocks.resolveActiveVehicle.mockResolvedValue(carActive()));
+
+    it("uses the car's own doc fetches, not the bike ones", async () => {
+      mocks.getCarServiceRecords.mockResolvedValue([{ date: "2025-01-01", cost: 100 }]);
+      mocks.getCarFuelLogs.mockResolvedValue([{ date: "2025-01-01", cost: 50 }]);
+      const result: any = await toolGetSpendTotal("owner@example.com", {});
+      expect(result.total).toBe(150);
+      expect(mocks.getServiceRecords).not.toHaveBeenCalled();
+      expect(mocks.getFuelLogs).not.toHaveBeenCalled();
+    });
+  });
 });
 
 describe("toolGetEntries", () => {
@@ -217,10 +267,10 @@ describe("toolGetEntries", () => {
     expect(result).toEqual({ error: "Needs a date, or a start/end range, to look up - which day, or which period?" });
   });
 
-  it("returns an error when the account has no bike", async () => {
-    mocks.getPrimaryBike.mockResolvedValue(null);
+  it("returns an error when the account has no vehicle at all", async () => {
+    mocks.resolveActiveVehicle.mockResolvedValue(null);
     const result = await toolGetEntries("owner@example.com", { date: "2025-01-01" });
-    expect(result).toEqual({ error: "No bike found on this account." });
+    expect(result).toEqual({ error: "No vehicle found on this account." });
   });
 
   it("lists the individual entries for a single day, across every category, with a real description each", async () => {
@@ -289,6 +339,35 @@ describe("toolGetEntries", () => {
     const result: any = await toolGetEntries("owner@example.com", { date: "2026-01-05" });
     expect(result).toEqual({ entries: [], entryCount: 0, totalCost: 0, currency: "GBP", note: "Nothing logged in that range." });
   });
+
+  describe("car-active session", () => {
+    beforeEach(() => mocks.resolveActiveVehicle.mockResolvedValue(carActive()));
+
+    it("uses the car's own doc fetches and car job/bill/mod labels, not the bike ones", async () => {
+      mocks.getCarServiceRecords.mockResolvedValue([{ date: "2026-01-05", cost: 40, jobType: "oil-filter", notes: "" }]);
+      const result: any = await toolGetEntries("owner@example.com", { date: "2026-01-05" });
+      expect(result.entries[0].category).toBe("service");
+      expect(mocks.getServiceRecords).not.toHaveBeenCalled();
+    });
+
+    it("describes a litres-based car fuel entry the same way as a bike's", async () => {
+      mocks.getCarFuelLogs.mockResolvedValue([{ date: "2026-01-05", cost: 15, litres: 10, filledToFull: true }]);
+      const result: any = await toolGetEntries("owner@example.com", { date: "2026-01-05" });
+      expect(result.entries[0].description).toBe("Fuel fill-up - 10L (full tank)");
+    });
+
+    it("describes a kWh-based car charging entry, not litres", async () => {
+      mocks.getCarFuelLogs.mockResolvedValue([{ date: "2026-01-05", cost: 8, kwh: 22 }]);
+      const result: any = await toolGetEntries("owner@example.com", { date: "2026-01-05" });
+      expect(result.entries[0].description).toBe("Charge - 22kWh");
+    });
+
+    it("resolves a car-only bill type (e.g. congestion charge) that has no bike equivalent", async () => {
+      mocks.getCarBills.mockResolvedValue([{ date: "2026-01-05", cost: 15, billType: "congestion", notes: "" }]);
+      const result: any = await toolGetEntries("owner@example.com", { date: "2026-01-05" });
+      expect(result.entries[0].description).toMatch(/congestion/i);
+    });
+  });
 });
 
 describe("toolGetMileage", () => {
@@ -313,6 +392,24 @@ describe("toolGetMileage", () => {
   it("returns an error when no mileage history is logged at all", async () => {
     mocks.gatherMileagePoints.mockReturnValue([]);
     expect(await toolGetMileage("owner@example.com", { atDate: "2025-01-01" })).toEqual({ error: "No mileage history logged yet." });
+  });
+
+  it("returns an error when the account has no vehicle at all", async () => {
+    mocks.resolveActiveVehicle.mockResolvedValue(null);
+    expect(await toolGetMileage("owner@example.com", {})).toEqual({ error: "No vehicle found on this account." });
+  });
+
+  describe("car-active session", () => {
+    beforeEach(() => mocks.resolveActiveVehicle.mockResolvedValue(carActive()));
+
+    it("returns the car's own current mileage, via gatherCarMileagePoints not gatherMileagePoints", async () => {
+      expect(await toolGetMileage("owner@example.com", {})).toEqual({ mileage: 20000, asOf: "current" });
+
+      mocks.gatherCarMileagePoints.mockReturnValue([{ date: "2025-06-01", mileage: 18000 }]);
+      const result: any = await toolGetMileage("owner@example.com", { atDate: "2025-06-01" });
+      expect(result.mileage).toBe(18000);
+      expect(mocks.gatherMileagePoints).not.toHaveBeenCalled();
+    });
   });
 });
 
@@ -339,6 +436,32 @@ describe("toolGetMpgTrend", () => {
     expect(result.trend).toBe("steady");
     expect(result.mostRecentFillUpMpg).toBeUndefined();
   });
+
+  it("returns an error when the account has no vehicle at all", async () => {
+    mocks.resolveActiveVehicle.mockResolvedValue(null);
+    expect(await toolGetMpgTrend("owner@example.com")).toEqual({ error: "No vehicle found on this account." });
+  });
+
+  describe("car-active session", () => {
+    it("reports MPG doesn't apply for an electric car, without touching the litres-based mpg calc at all", async () => {
+      mocks.resolveActiveVehicle.mockResolvedValue(carActive({ fuelType: "electric" }));
+      const result: any = await toolGetMpgTrend("owner@example.com");
+      expect(result.hasEnoughData).toBe(false);
+      expect(result.reason).toMatch(/electric/i);
+      expect(mocks.getCarFuelLogs).not.toHaveBeenCalled();
+      expect(mocks.computeActualMPG).not.toHaveBeenCalled();
+    });
+
+    it("computes MPG for a non-electric car from its own litres-based fuel logs", async () => {
+      mocks.resolveActiveVehicle.mockResolvedValue(carActive({ fuelType: "petrol" }));
+      mocks.getCarFuelLogs.mockResolvedValue([{ id: "f1", date: "2025-01-01", litres: 40, mileage: 5000, filledToFull: true }]);
+      mocks.computeActualMPG.mockReturnValue(50);
+      mocks.computeMPGSeries.mockReturnValue([{ mpg: 50, exclusionReason: undefined }]);
+      const result: any = await toolGetMpgTrend("owner@example.com");
+      expect(result.hasEnoughData).toBe(true);
+      expect(mocks.getFuelLogs).not.toHaveBeenCalled();
+    });
+  });
 });
 
 describe("toolGetReminders", () => {
@@ -357,17 +480,38 @@ describe("toolGetReminders", () => {
     expect(result.upcoming[0].name).toBe("MOT");
     expect(result.overdue).toHaveLength(1);
   });
+
+  it("returns an error when the account has no vehicle at all", async () => {
+    mocks.resolveActiveVehicle.mockResolvedValue(null);
+    expect(await toolGetReminders("owner@example.com")).toEqual({ error: "No vehicle found on this account." });
+  });
+
+  describe("car-active session", () => {
+    beforeEach(() => mocks.resolveActiveVehicle.mockResolvedValue(carActive()));
+
+    it("uses computeCarReminderStatus/carReminderDetailLabel, not the bike versions", async () => {
+      mocks.getCarReminders.mockResolvedValue([{ name: "MOT renewal" }]);
+      mocks.computeCarReminderStatus.mockReturnValue("overdue");
+      mocks.carReminderDetailLabel.mockReturnValue("overdue since 1 Jun 2026");
+
+      const result: any = await toolGetReminders("owner@example.com");
+
+      expect(result.overdue).toHaveLength(1);
+      expect(mocks.computeReminderStatus).not.toHaveBeenCalled();
+      expect(mocks.getReminders).not.toHaveBeenCalled();
+    });
+  });
 });
 
 describe("toolGetBudgetProgress", () => {
   it("reports no budget when none is set, without attempting to compute spend", async () => {
-    mocks.getPrimaryBike.mockResolvedValue({ ...bike, annualBudget: null });
+    mocks.resolveActiveVehicle.mockResolvedValue(bikeActive({ annualBudget: null }));
     expect(await toolGetBudgetProgress("owner@example.com")).toEqual({ hasBudget: false });
     expect(mocks.getServiceRecords).not.toHaveBeenCalled();
   });
 
   it("only counts spend from the current calendar year toward budget progress", async () => {
-    mocks.getPrimaryBike.mockResolvedValue({ ...bike, annualBudget: 1000 });
+    mocks.resolveActiveVehicle.mockResolvedValue(bikeActive({ annualBudget: 1000 }));
     mocks.getServiceRecords.mockResolvedValue([
       { date: "2020-01-01", cost: 500 }, // a past year, must not count
       { date: `${new Date().getFullYear()}-01-01`, cost: 200 },
@@ -375,6 +519,28 @@ describe("toolGetBudgetProgress", () => {
     const result: any = await toolGetBudgetProgress("owner@example.com");
     expect(result.spentThisYear).toBe(200);
     expect(result.remaining).toBe(800);
+  });
+
+  it("returns an error when the account has no vehicle at all", async () => {
+    mocks.resolveActiveVehicle.mockResolvedValue(null);
+    expect(await toolGetBudgetProgress("owner@example.com")).toEqual({ error: "No vehicle found on this account." });
+  });
+
+  describe("car-active session", () => {
+    it("reports no budget when the car has none set, without fetching any car records", async () => {
+      mocks.resolveActiveVehicle.mockResolvedValue(carActive({ annualBudget: null }));
+      expect(await toolGetBudgetProgress("owner@example.com")).toEqual({ hasBudget: false });
+      expect(mocks.getCarServiceRecords).not.toHaveBeenCalled();
+    });
+
+    it("computes the car's own year-to-date spend against its own budget", async () => {
+      mocks.resolveActiveVehicle.mockResolvedValue(carActive({ annualBudget: 1000 }));
+      mocks.getCarServiceRecords.mockResolvedValue([{ date: `${new Date().getFullYear()}-01-01`, cost: 300 }]);
+      const result: any = await toolGetBudgetProgress("owner@example.com");
+      expect(result.spentThisYear).toBe(300);
+      expect(result.remaining).toBe(700);
+      expect(mocks.getServiceRecords).not.toHaveBeenCalled();
+    });
   });
 });
 
@@ -406,6 +572,22 @@ describe("toolGetLastLoggedJob", () => {
     const result: any = await toolGetLastLoggedJob("owner@example.com", { jobQuery: "oil" });
     expect(result.date).toBe("2025-06-01");
   });
+
+  it("returns an error when the account has no vehicle at all", async () => {
+    mocks.resolveActiveVehicle.mockResolvedValue(null);
+    expect(await toolGetLastLoggedJob("owner@example.com", { jobQuery: "oil" })).toEqual({ error: "No vehicle found on this account." });
+  });
+
+  describe("car-active session", () => {
+    beforeEach(() => mocks.resolveActiveVehicle.mockResolvedValue(carActive()));
+
+    it("looks up the car's own service records via car job labels, not the bike ones", async () => {
+      mocks.getCarServiceRecords.mockResolvedValue([{ jobType: "oil-filter", date: "2025-01-01", mileage: 5000, cost: 40 }]);
+      const result: any = await toolGetLastLoggedJob("owner@example.com", { jobQuery: "oil" });
+      expect(result.found).toBe(true);
+      expect(mocks.getServiceRecords).not.toHaveBeenCalled();
+    });
+  });
 });
 
 describe("toolGetShareLinks", () => {
@@ -431,26 +613,50 @@ describe("toolGetShareLinks", () => {
     const result: any = await toolGetShareLinks("owner@example.com");
     expect(result).toEqual({ hasActiveLinks: false, pendingReceiptRequestCount: 1 });
   });
+
+  it("returns an error when the account has no vehicle at all", async () => {
+    mocks.resolveActiveVehicle.mockResolvedValue(null);
+    expect(await toolGetShareLinks("owner@example.com")).toEqual({ error: "No vehicle found on this account." });
+  });
+
+  it("reports not-available for a car-active session, without calling any bike-only share-link lookup", async () => {
+    mocks.resolveActiveVehicle.mockResolvedValue(carActive());
+    const result: any = await toolGetShareLinks("owner@example.com");
+    expect(result.hasActiveLinks).toBe(false);
+    expect(result.note).toMatch(/available for cars/i);
+    expect(mocks.getShareLinksForUser).not.toHaveBeenCalled();
+  });
 });
 
 describe("toolGetStorySoFar", () => {
   it("gives clear guidance when no story has been generated yet, rather than an empty result", async () => {
-    mocks.getPrimaryBike.mockResolvedValue({ ...bike, storyCache: undefined });
+    mocks.resolveActiveVehicle.mockResolvedValue(bikeActive({ storyCache: undefined } as any));
     const result: any = await toolGetStorySoFar("owner@example.com");
     expect(result.hasStory).toBe(false);
     expect(result.note).toContain("click Generate my story");
   });
 
   it("returns the cached story when one exists", async () => {
-    mocks.getPrimaryBike.mockResolvedValue({
-      ...bike,
+    mocks.resolveActiveVehicle.mockResolvedValue(bikeActive({
       storyCache: {
         generatedAt: "2025-06-01",
         response: { verdict: { label: "Well documented", reasons: [] }, sharedStory: ["A good bike."], ownerNotes: ["Log more receipts."] },
       },
-    });
+    } as any));
     const result: any = await toolGetStorySoFar("owner@example.com");
     expect(result).toMatchObject({ hasStory: true, story: ["A good bike."], ownerOnlyNotes: ["Log more receipts."] });
+  });
+
+  it("returns an error when the account has no vehicle at all", async () => {
+    mocks.resolveActiveVehicle.mockResolvedValue(null);
+    expect(await toolGetStorySoFar("owner@example.com")).toEqual({ error: "No vehicle found on this account." });
+  });
+
+  it("reports not-available for a car-active session - CarDoc has no storyCache field at all", async () => {
+    mocks.resolveActiveVehicle.mockResolvedValue(carActive());
+    const result: any = await toolGetStorySoFar("owner@example.com");
+    expect(result.hasStory).toBe(false);
+    expect(result.note).toMatch(/available for cars/i);
   });
 });
 
@@ -487,10 +693,16 @@ describe("toolGetViewedReport", () => {
 });
 
 describe("toolProposeLogEntry", () => {
-  it("returns an error when the account has no bike", async () => {
-    mocks.getPrimaryBike.mockResolvedValue(null);
+  it("returns an error when the account has no vehicle at all", async () => {
+    mocks.resolveActiveVehicle.mockResolvedValue(null);
     const result = await toolProposeLogEntry("owner@example.com", { category: "service", description: "Oil", cost: 20 });
-    expect(result).toEqual({ error: "No bike found on this account." });
+    expect(result).toEqual({ error: "No vehicle found on this account." });
+  });
+
+  it("is not available for a car-active session at all, and never reaches any category/cost validation", async () => {
+    mocks.resolveActiveVehicle.mockResolvedValue(carActive());
+    const result: any = await toolProposeLogEntry("owner@example.com", { category: "service", description: "Oil", cost: 20 });
+    expect(result.error).toMatch(/available for cars/i);
   });
 
   it("rejects a genuinely unrecognized category rather than guessing", async () => {

@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   pruneKnowledgeBaseVersions: vi.fn(),
   prunePersonalityVersions: vi.fn(),
   purgeOldImpersonationLogs: vi.fn(),
+  pruneCarKnowledgeBaseVersions: vi.fn(),
 }));
 
 vi.mock("@/lib/tracker/notification", () => ({ purgeOldNotifications: mocks.purgeOldNotifications }));
@@ -14,6 +15,7 @@ vi.mock("@/lib/tracker/pendingScanBatch", () => ({ purgeStalePendingScanBatches:
 vi.mock("@/lib/tracker/assistantConfig", () => ({
   pruneKnowledgeBaseVersions: mocks.pruneKnowledgeBaseVersions,
   prunePersonalityVersions: mocks.prunePersonalityVersions,
+  pruneCarKnowledgeBaseVersions: mocks.pruneCarKnowledgeBaseVersions,
 }));
 vi.mock("@/lib/admin/impersonation", () => ({ purgeOldImpersonationLogs: mocks.purgeOldImpersonationLogs }));
 
@@ -37,6 +39,7 @@ describe("POST /api/cron/purge-stale-data", () => {
     mocks.pruneKnowledgeBaseVersions.mockResolvedValue(3);
     mocks.prunePersonalityVersions.mockResolvedValue(4);
     mocks.purgeOldImpersonationLogs.mockResolvedValue(5);
+    mocks.pruneCarKnowledgeBaseVersions.mockResolvedValue(6);
   });
 
   afterEach(() => {
@@ -74,6 +77,7 @@ describe("POST /api/cron/purge-stale-data", () => {
         knowledgeBaseVersions: 3,
         personalityVersions: 4,
         impersonationLogs: 5,
+        carKnowledgeBaseVersions: 6,
       },
     });
   });

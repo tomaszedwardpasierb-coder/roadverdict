@@ -13,11 +13,14 @@ const mocks = vi.hoisted(() => ({
   getBikesForUser: vi.fn(),
   isBikeReadOnly: vi.fn(),
   isPro: vi.fn(),
+  resolveActiveVehicle: vi.fn(),
+  getCarAssistantConfig: vi.fn(),
 }));
 
 vi.mock("@/lib/auth/session", () => ({ getSession: mocks.getSession }));
 vi.mock("@/lib/tracker/assistantKnowledge", () => ({ getLivePrivacyPolicyText: mocks.getLivePrivacyPolicyText }));
-vi.mock("@/lib/tracker/assistantConfig", () => ({ getAssistantConfig: mocks.getAssistantConfig }));
+vi.mock("@/lib/tracker/assistantConfig", () => ({ getAssistantConfig: mocks.getAssistantConfig, getCarAssistantConfig: mocks.getCarAssistantConfig }));
+vi.mock("@/lib/tracker/activeVehicle", () => ({ resolveActiveVehicle: mocks.resolveActiveVehicle }));
 vi.mock("@/lib/tracker/assistantTools", () => ({
   ASSISTANT_TOOL_DECLARATIONS: [{ name: "getSpendTotal" }],
   REPORT_TOOL_DECLARATIONS: [{ name: "getViewedReport" }],
@@ -95,6 +98,8 @@ beforeEach(() => {
   mocks.isPro.mockResolvedValue(false);
   mocks.getBikesForUser.mockResolvedValue([]);
   mocks.isBikeReadOnly.mockReturnValue(false);
+  mocks.resolveActiveVehicle.mockResolvedValue(null);
+  mocks.getCarAssistantConfig.mockResolvedValue(null);
 });
 
 const bikeA = { id: "bike-1", make: "Honda", model: "Africa Twin", nickname: "" };
@@ -518,5 +523,100 @@ describe("POST /api/assistant", () => {
     const response = await POST(request({ messages: [{ role: "user", content: "How much have I spent?" }] }));
 
     await expect(response.json()).resolves.toEqual({ reply: "You've spent £400." });
+  });
+});
+
+// ---------------------------------------------------------------------
+// Vehicle-kind-aware knowledge base injection (Phase 6) - a car-active
+// session gets its own, completely separate knowledge base document,
+// never a fallback to the motorcycle one, even on a read failure or
+// before anything's ever been saved for the car config.
+// ---------------------------------------------------------------------
+describe("POST /api/assistant - car-active knowledge base and log-entry gating", () => {
+  it("injects the car knowledge base instead of the motorcycle one for a car-active session", async () => {
+    mocks.getSession.mockResolvedValue({ email: "driver@example.com" });
+    mocks.resolveActiveVehicle.mockResolvedValue({ kind: "car", car: { id: "car-1" }, hasAnyBike: false });
+    mocks.getCarAssistantConfig.mockResolvedValue({ knowledgeBase: "Totally separate car document." });
+
+    await POST(request({ messages: [{ role: "user", content: "hi" }] }));
+
+    const callBody = JSON.parse(mocks.fetch.mock.calls[0][1].body);
+    expect(callBody.systemInstruction.parts[0].text).toContain("Totally separate car document.");
+    expect(callBody.systemInstruction.parts[0].text).not.toContain("KB content."); // the motorcycle config's own text
+  });
+
+  it("uses the motorcycle knowledge base unchanged for a bike-active session", async () => {
+    mocks.getSession.mockResolvedValue({ email: "rider@example.com" });
+    mocks.resolveActiveVehicle.mockResolvedValue({ kind: "bike", bike: { id: "bike-1" }, hasAnyCar: false });
+
+    await POST(request({ messages: [{ role: "user", content: "hi" }] }));
+
+    const callBody = JSON.parse(mocks.fetch.mock.calls[0][1].body);
+    expect(callBody.systemInstruction.parts[0].text).toContain("KB content.");
+    expect(mocks.getCarAssistantConfig).not.toHaveBeenCalled();
+  });
+
+  it("falls back to an honest notice, never the motorcycle KB, when no car knowledge base has been saved yet", async () => {
+    mocks.getSession.mockResolvedValue({ email: "driver@example.com" });
+    mocks.resolveActiveVehicle.mockResolvedValue({ kind: "car", car: { id: "car-1" }, hasAnyBike: false });
+    mocks.getCarAssistantConfig.mockResolvedValue(null);
+
+    await POST(request({ messages: [{ role: "user", content: "hi" }] }));
+
+    const callBody = JSON.parse(mocks.fetch.mock.calls[0][1].body);
+    expect(callBody.systemInstruction.parts[0].text).toContain("No car-specific knowledge base has been written yet");
+    expect(callBody.systemInstruction.parts[0].text).not.toContain("KB content.");
+  });
+
+  it("falls back to the same honest notice, not the motorcycle KB, if getCarAssistantConfig() itself throws", async () => {
+    mocks.getSession.mockResolvedValue({ email: "driver@example.com" });
+    mocks.resolveActiveVehicle.mockResolvedValue({ kind: "car", car: { id: "car-1" }, hasAnyBike: false });
+    mocks.getCarAssistantConfig.mockRejectedValue(new Error("Cosmos unavailable"));
+
+    const response = await POST(request({ messages: [{ role: "user", content: "hi" }] }));
+
+    expect(response.status).toBe(200);
+    const callBody = JSON.parse(mocks.fetch.mock.calls[0][1].body);
+    expect(callBody.systemInstruction.parts[0].text).toContain("No car-specific knowledge base");
+  });
+
+  it("degrades to the motorcycle default when resolveActiveVehicle() itself throws", async () => {
+    mocks.getSession.mockResolvedValue({ email: "rider@example.com" });
+    mocks.resolveActiveVehicle.mockRejectedValue(new Error("Cosmos unavailable"));
+
+    const response = await POST(request({ messages: [{ role: "user", content: "hi" }] }));
+
+    expect(response.status).toBe(200);
+    const callBody = JSON.parse(mocks.fetch.mock.calls[0][1].body);
+    expect(callBody.systemInstruction.parts[0].text).toContain("KB content.");
+  });
+
+  it("never offers the log-entry tool for a car-active session, even when the account is Pro", async () => {
+    mocks.getSession.mockResolvedValue({ email: "driver@example.com" });
+    mocks.resolveActiveVehicle.mockResolvedValue({ kind: "car", car: { id: "car-1" }, hasAnyBike: false });
+    mocks.isPro.mockResolvedValue(true);
+
+    await POST(request({ messages: [{ role: "user", content: "Log my oil change" }] }));
+
+    const callBody = JSON.parse(mocks.fetch.mock.calls[0][1].body);
+    const names = (callBody.tools?.[0]?.functionDeclarations ?? []).map((d: { name: string }) => d.name);
+    expect(names).not.toContain("proposeLogEntry");
+    expect(callBody.systemInstruction.parts[0].text).toContain("LOGGING VIA CHAT: drafting a new entry by describing it in chat isn't available for cars yet");
+    // isPro() is never even reached for a car-active session - checked
+    // before the Pro lookup, since a car-active Pro account still can't
+    // use this yet.
+    expect(mocks.isPro).not.toHaveBeenCalled();
+  });
+
+  it("still offers the log-entry tool normally for a bike-active Pro session", async () => {
+    mocks.getSession.mockResolvedValue({ email: "rider@example.com" });
+    mocks.resolveActiveVehicle.mockResolvedValue({ kind: "bike", bike: { id: "bike-1" }, hasAnyCar: false });
+    mocks.isPro.mockResolvedValue(true);
+
+    await POST(request({ messages: [{ role: "user", content: "Log my oil change" }] }));
+
+    const callBody = JSON.parse(mocks.fetch.mock.calls[0][1].body);
+    const names = callBody.tools[0].functionDeclarations.map((d: { name: string }) => d.name);
+    expect(names).toContain("proposeLogEntry");
   });
 });

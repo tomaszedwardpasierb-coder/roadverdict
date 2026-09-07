@@ -28,6 +28,8 @@ import {
   prunePersonalityVersions,
   getCarAssistantConfig,
   updateCarKnowledgeBase,
+  getCarKnowledgeBaseVersions,
+  pruneCarKnowledgeBaseVersions,
   type PersonalitySlot,
 } from "@/lib/tracker/assistantConfig";
 
@@ -273,5 +275,57 @@ describe("updateCarKnowledgeBase", () => {
     const version = mocks.create.mock.calls[0][0];
     expect(version.type).not.toBe("knowledgeBaseVersion");
     expect(version.type).toBe("knowledgeBaseVersionCar");
+  });
+});
+
+describe("getCarKnowledgeBaseVersions", () => {
+  beforeEach(() => mocks.fetchAll.mockReset());
+
+  it("queries car knowledge base versions scoped to the system partition, with a default limit of 20", async () => {
+    mocks.fetchAll.mockResolvedValue({ resources: [] });
+    await getCarKnowledgeBaseVersions();
+    const [query, options] = mockContainer.items.query.mock.calls.at(-1) as any[];
+    expect(query.query).toContain("c.type = 'knowledgeBaseVersionCar'");
+    expect(query.parameters).toEqual([{ name: "@limit", value: 20 }]);
+    expect(options).toEqual({ partitionKey: "system" });
+  });
+
+  it("respects a custom limit", async () => {
+    mocks.fetchAll.mockResolvedValue({ resources: [] });
+    await getCarKnowledgeBaseVersions(5);
+    const [query] = mockContainer.items.query.mock.calls.at(-1) as any[];
+    expect(query.parameters).toEqual([{ name: "@limit", value: 5 }]);
+  });
+});
+
+describe("pruneCarKnowledgeBaseVersions", () => {
+  beforeEach(() => {
+    mocks.fetchAll.mockReset();
+    mocks.deleteFn.mockReset();
+    mocks.deleteFn.mockResolvedValue(undefined);
+  });
+
+  it("skips the most recent MAX_VERSIONS_KEPT via OFFSET, deleting the rest, scoped to the car version type", async () => {
+    mocks.fetchAll.mockResolvedValue({ resources: [{ id: "kbc1" }, { id: "kbc2" }] });
+    const count = await pruneCarKnowledgeBaseVersions();
+    expect(mocks.deleteFn).toHaveBeenCalledTimes(2);
+    expect(count).toBe(2);
+    const [query, options] = mockContainer.items.query.mock.calls.at(-1) as any[];
+    expect(query.query).toContain("c.type = 'knowledgeBaseVersionCar'");
+    expect(query.query).toContain("OFFSET @keep");
+    expect(query.parameters).toEqual([{ name: "@keep", value: 50 }]);
+    expect(options).toEqual({ partitionKey: "system" });
+  });
+
+  it("returns 0 when there's nothing beyond the kept count", async () => {
+    mocks.fetchAll.mockResolvedValue({ resources: [] });
+    expect(await pruneCarKnowledgeBaseVersions()).toBe(0);
+    expect(mocks.deleteFn).not.toHaveBeenCalled();
+  });
+
+  it("is best-effort - one failed delete doesn't stop the rest", async () => {
+    mocks.fetchAll.mockResolvedValue({ resources: [{ id: "kbc1" }, { id: "kbc2" }] });
+    mocks.deleteFn.mockResolvedValueOnce(undefined).mockRejectedValueOnce(new Error("boom"));
+    expect(await pruneCarKnowledgeBaseVersions()).toBe(1);
   });
 });

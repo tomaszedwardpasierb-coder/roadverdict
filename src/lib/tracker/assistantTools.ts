@@ -9,16 +9,35 @@
 // knowledge base section 5. The API route (route.ts) is the only place
 // `email` is ever read from - always `session.email`, never the
 // request body, never a model-supplied argument.
+//
+// Vehicle-kind-aware since Phase 6: each read tool below resolves the
+// account's own active vehicle via resolveActiveVehicle() (bike.ts's
+// getPrimaryBike() is no longer called directly anywhere here) and
+// branches to a bike-shaped or car-shaped fetch, then feeds both into
+// one shared, vehicle-agnostic compute helper - exactly the same
+// "genuinely generic logic, vehicle-specific data-fetch" split every
+// other part of this build already uses (see carSummary.ts,
+// carReminderStatus.ts). Three tools stay bike-only for now, each
+// failing soft with an honest "not available for cars yet" result
+// rather than either guessing at a car equivalent or crashing:
+// getShareLinks (no share-link concept exists for cars), getStorySoFar
+// (CarDoc has no storyCache field - the AI narrative generator is
+// motorcycle-written), and proposeLogEntry (the on-screen draft card,
+// AssistantProposedEntryCard.tsx, is itself deeply bike-shaped - grouped
+// job/mod catalogs, a hardcoded /api/tracker/* endpoint per category, no
+// litres-vs-kWh branching - making it vehicle-kind-aware is real,
+// separate UI work, not attempted here so a car user never gets a
+// drafted entry that silently posts to the wrong endpoint).
 
-import { getPrimaryBike } from "./bike";
 import { getServiceRecords } from "./serviceRecord";
 import { getMods } from "./mod";
 import { getBills } from "./bill";
 import { getFuelLogs } from "./fuelLog";
+import type { FuelLogDoc } from "./fuelLog";
 import { getReminders } from "./reminder";
 import { computeReminderStatus, reminderDetailLabel } from "./reminderStatus";
-import { computeActualMPG, computeMPGSeries } from "./mpgCalc";
-import { gatherMileagePoints } from "./summary";
+import { computeActualMPG, computeMPGSeries, type MpgCalcInput } from "./mpgCalc";
+import { gatherMileagePoints, type MileagePoint } from "./summary";
 import { JOB_LABELS } from "./jobTypes";
 import { BILL_LABELS } from "./billTypes";
 import { MOD_LABELS } from "./modTypes";
@@ -28,8 +47,26 @@ import { getSellerReportData } from "./sellerReportData";
 import { buildBikeComparison } from "./bikeComparison";
 import { buildCostPerMileVerdict } from "./bikeComparisonVerdict";
 import type { ComparisonPeriod } from "./bikeComparisonPeriod";
+import { resolveActiveVehicle } from "./activeVehicle";
+import { getCarServiceRecords } from "./carServiceRecord";
+import { getCarMods } from "./carMod";
+import { getCarBills } from "./carBill";
+import { getCarFuelLogs } from "./carFuelLog";
+import { getCarReminders } from "./carReminder";
+import { computeCarReminderStatus, carReminderDetailLabel } from "./carReminderStatus";
+import { gatherCarMileagePoints } from "./carSummary";
+import { CAR_JOB_LABELS } from "./carJobTypes";
+import { CAR_BILL_LABELS } from "./carBillTypes";
+import { CAR_MOD_LABELS } from "./carModTypes";
 
 type CostItem = { date: string; cost: number };
+// Minimal structural shapes both a bike doc type and its car sister
+// satisfy - genuinely identical on every field these tools touch, only
+// their nominal `type` literal differs (see carSummary.ts's own comment
+// for the same reasoning applied to aggregation instead of lookup).
+interface ServiceLike { date: string; jobType: string; notes: string; cost: number; mileage: number; }
+interface ModLike { date: string; category: string; name: string; notes: string; cost: number; mileage: number; }
+interface BillLike { date: string; billType: string; notes: string; cost: number; }
 
 function inRange(dateStr: string, start?: string, end?: string): boolean {
   const t = new Date(dateStr).getTime();
@@ -50,27 +87,41 @@ export interface SpendTotalArgs {
   category?: "servicing" | "fuel" | "mods" | "bills";
 }
 
-export async function toolGetSpendTotal(email: string, args: SpendTotalArgs) {
-  const bike = await getPrimaryBike(email);
-  if (!bike) return { error: "No bike found on this account." };
+function computeSpendTotal(records: CostItem[], mods: CostItem[], fuelLogs: CostItem[], bills: CostItem[], currency: string, args: SpendTotalArgs) {
+  const sets: Record<string, CostItem[]> = { servicing: records, mods, fuel: fuelLogs, bills };
+  const chosen: CostItem[] = args.category ? (sets[args.category] ?? []) : [...records, ...mods, ...fuelLogs, ...bills];
+  const filtered = chosen.filter((x) => inRange(x.date, args.startDate, args.endDate));
+  return {
+    total: round2(filtered.reduce((s, x) => s + x.cost, 0)),
+    currency,
+    entryCount: filtered.length,
+    category: args.category ?? "all",
+  };
+}
 
+export async function toolGetSpendTotal(email: string, args: SpendTotalArgs) {
+  const vehicle = await resolveActiveVehicle(email);
+  if (!vehicle) return { error: "No vehicle found on this account." };
+
+  if (vehicle.kind === "car") {
+    const car = vehicle.car;
+    const [records, mods, fuelLogs, bills] = await Promise.all([
+      getCarServiceRecords(email, car.id),
+      getCarMods(email, car.id),
+      getCarFuelLogs(email, car.id),
+      getCarBills(email, car.id),
+    ]);
+    return computeSpendTotal(records, mods, fuelLogs, bills, car.currency ?? "GBP", args);
+  }
+
+  const bike = vehicle.bike;
   const [records, mods, fuelLogs, bills] = await Promise.all([
     getServiceRecords(email, bike.id),
     getMods(email, bike.id),
     getFuelLogs(email, bike.id),
     getBills(email, bike.id),
   ]);
-
-  const sets: Record<string, CostItem[]> = { servicing: records, mods, fuel: fuelLogs, bills };
-  const chosen: CostItem[] = args.category ? (sets[args.category] ?? []) : [...records, ...mods, ...fuelLogs, ...bills];
-  const filtered = chosen.filter((x) => inRange(x.date, args.startDate, args.endDate));
-
-  return {
-    total: round2(filtered.reduce((s, x) => s + x.cost, 0)),
-    currency: bike.currency ?? "GBP",
-    entryCount: filtered.length,
-    category: args.category ?? "all",
-  };
+  return computeSpendTotal(records, mods, fuelLogs, bills, bike.currency ?? "GBP", args);
 }
 
 // ---- The individual entries behind a total, not just the number ----
@@ -102,50 +153,54 @@ function describeWithNotes(label: string, notes?: string): string {
   return notes && notes.trim() ? `${label} - ${notes.trim()}` : label;
 }
 
-export async function toolGetEntries(email: string, args: GetEntriesArgs) {
-  if (!args.date && !args.startDate && !args.endDate) {
-    return { error: "Needs a date, or a start/end range, to look up - which day, or which period?" };
-  }
+function describeBikeFuel(f: FuelLogDoc): string {
+  return `Fuel fill-up - ${f.litres}L${f.filledToFull ? " (full tank)" : ""}`;
+}
 
-  const bike = await getPrimaryBike(email);
-  if (!bike) return { error: "No bike found on this account." };
+function describeCarFuel(f: { litres?: number; kwh?: number; filledToFull?: boolean }): string {
+  if (f.kwh != null) return `Charge - ${f.kwh}kWh`;
+  return `Fuel fill-up - ${f.litres ?? 0}L${f.filledToFull ? " (full tank)" : ""}`;
+}
 
+function computeEntries(
+  records: ServiceLike[],
+  mods: ModLike[],
+  fuelLogs: CostItem[],
+  bills: BillLike[],
+  currency: string,
+  args: GetEntriesArgs,
+  labels: { job: Record<string, string>; bill: Record<string, string>; mod: Record<string, string> },
+  describeFuel: (f: any) => string
+) {
   const start = args.date ?? args.startDate;
   const end = args.date ?? args.endDate;
-
-  const [records, mods, fuelLogs, bills] = await Promise.all([
-    getServiceRecords(email, bike.id),
-    getMods(email, bike.id),
-    getFuelLogs(email, bike.id),
-    getBills(email, bike.id),
-  ]);
 
   const entries: HistoryEntry[] = [];
   if (!args.category || args.category === "servicing") {
     for (const r of records) {
       if (inRange(r.date, start, end)) {
-        entries.push({ date: r.date, category: "service", description: describeWithNotes(JOB_LABELS[r.jobType] ?? r.jobType, r.notes), cost: r.cost });
+        entries.push({ date: r.date, category: "service", description: describeWithNotes(labels.job[r.jobType] ?? r.jobType, r.notes), cost: r.cost });
       }
     }
   }
   if (!args.category || args.category === "fuel") {
     for (const f of fuelLogs) {
       if (inRange(f.date, start, end)) {
-        entries.push({ date: f.date, category: "fuel", description: `Fuel fill-up - ${f.litres}L${f.filledToFull ? " (full tank)" : ""}`, cost: f.cost });
+        entries.push({ date: f.date, category: "fuel", description: describeFuel(f), cost: f.cost });
       }
     }
   }
   if (!args.category || args.category === "mods") {
     for (const m of mods) {
       if (inRange(m.date, start, end)) {
-        entries.push({ date: m.date, category: "mod", description: describeWithNotes(`${MOD_LABELS[m.category] ?? m.category} - ${m.name}`, m.notes), cost: m.cost });
+        entries.push({ date: m.date, category: "mod", description: describeWithNotes(`${labels.mod[m.category] ?? m.category} - ${m.name}`, m.notes), cost: m.cost });
       }
     }
   }
   if (!args.category || args.category === "bills") {
     for (const b of bills) {
       if (inRange(b.date, start, end)) {
-        entries.push({ date: b.date, category: "bill", description: describeWithNotes(BILL_LABELS[b.billType] ?? b.billType, b.notes), cost: b.cost });
+        entries.push({ date: b.date, category: "bill", description: describeWithNotes(labels.bill[b.billType] ?? b.billType, b.notes), cost: b.cost });
       }
     }
   }
@@ -156,9 +211,38 @@ export async function toolGetEntries(email: string, args: GetEntriesArgs) {
     entries,
     entryCount: entries.length,
     totalCost: round2(entries.reduce((s, e) => s + e.cost, 0)),
-    currency: bike.currency ?? "GBP",
+    currency,
     ...(entries.length === 0 ? { note: "Nothing logged in that range." } : {}),
   };
+}
+
+export async function toolGetEntries(email: string, args: GetEntriesArgs) {
+  if (!args.date && !args.startDate && !args.endDate) {
+    return { error: "Needs a date, or a start/end range, to look up - which day, or which period?" };
+  }
+
+  const vehicle = await resolveActiveVehicle(email);
+  if (!vehicle) return { error: "No vehicle found on this account." };
+
+  if (vehicle.kind === "car") {
+    const car = vehicle.car;
+    const [records, mods, fuelLogs, bills] = await Promise.all([
+      getCarServiceRecords(email, car.id),
+      getCarMods(email, car.id),
+      getCarFuelLogs(email, car.id),
+      getCarBills(email, car.id),
+    ]);
+    return computeEntries(records, mods, fuelLogs, bills, car.currency ?? "GBP", args, { job: CAR_JOB_LABELS, bill: CAR_BILL_LABELS, mod: CAR_MOD_LABELS }, describeCarFuel);
+  }
+
+  const bike = vehicle.bike;
+  const [records, mods, fuelLogs, bills] = await Promise.all([
+    getServiceRecords(email, bike.id),
+    getMods(email, bike.id),
+    getFuelLogs(email, bike.id),
+    getBills(email, bike.id),
+  ]);
+  return computeEntries(records, mods, fuelLogs, bills, bike.currency ?? "GBP", args, { job: JOB_LABELS, bill: BILL_LABELS, mod: MOD_LABELS }, describeBikeFuel);
 }
 
 // ---- Current mileage, or the closest logged mileage to a given date ----
@@ -167,26 +251,13 @@ export interface MileageArgs {
   atDate?: string;
 }
 
-export async function toolGetMileage(email: string, args: MileageArgs) {
-  const bike = await getPrimaryBike(email);
-  if (!bike) return { error: "No bike found on this account." };
-
-  if (!args.atDate) {
-    return { mileage: bike.currentMileage, asOf: "current" };
-  }
-
-  const [records, mods, fuelLogs] = await Promise.all([
-    getServiceRecords(email, bike.id),
-    getMods(email, bike.id),
-    getFuelLogs(email, bike.id),
-  ]);
-  const points = gatherMileagePoints(records, mods, fuelLogs);
+function closestMileagePoint(points: MileagePoint[], atDate: string) {
   if (points.length === 0) return { error: "No mileage history logged yet." };
 
   // Closest logged point to the requested date, not an interpolation -
   // an approximate but honestly-labelled answer, never a fabricated
   // exact figure for a date nothing was actually logged on.
-  const target = new Date(args.atDate).getTime();
+  const target = new Date(atDate).getTime();
   let closest = points[0];
   let closestDiff = Math.abs(new Date(points[0].date).getTime() - target);
   for (const p of points) {
@@ -199,14 +270,34 @@ export async function toolGetMileage(email: string, args: MileageArgs) {
   return { mileage: closest.mileage, asOf: closest.date, note: "Closest logged reading to the date asked about, not the exact date itself unless they match." };
 }
 
+export async function toolGetMileage(email: string, args: MileageArgs) {
+  const vehicle = await resolveActiveVehicle(email);
+  if (!vehicle) return { error: "No vehicle found on this account." };
+
+  if (vehicle.kind === "car") {
+    const car = vehicle.car;
+    if (!args.atDate) return { mileage: car.currentMileage, asOf: "current" };
+    const [records, mods, fuelLogs] = await Promise.all([
+      getCarServiceRecords(email, car.id),
+      getCarMods(email, car.id),
+      getCarFuelLogs(email, car.id),
+    ]);
+    return closestMileagePoint(gatherCarMileagePoints(records, mods, fuelLogs), args.atDate);
+  }
+
+  const bike = vehicle.bike;
+  if (!args.atDate) return { mileage: bike.currentMileage, asOf: "current" };
+  const [records, mods, fuelLogs] = await Promise.all([
+    getServiceRecords(email, bike.id),
+    getMods(email, bike.id),
+    getFuelLogs(email, bike.id),
+  ]);
+  return closestMileagePoint(gatherMileagePoints(records, mods, fuelLogs), args.atDate);
+}
+
 // ---- Actual fuel economy and its recent trend ----
 
-export async function toolGetMpgTrend(email: string) {
-  const bike = await getPrimaryBike(email);
-  if (!bike) return { error: "No bike found on this account." };
-
-  const fuelLogs = await getFuelLogs(email, bike.id);
-  const officialMpg = bike.dvlaData?.officialCombinedMpg;
+function computeMpgTrendResult(fuelLogs: MpgCalcInput[], officialMpg?: number) {
   const overall = computeActualMPG(fuelLogs, officialMpg);
   if (overall === null) {
     return { hasEnoughData: false, reason: "Needs at least two consecutive full-tank fill-ups logged." };
@@ -224,6 +315,37 @@ export async function toolGetMpgTrend(email: string) {
   };
 }
 
+export async function toolGetMpgTrend(email: string) {
+  const vehicle = await resolveActiveVehicle(email);
+  if (!vehicle) return { error: "No vehicle found on this account." };
+
+  if (vehicle.kind === "car") {
+    const car = vehicle.car;
+    // MPG is meaningless for an electric car - a kWh-per-mile equivalent
+    // would need its own outlier-detection pass (mpgCalc.ts's is
+    // genuinely tuned for litres/MPG), not attempted here.
+    if (car.fuelType === "electric") {
+      return { hasEnoughData: false, reason: "This car is electric - MPG doesn't apply, and a miles-per-kWh figure isn't tracked yet." };
+    }
+    const fuelLogs = await getCarFuelLogs(email, car.id);
+    const withLitres: MpgCalcInput[] = fuelLogs
+      .filter((f) => f.litres != null)
+      .map((f) => ({
+        id: f.id,
+        mileage: f.mileage,
+        litres: f.litres as number,
+        filledToFull: f.filledToFull === true,
+        date: f.date,
+        mileageAnomaly: f.mileageAnomaly,
+      }));
+    return computeMpgTrendResult(withLitres, car.dvlaData?.officialCombinedMpg);
+  }
+
+  const bike = vehicle.bike;
+  const fuelLogs = await getFuelLogs(email, bike.id);
+  return computeMpgTrendResult(fuelLogs, bike.dvlaData?.officialCombinedMpg);
+}
+
 // ---- All reminders, not just the ones needing attention ----
 //
 // Deliberately returns every reminder, not just overdue/due-soon. A
@@ -235,17 +357,7 @@ export async function toolGetMpgTrend(email: string) {
 // convenience, it's a correctness bug: it makes the assistant confidently
 // report an honestly incomplete result as if it were the whole picture.
 
-export async function toolGetReminders(email: string) {
-  const bike = await getPrimaryBike(email);
-  if (!bike) return { error: "No bike found on this account." };
-
-  const reminders = await getReminders(email, bike.id);
-  const withStatus = reminders.map((r) => ({
-    name: r.name,
-    status: computeReminderStatus(r, bike.currentMileage),
-    detail: reminderDetailLabel(r),
-  }));
-
+function groupReminders(withStatus: { name: string; status: "ok" | "due-soon" | "overdue"; detail: string }[]) {
   return {
     overdue: withStatus.filter((r) => r.status === "overdue"),
     dueSoon: withStatus.filter((r) => r.status === "due-soon"),
@@ -253,31 +365,80 @@ export async function toolGetReminders(email: string) {
   };
 }
 
+export async function toolGetReminders(email: string) {
+  const vehicle = await resolveActiveVehicle(email);
+  if (!vehicle) return { error: "No vehicle found on this account." };
+
+  if (vehicle.kind === "car") {
+    const car = vehicle.car;
+    const reminders = await getCarReminders(email, car.id);
+    return groupReminders(reminders.map((r) => ({ name: r.name, status: computeCarReminderStatus(r, car.currentMileage), detail: carReminderDetailLabel(r) })));
+  }
+
+  const bike = vehicle.bike;
+  const reminders = await getReminders(email, bike.id);
+  return groupReminders(reminders.map((r) => ({ name: r.name, status: computeReminderStatus(r, bike.currentMileage), detail: reminderDetailLabel(r) })));
+}
+
 // ---- Annual budget progress ----
 
-export async function toolGetBudgetProgress(email: string) {
-  const bike = await getPrimaryBike(email);
-  if (!bike) return { error: "No bike found on this account." };
-  if (!bike.annualBudget) return { hasBudget: false };
+function computeBudgetProgress(budget: number, records: CostItem[], mods: CostItem[], fuelLogs: CostItem[], bills: CostItem[], year: number) {
+  const inYear = (d: string) => new Date(d).getFullYear() === year;
+  const sum = (arr: CostItem[]) => arr.filter((x) => inYear(x.date)).reduce((s, x) => s + x.cost, 0);
+  const spent = round2(sum(records) + sum(mods) + sum(fuelLogs) + sum(bills));
+  return { hasBudget: true, budget, spentThisYear: spent, remaining: round2(budget - spent), year };
+}
 
+export async function toolGetBudgetProgress(email: string) {
+  const vehicle = await resolveActiveVehicle(email);
+  if (!vehicle) return { error: "No vehicle found on this account." };
   const year = new Date().getFullYear();
+
+  if (vehicle.kind === "car") {
+    const car = vehicle.car;
+    if (!car.annualBudget) return { hasBudget: false };
+    const [records, mods, fuelLogs, bills] = await Promise.all([
+      getCarServiceRecords(email, car.id),
+      getCarMods(email, car.id),
+      getCarFuelLogs(email, car.id),
+      getCarBills(email, car.id),
+    ]);
+    return computeBudgetProgress(car.annualBudget, records, mods, fuelLogs, bills, year);
+  }
+
+  const bike = vehicle.bike;
+  if (!bike.annualBudget) return { hasBudget: false };
   const [records, mods, fuelLogs, bills] = await Promise.all([
     getServiceRecords(email, bike.id),
     getMods(email, bike.id),
     getFuelLogs(email, bike.id),
     getBills(email, bike.id),
   ]);
-  const inYear = (d: string) => new Date(d).getFullYear() === year;
-  const sum = (arr: CostItem[]) => arr.filter((x) => inYear(x.date)).reduce((s, x) => s + x.cost, 0);
-  const spent = round2(sum(records) + sum(mods) + sum(fuelLogs) + sum(bills));
-
-  return { hasBudget: true, budget: bike.annualBudget, spentThisYear: spent, remaining: round2(bike.annualBudget - spent), year };
+  return computeBudgetProgress(bike.annualBudget, records, mods, fuelLogs, bills, year);
 }
 
 // ---- When a specific type of job was last logged ----
 
 export interface LastJobArgs {
   jobQuery: string;
+}
+
+function findLastLoggedJob(records: ServiceLike[], jobQuery: string, jobLabels: Record<string, string>) {
+  if (records.length === 0) return { found: false };
+
+  // Simple substring match against the job's label and its raw type
+  // key - good enough for "when did I last change my oil" without
+  // needing a second AI pass just to resolve a job name.
+  const q = jobQuery.toLowerCase();
+  const matches = records.filter((r) => {
+    const label = (jobLabels[r.jobType] ?? r.jobType ?? "").toLowerCase();
+    return label.includes(q) || q.includes(label) || (r.jobType ?? "").toLowerCase().includes(q);
+  });
+  if (matches.length === 0) return { found: false };
+
+  matches.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  const latest = matches[0];
+  return { found: true, date: latest.date, mileage: latest.mileage, cost: latest.cost, jobType: jobLabels[latest.jobType] ?? latest.jobType };
 }
 
 // Takes the raw, unchecked args - jobQuery is declared "required" in the
@@ -289,25 +450,16 @@ export async function toolGetLastLoggedJob(email: string, args: Record<string, u
     return { error: "No job type specified." };
   }
 
-  const bike = await getPrimaryBike(email);
-  if (!bike) return { error: "No bike found on this account." };
+  const vehicle = await resolveActiveVehicle(email);
+  if (!vehicle) return { error: "No vehicle found on this account." };
 
-  const records = await getServiceRecords(email, bike.id);
-  if (records.length === 0) return { found: false };
+  if (vehicle.kind === "car") {
+    const records = await getCarServiceRecords(email, vehicle.car.id);
+    return findLastLoggedJob(records, args.jobQuery, CAR_JOB_LABELS);
+  }
 
-  // Simple substring match against the job's label and its raw type
-  // key - good enough for "when did I last change my oil" without
-  // needing a second AI pass just to resolve a job name.
-  const q = args.jobQuery.toLowerCase();
-  const matches = records.filter((r) => {
-    const label = (JOB_LABELS[r.jobType] ?? r.jobType ?? "").toLowerCase();
-    return label.includes(q) || q.includes(label) || (r.jobType ?? "").toLowerCase().includes(q);
-  });
-  if (matches.length === 0) return { found: false };
-
-  matches.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  const latest = matches[0];
-  return { found: true, date: latest.date, mileage: latest.mileage, cost: latest.cost, jobType: JOB_LABELS[latest.jobType] ?? latest.jobType };
+  const records = await getServiceRecords(email, vehicle.bike.id);
+  return findLastLoggedJob(records, args.jobQuery, JOB_LABELS);
 }
 
 // ---- Share links - whether any are active, and any pending receipt requests ----
@@ -317,12 +469,20 @@ export async function toolGetLastLoggedJob(email: string, args: Record<string, u
 // nothing model-supplied. Filtered down to the primary bike specifically
 // (rather than returning every link across every bike on the account),
 // matching how every other tool here answers about "this account's
-// bike" singular, not the account in general.
+// bike" singular, not the account in general. No car equivalent exists
+// yet (see the ADR's out-of-scope list) - a car-active session gets an
+// honest "not available" result rather than either an error or a
+// silently-wrong bike-scoped answer.
 
 export async function toolGetShareLinks(email: string) {
-  const bike = await getPrimaryBike(email);
-  if (!bike) return { error: "No bike found on this account." };
+  const vehicle = await resolveActiveVehicle(email);
+  if (!vehicle) return { error: "No vehicle found on this account." };
 
+  if (vehicle.kind === "car") {
+    return { hasActiveLinks: false, pendingReceiptRequestCount: 0, note: "Shareable report links aren't available for cars yet." };
+  }
+
+  const bike = vehicle.bike;
   const [allLinks, pendingRequests] = await Promise.all([
     getShareLinksForUser(email),
     getPendingReceiptRequestsForOwner(email),
@@ -353,15 +513,22 @@ export async function toolGetShareLinks(email: string) {
 //
 // Reads bike.storyCache directly off the already-fetched bike document -
 // no extra query needed, same document every other tool here already
-// loads via getPrimaryBike. Deliberately doesn't trigger a fresh
+// loads via resolveActiveVehicle. Deliberately doesn't trigger a fresh
 // generation if none exists yet (that's a paid-in-AI-calls action with
 // its own weekly cooldown, gated behind an explicit button click on the
 // Story So Far tab - a chat question should never silently spend it).
+// No car equivalent - CarDoc has no storyCache field at all
+// (storyFacts.ts/storyProse.ts are motorcycle-written, see the ADR).
 
 export async function toolGetStorySoFar(email: string) {
-  const bike = await getPrimaryBike(email);
-  if (!bike) return { error: "No bike found on this account." };
+  const vehicle = await resolveActiveVehicle(email);
+  if (!vehicle) return { error: "No vehicle found on this account." };
 
+  if (vehicle.kind === "car") {
+    return { hasStory: false, note: "The Story So Far feature isn't available for cars yet." };
+  }
+
+  const bike = vehicle.bike;
   if (!bike.storyCache) {
     return {
       hasStory: false,
@@ -424,7 +591,7 @@ export const ASSISTANT_TOOL_DECLARATIONS = [
   },
   {
     name: "getMpgTrend",
-    description: "Get the signed-in user's actual fuel economy (not the manufacturer figure) and whether recent fill-ups are trending above or below their own average.",
+    description: "Get the signed-in user's actual fuel economy (not the manufacturer figure) and whether recent fill-ups are trending above or below their own average. Not applicable for an electric vehicle.",
     parameters: { type: "OBJECT", properties: {} },
   },
   {
@@ -450,12 +617,12 @@ export const ASSISTANT_TOOL_DECLARATIONS = [
   },
   {
     name: "getShareLinks",
-    description: "Get the signed-in user's own active shareable report links for their bike - who each was shared with, any asking price set, when it expires, and how many pending receipt requests are waiting on a decision. Use for any question about their share link(s), whether they've shared their bike, or receipt requests from a buyer.",
+    description: "Get the signed-in user's own active shareable report links for their bike - who each was shared with, any asking price set, when it expires, and how many pending receipt requests are waiting on a decision. Use for any question about their share link(s), whether they've shared their bike, or receipt requests from a buyer. Not available for a car-active account yet.",
     parameters: { type: "OBJECT", properties: {} },
   },
   {
     name: "getStorySoFar",
-    description: "Get the signed-in user's own cached 'Story So Far' - the AI-written narrative about their bike's logged history, its documentation verdict, and the private owner-only notes. Use for any question about their Story So Far, what it says, or whether one has been generated yet.",
+    description: "Get the signed-in user's own cached 'Story So Far' - the AI-written narrative about their bike's logged history, its documentation verdict, and the private owner-only notes. Use for any question about their Story So Far, what it says, or whether one has been generated yet. Not available for a car-active account yet.",
     parameters: { type: "OBJECT", properties: {} },
   },
 ] as const;
@@ -526,7 +693,9 @@ export async function toolGetViewedReport(shareToken: string) {
 // is ever offered to the model. bikeIds/from/to here are never
 // model-supplied - they're the server-validated CompareContext route.ts
 // built from the client's OWN current page state, cross-checked against
-// this session's real bikes, exactly like reportToken above.
+// this session's real bikes, exactly like reportToken above. Bike-only:
+// the garage comparison page has no car equivalent (see the ADR's
+// out-of-scope list).
 export interface CompareContext {
   bikeIds: string[];
   from?: string;
@@ -585,6 +754,11 @@ export async function toolGetViewedComparison(email: string, compareContext: Com
 // already use, triggered by the user's own click, never by this tool or
 // the model.
 //
+// Bike-only for now (see the top-of-file comment) - a car-active session
+// gets an honest "not available" tool error rather than a draft the
+// on-screen card (AssistantProposedEntryCard.tsx) can't actually post
+// anywhere correctly yet.
+//
 // Mods have 250+ category keys - far too many to enumerate as a Gemini
 // enum without bloating the schema - so modCategory is free text here,
 // resolved with the same "case-insensitive substring match, always
@@ -628,8 +802,12 @@ function resolveModCategory(input: string | undefined): string {
 }
 
 export async function toolProposeLogEntry(email: string, args: ProposeLogEntryArgs) {
-  const bike = await getPrimaryBike(email);
-  if (!bike) return { error: "No bike found on this account." };
+  const vehicle = await resolveActiveVehicle(email);
+  if (!vehicle) return { error: "No vehicle found on this account." };
+  if (vehicle.kind === "car") {
+    return { error: "Drafting a new entry from chat isn't available for cars yet - log it directly from the dashboard instead." };
+  }
+  const bike = vehicle.bike;
 
   if (args.category !== "service" && args.category !== "bill" && args.category !== "mod" && args.category !== "fuel") {
     return { error: "Not sure what category that is - a service item, a bill (insurance/road tax/MOT/finance), a modification/accessory, or a fuel fill-up?" };
@@ -681,7 +859,7 @@ export const LOG_ENTRY_TOOL_DECLARATIONS = [
   {
     name: "proposeLogEntry",
     description:
-      "Draft a new service record, insurance/road-tax/MOT/finance bill, modification/accessory, or fuel fill-up for the signed-in user's bike, from their description of what they want to log. This only prepares a draft for the user to review, edit, and confirm themselves on screen - it NEVER saves anything by itself, and never changes or deletes an existing entry. Doesn't need an exact category match - your best guess is fine, the user can correct it on the draft card.",
+      "Draft a new service record, insurance/road-tax/MOT/finance bill, modification/accessory, or fuel fill-up for the signed-in user's bike, from their description of what they want to log. This only prepares a draft for the user to review, edit, and confirm themselves on screen - it NEVER saves anything by itself, and never changes or deletes an existing entry. Doesn't need an exact category match - your best guess is fine, the user can correct it on the draft card. Not available for a car-active account yet.",
     parameters: {
       type: "OBJECT",
       properties: {

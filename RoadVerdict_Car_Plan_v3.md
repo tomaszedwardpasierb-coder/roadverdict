@@ -575,20 +575,68 @@ doesn't exist until Phase 4) rather than a fake normal-navigation path pretendin
 **Cross-product signpost** (`AddBikeForm.tsx`'s four-wheeled rejection becoming a pointer to
 `/cars`) stays deferred — genuinely not useful until `/cars` itself exists to point to.
 
-### The shared, vehicle-kind-aware AI assistant (replaces v2's Phase 6)
+### Phase 6 — The shared, vehicle-kind-aware AI assistant — ✅ DONE, built 7 September 2026
 
-**No second route, no second widget, no `carAssistantTools.ts`.** `assistantTools.ts` gains
-vehicle-kind-aware branches inside the existing tool functions (or car-specific implementations
-dispatched internally) — `getSpendTotal`, `getEntries`, `proposeLogEntry`, etc. resolve against
-either bike data or car data depending on the account's active vehicle, exactly the way they
-already resolve "which bike" from the session rather than from anything the model supplies.
-Gemini sees one consistent set of tools regardless of which vehicle is active.
+**No second route, no second widget, no `carAssistantTools.ts`.** As planned: `assistantTools.ts`
+gains vehicle-kind-aware branches inside the existing tool functions rather than a parallel file.
+Every session-scoped tool now resolves the account's active vehicle via `resolveActiveVehicle()`
+(the same Phase 5 resolution function, not a second way of answering "which vehicle") instead of
+calling `getPrimaryBike()` directly, then branches to a car-shaped or bike-shaped data fetch and
+feeds both into one shared, vehicle-agnostic compute helper — `computeSpendTotal`, `computeEntries`,
+`closestMileagePoint`, `computeMpgTrendResult`, `groupReminders`, `computeBudgetProgress`,
+`findLastLoggedJob` — mirroring the "generic logic, vehicle-specific fetch" split `carSummary.ts`
+and `carReminderStatus.ts` already established. Fully car-aware: `getSpendTotal`, `getEntries`
+(including a car's litres-vs-kWh fuel description and car-only bill types like ULEZ/congestion),
+`getMileage`, `getMpgTrend` (electric cars get an honest "MPG doesn't apply" rather than a fake
+figure — a real kWh-per-mile equivalent would need its own outlier-detection pass, not attempted
+here), `getReminders`, `getBudgetProgress`, and `getLastLoggedJob`.
 
-`route.ts`'s `buildSystemInstruction()` gains one more conditional block, alongside the existing
-Pro-gating and dashboard-tab blocks: which knowledge-base document to inject (motorcycle vs. car)
-based on the active vehicle's kind. `AssistantWidget.tsx` — already globally mounted — needs no
-changes; it doesn't need to know which vehicle kind is active, same as it already doesn't need to
-know whether the account is Pro.
+**Three tools stay bike-only, each failing soft with an honest "not available for cars yet"
+result** rather than guessing at a car equivalent or crashing: `getShareLinks` (no share-link
+concept exists for cars), `getStorySoFar` (`CarDoc` has no `storyCache` field — the AI narrative
+generator is motorcycle-written), and `proposeLogEntry` (the on-screen draft card,
+`AssistantProposedEntryCard.tsx`, is itself deeply bike-shaped — grouped job/mod catalogs, a
+hardcoded `/api/tracker/*` endpoint per category, no litres-vs-kWh branching — making it
+vehicle-kind-aware is real, separate UI work, genuinely not attempted here so a car user never
+gets a drafted entry that silently posts to the wrong endpoint). Gemini still sees one consistent
+set of tool declarations regardless of which vehicle is active; the three above simply answer
+honestly that they can't help yet, rather than not existing.
+
+**`route.ts`'s `buildSystemInstruction()` now injects the right knowledge base.** A new
+`activeVehicleKind` resolution (same `resolveActiveVehicle()` call, done once per request) decides
+which document becomes the system prompt's opening block. A car-active session gets its own
+`CarAssistantConfigDoc` content — never a fallback to the motorcycle config, even when nothing's
+been saved yet or the read itself fails, since either fallback would hand motorcycle-specific
+content to a car-active session, exactly the leak Phase 8's vehicle-kind-leakage tests exist to
+catch; an honest `NO_CAR_KB_FALLBACK` notice covers both cases instead. Personality settings stay
+shared/global, read from the motorcycle config doc regardless of active vehicle (the car config has
+no personality slots — see the ADR). `logEntryAccess` gained a fourth state, `"car"`, checked
+before the Pro lookup so a car-active Pro account still doesn't get the chat-logging tool attached,
+with its own honest system-prompt line rather than the bike-only "upsell"/"available" copy.
+`AssistantWidget.tsx` — already globally mounted — needed no changes; it doesn't need to know which
+vehicle kind is active, same as it already doesn't need to know whether the account is Pro.
+
+**`/tomasz` gets a second, clearly-labeled knowledge base editor**, per explicit request rather
+than the original plan's vaguer "a second KB editor tab": `KnowledgeBaseEditor.tsx` gained four
+optional props (`title`, `saveEndpoint`, `versionsEndpoint`, `confirmMessage`, all defaulting to
+the original motorcycle-KB behaviour so the existing instance and its tests needed zero changes) so
+one genuinely generic component serves both, rather than a duplicate file. The Assistant tab now
+renders both instances back-to-back under one "Assistant configuration" heading — "🏍️ Motorcycle
+knowledge base" and "🚗 Car knowledge base" — with a one-line explainer that they're fully separate
+and editing one never touches the other. New `getCarKnowledgeBaseVersions`/
+`pruneCarKnowledgeBaseVersions` in `assistantConfig.ts` (mirroring the motorcycle versions) back two
+new routes, `/api/tomasz/assistant-config/car-knowledge-base` and its `/versions` sibling; the prune
+function is wired into the existing combined `purge-stale-data` cron sweep alongside the motorcycle
+one. A car KB with nothing saved yet shows "Never saved yet - the first save creates it." instead
+of a garbage `Invalid Date`, a small pre-existing latent bug the empty-state case exposed and fixed
+along the way (also fixed for the motorcycle editor, benefiting both).
+
+Tests: `tests/unit/assistantTools.test.ts` rewritten to mock `resolveActiveVehicle` directly (the
+one boundary every tool now actually calls) rather than `getPrimaryBike`, plus new car-active
+`describe` blocks per tool; `tests/api/assistant-route.test.ts` gained a dedicated car-KB-injection
+and log-entry-gating suite; `tests/unit/assistantConfig.test.ts`, `tests/api/purge-stale-data-route.test.ts`,
+two new car-knowledge-base route test files, and `tests/components/KnowledgeBaseEditor.test.tsx`
+all extended to cover the new car-facing surface.
 
 ### Public tools, price research, and VED (unchanged from v2)
 
@@ -643,6 +691,6 @@ specifically:**
 | 3 | ✅ Done — receipt scanner is vehicle-kind-aware; diesel not dropped for car accounts (EV/kWh receipts deferred); `commitCarReceiptItem.ts` + `reestimateCarFuelMileage.ts` new; 39 new tests, full suite green (2,603), build unchanged | Motorcycle scanning unchanged |
 | 4 | ✅ Done — `/cars` marketing landing page (no tool sub-pages yet, deferred to Phase 7); cross-product signpost both ways (motorcycle plate-lookup rejection → `/cars`, homepage → `/cars`, `/cars` → homepage); own JSON-LD + sitemap entry; 9 new/changed component tests (`CarsPage.test.tsx` new) + 1 new Playwright smoke test | Motorcycle dashboard unchanged; homepage gains one new secondary CTA link |
 | 5 | ✅ Done — full `/api/cars/*` route layer (14 routes); `carReminder.ts`, `activeVehicle.ts` kind-resolution, `carSummary.ts`, `carReminderStatus.ts`; `VehicleSwitcher` (replaces `BikeSwitcher`); `DashboardShell` vehicle-kind-aware; `AddCarForm` + 4 `LogCar*Form`s; 5 simplified car history/reminder cards; `dashboard/page.tsx` genuinely branches and renders a working car dashboard (Dashboard/Service/Fuel/Parts/Bills/Reminders/Privacy/Security - Reports and the 3 embedded tools deferred, no car price data yet); 196 new tests, full suite green (2,791 unit/API, 750 component) | Motorcycle dashboard unchanged (confirmed: same route list, same bundle size for every other route, same component behaviour for a bike-only account) |
-| 6 | One assistant, now vehicle-kind-aware; second knowledge base; `/tomasz` gets a second KB editor tab | Motorcycle assistant behaviour unchanged when a bike is active |
+| 6 | ✅ Done — one assistant, now vehicle-kind-aware; 7 of 10 tools fully car-aware (getShareLinks/getStorySoFar/proposeLogEntry stay bike-only, fail soft with an honest "not available" result); car knowledge base injected via `buildSystemInstruction()`, never falling back to the motorcycle one; `/tomasz` gets a second, clearly-labeled KB editor sharing one generic component | Motorcycle assistant behaviour unchanged when a bike is active |
 | 7 | `/cars/quote-checker`, `/cars/cost-calculator`, `/cars/buying-guide`; car VED; homepage cross-link both ways | Motorcycle tools unchanged |
 | 8 | Full test coverage for Phases 2–7, including vehicle-kind-leakage tests | None |

@@ -13,6 +13,14 @@ interface KnowledgeBaseVersion {
 interface Props {
   initialContent: string;
   initialUpdatedAt: string;
+  // All four below default to the original motorcycle-KB behaviour, so
+  // the existing call site (and its tests) needs no changes at all -
+  // only the car KB instance passes these explicitly, to stay clearly
+  // labeled and pointed at its own, separate endpoints.
+  title?: string;
+  saveEndpoint?: string;
+  versionsEndpoint?: string;
+  confirmMessage?: string;
 }
 
 function fmtDate(d: string): string {
@@ -31,7 +39,19 @@ function fmtDate(d: string): string {
 // build or code review afterward, so the confirm() before saving and
 // the version history below are the only safety net that used to come
 // from a git diff and a review before deploy.
-export function KnowledgeBaseEditor({ initialContent, initialUpdatedAt }: Props) {
+const DEFAULT_SAVE_ENDPOINT = '/api/tomasz/assistant-config/knowledge-base';
+const DEFAULT_VERSIONS_ENDPOINT = '/api/tomasz/assistant-config/knowledge-base/versions';
+const DEFAULT_CONFIRM_MESSAGE =
+  "Save this as the assistant's live knowledge base? This takes effect immediately for every user - there's no review step after this.";
+
+export function KnowledgeBaseEditor({
+  initialContent,
+  initialUpdatedAt,
+  title = 'Knowledge base',
+  saveEndpoint = DEFAULT_SAVE_ENDPOINT,
+  versionsEndpoint = DEFAULT_VERSIONS_ENDPOINT,
+  confirmMessage = DEFAULT_CONFIRM_MESSAGE,
+}: Props) {
   const [content, setContent] = useState(initialContent);
   // The baseline "nothing to save" content is compared against - starts
   // at the initial prop, but has to move to whatever was just saved,
@@ -49,13 +69,13 @@ export function KnowledgeBaseEditor({ initialContent, initialUpdatedAt }: Props)
   const dirty = content !== savedContent;
 
   async function handleSave() {
-    if (!confirm("Save this as the assistant's live knowledge base? This takes effect immediately for every user - there's no review step after this.")) {
+    if (!confirm(confirmMessage)) {
       return;
     }
     setSaving(true);
     setMessage(null);
     try {
-      const res = await fetch('/api/tomasz/assistant-config/knowledge-base', {
+      const res = await fetch(saveEndpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ content }),
@@ -84,7 +104,7 @@ export function KnowledgeBaseEditor({ initialContent, initialUpdatedAt }: Props)
     if (versions) return;
     setLoadingVersions(true);
     try {
-      const res = await fetch('/api/tomasz/assistant-config/knowledge-base/versions');
+      const res = await fetch(versionsEndpoint);
       const data = await res.json();
       setVersions(data.versions ?? []);
     } catch {
@@ -105,14 +125,16 @@ export function KnowledgeBaseEditor({ initialContent, initialUpdatedAt }: Props)
 
   return (
     <div className={styles.card} style={{ marginBottom: '1.5rem' }}>
-      <div className={styles.cardTitle}>Knowledge base</div>
+      <div className={styles.cardTitle}>{title}</div>
       <p className={styles.warnNote} style={{ marginBottom: '0.6rem' }}>
         The assistant&apos;s full source of truth - what it knows about RoadVerdict and how it&apos;s allowed to
         answer. Saving here takes effect immediately for every user, with no build or review step, so double-check
         before saving. Every save keeps the previous version below, so a bad edit is a quick revert rather than a
         scramble.
       </p>
-      <p className={styles.note} style={{ marginBottom: '0.6rem' }}>Last updated {fmtDate(updatedAt)}</p>
+      <p className={styles.note} style={{ marginBottom: '0.6rem' }}>
+        {updatedAt ? `Last updated ${fmtDate(updatedAt)}` : 'Never saved yet - the first save creates it.'}
+      </p>
       <textarea
         className={styles.input}
         value={content}

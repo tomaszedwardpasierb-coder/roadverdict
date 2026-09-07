@@ -160,6 +160,42 @@ describe("KnowledgeBaseEditor", () => {
     expect(screen.queryByRole("button", { name: "Hide version history" })).not.toBeInTheDocument();
   });
 
+  it("shows 'never saved yet' instead of a formatted date when initialUpdatedAt is empty", () => {
+    render(<KnowledgeBaseEditor initialContent="" initialUpdatedAt="" />);
+    expect(screen.getByText('Never saved yet - the first save creates it.')).toBeInTheDocument();
+  });
+
+  it("uses a custom title, endpoints, and confirm message when provided (e.g. the car knowledge base instance)", async () => {
+    vi.stubGlobal("confirm", vi.fn(() => true));
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true, json: async () => ({}) }));
+
+    const user = userEvent.setup();
+    render(
+      <KnowledgeBaseEditor
+        initialContent="Car KB."
+        initialUpdatedAt="2026-01-15T10:30:00.000Z"
+        title="🚗 Car knowledge base"
+        saveEndpoint="/api/tomasz/assistant-config/car-knowledge-base"
+        versionsEndpoint="/api/tomasz/assistant-config/car-knowledge-base/versions"
+        confirmMessage="Save the CAR knowledge base?"
+      />
+    );
+
+    expect(screen.getByText('🚗 Car knowledge base')).toBeInTheDocument();
+
+    await user.type(screen.getByRole("textbox"), " Edited.");
+    await user.click(screen.getByRole("button", { name: /Save/ }));
+
+    expect(confirm).toHaveBeenCalledWith("Save the CAR knowledge base?");
+    expect(fetch).toHaveBeenCalledWith(
+      "/api/tomasz/assistant-config/car-knowledge-base",
+      expect.objectContaining({ method: "POST" })
+    );
+
+    await user.click(screen.getByRole("button", { name: "View version history" }));
+    expect(fetch).toHaveBeenCalledWith("/api/tomasz/assistant-config/car-knowledge-base/versions");
+  });
+
   it("loading a version over unsaved edits asks first, and declining leaves the unsaved edits untouched", async () => {
     const versions = [{ id: "v1", content: "Restored content", savedAt: "2026-01-10T09:00:00.000Z" }];
     vi.stubGlobal("confirm", vi.fn(() => false));

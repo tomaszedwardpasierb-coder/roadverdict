@@ -10,7 +10,8 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/session";
 import { getLivePrivacyPolicyText } from "@/lib/tracker/assistantKnowledge";
-import { getAssistantConfig, type AssistantConfigDoc } from "@/lib/tracker/assistantConfig";
+import { getAssistantConfig, getCarAssistantConfig, type AssistantConfigDoc } from "@/lib/tracker/assistantConfig";
+import { resolveActiveVehicle } from "@/lib/tracker/activeVehicle";
 import {
   ASSISTANT_TOOL_DECLARATIONS,
   REPORT_TOOL_DECLARATIONS,
@@ -88,8 +89,18 @@ const DASHBOARD_TAB_LABELS: Record<string, string> = {
   security: "Security",
 };
 
-function buildSystemInstruction(config: AssistantConfigDoc, signedIn: boolean, privacyPolicyText: string | null, reportOpen: boolean, dashboardTabLabel: string | null, compareBikeNames: string[] | null, logEntryAccess: "available" | "upsell" | "none"): string {
-  const parts = [config.knowledgeBase];
+const NO_CAR_KB_FALLBACK =
+  "No car-specific knowledge base has been written yet for RoadVerdict's car support. Be honest that detailed car guidance isn't set up yet rather than guessing, and never use motorcycle-specific facts, terminology, or figures as if they applied to a car.";
+
+function buildSystemInstruction(config: AssistantConfigDoc, signedIn: boolean, privacyPolicyText: string | null, reportOpen: boolean, dashboardTabLabel: string | null, compareBikeNames: string[] | null, logEntryAccess: "available" | "upsell" | "none" | "car", carKnowledgeBase?: string): string {
+  // A car-active session's knowledge base is a completely separate
+  // document (see the ADR: one shared assistant, two knowledge bases) -
+  // swapped in here instead of config.knowledgeBase (motorcycle-only)
+  // whenever carKnowledgeBase is set, so a car-active session is never
+  // handed motorcycle content, and vice versa. config itself is still
+  // needed below for the personality settings, which are shared/global
+  // rather than per-vehicle-kind.
+  const parts = [carKnowledgeBase ?? config.knowledgeBase];
 
   // Appended right after the knowledge base, before the more
   // operational blocks below - both this and the knowledge base are
@@ -132,6 +143,10 @@ function buildSystemInstruction(config: AssistantConfigDoc, signedIn: boolean, p
   } else if (logEntryAccess === "upsell") {
     parts.push(
       "\n\n---\n\nLOGGING VIA CHAT: adding or logging a new entry by describing it in chat is a Pro feature, not available on this account. If asked to add/log something, say so plainly, and mention they can still add it themselves from the dashboard in a few seconds, or upgrade to Pro to have the assistant do it for them next time. Never attempt to draft or describe an entry as if it were being logged when this isn't available."
+    );
+  } else if (logEntryAccess === "car") {
+    parts.push(
+      "\n\n---\n\nLOGGING VIA CHAT: drafting a new entry by describing it in chat isn't available for cars yet, regardless of Pro status - this is a real, current product gap, not a plan restriction. If asked to add/log something, say so plainly and point them to the dashboard's own logging forms instead. Never attempt to draft or describe an entry as if it were being logged."
     );
   }
 
@@ -196,6 +211,22 @@ export async function POST(req: Request) {
   }
   const signedIn = !!session;
 
+  // Which knowledge base and log-entry gating apply for this request -
+  // resolved once here via the same resolveActiveVehicle() every tool in
+  // assistantTools.ts already uses, rather than re-deriving it a second,
+  // possibly-inconsistent way. Fails soft to null (treated as "bike",
+  // the pre-car-support default) on any error, same reasoning as every
+  // other best-effort block in this route.
+  let activeVehicleKind: "bike" | "car" | null = null;
+  if (signedIn && session) {
+    try {
+      const vehicle = await resolveActiveVehicle(session.email);
+      activeVehicleKind = vehicle?.kind ?? null;
+    } catch (err) {
+      console.error("Assistant: resolveActiveVehicle() failed, continuing without a known vehicle kind:", err);
+    }
+  }
+
   // Only ever trusted after both checks below pass - a token that
   // merely exists isn't enough, since that would let the assistant
   // answer about a report the visitor hasn't actually unlocked yet
@@ -258,8 +289,14 @@ export async function POST(req: Request) {
   // Same fail-open-to-"none" reasoning as compareContext above - an
   // isPro() hiccup should just mean the feature isn't offered this
   // request, never a broken/hanging chat.
-  let logEntryAccess: "available" | "upsell" | "none" = "none";
-  if (signedIn && session) {
+  let logEntryAccess: "available" | "upsell" | "none" | "car" = "none";
+  if (activeVehicleKind === "car") {
+    // Real, current product gap, not a plan restriction - see
+    // AssistantProposedEntryCard.tsx's own top-of-file comment for why
+    // it stays bike-only for now. Checked before the Pro lookup below,
+    // since a car-active Pro account still can't use this yet.
+    logEntryAccess = "car";
+  } else if (signedIn && session) {
     try {
       logEntryAccess = (await isPro(session.email)) ? "available" : "upsell";
     } catch (err) {
@@ -278,14 +315,33 @@ export async function POST(req: Request) {
   // second, driftable source is exactly the failure this migration
   // exists to remove. If the live config can't be read, the assistant
   // is genuinely unavailable, the same as a Gemini API failure below,
-  // not quietly running on stale content nobody chose.
+  // not quietly running on stale content nobody chose. This still
+  // applies to a car-active session too - the motorcycle config also
+  // holds the shared/global personality settings buildSystemInstruction
+  // needs regardless of which knowledge base ends up injected.
   if (!config) {
     console.error("Assistant: getAssistantConfig() returned null - config document missing or unreadable.");
     await logAssistantQuestion(question, signedIn, true, session?.email);
     return NextResponse.json({ error: "Assistant is temporarily unavailable." }, { status: 503 });
   }
 
-  const systemInstruction = buildSystemInstruction(config, signedIn, privacyPolicyText, !!reportToken, dashboardTabLabel, compareBikeNames, logEntryAccess);
+  // A car-active session gets its own, completely separate knowledge
+  // base document - never a fallback to the motorcycle one above, even
+  // on a read failure or before anything's ever been saved, since that
+  // would hand motorcycle-specific content to a car-active session
+  // (the exact leak Phase 8's vehicle-kind-leakage tests exist to catch).
+  let carKnowledgeBase: string | undefined;
+  if (activeVehicleKind === "car") {
+    try {
+      const carConfig = await getCarAssistantConfig();
+      carKnowledgeBase = carConfig?.knowledgeBase?.trim() ? carConfig.knowledgeBase : NO_CAR_KB_FALLBACK;
+    } catch (err) {
+      console.error("Assistant: getCarAssistantConfig() failed, continuing with the fallback car notice:", err);
+      carKnowledgeBase = NO_CAR_KB_FALLBACK;
+    }
+  }
+
+  const systemInstruction = buildSystemInstruction(config, signedIn, privacyPolicyText, !!reportToken, dashboardTabLabel, compareBikeNames, logEntryAccess, carKnowledgeBase);
 
   const contents: GeminiContent[] = toGeminiContents(messages);
   const toolDeclarations = [

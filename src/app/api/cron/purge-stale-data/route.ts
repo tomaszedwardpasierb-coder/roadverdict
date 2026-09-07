@@ -10,7 +10,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { purgeOldNotifications } from "@/lib/tracker/notification";
 import { purgeStalePendingScanBatches } from "@/lib/tracker/pendingScanBatch";
-import { pruneKnowledgeBaseVersions, prunePersonalityVersions } from "@/lib/tracker/assistantConfig";
+import { pruneKnowledgeBaseVersions, prunePersonalityVersions, pruneCarKnowledgeBaseVersions } from "@/lib/tracker/assistantConfig";
 import { purgeOldImpersonationLogs } from "@/lib/admin/impersonation";
 
 export const dynamic = "force-dynamic";
@@ -23,16 +23,17 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const [notifications, pendingScanBatches, knowledgeBaseVersions, personalityVersions, impersonationLogs] = await Promise.all([
+    const [notifications, pendingScanBatches, knowledgeBaseVersions, personalityVersions, impersonationLogs, carKnowledgeBaseVersions] = await Promise.all([
       purgeOldNotifications(),
       purgeStalePendingScanBatches(),
       pruneKnowledgeBaseVersions(),
       prunePersonalityVersions(),
       purgeOldImpersonationLogs(),
+      pruneCarKnowledgeBaseVersions(),
     ]);
     return NextResponse.json({
       ok: true,
-      deletedCounts: { notifications, pendingScanBatches, knowledgeBaseVersions, personalityVersions, impersonationLogs },
+      deletedCounts: { notifications, pendingScanBatches, knowledgeBaseVersions, personalityVersions, impersonationLogs, carKnowledgeBaseVersions },
     });
   } catch (err) {
     return NextResponse.json(

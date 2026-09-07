@@ -21,7 +21,7 @@ import {
 import { getSiteStats, type SiteStats } from '@/lib/monitoring/appInsights';
 import { getAllAssistantQuestions, groupSimilarQuestions, type AssistantQuestionLogDoc } from '@/lib/tracker/assistantQuestionLog';
 import { getAllUserEmails, getBroadcastSummaries, type BroadcastSummary } from '@/lib/tracker/notification';
-import { getAssistantConfig } from '@/lib/tracker/assistantConfig';
+import { getAssistantConfig, getCarAssistantConfig } from '@/lib/tracker/assistantConfig';
 import { getAllUserAccounts } from '@/lib/tracker/userAccount';
 import { getGeminiUsageByTask, type GeminiUsageByTask } from '@/lib/tracker/geminiUsageLog';
 import type { UserDoc } from '@/lib/tracker/userDoc';
@@ -188,6 +188,7 @@ export default async function AdminDashboardPage(
     assistantQuestions,
     allUserEmails,
     assistantConfig,
+    carAssistantConfig,
     allUserAccounts,
     geminiUsageByTask,
     broadcastSummaries,
@@ -209,6 +210,7 @@ export default async function AdminDashboardPage(
     getAssistantQuestionsSafe(),
     getAllUserEmailsSafe(),
     getAssistantConfig(),
+    getCarAssistantConfig(),
     getAllUserAccountsSafe(),
     getGeminiUsageByTaskSafe(),
     getBroadcastSummariesSafe(),
@@ -671,16 +673,30 @@ export default async function AdminDashboardPage(
       )}
 
       <h2 className={styles.sectionHeading}>Assistant configuration</h2>
+      <p className={styles.note} style={{ marginBottom: '0.8rem' }}>
+        One assistant, two separate knowledge bases - which one it draws on for a given reply
+        depends on whether the account asking has a bike or a car active. Editing one never
+        touches the other.
+      </p>
       {assistantConfig ? (
         <KnowledgeBaseEditor
+          title="🏍️ Motorcycle knowledge base"
           initialContent={assistantConfig.knowledgeBase}
           initialUpdatedAt={assistantConfig.knowledgeBaseUpdatedAt}
         />
       ) : (
         <p className={styles.warnNote} style={{ marginBottom: '1.5rem' }}>
-          Couldn&apos;t load the assistant config - has the seed migration in Jobs &amp; migrations been run yet?
+          Couldn&apos;t load the motorcycle assistant config - has the seed migration in Jobs &amp; migrations been run yet?
         </p>
       )}
+      <KnowledgeBaseEditor
+        title="🚗 Car knowledge base"
+        initialContent={carAssistantConfig?.knowledgeBase ?? ''}
+        initialUpdatedAt={carAssistantConfig?.knowledgeBaseUpdatedAt ?? ''}
+        saveEndpoint="/api/tomasz/assistant-config/car-knowledge-base"
+        versionsEndpoint="/api/tomasz/assistant-config/car-knowledge-base/versions"
+        confirmMessage="Save this as the CAR assistant's live knowledge base? This takes effect immediately for every car-active user - there's no review step after this."
+      />
 
       <h2 className={styles.sectionHeading}>Question log</h2>
       <p className={styles.note} style={{ marginBottom: '0.6rem' }}>

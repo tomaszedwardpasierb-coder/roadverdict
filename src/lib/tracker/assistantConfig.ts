@@ -264,3 +264,38 @@ export async function updateCarKnowledgeBase(newContent: string): Promise<void> 
   };
   await container.items.create(version);
 }
+
+export async function getCarKnowledgeBaseVersions(limit = 20): Promise<CarKnowledgeBaseVersionDoc[]> {
+  const container = getContainer();
+  const { resources } = await container.items
+    .query<CarKnowledgeBaseVersionDoc>(
+      {
+        query: "SELECT * FROM c WHERE c.type = 'knowledgeBaseVersionCar' ORDER BY c.savedAt DESC OFFSET 0 LIMIT @limit",
+        parameters: [{ name: "@limit", value: limit }],
+      },
+      { partitionKey: "system" }
+    )
+    .fetchAll();
+  return resources;
+}
+
+// Same count-based retention as pruneKnowledgeBaseVersions - see
+// MAX_VERSIONS_KEPT above.
+export async function pruneCarKnowledgeBaseVersions(): Promise<number> {
+  const container = getContainer();
+  const { resources } = await container.items
+    .query<{ id: string }>(
+      {
+        query: "SELECT c.id FROM c WHERE c.type = 'knowledgeBaseVersionCar' ORDER BY c.savedAt DESC OFFSET @keep LIMIT 10000",
+        parameters: [{ name: "@keep", value: MAX_VERSIONS_KEPT }],
+      },
+      { partitionKey: "system" }
+    )
+    .fetchAll();
+  const results = await Promise.allSettled(resources.map((r) => container.item(r.id, "system").delete()));
+  const failures = results.filter((r) => r.status === "rejected");
+  if (failures.length > 0) {
+    console.error(`pruneCarKnowledgeBaseVersions: ${failures.length} of ${resources.length} failed to delete:`, failures);
+  }
+  return results.filter((r) => r.status === "fulfilled").length;
+}
