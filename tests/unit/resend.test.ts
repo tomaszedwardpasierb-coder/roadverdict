@@ -109,8 +109,8 @@ describe("sendReceiptRequestEmail", () => {
     const { sendReceiptRequestEmail } = await import("@/lib/resend");
     await sendReceiptRequestEmail(baseParams);
     const html = mocks.send.mock.calls[0][0].html;
-    expect(html).toContain("<li>Front brake pads</li>");
-    expect(html).toContain("<li>&lt;script&gt;steal()&lt;/script&gt;</li>");
+    expect(html).toContain('<li style="margin-bottom:4px;">Front brake pads</li>');
+    expect(html).toContain('<li style="margin-bottom:4px;">&lt;script&gt;steal()&lt;/script&gt;</li>');
   });
 
   it("includes approve, decline, and review links carrying the decision token", async () => {
@@ -125,14 +125,14 @@ describe("sendReceiptRequestEmail", () => {
   it("omits the buyer note paragraph when no buyerMessage is given", async () => {
     const { sendReceiptRequestEmail } = await import("@/lib/resend");
     await sendReceiptRequestEmail(baseParams);
-    expect(mocks.send.mock.calls[0][0].html).not.toContain("They added a note");
+    expect(mocks.send.mock.calls[0][0].html).not.toContain("&ldquo;");
   });
 
   it("includes an escaped buyer note when buyerMessage is given", async () => {
     const { sendReceiptRequestEmail } = await import("@/lib/resend");
     await sendReceiptRequestEmail({ ...baseParams, buyerMessage: "Can I see the <invoice>?" });
     const html = mocks.send.mock.calls[0][0].html;
-    expect(html).toContain('They added a note: "Can I see the &lt;invoice&gt;?"');
+    expect(html).toContain("&ldquo;Can I see the &lt;invoice&gt;?&rdquo;");
   });
 
   it("uses the non-reminder subject by default", async () => {
