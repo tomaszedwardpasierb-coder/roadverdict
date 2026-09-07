@@ -47,11 +47,26 @@ db.exec(`
 // table exists — it will NOT add new columns to an existing local .db file.
 // Rather than requiring everyone to delete data/roadverdict.db every time the
 // schema moves, check for and add any missing column at startup.
+//
+// The check-then-add below isn't atomic across processes: Next.js's build
+// collects page data for each API route's bundle separately, and more than
+// one of those bundles imports this module, each opening its own connection
+// to the same physical roadverdict.db file. Two of them can both see "column
+// doesn't exist yet" before either has committed its ALTER, so the second
+// one fails with "duplicate column name" - a real race that surfaced once
+// enough routes importing this file existed for the build to hit it
+// reliably. The ALTER failing for that specific reason means the column now
+// exists either way (which is exactly this function's postcondition), so
+// it's caught and ignored rather than treated as a real error.
 function ensureColumn(table: string, column: string, definitionSql: string): void {
   const columns = db.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[];
   const exists = columns.some((c) => c.name === column);
   if (!exists) {
-    db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definitionSql}`);
+    try {
+      db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definitionSql}`);
+    } catch (err) {
+      if (!(err instanceof Error) || !/duplicate column name/i.test(err.message)) throw err;
+    }
   }
 }
 
