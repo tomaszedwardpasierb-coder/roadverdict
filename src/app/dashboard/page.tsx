@@ -77,11 +77,70 @@ import { PlanComparisonCards } from "@/components/PlanComparisonCards";
 import { isTwoFactorEnabled } from "@/lib/auth/twoFactor";
 import { TwoFactorSettings } from "./TwoFactorSettings";
 
+// --- Car support (see RoadVerdict_Car_Plan_v3.md's ADR) ---
+import { resolveActiveVehicle } from "@/lib/tracker/activeVehicle";
+import { getCarsForUser, getCurrentRegistration as getCarCurrentRegistration, type CarDoc } from "@/lib/tracker/car";
+import { getCarServiceRecords } from "@/lib/tracker/carServiceRecord";
+import { getCarFuelLogs } from "@/lib/tracker/carFuelLog";
+import { getCarMods } from "@/lib/tracker/carMod";
+import { getCarBills } from "@/lib/tracker/carBill";
+import { getCarReminders } from "@/lib/tracker/carReminder";
+import { computeCarReminderStatus } from "@/lib/tracker/carReminderStatus";
+import { computeCarYearSpend, gatherCarMileagePoints } from "@/lib/tracker/carSummary";
+import { CAR_JOB_LABELS } from "@/lib/tracker/carJobTypes";
+import { CAR_BILL_LABELS } from "@/lib/tracker/carBillTypes";
+import { AddCarForm } from "./AddCarForm";
+import { LogCarServiceForm } from "./LogCarServiceForm";
+import { LogCarFuelForm } from "./LogCarFuelForm";
+import { LogCarModForm } from "./LogCarModForm";
+import { LogCarBillForm } from "./LogCarBillForm";
+import { CarServiceHistoryCard } from "./CarServiceHistoryCard";
+import { CarFuelLogCard } from "./CarFuelLogCard";
+import { CarModCard } from "./CarModCard";
+import { CarBillCard } from "./CarBillCard";
+import { CarReminderItem } from "./CarReminderItem";
+
 export const dynamic = "force-dynamic";
 
-export default async function DashboardPage() {
+export default async function DashboardPage(props: { searchParams: Promise<{ addVehicle?: string }> }) {
+  const searchParams = await props.searchParams;
   const session = await getSession();
   if (!session) redirect("/login");
+
+  // Resolves which vehicle KIND is active (see activeVehicle.ts) -
+  // checked before any bike-specific fetch below, so a car-active
+  // session branches off entirely rather than falling through into
+  // logic that assumes a bike exists. Duplicates the getBikesForUser
+  // call made a few lines below (resolveActiveVehicle does its own
+  // internal fetch) - same accepted-duplication reasoning as
+  // getSellerReportCore further down this same file: one page load per
+  // visit for one signed-in person, not a hot path worth extra
+  // complexity to avoid.
+  const activeVehicle = await resolveActiveVehicle(session.email);
+  const existingCars = await getCarsForUser(session.email);
+
+  // Explicit escape hatch, not yet reachable through normal navigation -
+  // the public /cars marketing pages (Phase 4) that would normally link
+  // here with this same intent don't exist yet. Only shown when the
+  // account genuinely has no car yet; once one exists, this same URL
+  // (which a POST's router.refresh() would revisit, still carrying the
+  // query param) correctly falls through instead of re-showing the form.
+  if (searchParams.addVehicle === "car" && existingCars.length === 0) {
+    return (
+      <main className={styles.main}>
+        <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "1rem" }}>
+          <LogoutButton />
+        </div>
+        <h1 className={styles.heading}>Add your car</h1>
+        <p className={styles.subtext}>Signed in as {session.email}.</p>
+        <AddCarForm />
+      </main>
+    );
+  }
+
+  if (activeVehicle?.kind === "car") {
+    return renderCarDashboard(session.email, activeVehicle.car, existingCars, activeVehicle.hasAnyBike);
+  }
 
   const bikes = await getBikesForUser(session.email);
   const bike = await pickActiveBike(bikes);
@@ -604,8 +663,15 @@ export default async function DashboardPage() {
     </>
   );
 
-  const switcherBikes = bikes.map((b) => ({
+  // Car entries aren't merged in here yet - this page's own data-fetching
+  // and every tab's content below are still entirely BikeDoc-based (see
+  // the ADR: rendering real car dashboard content - forms, history tabs -
+  // is separate, not-yet-built work). The switcher, DashboardShell's
+  // vehicle-kind branching, and the full car API layer are ready for it;
+  // wiring an active car into this specific function is the next step.
+  const switcherVehicles = bikes.map((b) => ({
     id: b.id,
+    kind: 'bike' as const,
     name: b.nickname ? `${b.nickname} - ${b.make} ${b.model}` : `${b.make} ${b.model}`,
     year: b.year,
     currentMileage: b.currentMileage,
@@ -719,15 +785,16 @@ export default async function DashboardPage() {
 
   return (
     <DashboardShell
-      bikeName={bikeName}
-      bikeYear={bike.year}
+      vehicleKind="bike"
+      vehicleName={bikeName}
+      vehicleYear={bike.year}
       currentMileage={bike.currentMileage}
       distanceUnit={distanceUnit}
       userEmail={session.email}
       isPro={userIsPro}
       proDaysRemaining={proStatus.daysRemaining}
-      bikes={switcherBikes}
-      activeBikeId={bike.id}
+      vehicles={switcherVehicles}
+      activeVehicleId={bike.id}
       pendingReviewIds={pendingReviewIds}
       hasPendingReceiptRequests={pendingReceiptRequests.length > 0}
       dashboardContent={dashboardContent}
@@ -747,6 +814,270 @@ export default async function DashboardPage() {
       securityContent={securityContent}
       storyReady={storyReady}
       hasIncomingRequest={!!incomingRequest}
+    />
+  );
+}
+
+// The car-active dashboard - deliberately a separate function, not a
+// giant if/else woven through the ~700 lines above. Keeps the existing,
+// working bike path completely untouched (verified: same route list,
+// same component behaviour) rather than risking it via an inline
+// branch. Trimmed to what's actually built for cars so far: no Reports/
+// Story/Shareable Links/Transfer ownership/Quote Checker/Cost
+// Calculator/Buying Guide content is assembled at all (DashboardShell's
+// own CAR_UNAVAILABLE_SECTIONS hides their nav entries, so nothing here
+// needs to produce placeholder JSX for them).
+async function renderCarDashboard(email: string, car: CarDoc, allCars: CarDoc[], hasAnyBike: boolean) {
+  const [bikes, proStatus, twoFactorEnabled] = await Promise.all([
+    hasAnyBike ? getBikesForUser(email) : Promise.resolve([]),
+    getProStatus(email),
+    isTwoFactorEnabled(email),
+  ]);
+  const userIsPro = proStatus.isPro;
+
+  const distanceUnit: DistanceUnit = car.distanceUnit ?? "mi";
+  const currency: Currency = car.currency ?? "GBP";
+
+  const [records, fuelLogs, mods, bills, reminders, rates] = await Promise.all([
+    getCarServiceRecords(email, car.id),
+    getCarFuelLogs(email, car.id),
+    getCarMods(email, car.id),
+    getCarBills(email, car.id),
+    getCarReminders(email, car.id),
+    getExchangeRates(),
+  ]);
+
+  const pendingReviewIds = {
+    service: records.filter((r) => r.needsReview).map((r) => r.id),
+    fuel: fuelLogs.filter((f) => f.needsReview).map((f) => f.id),
+    mods: mods.filter((m) => m.needsReview).map((m) => m.id),
+    bills: bills.filter((b) => b.needsReview).map((b) => b.id),
+  };
+
+  const mileagePoints = gatherCarMileagePoints(records, mods, fuelLogs, bills);
+  const currentYear = new Date().getFullYear();
+  const yearSpend = computeCarYearSpend(records, mods, fuelLogs, bills, currentYear);
+  const overBudget = car.annualBudget != null && yearSpend >= car.annualBudget;
+
+  const recentActivity: RecentActivityItem[] = [
+    ...records.map((r) => ({
+      id: r.id, reviewCategory: "service" as const, date: r.date, icon: "🔧", type: "Service",
+      description: CAR_JOB_LABELS[r.jobType] ?? r.jobType, category: "Servicing & repairs", cost: r.cost, mileage: r.mileage,
+    })),
+    ...fuelLogs.map((f) => ({
+      id: f.id, reviewCategory: "fuel" as const, date: f.date, icon: "⛽", type: "Fuel",
+      description: f.fuelType === "electric" ? `${(f.kwh ?? 0).toFixed(1)} kWh` : `${(f.litres ?? 0).toFixed(1)}L${f.filledToFull ? " (full)" : ""}`,
+      category: "Fuel", cost: f.cost, mileage: f.mileage,
+    })),
+    ...mods.map((m) => ({
+      id: m.id, reviewCategory: "mods" as const, date: m.date, icon: "⚙", type: "Part",
+      description: m.name, category: "Parts & Accessories", cost: m.cost, mileage: m.mileage,
+    })),
+    ...bills.map((b) => ({
+      id: b.id, reviewCategory: "bills" as const, date: b.date, icon: "📄", type: "Bill",
+      description: CAR_BILL_LABELS[b.billType] ?? b.billType, category: "Insurance/tax/MOT/finance", cost: b.cost,
+    })),
+  ]
+    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+    .slice(0, 8);
+
+  const carName = car.nickname ? `${car.nickname} - ${car.make} ${car.model}` : `${car.make} ${car.model}`;
+  const currentRegistration = getCarCurrentRegistration(car);
+  const carTag = (car.nickname || currentRegistration) ? (
+    <span className={styles.headingBikeTag}>
+      {car.nickname}
+      {car.nickname && currentRegistration && " · "}
+      {currentRegistration}
+    </span>
+  ) : null;
+  const mileagePill = (
+    <div style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
+      <NotificationBell />
+      <div className={styles.headerMileagePill}>
+        <Icon name="currentMiles" size={15} />
+        {Math.round(convertMilesToDisplay(car.currentMileage, distanceUnit)).toLocaleString()} {distanceUnit === "km" ? "km" : "mi"}
+      </div>
+    </div>
+  );
+
+  const dashboardContent = (
+    <>
+      {overBudget && (
+        <div className={styles.budgetWarningBanner}>
+          ⚠ <strong>You&apos;re over your {currentYear} budget</strong> - {formatCurrency(yearSpend, currency, rates)} spent against a{" "}
+          {formatCurrency(car.annualBudget as number, currency, rates)} budget, {formatCurrency(yearSpend - (car.annualBudget as number), currency, rates)} over.
+        </div>
+      )}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "0.75rem" }}>
+        <h1 className={styles.heading}>Dashboard{carTag}</h1>
+        {mileagePill}
+      </div>
+      <p className={styles.subtext} style={{ marginBottom: "1rem" }}>Here&apos;s how your car looks today.</p>
+      <ScanReceiptButton isPro={userIsPro} />
+      <div className={styles.dashboardStatsGrid}>
+        <div className={styles.statCard}>
+          <div className={`${styles.statCardIcon} ${styles.statCardIconNeutral}`}><Icon name="currentMiles" size={16} /></div>
+          <div className={styles.statCardValue}>{Math.round(convertMilesToDisplay(car.currentMileage, distanceUnit)).toLocaleString()}</div>
+          <div className={styles.statCardLabel}>Current {distanceUnit === "km" ? "km" : "miles"}</div>
+        </div>
+        {userIsPro ? (
+          <div className={styles.statCard}>
+            <div className={`${styles.statCardIcon} ${styles.statCardIconNeutral}`}><Icon name="spendThisYear" size={16} /></div>
+            <div className={styles.statCardValue}>{formatCurrency(yearSpend, currency, rates)}</div>
+            <div className={styles.statCardLabel}>Spend this year</div>
+          </div>
+        ) : (
+          <LockedStatCard icon="spendThisYear" iconClass={styles.statCardIconNeutral} label="Spend this year" />
+        )}
+      </div>
+      <div className={styles.chartCard}>
+        <div className={styles.chartCardTitle}>Recent activity</div>
+        <RecentActivity items={recentActivity} distanceUnit={distanceUnit} currency={currency} rates={rates} />
+      </div>
+      <p className={styles.subtext} style={{ marginTop: "1rem" }}>
+        Reports and the Quote Checker/Cost Calculator/Buying Guide tools aren&apos;t available for cars yet - they need real UK car price
+        data to be worth showing, and that research hasn&apos;t happened yet.
+      </p>
+    </>
+  );
+
+  const serviceContent = (
+    <>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "0.75rem" }}>
+        <h1 className={styles.heading}>Service{carTag}</h1>
+        {mileagePill}
+      </div>
+      <p className={styles.subtext}>Every oil change, every brake job - a real maintenance record, not a hazy memory of &quot;I think I did it.&quot;</p>
+      <LogCarServiceForm initialMileage={car.currentMileage} mileageHistory={mileagePoints} distanceUnit={distanceUnit} currency={currency} rates={rates} carYear={car.year} isCustomBuild={car.isCustomBuild} />
+      <h2 className={styles.sectionHeading}>Service history</h2>
+      {records.length === 0 ? (
+        <div className={styles.card}><p className={styles.cardBody}>No service records logged yet. Log your first one above.</p></div>
+      ) : (
+        records.map((r) => <CarServiceHistoryCard key={r.id} record={r} distanceUnit={distanceUnit} currency={currency} rates={rates} />)
+      )}
+    </>
+  );
+
+  const fuelContent = (
+    <>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "0.75rem" }}>
+        <h1 className={styles.heading}>Fuel{carTag}</h1>
+        {mileagePill}
+      </div>
+      <p className={styles.subtext}>Log a fill-up or charge in seconds.</p>
+      <LogCarFuelForm fuelType={car.fuelType} initialMileage={car.currentMileage} mileageHistory={mileagePoints} distanceUnit={distanceUnit} currency={currency} rates={rates} carYear={car.year} isCustomBuild={car.isCustomBuild} />
+      <h2 className={styles.sectionHeading}>Fuel log</h2>
+      {fuelLogs.length === 0 ? (
+        <div className={styles.card}><p className={styles.cardBody}>No fuel fill-ups or charges logged yet. Log your first one above.</p></div>
+      ) : (
+        fuelLogs.map((f) => <CarFuelLogCard key={f.id} log={f} distanceUnit={distanceUnit} currency={currency} rates={rates} />)
+      )}
+    </>
+  );
+
+  const modsContent = (
+    <>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "0.75rem" }}>
+        <h1 className={styles.heading}>Parts & Accessories{carTag}</h1>
+        {mileagePill}
+      </div>
+      <p className={styles.subtext}>Every upgrade, with the receipt to prove it wasn&apos;t a bodge job.</p>
+      <LogCarModForm initialMileage={car.currentMileage} mileageHistory={mileagePoints} distanceUnit={distanceUnit} currency={currency} rates={rates} carYear={car.year} isCustomBuild={car.isCustomBuild} />
+      <h2 className={styles.sectionHeading}>History</h2>
+      {mods.length === 0 ? (
+        <div className={styles.card}><p className={styles.cardBody}>No modifications or accessories logged yet.</p></div>
+      ) : (
+        mods.map((m) => <CarModCard key={m.id} mod={m} distanceUnit={distanceUnit} currency={currency} rates={rates} />)
+      )}
+    </>
+  );
+
+  const billsContent = (
+    <>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "0.75rem" }}>
+        <h1 className={styles.heading}>Insurance, Tax, MOT &amp; Finance{carTag}</h1>
+        {mileagePill}
+      </div>
+      <p className={styles.subtext}>The paperwork you genuinely can&apos;t afford to forget, tracked in one place.</p>
+      <LogCarBillForm currency={currency} rates={rates} carYear={car.year} isCustomBuild={car.isCustomBuild} />
+      <h2 className={styles.sectionHeading}>History</h2>
+      {bills.length === 0 ? (
+        <div className={styles.card}><p className={styles.cardBody}>No insurance, tax, MOT, ULEZ/CAZ, congestion charge, or finance payments logged yet.</p></div>
+      ) : (
+        bills.map((b) => <CarBillCard key={b.id} bill={b} currency={currency} rates={rates} />)
+      )}
+    </>
+  );
+
+  const remindersContent = (
+    <>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "0.75rem" }}>
+        <h1 className={styles.heading}>Reminders{carTag}</h1>
+        {mileagePill}
+      </div>
+      <p className={styles.subtext}>RoadVerdict remembers so you don&apos;t have to. Nothing missed, nothing lapsed.</p>
+      {!userIsPro && (
+        <>
+          <p className={styles.subtext} style={{ marginBottom: "1rem" }}>
+            <Icon name="lock" size={13} /> Free plan: every reminder is tracked here with its OK/Overdue status, but the exact due date/mileage is Premium.
+          </p>
+          <PlanComparisonCards userIsPro={false} showFreeCta={false} />
+        </>
+      )}
+      {reminders.length === 0 ? (
+        <div className={styles.card}><p className={styles.cardBody}>No reminders set yet. Tick &quot;Remind me&quot; when logging a service or a bill to add one.</p></div>
+      ) : (
+        reminders.map((r) => <CarReminderItem key={r.id} reminder={r} status={computeCarReminderStatus(r, car.currentMileage)} isPro={userIsPro} />)
+      )}
+    </>
+  );
+
+  const privacyContent = <PrivacyContent />;
+  const securityContent = (
+    <>
+      <h1 className={styles.heading}>Security</h1>
+      <p className={styles.subtext}>Manage how you sign in to your account.</p>
+      <TwoFactorSettings initiallyEnabled={twoFactorEnabled} />
+    </>
+  );
+
+  const switcherVehicles = [
+    ...bikes.map((b) => ({
+      id: b.id, kind: "bike" as const,
+      name: b.nickname ? `${b.nickname} - ${b.make} ${b.model}` : `${b.make} ${b.model}`,
+      year: b.year, currentMileage: b.currentMileage,
+    })),
+    ...allCars.map((c) => ({
+      id: c.id, kind: "car" as const,
+      name: c.nickname ? `${c.nickname} - ${c.make} ${c.model}` : `${c.make} ${c.model}`,
+      year: c.year, currentMileage: c.currentMileage,
+    })),
+  ];
+
+  return (
+    <DashboardShell
+      vehicleKind="car"
+      vehicleName={carName}
+      vehicleYear={car.year}
+      currentMileage={car.currentMileage}
+      distanceUnit={distanceUnit}
+      userEmail={email}
+      isPro={userIsPro}
+      proDaysRemaining={proStatus.daysRemaining}
+      vehicles={switcherVehicles}
+      activeVehicleId={car.id}
+      pendingReviewIds={pendingReviewIds}
+      hasPendingReceiptRequests={false}
+      dashboardContent={dashboardContent}
+      serviceContent={serviceContent}
+      fuelContent={fuelContent}
+      modsContent={modsContent}
+      billsContent={billsContent}
+      remindersContent={remindersContent}
+      privacyContent={privacyContent}
+      securityContent={securityContent}
+      storyReady={false}
+      hasIncomingRequest={false}
     />
   );
 }

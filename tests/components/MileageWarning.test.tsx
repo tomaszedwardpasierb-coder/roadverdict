@@ -26,7 +26,7 @@ describe("MileageWarning", () => {
         onAcknowledgeChange={vi.fn()}
       />
     );
-    expect(screen.getByText(/can't be lower than your bike's current recorded miles \(5,000 miles\)/)).toBeInTheDocument();
+    expect(screen.getByText(/can't be lower than the current recorded miles \(5,000 miles\)/)).toBeInTheDocument();
     expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
   });
 

@@ -230,7 +230,7 @@ describe("FuelLogCard", () => {
     renderCard({ log: makeLog({ date: new Date().toISOString().slice(0, 10), mileage: 3000 }), currentMileage: 4000 });
     await user.click(screen.getByRole("button", { name: "Edit" }));
 
-    expect(screen.getByText(/can't be lower than your bike's current recorded/)).toBeInTheDocument();
+    expect(screen.getByText(/can't be lower than the current recorded/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Save" })).toBeDisabled();
     // Blocked status offers no acknowledgement checkbox at all.
     expect(screen.queryByLabelText("Yes, this mileage is correct")).not.toBeInTheDocument();

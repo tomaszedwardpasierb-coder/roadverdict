@@ -20,7 +20,7 @@ export function MileageWarning({ result, distanceUnit, acknowledged, onAcknowled
 
   let message = '';
   if (result.reason === 'today-lower') {
-    message = `This is dated today or later, so it can't be lower than your bike's current recorded ${distanceUnitLabel(
+    message = `This is dated today or later, so it can't be lower than the current recorded ${distanceUnitLabel(
       distanceUnit
     )} (${formatDistance(result.referenceMileage!, distanceUnit)}).`;
   } else if (result.reason === 'below-earlier') {

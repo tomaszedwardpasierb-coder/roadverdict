@@ -360,64 +360,147 @@ topic clusters (motorcycle homepage → `/cars`, and back).
 `/login` with the existing `redirect` param (already validated by `safeRedirect.ts` — no auth
 changes needed), landing back on the one `/dashboard`.
 
-### The shared, vehicle-kind-aware dashboard (replaces v2's Phase 4/5 dashboard split)
+### Phase 5 — The shared, vehicle-kind-aware dashboard — ✅ DONE, built 7 September 2026
 
-**Vehicle switcher.** The existing multi-bike switcher pattern (`BikeSwitcher.tsx`,
-`pickActiveBike()`, an `activeBikeId` cookie) extends to list every vehicle on the account
-regardless of kind, each tagged motorcycle or car. Switching sets which vehicle is active — the
-same mechanism already in production for an account with two motorcycles, just no longer
-assuming every entry is a bike.
+Landed in two slices, both now complete: the API layer + dashboard-shell infrastructure first,
+then `AddCarForm`, the four car logging forms, five simplified car history/reminder components,
+and actually wiring `dashboard/page.tsx` to resolve and render either vehicle kind. Verified with
+a clean `tsc --noEmit`, a green full suite (2,791 tests), a green component suite (750 tests —
+196 new across both slices), and a clean production build (`/dashboard`'s own bundle grew from
+122 kB to 131 kB; every other route's size and the route list itself are unchanged, confirming the
+existing bike path is genuinely untouched).
 
-**`dashboard/page.tsx`** gains a branch at the top: load the active vehicle, check its kind, and
-fetch/assemble either the existing bike-flavoured content or the new car-flavoured content for
-each tab. `DashboardShell.tsx` itself needs little to no change — it's the nav shell and mostly
-vehicle-agnostic already; what changes is *what's passed into it* as each tab's content.
+**Two corrections to the original sketch below, found by reading the real bike routes before
+mirroring them, the same discipline used in Phase 3:**
 
-**Nav tabs keep their current shape** (Service, Fuel, Parts & Accessories, Insurance/Tax/MOT/
-Finance, Reminders, Reports, Story, Shareable Links, Transfer Ownership, Security) — those
-categories genuinely apply to both vehicle kinds. What's inside a tab is fully scoped to the
-active vehicle: `CAR_JOB_LABELS` when a car is active, `JOB_LABELS` when a bike is, never merged
-into one combined list.
+- **No `GET` on any collection route, no `car-bill-series/*` at all.** The real bike routes
+  (`services/route.ts`, `fuel/route.ts`, etc.) have no `GET` handler — record lists are read
+  server-side, directly via the lib functions, inside `dashboard/page.tsx`, never through a REST
+  `GET`. `bike/[bikeId]/route.ts` is `DELETE`-only too — the mileage/region/budget/etc PATCH lives
+  on the collection route (`bike/route.ts`), resolving the account's primary bike implicitly, not
+  on `[bikeId]`. The car routes below mirror this real convention, not the sketch's assumption.
+  `car-bill-series/*` is dropped entirely — `CarBillDoc` (Phase 2) deliberately has no
+  `seriesId`/`seriesIndex`/`source`, so there is nothing yet for a bill-series route to operate on.
+- **`scan-receipt`, `commit-receipt-item(s)`, and `plate-lookup` are not separate car routes.**
+  Phase 3 already made the three existing `/api/tracker/*` receipt-scanning routes
+  vehicle-kind-aware (a `vehicleKind` field, defaulting to `"motorcycle"`), and `plate-lookup`
+  turned out to have no rejection logic in the route at all — `classifyVehicleType()` just returns
+  data, and `AddBikeForm.tsx` is the one that rejects `'four-wheeled'` client-side. `AddCarForm`
+  will call the exact same `/api/tracker/plate-lookup`, just reacting to the result differently
+  (and warning, not rejecting, on `'motorcycle'`).
 
-**`AddCarForm.tsx`** — new, parallel to `AddBikeForm.tsx`. Key differences: fuel type is the
-first field (it decides everything downstream); no curated model dropdown — VDG's returned
-make/model strings go straight into free-text fields, since cars have too many live models to
-curate the way the ~13-brand motorcycle list works; engine size in litres, or a battery-kWh field
-for electric; year optional for EVs/custom builds, same logic as `isCustomBuild` today. Submits
-to `POST /api/cars/car`, then redirects to the existing `/dashboard` (not a separate URL).
-
-**Logging forms** — `LogCarServiceForm.tsx`, `LogCarFuelForm.tsx` (litres or kWh field depending
-on the active car's `fuelType`; "filled to full" only shown for ICE), `LogCarModForm.tsx`,
-`LogCarBillForm.tsx` (includes ULEZ/Congestion). Rendered inside the same `DashboardShell`, not a
-second shell.
-
-**Car API routes**, unchanged from v2 — all new, all under `/api/cars/` (this namespace is an
-internal implementation detail, not a user-facing URL, so it doesn't conflict with the "shared
-dashboard" decision):
+**Real, built car API routes** — all under `/api/cars/`, each a deliberate mirror of its bike
+equivalent (mirroring the exact validation order, mileage-consistency wiring, and response
+shapes), all reusing the vehicle-agnostic `mileageCheck.ts`/`fuelPlausibility.ts` functions
+already confirmed reusable in Phase 3:
 
 ```
 src/app/api/cars/
-  car/route.ts                — POST (create), GET (primary car)
-  car/[carId]/route.ts        — PATCH, DELETE
-  car-services/route.ts       — POST, GET          car-services/[id]/route.ts  — PATCH, DELETE
-  car-fuel/route.ts           — POST, GET          car-fuel/[id]/route.ts     — PATCH, DELETE
-  car-mods/route.ts           — POST, GET          car-mods/[id]/route.ts     — PATCH, DELETE
-  car-bills/route.ts          — POST, GET          car-bills/[id]/route.ts    — PATCH, DELETE
-  car-bill-series/route.ts    — POST, GET          car-bill-series/[id]/route.ts — PATCH, DELETE
-  car-reminders/route.ts      — POST, GET          car-reminders/[id]/route.ts — PATCH, DELETE
-  active-car/route.ts         — POST (set active vehicle cookie — extends the existing one)
-  car-exists/route.ts         — GET (check if reg already tracked)
-  scan-receipt/route.ts       — POST (sends vehicleKind: 'car' to receiptParse)
-  commit-receipt-items/route.ts
-  plate-lookup/route.ts       — same VDG call as /api/tracker/plate-lookup, minus the
-                                 'four-wheeled' rejection — the entire reason it's a separate
-                                 route rather than a shared one with a mode flag
+  car/route.ts                 — POST (create), PATCH (mileage/region/budget/units/currency/chartType)
+  car/[carId]/route.ts         — DELETE
+  car-services/route.ts        — POST      car-services/[id]/route.ts  — PATCH, DELETE
+  car-fuel/route.ts            — POST      car-fuel/[id]/route.ts      — PATCH, DELETE
+  car-mods/route.ts            — POST      car-mods/[id]/route.ts      — PATCH, DELETE
+  car-bills/route.ts           — POST      car-bills/[id]/route.ts     — PATCH, DELETE
+  car-reminders/route.ts       — POST      car-reminders/[id]/route.ts — PATCH, DELETE (mark done)
+  active-car/route.ts          — POST (sets activeCarId AND activeVehicleKind cookies)
+  car-exists/route.ts          — GET (mirrors bike-exists, via the already-existing
+                                  findCarByRegistrationAcrossAccounts)
 ```
 
-**Cross-product signpost.** `AddBikeForm.tsx`'s existing rejection message for a car plate
-(*"That registration belongs to a four-wheeled vehicle. We only support motorcycles here"*)
-becomes a pointer instead of a dead end: *"That looks like a car — want to track it here too?"*
-with a link to `/cars`, since it's the same account either way.
+**New file, `src/lib/tracker/carReminder.ts`** — a gap Phase 2 didn't cover (reminders weren't
+one of its four record types, since nothing needed them until this phase's routes did). Full
+sister mirror of `reminder.ts`: `CarReminderDoc { type: 'carReminder', carId, ... }`, via
+`queryCarTrackerDocs` from `car.ts` rather than the bike-only `queryTrackerDocs`. `reminder.ts`
+itself untouched, matching every other sister-schema decision this build has made.
+
+**New file, `src/lib/tracker/activeVehicle.ts`** — the one genuinely new architectural piece
+needed to make a *single* dashboard vehicle-kind-aware: `ACTIVE_BIKE_COOKIE` and
+`ACTIVE_CAR_COOKIE` each already track "which vehicle of that kind is active", but neither can
+answer "which *kind* is active right now" for an account holding both at once. A third,
+neutral file (not living inside `bike.ts` or `car.ts`, to avoid exactly the cross-sister coupling
+avoided everywhere else) adds `ACTIVE_VEHICLE_KIND_COOKIE` and `resolveActiveVehicle(email)`,
+which both `active-bike/route.ts` and `active-car/route.ts` now set alongside their own
+vehicle-id cookie. Defaults to bike when no preference is recorded yet, so every account that
+predates car support lands exactly where it always has.
+
+**`VehicleSwitcher.tsx` replaces `BikeSwitcher.tsx`.** Not a second, parallel switcher — the ADR
+calls for one unified list, so this is a genuine generalization: `SwitcherVehicle { id, kind,
+name, year?, currentMileage }`, switching posts to `/api/tracker/active-bike` or
+`/api/cars/active-car` depending on the clicked entry's kind. For a bike-only account (every
+account today) it renders byte-for-byte the same UI the original did.
+
+**`DashboardShell.tsx` gained the minimal generalization the ADR called for**, not a duplicate
+shell: `bikeName`/`bikeYear`/`bikes`/`activeBikeId` became `vehicleName`/`vehicleYear`/
+`vehicles`/`activeVehicleId`, plus one new required `vehicleKind` prop. Three nav tabs — Story,
+Shareable Links, Transfer ownership — depend on `BikeDoc` fields `CarDoc` deliberately doesn't
+have yet (`storyCache`, a share token, transfer semantics — all explicit out-of-scope items per
+the ADR), so they're hidden from both the sidebar and the mobile "More" sheet whenever
+`vehicleKind === 'car'`, rather than shown broken or empty; their content props became optional
+(`ReactNode | undefined`) to match. `UpdateMileageButton.tsx` gained the same `vehicleKind` prop,
+PATCHing `/api/cars/car` instead of `/api/tracker/bike` when a car is active — the one existing
+button wired directly into the shell (not passed as tab content) that would otherwise have
+silently updated the wrong vehicle, or 404'd, for a car-active session. `RefreshVehicleDataButton`
+(DVLA/MOT refresh — no car route for it yet, and MOT import is real, non-trivial extra scope) is
+hidden entirely for a car-active session rather than wired to an endpoint that doesn't exist.
+
+**`AddCarForm.tsx`** — new, parallel to `AddBikeForm.tsx` but genuinely simpler in three ways the
+original sketch called for: no curated make/model list at all (VDG's returned strings go straight
+into free-text fields — there's no `motorcycleModels.ts`-equivalent catalog for cars, so there's
+no "matched in our list" vs "custom entry" branching to do); no MOT-mileage-floor prefill and no
+post-create MOT import (`mot-history-preview`/`mot-history` are bike-only routes, a car
+equivalent is real, separate work); no "request ownership" flow for an already-tracked car (car
+ownership transfer isn't built — a duplicate plate on another account can still be started fresh
+under the new one, just without a transfer request). Plate lookup reuses the exact same
+`/api/tracker/plate-lookup` and reacts oppositely to `AddBikeForm` — rejects `'motorcycle'`
+instead of `'four-wheeled'` — and makes a best-effort guess at fuel type from DVLA's own free-text
+field (`mapDvlaFuelType()`), always left editable since DVLA doesn't distinguish plain hybrid from
+plug-in hybrid in that field.
+
+**Four new logging forms**, each simpler than its motorcycle counterpart in exactly the ways the
+smaller car catalogs allow: `LogCarServiceForm.tsx`/`LogCarModForm.tsx` use plain `<select>`s over
+`CAR_JOB_LABELS`/`CAR_MOD_LABELS` (28 and 19 keys — no grouping or search-autocomplete needed at
+that size, unlike the motorcycle catalogs' 250+ entries). `LogCarFuelForm.tsx` branches on the
+active car's own `fuelType`: litres and a "filled to full" checkbox for anything with an engine,
+kWh with no such checkbox for electric — the one genuinely new field-level branch a motorcycle
+form never needed. `LogCarBillForm.tsx` is one-off only, no instalment-plan path at all —
+`CarBillDoc` has no `seriesId`/`seriesIndex`/`source` fields (Phase 2's own scope cut), so there's
+nothing for a plan submit to attach to. All four reuse the shared, already-generic
+`useTrackerFormSubmit`/`ReminderFields`/`MileageWarning`/`AttachmentUploader` components
+unchanged (confirmed genuinely vehicle-agnostic before reuse) — plus one small, safe fix
+`MileageWarning.tsx`'s own copy needed: a hardcoded *"your bike's current recorded..."* string,
+the exact kind of leak the plan's own "no car string says bike" QA guard exists to catch.
+
+**Five simplified car history/reminder components** — `CarServiceHistoryCard.tsx`,
+`CarFuelLogCard.tsx`, `CarModCard.tsx`, `CarBillCard.tsx`, `CarReminderItem.tsx` — each a real,
+working view/edit/delete card, deliberately smaller than their motorcycle equivalents
+(`ServiceHistoryCard.tsx` alone is 340 lines) in two specific ways: **no price-benchmark verdict**
+(no car pricing data exists yet — Phase 7's research hasn't happened, and guessing a number here
+would violate the exact "no guessed numbers wearing a confidence label" discipline the benchmarked
+job-type lists already enforce), and **no mileage-conflict-modal** — an edit's mileage conflict
+surfaces as the server's own error message on save (the same `checkMileageConsistency` already
+wired into every `/api/cars/car-*/[id]` route from Phase 5's first slice), rather than the
+motorcycle cards' richer inline resolution UI. Two small new pure-logic files support them:
+`carSummary.ts` (mirrors `summary.ts`'s three aggregation functions — genuinely generic at
+runtime, but pinned to `BikeDoc`-derived types, so a car twin was smaller than loosening a shared
+file three other things depend on) and `carReminderStatus.ts` (mirrors `reminderStatus.ts`'s
+status/label functions, same "zero Cosmos dependency so a client bundle doesn't pull in the SDK"
+reasoning as the original).
+
+**`dashboard/page.tsx` now genuinely branches on vehicle kind.** At the top, `resolveActiveVehicle()`
+decides which path runs; a car-active session calls a new `renderCarDashboard()` function — kept
+deliberately separate from the ~700-line existing bike function rather than an inline if/else woven
+through it, so the working bike path stays provably untouched (same route list, same component
+behaviour, confirmed by the build). It assembles Dashboard/Service/Fuel/Parts & Accessories/
+Insurance-Tax-MOT-Finance/Reminders/Privacy/Security — the eight tabs `DashboardShell`'s
+`CAR_UNAVAILABLE_SECTIONS` (now also covering Reports, Quote Checker, Cost Calculator, and Buying
+Guide alongside Story/Shareable Links/Transfer ownership — none of those four have car equivalents
+yet either, all blocked on Phase 7's price research) actually leaves available. A fresh account
+with no car yet reaches `AddCarForm` via an explicit `?addVehicle=car` query param — a deliberate,
+honest stand-in for the real entry point (a `/cars` marketing page's own "get started" link, which
+doesn't exist until Phase 4) rather than a fake normal-navigation path pretending Phase 4 is done.
+**Cross-product signpost** (`AddBikeForm.tsx`'s four-wheeled rejection becoming a pointer to
+`/cars`) stays deferred — genuinely not useful until `/cars` itself exists to point to.
 
 ### The shared, vehicle-kind-aware AI assistant (replaces v2's Phase 6)
 
@@ -486,7 +569,7 @@ specifically:**
 | 2 | ✅ Done — new doc types, CRUD, job/mod/bill catalogs, car assistant config schema; 121 new unit tests, full suite green (2,564), build unchanged | None |
 | 3 | ✅ Done — receipt scanner is vehicle-kind-aware; diesel not dropped for car accounts (EV/kWh receipts deferred); `commitCarReceiptItem.ts` + `reestimateCarFuelMileage.ts` new; 39 new tests, full suite green (2,603), build unchanged | Motorcycle scanning unchanged |
 | 4 | `/cars/*` public marketing pages exist; cross-product signpost from motorcycle plate lookup | Motorcycle dashboard unchanged |
-| 5 | Vehicle switcher extended to cars; `AddCarForm`; all car logging forms; `/api/cars/*` routes; one shared dashboard now vehicle-kind-aware | Motorcycle dashboard unchanged apart from the switcher gaining car entries |
+| 5 | ✅ Done — full `/api/cars/*` route layer (14 routes); `carReminder.ts`, `activeVehicle.ts` kind-resolution, `carSummary.ts`, `carReminderStatus.ts`; `VehicleSwitcher` (replaces `BikeSwitcher`); `DashboardShell` vehicle-kind-aware; `AddCarForm` + 4 `LogCar*Form`s; 5 simplified car history/reminder cards; `dashboard/page.tsx` genuinely branches and renders a working car dashboard (Dashboard/Service/Fuel/Parts/Bills/Reminders/Privacy/Security - Reports and the 3 embedded tools deferred, no car price data yet); 196 new tests, full suite green (2,791 unit/API, 750 component) | Motorcycle dashboard unchanged (confirmed: same route list, same bundle size for every other route, same component behaviour for a bike-only account) |
 | 6 | One assistant, now vehicle-kind-aware; second knowledge base; `/tomasz` gets a second KB editor tab | Motorcycle assistant behaviour unchanged when a bike is active |
 | 7 | `/cars/quote-checker`, `/cars/cost-calculator`, `/cars/buying-guide`; car VED; homepage cross-link both ways | Motorcycle tools unchanged |
 | 8 | Full test coverage for Phases 2–7, including vehicle-kind-leakage tests | None |

@@ -53,7 +53,7 @@ describe("LogServiceForm", () => {
     await user.clear(mileageInput);
     await user.type(mileageInput, "100");
 
-    expect(screen.getByText(/can't be lower than your bike's current recorded miles \(5,000 miles\)/)).toBeInTheDocument();
+    expect(screen.getByText(/can't be lower than the current recorded miles \(5,000 miles\)/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Log it" })).toBeDisabled();
   });
 
