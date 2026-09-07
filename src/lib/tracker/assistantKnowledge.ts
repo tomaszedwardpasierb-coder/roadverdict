@@ -128,6 +128,8 @@ around it - it should be structurally impossible regardless of what's asked.
 **What it can answer about your own account:**
 - Total spend over a date range, or a specific month/year
 - Spend broken down by category (servicing, fuel, parts, insurance/tax/MOT) over a range
+- The individual entries behind a total for a specific day or range - what each one actually
+  was, its category, and its cost, not just the number (e.g. "what did I buy on the 5th")
 - Current mileage, or mileage at a given point in your history
 - Actual fuel economy, and how it's trending over time, once enough fill-ups have been logged
 - Cost per mile

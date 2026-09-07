@@ -73,6 +73,94 @@ export async function toolGetSpendTotal(email: string, args: SpendTotalArgs) {
   };
 }
 
+// ---- The individual entries behind a total, not just the number ----
+//
+// getSpendTotal above answers "how much" - this answers "what was it".
+// Requires a date or a range rather than defaulting to the whole
+// history: an unscoped call here could return every record ever logged,
+// which is both a poor answer to "what did I buy on X" and needlessly
+// expensive to hand the model in full.
+
+export interface GetEntriesArgs {
+  date?: string;
+  startDate?: string;
+  endDate?: string;
+  category?: "servicing" | "fuel" | "mods" | "bills";
+}
+
+interface HistoryEntry {
+  date: string;
+  category: "service" | "fuel" | "mod" | "bill";
+  description: string;
+  cost: number;
+}
+
+// Notes/name are appended to the category label when present, rather
+// than replacing it - "Oil & filter change - done at Halfords" is a
+// better answer than either half alone.
+function describeWithNotes(label: string, notes?: string): string {
+  return notes && notes.trim() ? `${label} - ${notes.trim()}` : label;
+}
+
+export async function toolGetEntries(email: string, args: GetEntriesArgs) {
+  if (!args.date && !args.startDate && !args.endDate) {
+    return { error: "Needs a date, or a start/end range, to look up - which day, or which period?" };
+  }
+
+  const bike = await getPrimaryBike(email);
+  if (!bike) return { error: "No bike found on this account." };
+
+  const start = args.date ?? args.startDate;
+  const end = args.date ?? args.endDate;
+
+  const [records, mods, fuelLogs, bills] = await Promise.all([
+    getServiceRecords(email, bike.id),
+    getMods(email, bike.id),
+    getFuelLogs(email, bike.id),
+    getBills(email, bike.id),
+  ]);
+
+  const entries: HistoryEntry[] = [];
+  if (!args.category || args.category === "servicing") {
+    for (const r of records) {
+      if (inRange(r.date, start, end)) {
+        entries.push({ date: r.date, category: "service", description: describeWithNotes(JOB_LABELS[r.jobType] ?? r.jobType, r.notes), cost: r.cost });
+      }
+    }
+  }
+  if (!args.category || args.category === "fuel") {
+    for (const f of fuelLogs) {
+      if (inRange(f.date, start, end)) {
+        entries.push({ date: f.date, category: "fuel", description: `Fuel fill-up - ${f.litres}L${f.filledToFull ? " (full tank)" : ""}`, cost: f.cost });
+      }
+    }
+  }
+  if (!args.category || args.category === "mods") {
+    for (const m of mods) {
+      if (inRange(m.date, start, end)) {
+        entries.push({ date: m.date, category: "mod", description: describeWithNotes(`${MOD_LABELS[m.category] ?? m.category} - ${m.name}`, m.notes), cost: m.cost });
+      }
+    }
+  }
+  if (!args.category || args.category === "bills") {
+    for (const b of bills) {
+      if (inRange(b.date, start, end)) {
+        entries.push({ date: b.date, category: "bill", description: describeWithNotes(BILL_LABELS[b.billType] ?? b.billType, b.notes), cost: b.cost });
+      }
+    }
+  }
+
+  entries.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+  return {
+    entries,
+    entryCount: entries.length,
+    totalCost: round2(entries.reduce((s, e) => s + e.cost, 0)),
+    currency: bike.currency ?? "GBP",
+    ...(entries.length === 0 ? { note: "Nothing logged in that range." } : {}),
+  };
+}
+
 // ---- Current mileage, or the closest logged mileage to a given date ----
 
 export interface MileageArgs {
@@ -308,6 +396,19 @@ export const ASSISTANT_TOOL_DECLARATIONS = [
         startDate: { type: "STRING", description: "ISO date (YYYY-MM-DD), inclusive. Omit for no lower bound." },
         endDate: { type: "STRING", description: "ISO date (YYYY-MM-DD), inclusive. Omit for no upper bound." },
         category: { type: "STRING", enum: ["servicing", "fuel", "mods", "bills"], description: "Omit to total across every category." },
+      },
+    },
+  },
+  {
+    name: "getEntries",
+    description: "List the signed-in user's individual logged entries (service, fuel, mods, bills) for a specific date or date range - what each one actually was, its category, and its cost, not just a total. Use this for 'what did I buy/log on X', 'what were those entries', 'what did I spend that amount on', or any question asking for the itemized detail behind a total rather than the total itself. Always requires a date or a range.",
+    parameters: {
+      type: "OBJECT",
+      properties: {
+        date: { type: "STRING", description: "ISO date (YYYY-MM-DD) to look up a single day. Use this for a specific-day question." },
+        startDate: { type: "STRING", description: "ISO date (YYYY-MM-DD), inclusive. Use with endDate instead of date for a range." },
+        endDate: { type: "STRING", description: "ISO date (YYYY-MM-DD), inclusive." },
+        category: { type: "STRING", enum: ["servicing", "fuel", "mods", "bills"], description: "Omit to include every category." },
       },
     },
   },
@@ -653,6 +754,8 @@ export async function runAssistantTool(
   switch (name as ToolName) {
     case "getSpendTotal":
       return toolGetSpendTotal(email, args as SpendTotalArgs);
+    case "getEntries":
+      return toolGetEntries(email, args as GetEntriesArgs);
     case "getMileage":
       return toolGetMileage(email, args as MileageArgs);
     case "getMpgTrend":

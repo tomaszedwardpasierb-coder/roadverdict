@@ -45,6 +45,7 @@ vi.mock("@/lib/tracker/bikeComparison", () => ({ buildBikeComparison: mocks.buil
 import {
   runAssistantTool,
   toolGetSpendTotal,
+  toolGetEntries,
   toolGetMileage,
   toolGetMpgTrend,
   toolGetReminders,
@@ -207,6 +208,86 @@ describe("toolGetSpendTotal", () => {
     const result: any = await toolGetSpendTotal("owner@example.com", { startDate: "2025-01-01", endDate: "2025-12-31" });
     expect(result.total).toBe(50);
     expect(result.entryCount).toBe(1);
+  });
+});
+
+describe("toolGetEntries", () => {
+  it("refuses to run without a date or a range, rather than dumping the whole history", async () => {
+    const result = await toolGetEntries("owner@example.com", {});
+    expect(result).toEqual({ error: "Needs a date, or a start/end range, to look up - which day, or which period?" });
+  });
+
+  it("returns an error when the account has no bike", async () => {
+    mocks.getPrimaryBike.mockResolvedValue(null);
+    const result = await toolGetEntries("owner@example.com", { date: "2025-01-01" });
+    expect(result).toEqual({ error: "No bike found on this account." });
+  });
+
+  it("lists the individual entries for a single day, across every category, with a real description each", async () => {
+    mocks.getServiceRecords.mockResolvedValue([{ date: "2026-01-05", cost: 12.78, jobType: "oil-filter", notes: "" }]);
+    mocks.getFuelLogs.mockResolvedValue([{ date: "2025-01-01", cost: 20, litres: 10, filledToFull: false }]); // different day, excluded
+
+    const result: any = await toolGetEntries("owner@example.com", { date: "2026-01-05" });
+
+    expect(result.entries).toEqual([
+      { date: "2026-01-05", category: "service", description: "Oil & filter change", cost: 12.78 },
+    ]);
+    expect(result.entryCount).toBe(1);
+    expect(result.totalCost).toBe(12.78);
+  });
+
+  it("appends notes to the category label rather than replacing it", async () => {
+    mocks.getServiceRecords.mockResolvedValue([{ date: "2026-01-05", cost: 40, jobType: "oil-filter", notes: "done at Halfords" }]);
+    const result: any = await toolGetEntries("owner@example.com", { date: "2026-01-05" });
+    expect(result.entries[0].description).toBe("Oil & filter change - done at Halfords");
+  });
+
+  it("describes a fuel entry with litres and a full-tank note, since fuel logs have no description field at all", async () => {
+    mocks.getFuelLogs.mockResolvedValue([{ date: "2026-01-05", cost: 15, litres: 10, filledToFull: true }]);
+    const result: any = await toolGetEntries("owner@example.com", { date: "2026-01-05" });
+    expect(result.entries[0]).toEqual({ date: "2026-01-05", category: "fuel", description: "Fuel fill-up - 10L (full tank)", cost: 15 });
+  });
+
+  it("describes a mod entry with its resolved category label and its own name", async () => {
+    mocks.getMods.mockResolvedValue([{ date: "2026-01-05", cost: 12, category: "other-accessory", name: "Szuwax detailing spray", notes: "" }]);
+    const result: any = await toolGetEntries("owner@example.com", { date: "2026-01-05" });
+    expect(result.entries[0].description).toBe("Other accessory - Szuwax detailing spray");
+  });
+
+  it("describes a bill entry with its resolved bill-type label", async () => {
+    mocks.getBills.mockResolvedValue([{ date: "2026-01-05", cost: 300, billType: "insurance", notes: "" }]);
+    const result: any = await toolGetEntries("owner@example.com", { date: "2026-01-05" });
+    expect(result.entries[0].description).toBe("Insurance");
+  });
+
+  it("filters to a single category when specified", async () => {
+    mocks.getServiceRecords.mockResolvedValue([{ date: "2026-01-05", cost: 40, jobType: "oil-filter", notes: "" }]);
+    mocks.getFuelLogs.mockResolvedValue([{ date: "2026-01-05", cost: 15, litres: 10, filledToFull: false }]);
+    const result: any = await toolGetEntries("owner@example.com", { date: "2026-01-05", category: "fuel" });
+    expect(result.entries).toHaveLength(1);
+    expect(result.entries[0].category).toBe("fuel");
+  });
+
+  it("filters by an inclusive start/end range", async () => {
+    mocks.getServiceRecords.mockResolvedValue([
+      { date: "2024-06-01", cost: 100, jobType: "other", notes: "" }, // before range
+      { date: "2025-06-01", cost: 50, jobType: "other", notes: "" },  // in range
+    ]);
+    const result: any = await toolGetEntries("owner@example.com", { startDate: "2025-01-01", endDate: "2025-12-31" });
+    expect(result.entryCount).toBe(1);
+    expect(result.entries[0].date).toBe("2025-06-01");
+  });
+
+  it("sorts entries chronologically regardless of category fetch order", async () => {
+    mocks.getServiceRecords.mockResolvedValue([{ date: "2026-01-10", cost: 40, jobType: "other", notes: "" }]);
+    mocks.getFuelLogs.mockResolvedValue([{ date: "2026-01-01", cost: 15, litres: 10, filledToFull: false }]);
+    const result: any = await toolGetEntries("owner@example.com", { startDate: "2026-01-01", endDate: "2026-01-31" });
+    expect(result.entries.map((e: any) => e.date)).toEqual(["2026-01-01", "2026-01-10"]);
+  });
+
+  it("returns a plain empty result with a note, rather than an error, when nothing matches", async () => {
+    const result: any = await toolGetEntries("owner@example.com", { date: "2026-01-05" });
+    expect(result).toEqual({ entries: [], entryCount: 0, totalCost: 0, currency: "GBP", note: "Nothing logged in that range." });
   });
 });
 
