@@ -73,8 +73,22 @@ describe("CarsPage", () => {
     render(jsx);
 
     for (const href of ["/quote-checker", "/cost-calculator", "/buying-guide"]) {
-      expect(screen.queryByRole("link", { name: new RegExp(href) })).not.toBeInTheDocument();
+      const link = screen.queryByRole("link", { name: new RegExp(href) });
+      // A link to the /cars/ prefixed version legitimately matches this
+      // same regex (no leading anchor) - only reject an exact, un-prefixed
+      // motorcycle URL.
+      if (link) expect(link).not.toHaveAttribute("href", href);
     }
+  });
+
+  it("links to its own three car tool pages (Phase 7 - built once car price research landed)", async () => {
+    mockGetSession.mockResolvedValue(null);
+    const jsx = await CarsPage();
+    render(jsx);
+
+    expect(screen.getByRole("link", { name: /quote checker/i })).toHaveAttribute("href", "/cars/quote-checker");
+    expect(screen.getByRole("link", { name: /cost calculator/i })).toHaveAttribute("href", "/cars/cost-calculator");
+    expect(screen.getByRole("link", { name: /buying guide/i })).toHaveAttribute("href", "/cars/buying-guide");
   });
 
   it("links back to the motorcycle homepage", async () => {

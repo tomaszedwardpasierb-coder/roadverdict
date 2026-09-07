@@ -48,7 +48,17 @@ export const CAR_JOB_REMINDER_DEFAULTS: Record<string, { type: "mileage" | "mont
   "battery-12v": { type: "months", value: 48 },
 };
 
-// Deliberately empty until Phase 7a's price research lands - a job type
-// only belongs here once it has a real, sourced, dated benchmark behind
-// it (see the ADR: no guessed numbers wearing a confidence label).
-export const CAR_BENCHMARKED_JOB_TYPES: string[] = [];
+// Populated once Phase 7's price research landed (see carPriceData.ts's
+// CAR_BENCHMARKS for the sourced figures behind each of these 5 - every
+// key here has a real, sourced, dated benchmark behind it, matching this
+// array's own original discipline: no guessed numbers wearing a
+// confidence label). Deliberately narrower than the full CAR_JOB_LABELS
+// catalog above - electric-car servicing and every job type beyond these
+// five still has no sourced benchmark.
+export const CAR_BENCHMARKED_JOB_TYPES: string[] = [
+  "oil-filter",
+  "interim-service",
+  "full-service",
+  "brake-pads-front",
+  "tyres-front-pair",
+];

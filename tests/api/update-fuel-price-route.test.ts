@@ -4,9 +4,13 @@ import { NextRequest } from "next/server";
 const mocks = vi.hoisted(() => ({
   fetch: vi.fn(),
   saveCurrentPetrolPrice: vi.fn(),
+  saveCurrentDieselPrice: vi.fn(),
 }));
 
-vi.mock("@/lib/fuelPrice", () => ({ saveCurrentPetrolPrice: mocks.saveCurrentPetrolPrice }));
+vi.mock("@/lib/fuelPrice", () => ({
+  saveCurrentPetrolPrice: mocks.saveCurrentPetrolPrice,
+  saveCurrentDieselPrice: mocks.saveCurrentDieselPrice,
+}));
 vi.stubGlobal("fetch", mocks.fetch);
 
 import { POST } from "@/app/api/cron/update-fuel-price/route";
@@ -45,6 +49,8 @@ describe("POST /api/cron/update-fuel-price", () => {
     mocks.fetch.mockReset();
     mocks.saveCurrentPetrolPrice.mockReset();
     mocks.saveCurrentPetrolPrice.mockResolvedValue(undefined);
+    mocks.saveCurrentDieselPrice.mockReset();
+    mocks.saveCurrentDieselPrice.mockResolvedValue(undefined);
     process.env.CRON_SECRET = "top-secret";
   });
 
@@ -121,8 +127,14 @@ describe("POST /api/cron/update-fuel-price", () => {
     const body = await response.json();
 
     expect(response.status).toBe(200);
-    expect(body).toEqual({ ok: true, pricePenceLitre: 149.9, weekCommencing: currentDate });
+    expect(body).toEqual({
+      ok: true,
+      pricePenceLitre: 149.9,
+      dieselPricePenceLitre: 155.0,
+      weekCommencing: currentDate,
+    });
     expect(mocks.saveCurrentPetrolPrice).toHaveBeenCalledWith(149.9, currentDate);
+    expect(mocks.saveCurrentDieselPrice).toHaveBeenCalledWith(155.0, currentDate);
   });
 
   it("fetches the CSV URL discovered on the statistics page, not a hardcoded one", async () => {

@@ -23,11 +23,12 @@ describe("CAR_JOB_LABELS", () => {
     }
   });
 
-  // Deliberately empty until Phase 7a's price research lands - see the
-  // ADR and the file's own comment. A non-empty list here would mean
-  // a job type is being benchmarked without a real, sourced figure.
-  it("CAR_BENCHMARKED_JOB_TYPES starts empty - no guessed numbers wearing a confidence label", () => {
-    expect(CAR_BENCHMARKED_JOB_TYPES).toEqual([]);
+  // Populated once Phase 7's price research landed - see carPriceData.ts's
+  // CAR_BENCHMARKS for the sourced figures behind each of these 5.
+  it("CAR_BENCHMARKED_JOB_TYPES lists exactly the 5 job types with a real, sourced benchmark", () => {
+    expect(CAR_BENCHMARKED_JOB_TYPES.sort()).toEqual(
+      ["oil-filter", "interim-service", "full-service", "brake-pads-front", "tyres-front-pair"].sort()
+    );
   });
 });
 

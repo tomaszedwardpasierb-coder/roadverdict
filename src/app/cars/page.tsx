@@ -7,12 +7,13 @@
 // there's no car-specific hero imagery to show - a text-led hero is
 // honest about that rather than reusing motorcycle photos on a car page.
 //
-// Deliberately does NOT link to /quote-checker, /cost-calculator, or
-// /buying-guide - those are benchmarked against motorcycle price data
-// only (see BRAND_OPTIONS / getBikeClassForCC in priceData.ts /
-// motorcycleModels.ts) and would overclaim if presented as available for
-// cars. Real car equivalents of those tools are Phase 7, blocked on car
-// price research landing first.
+// Links to /cars/quote-checker, /cars/cost-calculator, and
+// /cars/buying-guide - the car equivalents of the motorcycle tools,
+// built once Phase 7's real UK car price research landed (see
+// carPriceData.ts). Never links to the motorcycle-only /quote-checker,
+// /cost-calculator, or /buying-guide - those are benchmarked against
+// motorcycle price data only and would overclaim if presented as
+// available for cars.
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { headers } from 'next/headers';
@@ -171,11 +172,31 @@ export default async function CarsPage() {
         </div>
       </section>
 
-      <p className="disclaimer">
-        Quote checking, running-cost comparisons, and a buying guide are live for motorcycles
-        today, and are next on the list for cars - once real UK car price data is in place. For
-        now, logging, receipt scanning, and reminders work fully for cars; benchmarking is coming.
-      </p>
+      {/* ── FREE TOOLS ───────────────────────────────────────────────── */}
+      <section className="rv-problems" aria-labelledby="tools-heading">
+        <p className="rv-section-eyebrow">Also free</p>
+        <h2 className="rv-section-heading" id="tools-heading">
+          Benchmarked against real UK car prices
+        </h2>
+        <p className="rv-section-sub">
+          Not just for cars you&apos;re logging - for any car you&apos;re quoted on, running, or
+          about to buy.
+        </p>
+        <div className="rv-related-tools__row">
+          <Link href="/cars/quote-checker" className="rv-related-tools__link">
+            <strong>Quote Checker</strong>
+            <span>Is your service quote fair?</span>
+          </Link>
+          <Link href="/cars/cost-calculator" className="rv-related-tools__link">
+            <strong>Cost Calculator</strong>
+            <span>What does it actually cost you a year?</span>
+          </Link>
+          <Link href="/cars/buying-guide" className="rv-related-tools__link">
+            <strong>Buying Guide</strong>
+            <span>What to check before you buy</span>
+          </Link>
+        </div>
+      </section>
 
       {/* ── VERDICT PANEL ────────────────────────────────────────────── */}
       <section className="rv-verdict-strip" aria-labelledby="verdict-cta-heading">

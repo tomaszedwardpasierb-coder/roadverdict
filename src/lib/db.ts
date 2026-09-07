@@ -152,3 +152,82 @@ export function getCommunityStats(jobType: string, bikeClass: string): Community
     high: Math.round(percentile(prices, 75)),
   };
 }
+
+/**
+ * Car equivalents of the three functions/tables above - own tables, not
+ * shared rows with the motorcycle ones (same sister-schema principle as
+ * everywhere else in the car build). Same GDPR note applies: no column
+ * here could identify a person.
+ */
+db.exec(`
+  CREATE TABLE IF NOT EXISTS car_quote_logs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    job_type TEXT NOT NULL,
+    car_class TEXT NOT NULL,
+    brand TEXT NOT NULL,
+    region TEXT NOT NULL,
+    quoted_price REAL NOT NULL,
+    verdict TEXT NOT NULL,
+    created_at TEXT NOT NULL
+  )
+`);
+
+const insertCarQuoteStmt = db.prepare(`
+  INSERT INTO car_quote_logs (job_type, car_class, brand, region, quoted_price, verdict, created_at)
+  VALUES (@jobType, @carClass, @brand, @region, @quotedPrice, @verdict, @createdAt)
+`);
+
+export interface CarQuoteLogEntry {
+  jobType: string;
+  carClass: string;
+  brand: string;
+  region: string;
+  quotedPrice: number;
+  verdict: string;
+}
+
+export function logCarQuoteCheck(entry: CarQuoteLogEntry): void {
+  insertCarQuoteStmt.run({ ...entry, createdAt: new Date().toISOString() });
+}
+
+export function getCarCommunityStats(jobType: string, carClass: string): CommunityStats | null {
+  const rows = db
+    .prepare(
+      `SELECT quoted_price FROM car_quote_logs WHERE job_type = ? AND car_class = ? ORDER BY quoted_price ASC`
+    )
+    .all(jobType, carClass) as { quoted_price: number }[];
+
+  if (rows.length < MIN_SAMPLE_SIZE_FOR_COMMUNITY_STATS) return null;
+
+  const prices = rows.map((r) => r.quoted_price);
+  return {
+    sampleSize: prices.length,
+    low: Math.round(percentile(prices, 25)),
+    high: Math.round(percentile(prices, 75)),
+  };
+}
+
+db.exec(`
+  CREATE TABLE IF NOT EXISTS car_buying_guide_logs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    car_class TEXT NOT NULL,
+    brand TEXT NOT NULL,
+    age_band TEXT NOT NULL,
+    created_at TEXT NOT NULL
+  )
+`);
+
+const insertCarBuyingGuideStmt = db.prepare(`
+  INSERT INTO car_buying_guide_logs (car_class, brand, age_band, created_at)
+  VALUES (@carClass, @brand, @ageBand, @createdAt)
+`);
+
+export interface CarBuyingGuideLogEntry {
+  carClass: string;
+  brand: string;
+  ageBand: string;
+}
+
+export function logCarBuyingGuideCheck(entry: CarBuyingGuideLogEntry): void {
+  insertCarBuyingGuideStmt.run({ ...entry, createdAt: new Date().toISOString() });
+}

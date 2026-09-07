@@ -247,22 +247,38 @@ describe("DashboardShell", () => {
       });
     }
 
-    it("hides Story, Shareable Links, and Transfer ownership from the sidebar nav", () => {
+    // All 7 of CAR_UNAVAILABLE_SECTIONS (DashboardShell.tsx) - not just the
+    // original 3. Reports/Quote Checker/Cost calculator/Buying guide were
+    // added to that list alongside Story/Shareable Links/Transfer ownership
+    // later (Phase 5's second slice) without this test being updated to
+    // match, which would have let a regression re-show any of the four ship
+    // silently for a car-active session.
+    const CAR_UNAVAILABLE_LABELS = [
+      "The Story So Far",
+      "Shareable Links",
+      "Transfer ownership",
+      "Reports",
+      "Quote Checker",
+      "Cost calculator",
+      "Buying a used bike",
+    ];
+
+    it("hides every CAR_UNAVAILABLE_SECTIONS label from the sidebar nav", () => {
       render(<DashboardShell {...carProps()} />);
-      expect(screen.queryByRole("button", { name: /The Story So Far/ })).not.toBeInTheDocument();
-      expect(screen.queryByRole("button", { name: /Shareable Links/ })).not.toBeInTheDocument();
-      expect(screen.queryByRole("button", { name: /Transfer ownership/ })).not.toBeInTheDocument();
+      for (const label of CAR_UNAVAILABLE_LABELS) {
+        expect(screen.queryByRole("button", { name: label })).not.toBeInTheDocument();
+      }
       // Every other tab is still present.
       expect(screen.getAllByRole("button", { name: "Fuel" }).length).toBeGreaterThan(0);
     });
 
-    it("hides the same three from the mobile More sheet", async () => {
+    it("hides every CAR_UNAVAILABLE_SECTIONS label from the mobile More sheet", async () => {
       const user = userEvent.setup();
       render(<DashboardShell {...carProps()} />);
       await user.click(screen.getByRole("button", { name: /More/ }));
-      expect(screen.queryByText("The Story So Far")).not.toBeInTheDocument();
-      expect(screen.queryByText("Shareable Links")).not.toBeInTheDocument();
-      expect(screen.queryByText("Transfer ownership")).not.toBeInTheDocument();
+      for (const label of CAR_UNAVAILABLE_LABELS) {
+        expect(screen.queryByText(label)).not.toBeInTheDocument();
+      }
       // Also present in the always-mounted sidebar nav, hence getAllByText.
       expect(screen.getAllByText("Security").length).toBeGreaterThan(0);
     });

@@ -1,6 +1,6 @@
 ﻿// Place at: src/app/api/cron/update-fuel-price/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import { saveCurrentPetrolPrice } from "@/lib/fuelPrice";
+import { saveCurrentPetrolPrice, saveCurrentDieselPrice } from "@/lib/fuelPrice";
 
 export const dynamic = "force-dynamic";
 
@@ -41,9 +41,13 @@ function parseUkDate(value: string): Date | null {
 
 const MAX_PLAUSIBLE_AGE_DAYS = 30;
 
-function extractLatestPetrolPrice(
-  csvText: string
-): { price: number; weekCommencing: string } | null {
+interface LatestFuelPrices {
+  petrolPrice: number;
+  dieselPrice: number;
+  weekCommencing: string;
+}
+
+function extractLatestFuelPrices(csvText: string): LatestFuelPrices | null {
   // Strip a possible leading BOM, split into lines, drop the header,
   // and take the last non-empty line - the CSV is in chronological order.
   const cleaned = csvText.replace(/^\uFEFF/, "").trim();
@@ -54,9 +58,10 @@ function extractLatestPetrolPrice(
   const columns = lastLine.split(",");
   // Columns: Date, ULSP pence/litre, ULSD pence/litre, ...
   const weekCommencing = columns[0]?.trim();
-  const price = Number(columns[1]);
+  const petrolPrice = Number(columns[1]);
+  const dieselPrice = Number(columns[2]);
 
-  if (!weekCommencing || !Number.isFinite(price)) return null;
+  if (!weekCommencing || !Number.isFinite(petrolPrice) || !Number.isFinite(dieselPrice)) return null;
 
   // Catches the file-identity mistake this endpoint has already made
   // once (matching the CSV covering 2018-2026 versus the historical
@@ -70,7 +75,7 @@ function extractLatestPetrolPrice(
   const ageDays = (Date.now() - parsedDate.getTime()) / 86_400_000;
   if (ageDays > MAX_PLAUSIBLE_AGE_DAYS || ageDays < -7) return null;
 
-  return { price, weekCommencing };
+  return { petrolPrice, dieselPrice, weekCommencing };
 }
 
 export async function POST(req: NextRequest) {
@@ -98,16 +103,20 @@ export async function POST(req: NextRequest) {
     }
     const csvText = await csvResponse.text();
 
-    const latest = extractLatestPetrolPrice(csvText);
+    const latest = extractLatestFuelPrices(csvText);
     if (!latest) {
       return NextResponse.json({ error: "Could not parse latest price from CSV" }, { status: 502 });
     }
 
-    await saveCurrentPetrolPrice(latest.price, latest.weekCommencing);
+    await Promise.all([
+      saveCurrentPetrolPrice(latest.petrolPrice, latest.weekCommencing),
+      saveCurrentDieselPrice(latest.dieselPrice, latest.weekCommencing),
+    ]);
 
     return NextResponse.json({
       ok: true,
-      pricePenceLitre: latest.price,
+      pricePenceLitre: latest.petrolPrice,
+      dieselPricePenceLitre: latest.dieselPrice,
       weekCommencing: latest.weekCommencing,
     });
   } catch {

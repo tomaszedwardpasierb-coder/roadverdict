@@ -638,23 +638,78 @@ and log-entry-gating suite; `tests/unit/assistantConfig.test.ts`, `tests/api/pur
 two new car-knowledge-base route test files, and `tests/components/KnowledgeBaseEditor.test.tsx`
 all extended to cover the new car-facing surface.
 
-### Public tools, price research, and VED (unchanged from v2)
+### Phase 7 — Car public tools, price research, and VED — ✅ DONE, built 7 September 2026
 
-**Price research is a content-authoring prerequisite, not a code phase.** Same discipline as the
-motorcycle `BENCHMARKS` table: sourced, dated, confidence-rated, no guessed numbers. Minimum
-viable set to unblock `/cars/quote-checker`:
+Real, sourced, dated UK price research (RAC Drive, Bumper.co, Checkatrade, tyresavings.com, and
+GOV.UK's own official VED rate table, all checked 7 September 2026) unblocked the three car
+equivalents of the motorcycle public tools, plus a genuinely different VED lookup shape. Verified
+with a clean `tsc --noEmit`, a green full suite (2,966 unit/API tests, up from 2,887), a green
+component suite (785, up from 765), and a production build showing all six new routes
+(`/cars/quote-checker`, `/cars/cost-calculator`, `/cars/buying-guide`, and their three
+`/api/cars/*` backing routes) with every existing route's bundle size unchanged.
 
-- Oil & filter change, interim service, full service, brake pads (front), tyres (front pair) —
-  each × small/medium/large × 3 regions
-- MOT test — fixed by DVSA (currently £54.85 max for cars), no research needed
-- Electric-specific pricing (battery service, HV battery health check) deferred — too few
-  reference points for sourced data yet
+**Scope, matching this phase's own summary line exactly**: the three standalone `/cars/*` tool
+pages plus car VED. **Not** touched: the authenticated dashboard's `CAR_UNAVAILABLE_SECTIONS` -
+Quote Checker/Cost Calculator/Reports stay hidden there, since those tabs also depend on `Reports`
+(buyer-report infra), separately out of scope for this whole build.
 
-**Car VED** (`src/lib/tracker/carVed.ts`) uses CO₂-emissions banding (post-April-2017 DVLA
-rules), not engine-size bands like motorcycles — a genuinely different lookup table, taking
-`co2Gkm` and returning first-year and standard annual rates, with an explicit caveat pointing to
-GOV.UK for the exact current figure. Cars with no CO₂ figure on record show "VED varies — check
-GOV.UK" rather than a wrong number.
+**`src/lib/carPriceData.ts`** - the car equivalent of `priceData.ts`: `CAR_BENCHMARKS` (5 job
+types × small/medium/large, deliberately no `electric` key), `CAR_BRAND_OPTIONS` (all 41 brands
+from `carModels.ts`, tiered budget/mainstream/premium by market positioning, same "directionally
+reasonable, not a rate-card" honesty as the motorcycle table's own brand tiers), `getCarBenchmark`/
+`getAdjustedCarBenchmark`/`getCarBrandTier`, and `slugifyCarMake` (needs an extra
+diacritic-stripping step motorcycles never did - Škoda/Citroën wouldn't otherwise match their own
+`skoda`/`citroen` option values). A fresh, independent table, not an extension of the motorcycle
+one - only the `Region` *type* is reused from `priceData.ts` (erased at compile time), matching
+the sister-schema type-only-import rule this whole build has followed since Phase 2.
+
+**Electric cars are deliberately excluded from the quote-checker and cost-calculator**, exactly as
+scoped above - "too few reference points for sourced data yet." `CarSizeClass`'s 4th member,
+`'electric'`, simply isn't a key in `CAR_BENCHMARKS`, and neither tool's car-size dropdown offers
+it, so the gap is closed at the UI level rather than needing runtime gating. The **buying guide is
+the one exception**: `carBuyerChecklist.ts`'s `CAR_SIZE_CLASS_ADDENDUM` covers all 4 classes,
+including an EV-specific note (battery State of Health, brake-disc corrosion from regenerative-
+braking underuse) - a checklist has no benchmark-pricing gap to work around, so EV owners still
+get real, useful content from this one tool.
+
+**Car VED** (`src/lib/tracker/carVed.ts`) uses CO₂-emissions banding (GOV.UK's official rate
+table, cars registered on/after 2017-04-01), not engine-size bands like motorcycles - a genuinely
+different lookup shape, taking `co2Gkm` and returning first-year and standard annual rates. Two
+disclosed simplifications: diesel uses the RDE2-compliant column (most diesels sold since 2019
+comply; `CarDoc` has no RDE2 flag to check), and the £40k+ "expensive car supplement" isn't
+modelled (`CarDoc` doesn't capture list price). A car with no CO₂ figure shows "VED varies - check
+GOV.UK" rather than a guessed number - `co2Gkm` is a manually-entered, optional field in the cost
+calculator (DVLA vehicle-lookup data doesn't currently surface a CO₂ figure at all).
+
+**`src/lib/carCostCalculator.ts`** - mirrors `costCalculator.ts`: servicing/tyres from
+`getAdjustedCarBenchmark`, `mot` a flat £37 (DVSA's cap is £54.85, but - same precedent as the
+motorcycle module - 2026 cost guides converge on £30-45 actually paid), `tax` from `carVed.ts`'s
+*standard* (year 2+) rate, `fuel` from petrol/diesel price × average real-world MPG (petrol ~45,
+diesel ~55) × a per-class multiplier. Hybrid/PHEV use petrol × an unsourced, flagged 1.3
+multiplier - real-world PHEV cost in particular depends on charging habits and isn't modelled.
+Throws outright for an electric-classed car rather than guessing, same "let it propagate"
+convention the motorcycle route already uses for a failed fuel-price fetch.
+
+**`fuelPrice.ts` gained a diesel sibling** (`getCurrentDieselPricePenceLitre`/
+`saveCurrentDieselPrice`) - motorcycles are effectively all petrol, so the bike side never needed
+this. `update-fuel-price/route.ts`'s cron already downloaded a DESNZ CSV with a diesel (ULSD)
+column at index 2 and silently discarded it; now parses and saves both.
+
+**No plate lookup at all for the car buying guide** in this pass - brand/size/age-band selects
+only. The motorcycle buying guide's VRM lookup (its own route, an AI-generated `motFlags`/
+`modelNotes` briefing) is real extra complexity, additive-later-safe like every other Phase 5/7
+scope cut; the quote-checker and cost-calculator *do* keep plate lookup (reusing the existing,
+already vehicle-kind-aware `/api/tracker/plate-lookup`, rejecting a `'motorcycle'` result the way
+`AddCarForm.tsx` already does).
+
+**No Gemini advice on any of the three car tools** - the motorcycle versions' `quoteAdvice.ts`/
+`costAdvice.ts` modules aren't mirrored; car-native copy and real benchmark numbers ship first,
+AI-generated advice is additive-later work if it's ever wanted.
+
+**`src/app/cars/page.tsx`** now links its own three tools (previously: "benchmarking is coming,"
+linking to none of them) via a new `CarRelatedTools.tsx` (sister of `RelatedTools.tsx` - that
+component's `TOOLS`/`current` union is hardcoded to the motorcycle URLs). `sitemap.ts` gained the
+three new URLs at the same 0.9 priority as their motorcycle equivalents.
 
 ### Tests (revised — adds the vehicle-kind-leakage category v2 didn't have)
 
@@ -670,6 +725,47 @@ specifically:**
 | Assistant system prompt | The injected knowledge-base block matches the active vehicle's kind; a bike-active session is never handed car KB content and vice versa |
 | Assistant tools | `getSpendTotal`/`getEntries`/etc. resolve against the correct doc types for the active vehicle; never mix bike and car records in one answer |
 | Copy audit | No car-facing string contains the word "motorcycle" or "bike" (and vice versa) — the direct, mechanical guard against the bolt-on-by-reused-copy risk |
+
+### Phase 8 — Vehicle-kind-leakage test coverage — ✅ DONE, built 7 September 2026
+
+Audited the five leakage categories from the table above against what Phases 2-6 actually shipped,
+rather than writing speculative new tests for behaviour already exercised elsewhere. Three of the
+five turned out already substantively covered by Phase 5/6's own test work (`VehicleSwitcher.test.tsx`
+asserts kind-correct POSTs and a refresh on success; `assistant-route.test.ts` asserts the car KB is
+injected only for a car-active session with no motorcycle fallback, even on a missing doc or a
+`getCarAssistantConfig()` throw; `assistantTools.test.ts` already asserts, per tool, that the
+*other* vehicle kind's fetch function is never called). Two real, concrete gaps were found and
+closed:
+
+- **`DashboardShell.test.tsx`'s car-block tests only checked 3 of the 7 entries in
+  `CAR_UNAVAILABLE_SECTIONS`** (Story/Shareable Links/Transfer ownership) — Reports, Quote Checker,
+  Cost calculator, and Buying guide were added to that list during Phase 5's second slice without
+  the test being updated to match, leaving a live regression window where any of those four could
+  silently reappear for a car-active session. Both the sidebar-nav and mobile-More-sheet tests now
+  check all 7 labels.
+- **No copy audit existed at all.** New file, `tests/unit/vehicleKindLeakage.test.ts`:
+  - Scans every car-only dashboard component/form (`AddCarForm.tsx`, the four `LogCar*Form.tsx`,
+    the five `Car*Card.tsx`/`CarReminderItem.tsx`) for the words "bike"/"motorcycle" in
+    user-visible copy (JSX text nodes and multi-word quoted strings - single-word quoted strings
+    are filtered out as code values, e.g. the `'motorcycle'` enum literal `AddCarForm.tsx` compares
+    against, not copy), and the bike-only equivalents for the word "car" - with a two-entry
+    allowlist for the ADR's own approved cross-signpost exceptions (`AddCarForm`'s "track it from
+    your bike dashboard instead" rejection message; `AddBikeForm`'s "Track your car on RoadVerdict
+    for cars" link). Deliberately scoped to the authenticated dashboard surface, not the `/cars` and
+    homepage marketing pages - those legitimately mention both vehicle kinds by design (Phase 4's
+    own cross-product signposting), so a blanket word ban there would fail on purpose-built copy.
+  - Scans `CAR_JOB_LABELS`/`CAR_MOD_LABELS`/`CAR_BILL_LABELS` values for bike/motorcycle wording and
+    `JOB_LABELS`/`MOD_LABELS`/`BILL_LABELS` values for car wording, on top of `carCatalogs.test.ts`'s
+    existing structural (different-object) checks.
+  - Statically scans `dashboard/page.tsx`'s source: `renderCarDashboard`'s function body never
+    references the motorcycle `JOB_LABELS`/`MOD_LABELS` identifiers, and the bike-active render
+    path (everything in `DashboardPage()` itself, excluding the file's own import block) never
+    references `CAR_JOB_LABELS`/`CAR_MOD_LABELS` - the one place in the codebase without any
+    existing test coverage at all, bike or car, since `dashboard/page.tsx` is an async server
+    component nothing else in the suite renders directly.
+
+Verified with a clean `tsc --noEmit`, a green full suite (2,887 unit/API tests, up from 2,791), and
+a green component suite (765, up from 750).
 
 ### Explicitly out of scope for this build (unchanged from v2)
 
@@ -692,5 +788,5 @@ specifically:**
 | 4 | ✅ Done — `/cars` marketing landing page (no tool sub-pages yet, deferred to Phase 7); cross-product signpost both ways (motorcycle plate-lookup rejection → `/cars`, homepage → `/cars`, `/cars` → homepage); own JSON-LD + sitemap entry; 9 new/changed component tests (`CarsPage.test.tsx` new) + 1 new Playwright smoke test | Motorcycle dashboard unchanged; homepage gains one new secondary CTA link |
 | 5 | ✅ Done — full `/api/cars/*` route layer (14 routes); `carReminder.ts`, `activeVehicle.ts` kind-resolution, `carSummary.ts`, `carReminderStatus.ts`; `VehicleSwitcher` (replaces `BikeSwitcher`); `DashboardShell` vehicle-kind-aware; `AddCarForm` + 4 `LogCar*Form`s; 5 simplified car history/reminder cards; `dashboard/page.tsx` genuinely branches and renders a working car dashboard (Dashboard/Service/Fuel/Parts/Bills/Reminders/Privacy/Security - Reports and the 3 embedded tools deferred, no car price data yet); 196 new tests, full suite green (2,791 unit/API, 750 component) | Motorcycle dashboard unchanged (confirmed: same route list, same bundle size for every other route, same component behaviour for a bike-only account) |
 | 6 | ✅ Done — one assistant, now vehicle-kind-aware; 7 of 10 tools fully car-aware (getShareLinks/getStorySoFar/proposeLogEntry stay bike-only, fail soft with an honest "not available" result); car knowledge base injected via `buildSystemInstruction()`, never falling back to the motorcycle one; `/tomasz` gets a second, clearly-labeled KB editor sharing one generic component | Motorcycle assistant behaviour unchanged when a bike is active |
-| 7 | `/cars/quote-checker`, `/cars/cost-calculator`, `/cars/buying-guide`; car VED; homepage cross-link both ways | Motorcycle tools unchanged |
-| 8 | Full test coverage for Phases 2–7, including vehicle-kind-leakage tests | None |
+| 7 | ✅ Done — `/cars/quote-checker`, `/cars/cost-calculator`, `/cars/buying-guide` + their `/api/cars/*` routes; `carPriceData.ts` (5 job types × small/medium/large, sourced from RAC/Bumper.co/Checkatrade/tyresavings.com); `carVed.ts` (CO2-banded, GOV.UK-sourced); `carCostCalculator.ts`; diesel price added to `fuelPrice.ts`/the fuel-price cron; electric cars excluded from quote-checker/cost-calculator (not enough sourced data) but fully covered in the buying guide; `/cars` now links its own 3 tools; 99 new tests, full suite green (2,966 unit/API, 785 component), build unchanged elsewhere | Motorcycle tools unchanged |
+| 8 | ✅ Done — audited all 5 leakage categories; 2 real gaps found and closed (`DashboardShell.test.tsx` only checked 3 of 7 `CAR_UNAVAILABLE_SECTIONS`; no copy audit existed at all); new `tests/unit/vehicleKindLeakage.test.ts` scans dashboard component copy, catalog label values, and `dashboard/page.tsx`'s two render paths for cross-vehicle-kind references; full suite green (2,887 unit/API, 765 component) | None |
