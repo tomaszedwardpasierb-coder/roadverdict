@@ -173,13 +173,13 @@ export default async function HomePage() {
           Everything in one place. No app to install. Just your email.
         </p>
         <div className="rv-solution-grid">
-          <div className="rv-sol-card">
+          <Link href="/quote-checker" className="rv-sol-card">
             <div className="rv-sol-icon" aria-hidden="true">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2M9 5a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2M9 5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2m-6 9 2 2 4-4"/></svg>
             </div>
             <h3 className="rv-sol-title">Quote checker</h3>
             <p className="rv-sol-body">See if your service quote is fair for your vehicle, engine size, and region. Before you agree to anything.</p>
-          </div>
+          </Link>
           <div className="rv-sol-card">
             <div className="rv-sol-icon" aria-hidden="true">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
@@ -187,20 +187,20 @@ export default async function HomePage() {
             <h3 className="rv-sol-title">Full history log</h3>
             <p className="rv-sol-body">Services, fuel, mods, insurance, tax - all in one timeline. Scan receipts with your camera. AI reads them.</p>
           </div>
-          <div className="rv-sol-card">
+          <Link href="/buying-guide" className="rv-sol-card">
             <div className="rv-sol-icon" aria-hidden="true">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
             </div>
             <h3 className="rv-sol-title">Buying guide</h3>
             <p className="rv-sol-body">Enter a plate or paste a listing. Get a real verdict - buy, negotiate, or walk away - before you hand over money.</p>
-          </div>
-          <div className="rv-sol-card">
+          </Link>
+          <Link href="/cost-calculator" className="rv-sol-card">
             <div className="rv-sol-icon" aria-hidden="true">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M18 20V10M12 20V4M6 20v-6"/></svg>
             </div>
             <h3 className="rv-sol-title">True running cost</h3>
             <p className="rv-sol-body">What does your vehicle actually cost per mile? Per month? Per year? You&apos;ll know exactly.</p>
-          </div>
+          </Link>
           <div className="rv-sol-card">
             <div className="rv-sol-icon" aria-hidden="true">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>

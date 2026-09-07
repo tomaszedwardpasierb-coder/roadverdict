@@ -98,4 +98,19 @@ describe("HomePage", () => {
       expect(link).toHaveAttribute("href", "/login");
     }
   });
+
+  // The three solution cards with a real standalone public page to send
+  // people to are real links, not just decorative text - the other
+  // three (Full history log, Sell with proof, Smart reminders) are
+  // account-only dashboard features with no public page of their own,
+  // so they deliberately stay as plain cards.
+  it("links the Quote checker, Buying guide, and True running cost solution cards to their own tool pages", async () => {
+    mockGetSession.mockResolvedValue(null);
+    const jsx = await HomePage();
+    render(jsx);
+
+    expect(screen.getByRole("link", { name: /quote checker/i })).toHaveAttribute("href", "/quote-checker");
+    expect(screen.getByRole("link", { name: /buying guide/i })).toHaveAttribute("href", "/buying-guide");
+    expect(screen.getByRole("link", { name: /true running cost/i })).toHaveAttribute("href", "/cost-calculator");
+  });
 });

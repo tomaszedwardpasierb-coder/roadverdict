@@ -5,6 +5,7 @@ import { getSession } from '@/lib/auth/session';
 import { getPrimaryBike } from '@/lib/tracker/bike';
 import { BRAND_OPTIONS } from '@/lib/priceData';
 import { getModelsForBrand, getBikeClassForCC, slugifyMake } from '@/lib/motorcycleModels';
+import { RelatedTools } from '@/components/RelatedTools';
 
 export const dynamic = 'force-dynamic';
 
@@ -85,6 +86,7 @@ export default async function CostCalculatorPage() {
         This is an estimate built from typical UK prices for your bike&apos;s size, make, and
         region - not a quote, and not a substitute for checking your own riding costs.
       </p>
+      <RelatedTools current="/cost-calculator" />
     </>
   );
 }

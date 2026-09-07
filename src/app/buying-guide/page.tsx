@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { headers } from 'next/headers';
 import { BuyingGuideForm } from '@/components/BuyingGuideForm';
+import { RelatedTools } from '@/components/RelatedTools';
 import { getSession } from '@/lib/auth/session';
 
 export const dynamic = 'force-dynamic';
@@ -55,6 +56,7 @@ export default async function BuyingGuidePage() {
         General inspection guidance, not a substitute for a professional pre-purchase check -
         especially on anything safety-critical like brakes or frame condition.
       </p>
+      <RelatedTools current="/buying-guide" />
     </>
   );
 }

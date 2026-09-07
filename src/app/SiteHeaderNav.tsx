@@ -7,7 +7,10 @@ import { usePathname } from 'next/navigation';
 import { Menu, X } from 'lucide-react';
 
 const NAV_ITEMS = [
-  { href: '/privacy', label: 'Privacy' },
+  { href: '/quote-checker', label: 'Quote Checker' },
+  { href: '/cost-calculator', label: 'Cost Calculator' },
+  { href: '/buying-guide', label: 'Buying Guide' },
+  { href: '/pro', label: 'Pro' },
 ];
 
 export function SiteHeaderNav() {

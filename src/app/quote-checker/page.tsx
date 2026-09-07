@@ -9,6 +9,7 @@ import { getSession } from '@/lib/auth/session';
 import { getPrimaryBike } from '@/lib/tracker/bike';
 import { BRAND_OPTIONS } from '@/lib/priceData';
 import { getBikeClassForCC, slugifyMake } from '@/lib/motorcycleModels';
+import { RelatedTools } from '@/components/RelatedTools';
 
 export const dynamic = 'force-dynamic';
 
@@ -77,6 +78,7 @@ export default async function QuoteCheckerPage() {
         individual garage&apos;s price is unreasonable - a &quot;high&quot; verdict can still
         have a good reason behind it.
       </p>
+      <RelatedTools current="/quote-checker" />
     </>
   );
 }
