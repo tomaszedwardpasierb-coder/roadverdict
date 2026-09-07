@@ -42,6 +42,16 @@ function escapeHtml(str: string): string {
 // real site-header (asphalt background + logo-dark.png) rather than a
 // new look invented for email, since that combination is already the
 // one running in production on every page.
+//
+// Logo dimensions: logo-dark.png is 232×145px (aspect ratio ~1.6:1).
+// Rendered at width=116 height=72 (half size — sharp on retina, correct
+// ratio). The previous width=150 height=42 was wrong on both dimensions
+// and caused visible stretching in every email client.
+//
+// Card width: 600px is the standard safe email width. Gmail's reading
+// pane clips anything wider; most clients render 600px full-bleed
+// without horizontal scroll. The previous 560px was valid but left
+// visible empty space on desktop clients.
 function renderEmailLayout(params: { preheader: string; heading: string; bodyHtml: string }): string {
   const appUrl = process.env.APP_URL ?? "https://roadverdict.co.uk";
   return `<!DOCTYPE html>
@@ -56,22 +66,25 @@ function renderEmailLayout(params: { preheader: string; heading: string; bodyHtm
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;background:#F3F1EC;padding:32px 16px;">
       <tr>
         <td align="center">
-          <table role="presentation" width="560" cellpadding="0" cellspacing="0" align="center" style="border-collapse:collapse;max-width:560px;width:100%;background:#FFFFFF;border:1px solid #E4E0D6;border-radius:16px;overflow:hidden;">
+          <table role="presentation" width="600" cellpadding="0" cellspacing="0" align="center" style="border-collapse:collapse;max-width:600px;width:100%;background:#FFFFFF;border:1px solid #E4E0D6;border-radius:12px;overflow:hidden;">
+            <!-- Header -->
             <tr>
-              <td style="background:#17181B;padding:24px 32px;">
-                <img src="${appUrl}/logo-dark.png" alt="RoadVerdict" width="150" height="42" style="display:block;border:0;height:42px;width:150px;">
+              <td style="background:#17181B;padding:28px 36px;">
+                <img src="${appUrl}/logo-dark.png" alt="RoadVerdict" width="116" height="72" style="display:block;border:0;width:116px;height:72px;">
               </td>
             </tr>
+            <!-- Body -->
             <tr>
-              <td style="padding:32px;font-family:Inter,Arial,sans-serif;color:#1C1D20;">
-                <h1 style="margin:0 0 16px;font-family:Arial,sans-serif;font-size:22px;line-height:1.3;color:#1C1D20;">${escapeHtml(params.heading)}</h1>
-                <div style="font-size:15px;line-height:1.6;color:#1C1D20;">
+              <td style="padding:36px;font-family:Inter,Arial,sans-serif;color:#1C1D20;">
+                <h1 style="margin:0 0 16px;font-family:Arial,sans-serif;font-size:22px;line-height:1.3;font-weight:700;color:#1C1D20;">${escapeHtml(params.heading)}</h1>
+                <div style="font-size:15px;line-height:1.7;color:#1C1D20;">
                   ${params.bodyHtml}
                 </div>
               </td>
             </tr>
+            <!-- Footer -->
             <tr>
-              <td style="padding:20px 32px 28px;border-top:1px solid #E4E0D6;font-family:Inter,Arial,sans-serif;font-size:12px;line-height:1.6;color:#54555A;">
+              <td style="padding:20px 36px 28px;border-top:1px solid #E4E0D6;font-family:Inter,Arial,sans-serif;font-size:12px;line-height:1.6;color:#54555A;">
                 <p style="margin:0;">RoadVerdict &middot; <a href="${appUrl}" style="color:#54555A;text-decoration:underline;">roadverdict.co.uk</a></p>
               </td>
             </tr>
@@ -145,48 +158,55 @@ export async function sendReceiptRequestEmail(params: {
   const resend = getResend();
   const appUrl = process.env.APP_URL ?? "https://roadverdict.co.uk";
   const safeBikeName = escapeHtml(params.bikeName);
-  const itemList = params.items.map((i) => `<li>${escapeHtml(i.description)}</li>`).join("");
+  const itemList = params.items.map((i) => `<li style="margin-bottom:4px;">${escapeHtml(i.description)}</li>`).join("");
   const safeBuyerMessage = params.buyerMessage ? escapeHtml(params.buyerMessage) : undefined;
   const approveAllUrl = `${appUrl}/report/receipt-request/decide?token=${params.decisionToken}&action=approve`;
   const declineAllUrl = `${appUrl}/report/receipt-request/decide?token=${params.decisionToken}&action=decline`;
   const reviewUrl = `${appUrl}/report/receipt-request/decide?token=${params.decisionToken}`;
 
+  const html = renderEmailLayout({
+    preheader: params.isReminder
+      ? `Reminder: a buyer is waiting for receipts on your ${params.bikeName}`
+      : `A buyer has requested receipts for your ${params.bikeName}`,
+    heading: params.isReminder ? `Reminder: receipt request for your ${params.bikeName}` : `Receipt request for your ${params.bikeName}`,
+    bodyHtml: `
+      <p style="margin:0 0 12px;">${params.isReminder ? "A reminder that someone" : "Someone"} viewing your RoadVerdict report for <strong>${safeBikeName}</strong> has requested to see the receipts or invoices for:</p>
+      <ul style="margin:0 0 16px;padding-left:20px;font-size:15px;line-height:1.7;">${itemList}</ul>
+      ${safeBuyerMessage ? `<p style="margin:0 0 12px;padding:12px 16px;background:#F3F1EC;border-radius:8px;font-style:italic;">&ldquo;${safeBuyerMessage}&rdquo;</p>` : ""}
+      <p style="margin:0 0 20px;">These may contain personal details (your name, address, or part of a card number) — only share what you're comfortable with.</p>
+      ${emailButton("Review and decide", reviewUrl)}
+      <p style="margin:0 0 8px;font-size:13px;">Or decide in one click: <a href="${approveAllUrl}" style="color:#1C1D20;font-weight:600;">Approve all</a> &nbsp;&middot;&nbsp; <a href="${declineAllUrl}" style="color:#1C1D20;font-weight:600;">Decline all</a></p>
+      <p style="margin:0;color:#54555A;font-size:13px;">No sign-in needed — just one more click on the page that opens to confirm.</p>
+    `,
+  });
+
   await resend.emails.send({
     from: FROM,
     to: params.ownerEmail,
     subject: params.isReminder ? `Reminder: receipt request for ${params.bikeName}` : `Receipt request for ${params.bikeName}`,
-    html: `
-      <p>Hi,</p>
-      <p>${params.isReminder ? "A reminder that someone" : "Someone"} viewing your RoadVerdict report for <strong>${safeBikeName}</strong> has requested to see the
-      receipts/invoices for:</p>
-      <ul>${itemList}</ul>
-      ${safeBuyerMessage ? `<p>They added a note: "${safeBuyerMessage}"</p>` : ""}
-      <p>These may contain personal details (your name, address, or part of a card number) - only share what
-      you're comfortable with.</p>
-      <p>
-        <a href="${approveAllUrl}">Approve all</a> &nbsp;|&nbsp;
-        <a href="${declineAllUrl}">Decline all</a> &nbsp;|&nbsp;
-        <a href="${reviewUrl}">Choose individually</a>
-      </p>
-      <p>No sign-in needed - just one more click on the page that opens to confirm.</p>
-    `,
+    html,
   });
 }
 
 export async function sendShareLinkEmail(toEmail: string, bikeName: string, reportUrl: string, expiresAtLabel: string) {
   const resend = getResend();
   const safeBikeName = escapeHtml(bikeName);
+
+  const html = renderEmailLayout({
+    preheader: `You've been sent a verified ownership report for a ${bikeName}`,
+    heading: `Ownership report for ${bikeName}`,
+    bodyHtml: `
+      <p style="margin:0 0 12px;">You've been sent a RoadVerdict ownership report for a <strong>${safeBikeName}</strong> — a logged history of services, modifications, and bills, shared directly by the seller.</p>
+      ${emailButton("View the ownership report", reportUrl)}
+      <p style="margin:0;color:#54555A;font-size:13px;">This link is valid until ${escapeHtml(expiresAtLabel)}, after which it will be permanently deleted.</p>
+    `,
+  });
+
   await resend.emails.send({
     from: FROM,
     to: toEmail,
     subject: `Ownership report for ${bikeName}`,
-    html: `
-      <p>Hi,</p>
-      <p>You've been sent a RoadVerdict ownership report for <strong>${safeBikeName}</strong> - a logged history of service,
-      modifications, and bills, shared by the seller.</p>
-      <p><a href="${reportUrl}">View the report</a></p>
-      <p>This link is valid until ${escapeHtml(expiresAtLabel)}, after which it will be permanently deleted.</p>
-    `,
+    html,
   });
 }
 
@@ -206,22 +226,22 @@ export async function sendBikeTransferOfferEmail(params: {
   const safeBikeName = escapeHtml(formatBikeName(params.bikeSummary));
   const offerUrl = `${appUrl}/bike-transfer/${params.token}`;
 
+  const html = renderEmailLayout({
+    preheader: `${params.ownerEmail} wants to hand you the service history for a ${formatBikeName(params.bikeSummary)}`,
+    heading: `You've been offered a bike's history`,
+    bodyHtml: `
+      <p style="margin:0 0 12px;"><strong>${escapeHtml(params.ownerEmail)}</strong> has offered to hand you the RoadVerdict record for their <strong>${safeBikeName}</strong> — its full logged service history, mileage, and documentation, continuing under your account rather than starting fresh.</p>
+      ${emailButton("View the offer", offerUrl)}
+      <p style="margin:0 0 12px;color:#54555A;font-size:13px;">If you don't have a RoadVerdict account yet, sign in or create one at <a href="${appUrl}/login" style="color:#54555A;">roadverdict.co.uk/login</a> using this same email address (${escapeHtml(params.recipientEmail)}), then come back to this link to accept.</p>
+      <p style="margin:0;color:#54555A;font-size:13px;">This offer is valid for 7 days. If you're not expecting this, you can safely ignore this email or decline it from the link above.</p>
+    `,
+  });
+
   await resend.emails.send({
     from: FROM,
     to: params.recipientEmail,
     subject: `${params.ownerEmail} wants to hand you the RoadVerdict record for a ${safeBikeName}`,
-    html: `
-      <p>Hi,</p>
-      <p><strong>${escapeHtml(params.ownerEmail)}</strong> has offered to hand you the RoadVerdict tracking record for their
-      <strong>${safeBikeName}</strong> - its logged service history, mileage, and documentation, continuing under your
-      account rather than starting fresh.</p>
-      <p><a href="${offerUrl}">View the offer</a></p>
-      <p>If you don't have a RoadVerdict account yet, sign in or create one at
-      <a href="${appUrl}/login">roadverdict.co.uk/login</a> using this same email address
-      (${escapeHtml(params.recipientEmail)}), then come back to this link to accept.</p>
-      <p>This offer is valid for 7 days. If you're not expecting this, you can safely ignore this email or decline it
-      from the link above.</p>
-    `,
+    html,
   });
 }
 
@@ -233,18 +253,21 @@ export async function sendBikeTransferAcceptedEmail(params: {
   const resend = getResend();
   const safeBikeName = escapeHtml(formatBikeName(params.bikeSummary));
 
+  const html = renderEmailLayout({
+    preheader: `${params.recipientEmail} has accepted the handover for your ${formatBikeName(params.bikeSummary)}`,
+    heading: `Handover accepted`,
+    bodyHtml: `
+      <p style="margin:0 0 12px;"><strong>${escapeHtml(params.recipientEmail)}</strong> has accepted the RoadVerdict record you offered for your <strong>${safeBikeName}</strong>.</p>
+      <p style="margin:0 0 20px;">Your own copy is now read-only — a frozen record of everything you logged, kept for your own reference, but no longer editable.</p>
+      <p style="margin:0;color:#54555A;font-size:13px;">This is expected and can't be undone from here. If that doesn't sound right, reply to <a href="mailto:hello@roadverdict.co.uk" style="color:#54555A;">hello@roadverdict.co.uk</a> and we'll take a look.</p>
+    `,
+  });
+
   await resend.emails.send({
     from: FROM,
     to: params.ownerEmail,
     subject: `${params.recipientEmail} accepted the handover for your ${safeBikeName}`,
-    html: `
-      <p>Hi,</p>
-      <p><strong>${escapeHtml(params.recipientEmail)}</strong> has accepted the RoadVerdict record you offered for your
-      <strong>${safeBikeName}</strong>. Your own copy is now read-only - a frozen record of everything you logged, kept
-      for your own reference, but no longer editable.</p>
-      <p>This is expected and can't be undone from here - if that doesn't sound right, reply to
-      hello@roadverdict.co.uk and we'll take a look.</p>
-    `,
+    html,
   });
 }
 
@@ -266,20 +289,22 @@ export async function sendHistoryFollowUpEmail(params: {
   const resend = getResend();
   const safeBikeName = escapeHtml(formatBikeName(params.bikeSummary));
 
+  const html = renderEmailLayout({
+    preheader: `Bought the ${formatBikeName(params.bikeSummary)}? Keep its history alive`,
+    heading: `Bought this bike? Keep its history alive.`,
+    bodyHtml: `
+      <p style="margin:0 0 12px;">The RoadVerdict report you were sent for this <strong>${safeBikeName}</strong> was real, logged history — not guesswork. If you've bought it, you can carry that same record forward under your own free RoadVerdict account, instead of starting from a blank page.</p>
+      <p style="margin:0 0 20px;">It's what will make your eventual buyer trust this bike too, the same way you just did.</p>
+      ${emailButton("Request this bike's history", params.reportUrl)}
+      <p style="margin:0;color:#54555A;font-size:13px;">You're receiving this because a RoadVerdict report for this bike was shared with you a few weeks ago. If you didn't buy it, no action needed — you won't be emailed about it again.</p>
+    `,
+  });
+
   await resend.emails.send({
     from: FROM,
     to: params.recipientEmail,
     subject: `Bought the ${safeBikeName}? Keep its history alive`,
-    html: `
-      <p>Bought this bike? Keep its history alive.</p>
-      <p>The RoadVerdict report you were sent for this ${safeBikeName} was real, logged history - not guesswork.
-      If you've bought it, you can carry that same record forward under your own free RoadVerdict account, instead
-      of starting from a blank page. It's what will make your eventual buyer trust this bike too, the same way you
-      just did.</p>
-      <p><a href="${params.reportUrl}">Request this bike's history</a></p>
-      <p style="color: #888; font-size: 0.9em;">You're getting this because a RoadVerdict report for this bike was shared with you a few weeks ago. If you
-      didn't buy it, no action needed - you won't be emailed about it again.</p>
-    `,
+    html,
   });
 }
 
@@ -297,19 +322,22 @@ export async function sendIncomingOwnershipRequestEmail(params: {
   const appUrl = process.env.APP_URL ?? "https://roadverdict.co.uk";
   const safeBikeName = escapeHtml(formatBikeName(params.bikeSummary));
 
+  const html = renderEmailLayout({
+    preheader: `${params.requesterEmail} is requesting your ${formatBikeName(params.bikeSummary)}'s RoadVerdict history`,
+    heading: `Someone is requesting your bike's history`,
+    bodyHtml: `
+      <p style="margin:0 0 12px;"><strong>${escapeHtml(params.requesterEmail)}</strong> has requested the RoadVerdict history for your <strong>${safeBikeName}</strong>.</p>
+      <p style="margin:0 0 20px;">If you've sold it to them, approving this hands over its logged service history, mileage, and documentation to their account — and your own copy becomes read-only.</p>
+      ${emailButton("Review this request", `${appUrl}/dashboard`)}
+      <p style="margin:0;color:#54555A;font-size:13px;">If you don't recognise this request, or haven't sold the bike, you can safely decline it from the same place — nothing changes unless you approve it.</p>
+    `,
+  });
+
   await resend.emails.send({
     from: FROM,
     to: params.ownerEmail,
     subject: `${params.requesterEmail} is requesting your ${safeBikeName}'s RoadVerdict history`,
-    html: `
-      <p>Hi,</p>
-      <p><strong>${escapeHtml(params.requesterEmail)}</strong> has requested the RoadVerdict history for your
-      <strong>${safeBikeName}</strong> - if you've sold it to them, approving this hands over its logged service
-      history, mileage, and documentation to their account, and your own copy becomes read-only.</p>
-      <p><a href="${appUrl}/dashboard">Review this request</a></p>
-      <p>If you don't recognise this request, or haven't sold the bike, you can safely decline it from the same
-      place - nothing changes unless you approve it.</p>
-    `,
+    html,
   });
 }
 
@@ -321,16 +349,20 @@ export async function sendOwnershipRequestApprovedEmail(params: {
   const appUrl = process.env.APP_URL ?? "https://roadverdict.co.uk";
   const safeBikeName = escapeHtml(formatBikeName(params.bikeSummary));
 
+  const html = renderEmailLayout({
+    preheader: `Your request for the ${formatBikeName(params.bikeSummary)}'s history has been approved`,
+    heading: `History request approved`,
+    bodyHtml: `
+      <p style="margin:0 0 12px;">Your request for the <strong>${safeBikeName}</strong>'s RoadVerdict history has been approved. It now appears on your account, with its full logged service history, mileage, and documentation intact.</p>
+      ${emailButton("Go to your dashboard", `${appUrl}/dashboard`)}
+    `,
+  });
+
   await resend.emails.send({
     from: FROM,
     to: params.requesterEmail,
     subject: `Your request for the ${safeBikeName}'s history was approved`,
-    html: `
-      <p>Hi,</p>
-      <p>Your request for the <strong>${safeBikeName}</strong>'s RoadVerdict history has been approved. It now
-      appears on your account, with its logged service history, mileage, and documentation intact.</p>
-      <p><a href="${appUrl}/dashboard">Go to your dashboard</a></p>
-    `,
+    html,
   });
 }
 
@@ -341,14 +373,19 @@ export async function sendOwnershipRequestDeclinedEmail(params: {
   const resend = getResend();
   const safeBikeName = escapeHtml(formatBikeName(params.bikeSummary));
 
+  const html = renderEmailLayout({
+    preheader: `Your request for the ${formatBikeName(params.bikeSummary)}'s history wasn't approved`,
+    heading: `History request not approved`,
+    bodyHtml: `
+      <p style="margin:0 0 12px;">The current owner didn't approve your request for the <strong>${safeBikeName}</strong>'s RoadVerdict history.</p>
+      <p style="margin:0;color:#54555A;font-size:13px;">If you believe this is a mistake, you're welcome to get in touch at <a href="mailto:hello@roadverdict.co.uk" style="color:#54555A;">hello@roadverdict.co.uk</a>.</p>
+    `,
+  });
+
   await resend.emails.send({
     from: FROM,
     to: params.requesterEmail,
     subject: `Your request for the ${safeBikeName}'s history wasn't approved`,
-    html: `
-      <p>Hi,</p>
-      <p>The current owner didn't approve your request for the <strong>${safeBikeName}</strong>'s RoadVerdict
-      history. If you believe this is a mistake, you're welcome to get in touch at hello@roadverdict.co.uk.</p>
-    `,
+    html,
   });
 }
