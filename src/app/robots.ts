@@ -9,5 +9,6 @@ export default function robots(): MetadataRoute.Robots {
         disallow: ["/report/", "/dashboard", "/garage", "/tomasz", "/privacy-draft"],
       },
     ],
+    sitemap: "https://roadverdict.co.uk/sitemap.xml",
   };
 }

@@ -3,8 +3,9 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 
 export const metadata: Metadata = {
-  title: 'About | RoadVerdict',
+  title: 'About',
   description: 'Who runs RoadVerdict and why it exists.',
+  alternates: { canonical: '/about' },
 };
 
 export default function AboutPage() {

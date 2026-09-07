@@ -14,7 +14,7 @@ import { getAdminSession } from '@/lib/admin/session';
 import styles from './privacy-draft.module.css';
 
 export const metadata: Metadata = {
-  title: 'Privacy Policy Draft (admin only) | RoadVerdict',
+  title: 'Privacy Policy Draft (admin only)',
   robots: { index: false, follow: false },
 };
 

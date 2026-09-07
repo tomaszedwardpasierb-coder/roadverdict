@@ -7,6 +7,7 @@ import styles from './pro.module.css';
 export const metadata = {
   title: 'RoadVerdict Pro',
   description: 'Upgrade to RoadVerdict Pro for multi-bike tracking, AI summaries, CSV export, and more.',
+  alternates: { canonical: '/pro' },
 };
 
 export default async function ProPage() {
