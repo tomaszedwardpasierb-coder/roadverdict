@@ -2,6 +2,7 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { ALL_BRANDS, MOTORCYCLE_MODELS, getBikeClassForCC } from '@/lib/motorcycleModels';
 import { REGION_LABELS, type Region } from '@/lib/priceData';
@@ -35,6 +36,10 @@ export function AddBikeForm() {
   const [ownershipRequestSent, setOwnershipRequestSent] = useState(false);
   const [ownershipRequestError, setOwnershipRequestError] = useState<string | null>(null);
   const [startedFreshDespiteDuplicate, setStartedFreshDespiteDuplicate] = useState(false);
+  // Set only by the four-wheeled rejection below - the one lookup outcome
+  // that isn't "this isn't a bike, try again," but "this isn't a bike,
+  // and RoadVerdict now has somewhere else for it to go."
+  const [suggestCars, setSuggestCars] = useState(false);
   const [pendingLookupData, setPendingLookupData] = useState<{ make?: string; model?: string; year?: number; engineCapacityCc?: number; plateInRetention?: boolean } | null>(null);
   const router = useRouter();
   const [customMake, setCustomMake] = useState('');
@@ -193,6 +198,7 @@ export function AddBikeForm() {
     setLookupMessage(null);
     setExistingBike(null);
     setStartedFreshDespiteDuplicate(false);
+    setSuggestCars(false);
     try {
       const res = await fetch(`/api/tracker/plate-lookup?vrm=${encodeURIComponent(registration.trim())}`);
       const data = await res.json();
@@ -208,6 +214,7 @@ export function AddBikeForm() {
       // to be a bike just because that's the more common case.
       if (data.vehicleType === 'four-wheeled') {
         setLookupMessage({ text: "Oops! Are you sure that's a bike? It looks like it has four wheels. 🏍️", tone: 'error' });
+        setSuggestCars(true);
         return;
       }
       if (data.vehicleType === 'unknown') {
@@ -401,6 +408,11 @@ export function AddBikeForm() {
               style={{ marginTop: '0.4rem', color: lookupMessage.tone === 'warn' ? 'var(--verdict-red)' : undefined }}
             >
               {lookupMessage.text}
+            </p>
+          )}
+          {suggestCars && (
+            <p className="field-note" style={{ marginTop: '0.3rem' }}>
+              <Link href="/cars">Track your car on RoadVerdict for cars →</Link>
             </p>
           )}
           {existingBike?.status === 'own' && (

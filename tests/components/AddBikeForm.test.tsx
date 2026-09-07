@@ -105,6 +105,7 @@ describe("AddBikeForm", () => {
 
     expect(await screen.findByRole("alert")).toHaveTextContent(/four wheels/i);
     expect(fetch).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole("link", { name: /track your car on roadverdict for cars/i })).toHaveAttribute("href", "/cars");
   });
 
   it("look up: an 'unknown' vehicle type asks for manual entry instead of guessing", async () => {

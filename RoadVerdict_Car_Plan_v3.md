@@ -341,24 +341,53 @@ already-estimated one.
 skip-reason messages (e.g. *"not a valid fuel type for a car"* instead of the motorcycle
 wording).
 
-### Public marketing namespace (unchanged from v2 — this is the part that was never in dispute)
+### Phase 4 — Public marketing namespace — ✅ DONE, built 7 September 2026
 
 ```
 src/app/cars/
-  page.tsx                    — /cars marketing landing page (own hero imagery, own copy)
-  quote-checker/page.tsx      — /cars/quote-checker
-  cost-calculator/page.tsx    — /cars/cost-calculator
-  buying-guide/page.tsx       — /cars/buying-guide
+  page.tsx                    — /cars marketing landing page — ✅ DONE
+  quote-checker/page.tsx      — /cars/quote-checker — deferred to Phase 7 (no car price data)
+  cost-calculator/page.tsx    — /cars/cost-calculator — deferred to Phase 7
+  buying-guide/page.tsx       — /cars/buying-guide — deferred to Phase 7
 ```
 
-Each gets its own `WebApplication` JSON-LD, its own `sitemap.ts` entries, its own primary
-keyword — same discipline the four existing motorcycle tool pages already follow, and the same
-`RelatedTools`-style cross-linking pattern shipped this session extends to cross-link the two
-topic clusters (motorcycle homepage → `/cars`, and back).
+Only the landing page ships this phase — the three tool sub-pages stay deferred to Phase 7,
+same reasoning as the car dashboard's hidden Reports/Quote Checker/Cost Calculator/Buying Guide
+tabs: `/quote-checker`, `/cost-calculator`, and `/buying-guide` (the existing ones) are
+benchmarked against motorcycle price data only (`BRAND_OPTIONS`, `getBikeClassForCC`), and a
+car-facing page linking to them would overclaim. `/cars/page.tsx` deliberately never links to
+them; instead it says plainly, in its own copy, that benchmarking is "next on the list."
 
-**No `/cars/login`, no `/cars/dashboard`.** Signing in from any public car page uses the existing
+**No hero photography.** Reuses the homepage's `rv-*` design system (dark hero, amber accent,
+`rv-problems`/`rv-verdict-strip` sections) but omits the `rv-hero-panels` comic-panel grid
+entirely — there's no car-specific photography to show, and reusing the motorcycle panel images
+on a car page would misrepresent what they are. `.rv-hero` and `.rv-verdict-strip` both already
+have their own solid-color background set in CSS, so dropping the panel markup degrades cleanly
+to a clean text-led hero rather than an obviously-broken one.
+
+Gets its own `WebApplication` JSON-LD, its own `sitemap.ts` entry (priority 0.7, between the
+existing tool pages at 0.9 and `/pro` at 0.6), and a session-aware CTA: signed-out visitors go to
+`/login?redirect=%2Fdashboard%3FaddVehicle%3Dcar` (reusing the same `?addVehicle=car` stand-in
+`dashboard/page.tsx` already handles from Phase 5), a signed-in visitor with no car yet goes
+straight to `/dashboard?addVehicle=car`, and one who already has a car goes to their existing
+`/dashboard`.
+
+**Cross-product signpost, both ways.** `AddBikeForm.tsx`'s existing four-wheeled-registration
+rejection (`vehicleType === 'four-wheeled'`) now also shows a `Link` to `/cars` underneath its
+error message (a new `suggestCars` state, reset alongside the other lookup state each attempt) —
+this was the one thing Phase 5 explicitly left deferred, "not useful until `/cars` itself exists
+to point to." The homepage gets the reverse link: a new `rv-cta-secondary` link ("Own a car
+instead?") next to its existing primary CTA, using a class that already existed in `globals.css`
+but was unused. `/cars` itself carries the same pattern back ("Ride a motorcycle instead?" → `/`).
+
+**No `/cars/login`, no `/cars/dashboard`.** Signing in from the public car page uses the existing
 `/login` with the existing `redirect` param (already validated by `safeRedirect.ts` — no auth
 changes needed), landing back on the one `/dashboard`.
+
+Tests: `tests/components/CarsPage.test.tsx` (new — session-aware CTA in all three states, no
+links to the motorcycle-only tool pages, JSON-LD, feature cards), plus updated assertions in
+`AddBikeForm.test.tsx` and `HomePage.test.tsx` for the two new cross-links, and a Playwright
+smoke test in `tests/e2e/public-smoke.spec.ts`.
 
 ### Phase 5 — The shared, vehicle-kind-aware dashboard — ✅ DONE, built 7 September 2026
 
@@ -568,7 +597,7 @@ specifically:**
 | 1 | ✅ Done — VDG classifier verified against a real car plate and a real motorcycle plate | None |
 | 2 | ✅ Done — new doc types, CRUD, job/mod/bill catalogs, car assistant config schema; 121 new unit tests, full suite green (2,564), build unchanged | None |
 | 3 | ✅ Done — receipt scanner is vehicle-kind-aware; diesel not dropped for car accounts (EV/kWh receipts deferred); `commitCarReceiptItem.ts` + `reestimateCarFuelMileage.ts` new; 39 new tests, full suite green (2,603), build unchanged | Motorcycle scanning unchanged |
-| 4 | `/cars/*` public marketing pages exist; cross-product signpost from motorcycle plate lookup | Motorcycle dashboard unchanged |
+| 4 | ✅ Done — `/cars` marketing landing page (no tool sub-pages yet, deferred to Phase 7); cross-product signpost both ways (motorcycle plate-lookup rejection → `/cars`, homepage → `/cars`, `/cars` → homepage); own JSON-LD + sitemap entry; 9 new/changed component tests (`CarsPage.test.tsx` new) + 1 new Playwright smoke test | Motorcycle dashboard unchanged; homepage gains one new secondary CTA link |
 | 5 | ✅ Done — full `/api/cars/*` route layer (14 routes); `carReminder.ts`, `activeVehicle.ts` kind-resolution, `carSummary.ts`, `carReminderStatus.ts`; `VehicleSwitcher` (replaces `BikeSwitcher`); `DashboardShell` vehicle-kind-aware; `AddCarForm` + 4 `LogCar*Form`s; 5 simplified car history/reminder cards; `dashboard/page.tsx` genuinely branches and renders a working car dashboard (Dashboard/Service/Fuel/Parts/Bills/Reminders/Privacy/Security - Reports and the 3 embedded tools deferred, no car price data yet); 196 new tests, full suite green (2,791 unit/API, 750 component) | Motorcycle dashboard unchanged (confirmed: same route list, same bundle size for every other route, same component behaviour for a bike-only account) |
 | 6 | One assistant, now vehicle-kind-aware; second knowledge base; `/tomasz` gets a second KB editor tab | Motorcycle assistant behaviour unchanged when a bike is active |
 | 7 | `/cars/quote-checker`, `/cars/cost-calculator`, `/cars/buying-guide`; car VED; homepage cross-link both ways | Motorcycle tools unchanged |

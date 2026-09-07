@@ -11,3 +11,9 @@ test("public buying guide is reachable", async ({ page }) => {
   await expect(page).toHaveTitle(/RoadVerdict/i);
   await expect(page.getByRole("heading").first()).toBeVisible();
 });
+
+test("public cars landing page is reachable", async ({ page }) => {
+  await page.goto("/cars");
+  await expect(page).toHaveTitle(/RoadVerdict/i);
+  await expect(page.getByRole("heading").first()).toBeVisible();
+});

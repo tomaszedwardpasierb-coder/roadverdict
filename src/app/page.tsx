@@ -109,6 +109,7 @@ export default async function HomePage() {
               Start tracking free
               <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M2 7h10M8 3l4 4-4 4"/></svg>
             </Link>
+            <Link href="/cars" className="rv-cta-secondary">Own a car instead?</Link>
           </div>
           <ul className="rv-hero-proof" aria-label="Key facts">
             <li className="rv-proof-item">

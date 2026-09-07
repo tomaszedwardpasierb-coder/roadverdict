@@ -99,6 +99,14 @@ describe("HomePage", () => {
     }
   });
 
+  it("links to /cars for a visitor who owns a car instead of a motorcycle", async () => {
+    mockGetSession.mockResolvedValue(null);
+    const jsx = await HomePage();
+    render(jsx);
+
+    expect(screen.getByRole("link", { name: /own a car instead/i })).toHaveAttribute("href", "/cars");
+  });
+
   // The three solution cards with a real standalone public page to send
   // people to are real links, not just decorative text - the other
   // three (Full history log, Sell with proof, Smart reminders) are
