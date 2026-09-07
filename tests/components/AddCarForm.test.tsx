@@ -1,12 +1,14 @@
 // Place at: tests/components/AddCarForm.test.tsx
 //
-// AddCarForm mirrors AddBikeForm's plate-lookup and duplicate-handling
-// pattern, simplified: no curated make/model list (free text, filled in
-// directly from the lookup - no "matched in our list" branching), no
-// MOT-mileage-floor prefill, no request-ownership flow (car transfer
-// isn't built). Only fetch and next/navigation's useRouter are mocked.
+// AddCarForm mirrors AddBikeForm's curated make/model select, plate-lookup,
+// MOT-mileage-floor prefill, and duplicate-handling pattern - simplified
+// only in that there's no request-ownership flow (car transfer isn't
+// built) and no per-model engine-size data (engineLitres always stays a
+// plain user-entered field). Only fetch and next/navigation's useRouter
+// are mocked - everything else (React state, the real CAR_MODELS list,
+// the real MOT-mileage-floor validation) runs for real.
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 const mockRouter = vi.hoisted(() => ({ push: vi.fn(), refresh: vi.fn() }));
@@ -23,11 +25,13 @@ function jsonErr(data: unknown) {
   return { ok: false, json: async () => data };
 }
 
-async function fillRequired(user: ReturnType<typeof userEvent.setup>, { make = "Ford", model = "Focus", engineLitres = "1.6", year = "2020", registration = "AB12CDE", mileage = "40000" } = {}) {
-  await user.clear(screen.getByLabelText("Make"));
-  await user.type(screen.getByLabelText("Make"), make);
-  await user.clear(screen.getByLabelText("Model"));
-  await user.type(screen.getByLabelText("Model"), model);
+async function selectFordFocus(user: ReturnType<typeof userEvent.setup>) {
+  await user.selectOptions(screen.getByLabelText("Make"), "Ford");
+  await user.selectOptions(screen.getByLabelText("Model"), "Focus");
+}
+
+async function fillRequired(user: ReturnType<typeof userEvent.setup>, { engineLitres = "1.6", year = "2020", registration = "AB12CDE", mileage = "40000" } = {}) {
+  await selectFordFocus(user);
   await user.clear(screen.getByLabelText("Engine size (litres)"));
   await user.type(screen.getByLabelText("Engine size (litres)"), engineLitres);
   await user.clear(screen.getByLabelText("Year"));
@@ -47,13 +51,14 @@ describe("AddCarForm", () => {
     vi.unstubAllGlobals();
   });
 
-  it("defaults to petrol with make/model free-text and the engine size + year fields visible", () => {
+  it("renders the first curated brand/model selected by default, with petrol fuel type and the year field visible", () => {
     render(<AddCarForm />);
     expect(screen.getByLabelText("Fuel type")).toHaveValue("petrol");
-    expect(screen.getByLabelText("Make")).toHaveValue("");
-    expect(screen.getByLabelText("Model")).toHaveValue("");
+    expect(screen.getByLabelText("Make")).toHaveValue("Abarth");
+    expect(screen.getByLabelText("Model")).toHaveValue("500");
     expect(screen.getByLabelText("Engine size (litres)")).toBeInTheDocument();
     expect(screen.getByLabelText("Year")).toBeInTheDocument();
+    expect(screen.getByLabelText("Year")).toBeRequired();
     expect(screen.queryByLabelText(/Battery size/)).not.toBeInTheDocument();
   });
 
@@ -73,14 +78,23 @@ describe("AddCarForm", () => {
     expect(screen.queryByLabelText("Year")).not.toBeInTheDocument();
   });
 
+  it("picking 'Other / not in this list' for the make skips straight to custom make + custom model fields", async () => {
+    const user = userEvent.setup();
+    render(<AddCarForm />);
+    await user.selectOptions(screen.getByLabelText("Make"), "__other__");
+    expect(screen.getByLabelText("Make (enter manually)")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Model")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Model (enter manually)")).toBeInTheDocument();
+    // Unlike a bike, engine size stays a plain field regardless of match
+    // status - no separate "custom engine size" input to switch to.
+    expect(screen.getByLabelText("Engine size (litres)")).toBeInTheDocument();
+  });
+
   it("rejects a missing engine size for a non-electric car, without ever calling fetch", async () => {
     const user = userEvent.setup();
     render(<AddCarForm />);
-    await user.type(screen.getByLabelText("Make"), "Ford");
-    await user.type(screen.getByLabelText("Model"), "Focus");
-    // Year filled so the input's own native `required` constraint
-    // doesn't block form submission before our JS validation even runs -
-    // this test is specifically about the engine-size check.
+    // Year filled so the input's own native `required` constraint doesn't
+    // block form submission before our JS validation even runs.
     await user.type(screen.getByLabelText("Year"), "2020");
     await user.type(screen.getByLabelText("Registration number"), "AB12CDE");
     await user.type(screen.getByLabelText("Current mileage"), "40000");
@@ -111,34 +125,55 @@ describe("AddCarForm", () => {
     expect(fetch).toHaveBeenCalledTimes(1);
   });
 
-  it("look up: fills make/model/year/engine size directly from the response, with no curated-list matching", async () => {
+  it("look up: a matched make and model auto-fills the form and pulls in the real MOT mileage floor", async () => {
     (fetch as ReturnType<typeof vi.fn>)
-      .mockResolvedValueOnce(jsonOk({ vrm: "AB12CDE", make: "Ford", model: "Focus", year: 2020, fuelType: "PETROL", engineCapacityCc: 1596, plateInRetention: false, vehicleType: "four-wheeled" }))
-      .mockResolvedValueOnce(jsonOk({ exists: false }));
+      .mockResolvedValueOnce(jsonOk({ vrm: "AB12CDE", make: "Ford", model: "Focus", year: 2018, fuelType: "PETROL", engineCapacityCc: 1596, plateInRetention: false, vehicleType: "four-wheeled" }))
+      .mockResolvedValueOnce(jsonOk({ exists: false }))
+      .mockResolvedValueOnce(jsonOk({ latestTrustedMileage: 12000, latestTestDate: "2025-01-01" }));
 
     const user = userEvent.setup();
     render(<AddCarForm />);
     await user.type(screen.getByLabelText("Registration number"), "AB12CDE");
     await user.click(screen.getByRole("button", { name: "Look up" }));
 
-    expect(await screen.findByLabelText("Make")).toHaveValue("Ford");
+    await waitFor(() => expect(screen.getByLabelText("Make")).toHaveValue("Ford"));
     expect(screen.getByLabelText("Model")).toHaveValue("Focus");
-    expect(screen.getByLabelText("Year")).toHaveValue(2020);
+    expect(screen.getByLabelText("Year")).toHaveValue(2018);
     expect(screen.getByLabelText("Engine size (litres)")).toHaveValue(1.6);
-    expect(screen.getByText(/Filled in from the registration: Ford Focus/)).toBeInTheDocument();
+    expect(screen.getByText(/Matched to Ford Focus in our list\./)).toBeInTheDocument();
+    expect(screen.getByLabelText("Current mileage")).toHaveValue(12000);
+    expect(screen.getByText(/recorded 12,000 miles/)).toBeInTheDocument();
+    expect(screen.getByLabelText(/I confirm this mileage is correct/)).toBeInTheDocument();
+  });
+
+  it("look up: a make match with a model not in our list drops into a custom model field pre-filled with the real data", async () => {
+    (fetch as ReturnType<typeof vi.fn>)
+      .mockResolvedValueOnce(jsonOk({ vrm: "AB12CDE", make: "Ford", model: "Some Rare Trim", year: 2018, fuelType: "PETROL", engineCapacityCc: 1596, plateInRetention: false, vehicleType: "four-wheeled" }))
+      .mockResolvedValueOnce(jsonOk({ exists: false }))
+      .mockResolvedValueOnce(jsonOk({ latestTrustedMileage: null }));
+
+    const user = userEvent.setup();
+    render(<AddCarForm />);
+    await user.type(screen.getByLabelText("Registration number"), "AB12CDE");
+    await user.click(screen.getByRole("button", { name: "Look up" }));
+
+    await waitFor(() => expect(screen.getByLabelText("Make")).toHaveValue("Ford"));
+    expect(screen.getByLabelText("Model (enter manually)")).toHaveValue("Some Rare Trim");
+    expect(screen.getByText(/isn't in our model list/)).toBeInTheDocument();
   });
 
   it("look up: guesses fuel type from DVLA's own field, defaulting the select to Electric", async () => {
     (fetch as ReturnType<typeof vi.fn>)
       .mockResolvedValueOnce(jsonOk({ vrm: "AB12CDE", make: "Tesla", model: "Model 3", year: 2022, fuelType: "ELECTRICITY", engineCapacityCc: null, plateInRetention: false, vehicleType: "four-wheeled" }))
-      .mockResolvedValueOnce(jsonOk({ exists: false }));
+      .mockResolvedValueOnce(jsonOk({ exists: false }))
+      .mockResolvedValueOnce(jsonOk({ latestTrustedMileage: null }));
 
     const user = userEvent.setup();
     render(<AddCarForm />);
     await user.type(screen.getByLabelText("Registration number"), "AB12CDE");
     await user.click(screen.getByRole("button", { name: "Look up" }));
 
-    expect(await screen.findByLabelText("Fuel type")).toHaveValue("electric");
+    await waitFor(() => expect(screen.getByLabelText("Fuel type")).toHaveValue("electric"));
     expect(screen.queryByLabelText("Engine size (litres)")).not.toBeInTheDocument();
   });
 
@@ -154,70 +189,94 @@ describe("AddCarForm", () => {
     await user.click(screen.getByRole("button", { name: "Look up" }));
 
     expect(await screen.findByText(/already added this car/i)).toBeInTheDocument();
-    expect(screen.getByLabelText("Make")).toHaveValue(""); // lookup data never applied
+    // The lookup data was never applied, since car-exists short-circuited before it.
+    expect(screen.getByLabelText("Make")).toHaveValue("Abarth");
 
     await user.click(screen.getByRole("button", { name: "Go to this car" }));
-    expect(mockRouter.push).toHaveBeenCalledWith("/dashboard");
+    await waitFor(() => expect(mockRouter.push).toHaveBeenCalledWith("/dashboard"));
     expect(fetch).toHaveBeenLastCalledWith(
       "/api/cars/active-car",
       expect.objectContaining({ method: "POST", body: JSON.stringify({ carId: "car-42" }) })
     );
   });
 
-  it("look up: a duplicate on someone else's account offers 'start fresh' with no ownership-request option at all", async () => {
+  it("look up: 'start fresh' on a duplicate applies the held lookup data without a second network round-trip, and flags the eventual submit as mayHavePriorHistory", async () => {
     (fetch as ReturnType<typeof vi.fn>)
       .mockResolvedValueOnce(jsonOk({ vrm: "AB12CDE", make: "Ford", model: "Focus", year: 2020, fuelType: "PETROL", engineCapacityCc: 1596, plateInRetention: false, vehicleType: "four-wheeled" }))
-      .mockResolvedValueOnce(jsonOk({ exists: true, belongsToCurrentUser: false }));
+      .mockResolvedValueOnce(jsonOk({ exists: true, belongsToCurrentUser: false }))
+      .mockResolvedValueOnce(jsonOk({ latestTrustedMileage: null }))
+      .mockResolvedValueOnce(jsonOk({ car: { id: "new-car-1" } }))
+      .mockResolvedValueOnce(jsonOk({}));
 
     const user = userEvent.setup();
     render(<AddCarForm />);
     await user.type(screen.getByLabelText("Registration number"), "AB12CDE");
     await user.click(screen.getByRole("button", { name: "Look up" }));
-
-    expect(await screen.findByText(/already tracked on a different account/i)).toBeInTheDocument();
+    await screen.findByText(/already tracked on a different account/i);
     expect(screen.queryByRole("button", { name: "Request ownership" })).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Start fresh" }));
-    await fillRequired(user);
+    await waitFor(() => expect(screen.getByLabelText("Make")).toHaveValue("Ford"));
+    // Calls so far: plate-lookup, car-exists, then the mot-history-preview
+    // that applyLookupData made on the already-held data - a 4th call
+    // would mean it looked the plate up again instead of reusing what it had.
+    expect(fetch).toHaveBeenCalledTimes(3);
+
+    await user.clear(screen.getByLabelText("Current mileage"));
+    await user.type(screen.getByLabelText("Current mileage"), "40000");
     await user.click(screen.getByRole("button", { name: "Add car" }));
 
-    expect(fetch).toHaveBeenLastCalledWith(
-      "/api/cars/car",
-      expect.objectContaining({ body: expect.stringContaining('"mayHavePriorHistory":true') })
+    await waitFor(() =>
+      expect(fetch).toHaveBeenCalledWith(
+        "/api/cars/car",
+        expect.objectContaining({ body: expect.stringContaining('"mayHavePriorHistory":true') })
+      )
     );
   });
 
-  it("submits the full form state to /api/cars/car", async () => {
-    (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce(jsonOk({ car: { id: "new-car-1" } }));
+  it("submits the full real form state to /api/cars/car, and best-effort imports MOT history for the newly created car", async () => {
+    (fetch as ReturnType<typeof vi.fn>)
+      .mockResolvedValueOnce(jsonOk({ car: { id: "new-car-1" } }))
+      .mockResolvedValueOnce(jsonOk({}));
 
     const user = userEvent.setup();
     render(<AddCarForm />);
-    await fillRequired(user);
+    await fillRequired(user, { engineLitres: "1.6", year: "2020", registration: "AB12CDE", mileage: "40000" });
     await user.click(screen.getByRole("button", { name: "Add car" }));
 
-    expect(fetch).toHaveBeenCalledWith(
-      "/api/cars/car",
-      expect.objectContaining({
-        method: "POST",
-        body: JSON.stringify({
-          make: "Ford",
-          model: "Focus",
-          fuelType: "petrol",
-          engineLitres: 1.6,
-          batteryKwh: undefined,
-          year: 2020,
-          isCustomBuild: false,
-          registration: "AB12CDE",
-          currentMileage: 40000,
-          nickname: "",
-          region: "rest-england-wales",
-          mayHavePriorHistory: false,
-        }),
-      })
+    await waitFor(() =>
+      expect(fetch).toHaveBeenNthCalledWith(
+        1,
+        "/api/cars/car",
+        expect.objectContaining({
+          method: "POST",
+          body: JSON.stringify({
+            make: "Ford",
+            model: "Focus",
+            fuelType: "petrol",
+            engineLitres: 1.6,
+            batteryKwh: undefined,
+            year: 2020,
+            isCustomBuild: false,
+            registration: "AB12CDE",
+            currentMileage: 40000,
+            nickname: "",
+            region: "rest-england-wales",
+            mayHavePriorHistory: false,
+          }),
+        })
+      )
+    );
+    await waitFor(() =>
+      expect(fetch).toHaveBeenNthCalledWith(
+        2,
+        "/api/cars/car/mot-history",
+        expect.objectContaining({ method: "POST", body: JSON.stringify({ carId: "new-car-1" }) })
+      )
     );
   });
 
-  it("shows the server's own error when the API rejects the submit", async () => {
+  it("shows the server's own error when the API rejects the submit, without attempting the MOT import", async () => {
     (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce(jsonErr({ error: "Something went wrong." }));
 
     const user = userEvent.setup();
@@ -226,5 +285,41 @@ describe("AddCarForm", () => {
     await user.click(screen.getByRole("button", { name: "Add car" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent("Something went wrong.");
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("the mileage input's own min attribute (set from the real MOT floor) reflects the fetched figure", async () => {
+    (fetch as ReturnType<typeof vi.fn>)
+      .mockResolvedValueOnce(jsonOk({ vrm: "AB12CDE", make: "Ford", model: "Focus", year: 2020, fuelType: "PETROL", engineCapacityCc: 1596, plateInRetention: false, vehicleType: "four-wheeled" }))
+      .mockResolvedValueOnce(jsonOk({ exists: false }))
+      .mockResolvedValueOnce(jsonOk({ latestTrustedMileage: 12000, latestTestDate: "2025-01-01" }));
+
+    const user = userEvent.setup();
+    render(<AddCarForm />);
+    await user.type(screen.getByLabelText("Registration number"), "AB12CDE");
+    await user.click(screen.getByRole("button", { name: "Look up" }));
+    await waitFor(() => expect(screen.getByLabelText("Current mileage")).toHaveValue(12000));
+
+    expect(screen.getByLabelText("Current mileage")).toHaveAttribute("min", "12000");
+  });
+
+  it("requires the mileage-confirmation checkbox even when the entered figure matches the MOT floor exactly", async () => {
+    (fetch as ReturnType<typeof vi.fn>)
+      .mockResolvedValueOnce(jsonOk({ vrm: "AB12CDE", make: "Ford", model: "Focus", year: 2020, fuelType: "PETROL", engineCapacityCc: 1596, plateInRetention: false, vehicleType: "four-wheeled" }))
+      .mockResolvedValueOnce(jsonOk({ exists: false }))
+      .mockResolvedValueOnce(jsonOk({ latestTrustedMileage: 12000, latestTestDate: "2025-01-01" }));
+
+    const user = userEvent.setup();
+    render(<AddCarForm />);
+    await user.type(screen.getByLabelText("Registration number"), "AB12CDE");
+    await user.click(screen.getByRole("button", { name: "Look up" }));
+    await waitFor(() => expect(screen.getByLabelText("Current mileage")).toHaveValue(12000));
+
+    await user.click(screen.getByRole("button", { name: "Add car" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Please confirm the current mileage figure before adding the car."
+    );
+    expect(fetch).toHaveBeenCalledTimes(3);
   });
 });

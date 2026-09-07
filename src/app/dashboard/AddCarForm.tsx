@@ -1,21 +1,21 @@
 // Place at: src/app/dashboard/AddCarForm.tsx
 //
 // Car equivalent of AddBikeForm.tsx. Two deliberate simplifications
-// versus the motorcycle version, both scope cuts already documented in
+// versus the motorcycle version remain, both documented in
 // RoadVerdict_Car_Plan_v3.md:
-// - No curated make/model list (none exists for cars - VDG's returned
-//   make/model strings go straight into free-text fields, so there's no
-//   "matched in our list" vs "custom entry" branching to do at all).
-// - No MOT-mileage-floor prefill and no post-create MOT import - both
-//   routes (mot-history-preview, mot-history) are bike-only today; a car
-//   equivalent is real, separate work, not attempted here.
 // - No "request ownership" flow for an already-tracked car - car
 //   ownership transfer isn't built (see the ADR). A duplicate plate on
 //   another account can still be started fresh under this one.
+// - CAR_MODELS carries no engine-size/fuel-type per entry (unlike
+//   MotorcycleModel's engineCC) - a single nameplate spans every fuel
+//   type over its production run, so selecting a model never auto-fills
+//   engine size the way picking a bike model does; engineLitres stays a
+//   plain user-entered field regardless of match status.
 'use client';
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { ALL_CAR_BRANDS, CAR_MODELS } from '@/lib/carModels';
 import { REGION_LABELS, type Region } from '@/lib/priceData';
 import { useTrackerFormSubmit } from './useTrackerFormSubmit';
 import styles from './dashboard.module.css';
@@ -46,10 +46,15 @@ function mapDvlaFuelType(raw: string): CarFuelType | null {
   return null;
 }
 
+const OTHER = '__other__';
+
 export function AddCarForm() {
   const [fuelType, setFuelType] = useState<CarFuelType>('petrol');
-  const [make, setMake] = useState('');
-  const [model, setModel] = useState('');
+  const [make, setMake] = useState(ALL_CAR_BRANDS[0]);
+  const modelsForBrand = CAR_MODELS.filter((m) => m.make === make);
+  const [model, setModel] = useState(modelsForBrand[0]?.model ?? '');
+  const [customMake, setCustomMake] = useState('');
+  const [customModel, setCustomModel] = useState('');
   const [engineLitres, setEngineLitres] = useState('');
   const [batteryKwh, setBatteryKwh] = useState('');
   const [isCustomBuild, setIsCustomBuild] = useState(false);
@@ -58,18 +63,36 @@ export function AddCarForm() {
   const [mileage, setMileage] = useState('');
   const [nickname, setNickname] = useState('');
   const [region, setRegion] = useState<Region>('rest-england-wales');
-  const { submit, submitting, error } = useTrackerFormSubmit('/api/cars/car');
+  const { submit, submitting, error, lastResponse } = useTrackerFormSubmit('/api/cars/car');
 
   const [lookingUp, setLookingUp] = useState(false);
   const [lookupMessage, setLookupMessage] = useState<{ text: string; tone: 'ok' | 'warn' | 'error' } | null>(null);
   const [existingCar, setExistingCar] = useState<{ status: 'own' | 'other'; carId?: string } | null>(null);
   const [switchingCar, setSwitchingCar] = useState(false);
   const [startedFreshDespiteDuplicate, setStartedFreshDespiteDuplicate] = useState(false);
+  const [pendingLookupData, setPendingLookupData] = useState<{ make?: string; model?: string; year?: number; engineCapacityCc?: number; fuelType?: string; plateInRetention?: boolean } | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
+  const [minMileage, setMinMileage] = useState<number | null>(null);
+  const [minMileageDate, setMinMileageDate] = useState<string | null>(null);
+  const [mileageConfirmed, setMileageConfirmed] = useState(false);
   const router = useRouter();
 
+  const isCustomMake = make === OTHER;
+  const isCustomModel = model === OTHER;
+  const effectiveMake = isCustomMake ? customMake.trim() : make;
+  const effectiveModel = isCustomModel ? customModel.trim() : model;
   const needsEngineLitres = fuelType !== 'electric';
   const yearRequired = !isCustomBuild && fuelType !== 'electric';
+
+  function handleMakeChange(newMake: string) {
+    setMake(newMake);
+    if (newMake === OTHER) {
+      setModel(OTHER);
+      return;
+    }
+    const firstModel = CAR_MODELS.find((m) => m.make === newMake);
+    setModel(firstModel?.model ?? '');
+  }
 
   async function handleGoToExistingCar(carId: string) {
     setSwitchingCar(true);
@@ -90,6 +113,83 @@ export function AddCarForm() {
       setLookupMessage({ text: "Couldn't reach the server. Try again.", tone: 'error' });
       setSwitchingCar(false);
     }
+  }
+
+  // Runs the make/model matching, fuel-type guess, and MOT-mileage-floor
+  // auto-fill against an already-fetched plate-lookup response. Split out
+  // from handleLookup so "Start fresh" can call this exact same logic on
+  // data that's already in hand, without a second network round-trip.
+  async function applyLookupData(data: { make?: string; model?: string; year?: number; engineCapacityCc?: number; fuelType?: string; plateInRetention?: boolean }) {
+    const matchedBrand = ALL_CAR_BRANDS.find((b) => b.toLowerCase() === String(data.make ?? '').toLowerCase());
+    let matchedModelName: string | null = null;
+    if (matchedBrand) {
+      handleMakeChange(matchedBrand);
+      const candidates = CAR_MODELS.filter((m) => m.make === matchedBrand);
+      const dvlaModel = String(data.model ?? '').toLowerCase();
+      const exact = candidates.find((m) => m.model.toLowerCase() === dvlaModel);
+      const partial = candidates.find(
+        (m) => dvlaModel.includes(m.model.toLowerCase()) || m.model.toLowerCase().includes(dvlaModel)
+      );
+      const found = exact ?? partial;
+      if (found) {
+        setModel(found.model);
+        matchedModelName = found.model;
+      } else {
+        // Make matched but the specific model isn't in our curated list -
+        // drop straight into the custom-entry field pre-filled with the
+        // real returned data, rather than making the user retype it.
+        setModel(OTHER);
+        setCustomModel(String(data.model ?? ''));
+      }
+    } else {
+      setMake(OTHER);
+      setCustomMake(String(data.make ?? ''));
+      setModel(OTHER);
+      setCustomModel(String(data.model ?? ''));
+    }
+
+    if (data.year && !isCustomBuild) setYear(String(data.year));
+    if (data.engineCapacityCc) setEngineLitres(String(Math.round((data.engineCapacityCc / 1000) * 10) / 10));
+    const guessedFuelType = mapDvlaFuelType(String(data.fuelType ?? ''));
+    if (guessedFuelType) setFuelType(guessedFuelType);
+
+    // Independent of whether make/model matched above - a genuine mileage
+    // floor from DVSA's own records is worth having even for a car not in
+    // our curated list at all. Failure here is silent and non-blocking:
+    // the vehicle lookup already succeeded, this is a bonus, and "no MOT
+    // history yet" (a car under 3 years old) is a completely normal,
+    // expected outcome, not an error. Reuses the same, already
+    // vehicle-agnostic /api/tracker/mot-history-preview endpoint bikes use.
+    try {
+      const motRes = await fetch(`/api/tracker/mot-history-preview?vrm=${encodeURIComponent(registration.trim())}`);
+      if (motRes.ok) {
+        const motData = await motRes.json();
+        if (motData.latestTrustedMileage != null) {
+          setMinMileage(motData.latestTrustedMileage);
+          setMinMileageDate(motData.latestTestDate ?? null);
+          setMileage(String(motData.latestTrustedMileage));
+          setMileageConfirmed(false);
+        }
+      }
+    } catch {
+      // Silent, non-blocking - see comment above.
+    }
+
+    const parts: string[] = [];
+    if (matchedBrand && matchedModelName) {
+      parts.push(`Matched to ${matchedBrand} ${matchedModelName} in our list.`);
+    } else if (matchedBrand) {
+      parts.push(`Matched the make (${matchedBrand}). "${data.model}" isn't in our model list, so it's been filled in below as a custom entry - check it over, or pick a listed model instead if you'd rather.`);
+    } else {
+      parts.push(`Found "${data.make} ${data.model}" - not in our make list at all, so both have been filled in below as a custom entry. Check the details before submitting.`);
+    }
+    if (guessedFuelType === 'hybrid' && String(data.fuelType ?? '').toUpperCase().includes('HYBRID')) {
+      parts.push("Fuel type guessed as Hybrid from DVLA's record - change it to Plug-in hybrid below if that's what this actually is, DVLA doesn't distinguish the two.");
+    }
+    if (data.plateInRetention) {
+      parts.push("Note: this plate is currently in retention (not on any vehicle right now) - the details shown are from the last vehicle it was recorded against, so double-check they're actually right for this car.");
+    }
+    setLookupMessage({ text: parts.join(' '), tone: matchedBrand && matchedModelName ? 'ok' : 'warn' });
   }
 
   async function handleLookup() {
@@ -127,24 +227,11 @@ export function AddCarForm() {
         setExistingCar(
           dupData.belongsToCurrentUser ? { status: 'own', carId: dupData.carId } : { status: 'other' }
         );
+        setPendingLookupData(data);
         return;
       }
 
-      setMake(String(data.make ?? ''));
-      setModel(String(data.model ?? ''));
-      if (data.year && !isCustomBuild) setYear(String(data.year));
-      if (data.engineCapacityCc) setEngineLitres(String(Math.round((data.engineCapacityCc / 1000) * 10) / 10));
-      const guessedFuelType = mapDvlaFuelType(String(data.fuelType ?? ''));
-      if (guessedFuelType) setFuelType(guessedFuelType);
-
-      const parts = [`Filled in from the registration: ${data.make} ${data.model}${data.year ? ` (${data.year})` : ''}.`];
-      if (guessedFuelType === 'hybrid' && String(data.fuelType ?? '').toUpperCase().includes('HYBRID')) {
-        parts.push("Fuel type guessed as Hybrid from DVLA's record - change it to Plug-in hybrid below if that's what this actually is, DVLA doesn't distinguish the two.");
-      }
-      if (data.plateInRetention) {
-        parts.push("Note: this plate is currently in retention (not on any vehicle right now) - the details shown are from the last vehicle it was recorded against, so double-check they're actually right for this car.");
-      }
-      setLookupMessage({ text: parts.join(' '), tone: 'ok' });
+      await applyLookupData(data);
     } catch {
       setLookupMessage({ text: "Couldn't reach the lookup service - enter details manually below.", tone: 'error' });
     } finally {
@@ -152,19 +239,22 @@ export function AddCarForm() {
     }
   }
 
-  function handleStartFresh() {
+  async function handleStartFresh() {
     setExistingCar(null);
     setStartedFreshDespiteDuplicate(true);
+    if (pendingLookupData) {
+      await applyLookupData(pendingLookupData);
+    }
   }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setFormError(null);
-    if (!make.trim()) {
+    if (isCustomMake && !customMake.trim()) {
       setFormError('Enter the make.');
       return;
     }
-    if (!model.trim()) {
+    if (isCustomModel && !customModel.trim()) {
       setFormError('Enter the model.');
       return;
     }
@@ -184,10 +274,20 @@ export function AddCarForm() {
       setFormError('Enter the current mileage.');
       return;
     }
+    if (minMileage !== null) {
+      if (!(Number(mileage) >= minMileage)) {
+        setFormError(`Current mileage has to be at least ${minMileage.toLocaleString()} miles - that's what your last MOT recorded.`);
+        return;
+      }
+      if (!mileageConfirmed) {
+        setFormError('Please confirm the current mileage figure before adding the car.');
+        return;
+      }
+    }
 
-    await submit({
-      make: make.trim(),
-      model: model.trim(),
+    const ok = await submit({
+      make: effectiveMake,
+      model: effectiveModel,
       fuelType,
       engineLitres: needsEngineLitres ? Number(engineLitres) : undefined,
       batteryKwh: batteryKwh ? Number(batteryKwh) : undefined,
@@ -199,6 +299,24 @@ export function AddCarForm() {
       region,
       mayHavePriorHistory: startedFreshDespiteDuplicate,
     });
+    // Best-effort, non-blocking - the car itself is already saved
+    // successfully regardless of what happens here. If this fails
+    // silently (no MOT history for this plate, service hiccup, etc.),
+    // the car still exists and MOT import can always be run again later.
+    if (ok) {
+      const newCarId = (lastResponse.current as { car?: { id?: string } } | null)?.car?.id;
+      if (newCarId) {
+        try {
+          await fetch('/api/cars/car/mot-history', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ carId: newCarId }),
+          });
+        } catch {
+          // Silent - see comment above.
+        }
+      }
+    }
   }
 
   return (
@@ -218,12 +336,35 @@ export function AddCarForm() {
         </div>
         <div className="field" style={{ marginTop: '0.9rem' }}>
           <label htmlFor="car-make">Make</label>
-          <input id="car-make" type="text" value={make} onChange={(e) => setMake(e.target.value)} placeholder="e.g. Ford" />
+          <select id="car-make" value={make} onChange={(e) => handleMakeChange(e.target.value)}>
+            {ALL_CAR_BRANDS.map((b) => (
+              <option key={b} value={b}>{b}</option>
+            ))}
+            <option value={OTHER}>Other / not in this list</option>
+          </select>
         </div>
-        <div className="field" style={{ marginTop: '0.9rem' }}>
-          <label htmlFor="car-model">Model</label>
-          <input id="car-model" type="text" value={model} onChange={(e) => setModel(e.target.value)} placeholder="e.g. Focus" />
-        </div>
+        {isCustomMake ? (
+          <div className="field" style={{ marginTop: '0.9rem' }}>
+            <label htmlFor="car-custom-make">Make (enter manually)</label>
+            <input id="car-custom-make" type="text" value={customMake} onChange={(e) => setCustomMake(e.target.value)} placeholder="e.g. Genesis" />
+          </div>
+        ) : (
+          <div className="field" style={{ marginTop: '0.9rem' }}>
+            <label htmlFor="car-model">Model</label>
+            <select id="car-model" value={model} onChange={(e) => setModel(e.target.value)}>
+              {modelsForBrand.map((m) => (
+                <option key={m.model} value={m.model}>{m.model}</option>
+              ))}
+              <option value={OTHER}>Other / not in this list</option>
+            </select>
+          </div>
+        )}
+        {isCustomModel && (
+          <div className="field" style={{ marginTop: '0.9rem' }}>
+            <label htmlFor="car-custom-model">Model (enter manually)</label>
+            <input id="car-custom-model" type="text" value={customModel} onChange={(e) => setCustomModel(e.target.value)} placeholder="e.g. GV70" />
+          </div>
+        )}
         {needsEngineLitres && (
           <div className="field" style={{ marginTop: '0.9rem' }}>
             <label htmlFor="car-engine-litres">Engine size (litres)</label>
@@ -307,7 +448,27 @@ export function AddCarForm() {
         </div>
         <div className="field" style={{ marginTop: '0.9rem' }}>
           <label htmlFor="car-mileage">Current mileage</label>
-          <input id="car-mileage" type="number" min="0" value={mileage} onChange={(e) => setMileage(e.target.value)} required />
+          <input
+            id="car-mileage"
+            type="number"
+            min={minMileage ?? 0}
+            value={mileage}
+            onChange={(e) => { setMileage(e.target.value); setMileageConfirmed(false); }}
+            required
+          />
+          {minMileage !== null && (
+            <>
+              <p className="field-note" style={{ marginTop: '0.4rem' }}>
+                Your last MOT{minMileageDate ? ` (${new Date(minMileageDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })})` : ''} recorded {minMileage.toLocaleString()} miles - current mileage has to be at least this.
+              </p>
+              <div className="field-checkbox" style={{ marginTop: '0.4rem' }}>
+                <label>
+                  <input type="checkbox" checked={mileageConfirmed} onChange={(e) => setMileageConfirmed(e.target.checked)} />
+                  I confirm this mileage is correct, or I&apos;ve updated it to the car&apos;s real current reading
+                </label>
+              </div>
+            </>
+          )}
         </div>
         <div className="field" style={{ marginTop: '0.9rem' }}>
           <label htmlFor="car-region">Where you keep and run it</label>

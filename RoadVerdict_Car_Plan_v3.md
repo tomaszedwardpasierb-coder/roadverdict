@@ -473,18 +473,62 @@ silently updated the wrong vehicle, or 404'd, for a car-active session. `Refresh
 (DVLA/MOT refresh — no car route for it yet, and MOT import is real, non-trivial extra scope) is
 hidden entirely for a car-active session rather than wired to an endpoint that doesn't exist.
 
-**`AddCarForm.tsx`** — new, parallel to `AddBikeForm.tsx` but genuinely simpler in three ways the
-original sketch called for: no curated make/model list at all (VDG's returned strings go straight
-into free-text fields — there's no `motorcycleModels.ts`-equivalent catalog for cars, so there's
-no "matched in our list" vs "custom entry" branching to do); no MOT-mileage-floor prefill and no
-post-create MOT import (`mot-history-preview`/`mot-history` are bike-only routes, a car
-equivalent is real, separate work); no "request ownership" flow for an already-tracked car (car
-ownership transfer isn't built — a duplicate plate on another account can still be started fresh
-under the new one, just without a transfer request). Plate lookup reuses the exact same
-`/api/tracker/plate-lookup` and reacts oppositely to `AddBikeForm` — rejects `'motorcycle'`
-instead of `'four-wheeled'` — and makes a best-effort guess at fuel type from DVLA's own free-text
-field (`mapDvlaFuelType()`), always left editable since DVLA doesn't distinguish plain hybrid from
-plug-in hybrid in that field.
+**`AddCarForm.tsx`** — new, parallel to `AddBikeForm.tsx`, originally simpler in three ways; two of
+those three were later closed out (see "MOT import + curated car catalog, 7 September 2026"
+below). One simplification remains genuinely permanent: no "request ownership" flow for an
+already-tracked car (car ownership transfer isn't built — a duplicate plate on another account can
+still be started fresh under the new one, just without a transfer request). Plate lookup reuses
+the exact same `/api/tracker/plate-lookup` and reacts oppositely to `AddBikeForm` — rejects
+`'motorcycle'` instead of `'four-wheeled'` — and makes a best-effort guess at fuel type from
+DVLA's own free-text field (`mapDvlaFuelType()`), always left editable since DVLA doesn't
+distinguish plain hybrid from plug-in hybrid in that field.
+
+### MOT import + curated car catalog — ✅ DONE, built 7 September 2026
+
+Closes the two Phase 5 scope cuts flagged above once real user feedback showed bikes actually do
+pull MOT at add-time (an initial mischaracterization in conversation — corrected once
+`AddBikeForm.tsx` was re-read closely: it calls `mot-history-preview` during plate lookup for the
+mileage floor, then `mot-history` again right after creation, not merely from the dashboard's
+"Refresh vehicle data" button).
+
+**`src/lib/carModels.ts`** — car equivalent of `motorcycleModels.ts`: `CAR_MODELS` (426 entries,
+41 UK-market brands, 2000-present mainstream nameplates, not exhaustive — same "Other / not in
+this list" fallback convention) and `ALL_CAR_BRANDS`. Deliberately **no** per-entry engine-size/
+fuel-type field (unlike `MotorcycleModel.engineCC`) — a single nameplate spans every fuel type and
+several engine sizes over its production run, so baking in one "typical" figure would be a guessed
+number wearing a confidence label, exactly what this app's conventions avoid elsewhere. Selecting
+a model is purely a typing aid; `engineLitres` stays a plain user-entered field regardless of
+match status, and `getCarSizeClass()` in `carClass.ts` classifies from that entered value, not
+from make/model.
+
+**`AddCarForm.tsx` now has real make/model `<select>`s** (mirroring `AddBikeForm.tsx`'s three-tier
+match: full match / brand-only match with model dropped into a pre-filled custom field / no match
+at all with both fields pre-filled), and real MOT integration: `applyLookupData()` calls the
+already vehicle-agnostic `/api/tracker/mot-history-preview` (VRM-only, no bike-specific writes, so
+reused as-is — no car-specific preview route needed) for the same mileage-floor-plus-confirmation-
+checkbox UX bikes get, and a successful car creation best-effort POSTs to the new
+`/api/cars/car/mot-history` route to import the full MOT history.
+
+**New backend**: `src/lib/tracker/carMotHistoryImport.ts` (`importMotHistoryForCar`) mirrors
+`motHistoryImport.ts` line-for-line in behaviour, reusing three already vehicle-agnostic
+dependencies directly rather than duplicating them — `fetchMotHistoryFromVdg` (VRM-only),
+`motReminderDate` (date-string-only), and `isBeforeProduction` (typed against the structural
+`ProductionYearCheckable` interface, which `CarDoc` already satisfies) — and only the
+bill/reminder/fuel-mileage calls are genuinely car-specific (`createCarBill`/`getCarBills`,
+`createCarReminder`/`deleteCarRemindersBySourceKey`, `reestimateCarFuelMileage`, all already built
+in earlier phases). `src/app/api/cars/car/mot-history/route.ts` mirrors
+`/api/tracker/mot-history/route.ts`, nested under `car/` alongside `car/[carId]/route.ts` — the
+same static-segment-beside-dynamic-segment pattern `bike/refresh-data/` already uses alongside
+`bike/[bikeId]/`.
+
+**Still not built**: the *ongoing* refresh flow. `RefreshVehicleDataButton` stays hidden for a
+car-active dashboard — there's still no `/api/cars/car/refresh-data` route to re-pull DVLA data or
+re-run MOT import after the car's already been added, only the one-time add-time pull above. A
+real gap, not scheduled under any named phase.
+
+Tests: `tests/unit/carModels.test.ts` (catalog integrity), `tests/unit/carMotHistoryImport.test.ts`
+and `tests/api/car-mot-history-route.test.ts` (both mirror their motorcycle equivalents exactly),
+`tests/components/AddCarForm.test.tsx` rewritten for the select-driven UX and MOT flow.
 
 **Four new logging forms**, each simpler than its motorcycle counterpart in exactly the ways the
 smaller car catalogs allow: `LogCarServiceForm.tsx`/`LogCarModForm.tsx` use plain `<select>`s over
