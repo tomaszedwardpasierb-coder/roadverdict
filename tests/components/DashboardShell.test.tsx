@@ -9,7 +9,7 @@
 // point of the test below is to prove DashboardShell wires the REAL
 // thing through to setActive, not that fallback). Only next/navigation's
 // useRouter is mocked - it's pulled in transitively by several of
-// DashboardShell's real child buttons (BikeSwitcher, UpdateMileageButton,
+// DashboardShell's real child buttons (VehicleSwitcher, UpdateMileageButton,
 // RefreshVehicleDataButton, LogoutButton, ResetDemoButton).
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
@@ -28,14 +28,15 @@ const emptyPendingIds = { service: [], fuel: [], mods: [], bills: [] };
 
 function baseProps(overrides: Partial<Parameters<typeof DashboardShell>[0]> = {}) {
   return {
-    bikeName: "Trusty Steed",
-    bikeYear: 2020,
+    vehicleKind: "bike" as const,
+    vehicleName: "Trusty Steed",
+    vehicleYear: 2020,
     currentMileage: 15000,
     distanceUnit: "mi" as const,
     userEmail: "rider@example.com",
     isPro: false,
-    bikes: [{ id: "bike-1", name: "Trusty Steed", year: 2020, currentMileage: 15000 }],
-    activeBikeId: "bike-1",
+    vehicles: [{ id: "bike-1", kind: "bike" as const, name: "Trusty Steed", year: 2020, currentMileage: 15000 }],
+    activeVehicleId: "bike-1",
     pendingReviewIds: emptyPendingIds,
     hasPendingReceiptRequests: false,
     dashboardContent: <div>Dashboard content</div>,
@@ -201,13 +202,13 @@ describe("DashboardShell", () => {
     expect(screen.queryByText(/Signed in as/)).not.toBeInTheDocument();
   });
 
-  it("renders the real BikeSwitcher child for a single-bike account, not a stub", () => {
+  it("renders the real VehicleSwitcher child for a single-bike account, not a stub", () => {
     render(<DashboardShell {...baseProps()} />);
     expect(screen.getByText("My bike")).toBeInTheDocument();
     expect(screen.getAllByText("Trusty Steed").length).toBeGreaterThan(0);
   });
 
-  it("renders the real bike year and formatted mileage (shown in both the sidebar card and the mobile top bar)", () => {
+  it("renders the real vehicle year and formatted mileage (shown in both the sidebar card and the mobile top bar)", () => {
     render(<DashboardShell {...baseProps()} />);
     expect(screen.getAllByText("2020 · 15,000 miles").length).toBe(2);
   });
@@ -227,5 +228,58 @@ describe("DashboardShell", () => {
     expect(
       screen.getAllByText(/RoadVerdict is guidance benchmarked against typical prices, not a professional inspection\./).length
     ).toBeGreaterThan(1);
+  });
+
+  // The hybrid dashboard's own guard: three tabs (Story, Shareable Links,
+  // Transfer ownership) depend on BikeDoc fields CarDoc doesn't have yet -
+  // hidden rather than shown broken while a car is the active vehicle.
+  describe("vehicleKind: car", () => {
+    function carProps(overrides: Partial<Parameters<typeof DashboardShell>[0]> = {}) {
+      return baseProps({
+        vehicleKind: "car",
+        vehicleName: "Focus",
+        vehicles: [{ id: "car-1", kind: "car", name: "Focus", year: 2020, currentMileage: 40000 }],
+        activeVehicleId: "car-1",
+        storyContent: undefined,
+        shareLinksContent: undefined,
+        transferOwnershipContent: undefined,
+        ...overrides,
+      });
+    }
+
+    it("hides Story, Shareable Links, and Transfer ownership from the sidebar nav", () => {
+      render(<DashboardShell {...carProps()} />);
+      expect(screen.queryByRole("button", { name: /The Story So Far/ })).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: /Shareable Links/ })).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: /Transfer ownership/ })).not.toBeInTheDocument();
+      // Every other tab is still present.
+      expect(screen.getAllByRole("button", { name: "Fuel" }).length).toBeGreaterThan(0);
+    });
+
+    it("hides the same three from the mobile More sheet", async () => {
+      const user = userEvent.setup();
+      render(<DashboardShell {...carProps()} />);
+      await user.click(screen.getByRole("button", { name: /More/ }));
+      expect(screen.queryByText("The Story So Far")).not.toBeInTheDocument();
+      expect(screen.queryByText("Shareable Links")).not.toBeInTheDocument();
+      expect(screen.queryByText("Transfer ownership")).not.toBeInTheDocument();
+      // Also present in the always-mounted sidebar nav, hence getAllByText.
+      expect(screen.getAllByText("Security").length).toBeGreaterThan(0);
+    });
+
+    it("labels the switcher card 'My car' and hides the DVLA-refresh button (no car route for it yet)", () => {
+      render(<DashboardShell {...carProps()} />);
+      expect(screen.getByText("My car")).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: /Refresh/ })).not.toBeInTheDocument();
+    });
+
+    it("PATCHes /api/cars/car (not /api/tracker/bike) when updating mileage", async () => {
+      (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({ ok: true, json: async () => ({}) });
+      const user = userEvent.setup();
+      render(<DashboardShell {...carProps()} />);
+      await user.click(screen.getAllByRole("button", { name: "Update mileage" })[0]);
+      await user.click(screen.getAllByRole("button", { name: "Save" })[0]);
+      expect(fetch).toHaveBeenCalledWith("/api/cars/car", expect.objectContaining({ method: "PATCH" }));
+    });
   });
 });

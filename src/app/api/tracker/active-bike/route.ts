@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/session";
 import { getBikesForUser, ACTIVE_BIKE_COOKIE } from "@/lib/tracker/bike";
+import { ACTIVE_VEHICLE_KIND_COOKIE } from "@/lib/tracker/activeVehicle";
 
 export const dynamic = "force-dynamic";
 
@@ -40,6 +41,16 @@ export async function POST(request: NextRequest) {
 
   const response = NextResponse.json({ ok: true });
   response.cookies.set(ACTIVE_BIKE_COOKIE, bikeId, {
+    httpOnly: true,
+    secure: true,
+    sameSite: "lax",
+    path: "/",
+    maxAge: ACTIVE_BIKE_COOKIE_MAX_AGE,
+  });
+  // Records which VEHICLE KIND is active, not just which bike - the one
+  // extra bit the shared dashboard needs that a single-kind cookie can't
+  // supply on its own, for an account holding both a bike and a car.
+  response.cookies.set(ACTIVE_VEHICLE_KIND_COOKIE, "bike", {
     httpOnly: true,
     secure: true,
     sameSite: "lax",

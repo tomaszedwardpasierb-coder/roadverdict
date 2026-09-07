@@ -5,7 +5,7 @@ import { useEffect, useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import { UpdateMileageButton } from './UpdateMileageButton';
 import { RefreshVehicleDataButton } from './RefreshVehicleDataButton';
-import { BikeSwitcher, type SwitcherBike } from './BikeSwitcher';
+import { VehicleSwitcher, type SwitcherVehicle } from './VehicleSwitcher';
 import LogoutButton from './LogoutButton';
 import { formatDistance, type DistanceUnit } from '@/lib/tracker/unitFormat';
 import { TabSwitchProvider, type ReviewCategory } from './TabSwitchContext';
@@ -60,9 +60,24 @@ const MORE_ITEMS: { key: Section; label: string; icon: IconName }[] = [
   { key: 'privacy', label: 'Privacy', icon: 'privacy' },
 ];
 
+// Story/Shareable Links/Transfer ownership depend on BikeDoc fields
+// CarDoc deliberately doesn't have yet (shareToken, storyCache, transfer
+// semantics - see the ADR's "explicitly out of scope" list). Reports and
+// the three embedded tools (Quote Checker/Cost Calculator/Buying Guide)
+// depend on motorcycle price-benchmark data that has no car equivalent
+// yet either (Phase 7's price research hasn't happened - see the ADR).
+// All six hidden rather than shown broken/empty/wrong while a car is
+// the active vehicle. Additive later: once each has a real car
+// equivalent, it just comes off this list.
+const CAR_UNAVAILABLE_SECTIONS: Section[] = ['story', 'shareLinks', 'transferOwnership', 'reports', 'quoteChecker', 'costCalculator', 'buyingGuide'];
+function availableFor(vehicleKind: 'bike' | 'car', items: { key: Section; label: string; icon: IconName }[]) {
+  return vehicleKind === 'bike' ? items : items.filter((item) => !CAR_UNAVAILABLE_SECTIONS.includes(item.key));
+}
+
 interface Props {
-  bikeName: string;
-  bikeYear?: number;
+  vehicleKind: 'bike' | 'car';
+  vehicleName: string;
+  vehicleYear?: number;
   currentMileage: number;
   distanceUnit: DistanceUnit;
   userEmail: string;
@@ -70,8 +85,8 @@ interface Props {
   // Null whenever isPro is false - only ever shown alongside the
   // Premium badge itself, never on its own.
   proDaysRemaining?: number | null;
-  bikes: SwitcherBike[];
-  activeBikeId: string;
+  vehicles: SwitcherVehicle[];
+  activeVehicleId: string;
   // Real, server-computed counts of needsReview records per category -
   // drives the pulsing nav dots directly from actual data, not an
   // in-memory queue that could disagree with what's really been saved.
@@ -83,14 +98,15 @@ interface Props {
   modsContent: ReactNode;
   billsContent: ReactNode;
   remindersContent: ReactNode;
-  reportsContent: ReactNode;
-  storyContent: ReactNode;
-  shareLinksContent: ReactNode;
-  quoteCheckerContent: ReactNode;
-  costCalculatorContent: ReactNode;
-  buyingGuideContent: ReactNode;
+  // Undefined for a car-active session - see CAR_UNAVAILABLE_SECTIONS.
+  reportsContent?: ReactNode;
+  storyContent?: ReactNode;
+  shareLinksContent?: ReactNode;
+  transferOwnershipContent?: ReactNode;
+  quoteCheckerContent?: ReactNode;
+  costCalculatorContent?: ReactNode;
+  buyingGuideContent?: ReactNode;
   privacyContent: ReactNode;
-  transferOwnershipContent: ReactNode;
   securityContent: ReactNode;
   storyReady: boolean;
   hasIncomingRequest: boolean;
@@ -112,15 +128,16 @@ function ReadyDot() {
 }
 
 export function DashboardShell({
-  bikeName,
-  bikeYear,
+  vehicleKind,
+  vehicleName,
+  vehicleYear,
   currentMileage,
   distanceUnit,
   userEmail,
   isPro,
   proDaysRemaining = null,
-  bikes,
-  activeBikeId,
+  vehicles,
+  activeVehicleId,
   pendingReviewIds,
   hasPendingReceiptRequests,
   dashboardContent,
@@ -188,7 +205,7 @@ export function DashboardShell({
           </div>
 
           <nav className={styles.sidebarNav}>
-            {NAV_ITEMS.map((item) => {
+            {availableFor(vehicleKind, NAV_ITEMS).map((item) => {
               const reviewCategory = asReviewCategory(item.key);
               const hasPending = reviewCategory ? pendingReviewIds[reviewCategory].length > 0 : (item.key === 'shareLinks' && hasPendingReceiptRequests);
               return (
@@ -208,13 +225,18 @@ export function DashboardShell({
             })}
           </nav>
 
-          <BikeSwitcher bikes={bikes} activeBikeId={activeBikeId} distanceUnit={distanceUnit} />
+          <VehicleSwitcher vehicles={vehicles} activeVehicleId={activeVehicleId} distanceUnit={distanceUnit} />
           <div style={{ marginTop: '0.6rem' }}>
-            <UpdateMileageButton currentMileage={currentMileage} distanceUnit={distanceUnit} />
+            <UpdateMileageButton currentMileage={currentMileage} distanceUnit={distanceUnit} vehicleKind={vehicleKind} />
           </div>
-          <div style={{ marginTop: '0.6rem' }}>
-            <RefreshVehicleDataButton bikeId={activeBikeId} />
-          </div>
+          {/* No car equivalent yet (DVLA refresh + MOT import are both
+              bike-only routes today) - hidden rather than wired to an
+              endpoint that would 404 for a car. */}
+          {vehicleKind === 'bike' && (
+            <div style={{ marginTop: '0.6rem' }}>
+              <RefreshVehicleDataButton bikeId={activeVehicleId} />
+            </div>
+          )}
 
           <div className={styles.sidebarUserFooter}>
             <div className={styles.sidebarUserAvatar}>{userEmail.slice(0, 2).toUpperCase()}</div>
@@ -255,12 +277,12 @@ export function DashboardShell({
 
         <div className={styles.mobileTopBar}>
           <div className={styles.mobileTopBarBike}>
-            <strong>{bikeName}</strong>
+            <strong>{vehicleName}</strong>
             <span>
-              {bikeYear ?? 'Custom build'} · {formatDistance(currentMileage, distanceUnit)}
+              {vehicleYear ?? 'Custom build'} · {formatDistance(currentMileage, distanceUnit)}
             </span>
           </div>
-          <UpdateMileageButton currentMileage={currentMileage} distanceUnit={distanceUnit} />
+          <UpdateMileageButton currentMileage={currentMileage} distanceUnit={distanceUnit} vehicleKind={vehicleKind} />
         </div>
 
         <div className={styles.content}>
@@ -332,7 +354,7 @@ export function DashboardShell({
           <>
             <div className={styles.mobileMoreSheetBackdrop} onClick={() => setShowMore(false)} />
             <div className={styles.mobileMoreSheet}>
-              {MORE_ITEMS.map((item) => {
+              {availableFor(vehicleKind, MORE_ITEMS).map((item) => {
                 const reviewCategory = asReviewCategory(item.key);
                 const hasPending = reviewCategory ? pendingReviewIds[reviewCategory].length > 0 : (item.key === 'shareLinks' && hasPendingReceiptRequests);
                 return (
@@ -356,7 +378,7 @@ export function DashboardShell({
                 Signed in as {userEmail}
               </div>
               <div style={{ marginTop: '0.5rem' }}>
-                <Link href="/garage" onClick={() => setShowMore(false)}>Manage bikes →</Link>
+                <Link href="/garage" onClick={() => setShowMore(false)}>Manage vehicles →</Link>
               </div>
               {userEmail === DEMO_EMAIL && (
                 <div style={{ marginTop: '0.5rem' }}>

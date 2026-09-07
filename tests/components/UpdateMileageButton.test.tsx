@@ -30,7 +30,7 @@ describe("UpdateMileageButton", () => {
     expect(screen.getByText("km")).toBeInTheDocument();
   });
 
-  it("blocks and disables saving when the entered value converts to less than the bike's current recorded mileage", async () => {
+  it("blocks and disables saving when the entered value converts to less than the current recorded mileage", async () => {
     const user = userEvent.setup();
     render(<UpdateMileageButton currentMileage={1000} distanceUnit="mi" />);
     await user.click(screen.getByRole("button", { name: "Update mileage" }));
@@ -39,12 +39,12 @@ describe("UpdateMileageButton", () => {
     await user.clear(input);
     await user.type(input, "500");
 
-    expect(screen.getByText(/can't be lower than your bike's current recorded miles/)).toBeInTheDocument();
+    expect(screen.getByText(/can't be lower than the current recorded miles/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Save" })).toBeDisabled();
     expect(fetch).not.toHaveBeenCalled();
   });
 
-  it("saves a valid higher mileage, converting the display value back to miles for the PATCH", async () => {
+  it("saves a valid higher mileage, converting the display value back to miles for the PATCH, defaulting to the bike endpoint", async () => {
     (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({ ok: true, json: async () => ({}) });
     const user = userEvent.setup();
     render(<UpdateMileageButton currentMileage={1000} distanceUnit="mi" />);
@@ -57,6 +57,23 @@ describe("UpdateMileageButton", () => {
 
     expect(fetch).toHaveBeenCalledWith(
       "/api/tracker/bike",
+      expect.objectContaining({ method: "PATCH", body: JSON.stringify({ currentMileage: 1500 }) })
+    );
+  });
+
+  it("PATCHes /api/cars/car instead when vehicleKind is 'car'", async () => {
+    (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({ ok: true, json: async () => ({}) });
+    const user = userEvent.setup();
+    render(<UpdateMileageButton currentMileage={1000} distanceUnit="mi" vehicleKind="car" />);
+    await user.click(screen.getByRole("button", { name: "Update mileage" }));
+
+    const input = screen.getByRole("spinbutton");
+    await user.clear(input);
+    await user.type(input, "1500");
+    await user.click(screen.getByRole("button", { name: "Save" }));
+
+    expect(fetch).toHaveBeenCalledWith(
+      "/api/cars/car",
       expect.objectContaining({ method: "PATCH", body: JSON.stringify({ currentMileage: 1500 }) })
     );
   });

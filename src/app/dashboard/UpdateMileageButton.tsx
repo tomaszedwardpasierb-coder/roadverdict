@@ -6,10 +6,21 @@ import { useTrackerFormSubmit } from './useTrackerFormSubmit';
 import { convertMilesToDisplay, convertDisplayToMiles, distanceUnitLabel, type DistanceUnit } from '@/lib/tracker/unitFormat';
 import styles from './dashboard.module.css';
 
-export function UpdateMileageButton({ currentMileage, distanceUnit }: { currentMileage: number; distanceUnit: DistanceUnit }) {
+export function UpdateMileageButton({
+  currentMileage,
+  distanceUnit,
+  vehicleKind = 'bike',
+}: {
+  currentMileage: number;
+  distanceUnit: DistanceUnit;
+  // '/api/tracker/bike' PATCH and '/api/cars/car' PATCH both resolve the
+  // account's own PRIMARY vehicle of that kind server-side (no id in the
+  // body) - same convention either way, just a different endpoint.
+  vehicleKind?: 'bike' | 'car';
+}) {
   const [editing, setEditing] = useState(false);
   const [value, setValue] = useState(String(Math.round(convertMilesToDisplay(currentMileage, distanceUnit))));
-  const { submit, submitting, error } = useTrackerFormSubmit('/api/tracker/bike');
+  const { submit, submitting, error } = useTrackerFormSubmit(vehicleKind === 'car' ? '/api/cars/car' : '/api/tracker/bike');
 
   const valueInMiles = convertDisplayToMiles(Number(value), distanceUnit);
   const isBlocked = valueInMiles > 0 && valueInMiles < currentMileage;
@@ -42,7 +53,7 @@ export function UpdateMileageButton({ currentMileage, distanceUnit }: { currentM
         </button>
         {isBlocked && (
           <p className="field-note" style={{ borderColor: 'var(--verdict-red)', color: '#7a251b', width: '100%' }}>
-            ⛔ This can&apos;t be lower than your bike&apos;s current recorded {unitLabel} (
+            ⛔ This can&apos;t be lower than the current recorded {unitLabel} (
             {Math.round(convertMilesToDisplay(currentMileage, distanceUnit)).toLocaleString()}).
           </p>
         )}
