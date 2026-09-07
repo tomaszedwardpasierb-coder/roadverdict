@@ -54,7 +54,7 @@ export default async function HomePage() {
         <div className="rv-hero-panels" aria-hidden="true">
           <div className="rv-panel rv-panel-left">
             <Image
-              src="/images/hero/panel-01.png"
+              src="/images/hero/panel-01.webp"
               alt=""
               fill
               style={{ objectFit: 'cover', objectPosition: 'center top' }}
@@ -66,7 +66,7 @@ export default async function HomePage() {
           <div className="rv-panel-right-col">
             <div className="rv-panel rv-panel-rt">
               <Image
-                src="/images/hero/panel-02.png"
+                src="/images/hero/panel-02.webp"
                 alt=""
                 fill
                 style={{ objectFit: 'cover', objectPosition: 'center center' }}
@@ -77,7 +77,7 @@ export default async function HomePage() {
             </div>
             <div className="rv-panel rv-panel-rb">
               <Image
-                src="/images/hero/panel-03.png"
+                src="/images/hero/panel-03.webp"
                 alt=""
                 fill
                 style={{ objectFit: 'cover', objectPosition: 'center top' }}
@@ -222,7 +222,7 @@ export default async function HomePage() {
       <section className="rv-verdict-strip" aria-labelledby="verdict-cta-heading">
         <div className="rv-verdict-panel-img" aria-hidden="true">
           <Image
-            src="/images/hero/panel-04.png"
+            src="/images/hero/panel-04.webp"
             alt=""
             fill
             style={{ objectFit: 'cover', objectPosition: 'center center' }}
