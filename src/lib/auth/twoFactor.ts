@@ -132,6 +132,30 @@ export async function createPendingLogin(email: string): Promise<{ cookieValue: 
   return { cookieValue: `${encodeEmail(email)}.${raw}`, maxAge: Math.ceil(LOGIN_PENDING_TTL_MS / 1000) };
 }
 
+// Read-only - deliberately doesn't delete. Callers must check this
+// BEFORE running a code guess against verifyLoginCode below, never
+// after: the cookie's email is only base64url-obfuscated, not signed
+// (see decodeEmail in crypto.ts), so anyone can construct one naming an
+// arbitrary account. Without this check running first, that would let
+// an attacker submit code guesses against any account's real TOTP
+// secret with no prerequisite at all - no email access, no magic-link
+// click, nothing - because a genuine totpPendingLogin doc (created only
+// by verify/route.ts after it independently confirms a real magic-link
+// click) is the one thing that can't be forged. Checking it first turns
+// "guess a 6-digit code" back into "guess a 6-digit code AND have
+// already completed the first factor," which is the entire point of a
+// second factor.
+export async function isPendingLoginValid(email: string, raw: string): Promise<boolean> {
+  const container = getContainer();
+  const hash = hashToken(raw);
+  try {
+    const { resource } = await container.item(hash, email).read();
+    return !!resource && resource.type === "totpPendingLogin" && new Date(resource.expiresAt) >= new Date();
+  } catch {
+    return false;
+  }
+}
+
 export async function consumePendingLogin(email: string, raw: string): Promise<boolean> {
   const container = getContainer();
   const hash = hashToken(raw);

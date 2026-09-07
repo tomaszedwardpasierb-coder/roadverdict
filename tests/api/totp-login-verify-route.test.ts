@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 
 const mocks = vi.hoisted(() => ({
+  isPendingLoginValid: vi.fn(),
   consumePendingLogin: vi.fn(),
   verifyLoginCode: vi.fn(),
   checkTotpRateLimit: vi.fn(),
@@ -11,6 +12,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("@/lib/auth/twoFactor", () => ({
+  isPendingLoginValid: mocks.isPendingLoginValid,
   consumePendingLogin: mocks.consumePendingLogin,
   verifyLoginCode: mocks.verifyLoginCode,
   checkTotpRateLimit: mocks.checkTotpRateLimit,
@@ -43,6 +45,7 @@ function pendingCookieValue(email = EMAIL, raw = "raw-pending-token") {
 describe("POST /api/auth/totp/login-verify", () => {
   beforeEach(() => {
     Object.values(mocks).forEach((m) => m.mockReset());
+    mocks.isPendingLoginValid.mockResolvedValue(true);
     mocks.checkTotpRateLimit.mockResolvedValue(true);
     mocks.verifyLoginCode.mockResolvedValue(true);
     mocks.consumePendingLogin.mockResolvedValue(true);
@@ -59,6 +62,23 @@ describe("POST /api/auth/totp/login-verify", () => {
     const response = await POST(req({ code: "123456" }, encodeEmail(EMAIL)));
     expect(response.status).toBe(401);
     expect(mocks.verifyLoginCode).not.toHaveBeenCalled();
+  });
+
+  // The security-critical ordering: decodeEmail is plain base64url, not a
+  // signature, so anyone can construct a totp_pending cookie naming any
+  // account. Without a genuine pending-login record (only ever created
+  // by verify/route.ts after a real magic-link click), a code guess must
+  // never even be attempted - otherwise this endpoint becomes a free
+  // "guess this account's TOTP code" oracle with no prerequisite at all.
+  it("never checks the code, the rate limit, or even reads the request body when the pending login itself doesn't validate - a forged cookie for someone else's account must not get a single guess", async () => {
+    mocks.isPendingLoginValid.mockResolvedValue(false);
+    const response = await POST(req({ code: "123456" }, pendingCookieValue("victim@example.com", "forged-token")));
+
+    expect(response.status).toBe(401);
+    expect(mocks.isPendingLoginValid).toHaveBeenCalledWith("victim@example.com", "forged-token");
+    expect(mocks.checkTotpRateLimit).not.toHaveBeenCalled();
+    expect(mocks.verifyLoginCode).not.toHaveBeenCalled();
+    expect(mocks.recordTotpAttempt).not.toHaveBeenCalled();
   });
 
   it("rejects when the rate limit for this account has been hit", async () => {

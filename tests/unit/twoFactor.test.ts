@@ -29,6 +29,7 @@ import {
   confirmEnrollment,
   disableTwoFactor,
   createPendingLogin,
+  isPendingLoginValid,
   consumePendingLogin,
   verifyLoginCode,
   checkTotpRateLimit,
@@ -234,6 +235,38 @@ describe("createPendingLogin / consumePendingLogin", () => {
     expect(await consumePendingLogin(EMAIL, "raw-token")).toBe(true);
     expect(mocks.deleteFn).toHaveBeenCalledOnce();
     expect(mockContainer.item).toHaveBeenCalledWith(hashToken("raw-token"), EMAIL);
+  });
+
+  it("isPendingLoginValid returns false when no doc exists, without deleting anything", async () => {
+    mocks.read.mockResolvedValue({ resource: undefined });
+    expect(await isPendingLoginValid(EMAIL, "raw-token")).toBe(false);
+    expect(mocks.deleteFn).not.toHaveBeenCalled();
+  });
+
+  it("isPendingLoginValid returns false for an expired doc, without deleting it", async () => {
+    mocks.read.mockResolvedValue({ resource: { type: "totpPendingLogin", expiresAt: new Date(Date.now() - 1000).toISOString() } });
+    expect(await isPendingLoginValid(EMAIL, "raw-token")).toBe(false);
+    expect(mocks.deleteFn).not.toHaveBeenCalled();
+  });
+
+  it("isPendingLoginValid returns false for a doc of the wrong type, without deleting it", async () => {
+    mocks.read.mockResolvedValue({ resource: { type: "totpEnrollmentPending", expiresAt: new Date(Date.now() + 60_000).toISOString() } });
+    expect(await isPendingLoginValid(EMAIL, "raw-token")).toBe(false);
+  });
+
+  // The whole point of this being a separate, read-only check: a caller
+  // must be able to confirm a pending login is real BEFORE spending it,
+  // e.g. before running a code guess against it - see login-verify's
+  // own route for why the ordering matters.
+  it("isPendingLoginValid returns true for a valid, unexpired doc WITHOUT deleting it, unlike consumePendingLogin", async () => {
+    mocks.read.mockResolvedValue({ resource: { type: "totpPendingLogin", expiresAt: new Date(Date.now() + 60_000).toISOString() } });
+    expect(await isPendingLoginValid(EMAIL, "raw-token")).toBe(true);
+    expect(mocks.deleteFn).not.toHaveBeenCalled();
+  });
+
+  it("isPendingLoginValid fails soft to false if the read itself throws", async () => {
+    mockContainer.item.mockReturnValueOnce({ read: vi.fn(async () => { throw new Error("cosmos unavailable"); }), delete: mocks.deleteFn });
+    expect(await isPendingLoginValid(EMAIL, "raw-token")).toBe(false);
   });
 });
 

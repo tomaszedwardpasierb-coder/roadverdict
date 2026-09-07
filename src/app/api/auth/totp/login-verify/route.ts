@@ -9,7 +9,7 @@
 // principle as every session check elsewhere in this app.
 import { NextRequest, NextResponse } from "next/server";
 import { decodeEmail } from "@/lib/auth/crypto";
-import { consumePendingLogin, verifyLoginCode, checkTotpRateLimit, recordTotpAttempt } from "@/lib/auth/twoFactor";
+import { isPendingLoginValid, consumePendingLogin, verifyLoginCode, checkTotpRateLimit, recordTotpAttempt } from "@/lib/auth/twoFactor";
 import { createSessionForEmail } from "@/lib/auth/session";
 
 export const dynamic = "force-dynamic";
@@ -30,6 +30,17 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "That link has expired - sign in again." }, { status: 401 });
   }
   const email = decodeEmail(encodedEmail);
+
+  // Checked before anything else, and before any code is even looked
+  // at - decodeEmail is plain base64url, not a signature, so this cookie
+  // could name any account. Without a genuine, unexpired pending-login
+  // record (only ever created by verify/route.ts after it independently
+  // confirms a real magic-link click), there is nothing legitimate to
+  // verify a code against - see isPendingLoginValid's own comment for
+  // why this specifically has to run first, not just eventually.
+  if (!(await isPendingLoginValid(email, rawToken))) {
+    return NextResponse.json({ error: "That link has expired - sign in again." }, { status: 401 });
+  }
 
   const allowed = await checkTotpRateLimit(email, "login");
   if (!allowed) {
