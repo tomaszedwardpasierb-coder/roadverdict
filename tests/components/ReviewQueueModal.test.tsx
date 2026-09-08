@@ -82,8 +82,9 @@ function createFetchMock(opts: {
 
     // The batch-sync effect (fires on every `committed` change) and the
     // "Finish later" cleanup DELETE both hit this same endpoint - neither
-    // is under test here, so it's always a no-op success.
-    if (url === "/api/tracker/pending-scan-batch") {
+    // is under test here, so it's always a no-op success. Matched by
+    // prefix since DELETE calls now carry a ?vehicleKind= query string.
+    if (url.startsWith("/api/tracker/pending-scan-batch")) {
       return jsonRes({});
     }
 
@@ -241,6 +242,31 @@ describe("ReviewQueueModal", () => {
     expect(calls).toEqual([{ category: "other-accessory", name: "Chain lube", cost: 12, mileage: 3000, date: "2024-01-01", notes: "", batchHints: [] }]);
   });
 
+  it("vehicleKind='car': sends vehicleKind in the commit body, and saves against the car routes, not the bike ones", async () => {
+    const item = makeItem({ category: "mods", description: "Dash cam" });
+    const fetchMock = createFetchMock({
+      commitItem: (i) =>
+        i.description === "Dash cam"
+          ? { entry: { id: "car-mod-1", category: "mods", aiDescription: "Dash cam AI", duplicate: null, name: "Dash cam", modCategory: "dash-cam", cost: 90, mileage: 3000, mileageNeedsManualEntry: false, plateMismatch: null, vehicleMismatch: null, date: "2024-01-01", notes: "", attachment: makeAttachment() } }
+          : undefined,
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<ReviewQueueModal parsedItems={[item]} onFinished={vi.fn()} vehicleKind="car" />);
+
+    await screen.findByLabelText("Mileage");
+    const commitCall = fetchCalls(fetchMock).find((call) => call[0] === "/api/tracker/commit-receipt-item");
+    expect(JSON.parse(commitCall![1]!.body as string)).toMatchObject({ vehicleKind: "car" });
+
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "Save and next" }));
+
+    await screen.findByText("All caught up");
+    const calls = patchCallsTo(fetchMock, "/api/cars/car-mods/car-mod-1");
+    expect(calls).toHaveLength(1);
+    expect(fetchCalls(fetchMock).some((call) => call[0] === "/api/tracker/mods/car-mod-1")).toBe(false);
+  });
+
   it("shows the duplicate warning, and deleting the new entry removes it from the batch entirely", async () => {
     const item = makeItem({ category: "service", description: "Second oil change" });
     const fetchMock = createFetchMock({
@@ -370,7 +396,7 @@ describe("ReviewQueueModal", () => {
     await user.click(screen.getByRole("button", { name: "Finish later" }));
 
     await vi.waitFor(() => expect(onFinished).toHaveBeenCalledTimes(1));
-    expect(fetchCalls(fetchMock).some((call) => call[0] === "/api/tracker/pending-scan-batch" && (call[1]?.method ?? "").toUpperCase() === "DELETE")).toBe(true);
+    expect(fetchCalls(fetchMock).some((call) => call[0].startsWith("/api/tracker/pending-scan-batch") && (call[1]?.method ?? "").toUpperCase() === "DELETE")).toBe(true);
   });
 
   it("Finish later: a partial failure keeps only the failed items in the queue and reports exactly how many did and didn't save", async () => {

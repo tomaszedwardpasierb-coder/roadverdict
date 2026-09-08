@@ -21,7 +21,7 @@ interface FileParseOutcome {
   error?: string;
 }
 
-export function ScanReceiptButton({ isPro = false }: { isPro?: boolean }) {
+export function ScanReceiptButton({ isPro = false, vehicleKind = 'bike' }: { isPro?: boolean; vehicleKind?: 'bike' | 'car' }) {
   const router = useRouter();
   const [scanning, setScanning] = useState(false);
   const [progress, setProgress] = useState<{ current: number; total: number } | null>(null);
@@ -30,12 +30,13 @@ export function ScanReceiptButton({ isPro = false }: { isPro?: boolean }) {
   const [pendingBatch, setPendingBatch] = useState<ParsedReceiptItem[] | null>(null);
   const [checkingResume, setCheckingResume] = useState(true);
   const [discarding, setDiscarding] = useState(false);
+  const serverVehicleKind = vehicleKind === 'car' ? 'car' : 'motorcycle';
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch('/api/tracker/pending-scan-batch');
+        const res = await fetch(`/api/tracker/pending-scan-batch?vehicleKind=${serverVehicleKind}`);
         const data = await res.json();
         if (!cancelled && res.ok && data.batch?.items?.length > 0) {
           setPendingBatch(data.batch.items);
@@ -47,12 +48,13 @@ export function ScanReceiptButton({ isPro = false }: { isPro?: boolean }) {
       }
     })();
     return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function handleDiscardPending() {
     setDiscarding(true);
     try {
-      await fetch('/api/tracker/pending-scan-batch', { method: 'DELETE' });
+      await fetch(`/api/tracker/pending-scan-batch?vehicleKind=${serverVehicleKind}`, { method: 'DELETE' });
     } finally {
       setDiscarding(false);
       setPendingBatch(null);
@@ -63,6 +65,7 @@ export function ScanReceiptButton({ isPro = false }: { isPro?: boolean }) {
     try {
       const formData = new FormData();
       formData.append('file', file);
+      formData.append('vehicleKind', serverVehicleKind);
       const res = await fetch('/api/tracker/scan-receipt', { method: 'POST', body: formData });
       const data = await res.json();
       if (!res.ok) {
@@ -111,7 +114,7 @@ export function ScanReceiptButton({ isPro = false }: { isPro?: boolean }) {
         await fetch('/api/tracker/pending-scan-batch', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ items: allItems }),
+          body: JSON.stringify({ items: allItems, vehicleKind: serverVehicleKind }),
         });
       } catch {
         // Not fatal — worst case this scan isn't resumable if they leave mid-review.
@@ -233,13 +236,15 @@ export function ScanReceiptButton({ isPro = false }: { isPro?: boolean }) {
             <p className={styles.scanSkipNote}>
               {totalSkippedBeforeProduction} item{totalSkippedBeforeProduction === 1 ? '' : 's'}{' '}
               {totalSkippedBeforeProduction === 1 ? 'was' : 'were'} dated
-              before your bike was made and {totalSkippedBeforeProduction === 1 ? "wasn't" : "weren't"} logged.
+              before your {vehicleKind === 'car' ? 'car' : 'bike'} was made and {totalSkippedBeforeProduction === 1 ? "wasn't" : "weren't"} logged.
             </p>
           )}
           {totalSkippedNonPetrol > 0 && (
             <p className={styles.scanSkipNote}>
-              {totalSkippedNonPetrol} fuel item{totalSkippedNonPetrol === 1 ? '' : 's'} looked like diesel
-              and {totalSkippedNonPetrol === 1 ? "wasn't" : "weren't"} logged - motorcycles run on petrol.
+              {totalSkippedNonPetrol} fuel item{totalSkippedNonPetrol === 1 ? '' : 's'}{' '}
+              {vehicleKind === 'car'
+                ? `${totalSkippedNonPetrol === 1 ? "wasn't" : "weren't"} a valid fuel type for a car, so ${totalSkippedNonPetrol === 1 ? "it wasn't" : "they weren't"} logged.`
+                : `looked like diesel and ${totalSkippedNonPetrol === 1 ? "wasn't" : "weren't"} logged - motorcycles run on petrol.`}
             </p>
           )}
           {totalSkippedUnreadableLitres > 0 && (
@@ -263,7 +268,7 @@ export function ScanReceiptButton({ isPro = false }: { isPro?: boolean }) {
         </div>
       )}
 
-      {queueItems && <ReviewQueueModal parsedItems={queueItems} onFinished={handleQueueFinished} />}
+      {queueItems && <ReviewQueueModal parsedItems={queueItems} onFinished={handleQueueFinished} vehicleKind={vehicleKind} />}
     </div>
   );
 }

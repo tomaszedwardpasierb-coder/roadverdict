@@ -341,6 +341,26 @@ already-estimated one.
 skip-reason messages (e.g. *"not a valid fuel type for a car"* instead of the motorcycle
 wording).
 
+**Post-launch fix, 8 September 2026 — the client side of this pipeline never actually sent
+`vehicleKind`, so every car account's receipt upload 404'd with "No bike found for this account."**
+The server-side routing above was real and correct; `ScanReceiptButton.tsx` (and everything it
+opens) simply never had a `vehicleKind` prop to send it with — this phase's own text even flagged
+it at the time ("the existing upload UI doesn't send it yet — that's Phase 5"), but Phase 5 never
+actually closed that gap. Fixed by threading a `vehicleKind` prop from `ScanReceiptButton` down
+through the whole review pipeline: `ReviewQueueModal` (commit-receipt-item(s) bodies), its internal
+`QueueItemForm` (per-category PATCH/DELETE — needed a car-route map, since car routes live under
+`/api/cars/car-*` with a `car-` prefix, not just a different base path), and `MileageConflictModal`
+(the `conflict-reference` lookup, reachable from the review queue for either vehicle kind, unlike
+the simplified car history cards which deliberately omit this modal per the ADR). Two previously
+bike-only server routes gained the same `vehicleKind` resolution as the routes above:
+`pending-scan-batch/route.ts` (the resumable-batch GET/POST/DELETE) and `conflict-reference/route.ts`
+(also fixed a latent crash risk — car fuel logs can lack `litres` entirely for EV entries, unlike
+`FuelLogDoc.litres`, which is never optional). Also fixed two copy leaks in `ScanReceiptButton.tsx`
+found while touching this file: a hardcoded "motorcycles run on petrol" skip-reason message and a
+"before your bike was made" message, both now vehicle-kind-aware. Verified with a clean
+`tsc --noEmit`, a green full suite (2,974 unit/API, up from 2,966; 791 component, up from 785), and
+a production build against a freshly-deleted local database.
+
 ### Phase 4 — Public marketing namespace — ✅ DONE, built 7 September 2026
 
 ```
@@ -809,7 +829,7 @@ a green component suite (765, up from 750).
 | 0 | Homepage copy corrected — no longer claims car support until it's real | None |
 | 1 | ✅ Done — VDG classifier verified against a real car plate and a real motorcycle plate | None |
 | 2 | ✅ Done — new doc types, CRUD, job/mod/bill catalogs, car assistant config schema; 121 new unit tests, full suite green (2,564), build unchanged | None |
-| 3 | ✅ Done — receipt scanner is vehicle-kind-aware; diesel not dropped for car accounts (EV/kWh receipts deferred); `commitCarReceiptItem.ts` + `reestimateCarFuelMileage.ts` new; 39 new tests, full suite green (2,603), build unchanged | Motorcycle scanning unchanged |
+| 3 | ✅ Done — receipt scanner is vehicle-kind-aware; diesel not dropped for car accounts (EV/kWh receipts deferred); `commitCarReceiptItem.ts` + `reestimateCarFuelMileage.ts` new; 39 new tests, full suite green (2,603), build unchanged. **Post-launch fix, 2026-09-08:** the server-side routing was correct but the client (`ScanReceiptButton`/`ReviewQueueModal`/`MileageConflictModal`) never actually sent `vehicleKind`, so every car upload 404'd with a bike-only error — now threaded through the whole pipeline | Motorcycle scanning unchanged |
 | 4 | ✅ Done — `/cars` marketing landing page (no tool sub-pages yet, deferred to Phase 7); cross-product signpost both ways (motorcycle plate-lookup rejection → `/cars`, homepage → `/cars`, `/cars` → homepage); own JSON-LD + sitemap entry; 9 new/changed component tests (`CarsPage.test.tsx` new) + 1 new Playwright smoke test | Motorcycle dashboard unchanged; homepage gains one new secondary CTA link |
 | 5 | ✅ Done — full `/api/cars/*` route layer (14 routes); `carReminder.ts`, `activeVehicle.ts` kind-resolution, `carSummary.ts`, `carReminderStatus.ts`; `VehicleSwitcher` (replaces `BikeSwitcher`); `DashboardShell` vehicle-kind-aware; `AddCarForm` + 4 `LogCar*Form`s; 5 simplified car history/reminder cards; `dashboard/page.tsx` genuinely branches and renders a working car dashboard (Dashboard/Service/Fuel/Parts/Bills/Reminders/Privacy/Security - Reports and the 3 embedded tools deferred, no car price data yet); 196 new tests, full suite green (2,791 unit/API, 750 component). **Post-launch fix, 2026-09-08:** the Dashboard tab's stat cards/budget/spend chart/mileage chart/range filters were a real gap, not a deliberate cut — now wired up, reusing the already-generic shared components (`DashboardStatCards`, `SpendDonutChart`, `MileageChart`, `ChartFilterBar`), plus a new `CarDoc.fuelEconomyUnit` field | Motorcycle dashboard unchanged (confirmed: same route list, same bundle size for every other route, same component behaviour for a bike-only account) |
 | 6 | ✅ Done — one assistant, now vehicle-kind-aware; 7 of 10 tools fully car-aware (getShareLinks/getStorySoFar/proposeLogEntry stay bike-only, fail soft with an honest "not available" result); car knowledge base injected via `buildSystemInstruction()`, never falling back to the motorcycle one; `/tomasz` gets a second, clearly-labeled KB editor sharing one generic component | Motorcycle assistant behaviour unchanged when a bike is active |

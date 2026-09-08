@@ -8,7 +8,15 @@ import type { Attachment } from '@/lib/tracker/cosmosHelpers';
 import styles from './dashboard.module.css';
 
 const CATEGORY_ROUTE: Record<string, string> = { service: 'services', fuel: 'fuel', mods: 'mods', mot: 'bills' };
+// Car equivalents live under /api/cars/, not /api/tracker/, and use a
+// car- prefixed route name too - both differ from the bike mapping
+// above, not just the base path.
+const CATEGORY_ROUTE_CAR: Record<string, string> = { service: 'car-services', fuel: 'car-fuel', mods: 'car-mods', mot: 'car-bills' };
 const CATEGORY_LABEL: Record<string, string> = { service: 'Service', fuel: 'Fuel', mods: 'Parts & Accessories', mot: 'MOT test' };
+
+function categoryRouteBase(category: string, vehicleKind: 'bike' | 'car'): string {
+  return vehicleKind === 'car' ? `/api/cars/${CATEGORY_ROUTE_CAR[category]}` : `/api/tracker/${CATEGORY_ROUTE[category]}`;
+}
 
 interface ReferenceEntry {
   id: string;
@@ -58,6 +66,7 @@ interface Props {
   buildPatchBody: (overrides: { mileage?: number; date?: string; mileageAnomaly?: boolean; mileageAcknowledged?: boolean }) => Record<string, unknown>;
   onResolved: () => void;
   onClose: () => void;
+  vehicleKind?: 'bike' | 'car';
 }
 
 export function MileageConflictModal({
@@ -76,7 +85,9 @@ export function MileageConflictModal({
   buildPatchBody,
   onResolved,
   onClose,
+  vehicleKind = 'bike',
 }: Props) {
+  const serverVehicleKind = vehicleKind === 'car' ? 'car' : 'motorcycle';
   const [reference, setReference] = useState<ReferenceEntry | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -103,7 +114,7 @@ export function MileageConflictModal({
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch(`/api/tracker/conflict-reference?category=${referenceCategory}&id=${encodeURIComponent(referenceId)}`);
+        const res = await fetch(`/api/tracker/conflict-reference?category=${referenceCategory}&id=${encodeURIComponent(referenceId)}&vehicleKind=${serverVehicleKind}`);
         const data = await res.json();
         if (cancelled) return;
         if (res.ok) {
@@ -122,10 +133,10 @@ export function MileageConflictModal({
     return () => {
       cancelled = true;
     };
-  }, [preloadedReference, referenceId, referenceCategory]);
+  }, [preloadedReference, referenceId, referenceCategory, serverVehicleKind]);
 
   async function patchThisEntry(overrides: { mileage?: number; date?: string; mileageAnomaly?: boolean; mileageAcknowledged?: boolean }): Promise<boolean> {
-    const res = await fetch(`/api/tracker/${CATEGORY_ROUTE[entryCategory]}/${encodeURIComponent(entryId)}`, {
+    const res = await fetch(`${categoryRouteBase(entryCategory, vehicleKind)}/${encodeURIComponent(entryId)}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(buildPatchBody(overrides)),
@@ -144,7 +155,7 @@ export function MileageConflictModal({
     else if (ref.category === 'fuel') body = { litres: ref.litres, cost: ref.cost, mileage, date, filledToFull: ref.filledToFull, mileageAcknowledged: true };
     else if (ref.category === 'mot') body = { billType: ref.billType, cost: ref.cost, mileage, date, notes: ref.notes };
     else body = { category: ref.modCategory, name: ref.name, cost: ref.cost, mileage, date, notes: ref.notes, mileageAcknowledged: true };
-    const res = await fetch(`/api/tracker/${CATEGORY_ROUTE[ref.category]}/${encodeURIComponent(ref.id)}`, {
+    const res = await fetch(`${categoryRouteBase(ref.category, vehicleKind)}/${encodeURIComponent(ref.id)}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
@@ -153,7 +164,7 @@ export function MileageConflictModal({
   }
 
   async function deleteEntry(category: string, id: string): Promise<boolean> {
-    const res = await fetch(`/api/tracker/${CATEGORY_ROUTE[category]}/${encodeURIComponent(id)}`, { method: 'DELETE' });
+    const res = await fetch(`${categoryRouteBase(category, vehicleKind)}/${encodeURIComponent(id)}`, { method: 'DELETE' });
     return res.ok;
   }
 

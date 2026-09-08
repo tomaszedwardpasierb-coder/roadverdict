@@ -20,6 +20,20 @@ const CATEGORY_ROUTE: Record<ReviewQueueEntry['category'], string> = {
   bills: 'bills',
 };
 
+// Car equivalents live under /api/cars/, not /api/tracker/, and use a
+// car- prefixed route name too - both differ from the bike mapping
+// above, not just the base path.
+const CATEGORY_ROUTE_CAR: Record<ReviewQueueEntry['category'], string> = {
+  service: 'car-services',
+  fuel: 'car-fuel',
+  mods: 'car-mods',
+  bills: 'car-bills',
+};
+
+function entryRouteBase(category: ReviewQueueEntry['category'], vehicleKind: 'bike' | 'car'): string {
+  return vehicleKind === 'car' ? `/api/cars/${CATEGORY_ROUTE_CAR[category]}` : `/api/tracker/${CATEGORY_ROUTE[category]}`;
+}
+
 const CATEGORY_LABEL: Record<ReviewQueueEntry['category'], string> = {
   service: 'Service',
   fuel: 'Fuel',
@@ -27,9 +41,13 @@ const CATEGORY_LABEL: Record<ReviewQueueEntry['category'], string> = {
   bills: 'Insurance, Tax, MOT & Finance',
 };
 
-async function patchEntry(entry: ReviewQueueEntry, body: Record<string, unknown>): Promise<{ ok: boolean; error?: string }> {
+async function patchEntry(
+  entry: ReviewQueueEntry,
+  body: Record<string, unknown>,
+  vehicleKind: 'bike' | 'car'
+): Promise<{ ok: boolean; error?: string }> {
   try {
-    const res = await fetch(`/api/tracker/${CATEGORY_ROUTE[entry.category]}/${encodeURIComponent(entry.id)}`, {
+    const res = await fetch(`${entryRouteBase(entry.category, vehicleKind)}/${encodeURIComponent(entry.id)}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
@@ -42,9 +60,9 @@ async function patchEntry(entry: ReviewQueueEntry, body: Record<string, unknown>
   }
 }
 
-async function deleteEntry(entry: ReviewQueueEntry): Promise<boolean> {
+async function deleteEntry(entry: ReviewQueueEntry, vehicleKind: 'bike' | 'car'): Promise<boolean> {
   try {
-    const res = await fetch(`/api/tracker/${CATEGORY_ROUTE[entry.category]}/${encodeURIComponent(entry.id)}`, { method: 'DELETE' });
+    const res = await fetch(`${entryRouteBase(entry.category, vehicleKind)}/${encodeURIComponent(entry.id)}`, { method: 'DELETE' });
     return res.ok;
   } catch {
     return false;
@@ -69,6 +87,7 @@ function QueueItemForm({
   conflictPeer,
   onCorrectPeer,
   onDeletePeer,
+  vehicleKind,
 }: {
   entry: ReviewQueueEntry;
   batchHints: { date: string; mileage: number }[];
@@ -83,6 +102,7 @@ function QueueItemForm({
   conflictPeer: ParsedReceiptItem | null;
   onCorrectPeer: (newMileage: number, newDate: string) => void;
   onDeletePeer: () => void;
+  vehicleKind: 'bike' | 'car';
 }) {
   const [submitting, setSubmitting] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -143,7 +163,7 @@ function QueueItemForm({
       savedFields = { billType, cost: Number(cost), date, notes };
     }
 
-    const result = await patchEntry(entry, body);
+    const result = await patchEntry(entry, body, vehicleKind);
     setSubmitting(false);
     if (result.ok) onSaved(savedFields);
     else setError(result.error ?? 'Could not save. Try again.');
@@ -152,7 +172,7 @@ function QueueItemForm({
   async function handleDelete() {
     setDeleting(true);
     setError(null);
-    const ok = await deleteEntry(entry);
+    const ok = await deleteEntry(entry, vehicleKind);
     setDeleting(false);
     if (ok) onDeleteDuplicate();
     else setError('Could not delete. Try again.');
@@ -346,6 +366,7 @@ function QueueItemForm({
         ((entry.mileageConflictReferenceId && entry.mileageConflictReferenceCategory) ||
           (entry.mileageConflictReferenceBatchIndex !== undefined && conflictPeer)) && (
         <MileageConflictModal
+          vehicleKind={vehicleKind}
           entryId={entry.id}
           entryCategory={entry.category as "service" | "fuel" | "mods"}
           entryDate={date}
@@ -438,7 +459,7 @@ function isDirty(entry: ReviewQueueEntry, original: ParsedReceiptItem): boolean 
 // opposite of what auto-commit is for. This re-saves the entry with its
 // own already-confirmed values, unchanged, purely to trigger that flag
 // clearing server-side.
-async function markEntryReviewed(entry: ReviewQueueEntry): Promise<void> {
+async function markEntryReviewed(entry: ReviewQueueEntry, vehicleKind: 'bike' | 'car'): Promise<void> {
   let body: Record<string, unknown>;
   if (entry.category === 'service') {
     body = { jobType: entry.jobType, cost: entry.cost, mileage: entry.mileage, date: entry.date, notes: entry.notes, mileageAcknowledged: true };
@@ -450,7 +471,7 @@ async function markEntryReviewed(entry: ReviewQueueEntry): Promise<void> {
     body = { billType: entry.billType, cost: entry.cost, date: entry.date, notes: entry.notes };
   }
   try {
-    await fetch(`/api/tracker/${CATEGORY_ROUTE[entry.category]}/${encodeURIComponent(entry.id)}`, {
+    await fetch(`${entryRouteBase(entry.category, vehicleKind)}/${encodeURIComponent(entry.id)}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
@@ -478,7 +499,16 @@ function findPrevInteractiveIndex(items: ParsedReceiptItem[], committed: (Review
   return 0;
 }
 
-export function ReviewQueueModal({ parsedItems, onFinished }: { parsedItems: ParsedReceiptItem[]; onFinished: () => void }) {
+export function ReviewQueueModal({
+  parsedItems,
+  onFinished,
+  vehicleKind = 'bike',
+}: {
+  parsedItems: ParsedReceiptItem[];
+  onFinished: () => void;
+  vehicleKind?: 'bike' | 'car';
+}) {
+  const serverVehicleKind = vehicleKind === 'car' ? 'car' : 'motorcycle';
   const [items, setItems] = useState(() =>
     // Re-sorts with the exact same tier-then-date rule ScanReceiptButton.tsx
     // already applied before handing this batch over - not a second,
@@ -568,7 +598,7 @@ export function ReviewQueueModal({ parsedItems, onFinished }: { parsedItems: Par
         const res = await fetch('/api/tracker/commit-receipt-item', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ item: items[index], batchHints, boundsOnlyHints }),
+          body: JSON.stringify({ item: items[index], batchHints, boundsOnlyHints, vehicleKind: serverVehicleKind }),
         });
         const data = await res.json();
         if (cancelled) return;
@@ -585,7 +615,7 @@ export function ReviewQueueModal({ parsedItems, onFinished }: { parsedItems: Par
           // that was never actually in question.
           const tier = classifyReceiptTier(items[index]);
           if (isAutoCommitTier(tier) && !isDirty(data.entry, items[index])) {
-            void markEntryReviewed(data.entry);
+            void markEntryReviewed(data.entry, vehicleKind);
             setIndex((i) => i + 1);
           }
         } else {
@@ -625,7 +655,7 @@ export function ReviewQueueModal({ parsedItems, onFinished }: { parsedItems: Par
     void fetch('/api/tracker/pending-scan-batch', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ items: remaining }),
+      body: JSON.stringify({ items: remaining, vehicleKind: serverVehicleKind }),
     }).catch(() => {
       // Not fatal - the actual records are already safely committed
       // either way, this only affects whether an interrupted resume
@@ -734,7 +764,7 @@ export function ReviewQueueModal({ parsedItems, onFinished }: { parsedItems: Par
   async function handleFinishLater() {
     const remaining = items.filter((_, i) => committed[i] === null);
     if (remaining.length === 0) {
-      await fetch('/api/tracker/pending-scan-batch', { method: 'DELETE' }).catch(() => {});
+      await fetch(`/api/tracker/pending-scan-batch?vehicleKind=${serverVehicleKind}`, { method: 'DELETE' }).catch(() => {});
       onFinished();
       return;
     }
@@ -746,7 +776,7 @@ export function ReviewQueueModal({ parsedItems, onFinished }: { parsedItems: Par
       res = await fetch('/api/tracker/commit-receipt-items', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ items: remaining }),
+        body: JSON.stringify({ items: remaining, vehicleKind: serverVehicleKind }),
       });
     } catch {
       // A genuine network failure - nothing was sent, nothing was saved.
@@ -789,7 +819,7 @@ export function ReviewQueueModal({ parsedItems, onFinished }: { parsedItems: Par
       await fetch('/api/tracker/pending-scan-batch', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ items: stillOutstanding }),
+        body: JSON.stringify({ items: stillOutstanding, vehicleKind: serverVehicleKind }),
       }).catch(() => {
         // Not fatal - the records that DID save are safely saved either
         // way. Worst case here is the resumable batch going briefly out
@@ -808,7 +838,7 @@ export function ReviewQueueModal({ parsedItems, onFinished }: { parsedItems: Par
 
     // Full success - only now is it actually safe to clear the
     // resumable batch and close.
-    await fetch('/api/tracker/pending-scan-batch', { method: 'DELETE' }).catch(() => {});
+    await fetch(`/api/tracker/pending-scan-batch?vehicleKind=${serverVehicleKind}`, { method: 'DELETE' }).catch(() => {});
     setFinishing(false);
     onFinished();
   }
@@ -926,6 +956,7 @@ export function ReviewQueueModal({ parsedItems, onFinished }: { parsedItems: Par
           <QueueItemForm
             key={current.id}
             entry={current}
+            vehicleKind={vehicleKind}
             mileageOptional={currentTier === 2}
             conflictPeer={current.category !== "bills" && current.mileageConflictReferenceBatchIndex !== undefined ? items[current.mileageConflictReferenceBatchIndex] ?? null : null}
             onCorrectPeer={(newMileage, newDate) => {

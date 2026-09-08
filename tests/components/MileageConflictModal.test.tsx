@@ -97,13 +97,31 @@ describe("MileageConflictModal", () => {
     (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce(jsonOk(conflictingReference));
     renderModal({ referenceId: "ref-1", referenceCategory: "fuel" });
 
-    expect(fetch).toHaveBeenCalledWith("/api/tracker/conflict-reference?category=fuel&id=ref-1");
+    expect(fetch).toHaveBeenCalledWith("/api/tracker/conflict-reference?category=fuel&id=ref-1&vehicleKind=motorcycle");
     expect(await screen.findByText("Mileage conflict")).toBeInTheDocument();
     // Entry is dated 2025-02-01 (later); reference is dated 2025-01-01 (earlier).
     expect(screen.getByText("LATER · This entry")).toBeInTheDocument();
     expect(screen.getByText("EARLIER · Fuel")).toBeInTheDocument();
     expect(screen.getByText("5,000 mi")).toBeInTheDocument();
     expect(screen.getByText("6,000 mi")).toBeInTheDocument();
+  });
+
+  it("looks up the reference and PATCHes against the car routes, not the bike ones, when vehicleKind='car'", async () => {
+    (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce(jsonOk(conflictingReference)).mockResolvedValueOnce(jsonOk({}));
+    const user = userEvent.setup();
+    renderModal({ referenceId: "ref-1", referenceCategory: "fuel", vehicleKind: "car" });
+
+    expect(await screen.findByText("Mileage conflict")).toBeInTheDocument();
+    expect(fetch).toHaveBeenCalledWith("/api/tracker/conflict-reference?category=fuel&id=ref-1&vehicleKind=car");
+
+    await user.click(screen.getByRole("button", { name: /Keep both as they are/ }));
+
+    await waitFor(() =>
+      expect(fetch).toHaveBeenLastCalledWith(
+        "/api/cars/car-services/entry-1",
+        expect.objectContaining({ method: "PATCH" })
+      )
+    );
   });
 
   it("uses a pre-loaded batch-peer reference with no network fetch at all", async () => {

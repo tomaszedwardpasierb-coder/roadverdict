@@ -926,7 +926,7 @@ async function renderCarDashboard(email: string, car: CarDoc, allCars: CarDoc[],
         {mileagePill}
       </div>
       <p className={styles.subtext} style={{ marginBottom: "1rem" }}>Here&apos;s how your car looks today.</p>
-      <ScanReceiptButton isPro={userIsPro} />
+      <ScanReceiptButton isPro={userIsPro} vehicleKind="car" />
       <ChartFilterBar />
       <div style={{ marginBottom: "1rem" }}>
         <UnitSettings distanceUnit={distanceUnit} fuelEconomyUnit={fuelEconomyUnit} currency={currency} vehicleKind="car" />

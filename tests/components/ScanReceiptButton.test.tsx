@@ -57,13 +57,17 @@ function makeFetch(opts: {
   let scanCallIndex = 0;
   return vi.fn(async (url: string, init?: RequestInit) => {
     const method = init?.method ?? "GET";
-    if (url === "/api/tracker/pending-scan-batch" && method === "GET") {
+    // vehicleKind is now sent as a ?vehicleKind= query param, not the
+    // bare pathname - match on the pathname prefix rather than an exact
+    // string, same as production code doesn't care what else is on the
+    // URL beyond that param.
+    if (url.startsWith("/api/tracker/pending-scan-batch") && method === "GET") {
       return { ok: true, json: async () => ({ batch: opts.pendingBatchGet?.batch ?? null }) };
     }
-    if (url === "/api/tracker/pending-scan-batch" && method === "DELETE") {
+    if (url.startsWith("/api/tracker/pending-scan-batch") && method === "DELETE") {
       return { ok: true, json: async () => ({}) };
     }
-    if (url === "/api/tracker/pending-scan-batch" && method === "POST") {
+    if (url.startsWith("/api/tracker/pending-scan-batch") && method === "POST") {
       return { ok: true, json: async () => ({}) };
     }
     if (url === "/api/tracker/scan-receipt" && method === "POST") {
@@ -104,7 +108,7 @@ describe("ScanReceiptButton", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     render(<ScanReceiptButton />);
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith("/api/tracker/pending-scan-batch"));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith("/api/tracker/pending-scan-batch?vehicleKind=motorcycle"));
     expect(screen.queryByText(/waiting to be reviewed/)).not.toBeInTheDocument();
   });
 
@@ -146,7 +150,10 @@ describe("ScanReceiptButton", () => {
     await user.click(screen.getByRole("button", { name: "Discard" }));
 
     await waitFor(() =>
-      expect(fetchMock).toHaveBeenCalledWith("/api/tracker/pending-scan-batch", expect.objectContaining({ method: "DELETE" }))
+      expect(fetchMock).toHaveBeenCalledWith(
+        "/api/tracker/pending-scan-batch?vehicleKind=motorcycle",
+        expect.objectContaining({ method: "DELETE" })
+      )
     );
     await waitFor(() => expect(screen.queryByText(/waiting to be reviewed/)).not.toBeInTheDocument());
   });
@@ -187,6 +194,44 @@ describe("ScanReceiptButton", () => {
     expect(scanCall![1]!.method).toBe("POST");
     expect(scanCall![1]!.body).toBeInstanceOf(FormData);
     expect((scanCall![1]!.body as FormData).get("file")).toBeInstanceOf(File);
+    // Defaults to 'motorcycle' when no vehicleKind prop is given - every
+    // existing bike call site keeps sending exactly this.
+    expect((scanCall![1]!.body as FormData).get("vehicleKind")).toBe("motorcycle");
+  });
+
+  it("sends vehicleKind=car in the upload FormData and the pending-batch query string when vehicleKind='car'", async () => {
+    const fetchMock = makeFetch({
+      pendingBatchGet: { batch: null },
+      scanReceipt: () => ({ ok: true, json: async () => ({ items: [makeItem()] }) }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const user = userEvent.setup();
+    render(<ScanReceiptButton isPro={true} vehicleKind="car" />);
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith("/api/tracker/pending-scan-batch?vehicleKind=car"));
+
+    await user.upload(fileInput(), jpgFile("receipt1.jpg"));
+    await screen.findByText("✓ Read 1 receipt successfully.");
+
+    const scanCall = fetchMock.mock.calls.find((c) => c[0] === "/api/tracker/scan-receipt");
+    expect((scanCall![1]!.body as FormData).get("vehicleKind")).toBe("car");
+  });
+
+  it("shows the car-specific skip reason, not the motorcycle one, when vehicleKind='car'", async () => {
+    const fetchMock = makeFetch({
+      scanReceipt: () => ({
+        ok: true,
+        json: async () => ({ items: [], skippedNonPetrol: 1 }),
+      }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const user = userEvent.setup();
+    render(<ScanReceiptButton vehicleKind="car" />);
+    await user.upload(fileInput(), jpgFile("adblue.jpg"));
+
+    expect(await screen.findByText(/wasn't a valid fuel type for a car/)).toBeInTheDocument();
+    expect(screen.queryByText(/motorcycles run on petrol/)).not.toBeInTheDocument();
   });
 
   it("a per-file server error is shown against that file's own name, without blocking the others", async () => {
@@ -210,7 +255,7 @@ describe("ScanReceiptButton", () => {
   it("a network failure while scanning a file shows the connection-error message for that file", async () => {
     const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
       const method = init?.method ?? "GET";
-      if (url === "/api/tracker/pending-scan-batch" && method === "GET") {
+      if (url.startsWith("/api/tracker/pending-scan-batch") && method === "GET") {
         return { ok: true, json: async () => ({ batch: null }) };
       }
       if (url === "/api/tracker/scan-receipt") {
@@ -279,7 +324,7 @@ describe("ScanReceiptButton", () => {
     await screen.findByText("✓ Read 2 receipts successfully.");
 
     const postBatchCall = fetchMock.mock.calls.find(
-      (c) => c[0] === "/api/tracker/pending-scan-batch" && c[1]?.method === "POST"
+      (c) => typeof c[0] === "string" && c[0].startsWith("/api/tracker/pending-scan-batch") && c[1]?.method === "POST"
     );
     expect(postBatchCall).toBeTruthy();
     const body = JSON.parse(postBatchCall![1]!.body as string);
@@ -313,7 +358,9 @@ describe("ScanReceiptButton", () => {
       expect(fetchMock.mock.calls.some((c) => c[0] === "/api/tracker/scan-receipt")).toBe(true)
     );
     expect(
-      fetchMock.mock.calls.some((c) => c[0] === "/api/tracker/pending-scan-batch" && c[1]?.method === "POST")
+      fetchMock.mock.calls.some(
+        (c) => typeof c[0] === "string" && c[0].startsWith("/api/tracker/pending-scan-batch") && c[1]?.method === "POST"
+      )
     ).toBe(false);
     expect(screen.queryByText(/Reviewing 1 of/)).not.toBeInTheDocument();
   });
