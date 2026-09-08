@@ -179,6 +179,33 @@ of you is wrong.
 
 Each entry: what it is, why you'd want it, how to do it, and its current status.
 
+### 6.0 Dashboard layout: how the tabs are organized
+**What:** The dashboard's tabs are grouped into four collapsible categories, plus a few
+standalone items that don't belong to any group:
+- **Logbook** - Service, Fuel, Parts & Accessories, Insurance, Tax, MOT & Finance, and Labour.
+  Anything you'd log after a workshop visit, a fill-up, or a bill lives here. Open by default,
+  since it's what most people use most often.
+- **Insights** - Reports and The Story So Far. The "how's my bike doing, and what's its
+  documented history" tabs, built from everything logged in Logbook - not a place you log
+  anything new yourself.
+- **Selling** - Shareable Links and Transfer ownership. The tabs you'd only reach for when
+  you're actually selling the bike or handing it to a new owner.
+- **Buying Tools** - Quote Checker, Cost Calculator, and Buying a used bike. These don't need
+  your own bike logged at all - they're useful even before you own one, or for sizing up a bike
+  you're thinking of buying.
+- **Standalone**, not inside any group - Dashboard (the overview), Reminders, Security, and
+  Privacy.
+**Why:** With well over a dozen tabs, a flat list got cluttered fast, especially on mobile.
+Grouping by how often and why someone reaches for a tab - log something today, versus check the
+bigger picture, versus only-when-selling, versus tools useful before you even own the bike -
+keeps the handful almost everyone uses front and center, without hiding the rest.
+**How:** On desktop, each group is a collapsible section in the sidebar - click the group name
+to expand or collapse it; Logbook starts expanded, the other three start collapsed. On mobile,
+Logbook/Insights/Selling each get their own icon in the bottom bar (tapping one opens a small
+list of just that group's tabs); Buying Tools lives inside the "More" (⋯) button along with
+Reminders, Security, and Privacy.
+**Status:** Live.
+
 ### 6.1 Adding your bike
 **What:** Tell RoadVerdict the bike's registration and basic details when you first sign up.
 **Why:** This is what lets everything else work automatically - RoadVerdict looks up the
@@ -217,8 +244,8 @@ guarantee every field is read perfectly. Nothing is saved until you review and c
 the cost.
 **Why:** This is the backbone of your bike's documented history - regular, dated service records
 are exactly what a buyer looks for and exactly what's hardest to fake convincingly.
-**How:** Service tab → scan a receipt, or fill in the form directly (job type, date, mileage,
-cost) → Log it.
+**How:** Logbook → Service tab → scan a receipt, or fill in the form directly (job type, date,
+mileage, cost) → Log it.
 **Status:** Live.
 
 ### 6.4 Logging a fuel fill-up
@@ -226,7 +253,7 @@ cost) → Log it.
 **Why:** Two reasons: it builds your running-cost picture, and once you've logged a couple of
 consecutive full tanks, RoadVerdict works out your bike's *actual* fuel economy - not the
 manufacturer's lab figure, your real-world number, on your real roads.
-**How:** Fuel tab → scan a receipt, or fill in the form directly → Log it.
+**How:** Logbook → Fuel tab → scan a receipt, or fill in the form directly → Log it.
 **Status:** Live.
 **Limits:** You need at least two consecutive full-tank fill-ups logged before an actual MPG
 figure appears - a single fill-up isn't enough data to calculate it from.
@@ -236,27 +263,42 @@ figure appears - a single fill-up isn't enough data to calculate it from.
 crash protection, cosmetic parts, anything.
 **Why:** Upgrades and replacements add real value and real cost - logging them means that value
 is documented, not just something you remember telling a buyer about verbally.
-**How:** Parts & Accessories tab → scan a receipt, or fill in the form directly → Log it.
+**How:** Logbook → Parts & Accessories tab → scan a receipt, or fill in the form directly → Log
+it.
 **Status:** Live.
 
-### 6.6 Logging insurance, tax, or an MOT
-**What:** Record insurance payments, road tax, and MOT test results and costs.
+### 6.6 Logging insurance, tax, MOT, or finance
+**What:** Record insurance payments, road tax, MOT test results and costs, and any finance
+payments on the bike.
 **Why:** This is the paperwork people are most likely to lose track of - and the paperwork a
 buyer most wants confirmed. Having it logged with dates means nothing catches you out later.
-**How:** Insurance, tax & MOT tab → scan a receipt, or fill in the form directly → Log it.
+**How:** Logbook → Insurance, Tax, MOT & Finance tab → scan a receipt, or fill in the form
+directly → Log it.
+**Status:** Live.
+
+### 6.6a Logging labour or workshop time
+**What:** Record workshop labour or diagnostic time billed on its own - separate from a
+specific part or consumable - e.g. "2 hours labour," a diagnostic fee, or a job described only
+as time rather than a named part.
+**Why:** A real invoice often splits a named part (that's Service, section 6.3) from the
+labour charged to fit or investigate it - logging labour on its own keeps your spend breakdown
+matching what you were actually charged for, not just the parts.
+**How:** Logbook → Labour tab → scan a receipt (RoadVerdict recognises a pure labour or
+diagnostic line item on a scanned invoice automatically, separately from a named part), or fill
+in the form directly (job type, date, mileage, cost) → Log it.
 **Status:** Live.
 
 ### 6.7 Checking how much you've spent
 **What:** See your total spend, or spend broken down by category (servicing, fuel, parts,
-insurance/tax/MOT), over any time range.
+insurance/tax/MOT/finance, labour), over any time range.
 **Why:** Most owners genuinely don't know what their bike costs them a year - this turns a vague
 sense of "it's not cheap" into an actual number, and shows exactly where the money's going.
 **How:** The Dashboard shows total spend and a "Spend by category" breakdown at a glance. The
-Reports tab has the same breakdown in more depth, with a time-range filter (last week, last
-month, last 6 months, last year, year-to-date, or everything). For a specific category - "how
-much have I spent on tyres," for example - check the category spend chart in Reports, or the
-relevant tab's history list (parts and services both show cost per item, so you can see exactly
-which entries add up to that total).
+Reports tab (inside the Insights group) has the same breakdown in more depth, with a time-range
+filter (last week, last month, last 6 months, last year, year-to-date, or everything). For a
+specific category - "how much have I spent on tyres," for example - check the category spend
+chart in Reports, or the relevant Logbook tab's history list (parts and services both show cost
+per item, so you can see exactly which entries add up to that total).
 **Status:** Live.
 **[VERIFY]** Whether tyres specifically are logged under Service or under Parts & Accessories -
 this can vary by how the user chooses to log it, so the safe general answer above (check the
@@ -269,8 +311,9 @@ and engine size, and get a Fair / High / Second Opinion result.
 **Why:** Getting quoted a price with no way to sanity-check it is exactly how people end up
 overpaying, or worse, walking away from work their bike actually needed because they suspected
 (wrongly) that they were being overcharged. This gives an honest reference point either way.
-**How:** Available two ways - as a standalone Quote Checker anyone can use without an account,
-or automatically whenever you log a service in the tracker.
+**How:** Available three ways - as a standalone Quote Checker on the RoadVerdict site (no
+account needed), from the Buying Tools group in your dashboard once signed in, or automatically
+whenever you log a service in the tracker.
 **Status:** Live.
 **Limits:** This is a benchmark against typical prices, not a professional inspection, and not
 a verdict on the workshop or the job - it's guidance, and it's always fine to disagree with it.
@@ -307,7 +350,7 @@ tab individually.
 and spend by category, each filterable by date range or by mileage.
 **Why:** For anyone who wants to see trends, not just totals - is fuel economy getting worse
 as the bike ages, is spend trending up, when were the expensive months.
-**How:** Reports tab.
+**How:** Reports tab, inside the Insights group.
 **Status:** Live.
 
 ### 6.13 The Story So Far
@@ -317,8 +360,8 @@ logged - how long you've owned it, overall spend, service pattern, and an overal
 **Why:** This is the difference between handing a buyer a spreadsheet and handing them a story
 they can actually read in two minutes and come away trusting. It's also useful just for
 yourself - a plain-language summary of your own bike's history.
-**How:** The Story So Far tab → Generate my story. You can regenerate it any time your history
-has moved on since the last version.
+**How:** The Story So Far tab, inside the Insights group → Generate my story. You can regenerate
+it any time your history has moved on since the last version.
 **Status:** Live.
 **Limits:** It's generated from what's been logged - the more thoroughly a bike's history has
 been recorded, the more complete the story it can tell.
@@ -328,8 +371,8 @@ been recorded, the more complete the story it can tell.
 giving them access to your account.
 **Why:** This is the actual point of everything else - all that logging becomes worth something
 the moment you're selling, because you can hand a buyer proof instead of a promise.
-**How:** Shareable Links tab → generate a link → send it to whoever's interested. You choose how
-long the link stays valid - 1 week, 1 month, or 6 months - and it stops working automatically
+**How:** Shareable Links tab, inside the Selling group → generate a link → send it to whoever's
+interested. You choose how long the link stays valid - 1 week, 1 month, or 6 months - and it stops working automatically
 once that period ends. A buyer viewing the link can request to see a specific receipt if they
 want more detail; you get to approve or decline each request individually before anything's
 shared.
@@ -356,7 +399,8 @@ needing to own it yet or log anything.
 **Why:** For anyone still deciding whether a bike is affordable to run, before they've committed
 to buying it. It's the "what am I actually signing up for" answer, up front, instead of finding
 out the hard way over the first year of ownership.
-**How:** Available directly from the RoadVerdict site, no account required - either enter a
+**How:** Available two ways - directly from the RoadVerdict site with no account required, or
+from the Buying Tools group in your dashboard if you're signed in. Either way, enter a
 registration plate to pull in real details automatically, or enter the make, model, and engine
 size by hand if you'd rather not look up a specific bike yet.
 **Status:** Live.
@@ -370,9 +414,11 @@ ask the seller, what paperwork should exist.
 **Why:** Buying a used bike is exactly the situation this whole product exists for - a buyer
 with no way to verify what they're being told. This gives a buyer a concrete checklist to work
 from, whether or not the seller happens to be using RoadVerdict themselves.
-**How:** Available directly from the RoadVerdict site, no account required - includes a
-registration lookup that pulls in the bike's full official MOT test history alongside the
-checklist, so you're not checking the guide and a separate DVSA lookup as two different steps.
+**How:** Available two ways - directly from the RoadVerdict site with no account required, or
+as "Buying a used bike" in the Buying Tools group of your dashboard if you're signed in.
+Includes a registration lookup that pulls in the bike's full official MOT test history alongside
+the checklist, so you're not checking the guide and a separate DVSA lookup as two different
+steps.
 **Status:** Live.
 **Limits:** [VERIFY: the exact checklist content and structure beyond the registration/MOT
 lookup described above - that part is confirmed, the specific checklist wording hasn't been
@@ -392,8 +438,9 @@ changes.
 **Why:** Most owners eventually have more than one bike, or move on from one to another - this
 is where you see everything you're tracking in one place, not just whichever bike happens to be
 active right now.
-**How:** The Garage page lists every bike on your account. Click into one to make it the active
-bike your Dashboard, Service tab, and everything else is currently showing. From there you can
+**How:** The Garage page lists every bike on your account - reached via the vehicle switcher,
+not one of the dashboard's own tabs or groups (see 6.0). Click into one to make it the active
+bike your Dashboard, Logbook, and everything else is currently showing. From there you can
 also change a bike's registration (for a genuine plate change, like a private plate being
 applied) or delete it entirely.
 **Status:** Live.
@@ -415,8 +462,8 @@ also means when you sell, you keep your own read-only copy forever, as proof of 
 while you owned it.
 **Status:** Live.
 **How - there are two ways this starts, depending on who acts first:**
-- **You're the seller, and you start it.** From your own Transfer ownership tab, enter the
-  buyer's email and choose whether to include your logged service records, fuel logs, mods,
+- **You're the seller, and you start it.** From your own Transfer ownership tab (inside the
+  Selling group), enter the buyer's email and choose whether to include your logged service records, fuel logs, mods,
   bills, and any attached receipts, or just the bike's identity and a summary of what it added
   up to - then start the handover. The buyer gets an email; they sign in or create a free
   account using that same email address, then accept it from the offer page. The bike moves to
@@ -425,8 +472,8 @@ while you owned it.
   RoadVerdict already has a record for it under someone else's account (see 6.1), or you're
   looking at a Buyer Verdict Report for a bike you've bought, you can request its history
   directly instead of starting fresh. The current owner gets an email and sees your request on
-  their own Transfer ownership tab, where they choose whether to include their logged records
-  and then approve or decline it.
+  their own Transfer ownership tab (inside the Selling group), where they choose whether to
+  include their logged records and then approve or decline it.
 **What actually moves, and what always stays private:** whoever's approving the handover - the
 seller if they started it, or the current owner responding to a request either way - decides
 whether individual service records, fuel logs, mods, bills, and any attached receipt images
@@ -451,8 +498,9 @@ in.
 ever got into that inbox, they could sign in as you too. Turning this on means your email alone
 stops being enough.
 **Status:** Live. Available on every account, free or Premium - this is never a paid feature.
-**How to turn it on:** Security tab (in the sidebar; under "More" on mobile) → "Set up
-two-factor authentication." A QR code appears - scan it with an authenticator app (Google
+**How to turn it on:** Security tab - a standalone item, not inside any group, on both desktop
+(sidebar) and mobile (inside the "More" ⋯ sheet) → "Set up two-factor authentication." A QR code
+appears - scan it with an authenticator app (Google
 Authenticator, Microsoft Authenticator, Authy, or a password manager like 1Password or Bitwarden
 that supports authenticator codes; on iPhone, the built-in Passwords app works too, no extra app
 needed - Settings → Passwords → set up a verification code). Can't scan it? A manual-entry code
@@ -471,8 +519,9 @@ same way it can't sign anyone in or out either.
 
 ### 6.22 Logging a new entry via chat
 **What:** Describe something you want to log - a service item, a bill, a modification or
-accessory, or a fuel fill-up - in plain language, and the assistant drafts it for you right there
-in the conversation, instead of you going to find the right form yourself.
+accessory, a fuel fill-up, or labour/workshop time - in plain language, and the assistant drafts
+it for you right there in the conversation, instead of you going to find the right form
+yourself.
 **Why:** Typing "add a valve cleaner for £4, today" is faster than opening the Service tab,
 picking a job type from a list, and filling in a form for something small. This exists for the
 quick, low-friction cases - it doesn't replace the manual forms, which still work exactly as
@@ -487,8 +536,8 @@ it** yourself - only that click actually saves it, going through the exact same 
 manual form already uses (so a mileage that doesn't add up against your history is flagged the
 same way, with the same option to confirm it anyway).
 **Categories it covers:** service records, bills (insurance/road tax/MOT/finance),
-modifications/accessories, and fuel fill-ups - all four, the same categories the manual forms
-cover.
+modifications/accessories, fuel fill-ups, and labour/workshop time - all five, the same
+categories the manual Logbook forms cover.
 **Getting the category right:** for a bill, if it isn't clear which of the four types it is, the
 assistant asks rather than guessing, since there's no safe default for a bill. For a
 modification/accessory, an unclear or very specific item (a wax, a cleaning product, anything
@@ -539,15 +588,15 @@ You choose when you create it - 1 week, 1 month, or 6 months. It stops working o
 that period ends.
 
 **"How do I log something like a clutch cable I replaced?"**
-Parts & Accessories tab - scan the receipt, or fill in the form directly with the date, cost,
-and what it was. The same applies to any single part or accessory, not just a clutch cable -
-tyres, a chain and sprocket set, luggage, crash protection, anything you've bought or fitted.
-See section 6.5.
+Logbook → Parts & Accessories tab - scan the receipt, or fill in the form directly with the
+date, cost, and what it was. The same applies to any single part or accessory, not just a clutch
+cable - tyres, a chain and sprocket set, luggage, crash protection, anything you've bought or
+fitted. See section 6.5.
 
 **"How do I know the price I was quoted is fair?"**
-Log it in the Service tab, or check it directly with the Quote Checker - either way you'll get
-a Fair / High / Second Opinion result benchmarked against typical UK prices for that job and
-engine size.
+Log it in the Logbook's Service tab, or check it directly with the Quote Checker (in the Buying
+Tools group, or as a standalone tool with no account needed) - either way you'll get a Fair /
+High / Second Opinion result benchmarked against typical UK prices for that job and engine size.
 
 **"Do I need an account to check a bike someone's selling me?"**
 No - if the seller's shared a RoadVerdict link with you, you can view it directly. You'd only

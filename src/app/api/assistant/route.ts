@@ -90,10 +90,32 @@ const DASHBOARD_TAB_LABELS: Record<string, string> = {
   security: "Security",
 };
 
+// Which of the four collapsible sidebar groups (see DashboardShell.tsx's
+// NAV_GROUPS) each tab lives in - kept in sync by hand, same as
+// DASHBOARD_TAB_LABELS above. A key absent here (dashboard, reminders,
+// security, privacy) means that tab is standalone, not inside any group.
+// Lets the "CURRENT DASHBOARD TAB" block below name the group a tab is
+// in, so "why is this here" / "where do I find X" stay accurate even as
+// the knowledge base's own prose ages.
+const TAB_GROUP_LABELS: Record<string, string> = {
+  service: "Logbook",
+  fuel: "Logbook",
+  mods: "Logbook",
+  bills: "Logbook",
+  labour: "Logbook",
+  reports: "Insights",
+  story: "Insights",
+  shareLinks: "Selling",
+  transferOwnership: "Selling",
+  quoteChecker: "Buying Tools",
+  costCalculator: "Buying Tools",
+  buyingGuide: "Buying Tools",
+};
+
 const NO_CAR_KB_FALLBACK =
   "No car-specific knowledge base has been written yet for RoadVerdict's car support. Be honest that detailed car guidance isn't set up yet rather than guessing, and never use motorcycle-specific facts, terminology, or figures as if they applied to a car.";
 
-function buildSystemInstruction(config: AssistantConfigDoc, signedIn: boolean, privacyPolicyText: string | null, reportOpen: boolean, dashboardTabLabel: string | null, compareBikeNames: string[] | null, logEntryAccess: "available" | "upsell" | "none", activeVehicleKind: "bike" | "car" | null, carKnowledgeBase?: string): string {
+function buildSystemInstruction(config: AssistantConfigDoc, signedIn: boolean, privacyPolicyText: string | null, reportOpen: boolean, dashboardTabLabel: string | null, dashboardTabGroupLabel: string | null, compareBikeNames: string[] | null, logEntryAccess: "available" | "upsell" | "none", activeVehicleKind: "bike" | "car" | null, carKnowledgeBase?: string): string {
   // A car-active session's knowledge base is a completely separate
   // document (see the ADR: one shared assistant, two knowledge bases) -
   // swapped in here instead of config.knowledgeBase (motorcycle-only)
@@ -132,8 +154,11 @@ function buildSystemInstruction(config: AssistantConfigDoc, signedIn: boolean, p
   }
 
   if (dashboardTabLabel) {
+    const groupNote = dashboardTabGroupLabel
+      ? ` This tab lives inside the "${dashboardTabGroupLabel}" group in the sidebar/bottom nav - if they ask why it's grouped there, or where to find it, answer from the document above's own description of the dashboard's layout rather than guessing.`
+      : "";
     parts.push(
-      `\n\n---\n\nCURRENT DASHBOARD TAB: the signed-in user currently has the "${dashboardTabLabel}" tab open on their dashboard. If they ask a vague, pronoun-only, or unqualified question about what something is or does - e.g. "what's this for?", "what's that?", "not sure what this does" - with no other clearer subject in the conversation, assume they mean the "${dashboardTabLabel}" tab specifically, using the document above's own description of that feature. Answer in ONE short, plain paragraph - what it's for, nothing more - then ask a brief follow-up like "want me to go into more detail?" rather than immediately explaining everything about it. Only go deeper than that first short answer if they actually say yes to that follow-up (or ask a specific follow-up question) - don't front-load the full explanation before they've asked for it.`
+      `\n\n---\n\nCURRENT DASHBOARD TAB: the signed-in user currently has the "${dashboardTabLabel}" tab open on their dashboard.${groupNote} If they ask a vague, pronoun-only, or unqualified question about what something is or does - e.g. "what's this for?", "what's that?", "not sure what this does" - with no other clearer subject in the conversation, assume they mean the "${dashboardTabLabel}" tab specifically, using the document above's own description of that feature. Answer in ONE short, plain paragraph - what it's for, nothing more - then ask a brief follow-up like "want me to go into more detail?" rather than immediately explaining everything about it. Only go deeper than that first short answer if they actually say yes to that follow-up (or ask a specific follow-up question) - don't front-load the full explanation before they've asked for it.`
     );
   }
 
@@ -253,8 +278,9 @@ export async function POST(req: Request) {
   // same reasoning as reportToken above: the client sends a bare key,
   // never free text, so nothing it sends can inject arbitrary content
   // into the system prompt below.
-  const dashboardTabLabel =
-    signedIn && typeof body.dashboardTab === "string" ? DASHBOARD_TAB_LABELS[body.dashboardTab] ?? null : null;
+  const dashboardTabKey = signedIn && typeof body.dashboardTab === "string" ? body.dashboardTab : null;
+  const dashboardTabLabel = dashboardTabKey ? DASHBOARD_TAB_LABELS[dashboardTabKey] ?? null : null;
+  const dashboardTabGroupLabel = dashboardTabKey ? TAB_GROUP_LABELS[dashboardTabKey] ?? null : null;
 
   // Only ever trusted after being cross-checked against this session's
   // own real bikes and Pro status below - the client sends raw ids read
@@ -339,7 +365,7 @@ export async function POST(req: Request) {
     }
   }
 
-  const systemInstruction = buildSystemInstruction(config, signedIn, privacyPolicyText, !!reportToken, dashboardTabLabel, compareBikeNames, logEntryAccess, activeVehicleKind, carKnowledgeBase);
+  const systemInstruction = buildSystemInstruction(config, signedIn, privacyPolicyText, !!reportToken, dashboardTabLabel, dashboardTabGroupLabel, compareBikeNames, logEntryAccess, activeVehicleKind, carKnowledgeBase);
 
   const contents: GeminiContent[] = toGeminiContents(messages);
   const toolDeclarations = [

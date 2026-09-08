@@ -243,6 +243,24 @@ describe("POST /api/assistant", () => {
     expect(callBody.systemInstruction.parts[0].text).toContain('CURRENT DASHBOARD TAB: the signed-in user currently has the "Security" tab open');
   });
 
+  it("names the sidebar group a tab lives in, for a tab that belongs to one", async () => {
+    mocks.getSession.mockResolvedValue({ email: "rider@example.com" });
+
+    await POST(request({ messages: [{ role: "user", content: "why is this here?" }], dashboardTab: "shareLinks" }));
+
+    const callBody = JSON.parse(mocks.fetch.mock.calls[0][1].body);
+    expect(callBody.systemInstruction.parts[0].text).toContain('This tab lives inside the "Selling" group');
+  });
+
+  it("adds no group note for a standalone tab that isn't inside any sidebar group", async () => {
+    mocks.getSession.mockResolvedValue({ email: "rider@example.com" });
+
+    await POST(request({ messages: [{ role: "user", content: "what's this for?" }], dashboardTab: "security" }));
+
+    const callBody = JSON.parse(mocks.fetch.mock.calls[0][1].body);
+    expect(callBody.systemInstruction.parts[0].text).not.toContain("lives inside");
+  });
+
   it("ignores an unrecognised dashboardTab key rather than passing arbitrary client text into the prompt", async () => {
     mocks.getSession.mockResolvedValue({ email: "rider@example.com" });
 
