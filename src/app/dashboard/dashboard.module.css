@@ -638,6 +638,41 @@
   flex-shrink: 0;
 }
 
+/* Sidebar nav groups (DashboardShell.tsx's NAV_GROUPS) - a collapsible
+   category header, sitting alongside the plain .sidebarNavItem buttons
+   for Dashboard/Reminders/Security, with its own items indented
+   underneath when expanded. */
+.sidebarNavGroup { display: flex; flex-direction: column; }
+.sidebarNavGroupHeader {
+  display: flex; align-items: center; gap: 0.7rem;
+  padding: 0.65rem 0.8rem; border-radius: var(--radius-sm);
+  font-family: var(--font-display); font-size: 0.9rem;
+  color: rgba(255, 255, 255, 0.75); background: none;
+  border: 1.5px solid transparent;
+  text-align: left; cursor: pointer; width: 100%;
+}
+.sidebarNavGroupHeader:hover { background: var(--asphalt-2); }
+.sidebarNavGroupHeader span { flex: 1; }
+.navChevron { margin-left: auto; opacity: 0.6; }
+.sidebarNavGroupItems { display: flex; flex-direction: column; gap: 0.2rem; }
+.sidebarNavItemIndented { padding-left: 1.9rem; }
+.sidebarNavEmptyGroupNote {
+  padding: 0.3rem 0.8rem 0.5rem 1.9rem;
+  font-size: 0.78rem; color: rgba(255, 255, 255, 0.45);
+}
+
+/* Same collapsible-group treatment inside the mobile More sheet - light
+   background here (unlike the dark sidebar above), so its own colours
+   are set separately rather than shared with .sidebarNavGroupHeader. */
+.mobileMoreSheetGroup { display: flex; flex-direction: column; }
+.mobileMoreSheetGroupHeader {
+  display: flex; align-items: center; gap: 0.5rem; width: 100%;
+  padding: 0.6rem 0; border: none; border-bottom: 1px solid var(--border);
+  background: none; font-size: 0.85rem; color: var(--ink);
+  text-align: left; cursor: pointer;
+}
+.mobileMoreSheetGroupHeader span { flex: 1; }
+
 .sidebarBikeCard { border-top: 1px solid rgba(255, 255, 255, 0.12); padding-top: 1rem; margin-top: 1rem; font-size: 0.85rem; position: relative; }
 .sidebarBikeLabel { font-family: var(--font-mono); font-size: 0.65rem; text-transform: uppercase; color: rgba(255, 255, 255, 0.5); margin-bottom: 0.3rem; }
 .sidebarBikeName { font-weight: 600; }

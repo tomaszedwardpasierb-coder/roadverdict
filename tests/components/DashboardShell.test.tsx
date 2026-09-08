@@ -113,22 +113,41 @@ describe("DashboardShell", () => {
     expect(screen.queryByLabelText("An entry here needs review")).not.toBeInTheDocument();
   });
 
-  it("shows the same pending dot next to Shareable Links when there's an incoming receipt request", () => {
+  it("shows the same pending dot next to Shareable Links when there's an incoming receipt request", async () => {
+    const user = userEvent.setup();
     render(<DashboardShell {...baseProps({ hasPendingReceiptRequests: true })} />);
+    // Shareable Links lives inside the Selling group, collapsed by default -
+    // its own header should already show the rolled-up signal even before
+    // expanding.
+    const sellingHeader = screen.getByRole("button", { name: /Selling/ });
+    expect(sellingHeader.querySelector('[aria-label="An entry here needs review"]')).not.toBeNull();
+
+    await user.click(sellingHeader);
     const shareLinksButton = screen.getByRole("button", { name: /Shareable Links/ });
     expect(shareLinksButton.querySelector('[aria-label="An entry here needs review"]')).not.toBeNull();
   });
 
-  it("shows the ready dot next to Story only when storyReady is true", () => {
+  it("shows the ready dot next to Story only when storyReady is true", async () => {
+    const user = userEvent.setup();
     const { rerender } = render(<DashboardShell {...baseProps({ storyReady: true })} />);
+    // The Story item lives inside the Insights group, collapsed by default.
+    await user.click(screen.getByRole("button", { name: /Insights/ }));
     expect(screen.getAllByLabelText("Enough logged history for a worthwhile story").length).toBeGreaterThan(0);
 
     rerender(<DashboardShell {...baseProps({ storyReady: false })} />);
     expect(screen.queryByLabelText("Enough logged history for a worthwhile story")).not.toBeInTheDocument();
   });
 
-  it("shows the request dot next to Transfer ownership only when hasIncomingRequest is true", () => {
+  it("shows the request dot next to Transfer ownership only when hasIncomingRequest is true", async () => {
+    const user = userEvent.setup();
     render(<DashboardShell {...baseProps({ hasIncomingRequest: true })} />);
+    // Transfer ownership lives inside the Selling group, collapsed by
+    // default - its own header should already show the rolled-up signal
+    // even before expanding.
+    const sellingHeader = screen.getByRole("button", { name: /Selling/ });
+    expect(sellingHeader.querySelector('[aria-label="An entry here needs review"]')).not.toBeNull();
+
+    await user.click(sellingHeader);
     expect(screen.getByLabelText("Someone is requesting this bike's history")).toBeInTheDocument();
   });
 
@@ -231,6 +250,54 @@ describe("DashboardShell", () => {
     ).toBeGreaterThan(1);
   });
 
+  // Sidebar/mobile-sheet nav items are grouped into collapsible categories
+  // (Logbook/Insights/Selling/Buying Tools) rather than one flat 15-item
+  // list - Logbook defaults open (daily-use tabs), the other three default
+  // closed (the long-tail tabs that were causing the actual clutter).
+  describe("collapsible nav groups", () => {
+    it("Logbook's own items are visible with no interaction; the other three groups' items are not", () => {
+      render(<DashboardShell {...baseProps()} />);
+      // "Fuel" also has its own mobile-bottom-bar icon (always mounted,
+      // just CSS-hidden by media query) - getAllByRole, not getByRole,
+      // same reasoning the rest of this file already uses for it.
+      expect(screen.getAllByRole("button", { name: "Fuel" }).length).toBeGreaterThan(0);
+      expect(screen.getByRole("button", { name: "Labour" })).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Reports" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Shareable Links" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Quote Checker" })).not.toBeInTheDocument();
+    });
+
+    it("clicking a group header toggles its items open and closed, and flips aria-expanded", async () => {
+      const user = userEvent.setup();
+      render(<DashboardShell {...baseProps()} />);
+      const insightsHeader = screen.getByRole("button", { name: /Insights/ });
+      expect(insightsHeader).toHaveAttribute("aria-expanded", "false");
+      expect(screen.queryByRole("button", { name: "Reports" })).not.toBeInTheDocument();
+
+      await user.click(insightsHeader);
+      expect(insightsHeader).toHaveAttribute("aria-expanded", "true");
+      expect(screen.getByRole("button", { name: "Reports" })).toBeInTheDocument();
+
+      await user.click(insightsHeader);
+      expect(insightsHeader).toHaveAttribute("aria-expanded", "false");
+      expect(screen.queryByRole("button", { name: "Reports" })).not.toBeInTheDocument();
+    });
+
+    it("a group stays expanded even if its own header is clicked to collapse it, as long as its item is the active tab", async () => {
+      const user = userEvent.setup();
+      render(<DashboardShell {...baseProps()} />);
+      const insightsHeader = screen.getByRole("button", { name: /Insights/ });
+      await user.click(insightsHeader);
+      await user.click(screen.getByRole("button", { name: "Reports" }));
+      expect(screen.getByText("Reports content")).toBeInTheDocument();
+
+      await user.click(insightsHeader);
+      // Still expanded - Reports is the active tab, so its own group
+      // can't be collapsed out from under it.
+      expect(screen.getByRole("button", { name: "Reports" })).toBeInTheDocument();
+    });
+  });
+
   // The hybrid dashboard's own guard: three tabs (Story, Shareable Links,
   // Transfer ownership) depend on BikeDoc fields CarDoc doesn't have yet -
   // hidden rather than shown broken while a car is the active vehicle.
@@ -282,6 +349,23 @@ describe("DashboardShell", () => {
       }
       // Also present in the always-mounted sidebar nav, hence getAllByText.
       expect(screen.getAllByText("Security").length).toBeGreaterThan(0);
+    });
+
+    // The user explicitly wants the group STRUCTURE to exist for cars too,
+    // even where every item inside a group is currently unavailable -
+    // rather than the group disappearing entirely, expanding it should
+    // show a short "not available yet" note.
+    it("still shows the Insights/Selling/Buying Tools group headers for a car, and expanding each reveals the empty-state note instead of any items", async () => {
+      const user = userEvent.setup();
+      render(<DashboardShell {...carProps()} />);
+
+      for (const groupLabel of ["Insights", "Selling", "Buying Tools"]) {
+        const header = screen.getByRole("button", { name: new RegExp(groupLabel) });
+        expect(header).toBeInTheDocument();
+        await user.click(header);
+        expect(screen.getAllByText("Not available for cars yet.").length).toBeGreaterThan(0);
+        await user.click(header); // collapse again before checking the next group
+      }
     });
 
     it("labels the switcher card 'My car' and hides the DVLA-refresh button (no car route for it yet)", () => {

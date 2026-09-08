@@ -22,45 +22,85 @@ function asReviewCategory(key: string): ReviewCategory | null {
   return (REVIEW_CATEGORIES as string[]).includes(key) ? (key as ReviewCategory) : null;
 }
 
-const NAV_ITEMS: { key: Section; label: string; icon: IconName }[] = [
+interface NavItemDef {
+  key: Section;
+  label: string;
+  icon: IconName;
+}
+
+interface NavGroupDef {
+  groupKey: string;
+  groupLabel: string;
+  groupIcon: IconName;
+  defaultExpanded: boolean;
+  items: NavItemDef[];
+}
+
+// Ungrouped top-level items, both on the desktop sidebar and (minus
+// 'dashboard', which has its own bottom-bar icon there) the mobile More
+// sheet. Privacy is deliberately not here - it keeps its own hardcoded
+// button below the sidebar divider, and its own entry at the end of the
+// More sheet, exactly as before this grouping existed.
+const STANDALONE_ITEMS: NavItemDef[] = [
   { key: 'dashboard', label: 'Dashboard', icon: 'dashboard' },
-  { key: 'service', label: 'Service', icon: 'service' },
-  { key: 'fuel', label: 'Fuel', icon: 'fuel' },
-  { key: 'mods', label: 'Parts & Accessories', icon: 'mods' },
-  { key: 'bills', label: 'Insurance, Tax, MOT & Finance', icon: 'bills' },
-  { key: 'labour', label: 'Labour', icon: 'labour' },
   { key: 'reminders', label: 'Reminders', icon: 'reminders' },
-  { key: 'reports', label: 'Reports', icon: 'reports' },
-  { key: 'story', label: 'The Story So Far', icon: 'story' },
-  { key: 'shareLinks', label: 'Shareable Links', icon: 'shareLinks' },
-  { key: 'quoteChecker', label: 'Quote Checker', icon: 'quoteChecker' },
-  { key: 'costCalculator', label: 'Cost calculator', icon: 'costCalculator' },
-  { key: 'buyingGuide', label: 'Buying a used bike', icon: 'buyingGuide' },
-  { key: 'transferOwnership', label: 'Transfer ownership', icon: 'transferOwnership' },
   { key: 'security', label: 'Security', icon: 'security' },
 ];
 
+// Groups the flat 15-item sidebar used to be, into what the tabs actually
+// are: day-to-day logging vs. the long-tail stuff. Logbook defaults open
+// (it's the daily-use set); the other three default closed - that's
+// where the real clutter was coming from. Shared by both the desktop
+// sidebar and the mobile More sheet (see renderNavButton/isGroupExpanded
+// below) so there's one definition of "what's in each group", not two
+// hand-kept-in-sync lists.
+const NAV_GROUPS: NavGroupDef[] = [
+  {
+    groupKey: 'logbook', groupLabel: 'Logbook', groupIcon: 'logbook', defaultExpanded: true,
+    items: [
+      { key: 'service', label: 'Service', icon: 'service' },
+      { key: 'fuel', label: 'Fuel', icon: 'fuel' },
+      { key: 'mods', label: 'Parts & Accessories', icon: 'mods' },
+      { key: 'bills', label: 'Insurance, Tax, MOT & Finance', icon: 'bills' },
+      { key: 'labour', label: 'Labour', icon: 'labour' },
+    ],
+  },
+  {
+    groupKey: 'insights', groupLabel: 'Insights', groupIcon: 'insights', defaultExpanded: false,
+    items: [
+      { key: 'reports', label: 'Reports', icon: 'reports' },
+      { key: 'story', label: 'The Story So Far', icon: 'story' },
+    ],
+  },
+  {
+    groupKey: 'selling', groupLabel: 'Selling', groupIcon: 'selling', defaultExpanded: false,
+    items: [
+      { key: 'shareLinks', label: 'Shareable Links', icon: 'shareLinks' },
+      { key: 'transferOwnership', label: 'Transfer ownership', icon: 'transferOwnership' },
+    ],
+  },
+  {
+    groupKey: 'buyingTools', groupLabel: 'Buying Tools', groupIcon: 'buyingTools', defaultExpanded: false,
+    items: [
+      { key: 'quoteChecker', label: 'Quote Checker', icon: 'quoteChecker' },
+      { key: 'costCalculator', label: 'Cost calculator', icon: 'costCalculator' },
+      { key: 'buyingGuide', label: 'Buying a used bike', icon: 'buyingGuide' },
+    ],
+  },
+];
+
+// The mobile bottom bar's 4 fixed quick-access icons - unrelated to the
+// grouping above, unchanged from before it existed. Every group's items
+// get these keys filtered back out when rendered inside the mobile More
+// sheet (see MORE_SHEET_GROUPS below), since they already have their own
+// always-visible icon down there.
 const MOBILE_NAV_ITEMS: { key: Section; label: string; icon: IconName }[] = [
   { key: 'dashboard', label: 'Dashboard', icon: 'dashboard' },
   { key: 'service', label: 'Service', icon: 'service' },
   { key: 'fuel', label: 'Fuel', icon: 'fuel' },
   { key: 'mods', label: 'Parts', icon: 'mods' },
 ];
-
-const MORE_ITEMS: { key: Section; label: string; icon: IconName }[] = [
-  { key: 'bills', label: 'Insurance, Tax, MOT & Finance', icon: 'bills' },
-  { key: 'labour', label: 'Labour', icon: 'labour' },
-  { key: 'reminders', label: 'Reminders', icon: 'reminders' },
-  { key: 'reports', label: 'Reports', icon: 'reports' },
-  { key: 'story', label: 'The Story So Far', icon: 'story' },
-  { key: 'shareLinks', label: 'Shareable Links', icon: 'shareLinks' },
-  { key: 'quoteChecker', label: 'Quote Checker', icon: 'quoteChecker' },
-  { key: 'costCalculator', label: 'Cost calculator', icon: 'costCalculator' },
-  { key: 'buyingGuide', label: 'Buying a used bike', icon: 'buyingGuide' },
-  { key: 'transferOwnership', label: 'Transfer ownership', icon: 'transferOwnership' },
-  { key: 'security', label: 'Security', icon: 'security' },
-  { key: 'privacy', label: 'Privacy', icon: 'privacy' },
-];
+const MOBILE_QUICKBAR_KEYS: Section[] = MOBILE_NAV_ITEMS.map((item) => item.key);
 
 // Story/Shareable Links/Transfer ownership depend on BikeDoc fields
 // CarDoc deliberately doesn't have yet (shareToken, storyCache, transfer
@@ -68,11 +108,14 @@ const MORE_ITEMS: { key: Section; label: string; icon: IconName }[] = [
 // the three embedded tools (Quote Checker/Cost Calculator/Buying Guide)
 // depend on motorcycle price-benchmark data that has no car equivalent
 // yet either (Phase 7's price research hasn't happened - see the ADR).
-// All six hidden rather than shown broken/empty/wrong while a car is
-// the active vehicle. Additive later: once each has a real car
-// equivalent, it just comes off this list.
+// All seven hidden rather than shown broken/empty/wrong while a car is
+// the active vehicle - their groups (Insights/Selling/Buying Tools)
+// still render for a car-active session, just empty (see
+// sidebarNavEmptyGroupNote below), rather than disappearing entirely.
+// Additive later: once each has a real car equivalent, it just comes
+// off this list.
 const CAR_UNAVAILABLE_SECTIONS: Section[] = ['story', 'shareLinks', 'transferOwnership', 'reports', 'quoteChecker', 'costCalculator', 'buyingGuide'];
-function availableFor(vehicleKind: 'bike' | 'car', items: { key: Section; label: string; icon: IconName }[]) {
+function availableFor(vehicleKind: 'bike' | 'car', items: NavItemDef[]) {
   return vehicleKind === 'bike' ? items : items.filter((item) => !CAR_UNAVAILABLE_SECTIONS.includes(item.key));
 }
 
@@ -164,7 +207,65 @@ export function DashboardShell({
 }: Props) {
   const [active, setActive] = useState<Section>('dashboard');
   const [showMore, setShowMore] = useState(false);
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(
+    () => new Set(NAV_GROUPS.filter((g) => g.defaultExpanded).map((g) => g.groupKey))
+  );
   const { setActiveSection } = useActiveSection();
+
+  // A group also counts as expanded if the active tab lives inside it,
+  // regardless of whether it was ever manually toggled open - e.g. a
+  // goToNextReview() call from elsewhere in the app switching straight to
+  // "reports" must not leave Insights looking collapsed with no visible
+  // active state.
+  function isGroupExpanded(group: NavGroupDef): boolean {
+    return expandedGroups.has(group.groupKey) || group.items.some((item) => item.key === active);
+  }
+  function toggleGroup(groupKey: string) {
+    setExpandedGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(groupKey)) next.delete(groupKey);
+      else next.add(groupKey);
+      return next;
+    });
+  }
+
+  function itemHasPending(item: NavItemDef): boolean {
+    const reviewCategory = asReviewCategory(item.key);
+    if (reviewCategory) return pendingReviewIds[reviewCategory].length > 0;
+    return item.key === 'shareLinks' && hasPendingReceiptRequests;
+  }
+  // Rolled-up "something in here needs attention" signal shown on a
+  // group's own header, so it's worth expanding even when collapsed.
+  // Takes the already vehicle-kind-filtered item list, so an empty car
+  // group can never show a false dot.
+  function groupHasSignal(visibleItems: NavItemDef[]): boolean {
+    return visibleItems.some(itemHasPending)
+      || (visibleItems.some((item) => item.key === 'story') && storyReady)
+      || (visibleItems.some((item) => item.key === 'transferOwnership') && hasIncomingRequest);
+  }
+
+  // Shared by the desktop sidebar and the mobile More sheet - same icon,
+  // label, and pending/ready/request dots either way, just a different
+  // className and an optional extra close-the-sheet callback.
+  function renderNavButton(item: NavItemDef, className: string, onSelect?: () => void) {
+    return (
+      <button
+        key={item.key}
+        type="button"
+        className={className}
+        onClick={() => {
+          setActive(item.key);
+          onSelect?.();
+        }}
+      >
+        <Icon name={item.icon} className={styles.navIcon} />
+        <span>{item.label}</span>
+        {itemHasPending(item) && <PendingDot />}
+        {item.key === 'story' && storyReady && <ReadyDot />}
+        {item.key === 'transferOwnership' && hasIncomingRequest && <RequestDot />}
+      </button>
+    );
+  }
 
   // Publishes which tab is open to the globally-mounted assistant widget
   // (see ActiveSectionContext.tsx's own comment for why this can't just
@@ -197,7 +298,10 @@ export function DashboardShell({
     security: securityContent,
   };
 
-  const isMoreActive = active === 'bills' || active === 'labour' || active === 'reminders' || active === 'reports' || active === 'story' || active === 'shareLinks' || active === 'quoteChecker' || active === 'costCalculator' || active === 'buyingGuide' || active === 'privacy' || active === 'transferOwnership' || active === 'security';
+  // Self-maintaining equivalent of the old hand-listed OR-chain: anything
+  // not one of the 4 always-visible mobile bottom-bar icons is "in More" -
+  // no future tab addition needs a manual edit here again.
+  const isMoreActive = !MOBILE_NAV_ITEMS.some((item) => item.key === active);
 
   return (
     <TabSwitchProvider onSwitchTab={(cat) => setActive(cat)}>
@@ -210,24 +314,46 @@ export function DashboardShell({
           </div>
 
           <nav className={styles.sidebarNav}>
-            {availableFor(vehicleKind, NAV_ITEMS).map((item) => {
-              const reviewCategory = asReviewCategory(item.key);
-              const hasPending = reviewCategory ? pendingReviewIds[reviewCategory].length > 0 : (item.key === 'shareLinks' && hasPendingReceiptRequests);
+            {renderNavButton(
+              STANDALONE_ITEMS[0], // Dashboard - always first
+              `${styles.sidebarNavItem} ${active === 'dashboard' ? styles.sidebarNavItemActive : ''}`
+            )}
+            {NAV_GROUPS.map((group) => {
+              const visibleItems = availableFor(vehicleKind, group.items);
+              const expanded = isGroupExpanded(group);
               return (
-                <button
-                  key={item.key}
-                  type="button"
-                  className={`${styles.sidebarNavItem} ${active === item.key ? styles.sidebarNavItemActive : ''}`}
-                  onClick={() => setActive(item.key)}
-                >
-                  <Icon name={item.icon} className={styles.navIcon} />
-                  <span>{item.label}</span>
-                  {hasPending && <PendingDot />}
-                  {item.key === 'story' && storyReady && <ReadyDot />}
-                  {item.key === 'transferOwnership' && hasIncomingRequest && <RequestDot />}
-                </button>
+                <div key={group.groupKey} className={styles.sidebarNavGroup}>
+                  <button
+                    type="button"
+                    className={styles.sidebarNavGroupHeader}
+                    aria-expanded={expanded}
+                    onClick={() => toggleGroup(group.groupKey)}
+                  >
+                    <Icon name={group.groupIcon} className={styles.navIcon} />
+                    <span>{group.groupLabel}</span>
+                    {groupHasSignal(visibleItems) && <PendingDot />}
+                    <Icon name={expanded ? 'chevronDown' : 'chevronRight'} className={styles.navChevron} />
+                  </button>
+                  {expanded && (
+                    <div className={styles.sidebarNavGroupItems}>
+                      {visibleItems.length === 0 ? (
+                        <p className={styles.sidebarNavEmptyGroupNote}>Not available for cars yet.</p>
+                      ) : (
+                        visibleItems.map((item) =>
+                          renderNavButton(
+                            item,
+                            `${styles.sidebarNavItem} ${styles.sidebarNavItemIndented} ${active === item.key ? styles.sidebarNavItemActive : ''}`
+                          )
+                        )
+                      )}
+                    </div>
+                  )}
+                </div>
               );
             })}
+            {STANDALONE_ITEMS.slice(1).map((item) =>
+              renderNavButton(item, `${styles.sidebarNavItem} ${active === item.key ? styles.sidebarNavItemActive : ''}`)
+            )}
           </nav>
 
           <VehicleSwitcher vehicles={vehicles} activeVehicleId={activeVehicleId} distanceUnit={distanceUnit} />
@@ -307,34 +433,30 @@ export function DashboardShell({
         </div>
 
         <nav data-mobile-bottom-nav className={styles.mobileBottomNav}>
-          {MOBILE_NAV_ITEMS.map((item) => {
-            const reviewCategory = asReviewCategory(item.key);
-            const hasPending = reviewCategory ? pendingReviewIds[reviewCategory].length > 0 : (item.key === 'shareLinks' && hasPendingReceiptRequests);
-            return (
-              <button
-                key={item.key}
-                type="button"
-                onClick={() => {
-                  setActive(item.key);
-                  setShowMore(false);
-                }}
-                style={{
-                  display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.2rem',
-                  background: 'none', border: 'none', fontSize: '0.65rem',
-                  color: active === item.key ? 'var(--amber-ink)' : 'var(--ink-soft)',
-                  position: 'relative',
-                }}
-              >
-                <Icon name={item.icon} className={styles.navIcon} />
-                {item.label}
-                {hasPending && (
-                  <span style={{ position: 'absolute', top: 0, right: '30%' }}>
-                    <PendingDot />
-                  </span>
-                )}
-              </button>
-            );
-          })}
+          {MOBILE_NAV_ITEMS.map((item) => (
+            <button
+              key={item.key}
+              type="button"
+              onClick={() => {
+                setActive(item.key);
+                setShowMore(false);
+              }}
+              style={{
+                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.2rem',
+                background: 'none', border: 'none', fontSize: '0.65rem',
+                color: active === item.key ? 'var(--amber-ink)' : 'var(--ink-soft)',
+                position: 'relative',
+              }}
+            >
+              <Icon name={item.icon} className={styles.navIcon} />
+              {item.label}
+              {itemHasPending(item) && (
+                <span style={{ position: 'absolute', top: 0, right: '30%' }}>
+                  <PendingDot />
+                </span>
+              )}
+            </button>
+          ))}
           <button
             type="button"
             onClick={() => setShowMore(true)}
@@ -359,26 +481,40 @@ export function DashboardShell({
           <>
             <div className={styles.mobileMoreSheetBackdrop} onClick={() => setShowMore(false)} />
             <div className={styles.mobileMoreSheet}>
-              {availableFor(vehicleKind, MORE_ITEMS).map((item) => {
-                const reviewCategory = asReviewCategory(item.key);
-                const hasPending = reviewCategory ? pendingReviewIds[reviewCategory].length > 0 : (item.key === 'shareLinks' && hasPendingReceiptRequests);
+              {availableFor(vehicleKind, STANDALONE_ITEMS.filter((item) => !MOBILE_QUICKBAR_KEYS.includes(item.key))).map((item) =>
+                renderNavButton(item, styles.mobileMoreSheetItem, () => setShowMore(false))
+              )}
+              {NAV_GROUPS.map((group) => {
+                const visibleItems = availableFor(vehicleKind, group.items).filter(
+                  (item) => !MOBILE_QUICKBAR_KEYS.includes(item.key)
+                );
+                const expanded = isGroupExpanded(group);
                 return (
-                  <button
-                    key={item.key}
-                    type="button"
-                    className={styles.mobileMoreSheetItem}
-                    onClick={() => {
-                      setActive(item.key);
-                      setShowMore(false);
-                    }}
-                  >
-                    <Icon name={item.icon} className={styles.navIcon} /> {item.label}
-                    {hasPending && <PendingDot />}
-                    {item.key === 'story' && storyReady && <ReadyDot />}
-                    {item.key === 'transferOwnership' && hasIncomingRequest && <RequestDot />}
-                  </button>
+                  <div key={group.groupKey} className={styles.mobileMoreSheetGroup}>
+                    <button
+                      type="button"
+                      className={styles.mobileMoreSheetGroupHeader}
+                      aria-expanded={expanded}
+                      onClick={() => toggleGroup(group.groupKey)}
+                    >
+                      <Icon name={group.groupIcon} className={styles.navIcon} />
+                      <span>{group.groupLabel}</span>
+                      {groupHasSignal(visibleItems) && <PendingDot />}
+                      <Icon name={expanded ? 'chevronDown' : 'chevronRight'} className={styles.navChevron} />
+                    </button>
+                    {expanded && (
+                      visibleItems.length === 0 ? (
+                        <p className={styles.sidebarNavEmptyGroupNote}>Not available for cars yet.</p>
+                      ) : (
+                        visibleItems.map((item) =>
+                          renderNavButton(item, `${styles.mobileMoreSheetItem} ${styles.sidebarNavItemIndented}`, () => setShowMore(false))
+                        )
+                      )
+                    )}
+                  </div>
                 );
               })}
+              {renderNavButton({ key: 'privacy', label: 'Privacy', icon: 'privacy' }, styles.mobileMoreSheetItem, () => setShowMore(false))}
               <div style={{ marginTop: '0.8rem', paddingTop: '0.8rem', borderTop: '1px solid var(--border)', fontSize: '0.8rem', color: 'var(--ink-soft)' }}>
                 Signed in as {userEmail}
               </div>

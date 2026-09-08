@@ -56,6 +56,9 @@ test.describe("Authenticated demo journeys", () => {
 
   test("creates a shareable report link, and an anonymous visitor only sees the report after confirming the real registration", async ({ page, browser }) => {
     await loginAsDemo(page);
+    // Shareable Links now lives inside the collapsible "Selling" sidebar
+    // group (collapsed by default) - expand it before clicking through.
+    await page.getByRole("button", { name: "Selling" }).click();
     await page.getByRole("button", { name: "Shareable Links" }).click();
 
     await page.getByLabel(/Sharing with/).fill("buyer@example.com");

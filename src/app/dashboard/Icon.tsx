@@ -1,6 +1,6 @@
 // Place at: src/app/dashboard/Icon.tsx
 'use client';
-import { Gauge, Wrench, Droplet, Package, Shield, Bell, BellRing, BarChart3, BookOpen, Share2, Receipt, Tag, Calendar, Camera, Calculator, ClipboardCheck, Lock, Scale, ArrowRightLeft, Upload, KeyRound, HardHat } from 'lucide-react';
+import { Gauge, Wrench, Droplet, Package, Shield, Bell, BellRing, BarChart3, BookOpen, Share2, Receipt, Tag, Calendar, Camera, Calculator, ClipboardCheck, Lock, Scale, ArrowRightLeft, Upload, KeyRound, HardHat, ClipboardList, Sparkles, Handshake, ShoppingCart, ChevronDown, ChevronRight } from 'lucide-react';
 import type { LucideProps } from 'lucide-react';
 // Maps this app's semantic icon names to their lucide-react component -
 // keeps every call site referring to "what this icon means" (fuel,
@@ -43,6 +43,15 @@ const ICONS = {
   transferOwnership: ArrowRightLeft,
   notificationBell: BellRing,
   security: KeyRound,
+  // Sidebar/mobile-More-sheet group headers (DashboardShell.tsx's
+  // NAV_GROUPS) - distinct from each group's own child items' icons, so
+  // a group heading never reads as just a duplicate of one of its members.
+  logbook: ClipboardList,
+  insights: Sparkles,
+  selling: Handshake,
+  buyingTools: ShoppingCart,
+  chevronDown: ChevronDown,
+  chevronRight: ChevronRight,
 } as const;
 export type IconName = keyof typeof ICONS;
 interface Props extends Omit<LucideProps, 'ref'> {
