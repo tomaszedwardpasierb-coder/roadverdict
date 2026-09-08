@@ -16,7 +16,7 @@ import {
   ASSISTANT_TOOL_DECLARATIONS,
   REPORT_TOOL_DECLARATIONS,
   COMPARISON_TOOL_DECLARATIONS,
-  LOG_ENTRY_TOOL_DECLARATIONS,
+  buildLogEntryToolDeclarations,
   runAssistantTool,
   type CompareContext,
   type ProposedEntry,
@@ -77,6 +77,7 @@ const DASHBOARD_TAB_LABELS: Record<string, string> = {
   fuel: "Fuel",
   mods: "Parts & Accessories",
   bills: "Insurance, Tax, MOT & Finance",
+  labour: "Labour",
   reminders: "Reminders",
   reports: "Reports",
   story: "The Story So Far",
@@ -92,7 +93,7 @@ const DASHBOARD_TAB_LABELS: Record<string, string> = {
 const NO_CAR_KB_FALLBACK =
   "No car-specific knowledge base has been written yet for RoadVerdict's car support. Be honest that detailed car guidance isn't set up yet rather than guessing, and never use motorcycle-specific facts, terminology, or figures as if they applied to a car.";
 
-function buildSystemInstruction(config: AssistantConfigDoc, signedIn: boolean, privacyPolicyText: string | null, reportOpen: boolean, dashboardTabLabel: string | null, compareBikeNames: string[] | null, logEntryAccess: "available" | "upsell" | "none" | "car", carKnowledgeBase?: string): string {
+function buildSystemInstruction(config: AssistantConfigDoc, signedIn: boolean, privacyPolicyText: string | null, reportOpen: boolean, dashboardTabLabel: string | null, compareBikeNames: string[] | null, logEntryAccess: "available" | "upsell" | "none", activeVehicleKind: "bike" | "car" | null, carKnowledgeBase?: string): string {
   // A car-active session's knowledge base is a completely separate
   // document (see the ADR: one shared assistant, two knowledge bases) -
   // swapped in here instead of config.knowledgeBase (motorcycle-only)
@@ -136,17 +137,17 @@ function buildSystemInstruction(config: AssistantConfigDoc, signedIn: boolean, p
     );
   }
 
-  if (logEntryAccess === "available") {
+  if (logEntryAccess === "available" && activeVehicleKind === "car") {
     parts.push(
-      "\n\n---\n\nLOGGING VIA CHAT (Pro feature, active now): if the signed-in user describes something they want to log - a consumable, a small maintenance item, an insurance/road-tax/MOT/finance payment, a modification/accessory (including general things like wax, polish, or cleaning products), or a fuel fill-up - use the proposeLogEntry tool to draft it, rather than telling them to go find the right form themselves. Only call it when they're clearly asking you to add/log something, never speculatively. This never saves anything by itself - it hands back a draft that appears on screen for them to review, edit, and confirm with their own click. Don't worry about picking the exact right sub-category yourself (e.g. the precise accessory type) - a reasonable guess is fine, since the draft card lets them correct it before confirming."
+      "\n\n---\n\nLOGGING VIA CHAT (Pro feature, active now - Labour only): if the signed-in user describes a Labour/workshop-time charge they want to log for their car, use the proposeLogEntry tool to draft it, rather than telling them to go find the right form themselves. Only call it when they're clearly asking you to add/log something, never speculatively. This never saves anything by itself - it hands back a draft that appears on screen for them to review, edit, and confirm with their own click. Every OTHER category (service, fuel, mods, bills) is a real, current product gap for cars, not available via chat yet - if asked to log one of those, say so plainly and point them to the dashboard's own logging forms instead."
+    );
+  } else if (logEntryAccess === "available") {
+    parts.push(
+      "\n\n---\n\nLOGGING VIA CHAT (Pro feature, active now): if the signed-in user describes something they want to log - a consumable, a small maintenance item, an insurance/road-tax/MOT/finance payment, a modification/accessory (including general things like wax, polish, or cleaning products), a fuel fill-up, or labour/workshop time - use the proposeLogEntry tool to draft it, rather than telling them to go find the right form themselves. Only call it when they're clearly asking you to add/log something, never speculatively. This never saves anything by itself - it hands back a draft that appears on screen for them to review, edit, and confirm with their own click. Don't worry about picking the exact right sub-category yourself (e.g. the precise accessory type) - a reasonable guess is fine, since the draft card lets them correct it before confirming."
     );
   } else if (logEntryAccess === "upsell") {
     parts.push(
       "\n\n---\n\nLOGGING VIA CHAT: adding or logging a new entry by describing it in chat is a Pro feature, not available on this account. If asked to add/log something, say so plainly, and mention they can still add it themselves from the dashboard in a few seconds, or upgrade to Pro to have the assistant do it for them next time. Never attempt to draft or describe an entry as if it were being logged when this isn't available."
-    );
-  } else if (logEntryAccess === "car") {
-    parts.push(
-      "\n\n---\n\nLOGGING VIA CHAT: drafting a new entry by describing it in chat isn't available for cars yet, regardless of Pro status - this is a real, current product gap, not a plan restriction. If asked to add/log something, say so plainly and point them to the dashboard's own logging forms instead. Never attempt to draft or describe an entry as if it were being logged."
     );
   }
 
@@ -288,15 +289,12 @@ export async function POST(req: Request) {
 
   // Same fail-open-to-"none" reasoning as compareContext above - an
   // isPro() hiccup should just mean the feature isn't offered this
-  // request, never a broken/hanging chat.
-  let logEntryAccess: "available" | "upsell" | "none" | "car" = "none";
-  if (activeVehicleKind === "car") {
-    // Real, current product gap, not a plan restriction - see
-    // AssistantProposedEntryCard.tsx's own top-of-file comment for why
-    // it stays bike-only for now. Checked before the Pro lookup below,
-    // since a car-active Pro account still can't use this yet.
-    logEntryAccess = "car";
-  } else if (signedIn && session) {
+  // request, never a broken/hanging chat. Pro-gating itself is identical
+  // for bike and car sessions alike - which CATEGORIES the tool actually
+  // offers is what differs by vehicle kind (see
+  // buildLogEntryToolDeclarations below), not whether it's offered at all.
+  let logEntryAccess: "available" | "upsell" | "none" = "none";
+  if (signedIn && session) {
     try {
       logEntryAccess = (await isPro(session.email)) ? "available" : "upsell";
     } catch (err) {
@@ -341,14 +339,14 @@ export async function POST(req: Request) {
     }
   }
 
-  const systemInstruction = buildSystemInstruction(config, signedIn, privacyPolicyText, !!reportToken, dashboardTabLabel, compareBikeNames, logEntryAccess, carKnowledgeBase);
+  const systemInstruction = buildSystemInstruction(config, signedIn, privacyPolicyText, !!reportToken, dashboardTabLabel, compareBikeNames, logEntryAccess, activeVehicleKind, carKnowledgeBase);
 
   const contents: GeminiContent[] = toGeminiContents(messages);
   const toolDeclarations = [
     ...(signedIn ? ASSISTANT_TOOL_DECLARATIONS : []),
     ...(reportToken ? REPORT_TOOL_DECLARATIONS : []),
     ...(compareContext ? COMPARISON_TOOL_DECLARATIONS : []),
-    ...(logEntryAccess === "available" ? LOG_ENTRY_TOOL_DECLARATIONS : []),
+    ...(logEntryAccess === "available" ? buildLogEntryToolDeclarations(activeVehicleKind === "car" ? "car" : "bike") : []),
   ];
   const tools = toolDeclarations.length > 0 ? [{ functionDeclarations: toolDeclarations }] : undefined;
 

@@ -104,9 +104,9 @@ async function createReminderBestEffort(email: string, data: Parameters<typeof c
 }
 
 export type ReviewQueueEntry =
-  | { id: string; category: "service"; aiDescription: string; duplicate: DuplicateMatch | null; jobType: string; cost: number; mileage: number; mileageNeedsManualEntry: boolean; mileageWarningText?: string; mileageConflictReferenceId?: string; mileageConflictReferenceCategory?: "service" | "fuel" | "mods" | "mot"; mileageConflictReferenceBatchIndex?: number; plateMismatch: PlateMismatch | null; vehicleMismatch: VehicleMismatch | null; date: string; notes: string; attachment: Attachment }
-  | { id: string; category: "fuel"; aiDescription: string; duplicate: DuplicateMatch | null; litres: number; cost: number; mileage: number; mileageNeedsManualEntry: boolean; mileageWarningText?: string; mileageConflictReferenceId?: string; mileageConflictReferenceCategory?: "service" | "fuel" | "mods" | "mot"; mileageConflictReferenceBatchIndex?: number; plateMismatch: PlateMismatch | null; vehicleMismatch: VehicleMismatch | null; date: string; filledToFull: boolean; attachment: Attachment; precedingFuelMileage?: number; tankCapacityLitres?: number }
-  | { id: string; category: "mods"; aiDescription: string; duplicate: DuplicateMatch | null; name: string; modCategory: string; cost: number; mileage: number; mileageNeedsManualEntry: boolean; mileageWarningText?: string; mileageConflictReferenceId?: string; mileageConflictReferenceCategory?: "service" | "fuel" | "mods" | "mot"; mileageConflictReferenceBatchIndex?: number; plateMismatch: PlateMismatch | null; vehicleMismatch: VehicleMismatch | null; date: string; notes: string; attachment: Attachment }
+  | { id: string; category: "service"; aiDescription: string; duplicate: DuplicateMatch | null; jobType: string; cost: number; mileage: number; mileageNeedsManualEntry: boolean; mileageWarningText?: string; mileageConflictReferenceId?: string; mileageConflictReferenceCategory?: "service" | "fuel" | "mods" | "mot" | "labour"; mileageConflictReferenceBatchIndex?: number; plateMismatch: PlateMismatch | null; vehicleMismatch: VehicleMismatch | null; date: string; notes: string; attachment: Attachment }
+  | { id: string; category: "fuel"; aiDescription: string; duplicate: DuplicateMatch | null; litres: number; cost: number; mileage: number; mileageNeedsManualEntry: boolean; mileageWarningText?: string; mileageConflictReferenceId?: string; mileageConflictReferenceCategory?: "service" | "fuel" | "mods" | "mot" | "labour"; mileageConflictReferenceBatchIndex?: number; plateMismatch: PlateMismatch | null; vehicleMismatch: VehicleMismatch | null; date: string; filledToFull: boolean; attachment: Attachment; precedingFuelMileage?: number; tankCapacityLitres?: number }
+  | { id: string; category: "mods"; aiDescription: string; duplicate: DuplicateMatch | null; name: string; modCategory: string; cost: number; mileage: number; mileageNeedsManualEntry: boolean; mileageWarningText?: string; mileageConflictReferenceId?: string; mileageConflictReferenceCategory?: "service" | "fuel" | "mods" | "mot" | "labour"; mileageConflictReferenceBatchIndex?: number; plateMismatch: PlateMismatch | null; vehicleMismatch: VehicleMismatch | null; date: string; notes: string; attachment: Attachment }
   | { id: string; category: "bills"; aiDescription: string; duplicate: DuplicateMatch | null; billType: string; cost: number; plateMismatch: PlateMismatch | null; vehicleMismatch: VehicleMismatch | null; date: string; notes: string; attachment: Attachment };
 
 export async function commitReceiptItem(
@@ -207,7 +207,7 @@ export async function commitReceiptItem(
   let mileageWarning: string | undefined;
   let mileageNeedsManualEntry = false;
   let conflictReferenceId: string | undefined;
-  let conflictReferenceCategory: "service" | "fuel" | "mods" | "mot" | undefined;
+  let conflictReferenceCategory: "service" | "fuel" | "mods" | "mot" | "labour" | undefined;
   let conflictReferenceBatchIndex: number | undefined;
 
   const filledToFullGuess = category === "fuel" ? guessFilledToFull(litres ?? 0, bike.tankCapacityLitres) : false;

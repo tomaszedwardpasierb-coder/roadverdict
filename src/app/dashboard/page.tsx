@@ -8,6 +8,8 @@ import { getServiceRecords } from "@/lib/tracker/serviceRecord";
 import { getFuelLogs, computeActualMPG, computeMPGSeries } from "@/lib/tracker/fuelLog";
 import { getMods } from "@/lib/tracker/mod";
 import { getBills } from "@/lib/tracker/bill";
+import { getLabour } from "@/lib/tracker/labour";
+import { LABOUR_LABELS } from "@/lib/tracker/labourTypes";
 import { getBillSeriesForBike, materializeAllDueForBike } from "@/lib/tracker/billSeries";
 import { getReminders, computeReminderStatus } from "@/lib/tracker/reminder";
 import { getShareLinksForUser } from "@/lib/tracker/shareLink";
@@ -34,10 +36,12 @@ import { LogServiceForm } from "./LogServiceForm";
 import { LogFuelForm } from "./LogFuelForm";
 import { LogModForm } from "./LogModForm";
 import { LogBillForm } from "./LogBillForm";
+import { LogLabourForm } from "./LogLabourForm";
 import { ServiceHistoryCard } from "./ServiceHistoryCard";
 import { FuelLogCard } from "./FuelLogCard";
 import { ModCard } from "./ModCard";
 import { BillCard } from "./BillCard";
+import { LabourCard } from "./LabourCard";
 import { BillSeriesSummary } from "./BillSeriesSummary";
 import { ExcludeFromReportToggle } from "./ExcludeFromReportToggle";
 import { ReminderItem } from "./ReminderItem";
@@ -84,6 +88,8 @@ import { getCarServiceRecords } from "@/lib/tracker/carServiceRecord";
 import { getCarFuelLogs } from "@/lib/tracker/carFuelLog";
 import { getCarMods } from "@/lib/tracker/carMod";
 import { getCarBills } from "@/lib/tracker/carBill";
+import { getCarLabour } from "@/lib/tracker/carLabour";
+import { CAR_LABOUR_LABELS } from "@/lib/tracker/carLabourTypes";
 import { getCarReminders } from "@/lib/tracker/carReminder";
 import { computeCarReminderStatus } from "@/lib/tracker/carReminderStatus";
 import { computeCarSpendSummary, computeCarYearSpend, gatherCarMileagePoints } from "@/lib/tracker/carSummary";
@@ -94,10 +100,12 @@ import { LogCarServiceForm } from "./LogCarServiceForm";
 import { LogCarFuelForm } from "./LogCarFuelForm";
 import { LogCarModForm } from "./LogCarModForm";
 import { LogCarBillForm } from "./LogCarBillForm";
+import { LogCarLabourForm } from "./LogCarLabourForm";
 import { CarServiceHistoryCard } from "./CarServiceHistoryCard";
 import { CarFuelLogCard } from "./CarFuelLogCard";
 import { CarModCard } from "./CarModCard";
 import { CarBillCard } from "./CarBillCard";
+import { CarLabourCard } from "./CarLabourCard";
 import { CarReminderItem } from "./CarReminderItem";
 
 export const dynamic = "force-dynamic";
@@ -195,11 +203,12 @@ export default async function DashboardPage(props: { searchParams: Promise<{ add
     await materializeAllDueForBike(session.email, bike.id);
   }
 
-  const [records, fuelLogs, mods, bills, billSeries, reminders, rates] = await Promise.all([
+  const [records, fuelLogs, mods, bills, labour, billSeries, reminders, rates] = await Promise.all([
     getServiceRecords(session.email, bike.id),
     getFuelLogs(session.email, bike.id),
     getMods(session.email, bike.id),
     getBills(session.email, bike.id),
+    getLabour(session.email, bike.id),
     getBillSeriesForBike(session.email, bike.id),
     getReminders(session.email, bike.id),
     getExchangeRates(),
@@ -210,14 +219,15 @@ export default async function DashboardPage(props: { searchParams: Promise<{ add
     fuel: fuelLogs.filter((f) => f.needsReview).map((f) => f.id),
     mods: mods.filter((m) => m.needsReview).map((m) => m.id),
     bills: bills.filter((b) => b.needsReview).map((b) => b.id),
+    labour: labour.filter((l) => l.needsReview).map((l) => l.id),
   };
   const actualMpg = computeActualMPG(fuelLogs, bike.dvlaData?.officialCombinedMpg);
   const mpgSeries = computeMPGSeries(fuelLogs, bike.dvlaData?.officialCombinedMpg);
-  const mileagePoints = gatherMileagePoints(records, mods, fuelLogs, bills);
+  const mileagePoints = gatherMileagePoints(records, mods, fuelLogs, bills, labour);
   const fuelCostPoints = fuelLogs.map((f) => ({ id: f.id, date: f.date, cost: f.cost, mileage: f.mileage }));
-  const summary = computeSpendSummary(records, mods, fuelLogs, bills);
+  const summary = computeSpendSummary(records, mods, fuelLogs, bills, labour);
   const currentYear = new Date().getFullYear();
-  const yearSpend = computeYearSpend(records, mods, fuelLogs, bills, currentYear);
+  const yearSpend = computeYearSpend(records, mods, fuelLogs, bills, currentYear, labour);
   const overBudget = bike.annualBudget != null && yearSpend >= bike.annualBudget;
 
   const recentActivity: RecentActivityItem[] = [
@@ -243,6 +253,12 @@ export default async function DashboardPage(props: { searchParams: Promise<{ add
       date: b.date, icon: "📄", type: "Bill",
       description: BILL_LABELS[b.billType] ?? b.billType,
       category: "Insurance/tax/MOT/finance", cost: b.cost,
+    })),
+    ...labour.map((l) => ({
+      id: l.id, reviewCategory: "labour" as const,
+      date: l.date, icon: "🔨", type: "Labour",
+      description: LABOUR_LABELS[l.category] ?? l.category,
+      category: "Labour", cost: l.cost, mileage: l.mileage,
     })),
   ]
     .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
@@ -345,6 +361,7 @@ export default async function DashboardPage(props: { searchParams: Promise<{ add
           records={records}
           mods={mods}
           bills={bills}
+          labour={labour}
           fuelLogs={fuelLogs}
           currentMileage={bike.currentMileage}
           startingMileage={bike.startingMileage}
@@ -378,7 +395,7 @@ export default async function DashboardPage(props: { searchParams: Promise<{ add
         <BudgetWidget yearSpend={yearSpend} currentYear={currentYear} initialBudget={bike.annualBudget} currency={currency} rates={rates} />
         <div className={styles.chartCard}>
           {summary.grandTotal > 0 ? (
-            <SpendDonutChart records={records} mods={mods} fuelLogs={fuelLogs} bills={bills} currency={currency} rates={rates} initialChartType={bike.chartTypes?.["spend-donut"] === "bar" ? "bar" : "pie"} isPro={userIsPro} />
+            <SpendDonutChart records={records} mods={mods} fuelLogs={fuelLogs} bills={bills} labour={labour} currency={currency} rates={rates} initialChartType={bike.chartTypes?.["spend-donut"] === "bar" ? "bar" : "pie"} isPro={userIsPro} />
           ) : (
             <>
               <div className={styles.chartCardTitle}>Spend by category</div>
@@ -521,6 +538,23 @@ export default async function DashboardPage(props: { searchParams: Promise<{ add
     </>
   );
 
+  const labourContent = (
+    <>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "0.75rem" }}>
+        <h1 className={styles.heading}>Labour{bikeTag}</h1>
+        {mileagePill}
+      </div>
+      <p className={styles.subtext}>Workshop time and diagnostic hours - the part of the bill that&apos;s easy to forget once the parts themselves are paid for.</p>
+      <LogLabourForm initialMileage={bike.currentMileage} mileageHistory={mileagePoints} distanceUnit={distanceUnit} currency={currency} rates={rates} bikeYear={bike.year} isCustomBuild={bike.isCustomBuild} />
+      <h2 className={styles.sectionHeading}>History</h2>
+      {labour.length === 0 ? (
+        <div className={styles.card}><p className={styles.cardBody}>No labour logged yet.</p></div>
+      ) : (
+        labour.map((l) => <LabourCard key={l.id} labour={l} distanceUnit={distanceUnit} currency={currency} rates={rates} pendingReviewIds={pendingReviewIds} mileageHistory={mileagePoints} currentMileage={bike.currentMileage} />)
+      )}
+    </>
+  );
+
   const remindersContent = (
     <>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "0.75rem" }}>
@@ -615,6 +649,16 @@ export default async function DashboardPage(props: { searchParams: Promise<{ add
             <>
               <div className={styles.chartCardTitle}>Insurance, tax, MOT & finance spend over time</div>
               <p className={styles.emptyNote}>No insurance, tax, or MOT payments logged yet.</p>
+            </>
+          )}
+        </div>
+        <div className={styles.chartCard}>
+          {labour.length > 0 ? (
+            <CategorySpendChart chartId="labour-spend" title="Labour spend over time" items={labour} category="labour" color="#3E6B99" currency={currency} rates={rates} distanceUnit={distanceUnit} initialChartType={bike.chartTypes?.["labour-spend"] === "line" ? "line" : "bar"} />
+          ) : (
+            <>
+              <div className={styles.chartCardTitle}>Labour spend over time</div>
+              <p className={styles.emptyNote}>No labour logged yet.</p>
             </>
           )}
         </div>
@@ -801,6 +845,7 @@ export default async function DashboardPage(props: { searchParams: Promise<{ add
       serviceContent={serviceContent}
       fuelContent={fuelContent}
       modsContent={modsContent}
+      labourContent={labourContent}
       billsContent={billsContent}
       remindersContent={remindersContent}
       reportsContent={reportsContent}
@@ -839,11 +884,12 @@ async function renderCarDashboard(email: string, car: CarDoc, allCars: CarDoc[],
   const fuelEconomyUnit: FuelEconomyUnit = car.fuelEconomyUnit ?? "mpg";
   const currency: Currency = car.currency ?? "GBP";
 
-  const [records, fuelLogs, mods, bills, reminders, rates] = await Promise.all([
+  const [records, fuelLogs, mods, bills, labour, reminders, rates] = await Promise.all([
     getCarServiceRecords(email, car.id),
     getCarFuelLogs(email, car.id),
     getCarMods(email, car.id),
     getCarBills(email, car.id),
+    getCarLabour(email, car.id),
     getCarReminders(email, car.id),
     getExchangeRates(),
   ]);
@@ -853,13 +899,14 @@ async function renderCarDashboard(email: string, car: CarDoc, allCars: CarDoc[],
     fuel: fuelLogs.filter((f) => f.needsReview).map((f) => f.id),
     mods: mods.filter((m) => m.needsReview).map((m) => m.id),
     bills: bills.filter((b) => b.needsReview).map((b) => b.id),
+    labour: labour.filter((l) => l.needsReview).map((l) => l.id),
   };
 
-  const mileagePoints = gatherCarMileagePoints(records, mods, fuelLogs, bills);
+  const mileagePoints = gatherCarMileagePoints(records, mods, fuelLogs, bills, labour);
   const currentYear = new Date().getFullYear();
-  const yearSpend = computeCarYearSpend(records, mods, fuelLogs, bills, currentYear);
+  const yearSpend = computeCarYearSpend(records, mods, fuelLogs, bills, currentYear, labour);
   const overBudget = car.annualBudget != null && yearSpend >= car.annualBudget;
-  const summary = computeCarSpendSummary(records, mods, fuelLogs, bills);
+  const summary = computeCarSpendSummary(records, mods, fuelLogs, bills, labour);
 
   // DashboardStatCards' MPG calc is petrol/diesel/hybrid-only (a litres
   // reading, not a kWh one) - the same reason Phase 3's receipt scanner
@@ -889,6 +936,10 @@ async function renderCarDashboard(email: string, car: CarDoc, allCars: CarDoc[],
     ...bills.map((b) => ({
       id: b.id, reviewCategory: "bills" as const, date: b.date, icon: "📄", type: "Bill",
       description: CAR_BILL_LABELS[b.billType] ?? b.billType, category: "Insurance/tax/MOT/finance", cost: b.cost,
+    })),
+    ...labour.map((l) => ({
+      id: l.id, reviewCategory: "labour" as const, date: l.date, icon: "🔨", type: "Labour",
+      description: CAR_LABOUR_LABELS[l.category] ?? l.category, category: "Labour", cost: l.cost, mileage: l.mileage,
     })),
   ]
     .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
@@ -936,6 +987,7 @@ async function renderCarDashboard(email: string, car: CarDoc, allCars: CarDoc[],
           records={records}
           mods={mods}
           bills={bills}
+          labour={labour}
           fuelLogs={mpgFuelLogs}
           currentMileage={car.currentMileage}
           startingMileage={car.startingMileage}
@@ -965,7 +1017,7 @@ async function renderCarDashboard(email: string, car: CarDoc, allCars: CarDoc[],
         <BudgetWidget yearSpend={yearSpend} currentYear={currentYear} initialBudget={car.annualBudget} currency={currency} rates={rates} vehicleKind="car" />
         <div className={styles.chartCard}>
           {summary.grandTotal > 0 ? (
-            <SpendDonutChart records={records} mods={mods} fuelLogs={fuelLogs} bills={bills} currency={currency} rates={rates} initialChartType={car.chartTypes?.["spend-donut"] === "bar" ? "bar" : "pie"} isPro={userIsPro} vehicleKind="car" />
+            <SpendDonutChart records={records} mods={mods} fuelLogs={fuelLogs} bills={bills} labour={labour} currency={currency} rates={rates} initialChartType={car.chartTypes?.["spend-donut"] === "bar" ? "bar" : "pie"} isPro={userIsPro} vehicleKind="car" />
           ) : (
             <>
               <div className={styles.chartCardTitle}>Spend by category</div>
@@ -1067,6 +1119,23 @@ async function renderCarDashboard(email: string, car: CarDoc, allCars: CarDoc[],
     </>
   );
 
+  const labourContent = (
+    <>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "0.75rem" }}>
+        <h1 className={styles.heading}>Labour{carTag}</h1>
+        {mileagePill}
+      </div>
+      <p className={styles.subtext}>Workshop time and diagnostic hours - the part of the bill that&apos;s easy to forget once the parts themselves are paid for.</p>
+      <LogCarLabourForm initialMileage={car.currentMileage} mileageHistory={mileagePoints} distanceUnit={distanceUnit} currency={currency} rates={rates} carYear={car.year} isCustomBuild={car.isCustomBuild} />
+      <h2 className={styles.sectionHeading}>History</h2>
+      {labour.length === 0 ? (
+        <div className={styles.card}><p className={styles.cardBody}>No labour logged yet.</p></div>
+      ) : (
+        labour.map((l) => <CarLabourCard key={l.id} labour={l} distanceUnit={distanceUnit} currency={currency} rates={rates} pendingReviewIds={pendingReviewIds} mileageHistory={mileagePoints} currentMileage={car.currentMileage} />)
+      )}
+    </>
+  );
+
   const remindersContent = (
     <>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "0.75rem" }}>
@@ -1130,6 +1199,7 @@ async function renderCarDashboard(email: string, car: CarDoc, allCars: CarDoc[],
       serviceContent={serviceContent}
       fuelContent={fuelContent}
       modsContent={modsContent}
+      labourContent={labourContent}
       billsContent={billsContent}
       remindersContent={remindersContent}
       privacyContent={privacyContent}

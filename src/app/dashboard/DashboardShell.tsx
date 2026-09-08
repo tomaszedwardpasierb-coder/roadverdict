@@ -15,9 +15,9 @@ import { DEMO_EMAIL } from '@/lib/tracker/demoSeed';
 import { Icon, type IconName } from './Icon';
 import styles from './dashboard.module.css';
 
-type Section = 'dashboard' | 'service' | 'fuel' | 'mods' | 'bills' | 'reminders' | 'reports' | 'shareLinks' | 'story' | 'quoteChecker' | 'costCalculator' | 'buyingGuide' | 'privacy' | 'transferOwnership' | 'security';
+type Section = 'dashboard' | 'service' | 'fuel' | 'mods' | 'bills' | 'labour' | 'reminders' | 'reports' | 'shareLinks' | 'story' | 'quoteChecker' | 'costCalculator' | 'buyingGuide' | 'privacy' | 'transferOwnership' | 'security';
 
-const REVIEW_CATEGORIES: ReviewCategory[] = ['service', 'fuel', 'mods', 'bills'];
+const REVIEW_CATEGORIES: ReviewCategory[] = ['service', 'fuel', 'mods', 'bills', 'labour'];
 function asReviewCategory(key: string): ReviewCategory | null {
   return (REVIEW_CATEGORIES as string[]).includes(key) ? (key as ReviewCategory) : null;
 }
@@ -28,6 +28,7 @@ const NAV_ITEMS: { key: Section; label: string; icon: IconName }[] = [
   { key: 'fuel', label: 'Fuel', icon: 'fuel' },
   { key: 'mods', label: 'Parts & Accessories', icon: 'mods' },
   { key: 'bills', label: 'Insurance, Tax, MOT & Finance', icon: 'bills' },
+  { key: 'labour', label: 'Labour', icon: 'labour' },
   { key: 'reminders', label: 'Reminders', icon: 'reminders' },
   { key: 'reports', label: 'Reports', icon: 'reports' },
   { key: 'story', label: 'The Story So Far', icon: 'story' },
@@ -48,6 +49,7 @@ const MOBILE_NAV_ITEMS: { key: Section; label: string; icon: IconName }[] = [
 
 const MORE_ITEMS: { key: Section; label: string; icon: IconName }[] = [
   { key: 'bills', label: 'Insurance, Tax, MOT & Finance', icon: 'bills' },
+  { key: 'labour', label: 'Labour', icon: 'labour' },
   { key: 'reminders', label: 'Reminders', icon: 'reminders' },
   { key: 'reports', label: 'Reports', icon: 'reports' },
   { key: 'story', label: 'The Story So Far', icon: 'story' },
@@ -96,6 +98,7 @@ interface Props {
   serviceContent: ReactNode;
   fuelContent: ReactNode;
   modsContent: ReactNode;
+  labourContent: ReactNode;
   billsContent: ReactNode;
   remindersContent: ReactNode;
   // Undefined for a car-active session - see CAR_UNAVAILABLE_SECTIONS.
@@ -144,6 +147,7 @@ export function DashboardShell({
   serviceContent,
   fuelContent,
   modsContent,
+  labourContent,
   billsContent,
   remindersContent,
   reportsContent,
@@ -179,6 +183,7 @@ export function DashboardShell({
     service: serviceContent,
     fuel: fuelContent,
     mods: modsContent,
+    labour: labourContent,
     bills: billsContent,
     reminders: remindersContent,
     reports: reportsContent,
@@ -192,7 +197,7 @@ export function DashboardShell({
     security: securityContent,
   };
 
-  const isMoreActive = active === 'bills' || active === 'reminders' || active === 'reports' || active === 'story' || active === 'shareLinks' || active === 'quoteChecker' || active === 'costCalculator' || active === 'buyingGuide' || active === 'privacy' || active === 'transferOwnership' || active === 'security';
+  const isMoreActive = active === 'bills' || active === 'labour' || active === 'reminders' || active === 'reports' || active === 'story' || active === 'shareLinks' || active === 'quoteChecker' || active === 'costCalculator' || active === 'buyingGuide' || active === 'privacy' || active === 'transferOwnership' || active === 'security';
 
   return (
     <TabSwitchProvider onSwitchTab={(cat) => setActive(cat)}>

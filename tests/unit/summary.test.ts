@@ -15,11 +15,22 @@ describe("computeSpendSummary", () => {
       [{ cost: 20 } as any, { cost: 30 } as any],
       [{ cost: 80 } as any]
     );
-    expect(result).toEqual({ servicingTotal: 150, modsTotal: 300, fuelTotal: 50, billsTotal: 80, grandTotal: 580 });
+    expect(result).toEqual({ servicingTotal: 150, modsTotal: 300, fuelTotal: 50, billsTotal: 80, labourTotal: 0, grandTotal: 580 });
   });
 
   it("returns all zeros for no records at all", () => {
-    expect(computeSpendSummary([], [], [], [])).toEqual({ servicingTotal: 0, modsTotal: 0, fuelTotal: 0, billsTotal: 0, grandTotal: 0 });
+    expect(computeSpendSummary([], [], [], [])).toEqual({ servicingTotal: 0, modsTotal: 0, fuelTotal: 0, billsTotal: 0, labourTotal: 0, grandTotal: 0 });
+  });
+
+  it("includes labour in both the per-category total and the grand total", () => {
+    const result = computeSpendSummary(
+      [{ cost: 100 } as any],
+      [{ cost: 50 } as any],
+      [{ cost: 20 } as any],
+      [{ cost: 10 } as any],
+      [{ cost: 40 } as any, { cost: 5 } as any]
+    );
+    expect(result).toEqual({ servicingTotal: 100, modsTotal: 50, fuelTotal: 20, billsTotal: 10, labourTotal: 45, grandTotal: 225 });
   });
 });
 

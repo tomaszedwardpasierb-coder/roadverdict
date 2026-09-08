@@ -20,6 +20,7 @@ interface Props {
   records: CostItem[];
   mods: CostItem[];
   bills: CostItem[];
+  labour: CostItem[];
   fuelLogs: (MpgCalcInput & { cost: number })[];
   currentMileage: number;
   startingMileage: number;
@@ -36,6 +37,7 @@ export function DashboardStatCards({
   records,
   mods,
   bills,
+  labour,
   fuelLogs,
   currentMileage,
   startingMileage,
@@ -50,8 +52,9 @@ export function DashboardStatCards({
   const filteredRecords = filterByDateRange(records, range);
   const filteredMods = filterByDateRange(mods, range);
   const filteredBills = filterByDateRange(bills, range);
+  const filteredLabour = filterByDateRange(labour, range);
   const filteredFuel = filterByDateRange(fuelLogs, range);
-  const totalSpend = [...filteredRecords, ...filteredMods, ...filteredBills, ...filteredFuel].reduce((sum, r) => sum + r.cost, 0);
+  const totalSpend = [...filteredRecords, ...filteredMods, ...filteredBills, ...filteredLabour, ...filteredFuel].reduce((sum, r) => sum + r.cost, 0);
 
   // Segments are computed on the FULL, unfiltered fuel log first, so a
   // fill-up right at the edge of the range still has its preceding
@@ -74,6 +77,7 @@ export function DashboardStatCards({
   const mileagePoints: number[] = [
     ...filteredRecords.map((r) => r.mileage).filter((m): m is number => m != null),
     ...filteredMods.map((r) => r.mileage).filter((m): m is number => m != null),
+    ...filteredLabour.map((r) => r.mileage).filter((m): m is number => m != null),
     ...filteredFuel.map((r) => r.mileage),
   ];
   if (range === 'all') {

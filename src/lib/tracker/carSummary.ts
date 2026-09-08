@@ -14,24 +14,28 @@ import type { CarServiceRecordDoc } from "./carServiceRecord";
 import type { CarModDoc } from "./carMod";
 import type { CarFuelLogDoc } from "./carFuelLog";
 import type { CarBillDoc } from "./carBill";
+import type { CarLabourDoc } from "./carLabour";
 import type { SpendSummary, MileagePoint } from "./summary";
 
 export function computeCarSpendSummary(
   records: CarServiceRecordDoc[],
   mods: CarModDoc[],
   fuelLogs: CarFuelLogDoc[],
-  bills: CarBillDoc[]
+  bills: CarBillDoc[],
+  labour: CarLabourDoc[] = []
 ): SpendSummary {
   const servicingTotal = records.reduce((sum, r) => sum + r.cost, 0);
   const modsTotal = mods.reduce((sum, m) => sum + m.cost, 0);
   const fuelTotal = fuelLogs.reduce((sum, f) => sum + f.cost, 0);
   const billsTotal = bills.reduce((sum, b) => sum + b.cost, 0);
+  const labourTotal = labour.reduce((sum, l) => sum + l.cost, 0);
   return {
     servicingTotal,
     modsTotal,
     fuelTotal,
     billsTotal,
-    grandTotal: servicingTotal + modsTotal + fuelTotal + billsTotal,
+    labourTotal,
+    grandTotal: servicingTotal + modsTotal + fuelTotal + billsTotal + labourTotal,
   };
 }
 
@@ -40,18 +44,20 @@ export function computeCarYearSpend(
   mods: CarModDoc[],
   fuelLogs: CarFuelLogDoc[],
   bills: CarBillDoc[],
-  year: number
+  year: number,
+  labour: CarLabourDoc[] = []
 ): number {
   const inYear = (d: string) => new Date(d).getFullYear() === year;
   const sum = (arr: { date: string; cost: number }[]) => arr.filter((x) => inYear(x.date)).reduce((s, x) => s + x.cost, 0);
-  return sum(records) + sum(mods) + sum(fuelLogs) + sum(bills);
+  return sum(records) + sum(mods) + sum(fuelLogs) + sum(bills) + sum(labour);
 }
 
 export function gatherCarMileagePoints(
   records: CarServiceRecordDoc[],
   mods: CarModDoc[],
   fuelLogs: CarFuelLogDoc[],
-  bills: CarBillDoc[] = []
+  bills: CarBillDoc[] = [],
+  labour: CarLabourDoc[] = []
 ): MileagePoint[] {
   const points: MileagePoint[] = [
     ...records.map((r) => ({ date: r.date, mileage: r.mileage, id: r.id, category: "service" as const })),
@@ -60,6 +66,7 @@ export function gatherCarMileagePoints(
     ...bills
       .filter((b) => b.billType === "mot-test" && b.mileage != null)
       .map((b) => ({ date: b.date, mileage: b.mileage as number, id: b.id, category: "mot" as const })),
+    ...labour.map((l) => ({ date: l.date, mileage: l.mileage, id: l.id, category: "labour" as const })),
   ];
   return points.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 }

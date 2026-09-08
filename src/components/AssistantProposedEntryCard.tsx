@@ -6,6 +6,8 @@ import { useRouter } from 'next/navigation';
 import { JOB_GROUPS, JOB_LABELS } from '@/lib/tracker/jobTypes';
 import { BILL_LABELS } from '@/lib/tracker/billTypes';
 import { MOD_GROUPS, MOD_LABELS } from '@/lib/tracker/modTypes';
+import { LABOUR_GROUPS, LABOUR_LABELS } from '@/lib/tracker/labourTypes';
+import { CAR_LABOUR_GROUPS, CAR_LABOUR_LABELS } from '@/lib/tracker/carLabourTypes';
 import styles from './AssistantProposedEntryCard.module.css';
 
 export interface ProposedServiceEntry {
@@ -46,20 +48,46 @@ export interface ProposedFuelEntry {
   filledToFull: boolean;
 }
 
-export type ProposedEntry = ProposedServiceEntry | ProposedBillEntry | ProposedModEntry | ProposedFuelEntry;
+export interface ProposedLabourEntry {
+  category: 'labour';
+  labourCategory: string;
+  labourLabel: string;
+  description: string;
+  cost: number;
+  date: string;
+  mileage: number;
+  // The only variant that can come from either vehicle kind - carried on
+  // the entry itself (see assistantTools.ts's ProposedEntry type) so this
+  // card knows which catalog to render and which endpoint to post to
+  // without re-resolving the account's active vehicle a second time.
+  vehicleKind: 'bike' | 'car';
+}
 
-const ENDPOINT: Record<ProposedEntry['category'], string> = {
+export type ProposedEntry = ProposedServiceEntry | ProposedBillEntry | ProposedModEntry | ProposedFuelEntry | ProposedLabourEntry;
+
+const ENDPOINT: Record<Exclude<ProposedEntry['category'], 'labour'>, string> = {
   service: '/api/tracker/services',
   bill: '/api/tracker/bills',
   mod: '/api/tracker/mods',
   fuel: '/api/tracker/fuel',
 };
 
+// Labour is the one category needing a vehicle-kind-dependent endpoint -
+// every other category is bike-only, so a plain lookup table is enough
+// for those.
+function getEndpoint(entry: ProposedEntry): string {
+  if (entry.category === 'labour') {
+    return entry.vehicleKind === 'car' ? '/api/cars/car-labour' : '/api/tracker/labour';
+  }
+  return ENDPOINT[entry.category];
+}
+
 const CARD_TITLE: Record<ProposedEntry['category'], string> = {
   service: 'New service record',
   bill: 'New bill',
   mod: 'New modification/accessory',
   fuel: 'New fuel log',
+  labour: 'New labour entry',
 };
 
 // Renders the AI assistant's draft for a new service record, bill,
@@ -73,6 +101,7 @@ export function AssistantProposedEntryCard({ entry }: { entry: ProposedEntry }) 
   const [jobType, setJobType] = useState(entry.category === 'service' ? entry.jobType : '');
   const [billType, setBillType] = useState(entry.category === 'bill' ? entry.billType : '');
   const [modCategory, setModCategory] = useState(entry.category === 'mod' ? entry.modCategory : '');
+  const [labourCategory, setLabourCategory] = useState(entry.category === 'labour' ? entry.labourCategory : '');
   const [description, setDescription] = useState(entry.category !== 'fuel' ? entry.description : '');
   const [cost, setCost] = useState(String(entry.cost));
   const [date, setDate] = useState(entry.date);
@@ -108,10 +137,12 @@ export function AssistantProposedEntryCard({ entry }: { entry: ProposedEntry }) 
         ? { billType, cost: costValue, date, notes: description }
         : entry.category === 'mod'
         ? { category: modCategory, name: description, cost: costValue, mileage: Number(mileage), date, mileageAcknowledged: mileageAck }
+        : entry.category === 'labour'
+        ? { category: labourCategory, cost: costValue, mileage: Number(mileage), date, notes: description, mileageAcknowledged: mileageAck }
         : { litres: Number(litres), cost: costValue, mileage: Number(mileage), date, filledToFull, mileageAcknowledged: mileageAck };
 
     try {
-      const res = await fetch(ENDPOINT[entry.category], {
+      const res = await fetch(getEndpoint(entry), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
@@ -136,6 +167,7 @@ export function AssistantProposedEntryCard({ entry }: { entry: ProposedEntry }) 
       entry.category === 'service' ? (JOB_LABELS[jobType] ?? jobType)
       : entry.category === 'bill' ? (BILL_LABELS[billType] ?? billType)
       : entry.category === 'mod' ? (MOD_LABELS[modCategory] ?? modCategory)
+      : entry.category === 'labour' ? ((entry.vehicleKind === 'car' ? CAR_LABOUR_LABELS : LABOUR_LABELS)[labourCategory] ?? labourCategory)
       : 'Fuel fill-up';
     return (
       <div className={styles.card}>
@@ -187,6 +219,21 @@ export function AssistantProposedEntryCard({ entry }: { entry: ProposedEntry }) 
               <optgroup key={g.group} label={g.group}>
                 {g.subgroups.flatMap((sg) => sg.mods).map((m) => (
                   <option key={m} value={m}>{MOD_LABELS[m]}</option>
+                ))}
+              </optgroup>
+            ))}
+          </select>
+        </div>
+      )}
+
+      {entry.category === 'labour' && (
+        <div className={styles.field}>
+          <label htmlFor="ai-labour-category">Category</label>
+          <select id="ai-labour-category" value={labourCategory} onChange={(e) => setLabourCategory(e.target.value)} disabled={submitting}>
+            {(entry.vehicleKind === 'car' ? CAR_LABOUR_GROUPS : LABOUR_GROUPS).map((g) => (
+              <optgroup key={g.group} label={g.group}>
+                {g.jobs.map((j) => (
+                  <option key={j} value={j}>{(entry.vehicleKind === 'car' ? CAR_LABOUR_LABELS : LABOUR_LABELS)[j]}</option>
                 ))}
               </optgroup>
             ))}

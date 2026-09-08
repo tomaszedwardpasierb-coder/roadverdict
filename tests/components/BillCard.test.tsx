@@ -32,7 +32,7 @@ function fmtDate(d: string): string {
   return new Date(d).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
 }
 
-const emptyPendingReviewIds: Record<ReviewCategory, string[]> = { service: [], fuel: [], mods: [], bills: [] };
+const emptyPendingReviewIds: Record<ReviewCategory, string[]> = { service: [], fuel: [], mods: [], bills: [], labour: [] };
 
 function makeBill(overrides: Partial<BillDoc> = {}): BillDoc {
   return {
@@ -223,7 +223,7 @@ describe("BillCard", () => {
     (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({ ok: true, json: async () => ({}) });
     const bill = makeBill({ needsReview: true });
     const onSwitchTab = vi.fn();
-    const pendingReviewIds: Record<ReviewCategory, string[]> = { service: ["svc-1"], fuel: [], mods: [], bills: ["bill-1"] };
+    const pendingReviewIds: Record<ReviewCategory, string[]> = { service: ["svc-1"], fuel: [], mods: [], bills: ["bill-1"], labour: [] };
     const user = userEvent.setup();
     render(
       <TabSwitchProvider onSwitchTab={onSwitchTab}>
@@ -242,7 +242,7 @@ describe("BillCard", () => {
     (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({ ok: true, json: async () => ({}) });
     const bill = makeBill({ needsReview: true });
     const onSwitchTab = vi.fn();
-    const pendingReviewIds: Record<ReviewCategory, string[]> = { service: [], fuel: [], mods: [], bills: ["bill-1", "bill-2"] };
+    const pendingReviewIds: Record<ReviewCategory, string[]> = { service: [], fuel: [], mods: [], bills: ["bill-1", "bill-2"], labour: [] };
     const user = userEvent.setup();
     render(
       <TabSwitchProvider onSwitchTab={onSwitchTab}>

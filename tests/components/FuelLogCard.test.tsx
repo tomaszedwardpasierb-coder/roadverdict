@@ -35,7 +35,7 @@ function makeLog(overrides: Partial<FuelLogDoc> = {}): FuelLogDoc {
 }
 
 const emptyHistory: HistoryPoint[] = [];
-const emptyPending: Record<ReviewCategory, string[]> = { service: [], fuel: [], mods: [], bills: [] };
+const emptyPending: Record<ReviewCategory, string[]> = { service: [], fuel: [], mods: [], bills: [], labour: [] };
 
 function renderCard(props: Partial<Parameters<typeof FuelLogCard>[0]> = {}) {
   return render(
@@ -291,7 +291,7 @@ describe("FuelLogCard", () => {
           distanceUnit="mi"
           currency="GBP"
           rates={null}
-          pendingReviewIds={{ service: [], fuel: ["fuel-A", "fuel-B"], mods: [], bills: [] }}
+          pendingReviewIds={{ service: [], fuel: ["fuel-A", "fuel-B"], mods: [], bills: [], labour: [] }}
           mileageHistory={emptyHistory}
           currentMileage={4000}
         />
@@ -300,7 +300,7 @@ describe("FuelLogCard", () => {
           distanceUnit="mi"
           currency="GBP"
           rates={null}
-          pendingReviewIds={{ service: [], fuel: ["fuel-A", "fuel-B"], mods: [], bills: [] }}
+          pendingReviewIds={{ service: [], fuel: ["fuel-A", "fuel-B"], mods: [], bills: [], labour: [] }}
           mileageHistory={emptyHistory}
           currentMileage={4000}
         />

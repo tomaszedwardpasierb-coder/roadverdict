@@ -1,0 +1,523 @@
+// Place at: src/lib/tracker/carLabourTypes.ts
+//
+// Car equivalent of labourTypes.ts - authored at comparable depth per an
+// explicit choice to mirror the motorcycle list rather than compact it
+// (unlike carModTypes.ts/carJobTypes.ts, which are deliberately much
+// shorter than their motorcycle counterparts - this catalog is the one
+// deliberate exception to that pattern in the whole car build). Not a
+// mechanical translation - several categories don't carry over at all
+// (no chain/final-drive on a car) and two are genuinely new (air
+// conditioning, electric/hybrid drive - covering "including electric").
+//
+// Category mapping from the motorcycle list:
+//   - "Chain & final drive" -> "Transmission & driveshaft" (driveshaft/
+//     CV joint/differential/torque-converter labour instead)
+//   - "Suspension & steering": fork/steering-head-bearing items replaced
+//     with strut/coil-spring/anti-roll-bar/track-rod-end/power-steering
+//   - "Controls & cables" -> "Controls & electronics" (no throttle
+//     cable/choke/clutch cable on a modern car)
+//   - "Exhaust" -> "Exhaust & emissions" (adds DPF/catalytic converter/
+//     EGR valve labour)
+//   - "Bodywork & accessories": car-specific items (bumper/door/wing
+//     mirror/tow bar), reusing carModTypes.ts's own vocabulary
+//   - NEW: "Air conditioning & climate control", "Electric & hybrid
+//     drive" - no motorcycle equivalent at all
+//   - Every other category translates at comparable depth with
+//     car-appropriate wording (turbocharger/timing belt on Engine,
+//     automatic-gearbox items on Clutch & gearbox, ADAS calibration on
+//     Electrical & electronics, TPMS on Tyres & wheels, etc.)
+export const CAR_LABOUR_LABELS: Record<string, string> = {
+  // Routine servicing & maintenance
+  "full-service": "Full car service",
+  "interim-service": "Interim car service",
+  "major-service": "Major car service",
+  "oil-and-filter-replacement": "Engine oil and oil filter replacement",
+  "engine-oil-replacement": "Engine oil replacement",
+  "oil-filter-replacement": "Oil filter replacement",
+  "air-filter-replacement": "Air filter replacement",
+  "cabin-filter-replacement": "Cabin/pollen filter replacement",
+  "spark-plug-replacement": "Spark plug replacement",
+  "spark-plug-inspection": "Spark plug inspection",
+  "brake-fluid-replacement": "Brake fluid replacement",
+  "auto-transmission-fluid-replacement": "Automatic transmission fluid replacement",
+  "manual-gearbox-oil-replacement": "Manual gearbox oil replacement",
+  "differential-oil-replacement": "Differential oil replacement",
+  "general-lubrication-service": "General lubrication service",
+  "fastener-torque-check": "Fastener and torque check",
+  "general-inspection": "General car inspection",
+  "pre-winter-inspection": "Pre-winter inspection",
+  "storage-preparation": "Long-term storage preparation",
+  "storage-recommissioning": "Storage recommissioning",
+
+  // Brakes
+  "front-brake-pad-replacement": "Front brake pad replacement",
+  "rear-brake-pad-replacement": "Rear brake pad replacement",
+  "front-brake-disc-replacement": "Front brake disc replacement",
+  "rear-brake-disc-replacement": "Rear brake disc replacement",
+  "front-brake-caliper-removal-refitting": "Front brake caliper removal/refitting",
+  "rear-brake-caliper-removal-refitting": "Rear brake caliper removal/refitting",
+  "brake-caliper-cleaning": "Brake caliper cleaning",
+  "brake-caliper-overhaul": "Brake caliper overhaul",
+  "brake-bleeding": "Brake bleeding",
+  "brake-system-flush": "Brake system flush",
+  "brake-hose-replacement": "Brake hose replacement",
+  "brake-master-cylinder-replacement": "Brake master cylinder replacement",
+  "brake-master-cylinder-overhaul": "Brake master cylinder overhaul",
+  "brake-servo-inspection": "Brake servo/booster inspection",
+  "brake-pedal-adjustment": "Brake pedal adjustment",
+  "brake-inspection": "Brake inspection",
+  "abs-system-inspection": "ABS system inspection",
+  "abs-fault-diagnosis": "ABS fault diagnosis",
+  "abs-sensor-replacement": "ABS sensor replacement",
+  "brake-fluid-leak-diagnosis": "Brake fluid leak diagnosis",
+  "handbrake-adjustment": "Handbrake/parking brake adjustment",
+  "electronic-parking-brake-diagnosis": "Electronic parking brake diagnosis",
+
+  // Tyres & wheels
+  "front-tyre-removal-fitting": "Front tyre removal and fitting",
+  "rear-tyre-removal-fitting": "Rear tyre removal and fitting",
+  "front-wheel-removal-refitting": "Front wheel removal/refitting",
+  "rear-wheel-removal-refitting": "Rear wheel removal/refitting",
+  "wheel-balancing": "Wheel balancing",
+  "wheel-alignment-tracking": "Wheel alignment/tracking",
+  "tyre-pressure-adjustment": "Tyre pressure adjustment",
+  "tyre-puncture-repair": "Tyre puncture repair",
+  "spare-wheel-check": "Spare wheel/space-saver check",
+  "rim-inspection": "Rim inspection",
+  "wheel-bearing-inspection": "Wheel bearing inspection",
+  "front-wheel-bearing-replacement": "Front wheel bearing replacement",
+  "rear-wheel-bearing-replacement": "Rear wheel bearing replacement",
+  "wheel-hub-removal-refitting": "Wheel spindle/hub removal/refitting",
+  "tyre-valve-replacement": "Tyre valve replacement",
+  "tpms-sensor-replacement": "TPMS sensor replacement",
+  "tpms-reset-calibration": "TPMS reset/calibration",
+
+  // Transmission & driveshaft
+  "driveshaft-inspection": "Driveshaft inspection",
+  "driveshaft-removal-refitting": "Driveshaft removal/refitting",
+  "driveshaft-replacement": "Driveshaft replacement",
+  "cv-joint-inspection": "CV joint inspection",
+  "cv-joint-replacement": "CV joint replacement",
+  "cv-boot-replacement": "CV boot replacement",
+  "propshaft-inspection": "Propshaft inspection",
+  "propshaft-removal-refitting": "Propshaft removal/refitting",
+  "differential-inspection": "Differential inspection",
+  "differential-replacement": "Differential replacement",
+  "torque-converter-inspection": "Torque converter inspection",
+  "torque-converter-replacement": "Torque converter replacement",
+  "transmission-mount-inspection": "Transmission mount inspection",
+  "transmission-mount-replacement": "Transmission mount replacement",
+  "transfer-case-inspection": "4x4/AWD transfer case inspection",
+  "transfer-case-replacement": "4x4/AWD transfer case replacement",
+
+  // Engine
+  "engine-diagnostic-inspection": "Engine diagnostic inspection",
+  "engine-fault-diagnosis": "Engine fault diagnosis",
+  "engine-compression-test": "Engine compression test",
+  "leak-down-test": "Leak-down test",
+  "valve-clearance-inspection": "Valve clearance inspection",
+  "valve-clearance-adjustment": "Valve clearance adjustment",
+  "camshaft-removal-refitting": "Camshaft removal/refitting",
+  "camshaft-inspection": "Camshaft inspection",
+  "timing-belt-inspection": "Timing belt inspection",
+  "timing-belt-replacement": "Timing belt replacement",
+  "timing-chain-inspection": "Timing chain inspection",
+  "timing-chain-replacement": "Timing chain replacement",
+  "timing-adjustment": "Timing adjustment",
+  "cylinder-head-removal-refitting": "Cylinder head removal/refitting",
+  "cylinder-head-overhaul": "Cylinder head overhaul",
+  "cylinder-head-gasket-replacement": "Cylinder head gasket replacement",
+  "rocker-cover-gasket-replacement": "Rocker cover gasket replacement",
+  "engine-gasket-replacement": "Engine gasket replacement",
+  "engine-seal-replacement": "Engine seal replacement",
+  "crankshaft-inspection": "Crankshaft inspection",
+  "piston-removal-refitting": "Piston removal/refitting",
+  "piston-replacement": "Piston replacement",
+  "piston-ring-replacement": "Piston ring replacement",
+  "cylinder-inspection": "Cylinder inspection",
+  "cylinder-replacement": "Cylinder replacement",
+  "cylinder-honing": "Cylinder honing",
+  "turbocharger-inspection": "Turbocharger inspection",
+  "turbocharger-replacement": "Turbocharger replacement",
+  "engine-removal": "Engine removal",
+  "engine-refitting": "Engine refitting",
+  "engine-strip-down": "Engine strip-down",
+  "engine-rebuild": "Engine rebuild",
+  "engine-overhaul": "Engine overhaul",
+  "engine-reassembly": "Engine reassembly",
+  "engine-leak-diagnosis": "Engine leak diagnosis",
+  "oil-leak-diagnosis": "Oil leak diagnosis",
+  "oil-leak-repair": "Oil leak repair",
+  "engine-mounting-inspection": "Engine mounting inspection",
+  "engine-mounting-replacement": "Engine mounting replacement",
+
+  // Clutch & gearbox
+  "clutch-inspection": "Clutch inspection",
+  "clutch-adjustment": "Clutch adjustment",
+  "clutch-hydraulic-bleeding": "Clutch hydraulic system bleeding",
+  "clutch-plate-replacement": "Clutch plate replacement",
+  "clutch-pressure-plate-replacement": "Clutch cover/pressure plate replacement",
+  "dual-mass-flywheel-inspection": "Dual-mass flywheel inspection",
+  "dual-mass-flywheel-replacement": "Dual-mass flywheel replacement",
+  "clutch-assembly-replacement": "Clutch assembly replacement",
+  "clutch-master-cylinder-replacement": "Clutch master cylinder replacement",
+  "clutch-slave-cylinder-replacement": "Clutch slave cylinder replacement",
+  "gearbox-inspection": "Gearbox inspection",
+  "gear-selection-fault-diagnosis": "Gear selection fault diagnosis",
+  "gear-linkage-adjustment": "Gear linkage adjustment",
+  "gear-linkage-replacement": "Gear linkage replacement",
+  "gearbox-removal": "Gearbox removal",
+  "gearbox-overhaul": "Gearbox overhaul",
+  "gearbox-rebuild": "Gearbox rebuild",
+  "auto-gearbox-service": "Automatic gearbox service",
+  "cvt-belt-inspection": "CVT belt/chain inspection",
+  "auto-gearbox-fault-diagnosis": "Automatic gearbox fault diagnosis",
+
+  // Fuel system
+  "fuel-system-inspection": "Fuel system inspection",
+  "fuel-system-diagnosis": "Fuel system diagnosis",
+  "throttle-body-inspection": "Throttle body inspection",
+  "throttle-body-cleaning": "Throttle body cleaning",
+  "fuel-injector-inspection": "Fuel injector inspection",
+  "fuel-injector-removal-refitting": "Fuel injector removal/refitting",
+  "fuel-injector-cleaning": "Fuel injector cleaning",
+  "diesel-injector-removal-refitting": "Diesel injector removal/refitting",
+  "fuel-pump-replacement": "Fuel pump replacement",
+  "fuel-pump-diagnosis": "Fuel pump diagnosis",
+  "fuel-filter-replacement": "Fuel filter replacement",
+  "fuel-hose-replacement": "Fuel hose replacement",
+  "fuel-tank-removal-refitting": "Fuel tank removal/refitting",
+  "fuel-tank-inspection": "Fuel tank inspection",
+  "fuel-leak-diagnosis": "Fuel leak diagnosis",
+  "fuel-system-flush": "Fuel system flush",
+  "diesel-hp-pump-inspection": "Diesel high-pressure pump inspection",
+  "diesel-hp-pump-replacement": "Diesel high-pressure pump replacement",
+
+  // Cooling system
+  "cooling-system-inspection": "Cooling system inspection",
+  "coolant-replacement": "Coolant replacement",
+  "cooling-system-flush": "Cooling system flush",
+  "radiator-removal-refitting": "Radiator removal/refitting",
+  "radiator-replacement": "Radiator replacement",
+  "radiator-cleaning": "Radiator cleaning",
+  "cooling-fan-inspection": "Cooling fan inspection",
+  "cooling-fan-replacement": "Cooling fan replacement",
+  "thermostat-replacement": "Thermostat replacement",
+  "water-pump-inspection": "Water pump inspection",
+  "water-pump-replacement": "Water pump replacement",
+  "coolant-hose-replacement": "Coolant hose replacement",
+  "cooling-system-pressure-test": "Cooling system pressure test",
+  "cooling-system-leak-diagnosis": "Cooling system leak diagnosis",
+
+  // Electrical & electronics
+  "electrical-system-diagnosis": "Electrical system diagnosis",
+  "electrical-fault-finding": "Electrical fault finding",
+  "wiring-inspection": "Wiring inspection",
+  "wiring-repair": "Wiring repair",
+  "wiring-harness-replacement": "Wiring harness replacement",
+  "battery-replacement": "Battery replacement",
+  "battery-testing": "Battery testing",
+  "charging-system-diagnosis": "Charging system diagnosis",
+  "alternator-inspection": "Alternator inspection",
+  "alternator-replacement": "Alternator replacement",
+  "starter-motor-inspection": "Starter motor inspection",
+  "starter-motor-replacement": "Starter motor replacement",
+  "starter-relay-replacement": "Starter relay replacement",
+  "ignition-system-diagnosis": "Ignition system diagnosis",
+  "ignition-coil-replacement": "Ignition coil replacement",
+  "spark-plug-lead-replacement": "Spark plug lead/cap replacement",
+  "ecu-diagnostic-scan": "ECU diagnostic scan",
+  "ecu-fault-diagnosis": "ECU fault diagnosis",
+  "ecu-replacement-programming": "ECU replacement/programming",
+  "sensor-diagnosis": "Sensor diagnosis",
+  "sensor-replacement": "Sensor replacement",
+  "headlight-replacement": "Headlight replacement",
+  "headlight-adjustment": "Headlight bulb/unit adjustment",
+  "indicator-replacement": "Indicator replacement",
+  "rear-light-replacement": "Rear light replacement",
+  "horn-replacement": "Horn replacement",
+  "switch-replacement": "Switch replacement",
+  "fuse-replacement": "Fuse replacement",
+  "immobiliser-diagnosis": "Immobiliser diagnosis",
+  "key-immobiliser-programming": "Key/immobiliser programming",
+  "parking-sensor-replacement": "Parking sensor replacement",
+  "reversing-camera-replacement": "Reversing camera replacement",
+  "adas-calibration": "ADAS calibration (cameras/radar)",
+
+  // Suspension & steering
+  "front-suspension-inspection": "Front suspension inspection",
+  "rear-suspension-inspection": "Rear suspension inspection",
+  "front-strut-inspection": "Front strut/coilover inspection",
+  "front-strut-replacement": "Front strut/coilover replacement",
+  "rear-shock-replacement": "Rear strut/shock replacement",
+  "coil-spring-replacement": "Coil spring replacement",
+  "anti-roll-bar-link-replacement": "Anti-roll bar/drop link replacement",
+  "suspension-bush-replacement": "Suspension bush replacement",
+  "suspension-arm-replacement": "Suspension arm/wishbone replacement",
+  "suspension-linkage-bearing-replacement": "Suspension linkage bearing replacement",
+  "track-rod-end-replacement": "Track rod end replacement",
+  "steering-rack-inspection": "Steering rack inspection",
+  "steering-rack-replacement": "Steering rack replacement",
+  "power-steering-pump-replacement": "Power steering pump replacement",
+  "power-steering-fluid-replacement": "Power steering fluid replacement",
+  "electric-power-steering-diagnosis": "Electric power steering diagnosis",
+  "steering-alignment": "Steering alignment",
+  "steering-column-inspection": "Steering column inspection",
+  "steering-fault-diagnosis": "Steering fault diagnosis",
+  "wheel-alignment-adjustment": "Wheel alignment adjustment",
+
+  // Controls & electronics
+  "throttle-pedal-inspection": "Throttle body/pedal inspection",
+  "accelerator-pedal-sensor-replacement": "Accelerator pedal sensor replacement",
+  "window-regulator-replacement": "Window regulator replacement",
+  "central-locking-diagnosis": "Central locking diagnosis",
+  "central-locking-repair": "Central locking repair",
+  "electric-seat-repair": "Electric seat mechanism repair",
+  "electric-mirror-repair": "Electric mirror repair",
+  "sunroof-mechanism-repair": "Sunroof mechanism repair",
+  "cruise-control-diagnosis": "Cruise control diagnosis",
+  "cruise-control-installation": "Cruise control installation",
+  "infotainment-diagnosis": "Infotainment system diagnosis",
+  "infotainment-replacement": "Infotainment unit replacement",
+
+  // Exhaust & emissions
+  "exhaust-system-inspection": "Exhaust system inspection",
+  "exhaust-removal-refitting": "Exhaust removal/refitting",
+  "exhaust-replacement": "Exhaust replacement",
+  "silencer-replacement": "Silencer/muffler replacement",
+  "exhaust-gasket-replacement": "Exhaust gasket replacement",
+  "exhaust-leak-diagnosis": "Exhaust leak diagnosis",
+  "exhaust-leak-repair": "Exhaust leak repair",
+  "exhaust-mounting-repair": "Exhaust mounting repair",
+  "catalytic-converter-inspection": "Catalytic converter inspection",
+  "catalytic-converter-replacement": "Catalytic converter replacement",
+  "dpf-inspection": "DPF inspection",
+  "dpf-cleaning": "DPF cleaning",
+  "dpf-replacement": "DPF replacement",
+  "egr-valve-inspection": "EGR valve inspection",
+  "egr-valve-cleaning": "EGR valve cleaning",
+  "egr-valve-replacement": "EGR valve replacement",
+  "emissions-fault-diagnosis": "Emissions fault diagnosis",
+
+  // Bodywork & accessories
+  "bumper-removal-refitting": "Bumper removal/refitting",
+  "bumper-replacement": "Bumper replacement",
+  "bumper-repair": "Bumper repair",
+  "door-removal-refitting": "Door removal/refitting",
+  "door-repair": "Door repair",
+  "wing-panel-replacement": "Wing/panel replacement",
+  "bonnet-removal-refitting": "Bonnet removal/refitting",
+  "windscreen-replacement": "Windscreen replacement",
+  "rear-screen-replacement": "Rear screen replacement",
+  "wing-mirror-replacement": "Wing mirror replacement",
+  "parking-sensor-installation": "Crash protection/parking sensor installation",
+  "tow-bar-installation": "Tow bar installation",
+  "roof-bars-installation": "Roof bars/box installation",
+  "boot-liner-installation": "Boot liner installation",
+  "dash-cam-installation": "Dash cam installation",
+  "auxiliary-light-installation": "Auxiliary light installation",
+  "accessory-wiring-installation": "Accessory wiring installation",
+
+  // Air conditioning & climate control
+  "aircon-inspection": "Air conditioning inspection",
+  "aircon-regas": "Air conditioning regas",
+  "aircon-compressor-replacement": "Air conditioning compressor replacement",
+  "aircon-condenser-replacement": "Air conditioning condenser replacement",
+  "aircon-leak-diagnosis": "Air conditioning leak diagnosis",
+  "cabin-blower-motor-replacement": "Cabin blower motor replacement",
+  "climate-control-diagnosis": "Climate control diagnosis",
+  "heater-matrix-replacement": "Heater matrix replacement",
+  "pollen-filter-replacement": "Pollen filter replacement",
+
+  // Electric & hybrid drive
+  "hv-battery-health-check": "HV battery health check",
+  "hv-battery-inspection": "HV battery inspection",
+  "hv-battery-replacement": "HV battery replacement",
+  "hv-battery-cooling-service": "HV battery cooling system service",
+  "drive-unit-inspection": "Drive unit/motor inspection",
+  "drive-unit-replacement": "Drive unit/motor replacement",
+  "inverter-inspection": "Inverter inspection",
+  "inverter-replacement": "Inverter replacement",
+  "charging-port-inspection": "Charging port inspection",
+  "charging-port-replacement": "Charging port replacement",
+  "onboard-charger-diagnosis": "On-board charger diagnosis",
+  "regen-braking-diagnosis": "Regenerative braking system diagnosis",
+  "regen-braking-calibration": "Regenerative braking system calibration",
+  "hybrid-system-diagnosis": "Hybrid system diagnosis",
+  "hv-safety-isolation": "EV/hybrid high-voltage safety isolation",
+  "dc-dc-converter-replacement": "DC-DC converter replacement",
+
+  // Diagnostics
+  "general-diagnostic-assessment": "General diagnostic assessment",
+  "engine-diagnostic-scan": "Engine diagnostic scan",
+  "ecu-fault-code-scan": "ECU fault-code scan",
+  "abs-diagnostic-scan": "ABS diagnostic scan",
+  "electrical-diagnostic-assessment": "Electrical diagnostic assessment",
+  "starting-problem-diagnosis": "Starting problem diagnosis",
+  "charging-problem-diagnosis": "Charging problem diagnosis",
+  "misfire-diagnosis": "Misfire diagnosis",
+  "poor-running-diagnosis": "Poor running diagnosis",
+  "overheating-diagnosis": "Overheating diagnosis",
+  "fuel-consumption-diagnosis": "Fuel consumption diagnosis",
+  "oil-consumption-diagnosis": "Oil consumption diagnosis",
+  "noise-vibration-diagnosis": "Noise/vibration diagnosis",
+  "gear-selection-diagnosis": "Gear selection diagnosis",
+  "clutch-fault-diagnosis": "Clutch fault diagnosis",
+  "brake-fault-diagnosis": "Brake fault diagnosis",
+  "suspension-fault-diagnosis": "Suspension fault diagnosis",
+  "steering-fault-diagnosis-general": "Steering fault diagnosis (general)",
+  "intermittent-fault-diagnosis": "Intermittent fault diagnosis",
+  "warning-light-diagnosis": "Warning light diagnosis",
+
+  // MOT / inspection
+  "mot-preparation": "MOT preparation",
+  "pre-mot-inspection": "Pre-MOT inspection",
+  "safety-inspection": "Car safety inspection",
+  "roadworthiness-inspection": "Roadworthiness inspection",
+  "lighting-inspection": "Lighting inspection",
+  "tyre-inspection": "Tyre inspection",
+  "steering-suspension-inspection": "Steering and suspension inspection",
+  "emissions-inspection": "Emissions inspection",
+  "post-mot-repair-work": "Post-MOT repair work",
+  "mot-failure-diagnosis": "MOT failure diagnosis",
+  "mot-retest-preparation": "MOT retest preparation",
+
+  // Recovery & workshop services
+  "car-collection": "Car collection",
+  "car-delivery": "Car delivery",
+  "car-loading-unloading": "Car loading/unloading",
+  "vehicle-assembly": "Vehicle assembly",
+  "vehicle-disassembly": "Vehicle disassembly",
+  "strip-and-assess": "Strip and assess",
+  "fault-investigation": "Fault investigation",
+  "corrosion-inspection": "Corrosion inspection",
+  "seized-component-removal": "Seized component removal",
+  "broken-bolt-removal": "Broken bolt removal",
+  "thread-repair": "Thread repair",
+  "fastener-replacement": "Fastener replacement",
+  "general-mechanical-repair": "General mechanical repair",
+  "workshop-diagnostic-time": "Workshop diagnostic time",
+  "additional-labour-time": "Additional labour time",
+  "specialist-repair-labour": "Specialist repair labour",
+  "road-test": "Road test",
+  "final-inspection-quality-check": "Final inspection and quality check",
+
+  // Restoration / specialist work
+  "restoration-assessment": "Car restoration assessment",
+  "car-strip-down": "Car strip-down",
+  "car-reassembly": "Car reassembly",
+  "engine-restoration": "Engine restoration",
+  "fuel-system-restoration": "Fuel system restoration",
+  "electrical-system-restoration": "Electrical system restoration",
+  "chassis-inspection": "Chassis inspection",
+  "chassis-component-removal-refitting": "Chassis component removal/refitting",
+  "classic-servicing": "Classic car servicing",
+  "classic-fault-diagnosis": "Classic car fault diagnosis",
+  "custom-modification": "Custom modification",
+  "custom-wiring-installation": "Custom wiring installation",
+  "performance-tuning": "Performance tuning",
+  "dyno-setup-tuning": "Dyno setup/tuning",
+  "ecu-remapping": "ECU remapping",
+  "suspension-setup": "Suspension setup",
+  "track-day-preparation": "Track-day preparation",
+  "race-preparation": "Race car preparation",
+  "post-track-inspection": "Post-track inspection",
+
+  "other": "Other",
+};
+
+export interface CarLabourGroup {
+  group: string;
+  jobs: string[];
+}
+
+export const CAR_LABOUR_GROUPS: CarLabourGroup[] = [
+  {
+    group: "Routine servicing & maintenance",
+    jobs: ["full-service", "interim-service", "major-service", "oil-and-filter-replacement", "engine-oil-replacement", "oil-filter-replacement", "air-filter-replacement", "cabin-filter-replacement", "spark-plug-replacement", "spark-plug-inspection", "brake-fluid-replacement", "auto-transmission-fluid-replacement", "manual-gearbox-oil-replacement", "differential-oil-replacement", "general-lubrication-service", "fastener-torque-check", "general-inspection", "pre-winter-inspection", "storage-preparation", "storage-recommissioning"],
+  },
+  {
+    group: "Brakes",
+    jobs: ["front-brake-pad-replacement", "rear-brake-pad-replacement", "front-brake-disc-replacement", "rear-brake-disc-replacement", "front-brake-caliper-removal-refitting", "rear-brake-caliper-removal-refitting", "brake-caliper-cleaning", "brake-caliper-overhaul", "brake-bleeding", "brake-system-flush", "brake-hose-replacement", "brake-master-cylinder-replacement", "brake-master-cylinder-overhaul", "brake-servo-inspection", "brake-pedal-adjustment", "brake-inspection", "abs-system-inspection", "abs-fault-diagnosis", "abs-sensor-replacement", "brake-fluid-leak-diagnosis", "handbrake-adjustment", "electronic-parking-brake-diagnosis"],
+  },
+  {
+    group: "Tyres & wheels",
+    jobs: ["front-tyre-removal-fitting", "rear-tyre-removal-fitting", "front-wheel-removal-refitting", "rear-wheel-removal-refitting", "wheel-balancing", "wheel-alignment-tracking", "tyre-pressure-adjustment", "tyre-puncture-repair", "spare-wheel-check", "rim-inspection", "wheel-bearing-inspection", "front-wheel-bearing-replacement", "rear-wheel-bearing-replacement", "wheel-hub-removal-refitting", "tyre-valve-replacement", "tpms-sensor-replacement", "tpms-reset-calibration"],
+  },
+  {
+    group: "Transmission & driveshaft",
+    jobs: ["driveshaft-inspection", "driveshaft-removal-refitting", "driveshaft-replacement", "cv-joint-inspection", "cv-joint-replacement", "cv-boot-replacement", "propshaft-inspection", "propshaft-removal-refitting", "differential-inspection", "differential-replacement", "torque-converter-inspection", "torque-converter-replacement", "transmission-mount-inspection", "transmission-mount-replacement", "transfer-case-inspection", "transfer-case-replacement"],
+  },
+  {
+    group: "Engine",
+    jobs: ["engine-diagnostic-inspection", "engine-fault-diagnosis", "engine-compression-test", "leak-down-test", "valve-clearance-inspection", "valve-clearance-adjustment", "camshaft-removal-refitting", "camshaft-inspection", "timing-belt-inspection", "timing-belt-replacement", "timing-chain-inspection", "timing-chain-replacement", "timing-adjustment", "cylinder-head-removal-refitting", "cylinder-head-overhaul", "cylinder-head-gasket-replacement", "rocker-cover-gasket-replacement", "engine-gasket-replacement", "engine-seal-replacement", "crankshaft-inspection", "piston-removal-refitting", "piston-replacement", "piston-ring-replacement", "cylinder-inspection", "cylinder-replacement", "cylinder-honing", "turbocharger-inspection", "turbocharger-replacement", "engine-removal", "engine-refitting", "engine-strip-down", "engine-rebuild", "engine-overhaul", "engine-reassembly", "engine-leak-diagnosis", "oil-leak-diagnosis", "oil-leak-repair", "engine-mounting-inspection", "engine-mounting-replacement"],
+  },
+  {
+    group: "Clutch & gearbox",
+    jobs: ["clutch-inspection", "clutch-adjustment", "clutch-hydraulic-bleeding", "clutch-plate-replacement", "clutch-pressure-plate-replacement", "dual-mass-flywheel-inspection", "dual-mass-flywheel-replacement", "clutch-assembly-replacement", "clutch-master-cylinder-replacement", "clutch-slave-cylinder-replacement", "gearbox-inspection", "gear-selection-fault-diagnosis", "gear-linkage-adjustment", "gear-linkage-replacement", "gearbox-removal", "gearbox-overhaul", "gearbox-rebuild", "auto-gearbox-service", "cvt-belt-inspection", "auto-gearbox-fault-diagnosis"],
+  },
+  {
+    group: "Fuel system",
+    jobs: ["fuel-system-inspection", "fuel-system-diagnosis", "throttle-body-inspection", "throttle-body-cleaning", "fuel-injector-inspection", "fuel-injector-removal-refitting", "fuel-injector-cleaning", "diesel-injector-removal-refitting", "fuel-pump-replacement", "fuel-pump-diagnosis", "fuel-filter-replacement", "fuel-hose-replacement", "fuel-tank-removal-refitting", "fuel-tank-inspection", "fuel-leak-diagnosis", "fuel-system-flush", "diesel-hp-pump-inspection", "diesel-hp-pump-replacement"],
+  },
+  {
+    group: "Cooling system",
+    jobs: ["cooling-system-inspection", "coolant-replacement", "cooling-system-flush", "radiator-removal-refitting", "radiator-replacement", "radiator-cleaning", "cooling-fan-inspection", "cooling-fan-replacement", "thermostat-replacement", "water-pump-inspection", "water-pump-replacement", "coolant-hose-replacement", "cooling-system-pressure-test", "cooling-system-leak-diagnosis"],
+  },
+  {
+    group: "Electrical & electronics",
+    jobs: ["electrical-system-diagnosis", "electrical-fault-finding", "wiring-inspection", "wiring-repair", "wiring-harness-replacement", "battery-replacement", "battery-testing", "charging-system-diagnosis", "alternator-inspection", "alternator-replacement", "starter-motor-inspection", "starter-motor-replacement", "starter-relay-replacement", "ignition-system-diagnosis", "ignition-coil-replacement", "spark-plug-lead-replacement", "ecu-diagnostic-scan", "ecu-fault-diagnosis", "ecu-replacement-programming", "sensor-diagnosis", "sensor-replacement", "headlight-replacement", "headlight-adjustment", "indicator-replacement", "rear-light-replacement", "horn-replacement", "switch-replacement", "fuse-replacement", "immobiliser-diagnosis", "key-immobiliser-programming", "parking-sensor-replacement", "reversing-camera-replacement", "adas-calibration"],
+  },
+  {
+    group: "Suspension & steering",
+    jobs: ["front-suspension-inspection", "rear-suspension-inspection", "front-strut-inspection", "front-strut-replacement", "rear-shock-replacement", "coil-spring-replacement", "anti-roll-bar-link-replacement", "suspension-bush-replacement", "suspension-arm-replacement", "suspension-linkage-bearing-replacement", "track-rod-end-replacement", "steering-rack-inspection", "steering-rack-replacement", "power-steering-pump-replacement", "power-steering-fluid-replacement", "electric-power-steering-diagnosis", "steering-alignment", "steering-column-inspection", "steering-fault-diagnosis", "wheel-alignment-adjustment"],
+  },
+  {
+    group: "Controls & electronics",
+    jobs: ["throttle-pedal-inspection", "accelerator-pedal-sensor-replacement", "window-regulator-replacement", "central-locking-diagnosis", "central-locking-repair", "electric-seat-repair", "electric-mirror-repair", "sunroof-mechanism-repair", "cruise-control-diagnosis", "cruise-control-installation", "infotainment-diagnosis", "infotainment-replacement"],
+  },
+  {
+    group: "Exhaust & emissions",
+    jobs: ["exhaust-system-inspection", "exhaust-removal-refitting", "exhaust-replacement", "silencer-replacement", "exhaust-gasket-replacement", "exhaust-leak-diagnosis", "exhaust-leak-repair", "exhaust-mounting-repair", "catalytic-converter-inspection", "catalytic-converter-replacement", "dpf-inspection", "dpf-cleaning", "dpf-replacement", "egr-valve-inspection", "egr-valve-cleaning", "egr-valve-replacement", "emissions-fault-diagnosis"],
+  },
+  {
+    group: "Bodywork & accessories",
+    jobs: ["bumper-removal-refitting", "bumper-replacement", "bumper-repair", "door-removal-refitting", "door-repair", "wing-panel-replacement", "bonnet-removal-refitting", "windscreen-replacement", "rear-screen-replacement", "wing-mirror-replacement", "parking-sensor-installation", "tow-bar-installation", "roof-bars-installation", "boot-liner-installation", "dash-cam-installation", "auxiliary-light-installation", "accessory-wiring-installation"],
+  },
+  {
+    group: "Air conditioning & climate control",
+    jobs: ["aircon-inspection", "aircon-regas", "aircon-compressor-replacement", "aircon-condenser-replacement", "aircon-leak-diagnosis", "cabin-blower-motor-replacement", "climate-control-diagnosis", "heater-matrix-replacement", "pollen-filter-replacement"],
+  },
+  {
+    group: "Electric & hybrid drive",
+    jobs: ["hv-battery-health-check", "hv-battery-inspection", "hv-battery-replacement", "hv-battery-cooling-service", "drive-unit-inspection", "drive-unit-replacement", "inverter-inspection", "inverter-replacement", "charging-port-inspection", "charging-port-replacement", "onboard-charger-diagnosis", "regen-braking-diagnosis", "regen-braking-calibration", "hybrid-system-diagnosis", "hv-safety-isolation", "dc-dc-converter-replacement"],
+  },
+  {
+    group: "Diagnostics",
+    jobs: ["general-diagnostic-assessment", "engine-diagnostic-scan", "ecu-fault-code-scan", "abs-diagnostic-scan", "electrical-diagnostic-assessment", "starting-problem-diagnosis", "charging-problem-diagnosis", "misfire-diagnosis", "poor-running-diagnosis", "overheating-diagnosis", "fuel-consumption-diagnosis", "oil-consumption-diagnosis", "noise-vibration-diagnosis", "gear-selection-diagnosis", "clutch-fault-diagnosis", "brake-fault-diagnosis", "suspension-fault-diagnosis", "steering-fault-diagnosis-general", "intermittent-fault-diagnosis", "warning-light-diagnosis"],
+  },
+  {
+    group: "MOT / inspection",
+    jobs: ["mot-preparation", "pre-mot-inspection", "safety-inspection", "roadworthiness-inspection", "lighting-inspection", "tyre-inspection", "steering-suspension-inspection", "emissions-inspection", "post-mot-repair-work", "mot-failure-diagnosis", "mot-retest-preparation"],
+  },
+  {
+    group: "Recovery & workshop services",
+    jobs: ["car-collection", "car-delivery", "car-loading-unloading", "vehicle-assembly", "vehicle-disassembly", "strip-and-assess", "fault-investigation", "corrosion-inspection", "seized-component-removal", "broken-bolt-removal", "thread-repair", "fastener-replacement", "general-mechanical-repair", "workshop-diagnostic-time", "additional-labour-time", "specialist-repair-labour", "road-test", "final-inspection-quality-check"],
+  },
+  {
+    group: "Restoration / specialist work",
+    jobs: ["restoration-assessment", "car-strip-down", "car-reassembly", "engine-restoration", "fuel-system-restoration", "electrical-system-restoration", "chassis-inspection", "chassis-component-removal-refitting", "classic-servicing", "classic-fault-diagnosis", "custom-modification", "custom-wiring-installation", "performance-tuning", "dyno-setup-tuning", "ecu-remapping", "suspension-setup", "track-day-preparation", "race-preparation", "post-track-inspection"],
+  },
+  {
+    group: "Other",
+    jobs: ["other"],
+  },
+];
+
+export const CAR_LABOUR_LABEL_TO_KEY: Record<string, string> = Object.fromEntries(
+  Object.entries(CAR_LABOUR_LABELS).map(([key, label]) => [label, key])
+);
+
+export function findGroupForCarLabourCategory(category: string): string | undefined {
+  return CAR_LABOUR_GROUPS.find((g) => g.jobs.includes(category))?.group;
+}

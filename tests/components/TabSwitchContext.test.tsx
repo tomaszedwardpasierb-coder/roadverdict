@@ -97,7 +97,7 @@ describe("viewRecords", () => {
 
 describe("goToNextReview", () => {
   function pending(overrides: Partial<Record<ReviewCategory, string[]>> = {}): Record<ReviewCategory, string[]> {
-    return { service: [], fuel: [], mods: [], bills: [], ...overrides };
+    return { service: [], fuel: [], mods: [], bills: [], labour: [], ...overrides };
   }
 
   it("stays on the same category, focusing the next pending id there, when something else is still pending in it", () => {

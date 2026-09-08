@@ -14,6 +14,8 @@ import { CAR_BILL_LABELS } from "@/lib/tracker/carBillTypes";
 import { JOB_LABELS } from "@/lib/tracker/jobTypes";
 import { MOD_LABELS } from "@/lib/tracker/modTypes";
 import { BILL_LABELS } from "@/lib/tracker/billTypes";
+import { CAR_LABOUR_LABELS } from "@/lib/tracker/carLabourTypes";
+import { LABOUR_LABELS } from "@/lib/tracker/labourTypes";
 
 const ROOT = path.resolve(__dirname, "../..");
 const BIKE_WORD = /\b(bike|bikes|motorcycle|motorcycles)\b/i;
@@ -81,6 +83,9 @@ describe("copy audit - car-only dashboard components never say bike/motorcycle",
     "src/app/dashboard/LogCarFuelForm.tsx",
     "src/app/dashboard/LogCarModForm.tsx",
     "src/app/dashboard/LogCarServiceForm.tsx",
+    "src/app/dashboard/LogCarLabourForm.tsx",
+    "src/app/dashboard/CarLabourCard.tsx",
+    "src/app/dashboard/CarLabourSearchAutocomplete.tsx",
     "src/components/CarQuoteForm.tsx",
     "src/components/CarCostCalculatorForm.tsx",
     "src/components/CarBuyingGuideForm.tsx",
@@ -112,6 +117,9 @@ describe("copy audit - bike-only dashboard components never say car", () => {
     "src/app/dashboard/FuelLogCard.tsx",
     "src/app/dashboard/ModCard.tsx",
     "src/app/dashboard/BillCard.tsx",
+    "src/app/dashboard/LogLabourForm.tsx",
+    "src/app/dashboard/LabourCard.tsx",
+    "src/app/dashboard/LabourSearchAutocomplete.tsx",
   ];
 
   for (const file of BIKE_ONLY_FILES) {
@@ -122,15 +130,15 @@ describe("copy audit - bike-only dashboard components never say car", () => {
 });
 
 describe("copy audit - catalog label values never cross vehicle kinds", () => {
-  it("no CAR_JOB_LABELS/CAR_MOD_LABELS/CAR_BILL_LABELS value mentions bike/motorcycle", () => {
-    const merged = { ...CAR_JOB_LABELS, ...CAR_MOD_LABELS, ...CAR_BILL_LABELS } as Record<string, string>;
+  it("no CAR_JOB_LABELS/CAR_MOD_LABELS/CAR_BILL_LABELS/CAR_LABOUR_LABELS value mentions bike/motorcycle", () => {
+    const merged = { ...CAR_JOB_LABELS, ...CAR_MOD_LABELS, ...CAR_BILL_LABELS, ...CAR_LABOUR_LABELS } as Record<string, string>;
     for (const [key, value] of Object.entries(merged)) {
       expect(BIKE_WORD.test(value), `${key}: "${value}"`).toBe(false);
     }
   });
 
-  it("no JOB_LABELS/MOD_LABELS/BILL_LABELS value mentions car", () => {
-    const merged = { ...JOB_LABELS, ...MOD_LABELS, ...BILL_LABELS } as Record<string, string>;
+  it("no JOB_LABELS/MOD_LABELS/BILL_LABELS/LABOUR_LABELS value mentions car", () => {
+    const merged = { ...JOB_LABELS, ...MOD_LABELS, ...BILL_LABELS, ...LABOUR_LABELS } as Record<string, string>;
     for (const [key, value] of Object.entries(merged)) {
       expect(CAR_WORD.test(value), `${key}: "${value}"`).toBe(false);
     }
@@ -149,13 +157,15 @@ describe("dashboard/page.tsx render paths never cross-reference the other vehicl
   // for renderCarDashboard's later use, which isn't a leak into the bike path.
   const bikeDashboardSource = source.slice(pageFnStart, carFnStart);
 
-  it("renderCarDashboard never references the motorcycle JOB_LABELS/MOD_LABELS catalogs", () => {
+  it("renderCarDashboard never references the motorcycle JOB_LABELS/MOD_LABELS/LABOUR_LABELS catalogs", () => {
     expect(/\bJOB_LABELS\b/.test(carDashboardSource)).toBe(false);
     expect(/\bMOD_LABELS\b/.test(carDashboardSource)).toBe(false);
+    expect(/(?<!CAR_)\bLABOUR_LABELS\b/.test(carDashboardSource)).toBe(false);
   });
 
-  it("the bike-active render path never references the car CAR_JOB_LABELS/CAR_MOD_LABELS catalogs", () => {
+  it("the bike-active render path never references the car CAR_JOB_LABELS/CAR_MOD_LABELS/CAR_LABOUR_LABELS catalogs", () => {
     expect(/\bCAR_JOB_LABELS\b/.test(bikeDashboardSource)).toBe(false);
     expect(/\bCAR_MOD_LABELS\b/.test(bikeDashboardSource)).toBe(false);
+    expect(/\bCAR_LABOUR_LABELS\b/.test(bikeDashboardSource)).toBe(false);
   });
 });

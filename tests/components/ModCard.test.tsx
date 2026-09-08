@@ -35,7 +35,7 @@ const baseMod: ModDoc = {
   notes: "",
 };
 
-const emptyPendingIds = { service: [], fuel: [], mods: [], bills: [] };
+const emptyPendingIds = { service: [], fuel: [], mods: [], bills: [], labour: [] };
 
 function FocusDisplay() {
   const { focusId } = useTabSwitch();

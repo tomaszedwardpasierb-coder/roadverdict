@@ -2,6 +2,7 @@
 import { JOB_LABELS } from "./jobTypes";
 import { MOD_LABELS } from "./modTypes";
 import { BILL_LABELS } from "./billTypes";
+import { LABOUR_LABELS } from "./labourTypes";
 
 // Counts how many words from the description appear in each label, picks
 // whichever label matches the most - a simple heuristic, not true fuzzy
@@ -37,4 +38,8 @@ export function guessModCategory(description: string): string | null {
 
 export function guessBillType(description: string): string | null {
   return bestMatch(description, BILL_LABELS);
+}
+
+export function guessLabourCategory(description: string): string | null {
+  return bestMatch(description, LABOUR_LABELS);
 }

@@ -3,7 +3,7 @@
 
 import { createContext, useContext, useState, type ReactNode } from 'react';
 
-export type ReviewCategory = 'service' | 'fuel' | 'mods' | 'bills';
+export type ReviewCategory = 'service' | 'fuel' | 'mods' | 'bills' | 'labour';
 
 interface ContextValue {
   switchTo: (category: ReviewCategory) => void;
@@ -58,7 +58,7 @@ export function viewRecords(
   setHighlightIds(ids);
 }
 
-const CATEGORY_ORDER: ReviewCategory[] = ['service', 'fuel', 'mods', 'bills'];
+const CATEGORY_ORDER: ReviewCategory[] = ['service', 'fuel', 'mods', 'bills', 'labour'];
 
 // Shared by all 4 history cards - after saving a record that needed
 // review, moves straight to whatever's next with zero confirmation:

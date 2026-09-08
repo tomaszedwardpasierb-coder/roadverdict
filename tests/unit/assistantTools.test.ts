@@ -699,10 +699,10 @@ describe("toolProposeLogEntry", () => {
     expect(result).toEqual({ error: "No vehicle found on this account." });
   });
 
-  it("is not available for a car-active session at all, and never reaches any category/cost validation", async () => {
+  it("is not available for a car-active session's non-labour categories, and never reaches any cost/description validation", async () => {
     mocks.resolveActiveVehicle.mockResolvedValue(carActive());
     const result: any = await toolProposeLogEntry("owner@example.com", { category: "service", description: "Oil", cost: 20 });
-    expect(result.error).toMatch(/available for cars/i);
+    expect(result.error).toMatch(/only available for Labour/i);
   });
 
   it("rejects a genuinely unrecognized category rather than guessing", async () => {
@@ -812,5 +812,65 @@ describe("toolProposeLogEntry", () => {
     expect((await toolProposeLogEntry("owner@example.com", { category: "fuel", cost: 15 }) as any).error).toMatch(/litres/i);
     expect((await toolProposeLogEntry("owner@example.com", { category: "fuel", cost: 15, litres: 0 }) as any).error).toMatch(/litres/i);
     expect((await toolProposeLogEntry("owner@example.com", { category: "fuel", cost: 15, litres: -3 }) as any).error).toMatch(/litres/i);
+  });
+
+  // Labour is the one category available on both vehicle kinds - see
+  // the top-of-file comment in assistantTools.ts for why.
+  describe("labour (bike-active)", () => {
+    it("drafts a labour entry, resolving an exact category key or label, tagged vehicleKind: 'bike'", async () => {
+      const byKey: any = await toolProposeLogEntry("owner@example.com", {
+        category: "labour", description: "Front brake bleed", cost: 45, date: "2026-01-01", labourCategory: "brake-bleeding",
+      });
+      expect(byKey).toEqual({
+        category: "labour", labourCategory: "brake-bleeding", labourLabel: expect.any(String),
+        description: "Front brake bleed", cost: 45, date: "2026-01-01", mileage: 15000, vehicleKind: "bike",
+      });
+    });
+
+    it("fuzzy-matches a plain-language labour category by substring, case-insensitively", async () => {
+      const result: any = await toolProposeLogEntry("owner@example.com", { category: "labour", description: "Bleeding the brakes", cost: 45, labourCategory: "BRAKE bleeding" });
+      expect(result.labourCategory).toBe("brake-bleeding");
+    });
+
+    it("falls back to 'other' for a labour category with no match, rather than blocking the draft", async () => {
+      const result: any = await toolProposeLogEntry("owner@example.com", { category: "labour", description: "Something unusual", cost: 45, labourCategory: "not-a-real-labour-job" });
+      expect(result.labourCategory).toBe("other");
+    });
+
+    it("falls back to 'other' when labourCategory is missing entirely", async () => {
+      const result: any = await toolProposeLogEntry("owner@example.com", { category: "labour", description: "Workshop time", cost: 45 });
+      expect(result.labourCategory).toBe("other");
+    });
+
+    it("still requires a description and a valid cost for labour, same as every other bike category", async () => {
+      expect((await toolProposeLogEntry("owner@example.com", { category: "labour", cost: 45 }) as any).error).toMatch(/description/i);
+      expect((await toolProposeLogEntry("owner@example.com", { category: "labour", description: "Workshop time", cost: 0 }) as any).error).toMatch(/cost/i);
+    });
+  });
+
+  describe("labour (car-active)", () => {
+    it("drafts a labour entry against the car's own catalog and mileage, tagged vehicleKind: 'car'", async () => {
+      mocks.resolveActiveVehicle.mockResolvedValue(carActive());
+      const result: any = await toolProposeLogEntry("owner@example.com", {
+        category: "labour", description: "EV battery health check", cost: 60, date: "2026-01-01", labourCategory: "hv-battery-health-check",
+      });
+      expect(result).toEqual({
+        category: "labour", labourCategory: "hv-battery-health-check", labourLabel: expect.any(String),
+        description: "EV battery health check", cost: 60, date: "2026-01-01", mileage: 20000, vehicleKind: "car",
+      });
+    });
+
+    it("falls back to 'other' for an unmatched car labour category", async () => {
+      mocks.resolveActiveVehicle.mockResolvedValue(carActive());
+      const result: any = await toolProposeLogEntry("owner@example.com", { category: "labour", description: "Something unusual", cost: 60, labourCategory: "not-a-real-car-labour-job" });
+      expect(result.labourCategory).toBe("other");
+    });
+
+    it("still requires a description and a valid, non-future date for car labour", async () => {
+      mocks.resolveActiveVehicle.mockResolvedValue(carActive());
+      expect((await toolProposeLogEntry("owner@example.com", { category: "labour", cost: 60 }) as any).error).toMatch(/description/i);
+      const tomorrow = new Date(Date.now() + 2 * 86_400_000).toISOString().slice(0, 10);
+      expect((await toolProposeLogEntry("owner@example.com", { category: "labour", description: "Workshop time", cost: 60, date: tomorrow }) as any).error).toMatch(/future/);
+    });
   });
 });

@@ -26,6 +26,7 @@ const records = [{ date: "2024-01-01", cost: 100 }];
 const mods = [{ date: "2024-01-01", cost: 50 }];
 const fuelLogs = [{ date: "2024-01-01", cost: 30 }];
 const bills = [{ date: "2024-01-01", cost: 20 }];
+const labour = [{ date: "2024-01-01", cost: 10 }];
 
 describe("SpendDonutChart", () => {
   beforeEach(() => {
@@ -39,7 +40,7 @@ describe("SpendDonutChart", () => {
   });
 
   it("shows the empty note and renders neither chart when nothing has been logged", () => {
-    render(<SpendDonutChart records={[]} mods={[]} fuelLogs={[]} bills={[]} currency="GBP" rates={null} />);
+    render(<SpendDonutChart records={[]} mods={[]} fuelLogs={[]} bills={[]} labour={[]} currency="GBP" rates={null} />);
 
     expect(screen.getByText("Nothing logged in this range.")).toBeInTheDocument();
     expect(chartMocks.doughnut).not.toHaveBeenCalled();
@@ -47,42 +48,44 @@ describe("SpendDonutChart", () => {
   });
 
   it("defaults to the pie view, handing the mocked Doughnut the real per-category totals", () => {
-    render(<SpendDonutChart records={records} mods={mods} fuelLogs={fuelLogs} bills={bills} currency="GBP" rates={null} />);
+    render(<SpendDonutChart records={records} mods={mods} fuelLogs={fuelLogs} bills={bills} labour={labour} currency="GBP" rates={null} />);
 
     expect(chartMocks.doughnut).toHaveBeenCalledTimes(1);
     const props = chartMocks.doughnut.mock.calls[0][0] as any;
-    expect(props.data.labels).toEqual(["Servicing & repairs", "Modifications", "Fuel", "Insurance/tax/MOT/finance"]);
-    expect(props.data.datasets[0].data).toEqual([100, 50, 30, 20]);
-    expect(props.data.datasets[0].backgroundColor).toEqual(["#1C1D20", "#EE9A2E", "#21815A", "#8A867D"]);
+    expect(props.data.labels).toEqual(["Servicing & repairs", "Modifications", "Fuel", "Insurance/tax/MOT/finance", "Labour"]);
+    expect(props.data.datasets[0].data).toEqual([100, 50, 30, 20, 10]);
+    expect(props.data.datasets[0].backgroundColor).toEqual(["#1C1D20", "#EE9A2E", "#21815A", "#8A867D", "#3E6B99"]);
     expect(props.options.cutout).toBe("68%");
   });
 
   it("renders the real HTML legend and centre total, not just the chart data, when Pro", () => {
-    render(<SpendDonutChart records={records} mods={mods} fuelLogs={fuelLogs} bills={bills} currency="GBP" rates={null} isPro />);
+    render(<SpendDonutChart records={records} mods={mods} fuelLogs={fuelLogs} bills={bills} labour={labour} currency="GBP" rates={null} isPro />);
 
     expect(screen.getByText("Servicing & repairs")).toBeInTheDocument();
+    expect(screen.getByText("Labour")).toBeInTheDocument();
     expect(screen.getByText("£100")).toBeInTheDocument();
     expect(screen.getByText("£50")).toBeInTheDocument();
     expect(screen.getByText("£30")).toBeInTheDocument();
     expect(screen.getByText("£20")).toBeInTheDocument();
-    expect(screen.getAllByText("£200").length).toBeGreaterThan(0); // grand total (header line + ring centre)
+    expect(screen.getByText("£10")).toBeInTheDocument();
+    expect(screen.getAllByText("£210").length).toBeGreaterThan(0); // grand total (header line + ring centre)
     expect(screen.getByText("Total")).toBeInTheDocument();
   });
 
   it("obscures category names and per-category amounts when not Pro, but keeps the grand total visible", () => {
-    render(<SpendDonutChart records={records} mods={mods} fuelLogs={fuelLogs} bills={bills} currency="GBP" rates={null} />);
+    render(<SpendDonutChart records={records} mods={mods} fuelLogs={fuelLogs} bills={bills} labour={labour} currency="GBP" rates={null} />);
 
     expect(screen.queryByText("Servicing & repairs")).not.toBeInTheDocument();
     expect(screen.queryByText("£100")).not.toBeInTheDocument();
     expect(screen.queryByText("£50")).not.toBeInTheDocument();
     // Grand total still shows, in the always-visible header line and the ring's own centre.
-    expect(screen.getAllByText("£200").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("£210").length).toBeGreaterThan(0);
     const upsell = screen.getByRole("link", { name: /Category breakdown - Premium/ });
     expect(upsell).toHaveAttribute("href", "/pro");
   });
 
   it("disables the chart tooltip and hides the axis ticks that would reveal a category's name or amount when not Pro", () => {
-    render(<SpendDonutChart records={records} mods={mods} fuelLogs={fuelLogs} bills={bills} currency="GBP" rates={null} />);
+    render(<SpendDonutChart records={records} mods={mods} fuelLogs={fuelLogs} bills={bills} labour={labour} currency="GBP" rates={null} />);
 
     const props = chartMocks.doughnut.mock.calls[0][0] as any;
     expect(props.options.plugins.tooltip.enabled).toBe(false);
@@ -90,7 +93,7 @@ describe("SpendDonutChart", () => {
 
   it("honours initialChartType='bar' by rendering the mocked Bar chart from the start", () => {
     render(
-      <SpendDonutChart records={records} mods={mods} fuelLogs={fuelLogs} bills={bills} currency="GBP" rates={null} initialChartType="bar" />
+      <SpendDonutChart records={records} mods={mods} fuelLogs={fuelLogs} bills={bills} labour={labour} currency="GBP" rates={null} initialChartType="bar" />
     );
     expect(chartMocks.bar).toHaveBeenCalledTimes(1);
     expect(chartMocks.doughnut).not.toHaveBeenCalled();
@@ -98,13 +101,13 @@ describe("SpendDonutChart", () => {
 
   it("clicking the Bar toggle switches the real chart and persists the preference via PATCH /api/tracker/bike", async () => {
     const user = userEvent.setup();
-    render(<SpendDonutChart records={records} mods={mods} fuelLogs={fuelLogs} bills={bills} currency="GBP" rates={null} />);
+    render(<SpendDonutChart records={records} mods={mods} fuelLogs={fuelLogs} bills={bills} labour={labour} currency="GBP" rates={null} />);
 
     await user.click(screen.getByRole("button", { name: "Bar" }));
 
     expect(chartMocks.bar).toHaveBeenCalledTimes(1);
     const barProps = chartMocks.bar.mock.calls[0][0] as any;
-    expect(barProps.data.datasets[0].data).toEqual([100, 50, 30, 20]);
+    expect(barProps.data.datasets[0].data).toEqual([100, 50, 30, 20, 10]);
     expect(fetch).toHaveBeenCalledWith(
       "/api/tracker/bike",
       expect.objectContaining({
@@ -120,7 +123,7 @@ describe("SpendDonutChart", () => {
   // preference instead of the car's.
   it("PATCHes /api/cars/car instead of /api/tracker/bike when vehicleKind is 'car'", async () => {
     const user = userEvent.setup();
-    render(<SpendDonutChart records={records} mods={mods} fuelLogs={fuelLogs} bills={bills} currency="GBP" rates={null} vehicleKind="car" />);
+    render(<SpendDonutChart records={records} mods={mods} fuelLogs={fuelLogs} bills={bills} labour={labour} currency="GBP" rates={null} vehicleKind="car" />);
 
     await user.click(screen.getByRole("button", { name: "Bar" }));
 
@@ -129,20 +132,21 @@ describe("SpendDonutChart", () => {
 
   it("converts every real total to the display currency before handing it to the chart", () => {
     const rates = { base: "GBP" as const, rates: { EUR: 1.15 }, fetchedAt: "2024-01-01T00:00:00.000Z" };
-    render(<SpendDonutChart records={records} mods={mods} fuelLogs={fuelLogs} bills={bills} currency="EUR" rates={rates} isPro />);
+    render(<SpendDonutChart records={records} mods={mods} fuelLogs={fuelLogs} bills={bills} labour={labour} currency="EUR" rates={rates} isPro />);
 
     const props = chartMocks.doughnut.mock.calls[0][0] as any;
-    const [servicing, modsVal, fuelVal, billsVal] = props.data.datasets[0].data;
+    const [servicing, modsVal, fuelVal, billsVal, labourVal] = props.data.datasets[0].data;
     expect(servicing).toBeCloseTo(115);
     expect(modsVal).toBeCloseTo(57.5);
     expect(fuelVal).toBeCloseTo(34.5);
     expect(billsVal).toBeCloseTo(23);
+    expect(labourVal).toBeCloseTo(11.5);
     expect(screen.getByText("€115")).toBeInTheDocument();
   });
 
   it("in bar view, replaces category tick labels with a lock and hides the value axis when not Pro, but shows both when Pro", () => {
     render(
-      <SpendDonutChart records={records} mods={mods} fuelLogs={fuelLogs} bills={bills} currency="GBP" rates={null} initialChartType="bar" />
+      <SpendDonutChart records={records} mods={mods} fuelLogs={fuelLogs} bills={bills} labour={labour} currency="GBP" rates={null} initialChartType="bar" />
     );
     const freeProps = chartMocks.bar.mock.calls[0][0] as any;
     expect(freeProps.options.plugins.tooltip.enabled).toBe(false);
@@ -151,7 +155,7 @@ describe("SpendDonutChart", () => {
 
     chartMocks.bar.mockClear();
     render(
-      <SpendDonutChart records={records} mods={mods} fuelLogs={fuelLogs} bills={bills} currency="GBP" rates={null} initialChartType="bar" isPro />
+      <SpendDonutChart records={records} mods={mods} fuelLogs={fuelLogs} bills={bills} labour={labour} currency="GBP" rates={null} initialChartType="bar" isPro />
     );
     const proProps = chartMocks.bar.mock.calls[0][0] as any;
     expect(proProps.options.scales.x.ticks.callback(100, 0)).toBe("Servicing & repairs");

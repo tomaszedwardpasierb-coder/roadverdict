@@ -24,6 +24,7 @@ describe("DashboardStatCards", () => {
       <DashboardStatCards
         records={[{ date: "2026-01-01", cost: 100, mileage: 500 }]}
         mods={[{ date: "2026-02-01", cost: 50, mileage: 800 }]}
+        labour={[]}
         bills={[{ date: "2026-03-01", cost: 30 }]}
         fuelLogs={[]}
         currentMileage={1000}
@@ -48,6 +49,7 @@ describe("DashboardStatCards", () => {
       <DashboardStatCards
         records={[]}
         mods={[]}
+        labour={[]}
         bills={[]}
         fuelLogs={[
           { id: "f1", mileage: 1000, litres: 4.546, filledToFull: true, date: "2026-01-01", cost: 5 },
@@ -72,6 +74,7 @@ describe("DashboardStatCards", () => {
       <DashboardStatCards
         records={[]}
         mods={[]}
+        labour={[]}
         bills={[{ date: "2026-01-01", cost: 50 }]}
         fuelLogs={[]}
         currentMileage={100}
@@ -96,6 +99,7 @@ describe("DashboardStatCards", () => {
       <DashboardStatCards
         records={[]}
         mods={[]}
+        labour={[]}
         bills={[{ date: "2026-01-01", cost: 20 }]}
         fuelLogs={[]}
         currentMileage={500}
@@ -120,6 +124,7 @@ describe("DashboardStatCards", () => {
         <DashboardStatCards
           records={[]}
           mods={[]}
+          labour={[]}
           bills={[
             { date: "2000-01-01", cost: 500 },
             { date: today, cost: 50 },
@@ -143,6 +148,7 @@ describe("DashboardStatCards", () => {
       <DashboardStatCards
         records={[{ date: "2026-01-01", cost: 100, mileage: 500 }]}
         mods={[]}
+        labour={[]}
         bills={[]}
         fuelLogs={[]}
         currentMileage={1000}
@@ -167,6 +173,7 @@ describe("DashboardStatCards", () => {
       <DashboardStatCards
         records={[]}
         mods={[]}
+        labour={[]}
         bills={[]}
         fuelLogs={[]}
         currentMileage={100}

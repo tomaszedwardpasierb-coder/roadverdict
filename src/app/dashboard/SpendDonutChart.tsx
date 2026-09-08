@@ -17,11 +17,12 @@ ChartJS.register(ArcElement, BarElement, CategoryScale, LinearScale, Tooltip, Le
 
 const CHART_ID = 'spend-donut';
 // Fixed order per the design system, not arbitrary - Ink, Amber, Green,
-// Slate. The previous purple on Insurance/tax/MOT was a genuine bug,
+// Slate, Blue. The previous purple on Insurance/tax/MOT was a genuine bug,
 // not a style choice - slate is correct even when this segment is £0,
-// which is why it's never dropped from the ring or legend.
-const COLORS = ['#1C1D20', '#EE9A2E', '#21815A', '#8A867D'];
-const LABELS = ['Servicing & repairs', 'Modifications', 'Fuel', 'Insurance/tax/MOT/finance'];
+// which is why it's never dropped from the ring or legend. Blue (Labour)
+// is a genuinely new 5th colour, not a reuse of any of the first four.
+const COLORS = ['#1C1D20', '#EE9A2E', '#21815A', '#8A867D', '#3E6B99'];
+const LABELS = ['Servicing & repairs', 'Modifications', 'Fuel', 'Insurance/tax/MOT/finance', 'Labour'];
 const DONUT_CUTOUT = '68%';
 // Fixed box size matching the reference design exactly (132px, ~68%
 // cutout) - the legend used to be drawn by Chart.js inside the same
@@ -44,6 +45,7 @@ interface Props {
   mods: CostItem[];
   fuelLogs: CostItem[];
   bills: CostItem[];
+  labour: CostItem[];
   currency: Currency;
   rates: ExchangeRates | null;
   initialChartType?: 'bar' | 'pie';
@@ -65,7 +67,7 @@ function sumCost(items: CostItem[]): number {
 // now take raw arrays instead of pre-summed totals: a pre-summed number
 // computed once on the server has no way to react to the client-side
 // Range control changing after the page has already loaded.
-export function SpendDonutChart({ records, mods, fuelLogs, bills, currency, rates, initialChartType, isPro = false, vehicleKind = 'bike' }: Props) {
+export function SpendDonutChart({ records, mods, fuelLogs, bills, labour, currency, rates, initialChartType, isPro = false, vehicleKind = 'bike' }: Props) {
   const { range } = useChartFilter();
   const { kind, changeKind } = useChartTypePreference(CHART_ID, initialChartType ?? 'pie', vehicleKind);
   const symbol = CURRENCY_SYMBOLS[currency];
@@ -74,9 +76,10 @@ export function SpendDonutChart({ records, mods, fuelLogs, bills, currency, rate
   const modsTotal = sumCost(filterByDateRange(mods, range));
   const fuelTotal = sumCost(filterByDateRange(fuelLogs, range));
   const billsTotal = sumCost(filterByDateRange(bills, range));
-  const grandTotal = servicingTotal + modsTotal + fuelTotal + billsTotal;
+  const labourTotal = sumCost(filterByDateRange(labour, range));
+  const grandTotal = servicingTotal + modsTotal + fuelTotal + billsTotal + labourTotal;
 
-  const rawValues = [servicingTotal, modsTotal, fuelTotal, billsTotal];
+  const rawValues = [servicingTotal, modsTotal, fuelTotal, billsTotal, labourTotal];
   const values = rawValues.map((v) => convertGbpToDisplay(v, currency, rates));
 
   return (

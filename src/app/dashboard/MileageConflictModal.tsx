@@ -7,12 +7,12 @@ import { pointsConflict } from '@/lib/tracker/mileageCheck';
 import type { Attachment } from '@/lib/tracker/cosmosHelpers';
 import styles from './dashboard.module.css';
 
-const CATEGORY_ROUTE: Record<string, string> = { service: 'services', fuel: 'fuel', mods: 'mods', mot: 'bills' };
+const CATEGORY_ROUTE: Record<string, string> = { service: 'services', fuel: 'fuel', mods: 'mods', mot: 'bills', labour: 'labour' };
 // Car equivalents live under /api/cars/, not /api/tracker/, and use a
 // car- prefixed route name too - both differ from the bike mapping
 // above, not just the base path.
-const CATEGORY_ROUTE_CAR: Record<string, string> = { service: 'car-services', fuel: 'car-fuel', mods: 'car-mods', mot: 'car-bills' };
-const CATEGORY_LABEL: Record<string, string> = { service: 'Service', fuel: 'Fuel', mods: 'Parts & Accessories', mot: 'MOT test' };
+const CATEGORY_ROUTE_CAR: Record<string, string> = { service: 'car-services', fuel: 'car-fuel', mods: 'car-mods', mot: 'car-bills', labour: 'car-labour' };
+const CATEGORY_LABEL: Record<string, string> = { service: 'Service', fuel: 'Fuel', mods: 'Parts & Accessories', mot: 'MOT test', labour: 'Labour' };
 
 function categoryRouteBase(category: string, vehicleKind: 'bike' | 'car'): string {
   return vehicleKind === 'car' ? `/api/cars/${CATEGORY_ROUTE_CAR[category]}` : `/api/tracker/${CATEGORY_ROUTE[category]}`;
@@ -20,7 +20,7 @@ function categoryRouteBase(category: string, vehicleKind: 'bike' | 'car'): strin
 
 interface ReferenceEntry {
   id: string;
-  category: 'service' | 'fuel' | 'mods' | 'mot';
+  category: 'service' | 'fuel' | 'mods' | 'mot' | 'labour';
   date: string;
   mileage: number;
   label: string;
@@ -36,17 +36,18 @@ interface ReferenceEntry {
   modCategory?: string;
   name?: string;
   billType?: string;
+  labourCategory?: string;
 }
 
 interface Props {
   entryId: string;
-  entryCategory: 'service' | 'fuel' | 'mods';
+  entryCategory: 'service' | 'fuel' | 'mods' | 'labour';
   entryDate: string;
   entryMileage: number;
   entryLabel: string;
   entryAttachment?: Attachment;
   referenceId?: string;
-  referenceCategory?: 'service' | 'fuel' | 'mods' | 'mot';
+  referenceCategory?: 'service' | 'fuel' | 'mods' | 'mot' | 'labour';
   preloadedReference?: ReferenceEntry;
   // True when the reference is another item still sitting in this same
   // batch, not yet saved anywhere - it has a description and a receipt
@@ -154,6 +155,7 @@ export function MileageConflictModal({
     if (ref.category === 'service') body = { jobType: ref.jobType, cost: ref.cost, mileage, date, notes: ref.notes, mileageAcknowledged: true };
     else if (ref.category === 'fuel') body = { litres: ref.litres, cost: ref.cost, mileage, date, filledToFull: ref.filledToFull, mileageAcknowledged: true };
     else if (ref.category === 'mot') body = { billType: ref.billType, cost: ref.cost, mileage, date, notes: ref.notes };
+    else if (ref.category === 'labour') body = { category: ref.labourCategory, cost: ref.cost, mileage, date, notes: ref.notes, mileageAcknowledged: true };
     else body = { category: ref.modCategory, name: ref.name, cost: ref.cost, mileage, date, notes: ref.notes, mileageAcknowledged: true };
     const res = await fetch(`${categoryRouteBase(ref.category, vehicleKind)}/${encodeURIComponent(ref.id)}`, {
       method: 'PATCH',

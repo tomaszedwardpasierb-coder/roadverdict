@@ -3,12 +3,14 @@ import type { ServiceRecordDoc } from "./serviceRecord";
 import type { ModDoc } from "./mod";
 import type { FuelLogDoc } from "./fuelLog";
 import type { BillDoc } from "./bill";
+import type { LabourDoc } from "./labour";
 
 export interface SpendSummary {
   servicingTotal: number;
   modsTotal: number;
   fuelTotal: number;
   billsTotal: number;
+  labourTotal: number;
   grandTotal: number;
 }
 
@@ -16,18 +18,23 @@ export function computeSpendSummary(
   records: ServiceRecordDoc[],
   mods: ModDoc[],
   fuelLogs: FuelLogDoc[],
-  bills: BillDoc[]
+  bills: BillDoc[],
+  // Defaulted so every existing caller (there are several across the
+  // dashboard/reports/receipt-scanning code) keeps compiling unchanged.
+  labour: LabourDoc[] = []
 ): SpendSummary {
   const servicingTotal = records.reduce((sum, r) => sum + r.cost, 0);
   const modsTotal = mods.reduce((sum, m) => sum + m.cost, 0);
   const fuelTotal = fuelLogs.reduce((sum, f) => sum + f.cost, 0);
   const billsTotal = bills.reduce((sum, b) => sum + b.cost, 0);
+  const labourTotal = labour.reduce((sum, l) => sum + l.cost, 0);
   return {
     servicingTotal,
     modsTotal,
     fuelTotal,
     billsTotal,
-    grandTotal: servicingTotal + modsTotal + fuelTotal + billsTotal,
+    labourTotal,
+    grandTotal: servicingTotal + modsTotal + fuelTotal + billsTotal + labourTotal,
   };
 }
 
@@ -36,11 +43,12 @@ export function computeYearSpend(
   mods: ModDoc[],
   fuelLogs: FuelLogDoc[],
   bills: BillDoc[],
-  year: number
+  year: number,
+  labour: LabourDoc[] = []
 ): number {
   const inYear = (d: string) => new Date(d).getFullYear() === year;
   const sum = (arr: { date: string; cost: number }[]) => arr.filter((x) => inYear(x.date)).reduce((s, x) => s + x.cost, 0);
-  return sum(records) + sum(mods) + sum(fuelLogs) + sum(bills);
+  return sum(records) + sum(mods) + sum(fuelLogs) + sum(bills) + sum(labour);
 }
 
 // id/category are optional so every OTHER existing caller of this type
@@ -52,14 +60,15 @@ export interface MileagePoint {
   date: string;
   mileage: number;
   id?: string;
-  category?: "service" | "fuel" | "mods" | "mot";
+  category?: "service" | "fuel" | "mods" | "mot" | "labour";
 }
 
 export function gatherMileagePoints(
   records: ServiceRecordDoc[],
   mods: ModDoc[],
   fuelLogs: FuelLogDoc[],
-  bills: BillDoc[] = []
+  bills: BillDoc[] = [],
+  labour: LabourDoc[] = []
 ): MileagePoint[] {
   const points: MileagePoint[] = [
     ...records.map((r) => ({ date: r.date, mileage: r.mileage, id: r.id, category: "service" as const })),
@@ -71,6 +80,7 @@ export function gatherMileagePoints(
     ...bills
       .filter((b) => b.billType === "mot-test" && b.mileage != null)
       .map((b) => ({ date: b.date, mileage: b.mileage as number, id: b.id, category: "mot" as const })),
+    ...labour.map((l) => ({ date: l.date, mileage: l.mileage, id: l.id, category: "labour" as const })),
   ];
   return points.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 }

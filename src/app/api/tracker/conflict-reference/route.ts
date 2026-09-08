@@ -12,6 +12,10 @@ import type { CarServiceRecordDoc } from "@/lib/tracker/carServiceRecord";
 import type { CarFuelLogDoc } from "@/lib/tracker/carFuelLog";
 import type { CarModDoc } from "@/lib/tracker/carMod";
 import type { CarBillDoc } from "@/lib/tracker/carBill";
+import type { LabourDoc } from "@/lib/tracker/labour";
+import type { CarLabourDoc } from "@/lib/tracker/carLabour";
+import { LABOUR_LABELS } from "@/lib/tracker/labourTypes";
+import { CAR_LABOUR_LABELS } from "@/lib/tracker/carLabourTypes";
 
 export const dynamic = "force-dynamic";
 
@@ -32,7 +36,7 @@ export async function GET(request: NextRequest) {
   const category = searchParams.get("category");
   const id = searchParams.get("id");
   const vehicleKind = searchParams.get("vehicleKind") === "car" ? "car" : "motorcycle";
-  if (!id || !category || !["service", "fuel", "mods", "mot"].includes(category)) {
+  if (!id || !category || !["service", "fuel", "mods", "mot", "labour"].includes(category)) {
     return NextResponse.json({ error: "Invalid request." }, { status: 400 });
   }
   if (!id.startsWith(`${session.email}::`)) {
@@ -89,6 +93,20 @@ export async function GET(request: NextRequest) {
       label: "MOT test", cost: doc.cost,
       attachment: doc.attachments?.[0] ?? null,
       billType: doc.billType, notes: doc.notes,
+    });
+  }
+  if (category === "labour") {
+    const doc =
+      vehicleKind === "car"
+        ? await getTrackerDocById<CarLabourDoc>(session.email, id)
+        : await getTrackerDocById<LabourDoc>(session.email, id);
+    if (!doc) return NextResponse.json({ error: "Not found." }, { status: 404 });
+    const label = vehicleKind === "car" ? CAR_LABOUR_LABELS[doc.category] ?? doc.category : LABOUR_LABELS[doc.category] ?? doc.category;
+    return NextResponse.json({
+      id: doc.id, category: "labour", date: doc.date, mileage: doc.mileage,
+      label, cost: doc.cost,
+      attachment: doc.attachments?.[0] ?? null,
+      labourCategory: doc.category, notes: doc.notes,
     });
   }
   const doc =

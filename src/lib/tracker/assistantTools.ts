@@ -17,17 +17,18 @@
 // one shared, vehicle-agnostic compute helper - exactly the same
 // "genuinely generic logic, vehicle-specific data-fetch" split every
 // other part of this build already uses (see carSummary.ts,
-// carReminderStatus.ts). Three tools stay bike-only for now, each
+// carReminderStatus.ts). Two tools stay bike-only for now, each
 // failing soft with an honest "not available for cars yet" result
 // rather than either guessing at a car equivalent or crashing:
 // getShareLinks (no share-link concept exists for cars), getStorySoFar
 // (CarDoc has no storyCache field - the AI narrative generator is
-// motorcycle-written), and proposeLogEntry (the on-screen draft card,
-// AssistantProposedEntryCard.tsx, is itself deeply bike-shaped - grouped
-// job/mod catalogs, a hardcoded /api/tracker/* endpoint per category, no
-// litres-vs-kWh branching - making it vehicle-kind-aware is real,
-// separate UI work, not attempted here so a car user never gets a
-// drafted entry that silently posts to the wrong endpoint).
+// motorcycle-written). proposeLogEntry is bike-only for service/bill/mod/
+// fuel (the on-screen draft card, AssistantProposedEntryCard.tsx, is
+// deeply bike-shaped for those four - grouped job/mod catalogs, a
+// hardcoded /api/tracker/* endpoint, no litres-vs-kWh branching), but IS
+// available for a car-active session's Labour category specifically,
+// since Labour's own catalog and draft card were built vehicle-kind-aware
+// from the start - see the labourCategory/vehicleKind handling below.
 
 import { getServiceRecords } from "./serviceRecord";
 import { getMods } from "./mod";
@@ -58,6 +59,8 @@ import { gatherCarMileagePoints } from "./carSummary";
 import { CAR_JOB_LABELS } from "./carJobTypes";
 import { CAR_BILL_LABELS } from "./carBillTypes";
 import { CAR_MOD_LABELS } from "./carModTypes";
+import { LABOUR_LABELS } from "./labourTypes";
+import { CAR_LABOUR_LABELS } from "./carLabourTypes";
 
 type CostItem = { date: string; cost: number };
 // Minimal structural shapes both a bike doc type and its car sister
@@ -777,13 +780,20 @@ export interface ProposeLogEntryArgs {
   modCategory?: string;
   litres?: number;
   filledToFull?: boolean;
+  labourCategory?: string;
 }
 
 export type ProposedEntry =
   | { category: "service"; jobType: string; jobLabel: string; description: string; cost: number; date: string; mileage: number }
   | { category: "bill"; billType: string; billLabel: string; description: string; cost: number; date: string }
   | { category: "mod"; modCategory: string; modLabel: string; description: string; cost: number; date: string; mileage: number }
-  | { category: "fuel"; litres: number; cost: number; date: string; mileage: number; filledToFull: boolean };
+  | { category: "fuel"; litres: number; cost: number; date: string; mileage: number; filledToFull: boolean }
+  // The only variant that can come from a car-active session (see the
+  // top-of-file comment) - vehicleKind is carried on the entry itself,
+  // not inferred later, so the draft card and its confirm handler know
+  // which catalog and which /api/tracker vs /api/cars endpoint to use
+  // without re-resolving the account's active vehicle a second time.
+  | { category: "labour"; labourCategory: string; labourLabel: string; description: string; cost: number; date: string; mileage: number; vehicleKind: "bike" | "car" };
 
 function resolveModCategory(input: string | undefined): string {
   const fallback = "other-accessory";
@@ -801,16 +811,68 @@ function resolveModCategory(input: string | undefined): string {
   return substring ? substring[0] : fallback;
 }
 
+// Same case-insensitive "exact match, then substring, then a safe
+// fallback" approach as resolveModCategory above, generalised over
+// whichever labour catalog (bike or car) applies to this session - both
+// LABOUR_LABELS and CAR_LABOUR_LABELS carry their own "other" key as the
+// fallback, so this never needs a hardcoded default of its own.
+function resolveLabourCategory(input: string | undefined, labels: Record<string, string>): string {
+  const fallback = "other";
+  if (typeof input !== "string" || !input.trim()) return fallback;
+  const q = input.trim().toLowerCase();
+  if (q in labels) return q;
+
+  const exact = Object.entries(labels).find(([, label]) => label.toLowerCase() === q);
+  if (exact) return exact[0];
+
+  const substring = Object.entries(labels).find(([, label]) => {
+    const l = label.toLowerCase();
+    return l.includes(q) || q.includes(l);
+  });
+  return substring ? substring[0] : fallback;
+}
+
 export async function toolProposeLogEntry(email: string, args: ProposeLogEntryArgs) {
   const vehicle = await resolveActiveVehicle(email);
   if (!vehicle) return { error: "No vehicle found on this account." };
+
   if (vehicle.kind === "car") {
-    return { error: "Drafting a new entry from chat isn't available for cars yet - log it directly from the dashboard instead." };
+    // Labour is the one category the car-active draft card actually
+    // supports (see the top-of-file comment) - everything else still
+    // gets the honest "not available" reply, now naming the category it
+    // was asked for rather than a blanket refusal.
+    if (args.category !== "labour") {
+      return { error: "Drafting a new entry from chat is only available for Labour on a car-active account right now - log other categories directly from the dashboard instead." };
+    }
+    const car = vehicle.car;
+    if (typeof args.cost !== "number" || !Number.isFinite(args.cost) || args.cost <= 0) {
+      return { error: "Needs a valid, positive cost." };
+    }
+    const parsedCarDate = typeof args.date === "string" ? new Date(args.date) : null;
+    const carDate = parsedCarDate && !Number.isNaN(parsedCarDate.getTime()) ? args.date! : new Date().toISOString().slice(0, 10);
+    if (new Date(carDate).getTime() > Date.now() + 86_400_000) {
+      return { error: "That date is in the future - this can only log something that's already happened." };
+    }
+    if (typeof args.description !== "string" || !args.description.trim()) {
+      return { error: "Needs a short description of what this is." };
+    }
+    const carLabourCategory = resolveLabourCategory(args.labourCategory, CAR_LABOUR_LABELS);
+    const entry: ProposedEntry = {
+      category: "labour",
+      labourCategory: carLabourCategory,
+      labourLabel: CAR_LABOUR_LABELS[carLabourCategory],
+      description: args.description.trim(),
+      cost: args.cost,
+      date: carDate,
+      mileage: car.currentMileage,
+      vehicleKind: "car",
+    };
+    return entry;
   }
   const bike = vehicle.bike;
 
-  if (args.category !== "service" && args.category !== "bill" && args.category !== "mod" && args.category !== "fuel") {
-    return { error: "Not sure what category that is - a service item, a bill (insurance/road tax/MOT/finance), a modification/accessory, or a fuel fill-up?" };
+  if (args.category !== "service" && args.category !== "bill" && args.category !== "mod" && args.category !== "fuel" && args.category !== "labour") {
+    return { error: "Not sure what category that is - a service item, a bill (insurance/road tax/MOT/finance), a modification/accessory, a fuel fill-up, or labour/workshop time?" };
   }
   if (typeof args.cost !== "number" || !Number.isFinite(args.cost) || args.cost <= 0) {
     return { error: "Needs a valid, positive cost." };
@@ -847,6 +909,12 @@ export async function toolProposeLogEntry(email: string, args: ProposeLogEntryAr
     return entry;
   }
 
+  if (args.category === "labour") {
+    const labourCategory = resolveLabourCategory(args.labourCategory, LABOUR_LABELS);
+    const entry: ProposedEntry = { category: "labour", labourCategory, labourLabel: LABOUR_LABELS[labourCategory], description, cost: args.cost, date, mileage: bike.currentMileage, vehicleKind: "bike" };
+    return entry;
+  }
+
   const billType = typeof args.billType === "string" ? args.billType : undefined;
   if (!billType || !(billType in BILL_LABELS)) {
     return { error: "Which of these is this for: insurance, road tax, MOT test, or finance?" };
@@ -855,43 +923,83 @@ export async function toolProposeLogEntry(email: string, args: ProposeLogEntryAr
   return entry;
 }
 
-export const LOG_ENTRY_TOOL_DECLARATIONS = [
-  {
-    name: "proposeLogEntry",
-    description:
-      "Draft a new service record, insurance/road-tax/MOT/finance bill, modification/accessory, or fuel fill-up for the signed-in user's bike, from their description of what they want to log. This only prepares a draft for the user to review, edit, and confirm themselves on screen - it NEVER saves anything by itself, and never changes or deletes an existing entry. Doesn't need an exact category match - your best guess is fine, the user can correct it on the draft card. Not available for a car-active account yet.",
-    parameters: {
-      type: "OBJECT",
-      properties: {
-        category: {
-          type: "STRING",
-          enum: ["service", "bill", "mod", "fuel"],
-          description: "'service' for maintenance/consumables/small parts, 'bill' for insurance/road-tax/MOT/finance, 'mod' for a modification or accessory (including general detailing products like wax/polish), 'fuel' for a fuel fill-up.",
+// Vehicle-kind-dependent, unlike every other declaration array in this
+// file: a car-active session's draft card only ever supports Labour (see
+// toolProposeLogEntry above), so its schema offers just that one category
+// and the car's own labour catalog - never the bike-only categories or
+// LABOUR_LABELS' keys, which would let the model draft something the
+// car-active card can't actually post anywhere correct.
+export function buildLogEntryToolDeclarations(vehicleKind: "bike" | "car") {
+  if (vehicleKind === "car") {
+    return [
+      {
+        name: "proposeLogEntry",
+        description:
+          "Draft a new Labour entry (workshop time, diagnostic hours) for the signed-in user's car, from their description of what they want to log. This only prepares a draft for the user to review, edit, and confirm themselves on screen - it NEVER saves anything by itself. Doesn't need an exact category match - your best guess is fine, the user can correct it on the draft card. Only Labour is available for a car-active account right now - every other category still needs to be logged directly from the dashboard.",
+        parameters: {
+          type: "OBJECT",
+          properties: {
+            category: {
+              type: "STRING",
+              enum: ["labour"],
+              description: "Always 'labour' - the only category available for a car-active account.",
+            },
+            description: { type: "STRING", description: "A short, plain label for what this is, e.g. 'Cambelt replacement' or '2 hours diagnostic time'." },
+            cost: { type: "NUMBER", description: "The amount paid, in GBP, as a plain number." },
+            date: { type: "STRING", description: "ISO date (YYYY-MM-DD) this was paid/done. Use today's date if the user didn't say otherwise." },
+            labourCategory: {
+              type: "STRING",
+              description: "Your best guess at what kind of labour job this is, in plain words (e.g. 'brake bleed', 'timing belt', 'EV battery health check'). Doesn't need to be exact - it's matched to the closest real category, or filed as 'Other' if nothing fits.",
+            },
+          },
+          required: ["category", "cost"],
         },
-        description: { type: "STRING", description: "Not used for 'fuel'. A short, plain label for what this is, e.g. 'Valve cleaner' or 'Annual insurance renewal'." },
-        cost: { type: "NUMBER", description: "The amount paid, in GBP, as a plain number." },
-        date: { type: "STRING", description: "ISO date (YYYY-MM-DD) this was paid/done. Use today's date if the user didn't say otherwise." },
-        jobType: {
-          type: "STRING",
-          enum: Object.keys(JOB_LABELS),
-          description: "Only for category 'service' - the closest matching job type, or 'other' if genuinely nothing fits.",
-        },
-        billType: {
-          type: "STRING",
-          enum: ["insurance", "road-tax", "mot-test", "finance"],
-          description: "Only for category 'bill'.",
-        },
-        modCategory: {
-          type: "STRING",
-          description: "Only for category 'mod' - your best guess at what kind of part/accessory this is, in plain words (e.g. 'wax', 'tank pad', 'phone mount'). Doesn't need to be exact - it's matched to the closest real category, or filed as 'Other accessory' if nothing fits.",
-        },
-        litres: { type: "NUMBER", description: "Only for category 'fuel' - litres put in, as a plain number." },
-        filledToFull: { type: "BOOLEAN", description: "Only for category 'fuel' - true only if they said something like 'filled up' or 'full tank', otherwise omit." },
       },
-      required: ["category", "cost"],
+    ] as const;
+  }
+
+  return [
+    {
+      name: "proposeLogEntry",
+      description:
+        "Draft a new service record, insurance/road-tax/MOT/finance bill, modification/accessory, fuel fill-up, or labour/workshop-time entry for the signed-in user's bike, from their description of what they want to log. This only prepares a draft for the user to review, edit, and confirm themselves on screen - it NEVER saves anything by itself, and never changes or deletes an existing entry. Doesn't need an exact category match - your best guess is fine, the user can correct it on the draft card.",
+      parameters: {
+        type: "OBJECT",
+        properties: {
+          category: {
+            type: "STRING",
+            enum: ["service", "bill", "mod", "fuel", "labour"],
+            description: "'service' for maintenance/consumables/small parts, 'bill' for insurance/road-tax/MOT/finance, 'mod' for a modification or accessory (including general detailing products like wax/polish), 'fuel' for a fuel fill-up, 'labour' for workshop time/labour charges billed separately from parts.",
+          },
+          description: { type: "STRING", description: "Not used for 'fuel'. A short, plain label for what this is, e.g. 'Valve cleaner' or 'Annual insurance renewal'." },
+          cost: { type: "NUMBER", description: "The amount paid, in GBP, as a plain number." },
+          date: { type: "STRING", description: "ISO date (YYYY-MM-DD) this was paid/done. Use today's date if the user didn't say otherwise." },
+          jobType: {
+            type: "STRING",
+            enum: Object.keys(JOB_LABELS),
+            description: "Only for category 'service' - the closest matching job type, or 'other' if genuinely nothing fits.",
+          },
+          billType: {
+            type: "STRING",
+            enum: ["insurance", "road-tax", "mot-test", "finance"],
+            description: "Only for category 'bill'.",
+          },
+          modCategory: {
+            type: "STRING",
+            description: "Only for category 'mod' - your best guess at what kind of part/accessory this is, in plain words (e.g. 'wax', 'tank pad', 'phone mount'). Doesn't need to be exact - it's matched to the closest real category, or filed as 'Other accessory' if nothing fits.",
+          },
+          litres: { type: "NUMBER", description: "Only for category 'fuel' - litres put in, as a plain number." },
+          filledToFull: { type: "BOOLEAN", description: "Only for category 'fuel' - true only if they said something like 'filled up' or 'full tank', otherwise omit." },
+          labourCategory: {
+            type: "STRING",
+            description: "Only for category 'labour' - your best guess at what kind of labour job this is, in plain words (e.g. 'brake bleed', 'valve clearance', 'wheel bearing'). Doesn't need to be exact - it's matched to the closest real category, or filed as 'Other' if nothing fits.",
+          },
+        },
+        required: ["category", "cost"],
+      },
     },
-  },
-] as const;
+  ] as const;
+}
 
 // Single dispatch point - the API route calls this instead of a
 // hand-written switch of its own, so the set of callable tools is

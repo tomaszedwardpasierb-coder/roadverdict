@@ -15,6 +15,7 @@ const CATEGORY_TINT: Record<ReviewCategory, string> = {
   fuel: styles.statCardIconGreen,
   mods: styles.statCardIconAmber,
   bills: styles.statCardIconNeutral,
+  labour: styles.statCardIconAmber,
 };
 
 export interface RecentActivityItem {

@@ -24,7 +24,7 @@ import { useTabSwitch } from "@/app/dashboard/TabSwitchContext";
 import { ActiveSectionProvider, useActiveSection } from "@/components/ActiveSectionContext";
 import { DEMO_EMAIL } from "@/lib/tracker/demoSeed";
 
-const emptyPendingIds = { service: [], fuel: [], mods: [], bills: [] };
+const emptyPendingIds = { service: [], fuel: [], mods: [], bills: [], labour: [] };
 
 function baseProps(overrides: Partial<Parameters<typeof DashboardShell>[0]> = {}) {
   return {
@@ -43,6 +43,7 @@ function baseProps(overrides: Partial<Parameters<typeof DashboardShell>[0]> = {}
     serviceContent: <div>Service content</div>,
     fuelContent: <div>Fuel content</div>,
     modsContent: <div>Mods content</div>,
+    labourContent: <div>Labour content</div>,
     billsContent: <div>Bills content</div>,
     remindersContent: <div>Reminders content</div>,
     reportsContent: <div>Reports content</div>,

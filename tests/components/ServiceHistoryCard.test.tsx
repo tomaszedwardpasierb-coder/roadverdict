@@ -52,7 +52,7 @@ const defaultProps = {
   distanceUnit: "mi" as const,
   currency: "GBP" as const,
   rates: null,
-  pendingReviewIds: { service: [], fuel: [], mods: [], bills: [] },
+  pendingReviewIds: { service: [], fuel: [], mods: [], bills: [], labour: [] },
   mileageHistory: [] as HistoryPoint[],
   currentMileage: 8000,
 };
@@ -258,7 +258,7 @@ describe("ServiceHistoryCard", () => {
         <ServiceHistoryCard
           {...defaultProps}
           record={record}
-          pendingReviewIds={{ service: ["rec-1"], fuel: ["fuel-1"], mods: [], bills: [] }}
+          pendingReviewIds={{ service: ["rec-1"], fuel: ["fuel-1"], mods: [], bills: [], labour: [] }}
         />
       </TabSwitchProvider>
     );

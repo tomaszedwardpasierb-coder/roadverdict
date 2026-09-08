@@ -6,7 +6,7 @@
 
 export interface HistoryPoint {
   id?: string;
-  category?: "service" | "fuel" | "mods" | "mot";
+  category?: "service" | "fuel" | "mods" | "mot" | "labour";
   // Set when this point is another item in the SAME upload batch,
   // not yet saved to the database - lets a conflict point at "item #N
   // in this batch" when there is no real id to reference yet.
@@ -27,7 +27,7 @@ export interface MileageCheckResult {
   // record (including its own receipt image) side by side, rather than
   // only knowing a number and a date.
   referenceId?: string;
-  referenceCategory?: "service" | "fuel" | "mods" | "mot";
+  referenceCategory?: "service" | "fuel" | "mods" | "mot" | "labour";
   // Set instead of referenceId when the conflict is against another
   // item still pending in the same upload batch, not yet saved.
   referenceBatchIndex?: number;
@@ -66,7 +66,7 @@ export function checkMileageConsistency(
     return { status: "ok" };
   }
 
-  let closest: { direction: "below-earlier" | "above-later"; mileage: number; date: string; id?: string; category?: "service" | "fuel" | "mods" | "mot"; batchIndex?: number } | null = null;
+  let closest: { direction: "below-earlier" | "above-later"; mileage: number; date: string; id?: string; category?: "service" | "fuel" | "mods" | "mot" | "labour"; batchIndex?: number } | null = null;
   let closestGapMs = Infinity;
 
   for (const point of history) {

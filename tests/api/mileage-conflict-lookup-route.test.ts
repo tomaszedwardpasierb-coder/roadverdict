@@ -7,7 +7,14 @@ const mocks = vi.hoisted(() => ({
   getFuelLogs: vi.fn(),
   getMods: vi.fn(),
   getBills: vi.fn(),
+  getLabour: vi.fn(),
   getPrimaryBike: vi.fn(),
+  getCarServiceRecords: vi.fn(),
+  getCarFuelLogs: vi.fn(),
+  getCarMods: vi.fn(),
+  getCarBills: vi.fn(),
+  getCarLabour: vi.fn(),
+  getPrimaryCar: vi.fn(),
 }));
 
 vi.mock("@/lib/auth/session", () => ({ getSession: mocks.getSession }));
@@ -15,7 +22,14 @@ vi.mock("@/lib/tracker/serviceRecord", () => ({ getServiceRecords: mocks.getServ
 vi.mock("@/lib/tracker/fuelLog", () => ({ getFuelLogs: mocks.getFuelLogs }));
 vi.mock("@/lib/tracker/mod", () => ({ getMods: mocks.getMods }));
 vi.mock("@/lib/tracker/bill", () => ({ getBills: mocks.getBills }));
+vi.mock("@/lib/tracker/labour", () => ({ getLabour: mocks.getLabour }));
 vi.mock("@/lib/tracker/bike", () => ({ getPrimaryBike: mocks.getPrimaryBike }));
+vi.mock("@/lib/tracker/carServiceRecord", () => ({ getCarServiceRecords: mocks.getCarServiceRecords }));
+vi.mock("@/lib/tracker/carFuelLog", () => ({ getCarFuelLogs: mocks.getCarFuelLogs }));
+vi.mock("@/lib/tracker/carMod", () => ({ getCarMods: mocks.getCarMods }));
+vi.mock("@/lib/tracker/carBill", () => ({ getCarBills: mocks.getCarBills }));
+vi.mock("@/lib/tracker/carLabour", () => ({ getCarLabour: mocks.getCarLabour }));
+vi.mock("@/lib/tracker/car", () => ({ getPrimaryCar: mocks.getPrimaryCar }));
 // checkMileageConsistency is deliberately NOT mocked - it's already
 // covered by its own dedicated unit tests (mileageCheck.test.ts), so
 // these tests exercise the real function to prove the route's own
@@ -30,6 +44,7 @@ function request(query: string): NextRequest {
 const email = "owner@example.com";
 const id = `${email}::sr::1`;
 const bike = { id: "bike-1", currentMileage: 9000 };
+const car = { id: "car-1", currentMileage: 9000 };
 
 describe("GET /api/tracker/mileage-conflict-lookup", () => {
   beforeEach(() => {
@@ -40,6 +55,13 @@ describe("GET /api/tracker/mileage-conflict-lookup", () => {
     mocks.getFuelLogs.mockResolvedValue([]);
     mocks.getMods.mockResolvedValue([]);
     mocks.getBills.mockResolvedValue([]);
+    mocks.getLabour.mockResolvedValue([]);
+    mocks.getPrimaryCar.mockResolvedValue(car);
+    mocks.getCarServiceRecords.mockResolvedValue([]);
+    mocks.getCarFuelLogs.mockResolvedValue([]);
+    mocks.getCarMods.mockResolvedValue([]);
+    mocks.getCarBills.mockResolvedValue([]);
+    mocks.getCarLabour.mockResolvedValue([]);
   });
 
   it("rejects unauthenticated requests", async () => {
@@ -113,5 +135,38 @@ describe("GET /api/tracker/mileage-conflict-lookup", () => {
     await expect(response.json()).resolves.toEqual({
       error: "No current conflict found for this entry - it may have already been resolved.",
     });
+  });
+
+  it("finds a conflict against a labour entry, by category=labour", async () => {
+    const labourId = `${email}::labour::1`;
+    mocks.getLabour.mockResolvedValue([{ id: labourId, date: "2025-01-01", mileage: 5000 }]);
+    mocks.getFuelLogs.mockResolvedValue([{ id: "fl-1", date: "2025-02-01", mileage: 4900 }]);
+
+    const response = await GET(request(`?category=labour&id=${labourId}`));
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ referenceId: "fl-1", referenceCategory: "fuel" });
+  });
+
+  // vehicleKind=car routes to the car doc-getters and the car's own
+  // currentMileage, entirely separate from the bike branch above - a
+  // hybrid account (owns both) must never cross-contaminate the two.
+  it("uses the car's own records and mileage when vehicleKind=car", async () => {
+    const carId = `${email}::carLabour::1`;
+    mocks.getCarLabour.mockResolvedValue([{ id: carId, date: "2025-01-01", mileage: 5000 }]);
+    mocks.getCarFuelLogs.mockResolvedValue([{ id: "cfl-1", date: "2025-02-01", mileage: 4900 }]);
+
+    const response = await GET(request(`?category=labour&id=${carId}&vehicleKind=car`));
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ referenceId: "cfl-1", referenceCategory: "fuel" });
+    expect(mocks.getPrimaryCar).toHaveBeenCalled();
+    expect(mocks.getServiceRecords).not.toHaveBeenCalled();
+  });
+
+  it("returns 404 when vehicleKind=car and the account has no car yet", async () => {
+    mocks.getPrimaryCar.mockResolvedValue(null);
+    const response = await GET(request(`?category=labour&id=${id}&vehicleKind=car`));
+    expect(response.status).toBe(404);
   });
 });

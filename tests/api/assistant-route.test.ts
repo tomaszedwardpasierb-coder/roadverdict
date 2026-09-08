@@ -25,7 +25,8 @@ vi.mock("@/lib/tracker/assistantTools", () => ({
   ASSISTANT_TOOL_DECLARATIONS: [{ name: "getSpendTotal" }],
   REPORT_TOOL_DECLARATIONS: [{ name: "getViewedReport" }],
   COMPARISON_TOOL_DECLARATIONS: [{ name: "getViewedComparison" }],
-  LOG_ENTRY_TOOL_DECLARATIONS: [{ name: "proposeLogEntry" }],
+  buildLogEntryToolDeclarations: (vehicleKind: "bike" | "car") =>
+    vehicleKind === "car" ? [{ name: "proposeLogEntry", parameters: { properties: { category: { enum: ["labour"] } } } }] : [{ name: "proposeLogEntry", parameters: { properties: { category: { enum: ["service", "bill", "mod", "fuel", "labour"] } } } }],
   runAssistantTool: mocks.runAssistantTool,
 }));
 vi.mock("@/lib/tracker/assistantQuestionLog", () => ({ logAssistantQuestion: mocks.logAssistantQuestion }));
@@ -591,21 +592,37 @@ describe("POST /api/assistant - car-active knowledge base and log-entry gating",
     expect(callBody.systemInstruction.parts[0].text).toContain("KB content.");
   });
 
-  it("never offers the log-entry tool for a car-active session, even when the account is Pro", async () => {
+  // Labour is the one category a car-active session's draft card
+  // actually supports - the tool is now offered (Pro-gated exactly like
+  // a bike session), just with a labour-only category enum, not the
+  // full 5-category schema a bike session gets.
+  it("offers the log-entry tool (labour-only) for a car-active Pro session", async () => {
     mocks.getSession.mockResolvedValue({ email: "driver@example.com" });
     mocks.resolveActiveVehicle.mockResolvedValue({ kind: "car", car: { id: "car-1" }, hasAnyBike: false });
     mocks.isPro.mockResolvedValue(true);
 
-    await POST(request({ messages: [{ role: "user", content: "Log my oil change" }] }));
+    await POST(request({ messages: [{ role: "user", content: "Log my brake bleed" }] }));
+
+    const callBody = JSON.parse(mocks.fetch.mock.calls[0][1].body);
+    const declarations = callBody.tools[0].functionDeclarations;
+    const proposeLogEntry = declarations.find((d: { name: string }) => d.name === "proposeLogEntry");
+    expect(proposeLogEntry).toBeDefined();
+    expect(proposeLogEntry.parameters.properties.category.enum).toEqual(["labour"]);
+    expect(callBody.systemInstruction.parts[0].text).toContain("LOGGING VIA CHAT (Pro feature, active now - Labour only)");
+    expect(mocks.isPro).toHaveBeenCalled();
+  });
+
+  it("does not offer the log-entry tool for a car-active session that isn't Pro, and shows the upsell message", async () => {
+    mocks.getSession.mockResolvedValue({ email: "driver@example.com" });
+    mocks.resolveActiveVehicle.mockResolvedValue({ kind: "car", car: { id: "car-1" }, hasAnyBike: false });
+    mocks.isPro.mockResolvedValue(false);
+
+    await POST(request({ messages: [{ role: "user", content: "Log my brake bleed" }] }));
 
     const callBody = JSON.parse(mocks.fetch.mock.calls[0][1].body);
     const names = (callBody.tools?.[0]?.functionDeclarations ?? []).map((d: { name: string }) => d.name);
     expect(names).not.toContain("proposeLogEntry");
-    expect(callBody.systemInstruction.parts[0].text).toContain("LOGGING VIA CHAT: drafting a new entry by describing it in chat isn't available for cars yet");
-    // isPro() is never even reached for a car-active session - checked
-    // before the Pro lookup, since a car-active Pro account still can't
-    // use this yet.
-    expect(mocks.isPro).not.toHaveBeenCalled();
+    expect(callBody.systemInstruction.parts[0].text).toContain("LOGGING VIA CHAT: adding or logging a new entry by describing it in chat is a Pro feature");
   });
 
   it("still offers the log-entry tool normally for a bike-active Pro session", async () => {

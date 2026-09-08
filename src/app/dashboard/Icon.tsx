@@ -1,6 +1,6 @@
 // Place at: src/app/dashboard/Icon.tsx
 'use client';
-import { Gauge, Wrench, Droplet, Package, Shield, Bell, BellRing, BarChart3, BookOpen, Share2, Receipt, Tag, Calendar, Camera, Calculator, ClipboardCheck, Lock, Scale, ArrowRightLeft, Upload, KeyRound } from 'lucide-react';
+import { Gauge, Wrench, Droplet, Package, Shield, Bell, BellRing, BarChart3, BookOpen, Share2, Receipt, Tag, Calendar, Camera, Calculator, ClipboardCheck, Lock, Scale, ArrowRightLeft, Upload, KeyRound, HardHat } from 'lucide-react';
 import type { LucideProps } from 'lucide-react';
 // Maps this app's semantic icon names to their lucide-react component -
 // keeps every call site referring to "what this icon means" (fuel,
@@ -12,6 +12,7 @@ const ICONS = {
   fuel: Droplet,
   mods: Package,
   bills: Shield,
+  labour: HardHat,
   reminders: Bell,
   reports: BarChart3,
   story: BookOpen,

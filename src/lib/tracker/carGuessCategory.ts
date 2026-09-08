@@ -6,6 +6,7 @@
 import { CAR_JOB_LABELS } from "./carJobTypes";
 import { CAR_MOD_LABELS } from "./carModTypes";
 import { CAR_BILL_LABELS } from "./carBillTypes";
+import { CAR_LABOUR_LABELS } from "./carLabourTypes";
 
 function bestMatch(description: string, labels: Record<string, string>): string | null {
   const words = description.toLowerCase().split(/\s+/).filter((w) => w.length > 2);
@@ -36,4 +37,8 @@ export function guessCarModCategory(description: string): string | null {
 
 export function guessCarBillType(description: string): string | null {
   return bestMatch(description, CAR_BILL_LABELS);
+}
+
+export function guessCarLabourCategory(description: string): string | null {
+  return bestMatch(description, CAR_LABOUR_LABELS);
 }

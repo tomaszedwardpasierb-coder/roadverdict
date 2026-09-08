@@ -148,7 +148,7 @@ export async function commitCarReceiptItem(
   let mileageWarning: string | undefined;
   let mileageNeedsManualEntry = false;
   let conflictReferenceId: string | undefined;
-  let conflictReferenceCategory: "service" | "fuel" | "mods" | "mot" | undefined;
+  let conflictReferenceCategory: "service" | "fuel" | "mods" | "mot" | "labour" | undefined;
   let conflictReferenceBatchIndex: number | undefined;
 
   // CarDoc carries no tankCapacityLitres field (see the ADR - out of
