@@ -118,8 +118,10 @@ describe("DashboardShell", () => {
     render(<DashboardShell {...baseProps({ hasPendingReceiptRequests: true })} />);
     // Shareable Links lives inside the Selling group, collapsed by default -
     // its own header should already show the rolled-up signal even before
-    // expanding.
-    const sellingHeader = screen.getByRole("button", { name: /Selling/ });
+    // expanding. "Selling" also has its own mobile-bottom-bar icon (always
+    // mounted, just CSS-hidden by media query) - the sidebar's own copy is
+    // the first match.
+    const sellingHeader = screen.getAllByRole("button", { name: /Selling/ })[0];
     expect(sellingHeader.querySelector('[aria-label="An entry here needs review"]')).not.toBeNull();
 
     await user.click(sellingHeader);
@@ -131,7 +133,7 @@ describe("DashboardShell", () => {
     const user = userEvent.setup();
     const { rerender } = render(<DashboardShell {...baseProps({ storyReady: true })} />);
     // The Story item lives inside the Insights group, collapsed by default.
-    await user.click(screen.getByRole("button", { name: /Insights/ }));
+    await user.click(screen.getAllByRole("button", { name: /Insights/ })[0]);
     expect(screen.getAllByLabelText("Enough logged history for a worthwhile story").length).toBeGreaterThan(0);
 
     rerender(<DashboardShell {...baseProps({ storyReady: false })} />);
@@ -144,7 +146,7 @@ describe("DashboardShell", () => {
     // Transfer ownership lives inside the Selling group, collapsed by
     // default - its own header should already show the rolled-up signal
     // even before expanding.
-    const sellingHeader = screen.getByRole("button", { name: /Selling/ });
+    const sellingHeader = screen.getAllByRole("button", { name: /Selling/ })[0];
     expect(sellingHeader.querySelector('[aria-label="An entry here needs review"]')).not.toBeNull();
 
     await user.click(sellingHeader);
@@ -214,12 +216,31 @@ describe("DashboardShell", () => {
     await user.click(screen.getByRole("button", { name: /More/ }));
     expect(screen.getByText(/Signed in as rider@example\.com/)).toBeInTheDocument();
 
-    // "Insurance, Tax, MOT & Finance" also appears in the always-mounted sidebar nav -
+    // "Reminders" also appears in the always-mounted sidebar nav -
     // the sheet's own copy (rendered later in the DOM) is the last match.
-    const taxAndInsuranceButtons = screen.getAllByRole("button", { name: /Insurance, Tax, MOT & Finance/ });
-    await user.click(taxAndInsuranceButtons[taxAndInsuranceButtons.length - 1]);
-    expect(screen.getByText("Bills content")).toBeInTheDocument();
+    const remindersButtons = screen.getAllByRole("button", { name: /Reminders/ });
+    await user.click(remindersButtons[remindersButtons.length - 1]);
+    expect(screen.getByText("Reminders content")).toBeInTheDocument();
     expect(screen.queryByText(/Signed in as/)).not.toBeInTheDocument();
+  });
+
+  it("opening a bottom-bar group's own shelf (Logbook) shows just its items, not Reminders/Security/Privacy alongside them", async () => {
+    const user = userEvent.setup();
+    render(<DashboardShell {...baseProps()} />);
+
+    // The bottom-bar "Logbook" icon - distinct from the sidebar's own
+    // Logbook header (which is a different button, already expanded).
+    const logbookBarButtons = screen.getAllByRole("button", { name: /Logbook/ });
+    await user.click(logbookBarButtons[logbookBarButtons.length - 1]);
+
+    // The More sheet's own footer content never renders for a group
+    // shelf - proof this is the scoped Logbook shelf, not the full More
+    // sheet Logbook's items used to sit inside.
+    expect(screen.queryByText(/Signed in as/)).not.toBeInTheDocument();
+
+    const billsButtons = screen.getAllByRole("button", { name: /Insurance, Tax, MOT & Finance/ });
+    await user.click(billsButtons[billsButtons.length - 1]);
+    expect(screen.getByText("Bills content")).toBeInTheDocument();
   });
 
   it("renders the real VehicleSwitcher child for a single-bike account, not a stub", () => {
@@ -257,20 +278,29 @@ describe("DashboardShell", () => {
   describe("collapsible nav groups", () => {
     it("Logbook's own items are visible with no interaction; the other three groups' items are not", () => {
       render(<DashboardShell {...baseProps()} />);
-      // "Fuel" also has its own mobile-bottom-bar icon (always mounted,
-      // just CSS-hidden by media query) - getAllByRole, not getByRole,
-      // same reasoning the rest of this file already uses for it.
-      expect(screen.getAllByRole("button", { name: "Fuel" }).length).toBeGreaterThan(0);
+      expect(screen.getByRole("button", { name: "Fuel" })).toBeInTheDocument();
       expect(screen.getByRole("button", { name: "Labour" })).toBeInTheDocument();
       expect(screen.queryByRole("button", { name: "Reports" })).not.toBeInTheDocument();
       expect(screen.queryByRole("button", { name: "Shareable Links" })).not.toBeInTheDocument();
       expect(screen.queryByRole("button", { name: "Quote Checker" })).not.toBeInTheDocument();
     });
 
+    // The mobile bottom bar itself shows group-level icons (Dashboard,
+    // Logbook, Insights, Selling, More) rather than individual tabs
+    // (Service/Fuel/Parts used to have their own icons here) - Logbook's
+    // own items are only ever reached via its shelf now, never as
+    // separate bottom-bar buttons.
+    it("the mobile bottom bar shows group icons, not individual Service/Fuel/Parts icons", () => {
+      render(<DashboardShell {...baseProps()} />);
+      const bottomNav = document.querySelector('[data-mobile-bottom-nav]') as HTMLElement;
+      const bottomBarButtonNames = Array.from(bottomNav.querySelectorAll('button')).map((b) => b.textContent);
+      expect(bottomBarButtonNames).toEqual(['Dashboard', 'Logbook', 'Insights', 'Selling', '⋯More']);
+    });
+
     it("clicking a group header toggles its items open and closed, and flips aria-expanded", async () => {
       const user = userEvent.setup();
       render(<DashboardShell {...baseProps()} />);
-      const insightsHeader = screen.getByRole("button", { name: /Insights/ });
+      const insightsHeader = screen.getAllByRole("button", { name: /Insights/ })[0];
       expect(insightsHeader).toHaveAttribute("aria-expanded", "false");
       expect(screen.queryByRole("button", { name: "Reports" })).not.toBeInTheDocument();
 
@@ -286,7 +316,7 @@ describe("DashboardShell", () => {
     it("a group stays expanded even if its own header is clicked to collapse it, as long as its item is the active tab", async () => {
       const user = userEvent.setup();
       render(<DashboardShell {...baseProps()} />);
-      const insightsHeader = screen.getByRole("button", { name: /Insights/ });
+      const insightsHeader = screen.getAllByRole("button", { name: /Insights/ })[0];
       await user.click(insightsHeader);
       await user.click(screen.getByRole("button", { name: "Reports" }));
       expect(screen.getByText("Reports content")).toBeInTheDocument();
@@ -360,7 +390,10 @@ describe("DashboardShell", () => {
       render(<DashboardShell {...carProps()} />);
 
       for (const groupLabel of ["Insights", "Selling", "Buying Tools"]) {
-        const header = screen.getByRole("button", { name: new RegExp(groupLabel) });
+        // Insights/Selling also have their own mobile-bottom-bar icon
+        // (always mounted, just CSS-hidden by media query) - the
+        // sidebar's own copy is the first match.
+        const header = screen.getAllByRole("button", { name: new RegExp(groupLabel) })[0];
         expect(header).toBeInTheDocument();
         await user.click(header);
         expect(screen.getAllByText("Not available for cars yet.").length).toBeGreaterThan(0);

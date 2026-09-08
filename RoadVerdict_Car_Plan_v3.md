@@ -889,15 +889,27 @@ in "other," understating how much someone has actually invested in keeping a veh
   kind, only which categories the tool offers does.
   `AssistantProposedEntryCard.tsx` gained a `labour` variant carrying its own `vehicleKind` tag (the
   one category needing a vehicle-kind-dependent POST endpoint).
-- **Explicit scope cut, matching this build's own established discipline**: the AI receipt scanner
-  does NOT auto-detect Labour line items — `receiptParse.ts`, `commitReceiptItem.ts`/
-  `commitCarReceiptItem.ts`'s `ReviewQueueEntry` union, and `ReviewQueueModal`'s category routing stay
-  untouched. Labour launches as manual-entry + AI-chat-draft only; teaching the scanner to recognise
-  it as its own line-item category is real, additive-later work.
+- **Original scope cut** (now implemented, see below): the AI receipt scanner initially did NOT
+  auto-detect Labour line items, launching as manual-entry + AI-chat-draft only.
 
-Verified with a clean `tsc --noEmit`, a green full suite (3,063 unit/API tests, up from 2,887), a
-green component suite (836, up from 765), and a clean production build (new routes confirmed present,
-no other route's bundle size regressed).
+**Post-launch addition, 2026-09-08:** a user hit the scope cut directly — a garage invoice's
+"Suspension work labor" line logged as Service/Other, since the scanner only ever classified into
+service/fuel/mods/bills. Taught the scanner to recognise Labour as its own category, both vehicle
+kinds: `receiptParse.ts`'s Gemini prompt/schema gained a `"labour"` category (guide text tightened so
+a line item naming a specific part/consumable still classifies as `"service"` as before — `"labour"`
+is reserved for a pure workshop-labour/diagnostic charge with no part named); `receiptTiering.ts`'s
+`TierableItem` widened so labour gets identical tier-1/2 auto-commit treatment to service (tiering/
+auto-commit behaviour itself deliberately left unchanged, per explicit user instruction);
+`commitReceiptItem.ts`/`commitCarReceiptItem.ts` gained a `labour`/`labourCategory` `ReviewQueueEntry`
+arm and commit branch (mirrors the `service` branch, no reminder logic); `ReviewQueueModal.tsx` gained
+the labour category dropdown (bike `LABOUR_GROUPS` vs. car `CAR_LABOUR_GROUPS`, chosen by the modal's
+own `vehicleKind` prop), route mapping (`/api/tracker/labour`, `/api/cars/car-labour` — both already
+existed from the manual-entry feature), and the `markEntryReviewed`/`buildPatchBody` branches every
+other category already had. 11 new tests, full suite green (3,074 unit/API, up from 3,063; 842
+component, up from 836).
+
+Verified with a clean `tsc --noEmit`, the full suites above green, and a clean production build (no
+route's bundle size regressed).
 
 ### Explicitly out of scope for this build (unchanged from v2)
 
@@ -922,4 +934,4 @@ no other route's bundle size regressed).
 | 6 | ✅ Done — one assistant, now vehicle-kind-aware; 7 of 10 tools fully car-aware (getShareLinks/getStorySoFar/proposeLogEntry stay bike-only, fail soft with an honest "not available" result); car knowledge base injected via `buildSystemInstruction()`, never falling back to the motorcycle one; `/tomasz` gets a second, clearly-labeled KB editor sharing one generic component | Motorcycle assistant behaviour unchanged when a bike is active |
 | 7 | ✅ Done — `/cars/quote-checker`, `/cars/cost-calculator`, `/cars/buying-guide` + their `/api/cars/*` routes; `carPriceData.ts` (5 job types × small/medium/large, sourced from RAC/Bumper.co/Checkatrade/tyresavings.com); `carVed.ts` (CO2-banded, GOV.UK-sourced); `carCostCalculator.ts`; diesel price added to `fuelPrice.ts`/the fuel-price cron; electric cars excluded from quote-checker/cost-calculator (not enough sourced data) but fully covered in the buying guide; `/cars` now links its own 3 tools; 99 new tests, full suite green (2,966 unit/API, 785 component), build unchanged elsewhere | Motorcycle tools unchanged |
 | 8 | ✅ Done — audited all 5 leakage categories; 2 real gaps found and closed (`DashboardShell.test.tsx` only checked 3 of 7 `CAR_UNAVAILABLE_SECTIONS`; no copy audit existed at all); new `tests/unit/vehicleKindLeakage.test.ts` scans dashboard component copy, catalog label values, and `dashboard/page.tsx`'s two render paths for cross-vehicle-kind references; full suite green (2,887 unit/API, 765 component) | None |
-| 9 | ✅ Done — new 5th record type, Labour, both vehicle kinds; ~300-item deduplicated motorcycle catalog + a comparably deep, freshly-authored car catalog (19 categories, 2 with no bike equivalent); full CRUD, dashboard integration, and AI-assistant chat drafting (Labour only, both vehicle kinds — every other assistant category stays bike-only); receipt-scanner auto-detection explicitly out of scope; full suite green (3,063 unit/API, 836 component), build unchanged elsewhere | None |
+| 9 | ✅ Done — new 5th record type, Labour, both vehicle kinds; ~300-item deduplicated motorcycle catalog + a comparably deep, freshly-authored car catalog (19 categories, 2 with no bike equivalent); full CRUD, dashboard integration, and AI-assistant chat drafting (Labour only, both vehicle kinds — every other assistant category stays bike-only); full suite green (3,063 unit/API, 836 component), build unchanged elsewhere. **Post-launch addition, 2026-09-08:** the AI receipt scanner now also recognises Labour as its own category (both vehicle kinds), closing the one deliberate scope cut from this phase; auto-commit/tiering behaviour deliberately left unchanged; 3,074 unit/API, 842 component | None |

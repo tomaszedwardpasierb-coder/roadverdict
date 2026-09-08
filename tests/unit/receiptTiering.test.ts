@@ -17,6 +17,17 @@ describe("classifyReceiptTier", () => {
   it("classifies a fuel item with no mileage as tier 6, needing the most help", () => {
     expect(classifyReceiptTier({ category: "fuel", mileageOnReceipt: null })).toBe(6);
   });
+
+  // Labour is treated exactly like any other non-fuel category (service/
+  // mods/bills) - auto-commit/tiering behaviour was explicitly left
+  // unchanged when the scanner was taught to recognise labour.
+  it("classifies a labour item with a printed mileage as tier 1, same as service", () => {
+    expect(classifyReceiptTier({ category: "labour", mileageOnReceipt: 5000 })).toBe(1);
+  });
+
+  it("classifies a labour item with no mileage as tier 2, same as service", () => {
+    expect(classifyReceiptTier({ category: "labour", mileageOnReceipt: null })).toBe(2);
+  });
 });
 
 describe("receiptTierSortWeight", () => {

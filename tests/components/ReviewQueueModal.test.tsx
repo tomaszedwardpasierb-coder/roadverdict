@@ -267,6 +267,58 @@ describe("ReviewQueueModal", () => {
     expect(fetchCalls(fetchMock).some((call) => call[0] === "/api/tracker/mods/car-mod-1")).toBe(false);
   });
 
+  it("labour category: renders the motorcycle catalog dropdown, and saving PATCHes /api/tracker/labour with real form state", async () => {
+    const item = makeItem({ category: "labour", description: "Brake bleeding" });
+    const fetchMock = createFetchMock({
+      commitItem: (i) =>
+        i.description === "Brake bleeding"
+          ? { entry: { id: "labour-1", category: "labour", aiDescription: "Brake bleeding AI", duplicate: null, labourCategory: "brake-bleeding", cost: 45, mileage: 3000, mileageNeedsManualEntry: false, plateMismatch: null, vehicleMismatch: null, date: "2024-01-01", notes: "", attachment: makeAttachment() } }
+          : undefined,
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<ReviewQueueModal parsedItems={[item]} onFinished={vi.fn()} />);
+
+    const categorySelect = await screen.findByLabelText("Category");
+    expect(categorySelect).toHaveValue("brake-bleeding");
+    expect(screen.getByText("Brake bleeding")).toBeInTheDocument(); // the real catalog label, not just the raw key
+
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "Save and next" }));
+
+    expect(await screen.findByText("All caught up")).toBeInTheDocument();
+    const calls = patchCallsTo(fetchMock, "/api/tracker/labour/labour-1");
+    expect(calls).toEqual([{ category: "brake-bleeding", cost: 45, mileage: 3000, date: "2024-01-01", notes: "", batchHints: [] }]);
+  });
+
+  it("labour category, vehicleKind='car': renders the CAR labour catalog (not the motorcycle one), and saves against /api/cars/car-labour", async () => {
+    const item = makeItem({ category: "labour", description: "Coolant replacement" });
+    const fetchMock = createFetchMock({
+      commitItem: (i) =>
+        i.description === "Coolant replacement"
+          ? { entry: { id: "car-labour-1", category: "labour", aiDescription: "Coolant replacement AI", duplicate: null, labourCategory: "coolant-replacement", cost: 65, mileage: 42000, mileageNeedsManualEntry: false, plateMismatch: null, vehicleMismatch: null, date: "2024-01-01", notes: "", attachment: makeAttachment() } }
+          : undefined,
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<ReviewQueueModal parsedItems={[item]} onFinished={vi.fn()} vehicleKind="car" />);
+
+    const categorySelect = await screen.findByLabelText("Category");
+    expect(categorySelect).toHaveValue("coolant-replacement");
+    // Air conditioning & climate control and Electric & hybrid drive have
+    // no motorcycle equivalent - their presence confirms the CAR catalog
+    // (CAR_LABOUR_GROUPS), not LABOUR_GROUPS, is what actually rendered.
+    expect(screen.getByRole("group", { name: "Electric & hybrid drive" })).toBeInTheDocument();
+
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "Save and next" }));
+
+    await screen.findByText("All caught up");
+    const calls = patchCallsTo(fetchMock, "/api/cars/car-labour/car-labour-1");
+    expect(calls).toHaveLength(1);
+    expect(fetchCalls(fetchMock).some((call) => call[0] === "/api/tracker/labour/car-labour-1")).toBe(false);
+  });
+
   it("shows the duplicate warning, and deleting the new entry removes it from the batch entirely", async () => {
     const item = makeItem({ category: "service", description: "Second oil change" });
     const fetchMock = createFetchMock({

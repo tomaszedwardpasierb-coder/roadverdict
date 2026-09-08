@@ -33,6 +33,12 @@ interface NavGroupDef {
   groupLabel: string;
   groupIcon: IconName;
   defaultExpanded: boolean;
+  // Mobile only: whether this group gets its own bottom-bar icon (which
+  // opens a small shelf of just its own items) rather than living inside
+  // the "More" sheet alongside Reminders/Security/Privacy. Logbook/
+  // Insights/Selling are common enough to earn a permanent slot; Buying
+  // Tools stays folded into More.
+  inBottomBar: boolean;
   items: NavItemDef[];
 }
 
@@ -56,7 +62,7 @@ const STANDALONE_ITEMS: NavItemDef[] = [
 // hand-kept-in-sync lists.
 const NAV_GROUPS: NavGroupDef[] = [
   {
-    groupKey: 'logbook', groupLabel: 'Logbook', groupIcon: 'logbook', defaultExpanded: true,
+    groupKey: 'logbook', groupLabel: 'Logbook', groupIcon: 'logbook', defaultExpanded: true, inBottomBar: true,
     items: [
       { key: 'service', label: 'Service', icon: 'service' },
       { key: 'fuel', label: 'Fuel', icon: 'fuel' },
@@ -66,21 +72,21 @@ const NAV_GROUPS: NavGroupDef[] = [
     ],
   },
   {
-    groupKey: 'insights', groupLabel: 'Insights', groupIcon: 'insights', defaultExpanded: false,
+    groupKey: 'insights', groupLabel: 'Insights', groupIcon: 'insights', defaultExpanded: false, inBottomBar: true,
     items: [
       { key: 'reports', label: 'Reports', icon: 'reports' },
       { key: 'story', label: 'The Story So Far', icon: 'story' },
     ],
   },
   {
-    groupKey: 'selling', groupLabel: 'Selling', groupIcon: 'selling', defaultExpanded: false,
+    groupKey: 'selling', groupLabel: 'Selling', groupIcon: 'selling', defaultExpanded: false, inBottomBar: true,
     items: [
       { key: 'shareLinks', label: 'Shareable Links', icon: 'shareLinks' },
       { key: 'transferOwnership', label: 'Transfer ownership', icon: 'transferOwnership' },
     ],
   },
   {
-    groupKey: 'buyingTools', groupLabel: 'Buying Tools', groupIcon: 'buyingTools', defaultExpanded: false,
+    groupKey: 'buyingTools', groupLabel: 'Buying Tools', groupIcon: 'buyingTools', defaultExpanded: false, inBottomBar: false,
     items: [
       { key: 'quoteChecker', label: 'Quote Checker', icon: 'quoteChecker' },
       { key: 'costCalculator', label: 'Cost calculator', icon: 'costCalculator' },
@@ -88,19 +94,6 @@ const NAV_GROUPS: NavGroupDef[] = [
     ],
   },
 ];
-
-// The mobile bottom bar's 4 fixed quick-access icons - unrelated to the
-// grouping above, unchanged from before it existed. Every group's items
-// get these keys filtered back out when rendered inside the mobile More
-// sheet (see MORE_SHEET_GROUPS below), since they already have their own
-// always-visible icon down there.
-const MOBILE_NAV_ITEMS: { key: Section; label: string; icon: IconName }[] = [
-  { key: 'dashboard', label: 'Dashboard', icon: 'dashboard' },
-  { key: 'service', label: 'Service', icon: 'service' },
-  { key: 'fuel', label: 'Fuel', icon: 'fuel' },
-  { key: 'mods', label: 'Parts', icon: 'mods' },
-];
-const MOBILE_QUICKBAR_KEYS: Section[] = MOBILE_NAV_ITEMS.map((item) => item.key);
 
 // Story/Shareable Links/Transfer ownership depend on BikeDoc fields
 // CarDoc deliberately doesn't have yet (shareToken, storyCache, transfer
@@ -206,7 +199,11 @@ export function DashboardShell({
   hasIncomingRequest,
 }: Props) {
   const [active, setActive] = useState<Section>('dashboard');
-  const [showMore, setShowMore] = useState(false);
+  // Mobile only: which bottom-bar "shelf" is currently open - either a
+  // bottom-bar group's own key (its shelf shows just that group's items)
+  // or 'more' (the catch-all sheet: Buying Tools, Reminders, Security,
+  // Privacy, sign-out). Only ever one open at a time.
+  const [openMobileSheet, setOpenMobileSheet] = useState<string | null>(null);
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(
     () => new Set(NAV_GROUPS.filter((g) => g.defaultExpanded).map((g) => g.groupKey))
   );
@@ -298,10 +295,13 @@ export function DashboardShell({
     security: securityContent,
   };
 
-  // Self-maintaining equivalent of the old hand-listed OR-chain: anything
-  // not one of the 4 always-visible mobile bottom-bar icons is "in More" -
-  // no future tab addition needs a manual edit here again.
-  const isMoreActive = !MOBILE_NAV_ITEMS.some((item) => item.key === active);
+  // Self-maintaining: anything not Dashboard and not inside one of the
+  // bottom-bar groups (Logbook/Insights/Selling) is "in More" - no future
+  // tab addition needs a manual edit here again.
+  const bottomBarGroupItemKeys = new Set(
+    NAV_GROUPS.filter((g) => g.inBottomBar).flatMap((g) => g.items.map((item) => item.key))
+  );
+  const isMoreActive = active !== 'dashboard' && !bottomBarGroupItemKeys.has(active);
 
   return (
     <TabSwitchProvider onSwitchTab={(cat) => setActive(cat)}>
@@ -433,37 +433,56 @@ export function DashboardShell({
         </div>
 
         <nav data-mobile-bottom-nav className={styles.mobileBottomNav}>
-          {MOBILE_NAV_ITEMS.map((item) => (
-            <button
-              key={item.key}
-              type="button"
-              onClick={() => {
-                setActive(item.key);
-                setShowMore(false);
-              }}
-              style={{
-                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.2rem',
-                background: 'none', border: 'none', fontSize: '0.65rem',
-                color: active === item.key ? 'var(--amber-ink)' : 'var(--ink-soft)',
-                position: 'relative',
-              }}
-            >
-              <Icon name={item.icon} className={styles.navIcon} />
-              {item.label}
-              {itemHasPending(item) && (
-                <span style={{ position: 'absolute', top: 0, right: '30%' }}>
-                  <PendingDot />
-                </span>
-              )}
-            </button>
-          ))}
           <button
             type="button"
-            onClick={() => setShowMore(true)}
+            onClick={() => {
+              setActive('dashboard');
+              setOpenMobileSheet(null);
+            }}
             style={{
               display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.2rem',
               background: 'none', border: 'none', fontSize: '0.65rem',
-              color: isMoreActive || showMore ? 'var(--amber-ink)' : 'var(--ink-soft)',
+              color: active === 'dashboard' ? 'var(--amber-ink)' : 'var(--ink-soft)',
+              position: 'relative',
+            }}
+          >
+            <Icon name="dashboard" className={styles.navIcon} />
+            Dashboard
+          </button>
+
+          {NAV_GROUPS.filter((group) => group.inBottomBar).map((group) => {
+            const visibleItems = availableFor(vehicleKind, group.items);
+            const groupActive = visibleItems.some((item) => item.key === active);
+            return (
+              <button
+                key={group.groupKey}
+                type="button"
+                onClick={() => setOpenMobileSheet((prev) => (prev === group.groupKey ? null : group.groupKey))}
+                style={{
+                  display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.2rem',
+                  background: 'none', border: 'none', fontSize: '0.65rem',
+                  color: groupActive || openMobileSheet === group.groupKey ? 'var(--amber-ink)' : 'var(--ink-soft)',
+                  position: 'relative',
+                }}
+              >
+                <Icon name={group.groupIcon} className={styles.navIcon} />
+                {group.groupLabel}
+                {groupHasSignal(visibleItems) && (
+                  <span style={{ position: 'absolute', top: 0, right: '30%' }}>
+                    <PendingDot />
+                  </span>
+                )}
+              </button>
+            );
+          })}
+
+          <button
+            type="button"
+            onClick={() => setOpenMobileSheet((prev) => (prev === 'more' ? null : 'more'))}
+            style={{
+              display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.2rem',
+              background: 'none', border: 'none', fontSize: '0.65rem',
+              color: isMoreActive || openMobileSheet === 'more' ? 'var(--amber-ink)' : 'var(--ink-soft)',
               position: 'relative',
             }}
           >
@@ -477,17 +496,38 @@ export function DashboardShell({
           </button>
         </nav>
 
-        {showMore && (
+        {/* A bottom-bar group's own shelf - just its items, no Reminders/
+            Security/Privacy/sign-out clutter alongside them. Closing (tap
+            the backdrop, tap the item, or tap the same bottom-bar icon
+            again) is the only way out. */}
+        {openMobileSheet && openMobileSheet !== 'more' && (() => {
+          const group = NAV_GROUPS.find((g) => g.groupKey === openMobileSheet);
+          if (!group) return null;
+          const visibleItems = availableFor(vehicleKind, group.items);
+          return (
+            <>
+              <div className={styles.mobileMoreSheetBackdrop} onClick={() => setOpenMobileSheet(null)} />
+              <div className={styles.mobileMoreSheet}>
+                <div className={styles.mobileMoreSheetShelfTitle}>{group.groupLabel}</div>
+                {visibleItems.length === 0 ? (
+                  <p className={styles.sidebarNavEmptyGroupNote}>Not available for cars yet.</p>
+                ) : (
+                  visibleItems.map((item) => renderNavButton(item, styles.mobileMoreSheetItem, () => setOpenMobileSheet(null)))
+                )}
+              </div>
+            </>
+          );
+        })()}
+
+        {openMobileSheet === 'more' && (
           <>
-            <div className={styles.mobileMoreSheetBackdrop} onClick={() => setShowMore(false)} />
+            <div className={styles.mobileMoreSheetBackdrop} onClick={() => setOpenMobileSheet(null)} />
             <div className={styles.mobileMoreSheet}>
-              {availableFor(vehicleKind, STANDALONE_ITEMS.filter((item) => !MOBILE_QUICKBAR_KEYS.includes(item.key))).map((item) =>
-                renderNavButton(item, styles.mobileMoreSheetItem, () => setShowMore(false))
+              {STANDALONE_ITEMS.filter((item) => item.key !== 'dashboard').map((item) =>
+                renderNavButton(item, styles.mobileMoreSheetItem, () => setOpenMobileSheet(null))
               )}
-              {NAV_GROUPS.map((group) => {
-                const visibleItems = availableFor(vehicleKind, group.items).filter(
-                  (item) => !MOBILE_QUICKBAR_KEYS.includes(item.key)
-                );
+              {NAV_GROUPS.filter((group) => !group.inBottomBar).map((group) => {
+                const visibleItems = availableFor(vehicleKind, group.items);
                 const expanded = isGroupExpanded(group);
                 return (
                   <div key={group.groupKey} className={styles.mobileMoreSheetGroup}>
@@ -507,19 +547,19 @@ export function DashboardShell({
                         <p className={styles.sidebarNavEmptyGroupNote}>Not available for cars yet.</p>
                       ) : (
                         visibleItems.map((item) =>
-                          renderNavButton(item, `${styles.mobileMoreSheetItem} ${styles.sidebarNavItemIndented}`, () => setShowMore(false))
+                          renderNavButton(item, `${styles.mobileMoreSheetItem} ${styles.sidebarNavItemIndented}`, () => setOpenMobileSheet(null))
                         )
                       )
                     )}
                   </div>
                 );
               })}
-              {renderNavButton({ key: 'privacy', label: 'Privacy', icon: 'privacy' }, styles.mobileMoreSheetItem, () => setShowMore(false))}
+              {renderNavButton({ key: 'privacy', label: 'Privacy', icon: 'privacy' }, styles.mobileMoreSheetItem, () => setOpenMobileSheet(null))}
               <div style={{ marginTop: '0.8rem', paddingTop: '0.8rem', borderTop: '1px solid var(--border)', fontSize: '0.8rem', color: 'var(--ink-soft)' }}>
                 Signed in as {userEmail}
               </div>
               <div style={{ marginTop: '0.5rem' }}>
-                <Link href="/garage" onClick={() => setShowMore(false)}>Manage vehicles →</Link>
+                <Link href="/garage" onClick={() => setOpenMobileSheet(null)}>Manage vehicles →</Link>
               </div>
               {userEmail === DEMO_EMAIL && (
                 <div style={{ marginTop: '0.5rem' }}>
@@ -531,8 +571,8 @@ export function DashboardShell({
               </div>
               <div className={styles.mobileMoreFooterNote}>
                 RoadVerdict is guidance benchmarked against typical prices, not a professional inspection.{' '}
-                <Link href="/privacy" onClick={() => setShowMore(false)}>Privacy</Link> ·{' '}
-                <Link href="/about" onClick={() => setShowMore(false)}>About us</Link> ·{' '}
+                <Link href="/privacy" onClick={() => setOpenMobileSheet(null)}>Privacy</Link> ·{' '}
+                <Link href="/about" onClick={() => setOpenMobileSheet(null)}>About us</Link> ·{' '}
                 <a href="mailto:hello@roadverdict.co.uk">hello@roadverdict.co.uk</a>
               </div>
             </div>

@@ -88,7 +88,7 @@ function buildPrompt(vehicleKind: VehicleKind): string {
   "vehicleModelOnReceipt": the specific model, ONLY if named alongside the make above in that same "this is the vehicle" context (e.g. "CB500F", "Meteor 350") - otherwise null. Only relevant if isReceipt is true.,
   "items": [
     {
-      "category": one of "service", "fuel", "mods", "bills",
+      "category": one of "service", "fuel", "mods", "bills", "labour",
       "date": the transaction date as YYYY-MM-DD (your best reading of the receipt; if genuinely illegible, use today's date),
       "cost": the cost of just THIS item, in whatever currency you identified above, as a plain number with no currency symbol - not the receipt's grand total, unless there is genuinely only one item,
       "description": a short (max 6 words) plain-English description of this specific item,
@@ -100,7 +100,8 @@ function buildPrompt(vehicleKind: VehicleKind): string {
   ]
 }
 Category guide:
-- "service": ${noun} servicing, repairs, or parts fitted as a labour job (${serviceExamples})
+- "service": ${noun} servicing or repairs where a specific part or consumable is named (${serviceExamples}) - use this whenever the line item names the part or job itself, even if labour/fitting is also being charged
+- "labour": a line item billed purely as workshop labour or diagnostic time, with NO specific part or consumable named (e.g. "Suspension work - labour", "Diagnostic fee", "2 hrs labour @ £75") - even if it relates to a system "service" above also covers
 - "fuel": a petrol or diesel fill-up
 - "mods": accessories, gear, luggage, or electronics bought (not fitted as a labour job)
 - "bills": insurance, road tax (VED), or an MOT test
@@ -132,11 +133,11 @@ interface GeminiResponse {
   items?: GeminiItem[];
 }
 
-const VALID_CATEGORIES = new Set(["service", "fuel", "mods", "bills"]);
+const VALID_CATEGORIES = new Set(["service", "fuel", "mods", "bills", "labour"]);
 
 export interface ParsedReceiptItem {
   fileName: string;
-  category: "service" | "fuel" | "mods" | "bills";
+  category: "service" | "fuel" | "mods" | "bills" | "labour";
   date: string;
   costGbp: number;
   description: string;
@@ -317,7 +318,7 @@ export async function parseReceiptFile(file: File, apiKey: string, vehicle: Scan
     let skippedUnreadableLitres = 0;
 
     for (const item of validItems) {
-      const category = item.category as "service" | "fuel" | "mods" | "bills";
+      const category = item.category as "service" | "fuel" | "mods" | "bills" | "labour";
       const date = item.date ?? new Date().toISOString().slice(0, 10);
 
       if (category !== "mods" && isBeforeProduction(date, vehicle)) {

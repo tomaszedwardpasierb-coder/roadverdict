@@ -25,11 +25,13 @@ import { getCarServiceRecords, createCarServiceRecord } from "@/lib/tracker/carS
 import { getCarFuelLogs, createCarFuelLog } from "@/lib/tracker/carFuelLog";
 import { getCarMods, createCarMod } from "@/lib/tracker/carMod";
 import { getCarBills, createCarBill } from "@/lib/tracker/carBill";
+import { getCarLabour, createCarLabour } from "@/lib/tracker/carLabour";
 import { estimateMileage, estimateFuelMileageFromLitres, applyKnownBounds, type MileagePoint } from "@/lib/tracker/mileageEstimate";
 import { computeActualMPG } from "@/lib/tracker/mpgCalc";
-import { guessCarJobType, guessCarModCategory, guessCarBillType } from "@/lib/tracker/carGuessCategory";
+import { guessCarJobType, guessCarModCategory, guessCarBillType, guessCarLabourCategory } from "@/lib/tracker/carGuessCategory";
 import { CAR_JOB_LABELS } from "@/lib/tracker/carJobTypes";
 import { CAR_BILL_LABELS } from "@/lib/tracker/carBillTypes";
+import { CAR_LABOUR_LABELS } from "@/lib/tracker/carLabourTypes";
 import { buildAiDescription } from "@/lib/tracker/aiDescription";
 import { findPossibleDuplicate } from "@/lib/tracker/duplicateCheck";
 import { checkMileageConsistency, describeMileageCheck, type HistoryPoint } from "@/lib/tracker/mileageCheck";
@@ -96,7 +98,7 @@ export async function commitCarReceiptItem(
   email: string,
   car: CarDoc,
   item: ParsedReceiptItem,
-  batchHints: { date: string; mileage: number; batchIndex?: number; category?: "service" | "fuel" | "mods" | "mot"; litres?: number }[] = [],
+  batchHints: { date: string; mileage: number; batchIndex?: number; category?: "service" | "fuel" | "mods" | "mot" | "labour"; litres?: number }[] = [],
   boundsOnlyHints: { date: string; mileage: number; batchIndex?: number }[] = []
 ): Promise<ReviewQueueEntry> {
   const { category, date, costGbp, description, litres, mileageOnReceipt, registrationOnReceipt, merchantName, address, city, vehicleMakeOnReceipt, vehicleModelOnReceipt, attachment, currencyConversion, forceReview, aiLowConfidence } = item;
@@ -113,22 +115,25 @@ export async function commitCarReceiptItem(
       ? { makeOnReceipt: vehicleMakeOnReceipt, modelOnReceipt: vehicleModelOnReceipt }
       : null;
 
-  const [records, fuelLogs, mods, bills] = await Promise.all([
+  const [records, fuelLogs, mods, bills, labour] = await Promise.all([
     getCarServiceRecords(email, car.id),
     getCarFuelLogs(email, car.id),
     getCarMods(email, car.id),
     getCarBills(email, car.id),
+    getCarLabour(email, car.id),
   ]);
   const serviceCandidates = records.map((r) => ({ id: r.id, date: r.date, mileage: r.mileage, cost: r.cost, description: r.notes || (CAR_JOB_LABELS[r.jobType] ?? r.jobType) }));
   const fuelCandidates = fuelLogs.map((f) => ({ id: f.id, date: f.date, mileage: f.mileage, cost: f.cost, description: typeof f.litres === "number" ? `${f.litres.toFixed(1)}L fill-up` : `${(f.kwh ?? 0).toFixed(1)}kWh charge` }));
   const modCandidates = mods.map((m) => ({ id: m.id, date: m.date, mileage: m.mileage, cost: m.cost, description: m.name }));
   const billCandidates = bills.map((b) => ({ id: b.id, date: b.date, cost: b.cost, description: b.notes || (CAR_BILL_LABELS[b.billType] ?? b.billType) }));
+  const labourCandidates = labour.map((l) => ({ id: l.id, date: l.date, mileage: l.mileage, cost: l.cost, description: l.notes || (CAR_LABOUR_LABELS[l.category] ?? l.category) }));
 
   const isTrustworthy = (confidence: "interpolated" | "estimated" | "confirmed" | undefined) => !confidence || confidence === "confirmed";
   const trustedMileagePoints: HistoryPoint[] = [
     ...records.filter((r) => isTrustworthy(r.mileageConfidence)).map((r) => ({ id: r.id, category: "service" as const, date: r.date, mileage: r.mileage })),
     ...fuelLogs.filter((f) => isTrustworthy(f.mileageConfidence)).map((f) => ({ id: f.id, category: "fuel" as const, date: f.date, mileage: f.mileage })),
     ...mods.filter((m) => isTrustworthy(m.mileageConfidence)).map((m) => ({ id: m.id, category: "mods" as const, date: m.date, mileage: m.mileage })),
+    ...labour.filter((l) => isTrustworthy(l.mileageConfidence)).map((l) => ({ id: l.id, category: "labour" as const, date: l.date, mileage: l.mileage })),
     ...bills.filter((b) => b.billType === "mot-test" && b.mileage != null).map((b) => ({ id: b.id, category: "mot" as const, date: b.date, mileage: b.mileage as number })),
     ...batchHints,
   ];
@@ -137,6 +142,7 @@ export async function commitCarReceiptItem(
     ...records.map((r) => ({ id: r.id, category: "service" as const, date: r.date, mileage: r.mileage })),
     ...fuelLogs.map((f) => ({ id: f.id, category: "fuel" as const, date: f.date, mileage: f.mileage })),
     ...mods.map((m) => ({ id: m.id, category: "mods" as const, date: m.date, mileage: m.mileage })),
+    ...labour.map((l) => ({ id: l.id, category: "labour" as const, date: l.date, mileage: l.mileage })),
     ...bills.filter((b) => b.billType === "mot-test" && b.mileage != null).map((b) => ({ id: b.id, category: "mot" as const, date: b.date, mileage: b.mileage as number })),
     ...batchHints,
     ...boundsOnlyHints,
@@ -306,6 +312,23 @@ export async function commitCarReceiptItem(
     });
     if (mileageConfidence === undefined) await reestimateNearbyCarFuelLogs(email, car);
     return { id: record.id, category: "mods", aiDescription, duplicate, name: description, modCategory, cost: costGbp, mileage: mileage ?? car.currentMileage, mileageNeedsManualEntry, mileageWarningText: mileageNeedsManualEntry ? mileageWarning : undefined, mileageConflictReferenceId: conflictReferenceId, mileageConflictReferenceCategory: conflictReferenceCategory, mileageConflictReferenceBatchIndex: conflictReferenceBatchIndex, plateMismatch, vehicleMismatch, date, notes: modNotes, attachment };
+  }
+
+  if (category === "labour") {
+    const labourCategory = guessCarLabourCategory(description) ?? "other";
+    const notes = [
+      withAiCaveat(description, forceReview, aiLowConfidence),
+      mileageWarning ? `⚠ ${mileageWarning}` : null,
+    ].filter(Boolean).join(" - ");
+    const labourLabel = CAR_LABOUR_LABELS[labourCategory] ?? labourCategory;
+    const aiDescription = buildAiDescription({ description: labourLabel, merchantName, address, city, categoryLabel: "Labour" });
+    const duplicate = findPossibleDuplicate(date, costGbp, labourCandidates, description);
+    const record = await createCarLabour(email, {
+      carId: car.id, category: labourCategory, cost: costGbp, mileage: mileage ?? car.currentMileage, date, notes,
+      attachments: [attachment], needsReview: true, currencyConversion, mileageConfidence, aiDescription,
+    });
+    if (mileageConfidence === undefined) await reestimateNearbyCarFuelLogs(email, car);
+    return { id: record.id, category: "labour", aiDescription, duplicate, labourCategory, cost: costGbp, mileage: mileage ?? car.currentMileage, mileageNeedsManualEntry, mileageWarningText: mileageNeedsManualEntry ? mileageWarning : undefined, mileageConflictReferenceId: conflictReferenceId, mileageConflictReferenceCategory: conflictReferenceCategory, mileageConflictReferenceBatchIndex: conflictReferenceBatchIndex, plateMismatch, vehicleMismatch, date, notes, attachment };
   }
 
   const billType = guessCarBillType(description) ?? "insurance";

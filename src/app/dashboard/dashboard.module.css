@@ -673,6 +673,15 @@
 }
 .mobileMoreSheetGroupHeader span { flex: 1; }
 
+/* Heading at the top of a bottom-bar group's own shelf (Logbook/
+   Insights/Selling) - the group's own bottom-bar icon+label already
+   established the context, this is just a small confirmation, not
+   interactive like the group headers above. */
+.mobileMoreSheetShelfTitle {
+  font-family: var(--font-mono); font-size: 0.7rem; text-transform: uppercase;
+  letter-spacing: 0.04em; color: var(--ink-soft); margin-bottom: 0.5rem;
+}
+
 .sidebarBikeCard { border-top: 1px solid rgba(255, 255, 255, 0.12); padding-top: 1rem; margin-top: 1rem; font-size: 0.85rem; position: relative; }
 .sidebarBikeLabel { font-family: var(--font-mono); font-size: 0.65rem; text-transform: uppercase; color: rgba(255, 255, 255, 0.5); margin-bottom: 0.3rem; }
 .sidebarBikeName { font-weight: 600; }

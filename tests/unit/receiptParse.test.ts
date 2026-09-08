@@ -132,6 +132,31 @@ describe("parseReceiptFile", () => {
     expect((result as any).items).toHaveLength(1);
   });
 
+  // Labour is a valid, real category (not a fallback into "service") -
+  // added when the scanner was taught to recognise workshop labour/
+  // diagnostic-time line items as their own category, distinct from a
+  // line item naming a specific part/consumable.
+  it("accepts a labour-category item, unlike an unrecognised category", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(geminiResponse(JSON.stringify({
+      isReceipt: true, items: [{ category: "labour", date: "2025-06-01", cost: 255, description: "Suspension work - labour" }],
+    }))));
+    const result = await parseReceiptFile(fakeFile(), "key", bike);
+    expect(result.ok).toBe(true);
+    expect((result as any).items).toHaveLength(1);
+    expect((result as any).items[0].category).toBe("labour");
+  });
+
+  // Unlike mods, labour is NOT exempt from the production-year check -
+  // workshop labour can't have happened before the vehicle existed,
+  // same reasoning as service.
+  it("still applies the production-year skip to a labour item, unlike mods", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(geminiResponse(JSON.stringify({
+      isReceipt: true, items: [{ category: "labour", date: "2010-01-01", cost: 100, description: "Workshop labour" }],
+    }))));
+    const result = await parseReceiptFile(fakeFile(), "key", bike);
+    expect(result).toMatchObject({ ok: true, items: [], skippedBeforeProduction: 1 });
+  });
+
   it("skips a diesel fuel item, and counts it separately from an unreadable-litres skip", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(geminiResponse(JSON.stringify({
       isReceipt: true, items: [{ category: "fuel", date: "2025-06-01", cost: 20, fuelType: "diesel", litres: 10 }],

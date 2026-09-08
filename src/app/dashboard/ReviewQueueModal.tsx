@@ -5,6 +5,8 @@ import { useState, useEffect, useRef } from 'react';
 import { JOB_GROUPS, JOB_LABELS } from '@/lib/tracker/jobTypes';
 import { BILL_LABELS } from '@/lib/tracker/billTypes';
 import { MOD_LABELS } from '@/lib/tracker/modTypes';
+import { LABOUR_GROUPS, LABOUR_LABELS } from '@/lib/tracker/labourTypes';
+import { CAR_LABOUR_GROUPS, CAR_LABOUR_LABELS } from '@/lib/tracker/carLabourTypes';
 import { AttachmentThumb } from './AttachmentThumb';
 import { MileageConflictModal } from './MileageConflictModal';
 import { checkFullTankPlausibility, checkLitresPlausibility } from '@/lib/tracker/fuelPlausibility';
@@ -18,6 +20,7 @@ const CATEGORY_ROUTE: Record<ReviewQueueEntry['category'], string> = {
   fuel: 'fuel',
   mods: 'mods',
   bills: 'bills',
+  labour: 'labour',
 };
 
 // Car equivalents live under /api/cars/, not /api/tracker/, and use a
@@ -28,6 +31,7 @@ const CATEGORY_ROUTE_CAR: Record<ReviewQueueEntry['category'], string> = {
   fuel: 'car-fuel',
   mods: 'car-mods',
   bills: 'car-bills',
+  labour: 'car-labour',
 };
 
 function entryRouteBase(category: ReviewQueueEntry['category'], vehicleKind: 'bike' | 'car'): string {
@@ -39,6 +43,7 @@ const CATEGORY_LABEL: Record<ReviewQueueEntry['category'], string> = {
   fuel: 'Fuel',
   mods: 'Parts & Accessories',
   bills: 'Insurance, Tax, MOT & Finance',
+  labour: 'Labour',
 };
 
 async function patchEntry(
@@ -113,12 +118,13 @@ function QueueItemForm({
   const [mileage, setMileage] = useState(
     entry.category !== 'bills' && !entry.mileageNeedsManualEntry ? String(entry.mileage) : ''
   );
-  const [notes, setNotes] = useState(entry.category === 'bills' || entry.category === 'service' || entry.category === 'mods' ? entry.notes : '');
+  const [notes, setNotes] = useState(entry.category === 'bills' || entry.category === 'service' || entry.category === 'mods' || entry.category === 'labour' ? entry.notes : '');
   const [jobType, setJobType] = useState(entry.category === 'service' ? entry.jobType : '');
   const [litres, setLitres] = useState(entry.category === 'fuel' ? String(entry.litres) : '');
   const [filledToFull, setFilledToFull] = useState(entry.category === 'fuel' ? entry.filledToFull : true);
   const [name, setName] = useState(entry.category === 'mods' ? entry.name : '');
   const [billType, setBillType] = useState(entry.category === 'bills' ? entry.billType : '');
+  const [labourCategory, setLabourCategory] = useState(entry.category === 'labour' ? entry.labourCategory : '');
   const [showConflictModal, setShowConflictModal] = useState(false);
   const [findingConflict, setFindingConflict] = useState(false);
   const [conflictLookupError, setConflictLookupError] = useState<string | null>(null);
@@ -158,6 +164,11 @@ function QueueItemForm({
       // overwritten with the sub-category string, unlike the PATCH
       // route's body, which genuinely does expect it under "category".
       savedFields = { modCategory: entry.modCategory, name, cost: Number(cost), mileage: mileageValue, date, notes };
+    } else if (entry.category === 'labour') {
+      body = { category: labourCategory, cost: Number(cost), mileage: mileageValue, date, notes, batchHints };
+      // Same reasoning as mods above - ReviewQueueEntry's own field is
+      // labourCategory, not category.
+      savedFields = { labourCategory, cost: Number(cost), mileage: mileageValue, date, notes };
     } else {
       body = { billType, cost: Number(cost), date, notes };
       savedFields = { billType, cost: Number(cost), date, notes };
@@ -248,6 +259,21 @@ function QueueItemForm({
           <label htmlFor="rq-name">What is it?</label>
           <input id="rq-name" type="text" value={name} onChange={(e) => setName(e.target.value)} required />
           <p className="field-note">{MOD_LABELS[entry.modCategory] ?? entry.modCategory} - change the specific category from Edit on the card if needed.</p>
+        </div>
+      )}
+
+      {entry.category === 'labour' && (
+        <div className="field">
+          <label htmlFor="rq-labour-category">Category</label>
+          <select id="rq-labour-category" value={labourCategory} onChange={(e) => setLabourCategory(e.target.value)}>
+            {(vehicleKind === 'car' ? CAR_LABOUR_GROUPS : LABOUR_GROUPS).map((g) => (
+              <optgroup key={g.group} label={g.group}>
+                {g.jobs.map((j) => (
+                  <option key={j} value={j}>{(vehicleKind === 'car' ? CAR_LABOUR_LABELS : LABOUR_LABELS)[j]}</option>
+                ))}
+              </optgroup>
+            ))}
+          </select>
         </div>
       )}
 
@@ -368,7 +394,7 @@ function QueueItemForm({
         <MileageConflictModal
           vehicleKind={vehicleKind}
           entryId={entry.id}
-          entryCategory={entry.category as "service" | "fuel" | "mods"}
+          entryCategory={entry.category as "service" | "fuel" | "mods" | "labour"}
           entryDate={date}
           entryMileage={mileage.trim() ? Number(mileage) : entry.mileage}
           entryLabel={entry.aiDescription}
@@ -380,7 +406,7 @@ function QueueItemForm({
             entry.mileageConflictReferenceBatchIndex !== undefined && conflictPeer
               ? {
                   id: '',
-                  category: (conflictPeer.category === 'bills' ? 'service' : conflictPeer.category) as 'service' | 'fuel' | 'mods',
+                  category: (conflictPeer.category === 'bills' ? 'service' : conflictPeer.category) as 'service' | 'fuel' | 'mods' | 'labour',
                   date: conflictPeer.date,
                   mileage: conflictPeer.mileageOnReceipt ?? 0,
                   label: conflictPeer.description,
@@ -398,6 +424,7 @@ function QueueItemForm({
               entry.category === "service" ? { jobType, cost: Number(cost), mileage: mv, date: dt, notes } :
               entry.category === "fuel" ? { litres: Number(litres), cost: Number(cost), mileage: mv, date: dt, filledToFull } :
               entry.category === "mods" ? { category: entry.modCategory, name, cost: Number(cost), mileage: mv, date: dt, notes } :
+              entry.category === "labour" ? { category: labourCategory, cost: Number(cost), mileage: mv, date: dt, notes } :
               { billType, cost: Number(cost), date: dt, notes };
             return {
               ...base,
@@ -467,6 +494,8 @@ async function markEntryReviewed(entry: ReviewQueueEntry, vehicleKind: 'bike' | 
     body = { litres: entry.litres, cost: entry.cost, mileage: entry.mileage, date: entry.date, filledToFull: entry.filledToFull, mileageAcknowledged: true };
   } else if (entry.category === 'mods') {
     body = { category: entry.modCategory, name: entry.name, cost: entry.cost, mileage: entry.mileage, date: entry.date, notes: entry.notes, mileageAcknowledged: true };
+  } else if (entry.category === 'labour') {
+    body = { category: entry.labourCategory, cost: entry.cost, mileage: entry.mileage, date: entry.date, notes: entry.notes, mileageAcknowledged: true };
   } else {
     body = { billType: entry.billType, cost: entry.cost, date: entry.date, notes: entry.notes };
   }

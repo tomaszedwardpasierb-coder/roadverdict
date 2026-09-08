@@ -149,15 +149,15 @@ describe("service category", () => {
 
   it("re-estimates nearby car fuel mileage only when the mileage came directly off the receipt", async () => {
     await commitCarReceiptItem(email, car, makeItem({ description: "Cambelt", mileageOnReceipt: 42000 }));
-    // 4 initial fetches (service/fuel/mod/bill) + 4 more from
-    // reestimateCarFuelMileage's own fetch = 8 - same shape as the
-    // motorcycle version's equivalent test.
-    expect(mocks.queryCarTrackerDocs).toHaveBeenCalledTimes(8);
+    // 5 initial fetches (service/fuel/mod/bill/labour) + 4 more from
+    // reestimateCarFuelMileage's own fetch (still service/mod/fuel/bill
+    // only) = 9 - same shape as the motorcycle version's equivalent test.
+    expect(mocks.queryCarTrackerDocs).toHaveBeenCalledTimes(9);
   });
 
   it("does not re-estimate fuel mileage when the mileage was itself an estimate", async () => {
     await commitCarReceiptItem(email, car, makeItem({ description: "Cambelt", mileageOnReceipt: null }));
-    expect(mocks.queryCarTrackerDocs).toHaveBeenCalledTimes(4);
+    expect(mocks.queryCarTrackerDocs).toHaveBeenCalledTimes(5);
   });
 
   it("finds a same-day, same-cost, similarly-described existing service record as a duplicate", async () => {
@@ -230,6 +230,30 @@ describe("mods category", () => {
   });
 });
 
+describe("labour category", () => {
+  it("guesses the car labour category (own catalog, distinct from the motorcycle one) and wires carId", async () => {
+    const item = makeItem({ category: "labour", description: "Coolant replacement", costGbp: 65, mileageOnReceipt: 42000 });
+    const result: any = await commitCarReceiptItem(email, car, item);
+
+    expect(result.labourCategory).toBe("coolant-replacement");
+    expect(result.aiDescription).toBe("Coolant replacement at Dave's Garage - 14 High Street, Colchester (Labour)");
+    const [, , , payload] = callsFor("carLabour")[0];
+    expect(payload).toMatchObject({ carId: "car-1", category: "coolant-replacement", cost: 65, mileage: 42000 });
+  });
+
+  it("falls back to 'other' for a labour description matching no real category", async () => {
+    const item = makeItem({ category: "labour", description: "Sandwich crisps drink", mileageOnReceipt: 42000 });
+    const result: any = await commitCarReceiptItem(email, car, item);
+    expect(result.labourCategory).toBe("other");
+  });
+
+  it("notes the currency caveat, same shape as service", async () => {
+    const item = makeItem({ category: "labour", description: "Coolant replacement", mileageOnReceipt: 42000, forceReview: true });
+    const result: any = await commitCarReceiptItem(email, car, item);
+    expect(result.notes).toBe("Coolant replacement (currency could not be auto-converted - please check the amount)");
+  });
+});
+
 describe("bills category", () => {
   it("guesses the bill type (shared catalog) and wires carId", async () => {
     const item = makeItem({ category: "bills", description: "Annual insurance renewal", costGbp: 400 });
@@ -255,9 +279,9 @@ describe("bills category", () => {
 
   it("never attempts a mileage estimate for a bill", async () => {
     await commitCarReceiptItem(email, car, makeItem({ category: "bills", description: "Annual insurance renewal" }));
-    // Only the 4 initial fetches - bills have no mileage concept, so the
-    // fuel re-estimation pass never runs.
-    expect(mocks.queryCarTrackerDocs).toHaveBeenCalledTimes(4);
+    // Only the 5 initial fetches (service/fuel/mods/bills/labour) - bills
+    // have no mileage concept, so the fuel re-estimation pass never runs.
+    expect(mocks.queryCarTrackerDocs).toHaveBeenCalledTimes(5);
   });
 });
 

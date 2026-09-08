@@ -15,7 +15,7 @@
 export type ReceiptTier = 1 | 2 | 4 | 6;
 
 export interface TierableItem {
-  category: "service" | "fuel" | "mods" | "bills";
+  category: "service" | "fuel" | "mods" | "bills" | "labour";
   mileageOnReceipt: number | null;
 }
 

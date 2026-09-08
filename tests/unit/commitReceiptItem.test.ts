@@ -182,8 +182,8 @@ describe("service category", () => {
 
   it("re-estimates nearby fuel mileage only when the mileage came directly off the receipt (undefined confidence)", async () => {
     await commitReceiptItem(email, bike, makeItem({ description: "Basic service", mileageOnReceipt: 15000 }));
-    // 4 initial fetches (service/fuel/mod/bill) + 4 more from reestimateFuelMileage's own fetch = 8.
-    expect(mocks.queryTrackerDocs).toHaveBeenCalledTimes(8);
+    // 5 initial fetches (service/fuel/mod/bill/labour) + 4 more from reestimateFuelMileage's own fetch (still service/mod/fuel/bill only) = 9.
+    expect(mocks.queryTrackerDocs).toHaveBeenCalledTimes(9);
   });
 
   it("does not re-estimate fuel mileage when the mileage was itself an estimate", async () => {
@@ -191,13 +191,13 @@ describe("service category", () => {
     // already-estimated fallback path, which must never re-trigger the
     // fuel re-estimation pass (that's reserved for a genuinely new anchor).
     await commitReceiptItem(email, bike, makeItem({ description: "Basic service", mileageOnReceipt: null }));
-    expect(mocks.queryTrackerDocs).toHaveBeenCalledTimes(4);
+    expect(mocks.queryTrackerDocs).toHaveBeenCalledTimes(5);
   });
 
   it("still returns success if the fuel-mileage re-estimation pass throws", async () => {
     mocks.queryTrackerDocs.mockImplementation(async (_email: string, type: string) => {
       callIndex++;
-      if (callIndex > 4) throw new Error("re-estimate failed");
+      if (callIndex > 5) throw new Error("re-estimate failed");
       return queryResults[type] ?? [];
     });
     const result: any = await commitReceiptItem(email, bike, makeItem({ description: "Basic service", mileageOnReceipt: 15000 }));
@@ -371,7 +371,37 @@ describe("mods category", () => {
 
   it("re-estimates nearby fuel mileage when the mileage came directly off the receipt, same as service", async () => {
     await commitReceiptItem(email, bike, makeItem({ category: "mods", description: "Heated grips", mileageOnReceipt: 15000 }));
-    expect(mocks.queryTrackerDocs).toHaveBeenCalledTimes(8);
+    expect(mocks.queryTrackerDocs).toHaveBeenCalledTimes(9);
+  });
+});
+
+describe("labour category", () => {
+  it("guesses the labour category from the description and composes the right aiDescription", async () => {
+    const item = makeItem({ category: "labour", description: "Brake bleeding", costGbp: 45, mileageOnReceipt: 15000 });
+    const result: any = await commitReceiptItem(email, bike, item);
+
+    expect(result.labourCategory).toBe("brake-bleeding");
+    expect(result.aiDescription).toBe("Brake bleeding at Dave's Motorcycles - 14 High Street, Colchester (Labour)");
+
+    const [, , , payload] = callsFor("labour")[0];
+    expect(payload).toMatchObject({ bikeId: "bike-1", category: "brake-bleeding", cost: 45, mileage: 15000 });
+  });
+
+  it("falls back to 'other' for a labour description matching no real category, rather than blocking the commit", async () => {
+    const item = makeItem({ category: "labour", description: "Sandwich crisps drink", mileageOnReceipt: 15000 });
+    const result: any = await commitReceiptItem(email, bike, item);
+    expect(result.labourCategory).toBe("other");
+  });
+
+  it("notes the description plus a currency caveat (same shape as service)", async () => {
+    const item = makeItem({ category: "labour", description: "Brake bleeding", mileageOnReceipt: 15000, forceReview: true });
+    const result: any = await commitReceiptItem(email, bike, item);
+    expect(result.notes).toBe("Brake bleeding (currency could not be auto-converted - please check the amount)");
+  });
+
+  it("re-estimates nearby fuel mileage when the mileage came directly off the receipt, same as service", async () => {
+    await commitReceiptItem(email, bike, makeItem({ category: "labour", description: "Brake bleeding", mileageOnReceipt: 15000 }));
+    expect(mocks.queryTrackerDocs).toHaveBeenCalledTimes(9);
   });
 });
 
@@ -400,9 +430,10 @@ describe("bills category", () => {
 
   it("never attempts a mileage estimate, and never triggers fuel re-estimation, for a bill", async () => {
     await commitReceiptItem(email, bike, makeItem({ category: "bills", description: "Annual insurance renewal" }));
-    // Only the 4 initial fetches - bills have no mileage concept, so the
-    // reestimateNearbyFuelLogs pass (which would add 4 more) never runs.
-    expect(mocks.queryTrackerDocs).toHaveBeenCalledTimes(4);
+    // Only the 5 initial fetches (service/fuel/mods/bills/labour) - bills
+    // have no mileage concept, so the reestimateNearbyFuelLogs pass (which
+    // would add 4 more) never runs.
+    expect(mocks.queryTrackerDocs).toHaveBeenCalledTimes(5);
   });
 
   it("has no mileage-related fields at all on the returned entry", async () => {
