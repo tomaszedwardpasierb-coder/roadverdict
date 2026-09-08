@@ -28,10 +28,39 @@ if (!fs.existsSync(DATA_DIR)) {
   fs.mkdirSync(DATA_DIR, { recursive: true });
 }
 
-const db = new Database(DB_PATH);
+// `timeout` (-> SQLite's busy_timeout) matters a lot more here than the
+// 5000ms default: Next.js's build collects page data for each API
+// route's bundle separately, and every route importing this module
+// opens its OWN connection to the same physical roadverdict.db file at
+// module load - schema setup below (CREATE TABLE / ALTER TABLE) can run
+// from several of those connections at nearly the same moment. A short
+// timeout surfaced as an outright "database is locked" (SQLITE_BUSY)
+// build failure once enough routes importing this file existed for
+// that contention to actually happen; a generous one gives the other
+// connection's brief schema-setup write time to finish instead.
+const db = new Database(DB_PATH, { timeout: 15000 });
 db.pragma('journal_mode = WAL');
 
-db.exec(`
+// Schema setup (CREATE TABLE / ALTER TABLE) isn't atomic across the
+// separate processes described above - two connections can both start
+// creating/altering the same table at once. The busy_timeout above
+// absorbs most of that, but under enough concurrent build workers a
+// write can still be told the database is locked, or - for an ALTER
+// specifically - lose a race and find the column already added by the
+// other connection ("duplicate column name"). Either way the OTHER
+// connection's write still lands on the shared file regardless of
+// which one's own attempt "failed" here, so - purely at this one-time
+// schema-setup step, never for a real data write - the failure is safe
+// to swallow rather than treated as a real error.
+function safeSchemaExec(sql: string): void {
+  try {
+    db.exec(sql);
+  } catch (err) {
+    if (!(err instanceof Error) || !/database is locked|duplicate column name/i.test(err.message)) throw err;
+  }
+}
+
+safeSchemaExec(`
   CREATE TABLE IF NOT EXISTS quote_logs (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     job_type TEXT NOT NULL,
@@ -47,33 +76,18 @@ db.exec(`
 // table exists — it will NOT add new columns to an existing local .db file.
 // Rather than requiring everyone to delete data/roadverdict.db every time the
 // schema moves, check for and add any missing column at startup.
-//
-// The check-then-add below isn't atomic across processes: Next.js's build
-// collects page data for each API route's bundle separately, and more than
-// one of those bundles imports this module, each opening its own connection
-// to the same physical roadverdict.db file. Two of them can both see "column
-// doesn't exist yet" before either has committed its ALTER, so the second
-// one fails with "duplicate column name" - a real race that surfaced once
-// enough routes importing this file existed for the build to hit it
-// reliably. The ALTER failing for that specific reason means the column now
-// exists either way (which is exactly this function's postcondition), so
-// it's caught and ignored rather than treated as a real error.
 function ensureColumn(table: string, column: string, definitionSql: string): void {
   const columns = db.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[];
   const exists = columns.some((c) => c.name === column);
   if (!exists) {
-    try {
-      db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definitionSql}`);
-    } catch (err) {
-      if (!(err instanceof Error) || !/duplicate column name/i.test(err.message)) throw err;
-    }
+    safeSchemaExec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definitionSql}`);
   }
 }
 
 ensureColumn('quote_logs', 'brand', "TEXT NOT NULL DEFAULT ''");
 ensureColumn('quote_logs', 'region', "TEXT NOT NULL DEFAULT ''");
 
-db.exec(`
+safeSchemaExec(`
   CREATE TABLE IF NOT EXISTS buying_guide_logs (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     bike_class TEXT NOT NULL,
@@ -174,7 +188,7 @@ export function getCommunityStats(jobType: string, bikeClass: string): Community
  * everywhere else in the car build). Same GDPR note applies: no column
  * here could identify a person.
  */
-db.exec(`
+safeSchemaExec(`
   CREATE TABLE IF NOT EXISTS car_quote_logs (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     job_type TEXT NOT NULL,
@@ -222,7 +236,7 @@ export function getCarCommunityStats(jobType: string, carClass: string): Communi
   };
 }
 
-db.exec(`
+safeSchemaExec(`
   CREATE TABLE IF NOT EXISTS car_buying_guide_logs (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     car_class TEXT NOT NULL,
