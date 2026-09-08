@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { getLivePrivacyPolicyText } from "@/lib/tracker/assistantKnowledge";
+import { ASSISTANT_KNOWLEDGE_BASE, getLivePrivacyPolicyText } from "@/lib/tracker/assistantKnowledge";
 
 function htmlResponse(html: string, ok = true) {
   return { ok, text: async () => html };
@@ -109,5 +109,36 @@ describe("getLivePrivacyPolicyText", () => {
     const result = await getLivePrivacyPolicyText();
 
     expect(result).not.toMatch(/\n\s*\n\s*\n/);
+  });
+});
+
+describe("ASSISTANT_KNOWLEDGE_BASE", () => {
+  // Section 8.6 of the document itself bans the em dash from every
+  // assistant response - this is a self-check that the document doesn't
+  // break its own rule. The one exception is 8.6's own heading, which
+  // has to name the character to explain the rule at all.
+  it("contains no em dash outside of section 8.6 naming the character it bans", () => {
+    const withoutTheRuleItself = ASSISTANT_KNOWLEDGE_BASE.replace('### 8.6 Never use an em dash ("—")', "");
+    expect(withoutTheRuleItself).not.toContain("—");
+  });
+
+  // Regression coverage for the dashboard-layout rewrite: each of these
+  // feature entries should name its own sidebar group right next to the
+  // tab reference, not just in the standalone 6.0 overview - a future
+  // edit to one entry's "How" line shouldn't quietly drop this without a
+  // test noticing. See route.ts's TAB_GROUP_LABELS for the server-owned
+  // equivalent of this same tab-to-group mapping.
+  it.each([
+    "Logbook → Service tab",
+    "Logbook → Fuel tab",
+    "Logbook → Parts & Accessories tab",
+    "Logbook → Insurance, Tax, MOT & Finance tab",
+    "Logbook → Labour tab",
+    "Reports tab, inside the Insights group",
+    "The Story So Far tab, inside the Insights group",
+    "Shareable Links tab, inside the Selling group",
+    "Transfer ownership tab (inside the Selling group)",
+  ])('contains the tab-to-group reference "%s"', (phrase) => {
+    expect(ASSISTANT_KNOWLEDGE_BASE).toContain(phrase);
   });
 });

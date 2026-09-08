@@ -462,8 +462,8 @@ also means when you sell, you keep your own read-only copy forever, as proof of 
 while you owned it.
 **Status:** Live.
 **How - there are two ways this starts, depending on who acts first:**
-- **You're the seller, and you start it.** From your own Transfer ownership tab (inside the
-  Selling group), enter the buyer's email and choose whether to include your logged service records, fuel logs, mods,
+- **You're the seller, and you start it.** From your own Transfer ownership tab (inside the Selling group),
+  enter the buyer's email and choose whether to include your logged service records, fuel logs, mods,
   bills, and any attached receipts, or just the bike's identity and a summary of what it added
   up to - then start the handover. The buyer gets an email; they sign in or create a free
   account using that same email address, then accept it from the offer page. The bike moves to
