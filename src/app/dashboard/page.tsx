@@ -86,7 +86,7 @@ import { getCarMods } from "@/lib/tracker/carMod";
 import { getCarBills } from "@/lib/tracker/carBill";
 import { getCarReminders } from "@/lib/tracker/carReminder";
 import { computeCarReminderStatus } from "@/lib/tracker/carReminderStatus";
-import { computeCarYearSpend, gatherCarMileagePoints } from "@/lib/tracker/carSummary";
+import { computeCarSpendSummary, computeCarYearSpend, gatherCarMileagePoints } from "@/lib/tracker/carSummary";
 import { CAR_JOB_LABELS } from "@/lib/tracker/carJobTypes";
 import { CAR_BILL_LABELS } from "@/lib/tracker/carBillTypes";
 import { AddCarForm } from "./AddCarForm";
@@ -836,6 +836,7 @@ async function renderCarDashboard(email: string, car: CarDoc, allCars: CarDoc[],
   const userIsPro = proStatus.isPro;
 
   const distanceUnit: DistanceUnit = car.distanceUnit ?? "mi";
+  const fuelEconomyUnit: FuelEconomyUnit = car.fuelEconomyUnit ?? "mpg";
   const currency: Currency = car.currency ?? "GBP";
 
   const [records, fuelLogs, mods, bills, reminders, rates] = await Promise.all([
@@ -858,6 +859,18 @@ async function renderCarDashboard(email: string, car: CarDoc, allCars: CarDoc[],
   const currentYear = new Date().getFullYear();
   const yearSpend = computeCarYearSpend(records, mods, fuelLogs, bills, currentYear);
   const overBudget = car.annualBudget != null && yearSpend >= car.annualBudget;
+  const summary = computeCarSpendSummary(records, mods, fuelLogs, bills);
+
+  // DashboardStatCards' MPG calc is petrol/diesel/hybrid-only (a litres
+  // reading, not a kWh one) - the same reason Phase 3's receipt scanner
+  // never grew EV-charging support. Charging-only entries (no litres at
+  // all) are filtered out here rather than passed through with a fake
+  // litres value; a fully electric car simply shows "-" for Actual
+  // economy; the same honest "doesn't apply" this app already uses for
+  // the assistant's own getMpgTrend tool.
+  const mpgFuelLogs = fuelLogs
+    .filter((f): f is typeof f & { litres: number } => f.litres != null)
+    .map((f) => ({ id: f.id, mileage: f.mileage, litres: f.litres, filledToFull: f.filledToFull ?? false, date: f.date, cost: f.cost }));
 
   const recentActivity: RecentActivityItem[] = [
     ...records.map((r) => ({
@@ -901,7 +914,7 @@ async function renderCarDashboard(email: string, car: CarDoc, allCars: CarDoc[],
   );
 
   const dashboardContent = (
-    <>
+    <ChartFilterProvider>
       {overBudget && (
         <div className={styles.budgetWarningBanner}>
           ⚠ <strong>You&apos;re over your {currentYear} budget</strong> - {formatCurrency(yearSpend, currency, rates)} spent against a{" "}
@@ -914,7 +927,24 @@ async function renderCarDashboard(email: string, car: CarDoc, allCars: CarDoc[],
       </div>
       <p className={styles.subtext} style={{ marginBottom: "1rem" }}>Here&apos;s how your car looks today.</p>
       <ScanReceiptButton isPro={userIsPro} />
+      <ChartFilterBar />
+      <div style={{ marginBottom: "1rem" }}>
+        <UnitSettings distanceUnit={distanceUnit} fuelEconomyUnit={fuelEconomyUnit} currency={currency} vehicleKind="car" />
+      </div>
       <div className={styles.dashboardStatsGrid}>
+        <DashboardStatCards
+          records={records}
+          mods={mods}
+          bills={bills}
+          fuelLogs={mpgFuelLogs}
+          currentMileage={car.currentMileage}
+          startingMileage={car.startingMileage}
+          currency={currency}
+          rates={rates}
+          distanceUnit={distanceUnit}
+          fuelEconomyUnit={fuelEconomyUnit}
+          isPro={userIsPro}
+        />
         <div className={styles.statCard}>
           <div className={`${styles.statCardIcon} ${styles.statCardIconNeutral}`}><Icon name="currentMiles" size={16} /></div>
           <div className={styles.statCardValue}>{Math.round(convertMilesToDisplay(car.currentMileage, distanceUnit)).toLocaleString()}</div>
@@ -930,15 +960,43 @@ async function renderCarDashboard(email: string, car: CarDoc, allCars: CarDoc[],
           <LockedStatCard icon="spendThisYear" iconClass={styles.statCardIconNeutral} label="Spend this year" />
         )}
       </div>
-      <div className={styles.chartCard}>
-        <div className={styles.chartCardTitle}>Recent activity</div>
-        <RecentActivity items={recentActivity} distanceUnit={distanceUnit} currency={currency} rates={rates} />
+
+      <div className={`${styles.dashboardTwoCol} ${styles.equalHeightRow}`}>
+        <BudgetWidget yearSpend={yearSpend} currentYear={currentYear} initialBudget={car.annualBudget} currency={currency} rates={rates} vehicleKind="car" />
+        <div className={styles.chartCard}>
+          {summary.grandTotal > 0 ? (
+            <SpendDonutChart records={records} mods={mods} fuelLogs={fuelLogs} bills={bills} currency={currency} rates={rates} initialChartType={car.chartTypes?.["spend-donut"] === "bar" ? "bar" : "pie"} isPro={userIsPro} />
+          ) : (
+            <>
+              <div className={styles.chartCardTitle}>Spend by category</div>
+              <p className={styles.emptyNote}>Log something to see this fill in.</p>
+            </>
+          )}
+        </div>
       </div>
+
+      <div className={styles.dashboardTwoCol}>
+        <div className={styles.chartCard}>
+          {mileagePoints.length > 0 ? (
+            <MileageChart points={mileagePoints} distanceUnit={distanceUnit} initialChartType={car.chartTypes?.["mileage"] === "bar" ? "bar" : "line"} />
+          ) : (
+            <>
+              <div className={styles.chartCardTitle}>{distanceUnit === "km" ? "Kilometres" : "Mileage"} over time</div>
+              <p className={styles.emptyNote}>Log a couple of entries to see your mileage build up.</p>
+            </>
+          )}
+        </div>
+        <div className={styles.chartCard}>
+          <div className={styles.chartCardTitle}>Recent activity</div>
+          <RecentActivity items={recentActivity} distanceUnit={distanceUnit} currency={currency} rates={rates} />
+        </div>
+      </div>
+
       <p className={styles.subtext} style={{ marginTop: "1rem" }}>
         Reports and the Quote Checker/Cost Calculator/Buying Guide tools aren&apos;t available for cars yet - they need real UK car price
         data to be worth showing, and that research hasn&apos;t happened yet.
       </p>
-    </>
+    </ChartFilterProvider>
   );
 
   const serviceContent = (

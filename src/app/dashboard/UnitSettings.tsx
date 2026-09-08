@@ -11,14 +11,19 @@ interface Props {
   distanceUnit: DistanceUnit;
   fuelEconomyUnit: FuelEconomyUnit;
   currency: Currency;
+  // Defaults to 'bike' so every existing call site keeps working
+  // unchanged - same minimal-generalization pattern UpdateMileageButton
+  // already uses, rather than a duplicate car-only component for what's
+  // otherwise identical UI.
+  vehicleKind?: 'bike' | 'car';
 }
 
-export function UnitSettings({ distanceUnit, fuelEconomyUnit, currency }: Props) {
+export function UnitSettings({ distanceUnit, fuelEconomyUnit, currency, vehicleKind = 'bike' }: Props) {
   const [editing, setEditing] = useState(false);
   const [dUnit, setDUnit] = useState(distanceUnit);
   const [fUnit, setFUnit] = useState(fuelEconomyUnit);
   const [curr, setCurr] = useState(currency);
-  const { submit, submitting, error } = useTrackerFormSubmit('/api/tracker/bike');
+  const { submit, submitting, error } = useTrackerFormSubmit(vehicleKind === 'car' ? '/api/cars/car' : '/api/tracker/bike');
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();

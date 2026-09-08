@@ -12,14 +12,19 @@ interface Props {
   initialBudget?: number;
   currency: Currency;
   rates: ExchangeRates | null;
+  // Defaults to 'bike' so every existing call site keeps working
+  // unchanged - same minimal-generalization pattern UpdateMileageButton
+  // already uses, rather than a duplicate car-only component for what's
+  // otherwise identical UI.
+  vehicleKind?: 'bike' | 'car';
 }
 
-export function BudgetWidget({ yearSpend, currentYear, initialBudget, currency, rates }: Props) {
+export function BudgetWidget({ yearSpend, currentYear, initialBudget, currency, rates, vehicleKind = 'bike' }: Props) {
   const [editing, setEditing] = useState(!initialBudget);
   const [amountDisplay, setAmountDisplay] = useState(
     initialBudget ? convertGbpToDisplay(initialBudget, currency, rates).toFixed(2) : ''
   );
-  const { submit, submitting, error } = useTrackerFormSubmit('/api/tracker/bike');
+  const { submit, submitting, error } = useTrackerFormSubmit(vehicleKind === 'car' ? '/api/cars/car' : '/api/tracker/bike');
 
   const symbol = CURRENCY_SYMBOLS[currency];
 

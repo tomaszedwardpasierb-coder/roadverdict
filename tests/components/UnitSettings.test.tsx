@@ -43,6 +43,17 @@ describe("UnitSettings", () => {
     );
   });
 
+  it("PATCHes /api/cars/car instead of /api/tracker/bike when vehicleKind is 'car'", async () => {
+    (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({ ok: true, json: async () => ({}) });
+    const user = userEvent.setup();
+    render(<UnitSettings distanceUnit="mi" fuelEconomyUnit="mpg" currency="GBP" vehicleKind="car" />);
+
+    await user.click(screen.getByRole("button", { name: "Units: Miles / MPG / GBP" }));
+    await user.click(screen.getByRole("button", { name: "Save" }));
+
+    expect(fetch).toHaveBeenCalledWith("/api/cars/car", expect.objectContaining({ method: "PATCH" }));
+  });
+
   it("warns that currency changes only affect display, once a different currency is picked", async () => {
     const user = userEvent.setup();
     render(<UnitSettings distanceUnit="mi" fuelEconomyUnit="mpg" currency="GBP" />);

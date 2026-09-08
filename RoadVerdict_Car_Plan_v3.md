@@ -575,6 +575,31 @@ doesn't exist until Phase 4) rather than a fake normal-navigation path pretendin
 **Cross-product signpost** (`AddBikeForm.tsx`'s four-wheeled rejection becoming a pointer to
 `/cars`) stays deferred — genuinely not useful until `/cars` itself exists to point to.
 
+**Post-launch fix, 8 September 2026 — the car Dashboard tab's stat cards/budget/charts were
+missing, not deliberately deferred.** A real user comparing the car dashboard against the
+motorcycle one flagged that the car Dashboard tab only ever rendered two stat cards (Current
+miles, Spend this year) and a plain Recent Activity list — no Total spend, Actual economy (MPG),
+Per-mile cost, annual budget widget, spend-by-category donut, mileage-over-time chart, or the
+Range/View-by/Units controls the motorcycle dashboard has always had. Unlike the nav items hidden
+via `CAR_UNAVAILABLE_SECTIONS` (a real, documented ADR decision), this was never called out as a
+deliberate scope cut anywhere in this plan — it was a genuine gap in `renderCarDashboard()`
+specifically, not the underlying data layer: `carSummary.ts`'s aggregation functions already
+existed car-aware since this same phase, and `DashboardStatCards`/`CategorySpendChart`/
+`SpendDonutChart`/`ChartFilterBar`/`ChartFilterContext`/`MileageChart` all turned out to already
+be fully generic (plain `{date, cost, mileage?}`/`MpgCalcInput` shapes, zero `BikeDoc` coupling) —
+reused directly for cars, no car-only sister components needed. Only `BudgetWidget`/
+`UnitSettings` had one hardcoded bike endpoint each; both gained the same `vehicleKind` prop
+pattern `UpdateMileageButton` already used, defaulting to `'bike'` so every existing call site
+keeps working unchanged. `CarDoc` gained a `fuelEconomyUnit` field (`updateCarUnits`/`/api/cars/car`
+PATCH extended to match `updateBikeUnits`'s existing shape) — the one real gap in the data layer,
+since nothing had ever needed a car's MPG-vs-L/100km display preference before. A fully electric
+car's fuel logs (no `litres` reading, only `kwh`) are filtered out before being passed to
+`DashboardStatCards`, which already shows "-" for Actual economy when there's nothing to compute
+from — the same honest "doesn't apply" the assistant's own `getMpgTrend` tool already uses for
+EVs, not a new special case. Verified with a clean `tsc --noEmit`, a green full suite (2,969
+unit/API, up from 2,966; 787 component, up from 785), and a production build showing `/dashboard`'s
+bundle size unchanged (every one of these components was already bundled for the bike path).
+
 ### Phase 6 — The shared, vehicle-kind-aware AI assistant — ✅ DONE, built 7 September 2026
 
 **No second route, no second widget, no `carAssistantTools.ts`.** As planned: `assistantTools.ts`
@@ -786,7 +811,7 @@ a green component suite (765, up from 750).
 | 2 | ✅ Done — new doc types, CRUD, job/mod/bill catalogs, car assistant config schema; 121 new unit tests, full suite green (2,564), build unchanged | None |
 | 3 | ✅ Done — receipt scanner is vehicle-kind-aware; diesel not dropped for car accounts (EV/kWh receipts deferred); `commitCarReceiptItem.ts` + `reestimateCarFuelMileage.ts` new; 39 new tests, full suite green (2,603), build unchanged | Motorcycle scanning unchanged |
 | 4 | ✅ Done — `/cars` marketing landing page (no tool sub-pages yet, deferred to Phase 7); cross-product signpost both ways (motorcycle plate-lookup rejection → `/cars`, homepage → `/cars`, `/cars` → homepage); own JSON-LD + sitemap entry; 9 new/changed component tests (`CarsPage.test.tsx` new) + 1 new Playwright smoke test | Motorcycle dashboard unchanged; homepage gains one new secondary CTA link |
-| 5 | ✅ Done — full `/api/cars/*` route layer (14 routes); `carReminder.ts`, `activeVehicle.ts` kind-resolution, `carSummary.ts`, `carReminderStatus.ts`; `VehicleSwitcher` (replaces `BikeSwitcher`); `DashboardShell` vehicle-kind-aware; `AddCarForm` + 4 `LogCar*Form`s; 5 simplified car history/reminder cards; `dashboard/page.tsx` genuinely branches and renders a working car dashboard (Dashboard/Service/Fuel/Parts/Bills/Reminders/Privacy/Security - Reports and the 3 embedded tools deferred, no car price data yet); 196 new tests, full suite green (2,791 unit/API, 750 component) | Motorcycle dashboard unchanged (confirmed: same route list, same bundle size for every other route, same component behaviour for a bike-only account) |
+| 5 | ✅ Done — full `/api/cars/*` route layer (14 routes); `carReminder.ts`, `activeVehicle.ts` kind-resolution, `carSummary.ts`, `carReminderStatus.ts`; `VehicleSwitcher` (replaces `BikeSwitcher`); `DashboardShell` vehicle-kind-aware; `AddCarForm` + 4 `LogCar*Form`s; 5 simplified car history/reminder cards; `dashboard/page.tsx` genuinely branches and renders a working car dashboard (Dashboard/Service/Fuel/Parts/Bills/Reminders/Privacy/Security - Reports and the 3 embedded tools deferred, no car price data yet); 196 new tests, full suite green (2,791 unit/API, 750 component). **Post-launch fix, 2026-09-08:** the Dashboard tab's stat cards/budget/spend chart/mileage chart/range filters were a real gap, not a deliberate cut — now wired up, reusing the already-generic shared components (`DashboardStatCards`, `SpendDonutChart`, `MileageChart`, `ChartFilterBar`), plus a new `CarDoc.fuelEconomyUnit` field | Motorcycle dashboard unchanged (confirmed: same route list, same bundle size for every other route, same component behaviour for a bike-only account) |
 | 6 | ✅ Done — one assistant, now vehicle-kind-aware; 7 of 10 tools fully car-aware (getShareLinks/getStorySoFar/proposeLogEntry stay bike-only, fail soft with an honest "not available" result); car knowledge base injected via `buildSystemInstruction()`, never falling back to the motorcycle one; `/tomasz` gets a second, clearly-labeled KB editor sharing one generic component | Motorcycle assistant behaviour unchanged when a bike is active |
 | 7 | ✅ Done — `/cars/quote-checker`, `/cars/cost-calculator`, `/cars/buying-guide` + their `/api/cars/*` routes; `carPriceData.ts` (5 job types × small/medium/large, sourced from RAC/Bumper.co/Checkatrade/tyresavings.com); `carVed.ts` (CO2-banded, GOV.UK-sourced); `carCostCalculator.ts`; diesel price added to `fuelPrice.ts`/the fuel-price cron; electric cars excluded from quote-checker/cost-calculator (not enough sourced data) but fully covered in the buying guide; `/cars` now links its own 3 tools; 99 new tests, full suite green (2,966 unit/API, 785 component), build unchanged elsewhere | Motorcycle tools unchanged |
 | 8 | ✅ Done — audited all 5 leakage categories; 2 real gaps found and closed (`DashboardShell.test.tsx` only checked 3 of 7 `CAR_UNAVAILABLE_SECTIONS`; no copy audit existed at all); new `tests/unit/vehicleKindLeakage.test.ts` scans dashboard component copy, catalog label values, and `dashboard/page.tsx`'s two render paths for cross-vehicle-kind references; full suite green (2,887 unit/API, 765 component) | None |

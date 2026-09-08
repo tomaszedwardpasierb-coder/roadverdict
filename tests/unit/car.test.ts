@@ -379,6 +379,18 @@ describe("updateCarUnits", () => {
     expect(result?.distanceUnit).toBe("miles");
     expect(mocks.upsert).toHaveBeenCalledTimes(1);
   });
+
+  it("updates fuelEconomyUnit when supplied", async () => {
+    mocks.read.mockResolvedValue({ resource: makeCar({ fuelEconomyUnit: "mpg" as any }) });
+    const result = await updateCarUnits("owner@example.com", "car-1", undefined, "l100km" as any);
+    expect(result?.fuelEconomyUnit).toBe("l100km");
+  });
+
+  it("leaves fuelEconomyUnit unchanged when not supplied", async () => {
+    mocks.read.mockResolvedValue({ resource: makeCar({ fuelEconomyUnit: "mpg" as any }) });
+    const result = await updateCarUnits("owner@example.com", "car-1", "km" as any);
+    expect(result?.fuelEconomyUnit).toBe("mpg");
+  });
 });
 
 describe("addCarRegistrationChange", () => {

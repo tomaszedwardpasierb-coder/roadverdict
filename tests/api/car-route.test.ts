@@ -298,7 +298,15 @@ describe("PATCH /api/cars/car", () => {
     mocks.updateCarUnits.mockResolvedValue({ id: "car-1", distanceUnit: "km" });
     const response = await PATCH(request("PATCH", JSON.stringify({ distanceUnit: "km" })));
     expect(response.status).toBe(200);
-    expect(mocks.updateCarUnits).toHaveBeenCalledWith("owner@example.com", "car-1", "km");
+    expect(mocks.updateCarUnits).toHaveBeenCalledWith("owner@example.com", "car-1", "km", undefined);
+  });
+
+  it("updates the fuel economy unit", async () => {
+    mocks.getSession.mockResolvedValue({ email: "owner@example.com" });
+    mocks.updateCarUnits.mockResolvedValue({ id: "car-1", fuelEconomyUnit: "l100km" });
+    const response = await PATCH(request("PATCH", JSON.stringify({ fuelEconomyUnit: "l100km" })));
+    expect(response.status).toBe(200);
+    expect(mocks.updateCarUnits).toHaveBeenCalledWith("owner@example.com", "car-1", undefined, "l100km");
   });
 
   it("updates the currency", async () => {

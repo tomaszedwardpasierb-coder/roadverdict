@@ -13,7 +13,7 @@ import { cookies } from "next/headers";
 import { getContainer } from "@/lib/cosmos";
 import { stripCosmosMetadata, type TrackerDocBase } from "@/lib/tracker/cosmosHelpers";
 import type { Region } from "@/lib/priceData";
-import type { DistanceUnit } from "@/lib/tracker/unitFormat";
+import type { DistanceUnit, FuelEconomyUnit } from "@/lib/tracker/unitFormat";
 import type { Currency } from "@/lib/tracker/currency";
 import type { ChartKind, DvlaVehicleData, RegistrationChangeEntry, RegistrationChangeReason } from "@/lib/tracker/bike";
 
@@ -70,6 +70,7 @@ export interface CarDoc {
   region?: Region;
   annualBudget?: number;
   distanceUnit?: DistanceUnit;
+  fuelEconomyUnit?: FuelEconomyUnit;
   currency?: Currency;
   chartTypes?: Record<string, ChartKind>;
   originalRegistration?: string;
@@ -234,11 +235,17 @@ export async function updateCarBudget(email: string, carId: string, annualBudget
   return resource;
 }
 
-export async function updateCarUnits(email: string, carId: string, distanceUnit?: DistanceUnit): Promise<CarDoc | null> {
+export async function updateCarUnits(
+  email: string,
+  carId: string,
+  distanceUnit?: DistanceUnit,
+  fuelEconomyUnit?: FuelEconomyUnit
+): Promise<CarDoc | null> {
   const container = getContainer();
   const { resource } = await container.item(carId, email).read<CarDoc>();
   if (!resource) return null;
   if (distanceUnit) resource.distanceUnit = distanceUnit;
+  if (fuelEconomyUnit) resource.fuelEconomyUnit = fuelEconomyUnit;
   await container.items.upsert(resource);
   return resource;
 }

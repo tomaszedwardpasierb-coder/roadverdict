@@ -36,6 +36,17 @@ describe("BudgetWidget", () => {
     );
   });
 
+  it("PATCHes /api/cars/car instead of /api/tracker/bike when vehicleKind is 'car'", async () => {
+    (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({ ok: true, json: async () => ({}) });
+    const user = userEvent.setup();
+    render(<BudgetWidget yearSpend={500} currentYear={2026} currency="GBP" rates={null} vehicleKind="car" />);
+
+    await user.type(screen.getByLabelText("Annual budget (£)"), "2000");
+    await user.click(screen.getByRole("button", { name: "Set budget" }));
+
+    expect(fetch).toHaveBeenCalledWith("/api/cars/car", expect.objectContaining({ method: "PATCH" }));
+  });
+
   it("shows the 'on track' status when spend is comfortably under budget", () => {
     render(<BudgetWidget yearSpend={400} currentYear={2026} initialBudget={2000} currency="GBP" rates={null} />);
     expect(screen.getByText("On track for 2026")).toBeInTheDocument();

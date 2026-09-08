@@ -18,7 +18,7 @@ import {
 import { fetchDvlaDataFromVdg } from "@/lib/tracker/dvlaDataFetch";
 import type { Region } from "@/lib/priceData";
 import type { ChartKind } from "@/lib/tracker/bike";
-import type { DistanceUnit } from "@/lib/tracker/unitFormat";
+import type { DistanceUnit, FuelEconomyUnit } from "@/lib/tracker/unitFormat";
 import type { Currency } from "@/lib/tracker/currency";
 
 export const dynamic = "force-dynamic";
@@ -112,16 +112,17 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
   }
 
-  const { currentMileage, region, annualBudget, distanceUnit, currency, chartType } = body as {
+  const { currentMileage, region, annualBudget, distanceUnit, fuelEconomyUnit, currency, chartType } = body as {
     currentMileage?: number;
     region?: Region;
     annualBudget?: number;
     distanceUnit?: DistanceUnit;
+    fuelEconomyUnit?: FuelEconomyUnit;
     currency?: Currency;
     chartType?: { chartId: string; kind: ChartKind };
   };
 
-  if (currentMileage == null && !region && annualBudget == null && !distanceUnit && !currency && !chartType) {
+  if (currentMileage == null && !region && annualBudget == null && !distanceUnit && !fuelEconomyUnit && !currency && !chartType) {
     return NextResponse.json({ error: "Nothing to update." }, { status: 400 });
   }
 
@@ -153,8 +154,8 @@ export async function PATCH(request: NextRequest) {
     }
     car = await updateCarBudget(session.email, carId, annualBudget);
   }
-  if (distanceUnit) {
-    car = await updateCarUnits(session.email, carId, distanceUnit);
+  if (distanceUnit || fuelEconomyUnit) {
+    car = await updateCarUnits(session.email, carId, distanceUnit, fuelEconomyUnit);
   }
   if (currency) {
     car = await updateCarCurrency(session.email, carId, currency);
