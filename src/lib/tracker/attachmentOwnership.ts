@@ -20,7 +20,10 @@
 // risk.
 import { getContainer } from "@/lib/cosmos";
 
-const ATTACHMENT_BEARING_TYPES = ["serviceRecord", "fuelLog", "mod", "bill"];
+const ATTACHMENT_BEARING_TYPES = [
+  "serviceRecord", "fuelLog", "mod", "bill",
+  "carServiceRecord", "carFuelLog", "carMod", "carBill",
+];
 
 export async function ownsAttachment(email: string, blobName: string): Promise<boolean> {
   const container = getContainer();

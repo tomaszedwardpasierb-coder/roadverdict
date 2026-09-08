@@ -361,6 +361,15 @@ found while touching this file: a hardcoded "motorcycles run on petrol" skip-rea
 `tsc --noEmit`, a green full suite (2,974 unit/API, up from 2,966; 791 component, up from 785), and
 a production build against a freshly-deleted local database.
 
+**Same-day follow-up fix — `attachmentOwnership.ts`'s `ATTACHMENT_BEARING_TYPES` list only ever
+carried the four bike-side doc types**, so `ownsAttachment()` (gating `GET /api/tracker/attachment/
+[blobName]` and `POST /api/tracker/verify-receipt`, both used by `AttachmentThumb`/
+`AttachmentUploader` from every `Log*` form and `ReviewQueueModal`) could never match a car record's
+attachment — every car service/fuel/mod/bill receipt thumbnail 404'd, and the AI double-check
+silently no-op'd for cars. Found via a follow-up audit for this exact bug shape (a route already
+built vehicle-agnostically in principle, but with a hardcoded bike-only allowlist nobody updated).
+Fixed by adding `carServiceRecord`/`carFuelLog`/`carMod`/`carBill` to that list.
+
 ### Phase 4 — Public marketing namespace — ✅ DONE, built 7 September 2026
 
 ```
@@ -619,6 +628,19 @@ from — the same honest "doesn't apply" the assistant's own `getMpgTrend` tool 
 EVs, not a new special case. Verified with a clean `tsc --noEmit`, a green full suite (2,969
 unit/API, up from 2,966; 787 component, up from 785), and a production build showing `/dashboard`'s
 bundle size unchanged (every one of these components was already bundled for the bike path).
+
+**Same-day follow-up fix — `useChartTypePreference.ts` (the hook behind `MileageChart`'s and
+`SpendDonutChart`'s line/bar/pie toggle) hardcoded `PATCH /api/tracker/bike` unconditionally.**
+Same bug shape as the receipt-scan pipeline fix above, found via a deliberate audit for it: on a
+car-active session this PATCH just 404'd (preference silently didn't persist); on a *hybrid*
+account (owns both a bike and a car) with the car active, it silently overwrote the **bike's**
+own stored chart-type preference instead of the car's — a real cross-vehicle data-corruption case,
+not just a missing feature. Fixed with the same `vehicleKind` prop pattern as `BudgetWidget`/
+`UnitSettings`, threaded through `MileageChart`/`SpendDonutChart` into the hook. `MpgChart`/
+`FuelCostChart`/`CategorySpendChart` use the same hook but aren't reachable from
+`renderCarDashboard` today (Reports isn't built for cars yet) — the fix lives in the shared hook so
+those inherit correct behaviour automatically whenever that changes, rather than needing this same
+fix repeated later.
 
 ### Phase 6 — The shared, vehicle-kind-aware AI assistant — ✅ DONE, built 7 September 2026
 

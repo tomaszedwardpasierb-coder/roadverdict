@@ -90,6 +90,18 @@ describe("MileageChart", () => {
     );
   });
 
+  // Was hardcoded to PATCH /api/tracker/bike unconditionally - on a
+  // hybrid account (owns both a bike and a car) with the car active,
+  // this used to silently overwrite the BIKE's own chart-type
+  // preference instead of the car's.
+  it("PATCHes /api/cars/car instead of /api/tracker/bike when vehicleKind is 'car'", async () => {
+    const user = userEvent.setup();
+    render(<MileageChart points={points} distanceUnit="mi" vehicleKind="car" />);
+    await user.click(screen.getByRole("button", { name: "Bar" }));
+
+    expect(fetch).toHaveBeenCalledWith("/api/cars/car", expect.objectContaining({ method: "PATCH" }));
+  });
+
   it("clicking a plain service point routes to the 'service' tab and highlights its id", () => {
     const onSwitchTab = vi.fn();
     render(

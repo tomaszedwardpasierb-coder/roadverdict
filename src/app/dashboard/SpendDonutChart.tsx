@@ -52,6 +52,7 @@ interface Props {
   // proof. Only the category breakdown itself (which category, and how
   // much each one cost) is Premium.
   isPro?: boolean;
+  vehicleKind?: 'bike' | 'car';
 }
 
 function sumCost(items: CostItem[]): number {
@@ -64,9 +65,9 @@ function sumCost(items: CostItem[]): number {
 // now take raw arrays instead of pre-summed totals: a pre-summed number
 // computed once on the server has no way to react to the client-side
 // Range control changing after the page has already loaded.
-export function SpendDonutChart({ records, mods, fuelLogs, bills, currency, rates, initialChartType, isPro = false }: Props) {
+export function SpendDonutChart({ records, mods, fuelLogs, bills, currency, rates, initialChartType, isPro = false, vehicleKind = 'bike' }: Props) {
   const { range } = useChartFilter();
-  const { kind, changeKind } = useChartTypePreference(CHART_ID, initialChartType ?? 'pie');
+  const { kind, changeKind } = useChartTypePreference(CHART_ID, initialChartType ?? 'pie', vehicleKind);
   const symbol = CURRENCY_SYMBOLS[currency];
 
   const servicingTotal = sumCost(filterByDateRange(records, range));

@@ -114,6 +114,19 @@ describe("SpendDonutChart", () => {
     );
   });
 
+  // Was hardcoded to PATCH /api/tracker/bike unconditionally - on a
+  // hybrid account (owns both a bike and a car) with the car active,
+  // this used to silently overwrite the BIKE's own chart-type
+  // preference instead of the car's.
+  it("PATCHes /api/cars/car instead of /api/tracker/bike when vehicleKind is 'car'", async () => {
+    const user = userEvent.setup();
+    render(<SpendDonutChart records={records} mods={mods} fuelLogs={fuelLogs} bills={bills} currency="GBP" rates={null} vehicleKind="car" />);
+
+    await user.click(screen.getByRole("button", { name: "Bar" }));
+
+    expect(fetch).toHaveBeenCalledWith("/api/cars/car", expect.objectContaining({ method: "PATCH" }));
+  });
+
   it("converts every real total to the display currency before handing it to the chart", () => {
     const rates = { base: "GBP" as const, rates: { EUR: 1.15 }, fetchedAt: "2024-01-01T00:00:00.000Z" };
     render(<SpendDonutChart records={records} mods={mods} fuelLogs={fuelLogs} bills={bills} currency="EUR" rates={rates} isPro />);

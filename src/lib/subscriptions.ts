@@ -56,7 +56,7 @@ export const PRO_ANNUAL_PRICE = "£49";
 export const PRO_ANNUAL_MONTHLY_EQUIV = "£4.08";
 
 export const PRO_FEATURES = [
-  "Additional bikes beyond your first",
+  "Additional vehicles beyond your first",
   "Multi-bike overview and cost comparison",
   "Full Reports - fuel economy, running costs, and spend trends over time",
   "Category-by-category spend breakdown (which category, and how much)",

@@ -46,4 +46,17 @@ describe("ownsAttachment", () => {
       expect.arrayContaining([{ name: "@blobName", value: "abc.jpg" }])
     );
   });
+
+  // A car receipt's attachment must be findable too - the query's @types
+  // list previously only carried the four bike-side doc types, so this
+  // count query could never match a carServiceRecord/carFuelLog/carMod/
+  // carBill attachment, and every car receipt thumbnail 404'd.
+  it("includes all four car doc types in the @types list, not just the bike ones", async () => {
+    await ownsAttachment("rider@example.com", "abc.jpg");
+    const [queryObj] = mocks.query.mock.calls[0];
+    const typesParam = queryObj.parameters.find((p: { name: string }) => p.name === "@types");
+    expect(typesParam.value).toEqual(
+      expect.arrayContaining(["carServiceRecord", "carFuelLog", "carMod", "carBill"])
+    );
+  });
 });

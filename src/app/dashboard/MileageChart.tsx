@@ -26,14 +26,16 @@ export function MileageChart({
   points,
   distanceUnit,
   initialChartType,
+  vehicleKind = 'bike',
 }: {
   points: MileagePoint[];
   distanceUnit: DistanceUnit;
   initialChartType?: 'line' | 'bar';
+  vehicleKind?: 'bike' | 'car';
 }) {
   const { switchTo, setHighlightIds } = useTabSwitch();
   const { range } = useChartFilter();
-  const { kind, changeKind } = useChartTypePreference(CHART_ID, initialChartType ?? 'line');
+  const { kind, changeKind } = useChartTypePreference(CHART_ID, initialChartType ?? 'line', vehicleKind);
   const filtered = filterByDateRange(points, range);
   const title = `${distanceUnit === 'km' ? 'Kilometres' : 'Mileage'} over time`;
 

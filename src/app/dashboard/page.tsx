@@ -965,7 +965,7 @@ async function renderCarDashboard(email: string, car: CarDoc, allCars: CarDoc[],
         <BudgetWidget yearSpend={yearSpend} currentYear={currentYear} initialBudget={car.annualBudget} currency={currency} rates={rates} vehicleKind="car" />
         <div className={styles.chartCard}>
           {summary.grandTotal > 0 ? (
-            <SpendDonutChart records={records} mods={mods} fuelLogs={fuelLogs} bills={bills} currency={currency} rates={rates} initialChartType={car.chartTypes?.["spend-donut"] === "bar" ? "bar" : "pie"} isPro={userIsPro} />
+            <SpendDonutChart records={records} mods={mods} fuelLogs={fuelLogs} bills={bills} currency={currency} rates={rates} initialChartType={car.chartTypes?.["spend-donut"] === "bar" ? "bar" : "pie"} isPro={userIsPro} vehicleKind="car" />
           ) : (
             <>
               <div className={styles.chartCardTitle}>Spend by category</div>
@@ -978,7 +978,7 @@ async function renderCarDashboard(email: string, car: CarDoc, allCars: CarDoc[],
       <div className={styles.dashboardTwoCol}>
         <div className={styles.chartCard}>
           {mileagePoints.length > 0 ? (
-            <MileageChart points={mileagePoints} distanceUnit={distanceUnit} initialChartType={car.chartTypes?.["mileage"] === "bar" ? "bar" : "line"} />
+            <MileageChart points={mileagePoints} distanceUnit={distanceUnit} initialChartType={car.chartTypes?.["mileage"] === "bar" ? "bar" : "line"} vehicleKind="car" />
           ) : (
             <>
               <div className={styles.chartCardTitle}>{distanceUnit === "km" ? "Kilometres" : "Mileage"} over time</div>

@@ -27,7 +27,7 @@ export function PlanComparisonCards({ userIsPro, showFreeCta = true }: Props) {
         <div className={styles.planPrice}>£0</div>
         <div className={styles.planPriceSub}>forever</div>
         <ul className={styles.featureList}>
-          <li>1 bike</li>
+          <li>1 vehicle (bike or car)</li>
           <li>Service, fuel, mods &amp; bills logging</li>
           <li>Receipt scanning (one at a time)</li>
           <li>Reminders (OK/overdue status - exact dates are Pro)</li>
