@@ -24,7 +24,7 @@ describe("buildCostPerMileVerdict", () => {
       { bikeId: "b", name: "Tiger", costPerMile: 0.20 },
       { bikeId: "c", name: "MT-09", costPerMile: 0.15 },
     ]);
-    expect(verdict).toBe("Africa Twin is your cheapest bike to run, by 33% over your next-best, MT-09.");
+    expect(verdict).toBe("Africa Twin is your cheapest vehicle to run, by 33% over your next-best, MT-09.");
   });
 
   it("returns null when the cheapest and next-best are tied (0% headline would be meaningless)", () => {

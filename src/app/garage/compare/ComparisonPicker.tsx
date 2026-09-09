@@ -1,22 +1,23 @@
 // Place at: src/app/garage/compare/ComparisonPicker.tsx
 //
 // Plain server-rendered form - no client JS needed. A native GET form
-// submission with repeated `bikes` checkboxes and the two date inputs
-// produces exactly the `?bikes=id1&bikes=id2&from=...&to=...` query
-// string the page below already knows how to read, so all of the
+// submission with repeated `vehicles` checkboxes and the two date
+// inputs produces exactly the `?vehicles=id1&vehicles=id2&from=...&to=...`
+// query string the page below already knows how to read, so all of the
 // selection state lives in the URL, not in React state -
-// bookmarkable/shareable/back-button-safe for free.
+// bookmarkable/shareable/back-button-safe for free. `vehicles`, not
+// `bikes` - this list is a mix of bike and car ids now.
 import styles from "../garage.module.css";
 
 export function ComparisonPicker({
-  bikes,
+  vehicles,
   selectedIds,
   minCompare,
   maxCompare,
   from,
   to,
 }: {
-  bikes: { id: string; name: string }[];
+  vehicles: { id: string; name: string }[];
   selectedIds: string[];
   minCompare: number;
   maxCompare: number;
@@ -26,13 +27,13 @@ export function ComparisonPicker({
   return (
     <form method="get" action="/garage/compare" className={styles.comparePickerForm}>
       <p className="field-note" style={{ marginBottom: "0.6rem" }}>
-        Pick {minCompare} to {maxCompare} bikes to compare.
+        Pick {minCompare} to {maxCompare} vehicles to compare.
       </p>
-      {bikes.map((b) => (
-        <div key={b.id} className="field-checkbox">
+      {vehicles.map((v) => (
+        <div key={v.id} className="field-checkbox">
           <label>
-            <input type="checkbox" name="bikes" value={b.id} defaultChecked={selectedIds.includes(b.id)} />
-            {b.name}
+            <input type="checkbox" name="vehicles" value={v.id} defaultChecked={selectedIds.includes(v.id)} />
+            {v.name}
           </label>
         </div>
       ))}

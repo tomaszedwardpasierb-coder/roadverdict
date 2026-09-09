@@ -32,7 +32,10 @@ export function buildCostPerMileVerdict(entries: ComparisonCostInput[]): string 
   if (ranked.length === 2) {
     return `${best.name} costs you ${pct}% less per mile than ${nextBest.name}.`;
   }
-  return `${best.name} is your cheapest bike to run, by ${pct}% over your next-best, ${nextBest.name}.`;
+  // "vehicle", not "bike" - this same function is reused, unmodified,
+  // by the garage compare page's now-mixed bike+car comparisons (see
+  // vehicleComparison.ts), where the cheapest entry may well be a car.
+  return `${best.name} is your cheapest vehicle to run, by ${pct}% over your next-best, ${nextBest.name}.`;
 }
 
 // Which bike has the best value in a given numeric metric - "lower" for

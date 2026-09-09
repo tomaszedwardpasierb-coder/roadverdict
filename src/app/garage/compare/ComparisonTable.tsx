@@ -3,7 +3,7 @@ import { Fragment } from "react";
 import { CURRENCY_SYMBOLS, convertGbpToDisplay, formatCurrency, type Currency, type ExchangeRates } from "@/lib/tracker/currency";
 import { formatDistance, KM_PER_MILE, type DistanceUnit } from "@/lib/tracker/unitFormat";
 import { buildCostPerMileVerdict, pickWinnerId } from "@/lib/tracker/bikeComparisonVerdict";
-import type { BikeComparisonEntry } from "@/lib/tracker/bikeComparison";
+import type { VehicleComparisonEntry } from "@/lib/tracker/vehicleComparison";
 import type { ComparisonPeriod } from "@/lib/tracker/bikeComparisonPeriod";
 import styles from "../garage.module.css";
 
@@ -46,7 +46,7 @@ export function ComparisonTable({
   distanceUnit,
   period,
 }: {
-  entries: BikeComparisonEntry[];
+  entries: VehicleComparisonEntry[];
   currency: Currency;
   rates: ExchangeRates | null;
   distanceUnit: DistanceUnit;
@@ -122,7 +122,17 @@ export function ComparisonTable({
       rows: [
         {
           label: "Due soonest",
-          values: entries.map((e) => (e.nextDue ? `${e.nextDue.name} (${e.nextDue.status === "overdue" ? "overdue" : "due soon"})` : "Nothing due soon")),
+          // A car entry's nextDue is always null (no getSellerReportCore
+          // equivalent yet - see carComparison.ts) - "Not available yet"
+          // there is honest about that gap, distinct from a bike entry
+          // genuinely having nothing due, which says so instead.
+          values: entries.map((e) =>
+            e.kind === "car"
+              ? "Not available yet"
+              : e.nextDue
+                ? `${e.nextDue.name} (${e.nextDue.status === "overdue" ? "overdue" : "due soon"})`
+                : "Nothing due soon"
+          ),
           winnerBikeId: null,
         },
       ],
@@ -132,7 +142,9 @@ export function ComparisonTable({
       rows: [
         {
           label: "History with a receipt attached",
-          values: entries.map((e) => `${e.documentationPct}%`),
+          // Same reasoning as "Due soonest" above - null means "not
+          // tracked for this vehicle kind yet", not "0%".
+          values: entries.map((e) => (e.documentationPct == null ? "Not available yet" : `${e.documentationPct}%`)),
           winnerBikeId: documentationWinner,
           badge: "Best documented",
         },
