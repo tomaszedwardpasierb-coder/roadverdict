@@ -117,6 +117,20 @@ import { CarBillCard } from "./CarBillCard";
 import { CarLabourCard } from "./CarLabourCard";
 import { CarReminderItem } from "./CarReminderItem";
 import { CarCustomFilterPanel } from "./CarCustomFilterPanel";
+import { CarQuoteForm } from "@/components/CarQuoteForm";
+import { CarCostCalculatorForm } from "@/components/CarCostCalculatorForm";
+import { CarBuyingGuideForm } from "@/components/CarBuyingGuideForm";
+import { CAR_BRAND_OPTIONS, slugifyCarMake, type CarBenchmarkClass } from "@/lib/carPriceData";
+
+// Duplicated from src/app/cars/quote-checker/page.tsx and
+// cost-calculator/page.tsx (which don't share it with each other
+// either) - each of the three car tool entry points computing this
+// independently is the existing convention, not something new here.
+function classFromEngineLitres(engineLitres: number): CarBenchmarkClass {
+  if (engineLitres <= 1.2) return "small";
+  if (engineLitres <= 2.0) return "medium";
+  return "large";
+}
 
 export const dynamic = "force-dynamic";
 
@@ -1208,6 +1222,49 @@ async function renderCarDashboard(
     </ProGate>
   );
 
+  // Pre-population for the three embedded tools below - mirrors the
+  // standalone /cars/quote-checker and /cars/cost-calculator pages'
+  // own initialBrand/initialCarClass computation exactly (each of those
+  // two pages already duplicates this rather than sharing it with the
+  // other, so a third copy here matches the existing convention).
+  const carSlug = slugifyCarMake(car.make);
+  const toolInitialCarBrand = CAR_BRAND_OPTIONS.some((b) => b.value === carSlug) ? carSlug : "other";
+  const toolInitialCarClass: CarBenchmarkClass | undefined =
+    car.fuelType !== "electric" && car.engineLitres ? classFromEngineLitres(car.engineLitres) : undefined;
+
+  const carQuoteCheckerContent = (
+    <ProGate featureName="Quote Checker" description="Check whether a quote you've been given is fair, benchmarked against real UK car service and repair prices." isPro={userIsPro}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "0.75rem" }}>
+        <h1 className={styles.heading}>Quote Checker{carTag}</h1>
+        {mileagePill}
+      </div>
+      <p className={styles.subtext}>Four quick questions. One honest answer, benchmarked against typical UK prices.</p>
+      <CarQuoteForm signedIn initialBrand={toolInitialCarBrand} initialCarClass={toolInitialCarClass} />
+    </ProGate>
+  );
+
+  const carCostCalculatorContent = (
+    <ProGate featureName="Cost Calculator" description="Work out what a car really costs to run a year - servicing, tyres, MOT, tax, and fuel, benchmarked against typical UK prices." isPro={userIsPro}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "0.75rem" }}>
+        <h1 className={styles.heading}>Cost calculator{carTag}</h1>
+        {mileagePill}
+      </div>
+      <p className={styles.subtext}>Servicing, tyres, MOT, tax, and fuel - one honest number, benchmarked against typical UK prices.</p>
+      <CarCostCalculatorForm signedIn initialBrand={toolInitialCarBrand} initialCarClass={toolInitialCarClass} />
+    </ProGate>
+  );
+
+  const carBuyingGuideContent = (
+    <ProGate featureName="Buying a Used Car" description="A buyer's checklist weighted by how old the car actually is, so you know exactly what to check before handing any money over." isPro={userIsPro}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "0.75rem" }}>
+        <h1 className={styles.heading}>Buying a used car{carTag}</h1>
+        {mileagePill}
+      </div>
+      <p className={styles.subtext}>A buyer checklist weighted by how old the car actually is - not a generic list.</p>
+      <CarBuyingGuideForm />
+    </ProGate>
+  );
+
   const serviceContent = (
     <>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "0.75rem" }}>
@@ -1365,6 +1422,9 @@ async function renderCarDashboard(
       billsContent={billsContent}
       remindersContent={remindersContent}
       reportsContent={carReportsContent}
+      quoteCheckerContent={carQuoteCheckerContent}
+      costCalculatorContent={carCostCalculatorContent}
+      buyingGuideContent={carBuyingGuideContent}
       privacyContent={privacyContent}
       securityContent={securityContent}
       storyReady={false}

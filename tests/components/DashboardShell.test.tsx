@@ -345,18 +345,17 @@ describe("DashboardShell", () => {
       });
     }
 
-    // All 6 of CAR_UNAVAILABLE_SECTIONS (DashboardShell.tsx). Reports came
-    // off this list once its own car equivalent was built (see
-    // reportsContent in dashboard/page.tsx's renderCarDashboard) - kept
-    // listed here as a comment, not silently dropped, so a future reader
-    // can see it was deliberately removed rather than forgotten.
+    // All 3 of CAR_UNAVAILABLE_SECTIONS (DashboardShell.tsx). Reports and
+    // the three buying tools (Quote Checker/Cost calculator/Buying a
+    // used bike) came off this list once their own car equivalents were
+    // built (see reportsContent/quoteCheckerContent/costCalculatorContent/
+    // buyingGuideContent in dashboard/page.tsx's renderCarDashboard) -
+    // kept listed here as a comment, not silently dropped, so a future
+    // reader can see they were deliberately removed rather than forgotten.
     const CAR_UNAVAILABLE_LABELS = [
       "The Story So Far",
       "Shareable Links",
       "Transfer ownership",
-      "Quote Checker",
-      "Cost calculator",
-      "Buying a used bike",
     ];
 
     it("hides every CAR_UNAVAILABLE_SECTIONS label from the sidebar nav", () => {
@@ -383,6 +382,28 @@ describe("DashboardShell", () => {
       expect(screen.getByText("Reports content")).toBeInTheDocument();
     });
 
+    // Quote Checker/Cost calculator/Buying a used bike all have real car
+    // equivalents now (standalone /cars/quote-checker etc, wired into
+    // the dashboard's own tabs) - they must render as real, clickable
+    // nav items for a car-active session, not just be absent from the
+    // unavailable-labels list above.
+    it("still shows all three buying tools as real, clickable nav items for a car-active session", async () => {
+      const user = userEvent.setup();
+      render(<DashboardShell {...carProps()} />);
+      const buyingToolsHeader = screen.getAllByRole("button", { name: /Buying Tools/ })[0];
+      await user.click(buyingToolsHeader);
+
+      for (const [label, content] of [
+        ["Quote Checker", "QuoteChecker content"],
+        ["Cost calculator", "CostCalculator content"],
+        ["Buying a used bike", "BuyingGuide content"],
+      ]) {
+        expect(screen.getByRole("button", { name: label })).toBeInTheDocument();
+        await user.click(screen.getByRole("button", { name: label }));
+        expect(screen.getByText(content)).toBeInTheDocument();
+      }
+    });
+
     it("hides every CAR_UNAVAILABLE_SECTIONS label from the mobile More sheet", async () => {
       const user = userEvent.setup();
       render(<DashboardShell {...carProps()} />);
@@ -399,25 +420,23 @@ describe("DashboardShell", () => {
     // The user explicitly wants the group STRUCTURE to exist for cars too,
     // even where every item inside a group is currently unavailable -
     // rather than the group disappearing entirely, expanding it should
-    // show a short "not available yet" note. Insights is deliberately
-    // excluded here now: Reports has a real car equivalent, so that
-    // group is no longer empty for a car-active session (see the
-    // "still shows Reports" test above) - only Selling and Buying Tools
-    // remain fully empty.
-    it("still shows the Selling/Buying Tools group headers for a car, and expanding each reveals the empty-state note instead of any items", async () => {
+    // show a short "not available yet" note. Insights and Buying Tools
+    // are both deliberately excluded here now: Reports and all three
+    // buying tools have real car equivalents, so neither group is empty
+    // for a car-active session anymore (see the tests above) - only
+    // Selling (Story/Shareable Links/Transfer ownership) remains
+    // fully empty.
+    it("still shows the Selling group header for a car, and expanding it reveals the empty-state note instead of any items", async () => {
       const user = userEvent.setup();
       render(<DashboardShell {...carProps()} />);
 
-      for (const groupLabel of ["Selling", "Buying Tools"]) {
-        // Selling also has its own mobile-bottom-bar icon (always
-        // mounted, just CSS-hidden by media query) - the sidebar's own
-        // copy is the first match.
-        const header = screen.getAllByRole("button", { name: new RegExp(groupLabel) })[0];
-        expect(header).toBeInTheDocument();
-        await user.click(header);
-        expect(screen.getAllByText("Not available for cars yet.").length).toBeGreaterThan(0);
-        await user.click(header); // collapse again before checking the next group
-      }
+      // Selling also has its own mobile-bottom-bar icon (always
+      // mounted, just CSS-hidden by media query) - the sidebar's own
+      // copy is the first match.
+      const header = screen.getAllByRole("button", { name: /Selling/ })[0];
+      expect(header).toBeInTheDocument();
+      await user.click(header);
+      expect(screen.getAllByText("Not available for cars yet.").length).toBeGreaterThan(0);
     });
 
     it("labels the switcher card 'My car' and hides the DVLA-refresh button (no car route for it yet)", () => {
