@@ -103,17 +103,20 @@ const NAV_GROUPS: NavGroupDef[] = [
 
 // Story/Shareable Links/Transfer ownership depend on BikeDoc fields
 // CarDoc deliberately doesn't have yet (shareToken, storyCache, transfer
-// semantics - see the ADR's "explicitly out of scope" list). Reports and
-// the three embedded tools (Quote Checker/Cost Calculator/Buying Guide)
-// depend on motorcycle price-benchmark data that has no car equivalent
-// yet either (Phase 7's price research hasn't happened - see the ADR).
-// All seven hidden rather than shown broken/empty/wrong while a car is
-// the active vehicle - their groups (Insights/Selling/Buying Tools)
-// still render for a car-active session, just empty (see
+// semantics - see the ADR's "explicitly out of scope" list). The three
+// embedded tools (Quote Checker/Cost Calculator/Buying Guide) have real,
+// working standalone car versions at /cars/quote-checker etc (Phase 7's
+// price research landed), they're just not wired into these dashboard
+// tabs yet - a smaller remaining task than the other four, which have no
+// car equivalent anywhere. Reports came off this list once its own car
+// equivalent was built (see reportsContent in dashboard/page.tsx's
+// renderCarDashboard). All hidden rather than shown broken/empty/wrong
+// while a car is the active vehicle - their groups (Insights/Selling/
+// Buying Tools) still render for a car-active session, just empty (see
 // sidebarNavEmptyGroupNote below), rather than disappearing entirely.
 // Additive later: once each has a real car equivalent, it just comes
 // off this list.
-const CAR_UNAVAILABLE_SECTIONS: Section[] = ['story', 'shareLinks', 'transferOwnership', 'reports', 'quoteChecker', 'costCalculator', 'buyingGuide'];
+const CAR_UNAVAILABLE_SECTIONS: Section[] = ['story', 'shareLinks', 'transferOwnership', 'quoteChecker', 'costCalculator', 'buyingGuide'];
 function availableFor(vehicleKind: 'bike' | 'car', items: NavItemDef[]) {
   return vehicleKind === 'bike' ? items : items.filter((item) => !CAR_UNAVAILABLE_SECTIONS.includes(item.key));
 }

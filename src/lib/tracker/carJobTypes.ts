@@ -34,6 +34,22 @@ export const CAR_JOB_LABELS: Record<string, string> = {
   "other": "Other",
 };
 
+// The car equivalent of jobTypes.ts's JOB_GROUPS - every CAR_JOB_LABELS
+// key appears in exactly one group here, same invariant the motorcycle
+// list keeps.
+export const CAR_JOB_GROUPS: { group: string; jobs: string[] }[] = [
+  { group: "Servicing", jobs: ["oil-filter", "interim-service", "full-service"] },
+  { group: "Engine & ignition", jobs: ["spark-plugs", "air-filter", "cabin-filter"] },
+  { group: "Fluids", jobs: ["coolant-flush", "brake-fluid-flush", "gearbox-oil"] },
+  { group: "Brakes", jobs: ["brake-pads-front", "brake-pads-rear", "brake-discs"] },
+  { group: "Tyres", jobs: ["tyres-full-set", "tyres-front-pair", "tyres-rear-pair", "tyres-single", "wheel-alignment"] },
+  { group: "Drivetrain", jobs: ["cambelt", "timing-chain", "clutch"] },
+  { group: "Electrical & climate", jobs: ["battery-12v", "battery-hv", "aircon-regas"] },
+  { group: "Emissions", jobs: ["dpf-clean"] },
+  { group: "Bodywork & glass", jobs: ["mot-advisory", "bodywork", "windscreen"] },
+  { group: "Other", jobs: ["other"] },
+];
+
 export const CAR_JOB_REMINDER_DEFAULTS: Record<string, { type: "mileage" | "months"; value: number; note?: string }> = {
   "oil-filter": { type: "mileage", value: 10000 },
   "interim-service": { type: "mileage", value: 6000 },

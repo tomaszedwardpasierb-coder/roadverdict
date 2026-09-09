@@ -345,17 +345,15 @@ describe("DashboardShell", () => {
       });
     }
 
-    // All 7 of CAR_UNAVAILABLE_SECTIONS (DashboardShell.tsx) - not just the
-    // original 3. Reports/Quote Checker/Cost calculator/Buying guide were
-    // added to that list alongside Story/Shareable Links/Transfer ownership
-    // later (Phase 5's second slice) without this test being updated to
-    // match, which would have let a regression re-show any of the four ship
-    // silently for a car-active session.
+    // All 6 of CAR_UNAVAILABLE_SECTIONS (DashboardShell.tsx). Reports came
+    // off this list once its own car equivalent was built (see
+    // reportsContent in dashboard/page.tsx's renderCarDashboard) - kept
+    // listed here as a comment, not silently dropped, so a future reader
+    // can see it was deliberately removed rather than forgotten.
     const CAR_UNAVAILABLE_LABELS = [
       "The Story So Far",
       "Shareable Links",
       "Transfer ownership",
-      "Reports",
       "Quote Checker",
       "Cost calculator",
       "Buying a used bike",
@@ -368,6 +366,21 @@ describe("DashboardShell", () => {
       }
       // Every other tab is still present.
       expect(screen.getAllByRole("button", { name: "Fuel" }).length).toBeGreaterThan(0);
+    });
+
+    // Reports has a real car equivalent now (unlike Story, its sibling in
+    // the Insights group) - it must actually render as a clickable nav
+    // item for a car-active session, not just be absent from the
+    // unavailable-labels list above.
+    it("still shows Reports as a real, clickable nav item for a car-active session", async () => {
+      const user = userEvent.setup();
+      render(<DashboardShell {...carProps()} />);
+      const insightsHeader = screen.getAllByRole("button", { name: /Insights/ })[0];
+      await user.click(insightsHeader);
+
+      expect(screen.getByRole("button", { name: "Reports" })).toBeInTheDocument();
+      await user.click(screen.getByRole("button", { name: "Reports" }));
+      expect(screen.getByText("Reports content")).toBeInTheDocument();
     });
 
     it("hides every CAR_UNAVAILABLE_SECTIONS label from the mobile More sheet", async () => {
@@ -386,15 +399,19 @@ describe("DashboardShell", () => {
     // The user explicitly wants the group STRUCTURE to exist for cars too,
     // even where every item inside a group is currently unavailable -
     // rather than the group disappearing entirely, expanding it should
-    // show a short "not available yet" note.
-    it("still shows the Insights/Selling/Buying Tools group headers for a car, and expanding each reveals the empty-state note instead of any items", async () => {
+    // show a short "not available yet" note. Insights is deliberately
+    // excluded here now: Reports has a real car equivalent, so that
+    // group is no longer empty for a car-active session (see the
+    // "still shows Reports" test above) - only Selling and Buying Tools
+    // remain fully empty.
+    it("still shows the Selling/Buying Tools group headers for a car, and expanding each reveals the empty-state note instead of any items", async () => {
       const user = userEvent.setup();
       render(<DashboardShell {...carProps()} />);
 
-      for (const groupLabel of ["Insights", "Selling", "Buying Tools"]) {
-        // Insights/Selling also have their own mobile-bottom-bar icon
-        // (always mounted, just CSS-hidden by media query) - the
-        // sidebar's own copy is the first match.
+      for (const groupLabel of ["Selling", "Buying Tools"]) {
+        // Selling also has its own mobile-bottom-bar icon (always
+        // mounted, just CSS-hidden by media query) - the sidebar's own
+        // copy is the first match.
         const header = screen.getAllByRole("button", { name: new RegExp(groupLabel) })[0];
         expect(header).toBeInTheDocument();
         await user.click(header);

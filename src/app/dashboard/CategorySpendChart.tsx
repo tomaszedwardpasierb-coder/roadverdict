@@ -34,6 +34,7 @@ export function CategorySpendChart({
   distanceUnit,
   supportsMileageView = true,
   initialChartType,
+  vehicleKind = 'bike',
 }: {
   chartId: string;
   title: string;
@@ -51,10 +52,11 @@ export function CategorySpendChart({
   // note explaining why, rather than silently ignoring the setting.
   supportsMileageView?: boolean;
   initialChartType?: 'bar' | 'line';
+  vehicleKind?: 'bike' | 'car';
 }) {
   const { switchTo, setHighlightIds } = useTabSwitch();
   const { range, viewBy } = useChartFilter();
-  const { kind, changeKind } = useChartTypePreference(chartId, initialChartType ?? 'bar');
+  const { kind, changeKind } = useChartTypePreference(chartId, initialChartType ?? 'bar', vehicleKind);
   const symbol = CURRENCY_SYMBOLS[currency];
   const usingMileageView = supportsMileageView && viewBy === 'mileage';
 

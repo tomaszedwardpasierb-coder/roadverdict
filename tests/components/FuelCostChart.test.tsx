@@ -99,6 +99,18 @@ describe("FuelCostChart", () => {
     );
   });
 
+  // Without this, a car-active session toggling this chart would
+  // silently overwrite the BIKE's own stored chart-type preference
+  // instead of the car's - same bug class MileageChart/SpendDonutChart
+  // were already fixed for.
+  it("PATCHes /api/cars/car instead of /api/tracker/bike when vehicleKind is 'car'", async () => {
+    const user = userEvent.setup();
+    render(<FuelCostChart points={points} currency="GBP" rates={null} distanceUnit="mi" vehicleKind="car" />);
+    await user.click(screen.getByRole("button", { name: "Bar" }));
+
+    expect(fetch).toHaveBeenCalledWith("/api/cars/car", expect.objectContaining({ method: "PATCH" }));
+  });
+
   it("clicking a point switches to the fuel tab and highlights that exact record's id, via TabSwitchContext", () => {
     const onSwitchTab = vi.fn();
     render(

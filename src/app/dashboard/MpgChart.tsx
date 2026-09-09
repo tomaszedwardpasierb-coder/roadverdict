@@ -65,6 +65,7 @@ export function MpgChart({
   currency,
   rates,
   excludedFuelEntries,
+  vehicleKind = 'bike',
 }: {
   series: MpgSegment[];
   fuelEconomyUnit: FuelEconomyUnit;
@@ -73,10 +74,11 @@ export function MpgChart({
   currency: Currency;
   rates: ExchangeRates | null;
   excludedFuelEntries: { date: string; cost: number }[];
+  vehicleKind?: 'bike' | 'car';
 }) {
   const { switchTo, setHighlightIds } = useTabSwitch();
   const { range, viewBy } = useChartFilter();
-  const { kind, changeKind } = useChartTypePreference(CHART_ID, initialChartType ?? 'line');
+  const { kind, changeKind } = useChartTypePreference(CHART_ID, initialChartType ?? 'line', vehicleKind);
   const dateFiltered = filterByDateRange(series, range);
   const missedFillUpCount = dateFiltered.filter((s) => s.likelyMissedFillUps && s.exclusionReason !== 'marked-anomaly').length;
   const markedAnomalyCount = dateFiltered.filter((s) => s.exclusionReason === 'marked-anomaly').length;

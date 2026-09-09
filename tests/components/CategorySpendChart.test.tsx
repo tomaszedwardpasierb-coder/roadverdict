@@ -118,6 +118,30 @@ describe("CategorySpendChart", () => {
     );
   });
 
+  // Without this, a car-active session toggling this chart would
+  // silently overwrite the BIKE's own stored chart-type preference
+  // instead of the car's - same bug class MileageChart/SpendDonutChart
+  // were already fixed for.
+  it("PATCHes /api/cars/car instead of /api/tracker/bike when vehicleKind is 'car'", async () => {
+    const user = userEvent.setup();
+    render(
+      <CategorySpendChart
+        chartId="svc"
+        title="Service spend"
+        items={monthlyItems}
+        category="service"
+        color="#123456"
+        currency="GBP"
+        rates={null}
+        distanceUnit="mi"
+        vehicleKind="car"
+      />
+    );
+    await user.click(screen.getByRole("button", { name: "Line" }));
+
+    expect(fetch).toHaveBeenCalledWith("/api/cars/car", expect.objectContaining({ method: "PATCH" }));
+  });
+
   it("clicking a bucket switches tabs and highlights every real record id in it", () => {
     const onSwitchTab = vi.fn();
     render(

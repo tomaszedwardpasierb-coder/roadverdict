@@ -87,6 +87,23 @@ describe("MpgChart", () => {
     expect(props.data.datasets[0].data).toEqual([55]);
   });
 
+  // Without this, a car-active session toggling this chart would
+  // silently overwrite the BIKE's own stored chart-type preference
+  // instead of the car's - same bug class MileageChart/SpendDonutChart
+  // were already fixed for.
+  it("PATCHes /api/cars/car instead of /api/tracker/bike when vehicleKind is 'car'", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true, json: async () => ({}) }));
+    const series = [seg({ mpg: 55 })];
+    const user = userEvent.setup();
+    render(
+      <MpgChart series={series} fuelEconomyUnit="mpg" distanceUnit="mi" currency="GBP" rates={noRates} excludedFuelEntries={[]} vehicleKind="car" />
+    );
+    await user.click(screen.getByRole("button", { name: "Bar" }));
+
+    expect(fetch).toHaveBeenCalledWith("/api/cars/car", expect.objectContaining({ method: "PATCH" }));
+    vi.unstubAllGlobals();
+  });
+
   it("converts values to L/100km when that's the selected fuel economy unit", () => {
     const series = [seg({ mpg: 40 })];
     render(

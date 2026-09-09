@@ -97,6 +97,13 @@ import { computeCarReminderStatus } from "@/lib/tracker/carReminderStatus";
 import { computeCarSpendSummary, computeCarYearSpend, gatherCarMileagePoints } from "@/lib/tracker/carSummary";
 import { CAR_JOB_LABELS } from "@/lib/tracker/carJobTypes";
 import { CAR_BILL_LABELS } from "@/lib/tracker/carBillTypes";
+// Aliased, not re-imported under its own name - fuelLog.ts (bike-only)
+// already imports the same function from mpgCalc.ts above for the bike
+// path; this is a second, separate import of the same neutral function
+// for the car path, kept under its own name so neither path visibly
+// crosses into the other's file, matching the sister-schema convention
+// everywhere else in this file.
+import { computeMPGSeries as computeCarMpgSeries } from "@/lib/tracker/mpgCalc";
 import { AddCarForm } from "./AddCarForm";
 import { LogCarServiceForm } from "./LogCarServiceForm";
 import { LogCarFuelForm } from "./LogCarFuelForm";
@@ -109,6 +116,7 @@ import { CarModCard } from "./CarModCard";
 import { CarBillCard } from "./CarBillCard";
 import { CarLabourCard } from "./CarLabourCard";
 import { CarReminderItem } from "./CarReminderItem";
+import { CarCustomFilterPanel } from "./CarCustomFilterPanel";
 
 export const dynamic = "force-dynamic";
 
@@ -966,6 +974,20 @@ async function renderCarDashboard(
     .filter((f): f is typeof f & { litres: number } => f.litres != null)
     .map((f) => ({ id: f.id, mileage: f.mileage, litres: f.litres, filledToFull: f.filledToFull ?? false, date: f.date, cost: f.cost }));
 
+  // Same electric-filtering reasoning as mpgFuelLogs above, plus the two
+  // extra fields (mileageConfidence/mileageAnomaly) computeCarMpgSeries
+  // actually needs that the DashboardStatCards-only shape above doesn't.
+  const mpgSeries = computeCarMpgSeries(
+    fuelLogs
+      .filter((f): f is typeof f & { litres: number } => f.litres != null)
+      .map((f) => ({
+        id: f.id, mileage: f.mileage, litres: f.litres, filledToFull: f.filledToFull ?? false, date: f.date,
+        mileageConfidence: f.mileageConfidence, mileageAnomaly: f.mileageAnomaly,
+      })),
+    car.dvlaData?.officialCombinedMpg
+  );
+  const fuelCostPoints = fuelLogs.map((f) => ({ id: f.id, date: f.date, cost: f.cost, mileage: f.mileage }));
+
   const recentActivity: RecentActivityItem[] = [
     ...records.map((r) => ({
       id: r.id, reviewCategory: "service" as const, date: r.date, icon: "🔧", type: "Service",
@@ -1092,10 +1114,98 @@ async function renderCarDashboard(
       </div>
 
       <p className={styles.subtext} style={{ marginTop: "1rem" }}>
-        Reports and the Quote Checker/Cost Calculator/Buying Guide tools aren&apos;t available for cars yet - they need real UK car price
-        data to be worth showing, and that research hasn&apos;t happened yet.
+        The Quote Checker/Cost Calculator/Buying Guide tools aren&apos;t available from here yet - see the standalone
+        versions at /cars/quote-checker, /cars/cost-calculator, and /cars/buying-guide in the meantime.
       </p>
     </ChartFilterProvider>
+  );
+
+  const carReportsContent = (
+    <ProGate featureName="Reports" description="Every chart in one place - fuel economy, running costs, and category spend trends over the life of your car." isPro={userIsPro}>
+    <ChartFilterProvider>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "0.75rem" }}>
+        <h1 className={styles.heading}>Reports{carTag}</h1>
+        {mileagePill}
+      </div>
+      <p className={styles.subtext}>Every chart in one place - see where the money&apos;s really going, and whether your car&apos;s getting thirstier with age.</p>
+      <p className={styles.subtext} style={{ marginBottom: "1rem" }}>Every chart in one place.</p>
+      <ChartFilterBar />
+      <div className={styles.reportsGrid}>
+        <div className={styles.chartCard}>
+          {mpgSeries.length > 0 ? (
+            <MpgChart
+              series={mpgSeries}
+              fuelEconomyUnit={fuelEconomyUnit}
+              distanceUnit={distanceUnit}
+              initialChartType={car.chartTypes?.["mpg"] === "bar" ? "bar" : "line"}
+              currency={currency}
+              rates={rates}
+              excludedFuelEntries={fuelLogs
+                .filter((f) => f.mileageConfidence === "estimated" || f.mileageConfidence === "interpolated")
+                .map((f) => ({ date: f.date, cost: f.cost }))}
+              vehicleKind="car"
+            />
+          ) : (
+            <>
+              <div className={styles.chartCardTitle}>{fuelEconomyUnit === "l100km" ? "Fuel economy" : "MPG"} over time</div>
+              <p className={styles.emptyNote}>Log two consecutive full-tank fill-ups to see this.</p>
+            </>
+          )}
+        </div>
+        <div className={styles.chartCard}>
+          {fuelCostPoints.length > 0 ? (
+            <FuelCostChart points={fuelCostPoints} currency={currency} rates={rates} distanceUnit={distanceUnit} initialChartType={car.chartTypes?.["fuel-cost"] === "bar" ? "bar" : "line"} vehicleKind="car" />
+          ) : (
+            <>
+              <div className={styles.chartCardTitle}>Fuel cost over time</div>
+              <p className={styles.emptyNote}>Log a fuel fill-up to see cost trends here.</p>
+            </>
+          )}
+        </div>
+        <div className={styles.chartCard}>
+          {records.length > 0 ? (
+            <CategorySpendChart chartId="servicing-spend" title="Servicing spend over time" items={records} category="service" color="#1C1D20" currency={currency} rates={rates} distanceUnit={distanceUnit} initialChartType={car.chartTypes?.["servicing-spend"] === "line" ? "line" : "bar"} vehicleKind="car" />
+          ) : (
+            <>
+              <div className={styles.chartCardTitle}>Servicing spend over time</div>
+              <p className={styles.emptyNote}>No servicing logged yet.</p>
+            </>
+          )}
+        </div>
+        <div className={styles.chartCard}>
+          {mods.length > 0 ? (
+            <CategorySpendChart chartId="mods-spend" title="Parts & Accessories spend over time" items={mods} category="mods" color="#EE9A2E" currency={currency} rates={rates} distanceUnit={distanceUnit} initialChartType={car.chartTypes?.["mods-spend"] === "line" ? "line" : "bar"} vehicleKind="car" />
+          ) : (
+            <>
+              <div className={styles.chartCardTitle}>Parts & Accessories spend over time</div>
+              <p className={styles.emptyNote}>No modifications logged yet.</p>
+            </>
+          )}
+        </div>
+        <div className={styles.chartCard}>
+          {bills.length > 0 ? (
+            <CategorySpendChart chartId="bills-spend" title="Insurance, tax, MOT & finance spend over time" items={bills} category="bills" color="#8A867D" currency={currency} rates={rates} distanceUnit={distanceUnit} supportsMileageView={false} initialChartType={car.chartTypes?.["bills-spend"] === "line" ? "line" : "bar"} vehicleKind="car" />
+          ) : (
+            <>
+              <div className={styles.chartCardTitle}>Insurance, tax, MOT & finance spend over time</div>
+              <p className={styles.emptyNote}>No insurance, tax, or MOT payments logged yet.</p>
+            </>
+          )}
+        </div>
+        <div className={styles.chartCard}>
+          {labour.length > 0 ? (
+            <CategorySpendChart chartId="labour-spend" title="Labour spend over time" items={labour} category="labour" color="#3E6B99" currency={currency} rates={rates} distanceUnit={distanceUnit} initialChartType={car.chartTypes?.["labour-spend"] === "line" ? "line" : "bar"} vehicleKind="car" />
+          ) : (
+            <>
+              <div className={styles.chartCardTitle}>Labour spend over time</div>
+              <p className={styles.emptyNote}>No labour logged yet.</p>
+            </>
+          )}
+        </div>
+        <CarCustomFilterPanel records={records} mods={mods} bills={bills} fuelLogs={mpgFuelLogs} currency={currency} rates={rates} fuelEconomyUnit={fuelEconomyUnit} />
+      </div>
+    </ChartFilterProvider>
+    </ProGate>
   );
 
   const serviceContent = (
@@ -1254,6 +1364,7 @@ async function renderCarDashboard(
       labourContent={labourContent}
       billsContent={billsContent}
       remindersContent={remindersContent}
+      reportsContent={carReportsContent}
       privacyContent={privacyContent}
       securityContent={securityContent}
       storyReady={false}

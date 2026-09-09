@@ -35,16 +35,18 @@ export function FuelCostChart({
   rates,
   distanceUnit,
   initialChartType,
+  vehicleKind = 'bike',
 }: {
   points: FuelPoint[];
   currency: Currency;
   rates: ExchangeRates | null;
   distanceUnit: DistanceUnit;
   initialChartType?: 'line' | 'bar';
+  vehicleKind?: 'bike' | 'car';
 }) {
   const { switchTo, setHighlightIds } = useTabSwitch();
   const { range, viewBy } = useChartFilter();
-  const { kind, changeKind } = useChartTypePreference(CHART_ID, initialChartType ?? 'line');
+  const { kind, changeKind } = useChartTypePreference(CHART_ID, initialChartType ?? 'line', vehicleKind);
   const dateFiltered = filterByDateRange(points, range);
   const filtered =
     viewBy === 'mileage'
