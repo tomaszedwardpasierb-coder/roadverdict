@@ -79,7 +79,9 @@ import { getProStatus } from "@/lib/subscriptions";
 import { ProGate } from "./ProGate";
 import { PlanComparisonCards } from "@/components/PlanComparisonCards";
 import { isTwoFactorEnabled } from "@/lib/auth/twoFactor";
-import { TwoFactorSettings } from "./TwoFactorSettings";
+import { SettingsTab } from "./SettingsTab";
+import { getUserDoc } from "@/lib/tracker/userDoc";
+import { getPendingDeletionInfo } from "@/lib/tracker/userAccount";
 
 // --- Car support (see RoadVerdict_Car_Plan_v3.md's ADR) ---
 import { resolveActiveVehicle } from "@/lib/tracker/activeVehicle";
@@ -115,6 +117,12 @@ export default async function DashboardPage(props: { searchParams: Promise<{ add
   const session = await getSession();
   if (!session) redirect("/login");
 
+  // Account-level, not bike/car-specific - fetched once here so it's
+  // available before the car/bike branch decision below, and passed
+  // into renderCarDashboard rather than re-fetched there.
+  const userAccount = await getUserDoc(session.email);
+  const pendingDeletion = getPendingDeletionInfo(userAccount);
+
   // Resolves which vehicle KIND is active (see activeVehicle.ts) -
   // checked before any bike-specific fetch below, so a car-active
   // session branches off entirely rather than falling through into
@@ -147,7 +155,7 @@ export default async function DashboardPage(props: { searchParams: Promise<{ add
   }
 
   if (activeVehicle?.kind === "car") {
-    return renderCarDashboard(session.email, activeVehicle.car, existingCars, activeVehicle.hasAnyBike);
+    return renderCarDashboard(session.email, activeVehicle.car, existingCars, activeVehicle.hasAnyBike, userAccount, pendingDeletion);
   }
 
   const bikes = await getBikesForUser(session.email);
@@ -820,11 +828,13 @@ export default async function DashboardPage(props: { searchParams: Promise<{ add
   // specific bike.
   const twoFactorEnabled = await isTwoFactorEnabled(session.email);
   const securityContent = (
-    <>
-      <h1 className={styles.heading}>Security</h1>
-      <p className={styles.subtext}>Manage how you sign in to your account.</p>
-      <TwoFactorSettings initiallyEnabled={twoFactorEnabled} />
-    </>
+    <SettingsTab
+      email={session.email}
+      displayName={userAccount?.displayName ?? ""}
+      hasAvatar={!!userAccount?.avatarBlobName}
+      initiallyEnabled={twoFactorEnabled}
+      pendingDeletion={pendingDeletion}
+    />
   );
 
   return (
@@ -835,6 +845,9 @@ export default async function DashboardPage(props: { searchParams: Promise<{ add
       currentMileage={bike.currentMileage}
       distanceUnit={distanceUnit}
       userEmail={session.email}
+      displayName={userAccount?.displayName}
+      hasAvatar={!!userAccount?.avatarBlobName}
+      pendingDeletion={pendingDeletion}
       isPro={userIsPro}
       proDaysRemaining={proStatus.daysRemaining}
       vehicles={switcherVehicles}
@@ -872,7 +885,14 @@ export default async function DashboardPage(props: { searchParams: Promise<{ add
 // Calculator/Buying Guide content is assembled at all (DashboardShell's
 // own CAR_UNAVAILABLE_SECTIONS hides their nav entries, so nothing here
 // needs to produce placeholder JSX for them).
-async function renderCarDashboard(email: string, car: CarDoc, allCars: CarDoc[], hasAnyBike: boolean) {
+async function renderCarDashboard(
+  email: string,
+  car: CarDoc,
+  allCars: CarDoc[],
+  hasAnyBike: boolean,
+  userAccount: Awaited<ReturnType<typeof getUserDoc>>,
+  pendingDeletion: ReturnType<typeof getPendingDeletionInfo>
+) {
   const [bikes, proStatus, twoFactorEnabled] = await Promise.all([
     hasAnyBike ? getBikesForUser(email) : Promise.resolve([]),
     getProStatus(email),
@@ -1161,11 +1181,13 @@ async function renderCarDashboard(email: string, car: CarDoc, allCars: CarDoc[],
 
   const privacyContent = <PrivacyContent />;
   const securityContent = (
-    <>
-      <h1 className={styles.heading}>Security</h1>
-      <p className={styles.subtext}>Manage how you sign in to your account.</p>
-      <TwoFactorSettings initiallyEnabled={twoFactorEnabled} />
-    </>
+    <SettingsTab
+      email={email}
+      displayName={userAccount?.displayName ?? ""}
+      hasAvatar={!!userAccount?.avatarBlobName}
+      initiallyEnabled={twoFactorEnabled}
+      pendingDeletion={pendingDeletion}
+    />
   );
 
   const switcherVehicles = [
@@ -1189,6 +1211,9 @@ async function renderCarDashboard(email: string, car: CarDoc, allCars: CarDoc[],
       currentMileage={car.currentMileage}
       distanceUnit={distanceUnit}
       userEmail={email}
+      displayName={userAccount?.displayName}
+      hasAvatar={!!userAccount?.avatarBlobName}
+      pendingDeletion={pendingDeletion}
       isPro={userIsPro}
       proDaysRemaining={proStatus.daysRemaining}
       vehicles={switcherVehicles}

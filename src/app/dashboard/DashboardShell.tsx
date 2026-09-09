@@ -3,6 +3,7 @@
 
 import { useEffect, useState, type ReactNode } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { UpdateMileageButton } from './UpdateMileageButton';
 import { RefreshVehicleDataButton } from './RefreshVehicleDataButton';
 import { VehicleSwitcher, type SwitcherVehicle } from './VehicleSwitcher';
@@ -50,7 +51,12 @@ interface NavGroupDef {
 const STANDALONE_ITEMS: NavItemDef[] = [
   { key: 'dashboard', label: 'Dashboard', icon: 'dashboard' },
   { key: 'reminders', label: 'Reminders', icon: 'reminders' },
-  { key: 'security', label: 'Security', icon: 'security' },
+  // Label is "Settings" (profile, security, delete account, feedback -
+  // see SettingsTab.tsx) - the key stays 'security' on purpose, that's
+  // what DASHBOARD_TAB_LABELS/TAB_GROUP_LABELS in assistant/route.ts and
+  // every existing test already reference; renaming the key itself
+  // would ripple through all of those for a purely cosmetic label change.
+  { key: 'security', label: 'Settings', icon: 'security' },
 ];
 
 // Groups the flat 15-item sidebar used to be, into what the tabs actually
@@ -119,6 +125,14 @@ interface Props {
   currentMileage: number;
   distanceUnit: DistanceUnit;
   userEmail: string;
+  // Both optional - unset falls back to the existing email-initials
+  // avatar and plain email display, exactly as before this existed.
+  displayName?: string;
+  hasAvatar?: boolean;
+  // Set only while a self-serve deletion request is pending - drives
+  // the red countdown banner above the tab content, regardless of
+  // which tab is active.
+  pendingDeletion?: { daysRemaining: number } | null;
   isPro: boolean;
   // Null whenever isPro is false - only ever shown alongside the
   // Premium badge itself, never on its own.
@@ -173,6 +187,9 @@ export function DashboardShell({
   currentMileage,
   distanceUnit,
   userEmail,
+  displayName,
+  hasAvatar = false,
+  pendingDeletion = null,
   isPro,
   proDaysRemaining = null,
   vehicles,
@@ -198,7 +215,9 @@ export function DashboardShell({
   storyReady,
   hasIncomingRequest,
 }: Props) {
+  const router = useRouter();
   const [active, setActive] = useState<Section>('dashboard');
+  const [cancellingDeletion, setCancellingDeletion] = useState(false);
   // Mobile only: which bottom-bar "shelf" is currently open - either a
   // bottom-bar group's own key (its shelf shows just that group's items)
   // or 'more' (the catch-all sheet: Buying Tools, Reminders, Security,
@@ -224,6 +243,16 @@ export function DashboardShell({
       else next.add(groupKey);
       return next;
     });
+  }
+
+  async function handleCancelDeletion() {
+    setCancellingDeletion(true);
+    try {
+      await fetch('/api/account/cancel-deletion', { method: 'POST' });
+      router.refresh();
+    } finally {
+      setCancellingDeletion(false);
+    }
   }
 
   function itemHasPending(item: NavItemDef): boolean {
@@ -370,8 +399,13 @@ export function DashboardShell({
           )}
 
           <div className={styles.sidebarUserFooter}>
-            <div className={styles.sidebarUserAvatar}>{userEmail.slice(0, 2).toUpperCase()}</div>
-            <div className={styles.sidebarUserEmail}>{userEmail}</div>
+            {hasAvatar ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src="/api/account/avatar" alt="Your avatar" width={32} height={32} style={{ borderRadius: '50%', objectFit: 'cover', width: '32px', height: '32px' }} />
+            ) : (
+              <div className={styles.sidebarUserAvatar}>{(displayName || userEmail).slice(0, 2).toUpperCase()}</div>
+            )}
+            <div className={styles.sidebarUserEmail}>{displayName || userEmail}</div>
             {isPro && (
               <span className={styles.proGateBadge} style={{ marginLeft: '0.4rem' }}>
                 Premium
@@ -417,6 +451,20 @@ export function DashboardShell({
         </div>
 
         <div className={styles.content}>
+          {pendingDeletion && (
+            <div className={styles.budgetWarningBanner} style={{ marginBottom: '1.3rem' }}>
+              ⚠ <strong>Pending deletion</strong> - your account will be permanently deleted in{' '}
+              {pendingDeletion.daysRemaining} day{pendingDeletion.daysRemaining === 1 ? '' : 's'}.{' '}
+              <button
+                type="button"
+                onClick={handleCancelDeletion}
+                disabled={cancellingDeletion}
+                style={{ background: 'none', border: 'none', padding: 0, textDecoration: 'underline', cursor: 'pointer', color: 'inherit', fontWeight: 600 }}
+              >
+                {cancellingDeletion ? 'Cancelling…' : 'Cancel deletion'}
+              </button>
+            </div>
+          )}
           {contentMap[active]}
           {/* Every tab renders through this one container, so adding it
               here once - rather than into all 13 tab-content blocks in

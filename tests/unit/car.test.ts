@@ -454,21 +454,37 @@ describe("deleteCar", () => {
     });
   }
 
-  it("queries and deletes every matching record across all four car record types", async () => {
+  it("queries and deletes every matching record across all six car record types", async () => {
     mocks.read.mockResolvedValue({ resource: makeCar() });
     mockRecordsByType({
       carServiceRecord: [{ id: "sr-1" }],
       carFuelLog: [{ id: "fl-1" }, { id: "fl-2" }],
       carMod: [],
       carBill: [{ id: "bl-1" }],
+      carLabour: [{ id: "lb-1" }],
+      carReminder: [],
     });
 
     await deleteCar("owner@example.com", "car-1");
 
     const queriedTypes = mockContainer.items.query.mock.calls.map((call: any) => call[0].parameters.find((p: any) => p.name === "@type").value);
-    expect(queriedTypes.sort()).toEqual(["carBill", "carFuelLog", "carMod", "carServiceRecord"].sort());
-    // 4 real records deleted, plus the car document itself = 5 deletes.
-    expect(mocks.deleteFn).toHaveBeenCalledTimes(5);
+    expect(queriedTypes.sort()).toEqual(["carBill", "carFuelLog", "carLabour", "carMod", "carReminder", "carServiceRecord"].sort());
+    // 5 real records deleted, plus the car document itself = 6 deletes.
+    expect(mocks.deleteFn).toHaveBeenCalledTimes(6);
+  });
+
+  // Regression test: carLabour and carReminder existed as real,
+  // separate Cosmos doc types but were never in deleteCar's own
+  // record-type list, meaning deleting a car left both behind forever.
+  it("cleans up carLabour and carReminder specifically, not just the original four types", async () => {
+    mocks.read.mockResolvedValue({ resource: makeCar() });
+    mockRecordsByType({ carLabour: [{ id: "lb-1" }], carReminder: [{ id: "rm-1" }] });
+
+    await deleteCar("owner@example.com", "car-1");
+
+    const queriedTypes = mockContainer.items.query.mock.calls.map((call: any) => call[0].parameters.find((p: any) => p.name === "@type").value);
+    expect(queriedTypes).toContain("carLabour");
+    expect(queriedTypes).toContain("carReminder");
   });
 
   it("scopes every record-type query by carId, not just type", async () => {

@@ -193,8 +193,8 @@ standalone items that don't belong to any group:
 - **Buying Tools** - Quote Checker, Cost Calculator, and Buying a used bike. These don't need
   your own bike logged at all - they're useful even before you own one, or for sizing up a bike
   you're thinking of buying.
-- **Standalone**, not inside any group - Dashboard (the overview), Reminders, Security, and
-  Privacy.
+- **Standalone**, not inside any group - Dashboard (the overview), Reminders, Settings (profile,
+  security/2FA, deleting your account, and feedback - see 6.21a), and Privacy.
 **Why:** With well over a dozen tabs, a flat list got cluttered fast, especially on mobile.
 Grouping by how often and why someone reaches for a tab - log something today, versus check the
 bigger picture, versus only-when-selling, versus tools useful before you even own the bike -
@@ -203,7 +203,7 @@ keeps the handful almost everyone uses front and center, without hiding the rest
 to expand or collapse it; Logbook starts expanded, the other three start collapsed. On mobile,
 Logbook/Insights/Selling each get their own icon in the bottom bar (tapping one opens a small
 list of just that group's tabs); Buying Tools lives inside the "More" (⋯) button along with
-Reminders, Security, and Privacy.
+Reminders, Settings, and Privacy.
 **Status:** Live.
 
 ### 6.1 Adding your bike
@@ -491,6 +491,9 @@ simply lapses, and the same request would need to be made again.
 ---
 
 ### 6.21 Two-factor authentication (2FA)
+**Where this lives:** the Settings tab (see 6.0) - a standalone item, alongside Profile, Delete
+account, and Feedback (6.21a-6.21c below). This entry covers 2FA specifically; the others cover
+the rest of that same tab.
 **What:** An extra step when signing in - after clicking your usual sign-in email link, you also
 enter a 6-digit code from an authenticator app (or one of your backup codes) before you're let
 in.
@@ -498,7 +501,7 @@ in.
 ever got into that inbox, they could sign in as you too. Turning this on means your email alone
 stops being enough.
 **Status:** Live. Available on every account, free or Premium - this is never a paid feature.
-**How to turn it on:** Security tab - a standalone item, not inside any group, on both desktop
+**How to turn it on:** Settings tab - a standalone item, not inside any group, on both desktop
 (sidebar) and mobile (inside the "More" ⋯ sheet) → "Set up two-factor authentication." A QR code
 appears - scan it with an authenticator app (Google
 Authenticator, Microsoft Authenticator, Authy, or a password manager like 1Password or Bitwarden
@@ -509,11 +512,42 @@ shows to confirm it worked, then save the 8 backup codes shown - each works once
 back in if you ever lose your phone. They're shown exactly once.
 **From then on:** after clicking your sign-in email link, an "enter your code" screen appears
 before you're signed in.
-**Turning it off:** same Security tab → "Turn off" → enter your current code, or one of your
+**Turning it off:** same Settings tab → "Turn off" → enter your current code, or one of your
 backup codes, to confirm.
 **What the assistant can't do here:** this can only be explained, never carried out on the
 user's behalf - turning 2FA on or off always needs the person's own click and their own code, the
 same way it can't sign anyone in or out either.
+
+### 6.21a Profile - name and avatar
+**What:** Set a display name and upload a profile photo.
+**Why:** The name is what this assistant addresses you by - "USER'S NAME" in a signed-in
+conversation, when one's set - rather than always speaking generically. The photo just
+personalises the sidebar; it isn't shown to anyone else.
+**How:** Settings tab → Profile section → type a name and/or upload a photo, then save. Either
+one can be set independently of the other, and both are optional - leaving the name blank means
+the assistant just doesn't use one.
+**Status:** Live.
+
+### 6.21b Deleting your account
+**What:** Permanently delete your account and everything logged on it.
+**Why:** A genuine, self-serve way to leave, with a real safeguard against an accidental or
+impulsive click - not something that only support could previously do for you.
+**How:** Settings tab → Delete account → type "DELETE" to confirm. This starts a 30-day grace
+period, not an immediate deletion - you get an email confirming the exact date, your account
+keeps working completely normally in the meantime, and a red banner at the top of every tab
+shows how many days are left with a one-click "Cancel deletion" button. After the 30 days pass,
+it's permanently deleted (a second email confirms this too) and can't be undone.
+**Status:** Live.
+**What the assistant can't do here:** only explain this - starting or cancelling a deletion
+always needs the person's own action, the same as 2FA above.
+
+### 6.21c Feature request / report a bug
+**What:** Send feedback - a feature idea, a bug, or anything else - directly from the app.
+**Why:** A faster, more direct route than emailing support separately, and it automatically
+includes which account it came from.
+**How:** Settings tab → Feature request / report a bug section → choose a type, write a message,
+send. It's emailed straight to the team; there's no in-app inbox or ticket status to check.
+**Status:** Live.
 
 ---
 

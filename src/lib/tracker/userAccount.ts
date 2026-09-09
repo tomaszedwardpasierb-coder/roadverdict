@@ -9,6 +9,7 @@
 import { getContainer } from "@/lib/cosmos";
 import { getUserDoc, type UserDoc } from "@/lib/tracker/userDoc";
 import { getBikesForUser, deleteBike } from "@/lib/tracker/bike";
+import { getCarsForUser, deleteCar } from "@/lib/tracker/car";
 
 export const MAX_GRANT_YEARS = 3;
 
@@ -89,13 +90,85 @@ export async function revokePremium(email: string): Promise<void> {
   await container.items.upsert(user);
 }
 
+// Settings tab profile - either field can be updated independently
+// (e.g. removing the avatar shouldn't require re-sending the display
+// name), so only the fields actually passed are touched.
+export async function updateProfile(
+  email: string,
+  updates: { displayName?: string | null; avatarBlobName?: string | null }
+): Promise<void> {
+  const container = getContainer();
+  const user = await getUserDoc(email);
+  if (!user) throw new Error(`No account found for ${email}.`);
+
+  if ("displayName" in updates) {
+    if (updates.displayName) user.displayName = updates.displayName;
+    else delete user.displayName;
+  }
+  if ("avatarBlobName" in updates) {
+    if (updates.avatarBlobName) user.avatarBlobName = updates.avatarBlobName;
+    else delete user.avatarBlobName;
+  }
+  await container.items.upsert(user);
+}
+
+export const ACCOUNT_DELETION_GRACE_PERIOD_DAYS = 30;
+
+// Starts the self-serve deletion clock - this is deliberately NOT the
+// same thing as deleteAccount() above, and never calls it. It just
+// marks the account as scheduled; the actual, irreversible cascade only
+// ever runs later, from the hard-delete-expired-accounts cron job, once
+// pendingDeletionAt has passed. Returns the deadline so callers (the
+// API route, the confirmation email) don't each recompute it themselves.
+export async function requestAccountDeletion(email: string): Promise<{ deleteAfter: string }> {
+  const container = getContainer();
+  const user = await getUserDoc(email);
+  if (!user) throw new Error(`No account found for ${email}.`);
+
+  const now = new Date();
+  const deleteAfter = new Date(now);
+  deleteAfter.setDate(deleteAfter.getDate() + ACCOUNT_DELETION_GRACE_PERIOD_DAYS);
+
+  user.deletionRequestedAt = now.toISOString();
+  user.pendingDeletionAt = deleteAfter.toISOString();
+  await container.items.upsert(user);
+
+  return { deleteAfter: user.pendingDeletionAt };
+}
+
+// Reverses requestAccountDeletion above - the account was never
+// touched beyond those two fields, so undoing this is just clearing
+// them, nothing to restore.
+export async function cancelAccountDeletion(email: string): Promise<void> {
+  const container = getContainer();
+  const user = await getUserDoc(email);
+  if (!user) throw new Error(`No account found for ${email}.`);
+  delete user.deletionRequestedAt;
+  delete user.pendingDeletionAt;
+  await container.items.upsert(user);
+}
+
+// Pure presentation helper shared by page.tsx's two render paths (bike
+// dashboard and renderCarDashboard) - both need the exact same
+// day-count/date-label derived from pendingDeletionAt, once for the
+// DashboardShell banner and once for SettingsTab's own copy of the
+// same notice.
+export function getPendingDeletionInfo(user: UserDoc | null): { daysRemaining: number; deleteAfterLabel: string } | null {
+  if (!user?.pendingDeletionAt) return null;
+  const daysRemaining = Math.max(0, Math.ceil((new Date(user.pendingDeletionAt).getTime() - Date.now()) / 86400000));
+  const deleteAfterLabel = new Date(user.pendingDeletionAt).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
+  return { daysRemaining, deleteAfterLabel };
+}
+
 // Permanently deletes an account and everything tied to its email -
 // there is no "undo" here, matched by the strongest confirmation this
 // admin panel has (see DeleteAccountButton.tsx - a typed-email prompt,
 // not just a yes/no dialog). Cascades:
 // - every bike, via the existing deleteBike() (already cascades
-//   service/fuel/mod/bill/reminder records plus that bike's own
+//   service/fuel/mod/bill/reminder/labour records plus that bike's own
 //   share-link doc - see bike.ts's own comment on deleteBike)
+// - every car, via the existing deleteCar() (same idea, car-prefixed
+//   record types - see car.ts's own comment on deleteCar)
 // - every other document type keyed by this email as partition key,
 //   point-deleted directly below
 // - assistantQuestionLog entries mentioning this email - the one doc
@@ -106,8 +179,11 @@ export async function revokePremium(email: string): Promise<void> {
 export async function deleteAccount(email: string): Promise<void> {
   const container = getContainer();
 
-  const bikes = await getBikesForUser(email);
-  await Promise.all(bikes.map((bike) => deleteBike(email, bike.id)));
+  const [bikes, cars] = await Promise.all([getBikesForUser(email), getCarsForUser(email)]);
+  await Promise.all([
+    ...bikes.map((bike) => deleteBike(email, bike.id)),
+    ...cars.map((car) => deleteCar(email, car.id)),
+  ]);
 
   const pointDeleteTypes = ["user", "session", "magicLink", "notification", "pendingScanBatch", "bikeTransferRequest", "receiptRequest"];
   await Promise.all(

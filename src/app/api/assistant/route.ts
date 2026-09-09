@@ -12,6 +12,7 @@ import { getSession } from "@/lib/auth/session";
 import { getLivePrivacyPolicyText } from "@/lib/tracker/assistantKnowledge";
 import { getAssistantConfig, getCarAssistantConfig, type AssistantConfigDoc } from "@/lib/tracker/assistantConfig";
 import { resolveActiveVehicle } from "@/lib/tracker/activeVehicle";
+import { getUserDoc } from "@/lib/tracker/userDoc";
 import {
   ASSISTANT_TOOL_DECLARATIONS,
   REPORT_TOOL_DECLARATIONS,
@@ -87,7 +88,7 @@ const DASHBOARD_TAB_LABELS: Record<string, string> = {
   buyingGuide: "Buying a used bike",
   privacy: "Privacy",
   transferOwnership: "Transfer ownership",
-  security: "Security",
+  security: "Settings",
 };
 
 // Which of the four collapsible sidebar groups (see DashboardShell.tsx's
@@ -115,7 +116,7 @@ const TAB_GROUP_LABELS: Record<string, string> = {
 const NO_CAR_KB_FALLBACK =
   "No car-specific knowledge base has been written yet for RoadVerdict's car support. Be honest that detailed car guidance isn't set up yet rather than guessing, and never use motorcycle-specific facts, terminology, or figures as if they applied to a car.";
 
-function buildSystemInstruction(config: AssistantConfigDoc, signedIn: boolean, privacyPolicyText: string | null, reportOpen: boolean, dashboardTabLabel: string | null, dashboardTabGroupLabel: string | null, compareBikeNames: string[] | null, logEntryAccess: "available" | "upsell" | "none", activeVehicleKind: "bike" | "car" | null, carKnowledgeBase?: string): string {
+function buildSystemInstruction(config: AssistantConfigDoc, signedIn: boolean, privacyPolicyText: string | null, reportOpen: boolean, dashboardTabLabel: string | null, dashboardTabGroupLabel: string | null, compareBikeNames: string[] | null, logEntryAccess: "available" | "upsell" | "none", activeVehicleKind: "bike" | "car" | null, displayName: string | null, carKnowledgeBase?: string): string {
   // A car-active session's knowledge base is a completely separate
   // document (see the ADR: one shared assistant, two knowledge bases) -
   // swapped in here instead of config.knowledgeBase (motorcycle-only)
@@ -146,6 +147,16 @@ function buildSystemInstruction(config: AssistantConfigDoc, signedIn: boolean, p
       ? "\n\n---\n\nCURRENT SESSION: a real, signed-in user is asking. The tools described in section 5 of the document above are available to you now - use them for any question about their own logged data rather than guessing or asking them to look it up themselves. Never ask the user for an account identifier, email, or bike ID to look something up - you already have everything you need through the tools; asking for it would be both unnecessary and a sign something's gone wrong."
       : "\n\n---\n\nCURRENT SESSION: nobody is signed in right now. The personal-data tools in section 5 are not available for this conversation. If asked about their own spend, mileage, or similar, say plainly that you'd need them signed in to look that up - don't guess, and don't claim to check something you have no way to check right now."
   );
+
+  // Set from the Settings tab's own profile section (SettingsTab.tsx) -
+  // never trust anything about who's asking beyond this one string; it
+  // only ever shapes how they're addressed, not what the assistant does
+  // or doesn't check for them.
+  if (signedIn && displayName) {
+    parts.push(
+      `\n\n---\n\nUSER'S NAME: this signed-in user has told RoadVerdict their name is "${displayName}" - address them by it naturally where it reads well (e.g. a greeting), don't force it into every single reply.`
+    );
+  }
 
   if (reportOpen) {
     parts.push(
@@ -250,6 +261,20 @@ export async function POST(req: Request) {
       activeVehicleKind = vehicle?.kind ?? null;
     } catch (err) {
       console.error("Assistant: resolveActiveVehicle() failed, continuing without a known vehicle kind:", err);
+    }
+  }
+
+  // Set from the Settings tab's own profile section - best-effort, same
+  // fail-soft-to-null reasoning as activeVehicleKind above: a lookup
+  // hiccup here should just mean the assistant addresses the user
+  // generically this request, never a broken/hanging chat.
+  let displayName: string | null = null;
+  if (signedIn && session) {
+    try {
+      const user = await getUserDoc(session.email);
+      displayName = user?.displayName ?? null;
+    } catch (err) {
+      console.error("Assistant: getUserDoc() failed, continuing without a display name:", err);
     }
   }
 
@@ -365,7 +390,7 @@ export async function POST(req: Request) {
     }
   }
 
-  const systemInstruction = buildSystemInstruction(config, signedIn, privacyPolicyText, !!reportToken, dashboardTabLabel, dashboardTabGroupLabel, compareBikeNames, logEntryAccess, activeVehicleKind, carKnowledgeBase);
+  const systemInstruction = buildSystemInstruction(config, signedIn, privacyPolicyText, !!reportToken, dashboardTabLabel, dashboardTabGroupLabel, compareBikeNames, logEntryAccess, activeVehicleKind, displayName, carKnowledgeBase);
 
   const contents: GeminiContent[] = toGeminiContents(messages);
   const toolDeclarations = [

@@ -378,7 +378,9 @@ describe("DashboardShell", () => {
         expect(screen.queryByText(label)).not.toBeInTheDocument();
       }
       // Also present in the always-mounted sidebar nav, hence getAllByText.
-      expect(screen.getAllByText("Security").length).toBeGreaterThan(0);
+      // Label is "Settings" now (see STANDALONE_ITEMS) - the key is still
+      // 'security', which is what CAR_UNAVAILABLE_LABELS never includes.
+      expect(screen.getAllByText("Settings").length).toBeGreaterThan(0);
     });
 
     // The user explicitly wants the group STRUCTURE to exist for cars too,
@@ -414,6 +416,59 @@ describe("DashboardShell", () => {
       await user.click(screen.getAllByRole("button", { name: "Update mileage" })[0]);
       await user.click(screen.getAllByRole("button", { name: "Save" })[0]);
       expect(fetch).toHaveBeenCalledWith("/api/cars/car", expect.objectContaining({ method: "PATCH" }));
+    });
+  });
+
+  describe("sidebar identity", () => {
+    it("shows the raw email and initials-from-email by default", () => {
+      render(<DashboardShell {...baseProps()} />);
+      expect(screen.getByText("rider@example.com")).toBeInTheDocument();
+      expect(screen.getByText("RI")).toBeInTheDocument();
+    });
+
+    it("prefers the display name over the email, once one is set", () => {
+      render(<DashboardShell {...baseProps({ displayName: "Alex" })} />);
+      expect(screen.getByText("Alex")).toBeInTheDocument();
+      expect(screen.queryByText("rider@example.com")).not.toBeInTheDocument();
+      expect(screen.getByText("AL")).toBeInTheDocument();
+    });
+
+    it("renders the real avatar image instead of initials when hasAvatar is set", () => {
+      render(<DashboardShell {...baseProps({ hasAvatar: true })} />);
+      expect(screen.getAllByAltText("Your avatar")[0]).toHaveAttribute("src", "/api/account/avatar");
+      expect(screen.queryByText("RI")).not.toBeInTheDocument();
+    });
+  });
+
+  describe("pending-deletion banner", () => {
+    it("renders nothing when pendingDeletion isn't set", () => {
+      render(<DashboardShell {...baseProps()} />);
+      expect(screen.queryByText(/Pending deletion/)).not.toBeInTheDocument();
+    });
+
+    it("shows the day count regardless of which tab is active", async () => {
+      const user = userEvent.setup();
+      render(<DashboardShell {...baseProps({ pendingDeletion: { daysRemaining: 12 } })} />);
+
+      expect(screen.getByText(/Pending deletion/)).toBeInTheDocument();
+      expect(screen.getByText(/12 days/)).toBeInTheDocument();
+
+      await user.click(screen.getAllByRole("button", { name: "Fuel" })[0]);
+      expect(screen.getByText(/Pending deletion/)).toBeInTheDocument();
+    });
+
+    it("uses singular 'day' for exactly one day remaining", () => {
+      render(<DashboardShell {...baseProps({ pendingDeletion: { daysRemaining: 1 } })} />);
+      expect(screen.getByText(/1 day\./)).toBeInTheDocument();
+    });
+
+    it("cancelling posts to /api/account/cancel-deletion", async () => {
+      (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({ ok: true, json: async () => ({ ok: true }) });
+      const user = userEvent.setup();
+      render(<DashboardShell {...baseProps({ pendingDeletion: { daysRemaining: 5 } })} />);
+
+      await user.click(screen.getByRole("button", { name: "Cancel deletion" }));
+      expect(fetch).toHaveBeenCalledWith("/api/account/cancel-deletion", expect.objectContaining({ method: "POST" }));
     });
   });
 });

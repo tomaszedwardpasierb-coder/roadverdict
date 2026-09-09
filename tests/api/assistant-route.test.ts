@@ -15,12 +15,14 @@ const mocks = vi.hoisted(() => ({
   isPro: vi.fn(),
   resolveActiveVehicle: vi.fn(),
   getCarAssistantConfig: vi.fn(),
+  getUserDoc: vi.fn(),
 }));
 
 vi.mock("@/lib/auth/session", () => ({ getSession: mocks.getSession }));
 vi.mock("@/lib/tracker/assistantKnowledge", () => ({ getLivePrivacyPolicyText: mocks.getLivePrivacyPolicyText }));
 vi.mock("@/lib/tracker/assistantConfig", () => ({ getAssistantConfig: mocks.getAssistantConfig, getCarAssistantConfig: mocks.getCarAssistantConfig }));
 vi.mock("@/lib/tracker/activeVehicle", () => ({ resolveActiveVehicle: mocks.resolveActiveVehicle }));
+vi.mock("@/lib/tracker/userDoc", () => ({ getUserDoc: mocks.getUserDoc }));
 vi.mock("@/lib/tracker/assistantTools", () => ({
   ASSISTANT_TOOL_DECLARATIONS: [{ name: "getSpendTotal" }],
   REPORT_TOOL_DECLARATIONS: [{ name: "getViewedReport" }],
@@ -240,7 +242,7 @@ describe("POST /api/assistant", () => {
     await POST(request({ messages: [{ role: "user", content: "what's this for?" }], dashboardTab: "security" }));
 
     const callBody = JSON.parse(mocks.fetch.mock.calls[0][1].body);
-    expect(callBody.systemInstruction.parts[0].text).toContain('CURRENT DASHBOARD TAB: the signed-in user currently has the "Security" tab open');
+    expect(callBody.systemInstruction.parts[0].text).toContain('CURRENT DASHBOARD TAB: the signed-in user currently has the "Settings" tab open');
   });
 
   it("names the sidebar group a tab lives in, for a tab that belongs to one", async () => {
@@ -259,6 +261,37 @@ describe("POST /api/assistant", () => {
 
     const callBody = JSON.parse(mocks.fetch.mock.calls[0][1].body);
     expect(callBody.systemInstruction.parts[0].text).not.toContain("lives inside");
+  });
+
+  it("addresses the signed-in user by their Settings-tab display name, when one is set", async () => {
+    mocks.getSession.mockResolvedValue({ email: "rider@example.com" });
+    mocks.getUserDoc.mockResolvedValue({ displayName: "Alex" });
+
+    await POST(request({ messages: [{ role: "user", content: "hi" }] }));
+
+    const callBody = JSON.parse(mocks.fetch.mock.calls[0][1].body);
+    expect(callBody.systemInstruction.parts[0].text).toContain('USER\'S NAME: this signed-in user has told RoadVerdict their name is "Alex"');
+  });
+
+  it("adds no name block when no display name has been set", async () => {
+    mocks.getSession.mockResolvedValue({ email: "rider@example.com" });
+    mocks.getUserDoc.mockResolvedValue({});
+
+    await POST(request({ messages: [{ role: "user", content: "hi" }] }));
+
+    const callBody = JSON.parse(mocks.fetch.mock.calls[0][1].body);
+    expect(callBody.systemInstruction.parts[0].text).not.toContain("USER'S NAME");
+  });
+
+  it("never addresses an anonymous visitor by name, even if getUserDoc somehow returned one", async () => {
+    mocks.getSession.mockResolvedValue(null);
+    mocks.getUserDoc.mockResolvedValue({ displayName: "Alex" });
+
+    await POST(request({ messages: [{ role: "user", content: "hi" }] }));
+
+    const callBody = JSON.parse(mocks.fetch.mock.calls[0][1].body);
+    expect(callBody.systemInstruction.parts[0].text).not.toContain("USER'S NAME");
+    expect(mocks.getUserDoc).not.toHaveBeenCalled();
   });
 
   it("ignores an unrecognised dashboardTab key rather than passing arbitrary client text into the prompt", async () => {

@@ -3,8 +3,12 @@ import { BlobServiceClient, ContainerClient } from "@azure/storage-blob";
 
 let containerClientInstance: ContainerClient | null = null;
 
-// Receipts/invoices only. Kept as one constant here (not an env var) - same
-// pattern as the Cosmos database/container names in cosmos.ts.
+// Receipts/invoices, and (since the Settings-tab profile feature)
+// account avatars too - blob names are already unguessable and unrelated
+// to what they contain, so sharing one container isn't a functional
+// problem, just a name that's slightly wider than it once was. Kept as
+// one constant here (not an env var) - same pattern as the Cosmos
+// database/container names in cosmos.ts.
 const CONTAINER_NAME = "attachments";
 
 // Lazily creates the client on first real use, same reasoning as

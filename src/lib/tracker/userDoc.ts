@@ -37,6 +37,23 @@ export interface UserDoc {
     enrolledAt: string;
     backupCodeHashes: string[];
   };
+  // Settings tab profile - what the AI assistant addresses the user by
+  // (see assistant/route.ts's USER'S NAME block) and what shows in the
+  // sidebar avatar. Both optional; unset falls back to email-derived
+  // initials everywhere they'd otherwise appear.
+  displayName?: string;
+  // Points at a small, already-resized (~256px) JPEG in the same blob
+  // container the receipt/attachment system uses - see
+  // api/account/avatar/route.ts. Never the original upload; that's
+  // resized down before it's ever written to storage.
+  avatarBlobName?: string;
+  // Self-serve account deletion is a soft delete: these two fields mark
+  // an account as scheduled, not gone. userAccount.ts's deleteAccount()
+  // (the real, irreversible cascade) is only ever called once
+  // pendingDeletionAt has passed, by the hard-delete-expired-accounts
+  // cron job - never directly from the self-serve request route.
+  deletionRequestedAt?: string;
+  pendingDeletionAt?: string;
 }
 
 export async function getUserDoc(email: string): Promise<UserDoc | null> {

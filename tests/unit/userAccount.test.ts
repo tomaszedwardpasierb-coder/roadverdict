@@ -8,6 +8,8 @@ const mocks = vi.hoisted(() => ({
   getUserDoc: vi.fn(),
   getBikesForUser: vi.fn(),
   deleteBike: vi.fn(),
+  getCarsForUser: vi.fn(),
+  deleteCar: vi.fn(),
 }));
 
 vi.mock("@/lib/cosmos", () => ({
@@ -24,8 +26,26 @@ vi.mock("@/lib/tracker/bike", () => ({
   getBikesForUser: mocks.getBikesForUser,
   deleteBike: mocks.deleteBike,
 }));
+vi.mock("@/lib/tracker/car", () => ({
+  getCarsForUser: mocks.getCarsForUser,
+  deleteCar: mocks.deleteCar,
+}));
 
-import { getAllUserAccounts, blockAccount, unblockAccount, grantPremium, revokePremium, deleteAccount, revokeAllSessions, MAX_GRANT_YEARS } from "@/lib/tracker/userAccount";
+import {
+  getAllUserAccounts,
+  blockAccount,
+  unblockAccount,
+  grantPremium,
+  revokePremium,
+  deleteAccount,
+  revokeAllSessions,
+  MAX_GRANT_YEARS,
+  updateProfile,
+  requestAccountDeletion,
+  cancelAccountDeletion,
+  getPendingDeletionInfo,
+  ACCOUNT_DELETION_GRACE_PERIOD_DAYS,
+} from "@/lib/tracker/userAccount";
 
 const email = "rider@example.com";
 
@@ -36,6 +56,8 @@ beforeEach(() => {
   mocks.query.mockResolvedValue({ resources: [] });
   mocks.getBikesForUser.mockResolvedValue([]);
   mocks.deleteBike.mockResolvedValue(undefined);
+  mocks.getCarsForUser.mockResolvedValue([]);
+  mocks.deleteCar.mockResolvedValue(undefined);
 });
 
 describe("getAllUserAccounts", () => {
@@ -140,6 +162,18 @@ describe("deleteAccount", () => {
     expect(mocks.deleteBike).toHaveBeenCalledWith(email, "bike-2");
   });
 
+  // Regression test: deleteAccount originally only cascaded bikes -
+  // cars were added to the app later and never wired into this
+  // function, meaning a self-serve "delete my account" would have
+  // silently left every car (and its service/fuel/mod/bill/labour/
+  // reminder records) orphaned in the database forever.
+  it("deletes every car via the real deleteCar cascade", async () => {
+    mocks.getCarsForUser.mockResolvedValue([{ id: "car-1" }, { id: "car-2" }]);
+    await deleteAccount(email);
+    expect(mocks.deleteCar).toHaveBeenCalledWith(email, "car-1");
+    expect(mocks.deleteCar).toHaveBeenCalledWith(email, "car-2");
+  });
+
   it("point-deletes every other email-partitioned doc type", async () => {
     mocks.query.mockImplementation((q: { query: string; parameters?: { name: string; value: string }[] }) => {
       if (q.query.includes("c.type = @type")) {
@@ -179,5 +213,90 @@ describe("revokeAllSessions", () => {
     const count = await revokeAllSessions(email);
     expect(count).toBe(0);
     expect(mocks.itemDelete).not.toHaveBeenCalled();
+  });
+});
+
+describe("updateProfile", () => {
+  it("throws when no account exists", async () => {
+    mocks.getUserDoc.mockResolvedValue(null);
+    await expect(updateProfile(email, { displayName: "Alex" })).rejects.toThrow(`No account found for ${email}.`);
+  });
+
+  it("sets displayName when provided", async () => {
+    mocks.getUserDoc.mockResolvedValue({ email });
+    await updateProfile(email, { displayName: "Alex" });
+    expect(mocks.upsert).toHaveBeenCalledWith(expect.objectContaining({ displayName: "Alex" }));
+  });
+
+  it("clears displayName when explicitly set to null", async () => {
+    mocks.getUserDoc.mockResolvedValue({ email, displayName: "Alex" });
+    await updateProfile(email, { displayName: null });
+    expect(mocks.upsert.mock.calls[0][0].displayName).toBeUndefined();
+  });
+
+  it("leaves displayName untouched when the field isn't passed at all, while still updating avatarBlobName", async () => {
+    mocks.getUserDoc.mockResolvedValue({ email, displayName: "Alex" });
+    await updateProfile(email, { avatarBlobName: "blob-1.jpg" });
+    expect(mocks.upsert.mock.calls[0][0]).toEqual(expect.objectContaining({ displayName: "Alex", avatarBlobName: "blob-1.jpg" }));
+  });
+
+  it("clears avatarBlobName when explicitly set to null", async () => {
+    mocks.getUserDoc.mockResolvedValue({ email, avatarBlobName: "blob-1.jpg" });
+    await updateProfile(email, { avatarBlobName: null });
+    expect(mocks.upsert.mock.calls[0][0].avatarBlobName).toBeUndefined();
+  });
+});
+
+describe("requestAccountDeletion / cancelAccountDeletion", () => {
+  it("throws when no account exists", async () => {
+    mocks.getUserDoc.mockResolvedValue(null);
+    await expect(requestAccountDeletion(email)).rejects.toThrow(`No account found for ${email}.`);
+  });
+
+  it(`sets deletionRequestedAt to now and pendingDeletionAt to ${ACCOUNT_DELETION_GRACE_PERIOD_DAYS} days out`, async () => {
+    mocks.getUserDoc.mockResolvedValue({ email });
+    const before = Date.now();
+    const { deleteAfter } = await requestAccountDeletion(email);
+    const saved = mocks.upsert.mock.calls[0][0];
+
+    expect(saved.deletionRequestedAt).toEqual(expect.any(String));
+    expect(saved.pendingDeletionAt).toBe(deleteAfter);
+    const daysOut = (new Date(deleteAfter).getTime() - before) / 86_400_000;
+    expect(daysOut).toBeGreaterThan(ACCOUNT_DELETION_GRACE_PERIOD_DAYS - 1);
+    expect(daysOut).toBeLessThan(ACCOUNT_DELETION_GRACE_PERIOD_DAYS + 1);
+  });
+
+  it("cancelAccountDeletion clears both fields", async () => {
+    mocks.getUserDoc.mockResolvedValue({ email, deletionRequestedAt: "2025-01-01T00:00:00.000Z", pendingDeletionAt: "2025-01-31T00:00:00.000Z" });
+    await cancelAccountDeletion(email);
+    const saved = mocks.upsert.mock.calls[0][0];
+    expect(saved.deletionRequestedAt).toBeUndefined();
+    expect(saved.pendingDeletionAt).toBeUndefined();
+  });
+
+  it("cancelAccountDeletion also throws when no account exists", async () => {
+    mocks.getUserDoc.mockResolvedValue(null);
+    await expect(cancelAccountDeletion(email)).rejects.toThrow(`No account found for ${email}.`);
+  });
+});
+
+describe("getPendingDeletionInfo", () => {
+  it("returns null when there's no pending deletion", () => {
+    expect(getPendingDeletionInfo({ email } as never)).toBeNull();
+    expect(getPendingDeletionInfo(null)).toBeNull();
+  });
+
+  it("computes days remaining and a human date label from pendingDeletionAt", () => {
+    const deleteAfter = new Date(Date.now() + 5 * 86_400_000);
+    const result = getPendingDeletionInfo({ email, pendingDeletionAt: deleteAfter.toISOString() } as never);
+    expect(result).not.toBeNull();
+    expect(result!.daysRemaining).toBeGreaterThanOrEqual(4);
+    expect(result!.daysRemaining).toBeLessThanOrEqual(5);
+    expect(result!.deleteAfterLabel).toBe(deleteAfter.toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" }));
+  });
+
+  it("never returns a negative day count for a deadline that's already passed", () => {
+    const result = getPendingDeletionInfo({ email, pendingDeletionAt: new Date(Date.now() - 86_400_000).toISOString() } as never);
+    expect(result!.daysRemaining).toBe(0);
   });
 });

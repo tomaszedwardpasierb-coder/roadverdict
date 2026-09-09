@@ -285,11 +285,11 @@ export async function updateCarChartType(email: string, carId: string, chartId: 
 
 // Permanently deletes a car and every record that belongs to it -
 // mirrors deleteBike exactly, own record-type list (carServiceRecord/
-// carFuelLog/carMod/carBill), no shareToken to clean up since cars
-// don't have one yet.
+// carFuelLog/carMod/carBill/carLabour/carReminder), no shareToken to
+// clean up since cars don't have one yet.
 export async function deleteCar(email: string, carId: string): Promise<void> {
   const container = getContainer();
-  const recordTypes = ["carServiceRecord", "carFuelLog", "carMod", "carBill"];
+  const recordTypes = ["carServiceRecord", "carFuelLog", "carMod", "carBill", "carLabour", "carReminder"];
   await Promise.all(
     recordTypes.map(async (type) => {
       const { resources } = await container.items

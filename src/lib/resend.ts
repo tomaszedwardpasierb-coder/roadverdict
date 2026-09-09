@@ -389,3 +389,69 @@ export async function sendOwnershipRequestDeclinedEmail(params: {
     html,
   });
 }
+
+// deleteAfterLabel is pre-formatted by the caller (userAccount.ts's
+// requestAccountDeletion returns a raw ISO string; the API route turns
+// that into a human date), same convention as expiresAtLabel elsewhere
+// in this file - this function only ever renders it, never parses it.
+export async function sendAccountDeletionRequestedEmail(email: string, deleteAfterLabel: string) {
+  const resend = getResend();
+  const appUrl = process.env.APP_URL ?? "https://roadverdict.co.uk";
+  const html = renderEmailLayout({
+    preheader: `Your account is scheduled for deletion on ${deleteAfterLabel}`,
+    heading: "Your account is scheduled for deletion",
+    bodyHtml: `
+      <p style="margin:0 0 12px;">We've received a request to delete your RoadVerdict account. Nothing has been deleted yet - your account, and everything logged on it, will be permanently deleted on <strong>${escapeHtml(deleteAfterLabel)}</strong>, unless you cancel before then.</p>
+      <p style="margin:0 0 12px;">Changed your mind, or didn't request this? Just sign in and click "Cancel deletion" on the banner at the top of your dashboard - nothing about your account changes in the meantime, you can keep using it as normal right up until the date above.</p>
+      ${emailButton("Go to your dashboard", `${appUrl}/dashboard`)}
+      <p style="margin:0;color:#54555A;font-size:13px;">After that date, this can't be undone.</p>
+    `,
+  });
+  await resend.emails.send({
+    from: FROM,
+    to: email,
+    subject: "Your RoadVerdict account is scheduled for deletion",
+    html,
+  });
+}
+
+export async function sendAccountDeletedEmail(email: string) {
+  const resend = getResend();
+  const html = renderEmailLayout({
+    preheader: "Your account has been permanently deleted",
+    heading: "Your account has been deleted",
+    bodyHtml: `
+      <p style="margin:0 0 12px;">As requested, your RoadVerdict account and everything logged on it has now been permanently deleted. This can't be undone.</p>
+      <p style="margin:0;color:#54555A;font-size:13px;">Didn't expect this? Get in touch straight away at <a href="mailto:hello@roadverdict.co.uk" style="color:#54555A;">hello@roadverdict.co.uk</a>.</p>
+    `,
+  });
+  await resend.emails.send({
+    from: FROM,
+    to: email,
+    subject: "Your RoadVerdict account has been deleted",
+    html,
+  });
+}
+
+// fromEmail/message are both raw, user-supplied - never trust either as
+// safe HTML, same rule escapeHtml's own comment states for buyerMessage
+// above.
+export async function sendFeedbackEmail(fromEmail: string, type: "feature" | "bug" | "other", message: string) {
+  const resend = getResend();
+  const typeLabel = type === "feature" ? "Feature request" : type === "bug" ? "Bug report" : "Feedback";
+  const html = renderEmailLayout({
+    preheader: `${typeLabel} from ${fromEmail}`,
+    heading: typeLabel,
+    bodyHtml: `
+      <p style="margin:0 0 12px;">From: <strong>${escapeHtml(fromEmail)}</strong></p>
+      <p style="margin:0;white-space:pre-wrap;">${escapeHtml(message)}</p>
+    `,
+  });
+  await resend.emails.send({
+    from: FROM,
+    to: "hello@roadverdict.co.uk",
+    replyTo: fromEmail,
+    subject: `${typeLabel} - ${fromEmail}`,
+    html,
+  });
+}
