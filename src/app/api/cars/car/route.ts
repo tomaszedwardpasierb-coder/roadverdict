@@ -13,6 +13,8 @@ import {
   updateCarCurrency,
   updateCarChartType,
   updateCarDvlaData,
+  updateCarIncludeInsuranceInReport,
+  updateCarIncludeFinanceInReport,
   isCarReadOnly,
   CAR_READ_ONLY_MESSAGE,
   type CarFuelType,
@@ -139,7 +141,7 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
   }
 
-  const { currentMileage, region, annualBudget, distanceUnit, fuelEconomyUnit, currency, chartType } = body as {
+  const { currentMileage, region, annualBudget, distanceUnit, fuelEconomyUnit, currency, chartType, includeInsuranceInReport, includeFinanceInReport } = body as {
     currentMileage?: number;
     region?: Region;
     annualBudget?: number;
@@ -147,9 +149,21 @@ export async function PATCH(request: NextRequest) {
     fuelEconomyUnit?: FuelEconomyUnit;
     currency?: Currency;
     chartType?: { chartId: string; kind: ChartKind };
+    includeInsuranceInReport?: boolean;
+    includeFinanceInReport?: boolean;
   };
 
-  if (currentMileage == null && !region && annualBudget == null && !distanceUnit && !fuelEconomyUnit && !currency && !chartType) {
+  if (
+    currentMileage == null &&
+    !region &&
+    annualBudget == null &&
+    !distanceUnit &&
+    !fuelEconomyUnit &&
+    !currency &&
+    !chartType &&
+    includeInsuranceInReport === undefined &&
+    includeFinanceInReport === undefined
+  ) {
     return NextResponse.json({ error: "Nothing to update." }, { status: 400 });
   }
 
@@ -194,6 +208,14 @@ export async function PATCH(request: NextRequest) {
   }
   if (chartType?.chartId && chartType?.kind) {
     car = await updateCarChartType(session.email, carId, chartType.chartId, chartType.kind);
+    void logImpersonationActivityForCurrentRequest("car", carId, "update");
+  }
+  if (includeInsuranceInReport !== undefined) {
+    car = await updateCarIncludeInsuranceInReport(session.email, carId, includeInsuranceInReport);
+    void logImpersonationActivityForCurrentRequest("car", carId, "update");
+  }
+  if (includeFinanceInReport !== undefined) {
+    car = await updateCarIncludeFinanceInReport(session.email, carId, includeFinanceInReport);
     void logImpersonationActivityForCurrentRequest("car", carId, "update");
   }
 

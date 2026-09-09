@@ -15,6 +15,9 @@ import { getReminders, computeReminderStatus } from "@/lib/tracker/reminder";
 import { getShareLinksForUser } from "@/lib/tracker/shareLink";
 import { getPendingReceiptRequestsForOwner } from "@/lib/tracker/receiptRequest";
 import { ShareLinksSection } from "./ShareLinksSection";
+import { getCarShareLinksForUser } from "@/lib/tracker/carShareLink";
+import { getPendingCarReceiptRequestsForOwner } from "@/lib/tracker/carReceiptRequest";
+import { CarShareLinksSection } from "./CarShareLinksSection";
 import { computeSpendSummary, computeYearSpend, gatherMileagePoints } from "@/lib/tracker/summary";
 import { slugifyMake, getBikeClassForCC, getModelsForBrand } from "@/lib/motorcycleModels";
 import { BRAND_OPTIONS, type Region } from "@/lib/priceData";
@@ -53,6 +56,7 @@ import { FuelCostChart } from "./FuelCostChart";
 import { CategorySpendChart } from "./CategorySpendChart";
 import { UnitSettings } from "./UnitSettings";
 import { ExportShareSection } from "./ExportShareSection";
+import { CarExportShareSection } from "./CarExportShareSection";
 import { RecentActivity, type RecentActivityItem } from "./RecentActivity";
 import { DashboardShell } from "./DashboardShell";
 import { NotificationBell } from "./NotificationBell";
@@ -114,6 +118,7 @@ import { CarServiceHistoryCard } from "./CarServiceHistoryCard";
 import { CarFuelLogCard } from "./CarFuelLogCard";
 import { CarModCard } from "./CarModCard";
 import { CarBillCard } from "./CarBillCard";
+import { CarExcludeFromReportToggle } from "./CarExcludeFromReportToggle";
 import { CarLabourCard } from "./CarLabourCard";
 import { CarReminderItem } from "./CarReminderItem";
 import { CarCustomFilterPanel } from "./CarCustomFilterPanel";
@@ -953,7 +958,7 @@ async function renderCarDashboard(
   const fuelEconomyUnit: FuelEconomyUnit = car.fuelEconomyUnit ?? "mpg";
   const currency: Currency = car.currency ?? "GBP";
 
-  const [records, fuelLogs, mods, bills, labour, reminders, rates] = await Promise.all([
+  const [records, fuelLogs, mods, bills, labour, reminders, rates, carShareLinks, pendingCarReceiptRequests] = await Promise.all([
     getCarServiceRecords(email, car.id),
     getCarFuelLogs(email, car.id),
     getCarMods(email, car.id),
@@ -961,7 +966,13 @@ async function renderCarDashboard(
     getCarLabour(email, car.id),
     getCarReminders(email, car.id),
     getExchangeRates(),
+    getCarShareLinksForUser(email),
+    getPendingCarReceiptRequestsForOwner(email),
   ]);
+  const carNames: Record<string, string> = {};
+  for (const c of allCars) {
+    carNames[c.id] = c.nickname ? `${c.nickname} (${c.make} ${c.model})` : `${c.make} ${c.model}`;
+  }
 
   const pendingReviewIds = {
     service: records.filter((r) => r.needsReview).map((r) => r.id),
@@ -1127,10 +1138,7 @@ async function renderCarDashboard(
         </div>
       </div>
 
-      <p className={styles.subtext} style={{ marginTop: "1rem" }}>
-        The Quote Checker/Cost Calculator/Buying Guide tools aren&apos;t available from here yet - see the standalone
-        versions at /cars/quote-checker, /cars/cost-calculator, and /cars/buying-guide in the meantime.
-      </p>
+      <CarExportShareSection isPro={userIsPro} />
     </ChartFilterProvider>
   );
 
@@ -1324,11 +1332,34 @@ async function renderCarDashboard(
       </div>
       <p className={styles.subtext}>The paperwork you genuinely can&apos;t afford to forget, tracked in one place.</p>
       <LogCarBillForm currency={currency} rates={rates} carYear={car.year} isCustomBuild={car.isCustomBuild} />
+      <CarExcludeFromReportToggle
+        fieldName="includeInsuranceInReport"
+        included={Boolean(car.includeInsuranceInReport)}
+        checkboxLabel="Show insurance history in my buyer report"
+        confirmMessage="A future buyer will have their own insurance costs - showing yours could make your car look pricier to run than it will actually be for them. Show anyway?"
+        noteText="Off by default - insurance depends on who's holding the policy, not the car, so a future buyer's own premium will be different regardless of what you've paid. Road tax and MOT are always shown, since those are tied to the car itself."
+      />
+      <CarExcludeFromReportToggle
+        fieldName="includeFinanceInReport"
+        included={Boolean(car.includeFinanceInReport)}
+        checkboxLabel="Show finance history in my buyer report"
+        confirmMessage="A future buyer would have their own finance agreement, or none at all - showing yours could make your car look pricier to run than it will actually be for them. Show anyway?"
+        noteText="Off by default - a finance agreement is personal to whoever took it out, not the car, so a future buyer's own deal (if they have one) will be completely different. Road tax and MOT are always shown, since those are tied to the car itself."
+      />
       <h2 className={styles.sectionHeading}>History</h2>
       {bills.length === 0 ? (
         <div className={styles.card}><p className={styles.cardBody}>No insurance, tax, MOT, ULEZ/CAZ, congestion charge, or finance payments logged yet.</p></div>
       ) : (
-        bills.map((b) => <CarBillCard key={b.id} bill={b} currency={currency} rates={rates} />)
+        bills.map((b) => (
+          <CarBillCard
+            key={b.id}
+            bill={b}
+            currency={currency}
+            rates={rates}
+            includeInsuranceInReport={Boolean(car.includeInsuranceInReport)}
+            includeFinanceInReport={Boolean(car.includeFinanceInReport)}
+          />
+        ))
       )}
     </>
   );
@@ -1373,6 +1404,19 @@ async function renderCarDashboard(
     </>
   );
 
+  const carShareLinksContent = (
+    <CarShareLinksSection isPro={userIsPro}
+      links={carShareLinks}
+      carNames={carNames}
+      appUrl={process.env.APP_URL ?? "https://roadverdict.co.uk"}
+      requests={pendingCarReceiptRequests}
+      carNickname={car.nickname}
+      registration={currentRegistration}
+      currentMileage={car.currentMileage}
+      distanceUnit={distanceUnit}
+    />
+  );
+
   const privacyContent = <PrivacyContent />;
   const securityContent = (
     <SettingsTab
@@ -1413,7 +1457,7 @@ async function renderCarDashboard(
       vehicles={switcherVehicles}
       activeVehicleId={car.id}
       pendingReviewIds={pendingReviewIds}
-      hasPendingReceiptRequests={false}
+      hasPendingReceiptRequests={pendingCarReceiptRequests.length > 0}
       dashboardContent={dashboardContent}
       serviceContent={serviceContent}
       fuelContent={fuelContent}
@@ -1422,6 +1466,7 @@ async function renderCarDashboard(
       billsContent={billsContent}
       remindersContent={remindersContent}
       reportsContent={carReportsContent}
+      shareLinksContent={carShareLinksContent}
       quoteCheckerContent={carQuoteCheckerContent}
       costCalculatorContent={carCostCalculatorContent}
       buyingGuideContent={carBuyingGuideContent}

@@ -1,0 +1,217 @@
+// Place at: src/app/dashboard/CarExportShareSection.tsx
+// Car mirror of ExportShareSection.tsx. ProGate is reused directly -
+// genuinely vehicle-neutral. CSV export already resolves whichever
+// vehicle kind is active (see /api/tracker/export/csv), so no
+// car-specific export endpoint is needed either.
+'use client';
+
+import { useState } from 'react';
+import styles from './dashboard.module.css';
+import { ProGate } from './ProGate';
+
+type ShareLinkDuration = '1week' | '1month' | '6months';
+
+const DURATION_OPTIONS: { value: ShareLinkDuration; label: string }[] = [
+  { value: '1week', label: '1 week' },
+  { value: '1month', label: '1 month' },
+  { value: '6months', label: '6 months' },
+];
+
+export function CarExportShareSection({ isPro = false }: { isPro?: boolean }) {
+  const [duration, setDuration] = useState<ShareLinkDuration>('1month');
+  const [recipientEmail, setRecipientEmail] = useState('');
+  const [askingPrice, setAskingPrice] = useState('');
+  const [shareUrl, setShareUrl] = useState<string | null>(null);
+  const [expiresAt, setExpiresAt] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
+  const [emailTo, setEmailTo] = useState('');
+  const [sendingEmail, setSendingEmail] = useState(false);
+  const [emailStatus, setEmailStatus] = useState<string | null>(null);
+
+  async function handleGetLink() {
+    if (!recipientEmail.trim() || !recipientEmail.includes('@')) {
+      setCreateError('Please enter the email address you’re sharing this link with.');
+      return;
+    }
+    let parsedAskingPrice: number | undefined;
+    if (askingPrice.trim()) {
+      const parsed = Number(askingPrice);
+      if (!Number.isFinite(parsed) || parsed <= 0) {
+        setCreateError('Enter a valid asking price, or leave it blank.');
+        return;
+      }
+      parsedAskingPrice = parsed;
+    }
+    setCreateError(null);
+    setLoading(true);
+    try {
+      const res = await fetch('/api/cars/car-share-link', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ duration, recipientEmail: recipientEmail.trim(), askingPrice: parsedAskingPrice }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setShareUrl(data.url);
+        setExpiresAt(data.expiresAt ?? null);
+        setEmailTo(recipientEmail.trim());
+      } else {
+        setCreateError(data.error ?? 'Could not create the link. Please try again.');
+      }
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleCopy() {
+    if (!shareUrl) return;
+    await navigator.clipboard.writeText(shareUrl);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }
+
+  async function handleSendEmail(e: React.FormEvent) {
+    e.preventDefault();
+    if (!shareUrl || !emailTo.trim()) return;
+    const token = shareUrl.split('/car-report/')[1];
+    setSendingEmail(true);
+    setEmailStatus(null);
+    try {
+      const res = await fetch(`/api/cars/car-share-link/${token}/send-email`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ toEmail: emailTo.trim() }),
+      });
+      const data = await res.json();
+      setEmailStatus(res.ok ? `Sent to ${emailTo.trim()}.` : data.error ?? 'Could not send the email.');
+      if (res.ok) setEmailTo('');
+    } catch {
+      setEmailStatus('Could not reach the server.');
+    } finally {
+      setSendingEmail(false);
+    }
+  }
+
+  const expiresAtLabel = expiresAt
+    ? new Date(expiresAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
+    : null;
+
+  return (
+    <div className={styles.chartCard} style={{ marginBottom: '1.6rem' }}>
+      <div className={styles.chartCardTitle}>Get a shareable report link</div>
+      <p className={styles.subtext} style={{ marginBottom: '0.9rem' }}>
+        Thinking of selling? This is how you prove it. Generate a link that shows a buyer exactly how this car&apos;s
+        been looked after, dates, costs, a real history, not just your word for it. Your personal details stay
+        yours, receipts and invoices only appear if you specifically approve sharing them when someone asks.
+      </p>
+      <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap', alignItems: 'center' }}>
+        {isPro ? (
+          <a href="/api/tracker/export/csv" className={styles.scanReceiptBtn} style={{ textDecoration: 'none' }}>
+            Download CSV
+          </a>
+        ) : (
+          <ProGate featureName="Export as CSV" description="Download your full service, fuel, mods and bills history as a spreadsheet." isPro={false}>
+            <a href="/api/tracker/export/csv" className={styles.scanReceiptBtn} style={{ textDecoration: 'none' }}>Download CSV</a>
+          </ProGate>
+        )}
+      </div>
+
+      {!shareUrl ? (
+        <div style={{ marginTop: '1rem' }}>
+          <div className="field" style={{ marginTop: 0, maxWidth: '320px' }}>
+            <label htmlFor="car-share-recipient-email">Sharing with (email address)</label>
+            <input
+              id="car-share-recipient-email"
+              type="email"
+              placeholder="buyer@example.com"
+              value={recipientEmail}
+              onChange={(e) => setRecipientEmail(e.target.value)}
+              required
+              style={{ width: '100%', padding: '0.5rem', border: '1px solid var(--border)', borderRadius: '4px' }}
+            />
+          </div>
+          <p className="field-note" style={{ marginTop: '0.4rem' }}>
+            Required, this is who the link identifies if they ask you for a receipt through it.
+          </p>
+          <div className="field" style={{ marginTop: '0.8rem', maxWidth: '220px' }}>
+            <label htmlFor="car-share-duration">Link stays valid for</label>
+            <select id="car-share-duration" value={duration} onChange={(e) => setDuration(e.target.value as ShareLinkDuration)}>
+              {DURATION_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>{o.label}</option>
+              ))}
+            </select>
+          </div>
+          <p className="field-note" style={{ marginTop: '0.5rem' }}>
+            After this, the link stops working and is permanently deleted, it can be extended any time before then
+            from the Shareable Links tab.
+          </p>
+          <div className="field" style={{ marginTop: '0.8rem', maxWidth: '220px' }}>
+            <label htmlFor="car-share-asking-price">Asking price (optional)</label>
+            <input
+              id="car-share-asking-price"
+              type="number"
+              inputMode="decimal"
+              min="1"
+              max="200000"
+              placeholder="e.g. 3200"
+              value={askingPrice}
+              onChange={(e) => setAskingPrice(e.target.value)}
+              style={{ width: '100%', padding: '0.5rem', border: '1px solid var(--border)', borderRadius: '4px' }}
+            />
+          </div>
+          <p className="field-note" style={{ marginTop: '0.4rem' }}>
+            Shown to the buyer alongside your car&apos;s logged history and upcoming costs, leave blank if
+            you&apos;d rather not include it.
+          </p>
+          {createError && <p className="error-text" role="alert">{createError}</p>}
+          <button type="button" className={styles.scanReceiptBtn} onClick={handleGetLink} disabled={loading} style={{ marginTop: '0.7rem' }}>
+            {loading ? 'Generating…' : 'Get shareable report link'}
+          </button>
+        </div>
+      ) : (
+        <div style={{ marginTop: '1rem' }}>
+          <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap', alignItems: 'center' }}>
+            <input
+              readOnly
+              value={shareUrl}
+              style={{
+                flex: 1,
+                minWidth: '200px',
+                padding: '0.5rem',
+                fontFamily: 'var(--font-mono)',
+                fontSize: '0.8rem',
+                border: '1px solid var(--border)',
+                borderRadius: '4px',
+              }}
+            />
+            <button type="button" className={styles.iconBtn} onClick={handleCopy}>
+              {copied ? 'Copied!' : 'Copy'}
+            </button>
+          </div>
+          {expiresAtLabel && (
+            <p className="field-note" style={{ marginTop: '0.5rem' }}>
+              Valid until {expiresAtLabel}, then permanently deleted. Manage this and any other links from the
+              Shareable Links tab.
+            </p>
+          )}
+          <form onSubmit={handleSendEmail} style={{ display: 'flex', gap: '0.5rem', marginTop: '0.8rem', flexWrap: 'wrap' }}>
+            <input
+              type="email"
+              placeholder="Send to an email address"
+              value={emailTo}
+              onChange={(e) => setEmailTo(e.target.value)}
+              style={{ flex: 1, minWidth: '200px', padding: '0.5rem', border: '1px solid var(--border)', borderRadius: '4px' }}
+              required
+            />
+            <button type="submit" className={styles.iconBtn} disabled={sendingEmail}>
+              {sendingEmail ? 'Sending…' : 'Send by email'}
+            </button>
+          </form>
+          {emailStatus && <p className="field-note" style={{ marginTop: '0.4rem' }}>{emailStatus}</p>}
+        </div>
+      )}
+    </div>
+  );
+}

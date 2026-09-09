@@ -12,9 +12,11 @@ interface Props {
   bill: CarBillDoc;
   currency: Currency;
   rates: ExchangeRates | null;
+  includeInsuranceInReport?: boolean;
+  includeFinanceInReport?: boolean;
 }
 
-export function CarBillCard({ bill, currency, rates }: Props) {
+export function CarBillCard({ bill, currency, rates, includeInsuranceInReport = false, includeFinanceInReport = false }: Props) {
   const [isEditing, setIsEditing] = useState(false);
   const [billType, setBillType] = useState(bill.billType);
   const [cost, setCost] = useState(String(bill.cost));
@@ -76,6 +78,12 @@ export function CarBillCard({ bill, currency, rates }: Props) {
         {new Date(bill.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
         {bill.mileage != null && ` · ${bill.mileage.toLocaleString()} mi (MOT-recorded, not editable here)`}
       </div>
+      {bill.billType === 'insurance' && !includeInsuranceInReport && (
+        <div className={styles.jobCardMeta}>Not shown in buyer report</div>
+      )}
+      {bill.billType === 'finance' && !includeFinanceInReport && (
+        <div className={styles.jobCardMeta}>Not shown in buyer report</div>
+      )}
       {bill.notes && <p style={{ marginTop: '0.4rem' }}>{bill.notes}</p>}
       <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.6rem' }}>
         <button type="button" className={styles.iconBtn} onClick={() => setIsEditing(true)}>Edit</button>

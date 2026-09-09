@@ -50,4 +50,24 @@ describe("CarBillCard", () => {
     await user.click(screen.getByRole("button", { name: "Delete" }));
     expect(fetch).toHaveBeenCalledWith("/api/cars/car-bills/car-1::carBill::1", expect.objectContaining({ method: "DELETE" }));
   });
+
+  it("shows a 'not shown in buyer report' tag for insurance when includeInsuranceInReport is false", () => {
+    render(<CarBillCard bill={bill} currency="GBP" rates={null} includeInsuranceInReport={false} />);
+    expect(screen.getByText("Not shown in buyer report")).toBeInTheDocument();
+  });
+
+  it("hides the tag once includeInsuranceInReport is true", () => {
+    render(<CarBillCard bill={bill} currency="GBP" rates={null} includeInsuranceInReport />);
+    expect(screen.queryByText("Not shown in buyer report")).not.toBeInTheDocument();
+  });
+
+  it("shows the tag for finance when includeFinanceInReport is false, independently of the insurance setting", () => {
+    render(<CarBillCard bill={{ ...bill, billType: "finance" }} currency="GBP" rates={null} includeInsuranceInReport includeFinanceInReport={false} />);
+    expect(screen.getByText("Not shown in buyer report")).toBeInTheDocument();
+  });
+
+  it("hides the finance tag once includeFinanceInReport is true", () => {
+    render(<CarBillCard bill={{ ...bill, billType: "finance" }} currency="GBP" rates={null} includeFinanceInReport />);
+    expect(screen.queryByText("Not shown in buyer report")).not.toBeInTheDocument();
+  });
 });
