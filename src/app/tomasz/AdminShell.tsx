@@ -2,16 +2,17 @@
 'use client';
 
 import { useState, type ReactNode } from 'react';
-import { Activity, Server, Wrench, Users, Bell, MessageSquare, Database } from 'lucide-react';
+import { Activity, Server, Wrench, Users, Bell, MessageSquare, Database, UserCog } from 'lucide-react';
 import styles from './adminShell.module.css';
 
-type Section = 'overview' | 'traffic' | 'jobs' | 'accounts' | 'notifications' | 'assistant' | 'database';
+type Section = 'overview' | 'traffic' | 'jobs' | 'accounts' | 'impersonations' | 'notifications' | 'assistant' | 'database';
 
 const NAV_ITEMS: { key: Section; label: string; icon: typeof Server }[] = [
   { key: 'overview', label: 'Overview', icon: Server },
   { key: 'traffic', label: 'Traffic & performance', icon: Activity },
   { key: 'jobs', label: 'Jobs & migrations', icon: Wrench },
   { key: 'accounts', label: 'Accounts & sessions', icon: Users },
+  { key: 'impersonations', label: 'Impersonate sessions', icon: UserCog },
   { key: 'notifications', label: 'Notifications', icon: Bell },
   { key: 'assistant', label: 'AI assistant', icon: MessageSquare },
   { key: 'database', label: 'Database', icon: Database },
@@ -22,6 +23,7 @@ interface Props {
   trafficContent: ReactNode;
   jobsContent: ReactNode;
   accountsContent: ReactNode;
+  impersonationsContent: ReactNode;
   notificationsContent: ReactNode;
   assistantContent: ReactNode;
   databaseContent: ReactNode;
@@ -40,6 +42,7 @@ export function AdminShell({
   trafficContent,
   jobsContent,
   accountsContent,
+  impersonationsContent,
   notificationsContent,
   assistantContent,
   databaseContent,
@@ -52,6 +55,7 @@ export function AdminShell({
     traffic: trafficContent,
     jobs: jobsContent,
     accounts: accountsContent,
+    impersonations: impersonationsContent,
     notifications: notificationsContent,
     assistant: assistantContent,
     database: databaseContent,

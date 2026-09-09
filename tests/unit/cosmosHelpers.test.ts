@@ -6,6 +6,8 @@ const mocks = vi.hoisted(() => ({
   item: vi.fn(),
   read: vi.fn(),
   delete: vi.fn(),
+  cookieGet: vi.fn(),
+  logImpersonationActivity: vi.fn(),
 }));
 
 vi.mock("@/lib/cosmos", () => ({
@@ -14,6 +16,8 @@ vi.mock("@/lib/cosmos", () => ({
     item: mocks.item,
   }),
 }));
+vi.mock("next/headers", () => ({ cookies: async () => ({ get: mocks.cookieGet }) }));
+vi.mock("@/lib/admin/impersonation", () => ({ logImpersonationActivity: mocks.logImpersonationActivity }));
 
 import {
   createTrackerDoc,
@@ -42,6 +46,8 @@ beforeEach(() => {
   mocks.item.mockReturnValue({ read: mocks.read, delete: mocks.delete });
   mocks.read.mockResolvedValue({ resource: null });
   mocks.delete.mockResolvedValue(undefined);
+  mocks.cookieGet.mockReturnValue(undefined); // no impersonation_session_id cookie by default
+  mocks.logImpersonationActivity.mockResolvedValue(undefined);
 });
 
 describe("createTrackerDoc", () => {
@@ -171,6 +177,58 @@ describe("deleteTrackerDoc", () => {
     await deleteTrackerDoc(email, existingDoc.id);
     expect(mocks.item).toHaveBeenCalledWith(existingDoc.id, email);
     expect(mocks.delete).toHaveBeenCalledOnce();
+  });
+});
+
+describe("impersonation activity logging (create/update/delete)", () => {
+  it("createTrackerDoc logs nothing when no impersonation_session_id cookie is present", async () => {
+    await createTrackerDoc(email, "sr", "service", { date: "2025-01-01", bikeId: "bike-1" } as any);
+    expect(mocks.logImpersonationActivity).not.toHaveBeenCalled();
+  });
+
+  it("createTrackerDoc logs a 'create' activity entry when impersonating", async () => {
+    mocks.cookieGet.mockImplementation((name: string) => (name === "impersonation_session_id" ? { value: "session-abc" } : undefined));
+    const doc = await createTrackerDoc(email, "sr", "service", { date: "2025-01-01", bikeId: "bike-1" } as any);
+    expect(mocks.logImpersonationActivity).toHaveBeenCalledWith(
+      expect.objectContaining({ sessionId: "session-abc", targetEmail: email, docType: "service", docId: doc.id, action: "create" })
+    );
+  });
+
+  it("updateTrackerDoc logs an 'update' activity entry when impersonating", async () => {
+    mocks.read.mockResolvedValue({ resource: { ...existingDoc } });
+    mocks.cookieGet.mockImplementation((name: string) => (name === "impersonation_session_id" ? { value: "session-abc" } : undefined));
+    await updateTrackerDoc(email, existingDoc.id, { date: "2025-06-01" } as any);
+    expect(mocks.logImpersonationActivity).toHaveBeenCalledWith(
+      expect.objectContaining({ sessionId: "session-abc", targetEmail: email, docType: "service", docId: existingDoc.id, action: "update" })
+    );
+  });
+
+  it("updateTrackerDoc logs nothing when the document didn't exist (nothing was actually written)", async () => {
+    mocks.cookieGet.mockImplementation((name: string) => (name === "impersonation_session_id" ? { value: "session-abc" } : undefined));
+    await updateTrackerDoc(email, "nonexistent-id", { date: "2025-06-01" } as any);
+    expect(mocks.logImpersonationActivity).not.toHaveBeenCalled();
+  });
+
+  it("deleteTrackerDoc logs a 'delete' activity entry, correctly labelled with the deleted doc's own type, when impersonating", async () => {
+    mocks.read.mockResolvedValue({ resource: existingDoc });
+    mocks.cookieGet.mockImplementation((name: string) => (name === "impersonation_session_id" ? { value: "session-abc" } : undefined));
+    await deleteTrackerDoc(email, existingDoc.id);
+    expect(mocks.logImpersonationActivity).toHaveBeenCalledWith(
+      expect.objectContaining({ sessionId: "session-abc", targetEmail: email, docType: "service", docId: existingDoc.id, action: "delete" })
+    );
+  });
+
+  it("deleteTrackerDoc logs nothing when there's no impersonation cookie", async () => {
+    mocks.read.mockResolvedValue({ resource: existingDoc });
+    await deleteTrackerDoc(email, existingDoc.id);
+    expect(mocks.logImpersonationActivity).not.toHaveBeenCalled();
+  });
+
+  it("never blocks or fails the real write when the activity logger itself throws", async () => {
+    mocks.cookieGet.mockImplementation((name: string) => (name === "impersonation_session_id" ? { value: "session-abc" } : undefined));
+    mocks.logImpersonationActivity.mockRejectedValue(new Error("cosmos unavailable"));
+    await expect(createTrackerDoc(email, "sr", "service", { date: "2025-01-01", bikeId: "bike-1" } as any)).resolves.toBeDefined();
+    expect(mocks.upsert).toHaveBeenCalledOnce();
   });
 });
 

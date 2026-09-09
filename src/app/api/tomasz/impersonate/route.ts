@@ -1,8 +1,9 @@
 // Place at: src/app/api/tomasz/impersonate/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import { getAdminSession } from "@/lib/admin/session";
+import { getAdminSession, verifyAdminPassword, checkAdminLoginRateLimit, recordAdminLoginAttempt } from "@/lib/admin/session";
+import { verifyTotpCode } from "@/lib/admin/totp";
 import { createSessionForEmail } from "@/lib/auth/session";
-import { userExists, logImpersonation } from "@/lib/admin/impersonation";
+import { userExists, logImpersonation, newImpersonationSessionId } from "@/lib/admin/impersonation";
 
 export const dynamic = "force-dynamic";
 
@@ -24,10 +25,46 @@ export async function POST(request: NextRequest) {
   } catch {
     return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
   }
-  const { email } = body as { email?: string };
+  const { email, password, totpCode, reason } = body as {
+    email?: string;
+    password?: string;
+    totpCode?: string;
+    reason?: string;
+  };
   if (!email || !email.trim()) {
     return NextResponse.json({ error: "Email is required." }, { status: 400 });
   }
+  const trimmedReason = reason?.trim();
+  if (!trimmedReason) {
+    return NextResponse.json({ error: "Please give a reason for this impersonation." }, { status: 400 });
+  }
+
+  // Step-up re-auth: an already-valid admin session alone is no longer
+  // enough to start impersonating - the admin must re-prove their
+  // identity right now, the same way logging in the first time does
+  // (see login-password/login-totp routes), just without the pending-
+  // TOTP cookie dance those need for establishing a brand-new session -
+  // this is one already-authenticated admin re-proving themselves, not
+  // a fresh login. Password checked before TOTP, same order as login,
+  // so a wrong password never gets a "your code was fine" signal either.
+  const passwordLimit = await checkAdminLoginRateLimit("reauth-password");
+  if (!passwordLimit.allowed) {
+    return NextResponse.json({ error: "Too many attempts. Please wait and try again." }, { status: 429 });
+  }
+  await recordAdminLoginAttempt("reauth-password");
+  if (!password || !verifyAdminPassword(password)) {
+    return NextResponse.json({ error: "Incorrect password." }, { status: 401 });
+  }
+
+  const totpLimit = await checkAdminLoginRateLimit("reauth-totp");
+  if (!totpLimit.allowed) {
+    return NextResponse.json({ error: "Too many attempts. Please wait and try again." }, { status: 429 });
+  }
+  await recordAdminLoginAttempt("reauth-totp");
+  if (!totpCode || !verifyTotpCode(totpCode)) {
+    return NextResponse.json({ error: "Incorrect authenticator code." }, { status: 401 });
+  }
+
   const targetEmail = email.trim().toLowerCase();
 
   const exists = await userExists(targetEmail);
@@ -36,7 +73,8 @@ export async function POST(request: NextRequest) {
   }
 
   const ip = getClientIp(request);
-  await logImpersonation(targetEmail, ip, "start");
+  const sessionId = newImpersonationSessionId();
+  await logImpersonation(targetEmail, ip, "start", sessionId, trimmedReason);
 
   const { cookieValue, maxAge } = await createSessionForEmail(
     targetEmail,
@@ -74,6 +112,17 @@ export async function POST(request: NextRequest) {
     path: "/",
     maxAge,
   });
+  // Separate from impersonating_as (still a plain email, unchanged -
+  // see layout.tsx's own read of it) so this can carry just the
+  // correlation id every impersonationActivity entry gets tagged with,
+  // without touching the existing cookie's format or its other readers.
+  response.cookies.set("impersonation_session_id", sessionId, {
+    httpOnly: true,
+    secure: true,
+    sameSite: "lax",
+    path: "/",
+    maxAge,
+  });
 
   return response;
 }
@@ -84,8 +133,9 @@ export async function DELETE(request: NextRequest) {
   // happened to expire mid-impersonation shouldn't be stuck unable to
   // leave it.
   const targetEmail = request.cookies.get("impersonating_as")?.value;
-  if (targetEmail) {
-    await logImpersonation(targetEmail, getClientIp(request), "end");
+  const sessionId = request.cookies.get("impersonation_session_id")?.value;
+  if (targetEmail && sessionId) {
+    await logImpersonation(targetEmail, getClientIp(request), "end", sessionId);
   }
 
   const response = NextResponse.json({ ok: true });
@@ -103,6 +153,7 @@ export async function DELETE(request: NextRequest) {
   }
   response.cookies.delete("impersonating_as");
   response.cookies.delete("admin_prior_session");
+  response.cookies.delete("impersonation_session_id");
 
   return response;
 }

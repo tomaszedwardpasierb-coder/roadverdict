@@ -69,11 +69,18 @@ export async function invalidatePendingTotp(raw: string): Promise<void> {
 const LOGIN_RATE_LIMIT_WINDOW_SECONDS = 15 * 60;
 const MAX_LOGIN_ATTEMPTS_PER_WINDOW = 10;
 
-function loginAttemptIdPrefix(kind: "password" | "totp"): string {
+// "reauth-password"/"reauth-totp" are the impersonation step-up
+// re-auth's own counters (see api/tomasz/impersonate/route.ts) -
+// deliberately distinct kinds from the original login flow's, so a
+// burst of impersonation re-auth attempts can't lock an admin out of
+// signing in fresh, and vice versa.
+type LoginAttemptKind = "password" | "totp" | "reauth-password" | "reauth-totp";
+
+function loginAttemptIdPrefix(kind: LoginAttemptKind): string {
   return `admin-login-attempt:${kind}:`;
 }
 
-export async function checkAdminLoginRateLimit(kind: "password" | "totp"): Promise<{ allowed: boolean }> {
+export async function checkAdminLoginRateLimit(kind: LoginAttemptKind): Promise<{ allowed: boolean }> {
   const container = getContainer();
   const { resources } = await container.items
     .query<{ id: string }>(
@@ -87,7 +94,7 @@ export async function checkAdminLoginRateLimit(kind: "password" | "totp"): Promi
   return { allowed: resources.length < MAX_LOGIN_ATTEMPTS_PER_WINDOW };
 }
 
-export async function recordAdminLoginAttempt(kind: "password" | "totp"): Promise<void> {
+export async function recordAdminLoginAttempt(kind: LoginAttemptKind): Promise<void> {
   const container = getContainer();
   const suffix = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   await container.items.create({

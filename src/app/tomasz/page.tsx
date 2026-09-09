@@ -25,11 +25,13 @@ import { getAssistantConfig, getCarAssistantConfig } from '@/lib/tracker/assista
 import { getAllUserAccounts } from '@/lib/tracker/userAccount';
 import { getGeminiUsageByTask, type GeminiUsageByTask } from '@/lib/tracker/geminiUsageLog';
 import type { UserDoc } from '@/lib/tracker/userDoc';
+import { getAllImpersonationSessions, countImpersonationActivity, type ImpersonationSession } from '@/lib/admin/impersonation';
 import { AdminShell } from './AdminShell';
 import { KnowledgeBaseEditor } from './KnowledgeBaseEditor';
 import styles from './adminShell.module.css';
 import { RunCronButton } from './RunCronButton';
 import { AssistantQuestionsTable } from './AssistantQuestionsTable';
+import { ImpersonationSessionsTable } from './ImpersonationSessionsTable';
 import { ImpersonateButton } from './ImpersonateButton';
 import { AdminLogoutButton } from './AdminLogoutButton';
 import { SendNotificationForm } from './SendNotificationForm';
@@ -87,6 +89,27 @@ async function getAssistantQuestionsSafe(): Promise<AssistantQuestionLogDoc[]> {
   } catch (err) {
     console.error('Failed to load assistant questions for /tomasz:', err);
     return [];
+  }
+}
+
+// Same reasoning again - a new query against a document type this page
+// hasn't touched before shouldn't be able to take down the rest of the
+// page if it fails.
+async function getImpersonationSessionsSafe(): Promise<ImpersonationSession[]> {
+  try {
+    return await getAllImpersonationSessions();
+  } catch (err) {
+    console.error('Failed to load impersonation sessions for /tomasz:', err);
+    return [];
+  }
+}
+
+async function countImpersonationActivitySafe(sessionId: string): Promise<number> {
+  try {
+    return await countImpersonationActivity(sessionId);
+  } catch (err) {
+    console.error(`Failed to count impersonation activity for session ${sessionId}:`, err);
+    return 0;
   }
 }
 
@@ -192,6 +215,7 @@ export default async function AdminDashboardPage(
     allUserAccounts,
     geminiUsageByTask,
     broadcastSummaries,
+    impersonationSessions,
   ] = await Promise.all([
     getDbStats(),
     getActiveSessionCount(),
@@ -214,9 +238,16 @@ export default async function AdminDashboardPage(
     getAllUserAccountsSafe(),
     getGeminiUsageByTaskSafe(),
     getBroadcastSummariesSafe(),
+    getImpersonationSessionsSafe(),
   ]);
   const health = getServerHealth();
   const commonQuestions = groupSimilarQuestions(assistantQuestions);
+  // A second pass, not folded into the Promise.all above - each count
+  // depends on knowing the session ids first, which only exist once
+  // impersonationSessions itself has already resolved.
+  const impersonationSessionsWithCounts = await Promise.all(
+    impersonationSessions.map(async (s) => ({ ...s, changesCount: await countImpersonationActivitySafe(s.sessionId) }))
+  );
 
   const trendRequests = siteStats?.trend.map((t) => t.requests) ?? [];
   const trendFailures = siteStats?.trend.map((t) => t.failures) ?? [];
@@ -636,6 +667,19 @@ export default async function AdminDashboardPage(
     </>
   );
 
+  const impersonationsContent = (
+    <>
+      <h2 className={styles.sectionHeading}>Impersonate sessions</h2>
+      <p className={styles.note} style={{ marginBottom: '0.8rem' }}>
+        Every time an admin has viewed the app as another account, re-authenticated with a
+        password and TOTP code, and the reason given. &quot;Changes made&quot; covers changes made
+        through the standard logging forms (service, fuel, bills, etc.) - not every record type
+        is tracked here yet.
+      </p>
+      <ImpersonationSessionsTable sessions={impersonationSessionsWithCounts} />
+    </>
+  );
+
   const notificationsContent = (
     <>
       <SendNotificationForm allEmails={allUserEmails} />
@@ -771,6 +815,7 @@ export default async function AdminDashboardPage(
       trafficContent={trafficContent}
       jobsContent={jobsContent}
       accountsContent={accountsContent}
+      impersonationsContent={impersonationsContent}
       notificationsContent={notificationsContent}
       assistantContent={assistantContent}
       databaseContent={databaseContent}

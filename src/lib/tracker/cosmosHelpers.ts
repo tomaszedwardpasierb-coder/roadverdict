@@ -1,5 +1,7 @@
 ﻿// Place at: src/lib/tracker/cosmosHelpers.ts
+import { cookies } from "next/headers";
 import { getContainer } from "@/lib/cosmos";
+import { logImpersonationActivity } from "@/lib/admin/impersonation";
 
 // Cosmos attaches these system-generated properties to every stored
 // item and returns them from both point reads and SELECT * queries.
@@ -13,6 +15,28 @@ export function stripCosmosMetadata<T extends object>(doc: T): T {
   const clean = { ...doc } as Record<string, unknown>;
   for (const key of COSMOS_SYSTEM_KEYS) delete clean[key];
   return clean as T;
+}
+
+// Best-effort "was this write made while an admin was impersonating
+// this account" tag - see logImpersonationActivity's own comment for
+// why this is a genuine, honest subset (only the tracker doc types
+// that funnel through the three functions below), not a claim of full
+// coverage across every write in the app. Reads the same
+// impersonation_session_id cookie the impersonate route itself sets
+// (see api/tomasz/impersonate/route.ts) via the same cookies() call
+// getSession() already makes elsewhere - safe to call from here too,
+// since this only ever runs during a real request's handling (a normal
+// write, or a cron job's own request context, where the cookie is
+// simply absent).
+async function logImpersonationActivityIfApplicable(email: string, docType: string, docId: string, action: "create" | "update" | "delete") {
+  try {
+    const cookieStore = await cookies();
+    const sessionId = cookieStore.get("impersonation_session_id")?.value;
+    if (!sessionId) return;
+    await logImpersonationActivity({ sessionId, targetEmail: email, docType, docId, action, at: new Date().toISOString() });
+  } catch (err) {
+    console.error("logImpersonationActivityIfApplicable: failed (the real write itself still succeeded):", err);
+  }
 }
 
 // A single uploaded receipt/invoice. blobName is the unguessable random
@@ -110,6 +134,7 @@ export async function createTrackerDoc<TDoc extends TrackerDocBase>(
     createdAt: new Date().toISOString(),
   } as TDoc;
   await container.items.upsert(doc);
+  await logImpersonationActivityIfApplicable(email, type, doc.id, "create");
   return doc;
 }
 
@@ -191,12 +216,21 @@ export async function updateTrackerDoc<TDoc extends TrackerDocBase>(
   if (!resource) return null;
   const updated = { ...stripCosmosMetadata(resource), ...updates } as TDoc;
   await container.items.upsert(updated);
+  await logImpersonationActivityIfApplicable(email, updated.type as string, id, "update");
   return updated;
 }
 
 export async function deleteTrackerDoc(email: string, id: string): Promise<void> {
   const container = getContainer();
+  // deleteTrackerDoc isn't passed a type (unlike create/update above),
+  // so it's read first purely to label the activity-log entry
+  // correctly - one extra point-read on every delete (a rare,
+  // non-hot-path action), cheaper than widening this function's own
+  // signature just for the (usually never exercised) impersonation
+  // logging case.
+  const { resource } = await container.item(id, email).read<TrackerDocBase>();
   await container.item(id, email).delete();
+  await logImpersonationActivityIfApplicable(email, resource?.type ?? "unknown", id, "delete");
 }
 
 // Plain point-read, no merge/write - used when a route needs to check a
