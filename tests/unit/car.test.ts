@@ -42,6 +42,9 @@ import {
   addCarRegistrationChange,
   deleteCar,
   updateCarChartType,
+  updateCarIncludeInsuranceInReport,
+  updateCarIncludeFinanceInReport,
+  updateCarBuyerOpinionCache,
   queryCarTrackerDocs,
   type CarDoc,
 } from "@/lib/tracker/car";
@@ -319,6 +322,14 @@ describe("simple single-field car updates", () => {
     { name: "updateCarRegion", call: () => updateCarRegion("owner@example.com", "car-1", "scotland-ni"), field: "region", expected: "scotland-ni" },
     { name: "updateCarBudget", call: () => updateCarBudget("owner@example.com", "car-1", 900), field: "annualBudget", expected: 900 },
     { name: "updateCarCurrency", call: () => updateCarCurrency("owner@example.com", "car-1", "eur" as any), field: "currency", expected: "eur" },
+    { name: "updateCarIncludeInsuranceInReport", call: () => updateCarIncludeInsuranceInReport("owner@example.com", "car-1", true), field: "includeInsuranceInReport", expected: true },
+    { name: "updateCarIncludeFinanceInReport", call: () => updateCarIncludeFinanceInReport("owner@example.com", "car-1", true), field: "includeFinanceInReport", expected: true },
+    {
+      name: "updateCarBuyerOpinionCache",
+      call: () => updateCarBuyerOpinionCache("owner@example.com", "car-1", { generatedAt: "2026-01-01T00:00:00.000Z", response: { strengths: [], concerns: [], honestRead: "x" } }),
+      field: "buyerOpinionCache",
+      expected: { generatedAt: "2026-01-01T00:00:00.000Z", response: { strengths: [], concerns: [], honestRead: "x" } },
+    },
   ];
 
   it.each(cases)("$name returns null and does not upsert when the car doesn't exist", async ({ call }) => {

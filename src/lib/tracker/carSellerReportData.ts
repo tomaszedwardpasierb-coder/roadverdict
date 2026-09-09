@@ -1,13 +1,11 @@
 // Place at: src/lib/tracker/carSellerReportData.ts
 //
-// Car equivalent of sellerReportData.ts - only getSellerReportCore's
-// mirror (getCarSellerReportCore) and its rows/metrics helper
-// (computeCarSellerReportRowsAndMetrics) live here for now. The
-// token-aware getSellerReportData wrapper isn't mirrored yet - it needs
-// carShareLink.ts/carReceiptRequest.ts, which don't exist until the
-// share-links slice of this same build lands.
+// Car equivalent of sellerReportData.ts.
 import { notFound } from "next/navigation";
 import { getCarById, getCurrentRegistration, type CarDoc } from "@/lib/tracker/car";
+import { resolveCarShareToken } from "@/lib/tracker/carShareLink";
+import { getCarReceiptRequestsForShareToken, canSendCarReminder } from "@/lib/tracker/carReceiptRequest";
+import type { EntryRequestStatus } from "@/lib/tracker/sellerReportData";
 import { getCarServiceRecords } from "@/lib/tracker/carServiceRecord";
 import { getCarMods } from "@/lib/tracker/carMod";
 import { getCarBills } from "@/lib/tracker/carBill";
@@ -77,6 +75,18 @@ export interface CarSellerReportCore {
   supportedFindings: string[];
   unconfirmedFindings: string[];
   detailedQuestions: string[];
+}
+
+export interface CarSellerReportData extends CarSellerReportCore {
+  token: string;
+  // Entries this specific report link already has permission to show
+  // the real receipt for - re-checked fresh on every page load, so a
+  // decision the owner just made shows up the next time this same link
+  // is visited, no caching to go stale.
+  entryRequestStatus: Record<string, EntryRequestStatus>;
+  // The seller's own choice for this specific link, not the car - see
+  // carShareLink.ts for why it lives there.
+  askingPrice?: number;
 }
 
 // Duplicated from dashboard/page.tsx and the /cars/quote-checker etc
@@ -294,4 +304,30 @@ export async function getCarSellerReportCore(email: string, carId: string): Prom
     unconfirmedFindings,
     detailedQuestions,
   };
+}
+
+export async function getCarSellerReportData(token: string): Promise<CarSellerReportData> {
+  const resolved = await resolveCarShareToken(token);
+  if (!resolved) notFound();
+  const { email, carId, askingPrice } = resolved;
+
+  const core = await getCarSellerReportCore(email, carId);
+
+  const requests = await getCarReceiptRequestsForShareToken(email, token);
+  // Most recent request wins per entry - handles "declined, then asked
+  // again" correctly, since the newer request's pending status should
+  // take precedence over an older decline for display purposes.
+  const entryRequestStatus: Record<string, EntryRequestStatus> = {};
+  for (const r of [...requests].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())) {
+    for (const item of r.items) {
+      entryRequestStatus[item.entryId] = {
+        status: item.status,
+        reason: item.reason,
+        requestCreatedAt: r.createdAt,
+        canRemind: canSendCarReminder(r),
+      };
+    }
+  }
+
+  return { token, ...core, entryRequestStatus, askingPrice };
 }

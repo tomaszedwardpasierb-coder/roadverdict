@@ -85,6 +85,18 @@ export interface CarDoc {
   // owner's own dashboard/spend charts/cost-per-mile).
   includeInsuranceInReport?: boolean;
   includeFinanceInReport?: boolean;
+  // Cached AI-generated buyer opinion for the detailed car report -
+  // mirrors bike.ts's own field exactly. That report page has no login
+  // and can be viewed by anyone with the link, any number of times, so
+  // without this cache an AI call would fire on every single page load.
+  buyerOpinionCache?: {
+    generatedAt: string;
+    response: {
+      strengths: string[];
+      concerns: string[];
+      honestRead: string;
+    };
+  };
   dateAdded: string;
   // Set when this car was added despite the registration already having
   // a RoadVerdict record under a different account - see bike.ts's own
@@ -240,6 +252,15 @@ export async function updateCarIncludeFinanceInReport(email: string, carId: stri
   const { resource } = await container.item(carId, email).read<CarDoc>();
   if (!resource) return null;
   resource.includeFinanceInReport = includeFinanceInReport;
+  await container.items.upsert(resource);
+  return resource;
+}
+
+export async function updateCarBuyerOpinionCache(email: string, carId: string, buyerOpinionCache: CarDoc["buyerOpinionCache"]): Promise<CarDoc | null> {
+  const container = getContainer();
+  const { resource } = await container.item(carId, email).read<CarDoc>();
+  if (!resource) return null;
+  resource.buyerOpinionCache = buyerOpinionCache;
   await container.items.upsert(resource);
   return resource;
 }

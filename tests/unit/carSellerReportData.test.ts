@@ -10,9 +10,19 @@ const mocks = vi.hoisted(() => ({
   getCarBills: vi.fn(),
   getCarFuelLogs: vi.fn(),
   getCarReminders: vi.fn(),
+  resolveCarShareToken: vi.fn(),
+  getCarReceiptRequestsForShareToken: vi.fn(),
 }));
 
 vi.mock("next/navigation", () => ({ notFound: mocks.notFound }));
+vi.mock("@/lib/tracker/carShareLink", () => ({ resolveCarShareToken: mocks.resolveCarShareToken }));
+// Only getCarReceiptRequestsForShareToken is a genuine I/O boundary -
+// canSendCarReminder is pure and already covered by
+// carReceiptRequest.test.ts.
+vi.mock("@/lib/tracker/carReceiptRequest", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/tracker/carReceiptRequest")>();
+  return { ...actual, getCarReceiptRequestsForShareToken: mocks.getCarReceiptRequestsForShareToken };
+});
 
 // Only getCarById is a genuine I/O boundary - getCurrentRegistration is
 // pure and already covered elsewhere, so it's kept real via
@@ -38,6 +48,7 @@ vi.mock("@/lib/tracker/carReminder", () => ({ getCarReminders: mocks.getCarRemin
 import {
   computeCarSellerReportRowsAndMetrics,
   getCarSellerReportCore,
+  getCarSellerReportData,
 } from "@/lib/tracker/carSellerReportData";
 import type { CarDoc } from "@/lib/tracker/car";
 import type { CarServiceRecordDoc } from "@/lib/tracker/carServiceRecord";
@@ -215,5 +226,58 @@ describe("getCarSellerReportCore", () => {
     mocks.getCarById.mockResolvedValue(makeCar({ currentMileage: 300000, year: 2000 }));
     const core = await getCarSellerReportCore("owner@example.com", "car-1");
     expect(core.mileageCheck.implausible).toBe(false);
+  });
+});
+
+describe("getCarSellerReportData", () => {
+  beforeEach(() => {
+    resetAllMocks();
+    mocks.getCarServiceRecords.mockResolvedValue([]);
+    mocks.getCarMods.mockResolvedValue([]);
+    mocks.getCarBills.mockResolvedValue([]);
+    mocks.getCarFuelLogs.mockResolvedValue([]);
+    mocks.getCarReminders.mockResolvedValue([]);
+    mocks.getCarReceiptRequestsForShareToken.mockResolvedValue([]);
+  });
+
+  it("calls notFound() for an invalid or expired token, without ever fetching the car", async () => {
+    mocks.resolveCarShareToken.mockResolvedValue(null);
+    await expect(getCarSellerReportData("bad-token")).rejects.toThrow("NEXT_NOT_FOUND");
+    expect(mocks.getCarById).not.toHaveBeenCalled();
+  });
+
+  it("returns the token and askingPrice alongside the core report data", async () => {
+    mocks.resolveCarShareToken.mockResolvedValue({ email: "owner@example.com", carId: "car-1", askingPrice: 5000 });
+    mocks.getCarById.mockResolvedValue(makeCar());
+
+    const data = await getCarSellerReportData("tok_abc123");
+
+    expect(data.token).toBe("tok_abc123");
+    expect(data.askingPrice).toBe(5000);
+    expect(data.car.make).toBe("Ford");
+  });
+
+  // The real, distinctive piece of logic in this function: when the
+  // same entry was asked about more than once, the most recently
+  // created request's status must win, not the oldest.
+  it("resolves entryRequestStatus to the most recently created request when an entry was asked about more than once", async () => {
+    mocks.resolveCarShareToken.mockResolvedValue({ email: "owner@example.com", carId: "car-1" });
+    mocks.getCarById.mockResolvedValue(makeCar());
+    mocks.getCarReceiptRequestsForShareToken.mockResolvedValue([
+      {
+        id: "req-old", pk: "owner@example.com", type: "carReceiptRequest", shareToken: "tok_abc123", carId: "car-1",
+        items: [{ entryId: "sr-1", category: "service", description: "x", status: "declined", reason: "too personal" }],
+        decisionTokenHash: "h1", createdAt: "2025-01-01T00:00:00.000Z", ttl: 1,
+      },
+      {
+        id: "req-new", pk: "owner@example.com", type: "carReceiptRequest", shareToken: "tok_abc123", carId: "car-1",
+        items: [{ entryId: "sr-1", category: "service", description: "x", status: "pending" }],
+        decisionTokenHash: "h2", createdAt: "2025-02-01T00:00:00.000Z", ttl: 1,
+      },
+    ] as any);
+
+    const data = await getCarSellerReportData("tok_abc123");
+
+    expect(data.entryRequestStatus["sr-1"]).toMatchObject({ status: "pending", requestCreatedAt: "2025-02-01T00:00:00.000Z" });
   });
 });
