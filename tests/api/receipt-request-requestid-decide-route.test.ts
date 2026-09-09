@@ -4,12 +4,16 @@ import { NextRequest } from "next/server";
 const mocks = vi.hoisted(() => ({
   getSession: vi.fn(),
   decideReceiptRequestItems: vi.fn(),
+  decideCarReceiptRequestItems: vi.fn(),
   logImpersonationActivityForCurrentRequest: vi.fn(),
 }));
 
 vi.mock("@/lib/auth/session", () => ({ getSession: mocks.getSession }));
 vi.mock("@/lib/tracker/receiptRequest", () => ({
   decideReceiptRequestItems: mocks.decideReceiptRequestItems,
+}));
+vi.mock("@/lib/tracker/carReceiptRequest", () => ({
+  decideCarReceiptRequestItems: mocks.decideCarReceiptRequestItems,
 }));
 vi.mock("@/lib/admin/impersonation", () => ({
   logImpersonationActivityForCurrentRequest: mocks.logImpersonationActivityForCurrentRequest,
@@ -47,6 +51,7 @@ beforeEach(() => {
   Object.values(mocks).forEach((m) => m.mockReset());
   mocks.getSession.mockResolvedValue({ email });
   mocks.decideReceiptRequestItems.mockResolvedValue({ items: updatedItems });
+  mocks.decideCarReceiptRequestItems.mockResolvedValue(null);
 });
 
 describe("POST /api/tracker/receipt-request/[requestId]/decide", () => {
@@ -102,13 +107,32 @@ describe("POST /api/tracker/receipt-request/[requestId]/decide", () => {
     expect(response.status).toBe(200);
   });
 
-  it("returns 404 when decideReceiptRequestItems returns null", async () => {
+  it("returns 404 when neither the bike nor the car collection has a matching request", async () => {
     mocks.decideReceiptRequestItems.mockResolvedValue(null);
     const response = await POST(
       request(requestId, { decision: "approved" }),
       { params: Promise.resolve({ requestId }) }
     );
     expect(response.status).toBe(404);
+  });
+
+  it("falls back to the car receipt-request collection when no bike request matches", async () => {
+    mocks.decideReceiptRequestItems.mockResolvedValue(null);
+    mocks.decideCarReceiptRequestItems.mockResolvedValue({ items: updatedItems });
+
+    const response = await POST(
+      request(requestId, { decision: "approved" }),
+      { params: Promise.resolve({ requestId }) }
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ ok: true, items: updatedItems });
+    expect(mocks.logImpersonationActivityForCurrentRequest).toHaveBeenCalledWith("carReceiptRequest", requestId, "update");
+  });
+
+  it("never checks the car collection when a bike request already matched", async () => {
+    await POST(request(requestId, { decision: "approved" }), { params: Promise.resolve({ requestId }) });
+    expect(mocks.decideCarReceiptRequestItems).not.toHaveBeenCalled();
   });
 
   it("returns ok:true and the updated items on success", async () => {

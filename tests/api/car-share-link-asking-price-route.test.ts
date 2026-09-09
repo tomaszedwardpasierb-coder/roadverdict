@@ -1,0 +1,100 @@
+// Mirrors share-link-asking-price-route.test.ts for the car equivalent route.
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { NextRequest } from "next/server";
+
+const mocks = vi.hoisted(() => ({
+  getSession: vi.fn(),
+  getCarShareLink: vi.fn(),
+  updateCarShareLinkAskingPrice: vi.fn(),
+  logImpersonationActivityForCurrentRequest: vi.fn(),
+}));
+
+vi.mock("@/lib/auth/session", () => ({ getSession: mocks.getSession }));
+vi.mock("@/lib/tracker/carShareLink", () => ({
+  getCarShareLink: mocks.getCarShareLink,
+  updateCarShareLinkAskingPrice: mocks.updateCarShareLinkAskingPrice,
+}));
+vi.mock("@/lib/admin/impersonation", () => ({
+  logImpersonationActivityForCurrentRequest: mocks.logImpersonationActivityForCurrentRequest,
+}));
+
+import { POST } from "@/app/api/cars/car-share-link/[token]/asking-price/route";
+
+function req(body: string): NextRequest {
+  return new NextRequest("http://localhost/api/cars/car-share-link/tok/asking-price", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body,
+  });
+}
+
+describe("POST /api/cars/car-share-link/[token]/asking-price", () => {
+  beforeEach(() => {
+    Object.values(mocks).forEach((mock) => mock.mockReset());
+    mocks.getCarShareLink.mockResolvedValue({ id: "tok-1", email: "owner@example.com" });
+    mocks.updateCarShareLinkAskingPrice.mockResolvedValue({ askingPrice: 4500 });
+  });
+
+  it("rejects unauthenticated requests", async () => {
+    mocks.getSession.mockResolvedValue(null);
+    const response = await POST(req("{}"), { params: Promise.resolve({ token: "tok-1" }) });
+    expect(response.status).toBe(401);
+  });
+
+  it("returns not found for a link belonging to someone else, the identical response as nonexistent", async () => {
+    mocks.getSession.mockResolvedValue({ email: "attacker@example.com" });
+    const response = await POST(req(JSON.stringify({ askingPrice: 4500 })), { params: Promise.resolve({ token: "tok-1" }) });
+    expect(response.status).toBe(404);
+  });
+
+  it("checks ownership before ever reading the body, so malformed JSON on someone else's link still returns 404", async () => {
+    mocks.getSession.mockResolvedValue({ email: "attacker@example.com" });
+    const response = await POST(req("not-json"), { params: Promise.resolve({ token: "tok-1" }) });
+    expect(response.status).toBe(404);
+  });
+
+  it("rejects malformed JSON on a genuinely owned link", async () => {
+    mocks.getSession.mockResolvedValue({ email: "owner@example.com" });
+    const response = await POST(req("not-json"), { params: Promise.resolve({ token: "tok-1" }) });
+    expect(response.status).toBe(400);
+  });
+
+  it("rejects a non-positive or non-finite asking price", async () => {
+    mocks.getSession.mockResolvedValue({ email: "owner@example.com" });
+    expect((await POST(req(JSON.stringify({ askingPrice: -50 })), { params: Promise.resolve({ token: "tok-1" }) })).status).toBe(400);
+    expect((await POST(req(JSON.stringify({ askingPrice: 0 })), { params: Promise.resolve({ token: "tok-1" }) })).status).toBe(400);
+  });
+
+  it("rejects an asking price above the sanity ceiling, accepts one exactly at it", async () => {
+    mocks.getSession.mockResolvedValue({ email: "owner@example.com" });
+    expect((await POST(req(JSON.stringify({ askingPrice: 200001 })), { params: Promise.resolve({ token: "tok-1" }) })).status).toBe(400);
+    expect((await POST(req(JSON.stringify({ askingPrice: 200000 })), { params: Promise.resolve({ token: "tok-1" }) })).status).toBe(200);
+  });
+
+  it("treats an explicit null the same as an omitted field: clears the price rather than rejecting it", async () => {
+    mocks.getSession.mockResolvedValue({ email: "owner@example.com" });
+
+    await POST(req(JSON.stringify({ askingPrice: null })), { params: Promise.resolve({ token: "tok-1" }) });
+    expect(mocks.updateCarShareLinkAskingPrice).toHaveBeenCalledWith("tok-1", null);
+
+    mocks.updateCarShareLinkAskingPrice.mockClear();
+    await POST(req(JSON.stringify({})), { params: Promise.resolve({ token: "tok-1" }) });
+    expect(mocks.updateCarShareLinkAskingPrice).toHaveBeenCalledWith("tok-1", null);
+  });
+
+  it("updates a valid asking price", async () => {
+    mocks.getSession.mockResolvedValue({ email: "owner@example.com" });
+    const response = await POST(req(JSON.stringify({ askingPrice: 4500 })), { params: Promise.resolve({ token: "tok-1" }) });
+    expect(mocks.updateCarShareLinkAskingPrice).toHaveBeenCalledWith("tok-1", 4500);
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ askingPrice: 4500 });
+    expect(mocks.logImpersonationActivityForCurrentRequest).toHaveBeenCalledWith("carShareLink", "tok-1", "update");
+  });
+
+  it("returns not found if the link vanishes between the ownership check and the update itself", async () => {
+    mocks.getSession.mockResolvedValue({ email: "owner@example.com" });
+    mocks.updateCarShareLinkAskingPrice.mockResolvedValue(null);
+    const response = await POST(req(JSON.stringify({ askingPrice: 4500 })), { params: Promise.resolve({ token: "tok-1" }) });
+    expect(response.status).toBe(404);
+  });
+});

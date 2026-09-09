@@ -4,10 +4,12 @@ import { NextRequest } from "next/server";
 const mocks = vi.hoisted(() => ({
   getSession: vi.fn(),
   decideReceiptRequestItems: vi.fn(),
+  decideCarReceiptRequestItems: vi.fn(),
 }));
 
 vi.mock("@/lib/auth/session", () => ({ getSession: mocks.getSession }));
 vi.mock("@/lib/tracker/receiptRequest", () => ({ decideReceiptRequestItems: mocks.decideReceiptRequestItems }));
+vi.mock("@/lib/tracker/carReceiptRequest", () => ({ decideCarReceiptRequestItems: mocks.decideCarReceiptRequestItems }));
 
 import { POST } from "@/app/api/tracker/receipt-request/[requestId]/decide/route";
 
@@ -25,7 +27,9 @@ describe("POST /api/tracker/receipt-request/[requestId]/decide", () => {
   beforeEach(() => {
     mocks.getSession.mockReset();
     mocks.decideReceiptRequestItems.mockReset();
+    mocks.decideCarReceiptRequestItems.mockReset();
     mocks.decideReceiptRequestItems.mockResolvedValue({ items: [{ entryId: "e1", status: "approved" }] });
+    mocks.decideCarReceiptRequestItems.mockResolvedValue(null);
   });
 
   it("rejects unauthenticated requests before reading the body", async () => {

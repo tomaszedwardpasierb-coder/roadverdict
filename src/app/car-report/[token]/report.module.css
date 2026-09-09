@@ -1,0 +1,387 @@
+/* Place at: src/app/report/[token]/report.module.css */
+.wrapper {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 2.5rem 1.5rem 4rem;
+}
+.title { font-family: var(--font-display); font-size: 1.8rem; margin: 0 0 0.3rem; }
+.subtext { color: var(--ink-soft); margin: 0 0 1.5rem; }
+
+.verdictBlock {
+  border-radius: 6px;
+  padding: 1rem 1.2rem;
+  margin-bottom: 1.5rem;
+  border: 2px solid var(--border);
+}
+.verdictGood { border-color: var(--verdict-green); background: #eaf3ea; }
+.verdictMid { border-color: var(--amber); background: #fbf1e0; }
+.verdictPoor { border-color: var(--verdict-red); background: #f8e2dd; }
+.verdictBadge {
+  display: inline-block;
+  font-family: var(--font-display);
+  font-size: 1.1rem;
+  font-weight: 700;
+  margin-bottom: 0.5rem;
+}
+.verdictGood .verdictBadge { color: var(--verdict-green); }
+.verdictMid .verdictBadge { color: var(--amber-ink); }
+.verdictPoor .verdictBadge { color: var(--verdict-red); }
+.verdictReasons { margin: 0; padding-left: 1.2rem; font-size: 0.85rem; color: var(--ink-soft); }
+.verdictReasons li { margin-bottom: 0.2rem; }
+
+.verdictChips { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.7rem; }
+.verdictChip, .verdictChipGood, .verdictChipWarn, .verdictChipNeutral {
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 0.2rem 0.65rem;
+  border-radius: 20px;
+  white-space: nowrap;
+}
+.verdictChipGood { background: var(--green-tint); color: #173404; }
+.verdictChipWarn { background: var(--red-tint); color: #501313; }
+.verdictChipNeutral { background: #fff; color: var(--ink-soft); border: 1px solid var(--border); }
+
+.jumpNav {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  background: var(--stone);
+  margin: 0 -1.5rem 1.5rem;
+  padding: 0.6rem 1.5rem;
+  border-bottom: 1px solid var(--border);
+}
+.jumpNavInner { display: flex; gap: 0.5rem; overflow-x: auto; scrollbar-width: none; }
+.jumpNavInner::-webkit-scrollbar { display: none; }
+.jumpNavItem {
+  flex-shrink: 0;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--ink);
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 0.35rem 0.8rem;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.jumpNavItem:hover { background: var(--stone); }
+
+.upsellBlock {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1.2rem;
+  border: 2px dashed var(--amber);
+  border-radius: 6px;
+  padding: 1rem 1.2rem;
+  margin-bottom: 1.5rem;
+  background: #fbf1e0;
+}
+.upsellTitle { font-family: var(--font-display); font-size: 1rem; margin: 0 0 0.3rem; }
+.upsellText { margin: 0; font-size: 0.82rem; color: var(--ink-soft); max-width: 48ch; }
+.upsellFlag {
+  display: inline-block;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--amber-ink);
+  background: #fbeecd;
+  border-radius: 3px;
+  padding: 0.15rem 0.5rem;
+  margin: 0 0 1rem;
+}
+.backLink { font-size: 0.85rem; color: var(--ink-soft); text-decoration: none; }
+.backLink:hover { text-decoration: underline; }
+
+.docPage {
+  background: var(--paper);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 2rem 2.2rem;
+  margin-bottom: 1.5rem;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+}
+.docHeading {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  margin: 1.6rem 0 0.7rem;
+  padding-bottom: 0.35rem;
+  border-bottom: 1px solid var(--border);
+  scroll-margin-top: 4.5rem;
+}
+.docHeadingIcon { flex-shrink: 0; color: var(--amber-ink); }
+.docHeading:first-of-type { margin-top: 0.4rem; }
+.docParagraph { font-size: 0.92rem; line-height: 1.6; margin: 0 0 0.8rem; }
+
+.warnBlock {
+  border: 2px solid var(--verdict-red);
+  background: #f8e2dd;
+  border-radius: 6px;
+  padding: 0.8rem 1rem;
+  margin: 1rem 0 1.4rem;
+}
+.warnTitle { font-family: var(--font-display); font-weight: 700; color: var(--verdict-red); margin: 0 0 0.3rem; }
+
+.itemByItemList { margin: 0; }
+.itemByItemRow { margin-bottom: 0.7rem; }
+.itemByItemRow dt { font-weight: 700; font-size: 0.88rem; margin-bottom: 0.15rem; }
+.itemByItemRow dd { margin: 0; font-size: 0.87rem; color: var(--ink-soft); line-height: 1.5; }
+
+.twoColumn { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-top: 0.4rem; }
+.findingsList { margin: 0; padding-left: 1.1rem; font-size: 0.85rem; line-height: 1.6; }
+.findingGood { color: var(--verdict-green); }
+.findingGap { color: var(--ink-soft); }
+@media (max-width: 640px) {
+  .twoColumn { grid-template-columns: 1fr; }
+
+  /* upsellBlock's CTA link, verifyBlock's QR code, and requestBar's
+     form all resist shrinking (flexShrink: 0, or fixed-width content) -
+     on a row layout with no wrap, that forces their sibling text into
+     a sliver-width column instead. Stacking removes the squeeze. */
+  .upsellBlock, .verifyBlock, .requestBar {
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: flex-start;
+  }
+  .qrBlock { align-self: center; }
+
+  /* Mobile type scale. Until now, .wrapper/.docPage/.title/.docHeading
+     carried the exact same values at every width - this is the "shrunk
+     desktop" problem stated plainly: nothing here was ever considered
+     for a phone, it just reflowed narrower. docPage's horizontal
+     padding was the single biggest offender, eating 35px a side on a
+     ~360px screen for no real reason. */
+  .wrapper { padding: 1.5rem 1rem 3rem; }
+  .title { font-size: 1.5rem; }
+  .docPage { padding: 1.25rem 1.1rem; }
+  .verdictBlock { padding: 0.9rem 1rem; }
+  .docHeading { font-size: 0.98rem; margin: 1.3rem 0 0.6rem; }
+
+  /* jumpNav's negative margin bleeds it edge-to-edge by cancelling
+     .wrapper's own horizontal padding exactly - has to move in lockstep
+     with the padding change above, or it either falls short of the
+     edge or overshoots it. */
+  .jumpNav { margin: 0 -1rem 1.25rem; padding: 0.6rem 1rem; }
+}
+
+.gateBlock { max-width: 420px; margin: 3rem auto; text-align: center; }
+.gateForm { display: flex; flex-direction: column; gap: 0.7rem; margin-top: 1.2rem; }
+.gateInput {
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  font-size: 1.1rem;
+  text-align: center;
+  letter-spacing: 0.08em;
+  padding: 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+}
+
+.receiptAvailableTag {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.78rem;
+  color: var(--verdict-green);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.receiptRequestedTag { font-size: 0.78rem; color: var(--amber-ink); white-space: nowrap; }
+
+.requestBar {
+  position: sticky;
+  bottom: 0;
+  background: var(--paper);
+  border: 2px solid var(--amber);
+  border-radius: 6px;
+  padding: 0.8rem 1rem;
+  margin: 1rem 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  box-shadow: 0 -2px 8px rgba(0,0,0,0.08);
+}
+.requestForm { width: 100%; }
+
+.bulkSelectBar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.82rem;
+  color: var(--ink-soft);
+  margin-bottom: 0.6rem;
+}
+.bulkSelectBtn {
+  background: var(--stone);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 0.25rem 0.6rem;
+  font-size: 0.78rem;
+  cursor: pointer;
+  color: var(--ink);
+}
+.bulkSelectBtn:hover { background: var(--border); }
+
+.pendingTag { display: flex; flex-direction: column; gap: 0.3rem; font-size: 0.78rem; color: var(--amber-ink); white-space: nowrap; }
+.remindBtn {
+  background: none;
+  border: 1px solid var(--amber);
+  color: var(--amber-ink);
+  border-radius: 4px;
+  padding: 0.15rem 0.5rem;
+  font-size: 0.75rem;
+  cursor: pointer;
+  align-self: flex-start;
+}
+.remindBtn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.declinedTag { font-size: 0.78rem; color: var(--ink-soft); max-width: 220px; }
+.declinedTag p { margin: 0 0 0.3rem; }
+.askAgainLink {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--amber-ink);
+  text-decoration: underline;
+  cursor: pointer;
+  font-size: 0.78rem;
+}
+
+.verifyBlock {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1.2rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 1rem 1.2rem;
+  margin-bottom: 1.5rem;
+}
+.verifyText { margin: 0 0 0.5rem; font-size: 0.85rem; color: var(--ink-soft); max-width: 42ch; }
+.motLink {
+  display: inline-block;
+  font-weight: 600;
+  color: var(--amber-ink);
+  text-decoration: none;
+  border-bottom: 2px solid var(--amber);
+}
+.verifyPlate { margin: 0.5rem 0 0; font-size: 0.8rem; color: var(--ink-soft); }
+.verifyPlate strong { font-family: var(--font-mono); color: var(--ink); }
+.qrBlock { text-align: center; flex-shrink: 0; }
+.qrBlock img { display: block; margin: 0 auto 0.4rem; border: 1px solid var(--border); border-radius: 4px; }
+.qrCaption { margin: 0; font-size: 0.68rem; color: var(--ink-soft); max-width: 130px; }
+
+.upcomingBlock {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 1rem 1.2rem;
+  margin-bottom: 1.5rem;
+}
+.upcomingTitle { font-family: var(--font-display); font-size: 1rem; margin: 0 0 0.6rem; scroll-margin-top: 4.5rem; }
+.upcomingList { margin: 0; padding-left: 1.2rem; font-size: 0.87rem; }
+.upcomingList li { margin-bottom: 0.3rem; }
+.upcomingOverdue { color: var(--verdict-red); }
+.upcomingSoon { color: var(--amber-ink); }
+.upcomingNote { margin: 0.7rem 0 0; font-size: 0.75rem; color: var(--ink-soft); font-style: italic; }
+
+.questionsBlock {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 1rem 1.2rem;
+  margin-bottom: 1.5rem;
+}
+.questionsTitle { font-family: var(--font-display); font-size: 1rem; margin: 0 0 0.6rem; }
+.questionsList { margin: 0; padding-left: 1.2rem; font-size: 0.87rem; color: var(--ink-soft); }
+.questionsList li { margin-bottom: 0.4rem; }
+
+.registrationBlock {
+  font-size: 0.85rem;
+  color: var(--ink-soft);
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 1.2rem;
+  margin-bottom: 1.2rem;
+}
+.registrationBlock p { margin: 0; }
+.registrationBlock p + p { margin-top: 0.4rem; }
+.registrationBlock strong { color: var(--ink); font-family: var(--font-mono); }
+.registrationNote { font-style: italic; }
+.registrationWarning { color: #7a251b; font-weight: 600; }
+.table { width: 100%; border-collapse: collapse; font-size: 0.9rem; margin-bottom: 1.5rem; }
+.table th, .table td { text-align: left; padding: 0.5rem 0.7rem; border-bottom: 1px solid var(--border); }
+.table th { font-family: var(--font-mono); font-size: 0.72rem; text-transform: uppercase; color: var(--ink-soft); }
+.table tfoot td { font-weight: 600; border-top: 2px solid var(--asphalt); border-bottom: none; }
+.caveat { font-size: 0.82rem; color: var(--ink-soft); border-top: 1px solid var(--border); padding-top: 1rem; }
+
+.clusterWarning {
+  background: #f8e2dd;
+  border: 2px solid var(--verdict-red);
+  border-radius: 6px;
+  padding: 0.9rem 1.1rem;
+  margin-bottom: 1.2rem;
+  font-size: 0.88rem;
+  color: #7a251b;
+}
+.clusterWarning p { margin: 0; }
+.clusterWarning p + p { margin-top: 0.5rem; }
+
+.backdateSummary {
+  font-size: 0.85rem;
+  color: var(--ink-soft);
+  background: var(--paper);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.7rem 0.9rem;
+  margin-bottom: 1rem;
+}
+
+.backdateNote {
+  font-size: 0.72rem;
+  color: var(--verdict-red);
+  margin-top: 0.15rem;
+}
+.backdateNoteSoft {
+  font-size: 0.72rem;
+  color: var(--ink-soft);
+  margin-top: 0.15rem;
+}
+
+.receiptLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  text-decoration: none;
+  color: var(--amber-ink);
+}
+.receiptThumb {
+  width: 32px;
+  height: 32px;
+  object-fit: cover;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  display: block;
+}
+.receiptThumbPdf {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--stone);
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  font-weight: 700;
+  color: var(--ink-soft);
+}
+.receiptLabel { font-size: 0.78rem; }
+.noReceipt { font-size: 0.78rem; color: var(--ink-soft); }
+@media print {
+  .noPrint { display: none; }
+}

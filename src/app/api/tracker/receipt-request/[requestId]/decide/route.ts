@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/session";
 import { decideReceiptRequestItems } from "@/lib/tracker/receiptRequest";
+import { decideCarReceiptRequestItems } from "@/lib/tracker/carReceiptRequest";
 import { logImpersonationActivityForCurrentRequest } from "@/lib/admin/impersonation";
 
 export const dynamic = "force-dynamic";
@@ -29,9 +30,16 @@ export async function POST(req: NextRequest, props: { params: Promise<{ requestI
   }
 
   const updated = await decideReceiptRequestItems(params.requestId, session.email, body.entryIds ?? "all", body.decision, body.reason);
-  if (!updated) {
-    return NextResponse.json({ error: "Request not found." }, { status: 404 });
+  if (updated) {
+    void logImpersonationActivityForCurrentRequest("receiptRequest", params.requestId, "update");
+    return NextResponse.json({ ok: true, items: updated.items });
   }
-  void logImpersonationActivityForCurrentRequest("receiptRequest", params.requestId, "update");
-  return NextResponse.json({ ok: true, items: updated.items });
+
+  const carUpdated = await decideCarReceiptRequestItems(params.requestId, session.email, body.entryIds ?? "all", body.decision, body.reason);
+  if (carUpdated) {
+    void logImpersonationActivityForCurrentRequest("carReceiptRequest", params.requestId, "update");
+    return NextResponse.json({ ok: true, items: carUpdated.items });
+  }
+
+  return NextResponse.json({ error: "Request not found." }, { status: 404 });
 }
