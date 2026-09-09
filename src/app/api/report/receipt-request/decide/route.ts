@@ -1,6 +1,7 @@
 // Place at: src/app/api/report/receipt-request/decide/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { getReceiptRequestByDecisionToken, decideReceiptRequestItems } from "@/lib/tracker/receiptRequest";
+import { getCarReceiptRequestByDecisionToken, decideCarReceiptRequestItems } from "@/lib/tracker/carReceiptRequest";
 
 export const dynamic = "force-dynamic";
 
@@ -16,10 +17,16 @@ export async function POST(req: NextRequest) {
   }
 
   const request = await getReceiptRequestByDecisionToken(body.token);
-  if (!request) {
-    return NextResponse.json({ error: "This request link is no longer valid." }, { status: 404 });
+  if (request) {
+    const updated = await decideReceiptRequestItems(request.id, request.pk, body.entryIds ?? "all", body.decision, body.reason);
+    return NextResponse.json({ ok: true, items: updated?.items ?? [] });
   }
 
-  const updated = await decideReceiptRequestItems(request.id, request.pk, body.entryIds ?? "all", body.decision, body.reason);
-  return NextResponse.json({ ok: true, items: updated?.items ?? [] });
+  const carRequest = await getCarReceiptRequestByDecisionToken(body.token);
+  if (carRequest) {
+    const updated = await decideCarReceiptRequestItems(carRequest.id, carRequest.pk, body.entryIds ?? "all", body.decision, body.reason);
+    return NextResponse.json({ ok: true, items: updated?.items ?? [] });
+  }
+
+  return NextResponse.json({ error: "This request link is no longer valid." }, { status: 404 });
 }

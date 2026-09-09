@@ -4,11 +4,16 @@ import { NextRequest } from "next/server";
 
 const mocks = vi.hoisted(() => ({
   getReceiptRequestByDecisionToken: vi.fn(),
+  getCarReceiptRequestByDecisionToken: vi.fn(),
   download: vi.fn(),
 }));
 
 vi.mock("@/lib/tracker/receiptRequest", () => ({
   getReceiptRequestByDecisionToken: mocks.getReceiptRequestByDecisionToken,
+}));
+
+vi.mock("@/lib/tracker/carReceiptRequest", () => ({
+  getCarReceiptRequestByDecisionToken: mocks.getCarReceiptRequestByDecisionToken,
 }));
 
 const mockContainer = {
@@ -33,17 +38,33 @@ const requestDocWithAttachment = {
 describe("GET /api/report/receipt-request/attachment/[decisionToken]/[blobName]", () => {
   beforeEach(() => {
     mocks.getReceiptRequestByDecisionToken.mockReset();
+    mocks.getCarReceiptRequestByDecisionToken.mockReset();
     mocks.download.mockReset();
     mockContainer.getBlockBlobClient.mockClear();
+    mocks.getCarReceiptRequestByDecisionToken.mockResolvedValue(null);
   });
 
-  it("returns not found for a token that doesn't resolve to a real request", async () => {
+  it("returns not found for a token that doesn't resolve to a real request on either side", async () => {
     mocks.getReceiptRequestByDecisionToken.mockResolvedValue(null);
 
     const response = await GET(req(), { params: Promise.resolve({ decisionToken: "bad-token", blobName: "anything.jpg" }) });
 
     expect(response.status).toBe(404);
     await expect(response.json()).resolves.toEqual({ error: "This request is no longer available." });
+  });
+
+  it("falls back to the car receipt-request collection when no bike request matches the token", async () => {
+    mocks.getReceiptRequestByDecisionToken.mockResolvedValue(null);
+    mocks.getCarReceiptRequestByDecisionToken.mockResolvedValue(requestDocWithAttachment);
+    mocks.download.mockResolvedValue({
+      readableStreamBody: Readable.from([Buffer.from("fake jpeg bytes")]),
+      contentType: "image/jpeg",
+    });
+
+    const response = await GET(req(), { params: Promise.resolve({ decisionToken: "tok-car", blobName: "receipts/e1-invoice.jpg" }) });
+
+    expect(response.status).toBe(200);
+    expect(mockContainer.getBlockBlobClient).toHaveBeenCalledWith("receipts/e1-invoice.jpg");
   });
 
   // The actual isolation guarantee described in the source comment: a

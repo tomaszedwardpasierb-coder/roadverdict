@@ -1,5 +1,6 @@
 // Place at: src/app/report/receipt-request/decide/page.tsx
 import { getReceiptRequestByDecisionToken } from "@/lib/tracker/receiptRequest";
+import { getCarReceiptRequestByDecisionToken } from "@/lib/tracker/carReceiptRequest";
 import { DecideRequestForm } from "./DecideRequestForm";
 import styles from "../../[token]/report.module.css";
 
@@ -21,7 +22,7 @@ export default async function DecideReceiptRequestPage(
     );
   }
 
-  const request = await getReceiptRequestByDecisionToken(token);
+  const request = (await getReceiptRequestByDecisionToken(token)) ?? (await getCarReceiptRequestByDecisionToken(token));
   if (!request) {
     return (
       <div className={styles.wrapper}>

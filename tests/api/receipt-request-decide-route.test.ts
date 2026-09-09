@@ -4,11 +4,18 @@ import { NextRequest } from "next/server";
 const mocks = vi.hoisted(() => ({
   getReceiptRequestByDecisionToken: vi.fn(),
   decideReceiptRequestItems: vi.fn(),
+  getCarReceiptRequestByDecisionToken: vi.fn(),
+  decideCarReceiptRequestItems: vi.fn(),
 }));
 
 vi.mock("@/lib/tracker/receiptRequest", () => ({
   getReceiptRequestByDecisionToken: mocks.getReceiptRequestByDecisionToken,
   decideReceiptRequestItems: mocks.decideReceiptRequestItems,
+}));
+
+vi.mock("@/lib/tracker/carReceiptRequest", () => ({
+  getCarReceiptRequestByDecisionToken: mocks.getCarReceiptRequestByDecisionToken,
+  decideCarReceiptRequestItems: mocks.decideCarReceiptRequestItems,
 }));
 
 import { POST } from "@/app/api/report/receipt-request/decide/route";
@@ -29,8 +36,11 @@ describe("POST /api/report/receipt-request/decide", () => {
   beforeEach(() => {
     mocks.getReceiptRequestByDecisionToken.mockReset();
     mocks.decideReceiptRequestItems.mockReset();
+    mocks.getCarReceiptRequestByDecisionToken.mockReset();
+    mocks.decideCarReceiptRequestItems.mockReset();
     mocks.getReceiptRequestByDecisionToken.mockResolvedValue({ id: "req-1", pk: "owner@example.com" });
     mocks.decideReceiptRequestItems.mockResolvedValue({ items: [{ entryId: "e1", status: "approved" }] });
+    mocks.getCarReceiptRequestByDecisionToken.mockResolvedValue(null);
   });
 
   it("rejects malformed JSON", async () => {
@@ -56,14 +66,35 @@ describe("POST /api/report/receipt-request/decide", () => {
     expect(mocks.getReceiptRequestByDecisionToken).not.toHaveBeenCalled();
   });
 
-  it("returns not found for a token that doesn't resolve to a real request", async () => {
+  it("returns not found for a token that doesn't resolve to a real request on either side", async () => {
     mocks.getReceiptRequestByDecisionToken.mockResolvedValue(null);
+    mocks.getCarReceiptRequestByDecisionToken.mockResolvedValue(null);
 
     const response = await POST(request(JSON.stringify({ token: "expired-or-fake", decision: "approved" })));
 
     expect(response.status).toBe(404);
     await expect(response.json()).resolves.toEqual({ error: "This request link is no longer valid." });
     expect(mocks.decideReceiptRequestItems).not.toHaveBeenCalled();
+    expect(mocks.decideCarReceiptRequestItems).not.toHaveBeenCalled();
+  });
+
+  it("falls back to the car receipt-request collection when no bike request matches the token", async () => {
+    mocks.getReceiptRequestByDecisionToken.mockResolvedValue(null);
+    mocks.getCarReceiptRequestByDecisionToken.mockResolvedValue({ id: "car-req-1", pk: "owner@example.com" });
+    mocks.decideCarReceiptRequestItems.mockResolvedValue({ items: [{ entryId: "e1", status: "approved" }] });
+
+    const response = await POST(request(JSON.stringify({ token: "tok-car", decision: "approved" })));
+
+    expect(response.status).toBe(200);
+    expect(mocks.decideCarReceiptRequestItems).toHaveBeenCalledWith(
+      "car-req-1", "owner@example.com", "all", "approved", undefined
+    );
+    expect(mocks.decideReceiptRequestItems).not.toHaveBeenCalled();
+  });
+
+  it("never checks the car collection when a bike request already matched", async () => {
+    await POST(request(JSON.stringify({ token: "tok-1", decision: "approved" })));
+    expect(mocks.getCarReceiptRequestByDecisionToken).not.toHaveBeenCalled();
   });
 
   it("defaults to deciding all items when entryIds is omitted", async () => {

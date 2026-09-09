@@ -1,6 +1,7 @@
 // Place at: src/app/api/report/receipt-request/attachment/[decisionToken]/[blobName]/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { getReceiptRequestByDecisionToken } from "@/lib/tracker/receiptRequest";
+import { getCarReceiptRequestByDecisionToken } from "@/lib/tracker/carReceiptRequest";
 import { getAttachmentContainer } from "@/lib/blobStorage";
 
 export const dynamic = "force-dynamic";
@@ -24,7 +25,9 @@ export async function GET(
   props: { params: Promise<{ decisionToken: string; blobName: string }> }
 ) {
   const params = await props.params;
-  const requestDoc = await getReceiptRequestByDecisionToken(params.decisionToken);
+  const requestDoc =
+    (await getReceiptRequestByDecisionToken(params.decisionToken)) ??
+    (await getCarReceiptRequestByDecisionToken(params.decisionToken));
   if (!requestDoc) {
     return NextResponse.json({ error: "This request is no longer available." }, { status: 404 });
   }
