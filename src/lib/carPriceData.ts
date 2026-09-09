@@ -336,3 +336,18 @@ export function getAdjustedCarBenchmark(
     source: base.source,
   };
 }
+
+// Inflation-only variant for contexts higher-stakes than the Quote
+// Checker's own "does my quote look reasonable" use - the car buyer
+// report reads to a stranger who might spend real money, and brand/
+// region are explicitly unsourced placeholders above, not something
+// that belongs baked into a number shown with a confidence label and
+// source notes. Mirrors priceData.ts's getInflationAdjustedBenchmark.
+export function getInflationAdjustedCarBenchmark(job: CarJobType, carClass: CarBenchmarkClass): CarBenchmark {
+  const base = CAR_BENCHMARKS[job][carClass];
+  return {
+    low: Math.round(base.low * INFLATION_MULTIPLIER_SINCE_RESEARCH),
+    high: Math.round(base.high * INFLATION_MULTIPLIER_SINCE_RESEARCH),
+    source: base.source,
+  };
+}

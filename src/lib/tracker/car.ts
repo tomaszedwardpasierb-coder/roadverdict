@@ -2,11 +2,12 @@
 //
 // The car equivalent of bike.ts - sister schema, not a shared one (see
 // RoadVerdict_Car_Plan_v3.md's Architecture Decision Record for why).
-// Deliberately narrower than BikeDoc in a few places: no shareToken,
-// includeInsuranceInReport/includeFinanceInReport, storyCache, or
-// transferredFrom/transferredTo - those all belong to features
-// (buyer report, Story So Far, ownership transfer) that are explicit
-// out-of-scope items for this build. Adding them later is additive and
+// Still narrower than BikeDoc in a few places: no shareToken,
+// storyCache, or transferredFrom - those belong to features (share
+// links/buyer report page, Story So Far, ownership transfer) being
+// built incrementally; each comes off this list once its own car
+// mirror lands (includeInsuranceInReport/includeFinanceInReport and
+// transferredTo already have). Adding the rest later is additive and
 // safe; carrying them now with nothing to write or read them is dead
 // weight.
 import { cookies } from "next/headers";
@@ -76,6 +77,14 @@ export interface CarDoc {
   originalRegistration?: string;
   registrationChanges?: RegistrationChangeEntry[];
   dvlaData?: DvlaVehicleData;
+  // Off-by-default, buyer-report-only toggles - mirrors bike.ts's own
+  // fields of the same name exactly (see that file's comment for the
+  // full reasoning: a future owner's insurance/finance is specific to
+  // THEM, never predictive of this car, so it's excluded from the two
+  // buyer-report surfaces by default, while still counting in the
+  // owner's own dashboard/spend charts/cost-per-mile).
+  includeInsuranceInReport?: boolean;
+  includeFinanceInReport?: boolean;
   dateAdded: string;
   // Set when this car was added despite the registration already having
   // a RoadVerdict record under a different account - see bike.ts's own
@@ -213,6 +222,24 @@ export async function updateCarDvlaData(email: string, carId: string, dvlaData: 
   const { resource } = await container.item(carId, email).read<CarDoc>();
   if (!resource) return null;
   resource.dvlaData = dvlaData;
+  await container.items.upsert(resource);
+  return resource;
+}
+
+export async function updateCarIncludeInsuranceInReport(email: string, carId: string, includeInsuranceInReport: boolean): Promise<CarDoc | null> {
+  const container = getContainer();
+  const { resource } = await container.item(carId, email).read<CarDoc>();
+  if (!resource) return null;
+  resource.includeInsuranceInReport = includeInsuranceInReport;
+  await container.items.upsert(resource);
+  return resource;
+}
+
+export async function updateCarIncludeFinanceInReport(email: string, carId: string, includeFinanceInReport: boolean): Promise<CarDoc | null> {
+  const container = getContainer();
+  const { resource } = await container.item(carId, email).read<CarDoc>();
+  if (!resource) return null;
+  resource.includeFinanceInReport = includeFinanceInReport;
   await container.items.upsert(resource);
   return resource;
 }

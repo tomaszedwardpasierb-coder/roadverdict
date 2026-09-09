@@ -3,6 +3,8 @@
 // The car equivalent of jobTypes.ts's JOB_LABELS - almost no overlap
 // with the motorcycle list (see the ADR's divergence table). "other" is
 // the safe universal fallback, same role it plays for motorcycles.
+import type { CarJobType } from "@/lib/carPriceData";
+
 export const CAR_JOB_LABELS: Record<string, string> = {
   "oil-filter": "Oil & filter change",
   "interim-service": "Interim service",
@@ -78,3 +80,8 @@ export const CAR_BENCHMARKED_JOB_TYPES: string[] = [
   "brake-pads-front",
   "tyres-front-pair",
 ];
+
+// Mirrors jobTypes.ts's isBenchmarkedJob.
+export function isBenchmarkedCarJob(jobType: string): jobType is CarJobType {
+  return (CAR_BENCHMARKED_JOB_TYPES as string[]).includes(jobType);
+}
