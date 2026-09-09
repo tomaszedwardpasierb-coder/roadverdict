@@ -2,6 +2,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAllReminders, computeReminderStatus, reminderDetailLabel, markReminderNotified } from "@/lib/tracker/reminder";
 import { getBike } from "@/lib/tracker/bike";
+import { getAllCarReminders, markCarReminderNotified } from "@/lib/tracker/carReminder";
+import { computeCarReminderStatus, carReminderDetailLabel } from "@/lib/tracker/carReminderStatus";
+import { getCarById } from "@/lib/tracker/car";
 import { sendReminderEmail } from "@/lib/resend";
 import { getContainer } from "@/lib/cosmos";
 import { isPro } from "@/lib/subscriptions";
@@ -54,6 +57,42 @@ export async function POST(req: NextRequest) {
         sent++;
       } catch (err) {
         console.error(`Reminder check failed for reminder ${reminder.id}:`, err);
+        failed++;
+      }
+    }
+
+    // Car reminders - mirrored, not shared, same sister-schema convention
+    // as every other bike/car pair in this app: getAllCarReminders/
+    // getCarById/computeCarReminderStatus/carReminderDetailLabel/
+    // markCarReminderNotified instead of their bike equivalents. Counted
+    // into the SAME checked/sent/failed totals and the same cronStatus
+    // doc below - there's exactly one daily reminder run, not two
+    // separately-tracked ones per vehicle kind.
+    const carReminders = await getAllCarReminders();
+    for (const reminder of carReminders) {
+      checked++;
+      if (reminder.notifiedAt) continue;
+
+      try {
+        const email = reminder.pk;
+        let currentMileage = 0;
+        if (reminder.intervalType === "mileage") {
+          if (!reminder.carId) continue;
+          const car = await getCarById(email, reminder.carId);
+          if (!car) continue;
+          currentMileage = car.currentMileage;
+        }
+
+        const status = computeCarReminderStatus(reminder, currentMileage);
+        if (status !== "overdue") continue;
+
+        if (!(await isPro(email))) continue;
+
+        await sendReminderEmail(email, reminder.name, carReminderDetailLabel(reminder));
+        await markCarReminderNotified(email, reminder.id);
+        sent++;
+      } catch (err) {
+        console.error(`Car reminder check failed for reminder ${reminder.id}:`, err);
         failed++;
       }
     }

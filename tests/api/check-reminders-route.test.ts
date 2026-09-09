@@ -5,6 +5,9 @@ const mocks = vi.hoisted(() => ({
   getAllReminders: vi.fn(),
   markReminderNotified: vi.fn(),
   getBike: vi.fn(),
+  getAllCarReminders: vi.fn(),
+  markCarReminderNotified: vi.fn(),
+  getCarById: vi.fn(),
   sendReminderEmail: vi.fn(),
   upsert: vi.fn(),
   isPro: vi.fn(),
@@ -24,6 +27,14 @@ vi.mock("@/lib/tracker/reminder", async () => {
   };
 });
 vi.mock("@/lib/tracker/bike", () => ({ getBike: mocks.getBike }));
+// Same real-orchestration-logic reasoning as reminder.ts above, for the
+// car equivalent (computeCarReminderStatus/carReminderDetailLabel are
+// kept real, only the Cosmos-backed functions are replaced).
+vi.mock("@/lib/tracker/carReminder", () => ({
+  getAllCarReminders: mocks.getAllCarReminders,
+  markCarReminderNotified: mocks.markCarReminderNotified,
+}));
+vi.mock("@/lib/tracker/car", () => ({ getCarById: mocks.getCarById }));
 vi.mock("@/lib/resend", () => ({ sendReminderEmail: mocks.sendReminderEmail }));
 vi.mock("@/lib/cosmos", () => ({
   getContainer: () => ({ items: { upsert: mocks.upsert } }),
@@ -56,6 +67,16 @@ function futureDateReminder(overrides: Record<string, unknown> = {}) {
   };
 }
 
+function overdueDateCarReminder(overrides: Record<string, unknown> = {}) {
+  const past = new Date(Date.now() - 10 * 86_400_000).toISOString();
+  return {
+    id: "cr1", pk: "driver@example.com", type: "carReminder", name: "Insurance renewal",
+    intervalType: "date", exactDate: past, date: "2024-01-01", createdAt: "2024-01-01T00:00:00.000Z",
+    notifiedAt: null,
+    ...overrides,
+  };
+}
+
 describe("POST /api/cron/check-reminders", () => {
   const originalSecret = process.env.CRON_SECRET;
 
@@ -64,6 +85,8 @@ describe("POST /api/cron/check-reminders", () => {
     process.env.CRON_SECRET = "top-secret";
     mocks.getAllReminders.mockResolvedValue([]);
     mocks.markReminderNotified.mockResolvedValue(undefined);
+    mocks.getAllCarReminders.mockResolvedValue([]);
+    mocks.markCarReminderNotified.mockResolvedValue(undefined);
     mocks.sendReminderEmail.mockResolvedValue(undefined);
     mocks.upsert.mockResolvedValue(undefined);
     // Default every account to Pro so the pre-existing send-path tests
@@ -210,5 +233,114 @@ describe("POST /api/cron/check-reminders", () => {
     expect(await second.json()).toEqual({ ok: true, checked: 1, sent: 0 });
 
     expect(mocks.sendReminderEmail).toHaveBeenCalledTimes(1);
+  });
+
+  // Car reminders - mirrors every bike-side case above (see this file's
+  // own header note on the route: getAllCarReminders/getCarById were
+  // real, working code that nothing ever called before this pass, so a
+  // car owner's overdue reminders were silently never emailed).
+  describe("car reminders", () => {
+    it("skips a car reminder that's already been notified about", async () => {
+      mocks.getAllCarReminders.mockResolvedValue([overdueDateCarReminder({ notifiedAt: "2025-01-01T00:00:00.000Z" })]);
+      const response = await POST(request({ authorization: "Bearer top-secret" }));
+      const body = await response.json();
+      expect(body).toEqual({ ok: true, checked: 1, sent: 0 });
+      expect(mocks.sendReminderEmail).not.toHaveBeenCalled();
+    });
+
+    it("skips a mileage car reminder defensively when it has no carId (pre-migration data)", async () => {
+      mocks.getAllCarReminders.mockResolvedValue([
+        { id: "cr3", pk: "driver@example.com", intervalType: "mileage", intervalValue: 500, baseMileage: 0, notifiedAt: null, date: "2024-01-01" },
+      ]);
+      const response = await POST(request({ authorization: "Bearer top-secret" }));
+      const body = await response.json();
+      expect(body).toEqual({ ok: true, checked: 1, sent: 0 });
+      expect(mocks.getCarById).not.toHaveBeenCalled();
+    });
+
+    it("skips a mileage car reminder whose car no longer exists", async () => {
+      mocks.getAllCarReminders.mockResolvedValue([
+        { id: "cr4", pk: "driver@example.com", carId: "car-1", intervalType: "mileage", intervalValue: 500, baseMileage: 0, notifiedAt: null, date: "2024-01-01" },
+      ]);
+      mocks.getCarById.mockResolvedValue(null);
+      const response = await POST(request({ authorization: "Bearer top-secret" }));
+      const body = await response.json();
+      expect(body.sent).toBe(0);
+      expect(mocks.sendReminderEmail).not.toHaveBeenCalled();
+    });
+
+    it("does not email for a car reminder that isn't overdue yet", async () => {
+      const future = new Date(Date.now() + 60 * 86_400_000).toISOString();
+      mocks.getAllCarReminders.mockResolvedValue([
+        overdueDateCarReminder({ id: "cr2", name: "MOT", exactDate: future }),
+      ]);
+      const response = await POST(request({ authorization: "Bearer top-secret" }));
+      const body = await response.json();
+      expect(body).toEqual({ ok: true, checked: 1, sent: 0 });
+      expect(mocks.sendReminderEmail).not.toHaveBeenCalled();
+    });
+
+    it("emails and marks notified for an overdue car reminder, then persists a cronStatus summary", async () => {
+      mocks.getAllCarReminders.mockResolvedValue([overdueDateCarReminder()]);
+      const response = await POST(request({ authorization: "Bearer top-secret" }));
+      const body = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(body).toEqual({ ok: true, checked: 1, sent: 1 });
+      expect(mocks.sendReminderEmail).toHaveBeenCalledWith(
+        "driver@example.com", "Insurance renewal", expect.stringContaining("due")
+      );
+      expect(mocks.markCarReminderNotified).toHaveBeenCalledWith("driver@example.com", "cr1");
+      expect(mocks.upsert).toHaveBeenCalledWith(expect.objectContaining({
+        id: "cronStatus::reminders", pk: "system", type: "cronStatus", checked: 1, sent: 1,
+      }));
+    });
+
+    it("checks but does not email a free account's overdue car reminder, and leaves it un-notified so upgrading later still sends it", async () => {
+      mocks.isPro.mockResolvedValue(false);
+      mocks.getAllCarReminders.mockResolvedValue([overdueDateCarReminder()]);
+      const response = await POST(request({ authorization: "Bearer top-secret" }));
+      const body = await response.json();
+
+      expect(body).toEqual({ ok: true, checked: 1, sent: 0 });
+      expect(mocks.sendReminderEmail).not.toHaveBeenCalled();
+      expect(mocks.markCarReminderNotified).not.toHaveBeenCalled();
+    });
+
+    it("isolates a single failed car reminder send and still checks/sends every other reminder in the run", async () => {
+      mocks.getAllCarReminders.mockResolvedValue([
+        overdueDateCarReminder({ id: "cr1", pk: "first@example.com" }),
+        overdueDateCarReminder({ id: "cr5", pk: "second@example.com", name: "Tax renewal" }),
+      ]);
+      mocks.sendReminderEmail.mockImplementation(async (email: string) => {
+        if (email === "first@example.com") throw new Error("Resend API down");
+      });
+
+      const response = await POST(request({ authorization: "Bearer top-secret" }));
+      expect(response.status).toBe(200);
+      const body = await response.json();
+      expect(body).toEqual({ ok: true, checked: 2, sent: 1, failed: 1 });
+      expect(mocks.sendReminderEmail).toHaveBeenCalledWith("second@example.com", "Tax renewal", expect.anything());
+      expect(mocks.markCarReminderNotified).toHaveBeenCalledWith("second@example.com", "cr5");
+      expect(mocks.markCarReminderNotified).not.toHaveBeenCalledWith("first@example.com", "cr1");
+    });
+
+    // The two vehicle kinds share exactly one run/one cronStatus doc, not
+    // two independently-tracked ones - a bike reminder and a car reminder
+    // both overdue in the same run must combine into the same totals.
+    it("combines bike and car reminders into the same checked/sent totals and the same cronStatus doc", async () => {
+      mocks.getAllReminders.mockResolvedValue([overdueDateReminder()]);
+      mocks.getAllCarReminders.mockResolvedValue([overdueDateCarReminder()]);
+
+      const response = await POST(request({ authorization: "Bearer top-secret" }));
+      const body = await response.json();
+
+      expect(body).toEqual({ ok: true, checked: 2, sent: 2 });
+      expect(mocks.sendReminderEmail).toHaveBeenCalledWith("rider@example.com", "Insurance renewal", expect.anything());
+      expect(mocks.sendReminderEmail).toHaveBeenCalledWith("driver@example.com", "Insurance renewal", expect.anything());
+      expect(mocks.upsert).toHaveBeenCalledWith(expect.objectContaining({
+        id: "cronStatus::reminders", checked: 2, sent: 2,
+      }));
+    });
   });
 });
