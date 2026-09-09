@@ -5,6 +5,9 @@ const mocks = vi.hoisted(() => ({
   getSession: vi.fn(),
   createCar: vi.fn(),
   getPrimaryCar: vi.fn(),
+  getCarsForUser: vi.fn(),
+  getBikesForUser: vi.fn(),
+  isPro: vi.fn(),
   updateCarMileage: vi.fn(),
   updateCarRegion: vi.fn(),
   updateCarBudget: vi.fn(),
@@ -21,19 +24,29 @@ vi.mock("@/lib/auth/session", () => ({ getSession: mocks.getSession }));
 vi.mock("@/lib/admin/impersonation", () => ({
   logImpersonationActivityForCurrentRequest: mocks.logImpersonationActivityForCurrentRequest,
 }));
-vi.mock("@/lib/tracker/car", () => ({
-  createCar: mocks.createCar,
-  getPrimaryCar: mocks.getPrimaryCar,
-  updateCarMileage: mocks.updateCarMileage,
-  updateCarRegion: mocks.updateCarRegion,
-  updateCarBudget: mocks.updateCarBudget,
-  updateCarUnits: mocks.updateCarUnits,
-  updateCarCurrency: mocks.updateCarCurrency,
-  updateCarChartType: mocks.updateCarChartType,
-  updateCarDvlaData: mocks.updateCarDvlaData,
-  isCarReadOnly: mocks.isCarReadOnly,
-  CAR_READ_ONLY_MESSAGE: "This car has been transferred and is now read-only.",
-}));
+vi.mock("@/lib/tracker/car", async () => {
+  const actual = await vi.importActual<typeof import("@/lib/tracker/car")>("@/lib/tracker/car");
+  return {
+    createCar: mocks.createCar,
+    getPrimaryCar: mocks.getPrimaryCar,
+    getCarsForUser: mocks.getCarsForUser,
+    countActiveCars: actual.countActiveCars,
+    updateCarMileage: mocks.updateCarMileage,
+    updateCarRegion: mocks.updateCarRegion,
+    updateCarBudget: mocks.updateCarBudget,
+    updateCarUnits: mocks.updateCarUnits,
+    updateCarCurrency: mocks.updateCarCurrency,
+    updateCarChartType: mocks.updateCarChartType,
+    updateCarDvlaData: mocks.updateCarDvlaData,
+    isCarReadOnly: mocks.isCarReadOnly,
+    CAR_READ_ONLY_MESSAGE: "This car has been transferred and is now read-only.",
+  };
+});
+vi.mock("@/lib/tracker/bike", async () => {
+  const actual = await vi.importActual<typeof import("@/lib/tracker/bike")>("@/lib/tracker/bike");
+  return { getBikesForUser: mocks.getBikesForUser, countActiveBikes: actual.countActiveBikes };
+});
+vi.mock("@/lib/subscriptions", () => ({ isPro: mocks.isPro }));
 vi.mock("@/lib/tracker/dvlaDataFetch", () => ({ fetchDvlaDataFromVdg: mocks.fetchDvlaDataFromVdg }));
 // Unlike bike/route.ts, there's no bike-class-style classification here to
 // leave real - car creation doesn't derive anything pure from the payload
@@ -66,6 +79,13 @@ describe("POST /api/cars/car", () => {
     Object.values(mocks).forEach((m) => m.mockReset());
     mocks.createCar.mockResolvedValue({ id: "car-1", originalRegistration: "AB12CDE" });
     mocks.fetchDvlaDataFromVdg.mockResolvedValue(null);
+    // Combined cap pre-check defaults: an account with nothing else
+    // tracked and no Pro subscription never trips the new guard, so
+    // every existing test below (written before that guard existed)
+    // keeps exercising createCar unchanged.
+    mocks.isPro.mockResolvedValue(false);
+    mocks.getCarsForUser.mockResolvedValue([]);
+    mocks.getBikesForUser.mockResolvedValue([]);
   });
 
   it("rejects unauthenticated requests before reading the body", async () => {
@@ -73,6 +93,35 @@ describe("POST /api/cars/car", () => {
     const response = await POST(request("POST", "not-json"));
     expect(response.status).toBe(401);
     expect(mocks.createCar).not.toHaveBeenCalled();
+  });
+
+  // The combined bike+car cap - checked BEFORE createCar is ever called
+  // (createCar itself has no cap logic of its own, unlike createBike).
+  it("blocks a free account at the combined bike+car cap before ever calling createCar", async () => {
+    mocks.getSession.mockResolvedValue({ email: "owner@example.com" });
+    mocks.getBikesForUser.mockResolvedValue([{ id: "bike-1", transferredTo: undefined }]);
+    mocks.getCarsForUser.mockResolvedValue([{ id: "car-1", transferredTo: undefined }]);
+
+    const response = await POST(request("POST", JSON.stringify(validCreatePayload)));
+
+    expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toEqual({
+      error: "Free accounts can track up to 2 vehicles total (bikes and cars combined). Upgrade to add more.",
+      reason: "limit_reached",
+    });
+    expect(mocks.createCar).not.toHaveBeenCalled();
+  });
+
+  it("allows a Pro account past the combined cap", async () => {
+    mocks.getSession.mockResolvedValue({ email: "owner@example.com" });
+    mocks.isPro.mockResolvedValue(true);
+    mocks.getBikesForUser.mockResolvedValue([{ id: "bike-1", transferredTo: undefined }]);
+    mocks.getCarsForUser.mockResolvedValue([{ id: "car-1", transferredTo: undefined }]);
+
+    const response = await POST(request("POST", JSON.stringify(validCreatePayload)));
+
+    expect(response.status).toBe(200);
+    expect(mocks.createCar).toHaveBeenCalled();
   });
 
   it("rejects malformed JSON", async () => {

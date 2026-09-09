@@ -4,6 +4,8 @@ import { getSession } from "@/lib/auth/session";
 import {
   createCar,
   getPrimaryCar,
+  getCarsForUser,
+  countActiveCars,
   updateCarMileage,
   updateCarRegion,
   updateCarBudget,
@@ -15,10 +17,12 @@ import {
   CAR_READ_ONLY_MESSAGE,
   type CarFuelType,
 } from "@/lib/tracker/car";
+import { getBikesForUser, countActiveBikes, type ChartKind } from "@/lib/tracker/bike";
+import { isPro } from "@/lib/subscriptions";
+import { MAX_FREE_VEHICLES } from "@/lib/tracker/vehicleLimit";
 import { fetchDvlaDataFromVdg } from "@/lib/tracker/dvlaDataFetch";
 import { logImpersonationActivityForCurrentRequest } from "@/lib/admin/impersonation";
 import type { Region } from "@/lib/priceData";
-import type { ChartKind } from "@/lib/tracker/bike";
 import type { DistanceUnit, FuelEconomyUnit } from "@/lib/tracker/unitFormat";
 import type { Currency } from "@/lib/tracker/currency";
 
@@ -68,6 +72,27 @@ export async function POST(request: NextRequest) {
   }
   if (!registration || !registration.trim()) {
     return NextResponse.json({ error: "Registration number is required." }, { status: 400 });
+  }
+
+  // Combined bike+car cap - createCar itself has no cap logic of its own
+  // (unlike createBike), so this route is the only gate for cars. See
+  // the equivalent block in POST /api/tracker/bike for why this lives
+  // at the route layer rather than inside car.ts.
+  if (!(await isPro(session.email))) {
+    const [existingBikes, existingCars] = await Promise.all([
+      getBikesForUser(session.email),
+      getCarsForUser(session.email),
+    ]);
+    const combinedCount = countActiveBikes(existingBikes) + countActiveCars(existingCars);
+    if (combinedCount >= MAX_FREE_VEHICLES) {
+      return NextResponse.json(
+        {
+          error: `Free accounts can track up to ${MAX_FREE_VEHICLES} vehicles total (bikes and cars combined). Upgrade to add more.`,
+          reason: "limit_reached",
+        },
+        { status: 403 }
+      );
+    }
   }
 
   const car = await createCar(session.email, {

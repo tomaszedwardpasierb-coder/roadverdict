@@ -4,6 +4,8 @@ import { getSession } from "@/lib/auth/session";
 import {
   createBike,
   getPrimaryBike,
+  getBikesForUser,
+  countActiveBikes,
   updateBikeMileage,
   updateBikeRegion,
   updateBikeBudget,
@@ -17,6 +19,9 @@ import {
   BIKE_READ_ONLY_MESSAGE,
   type ChartKind,
 } from "@/lib/tracker/bike";
+import { getCarsForUser, countActiveCars } from "@/lib/tracker/car";
+import { isPro } from "@/lib/subscriptions";
+import { MAX_FREE_VEHICLES } from "@/lib/tracker/vehicleLimit";
 import { fetchDvlaDataFromVdg } from "@/lib/tracker/dvlaDataFetch";
 import { logImpersonationActivityForCurrentRequest } from "@/lib/admin/impersonation";
 import { getBikeClassForCC } from "@/lib/motorcycleModels";
@@ -60,6 +65,30 @@ export async function POST(request: NextRequest) {
   }
   if (!registration || !registration.trim()) {
     return NextResponse.json({ error: "Registration number is required." }, { status: 400 });
+  }
+
+  // Combined bike+car cap, checked here rather than inside createBike
+  // itself - bike.ts can't count cars without importing car.ts's
+  // runtime code, which this app's sister-schema architecture never
+  // does. createBike's own internal (bike-only) cap check stays as an
+  // inner safety net below, but is never actually reachable through this
+  // route once this fires, since a bike-only count can never exceed the
+  // combined count.
+  if (!(await isPro(session.email))) {
+    const [existingBikes, existingCars] = await Promise.all([
+      getBikesForUser(session.email),
+      getCarsForUser(session.email),
+    ]);
+    const combinedCount = countActiveBikes(existingBikes) + countActiveCars(existingCars);
+    if (combinedCount >= MAX_FREE_VEHICLES) {
+      return NextResponse.json(
+        {
+          error: `Free accounts can track up to ${MAX_FREE_VEHICLES} vehicles total (bikes and cars combined). Upgrade to add more.`,
+          reason: "limit_reached",
+        },
+        { status: 403 }
+      );
+    }
   }
 
   const bikeClass = getBikeClassForCC(engineCC);

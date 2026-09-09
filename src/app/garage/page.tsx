@@ -3,12 +3,16 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { getSession } from "@/lib/auth/session";
 import { isPro } from "@/lib/subscriptions";
-import { getBikesForUser, pickActiveBike, getCurrentRegistration, countActiveBikes, isBikeReadOnly, MAX_FREE_BIKES } from "@/lib/tracker/bike";
+import { getBikesForUser, getCurrentRegistration, countActiveBikes, isBikeReadOnly } from "@/lib/tracker/bike";
+import { getCarsForUser, getCurrentRegistration as getCarCurrentRegistration, countActiveCars, isCarReadOnly } from "@/lib/tracker/car";
+import { resolveActiveVehicle } from "@/lib/tracker/activeVehicle";
+import { MAX_FREE_VEHICLES } from "@/lib/tracker/vehicleLimit";
 import LogoutButton from "@/app/dashboard/LogoutButton";
 import dashboardStyles from "@/app/dashboard/dashboard.module.css";
 import styles from "./garage.module.css";
 import { BikeCard } from "./BikeCard";
-import { AddAnotherBikeSection } from "./AddAnotherBikeSection";
+import { CarCard } from "./CarCard";
+import { AddAnotherVehicleSection } from "./AddAnotherVehicleSection";
 
 export const dynamic = "force-dynamic";
 
@@ -16,14 +20,21 @@ export default async function GaragePage() {
   const session = await getSession();
   if (!session) redirect("/login");
 
-  const bikes = await getBikesForUser(session.email);
+  const [bikes, cars, activeVehicle] = await Promise.all([
+    getBikesForUser(session.email),
+    getCarsForUser(session.email),
+    resolveActiveVehicle(session.email),
+  ]);
 
-  // No bike yet at all - that onboarding flow already lives on the
+  // No vehicle yet at all - that onboarding flow already lives on the
   // dashboard page, no need to duplicate it here.
-  if (bikes.length === 0) redirect("/dashboard");
+  if (bikes.length === 0 && cars.length === 0) redirect("/dashboard");
 
-  const activeBike = await pickActiveBike(bikes);
   const userIsPro = await isPro(session.email);
+  const activeBikeCount = countActiveBikes(bikes);
+  const activeCarCount = countActiveCars(cars);
+  const vehicleCount = activeBikeCount + activeCarCount;
+  const comparableCount = bikes.filter((b) => !isBikeReadOnly(b)).length + cars.filter((c) => !isCarReadOnly(c)).length;
 
   return (
     <main className={dashboardStyles.main}>
@@ -32,17 +43,17 @@ export default async function GaragePage() {
         <LogoutButton />
       </div>
 
-      <h1 className={dashboardStyles.heading}>Your bikes</h1>
+      <h1 className={dashboardStyles.heading}>Your garage</h1>
       <p className={dashboardStyles.subtext} style={{ marginBottom: "1.3rem" }}>
         {userIsPro
-          ? `${countActiveBikes(bikes)} bike${countActiveBikes(bikes) === 1 ? "" : "s"} tracked - no limit on Pro.`
-          : `${countActiveBikes(bikes)} of ${MAX_FREE_BIKES} free bikes used.`}
+          ? `${vehicleCount} vehicle${vehicleCount === 1 ? "" : "s"} tracked - no limit on Pro.`
+          : `${vehicleCount} of ${MAX_FREE_VEHICLES} free vehicles used.`}
       </p>
 
-      {bikes.filter((b) => !isBikeReadOnly(b)).length >= 2 && (
+      {comparableCount >= 2 && (
         <p style={{ marginBottom: "1.3rem" }}>
           <Link href="/garage/compare" className="submit-button" style={{ textDecoration: "none", display: "inline-block" }}>
-            Compare bikes
+            Compare vehicles
           </Link>
         </p>
       )}
@@ -56,16 +67,29 @@ export default async function GaragePage() {
             year={bike.year}
             isCustomBuild={bike.isCustomBuild}
             currentMileage={bike.currentMileage}
-            isActive={bike.id === activeBike?.id}
+            isActive={activeVehicle?.kind === "bike" && bike.id === activeVehicle.bike.id}
             currentRegistration={getCurrentRegistration(bike)}
             registrationChangeCount={bike.registrationChanges?.length ?? 0}
             transferredToEmail={bike.transferredTo?.newOwnerEmail}
             mayHavePriorHistory={bike.mayHavePriorHistory}
           />
         ))}
+        {cars.map((car) => (
+          <CarCard
+            key={car.id}
+            carId={car.id}
+            name={car.nickname ? `${car.nickname} - ${car.make} ${car.model}` : `${car.make} ${car.model}`}
+            year={car.year}
+            isCustomBuild={car.isCustomBuild}
+            currentMileage={car.currentMileage}
+            isActive={activeVehicle?.kind === "car" && car.id === activeVehicle.car.id}
+            currentRegistration={getCarCurrentRegistration(car)}
+            transferredToEmail={car.transferredTo?.newOwnerEmail}
+          />
+        ))}
       </div>
 
-      <AddAnotherBikeSection bikeCount={countActiveBikes(bikes)} maxFreeBikes={MAX_FREE_BIKES} isPro={userIsPro} key={bikes.length} />
+      <AddAnotherVehicleSection vehicleCount={vehicleCount} maxFreeVehicles={MAX_FREE_VEHICLES} isPro={userIsPro} key={`${bikes.length}-${cars.length}`} />
     </main>
   );
 }

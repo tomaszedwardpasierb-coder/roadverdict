@@ -5,6 +5,9 @@ const mocks = vi.hoisted(() => ({
   getSession: vi.fn(),
   createBike: vi.fn(),
   getPrimaryBike: vi.fn(),
+  getBikesForUser: vi.fn(),
+  getCarsForUser: vi.fn(),
+  isPro: vi.fn(),
   updateBikeMileage: vi.fn(),
   updateBikeRegion: vi.fn(),
   updateBikeBudget: vi.fn(),
@@ -23,21 +26,31 @@ vi.mock("@/lib/auth/session", () => ({ getSession: mocks.getSession }));
 vi.mock("@/lib/admin/impersonation", () => ({
   logImpersonationActivityForCurrentRequest: mocks.logImpersonationActivityForCurrentRequest,
 }));
-vi.mock("@/lib/tracker/bike", () => ({
-  createBike: mocks.createBike,
-  getPrimaryBike: mocks.getPrimaryBike,
-  updateBikeMileage: mocks.updateBikeMileage,
-  updateBikeRegion: mocks.updateBikeRegion,
-  updateBikeBudget: mocks.updateBikeBudget,
-  updateBikeUnits: mocks.updateBikeUnits,
-  updateBikeCurrency: mocks.updateBikeCurrency,
-  updateBikeIncludeInsuranceInReport: mocks.updateBikeIncludeInsuranceInReport,
-  updateBikeIncludeFinanceInReport: mocks.updateBikeIncludeFinanceInReport,
-  updateBikeChartType: mocks.updateBikeChartType,
-  updateBikeDvlaData: mocks.updateBikeDvlaData,
-  isBikeReadOnly: mocks.isBikeReadOnly,
-  BIKE_READ_ONLY_MESSAGE: "This bike has been transferred and is now read-only.",
-}));
+vi.mock("@/lib/tracker/bike", async () => {
+  const actual = await vi.importActual<typeof import("@/lib/tracker/bike")>("@/lib/tracker/bike");
+  return {
+    createBike: mocks.createBike,
+    getPrimaryBike: mocks.getPrimaryBike,
+    getBikesForUser: mocks.getBikesForUser,
+    countActiveBikes: actual.countActiveBikes,
+    updateBikeMileage: mocks.updateBikeMileage,
+    updateBikeRegion: mocks.updateBikeRegion,
+    updateBikeBudget: mocks.updateBikeBudget,
+    updateBikeUnits: mocks.updateBikeUnits,
+    updateBikeCurrency: mocks.updateBikeCurrency,
+    updateBikeIncludeInsuranceInReport: mocks.updateBikeIncludeInsuranceInReport,
+    updateBikeIncludeFinanceInReport: mocks.updateBikeIncludeFinanceInReport,
+    updateBikeChartType: mocks.updateBikeChartType,
+    updateBikeDvlaData: mocks.updateBikeDvlaData,
+    isBikeReadOnly: mocks.isBikeReadOnly,
+    BIKE_READ_ONLY_MESSAGE: "This bike has been transferred and is now read-only.",
+  };
+});
+vi.mock("@/lib/tracker/car", async () => {
+  const actual = await vi.importActual<typeof import("@/lib/tracker/car")>("@/lib/tracker/car");
+  return { getCarsForUser: mocks.getCarsForUser, countActiveCars: actual.countActiveCars };
+});
+vi.mock("@/lib/subscriptions", () => ({ isPro: mocks.isPro }));
 vi.mock("@/lib/tracker/dvlaDataFetch", () => ({ fetchDvlaDataFromVdg: mocks.fetchDvlaDataFromVdg }));
 // getBikeClassForCC (from @/lib/motorcycleModels) is deliberately NOT mocked -
 // it's a pure threshold function, so the tests exercise the real logic
@@ -69,6 +82,13 @@ describe("POST /api/tracker/bike", () => {
     Object.values(mocks).forEach((m) => m.mockReset());
     mocks.createBike.mockResolvedValue({ ok: true, bike: { id: "bike-1", originalRegistration: "AB12CDE" } });
     mocks.fetchDvlaDataFromVdg.mockResolvedValue(null);
+    // Combined cap pre-check defaults: an account with nothing else
+    // tracked and no Pro subscription never trips the new outer guard,
+    // so every existing test below (written before that guard existed)
+    // keeps exercising createBike's own mocked behaviour unchanged.
+    mocks.isPro.mockResolvedValue(false);
+    mocks.getBikesForUser.mockResolvedValue([]);
+    mocks.getCarsForUser.mockResolvedValue([]);
   });
 
   it("rejects unauthenticated requests before reading the body", async () => {
@@ -157,6 +177,36 @@ describe("POST /api/tracker/bike", () => {
       error: "Free accounts can track up to 2 bikes. Upgrade to add more.",
       reason: "limit_reached",
     });
+  });
+
+  // The new combined cap - checked BEFORE createBike is ever called, so
+  // a free account with one bike and one car already can't add a second
+  // bike, even though createBike's own (bike-only) count would allow it.
+  it("blocks a free account at the combined bike+car cap before ever calling createBike", async () => {
+    mocks.getSession.mockResolvedValue({ email: "owner@example.com" });
+    mocks.getBikesForUser.mockResolvedValue([{ id: "bike-1", transferredTo: undefined }]);
+    mocks.getCarsForUser.mockResolvedValue([{ id: "car-1", transferredTo: undefined }]);
+
+    const response = await POST(request("POST", JSON.stringify(validCreatePayload)));
+
+    expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toEqual({
+      error: "Free accounts can track up to 2 vehicles total (bikes and cars combined). Upgrade to add more.",
+      reason: "limit_reached",
+    });
+    expect(mocks.createBike).not.toHaveBeenCalled();
+  });
+
+  it("allows a Pro account past the combined cap", async () => {
+    mocks.getSession.mockResolvedValue({ email: "owner@example.com" });
+    mocks.isPro.mockResolvedValue(true);
+    mocks.getBikesForUser.mockResolvedValue([{ id: "bike-1", transferredTo: undefined }]);
+    mocks.getCarsForUser.mockResolvedValue([{ id: "car-1", transferredTo: undefined }]);
+
+    const response = await POST(request("POST", JSON.stringify(validCreatePayload)));
+
+    expect(response.status).toBe(200);
+    expect(mocks.createBike).toHaveBeenCalled();
   });
 
   it("creates the bike and returns it when the DVLA lookup finds nothing", async () => {
