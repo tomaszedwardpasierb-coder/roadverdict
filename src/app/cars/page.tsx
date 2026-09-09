@@ -96,8 +96,17 @@ export default async function CarsPage() {
   }
   const hasCar = session ? (await getCarsForUser(session.email).catch(() => [])).length > 0 : false;
 
-  const ctaHref = !session ? `/login?redirect=${encodeURIComponent('/dashboard?addVehicle=car')}` : hasCar ? '/dashboard' : '/dashboard?addVehicle=car';
+  // addVehicle=car is kept even for a returning car owner (hasCar true) -
+  // dashboard/page.tsx forces the car view with it, so someone with both
+  // a bike and a car lands on their car, not whichever kind their
+  // activeVehicleKind cookie happened to remember from a previous visit.
+  const ctaHref = !session ? `/login?redirect=${encodeURIComponent('/dashboard?addVehicle=car')}` : '/dashboard?addVehicle=car';
   const ctaLabel = !session ? 'Start tracking your car free' : hasCar ? 'Go to your dashboard' : 'Add your car';
+  // Same reasoning as ctaHref above, mirrored for the opposite kind - a
+  // signed-in visitor here (e.g. one who also has a bike) needs this to
+  // force the bike view, not just land on plain "/" and bounce straight
+  // back to /dashboard showing whatever kind their cookie remembers.
+  const secondaryHref = !session ? '/' : '/dashboard?addVehicle=bike';
 
   return (
     <>
@@ -130,7 +139,7 @@ export default async function CarsPage() {
               {ctaLabel}
               <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M2 7h10M8 3l4 4-4 4"/></svg>
             </Link>
-            <Link href="/" className="rv-cta-secondary">Ride a motorcycle instead?</Link>
+            <Link href={secondaryHref} className="rv-cta-secondary">Ride a motorcycle instead?</Link>
           </div>
           <ul className="rv-hero-proof" aria-label="Key facts">
             <li className="rv-proof-item">

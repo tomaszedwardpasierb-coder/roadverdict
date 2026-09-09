@@ -936,6 +936,21 @@ body:has(main [data-admin-shell]) [data-assistant-widget] {
   text-decoration: none;
 }
 .rv-cta-secondary:hover { color: #f0ede6; }
+.rv-cta-outline {
+  background: transparent;
+  color: #f0ede6;
+  border: 1.5px solid rgba(240,237,230,0.35);
+  font-size: 14px;
+  font-weight: 700;
+  padding: 0.72rem 1.4rem;
+  border-radius: 6px;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  letter-spacing: 0.03em;
+}
+.rv-cta-outline:hover { border-color: rgba(240,237,230,0.6); background: rgba(240,237,230,0.06); }
 .rv-hero-proof {
   display: flex;
   gap: 1.4rem;
@@ -1172,6 +1187,13 @@ a.rv-sol-card {
   letter-spacing: 0.03em;
 }
 .rv-cta-dark:hover { background: #1a1a1a; color: #f0ede6; }
+.rv-verdict-actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
 
 /* ── Responsive tweaks ────────────────────────────────────────────── */
 @media (max-width: 640px) {

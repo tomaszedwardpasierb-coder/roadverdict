@@ -85,7 +85,7 @@ import { getPendingDeletionInfo } from "@/lib/tracker/userAccount";
 
 // --- Car support (see RoadVerdict_Car_Plan_v3.md's ADR) ---
 import { resolveActiveVehicle } from "@/lib/tracker/activeVehicle";
-import { getCarsForUser, getCurrentRegistration as getCarCurrentRegistration, type CarDoc } from "@/lib/tracker/car";
+import { getCarsForUser, pickActiveCar, getCurrentRegistration as getCarCurrentRegistration, type CarDoc } from "@/lib/tracker/car";
 import { getCarServiceRecords } from "@/lib/tracker/carServiceRecord";
 import { getCarFuelLogs } from "@/lib/tracker/carFuelLog";
 import { getCarMods } from "@/lib/tracker/carMod";
@@ -135,12 +135,12 @@ export default async function DashboardPage(props: { searchParams: Promise<{ add
   const activeVehicle = await resolveActiveVehicle(session.email);
   const existingCars = await getCarsForUser(session.email);
 
-  // Explicit escape hatch, not yet reachable through normal navigation -
-  // the public /cars marketing pages (Phase 4) that would normally link
-  // here with this same intent don't exist yet. Only shown when the
-  // account genuinely has no car yet; once one exists, this same URL
-  // (which a POST's router.refresh() would revisit, still carrying the
-  // query param) correctly falls through instead of re-showing the form.
+  // Reached from the homepage's/cars marketing page's "Start logging
+  // your car"/"Start logging your motorcycle" buttons - see page.tsx and
+  // cars/page.tsx. Only shown when the account genuinely has no car yet;
+  // once one exists, this same URL (which a POST's router.refresh()
+  // would revisit, still carrying the query param) correctly falls
+  // through instead of re-showing the form.
   if (searchParams.addVehicle === "car" && existingCars.length === 0) {
     return (
       <main className={styles.main}>
@@ -154,8 +154,35 @@ export default async function DashboardPage(props: { searchParams: Promise<{ add
     );
   }
 
-  if (activeVehicle?.kind === "car") {
-    return renderCarDashboard(session.email, activeVehicle.car, existingCars, activeVehicle.hasAnyBike, userAccount, pendingDeletion);
+  // addVehicle forces which kind renders below, overriding whatever the
+  // activeVehicleKind cookie remembers - without this, an account that
+  // holds both a bike and a car but last viewed its bike would silently
+  // stay on the bike dashboard after clicking "Start logging your car"
+  // (or the /cars page's "Go to your dashboard"), since the cookie-driven
+  // resolveActiveVehicle() has no idea a specific kind was just
+  // requested. addVehicle=bike needs no equivalent car-side branch above:
+  // forcing effectiveKind away from "car" here just falls through to the
+  // existing bike-fetch code below, which already renders AddBikeForm
+  // for an account with no bike yet, exactly like the car case does.
+  const effectiveKind: "bike" | "car" | null =
+    searchParams.addVehicle === "bike" ? "bike"
+    : searchParams.addVehicle === "car" ? "car"
+    : activeVehicle?.kind ?? null;
+
+  if (effectiveKind === "car") {
+    // Already resolved to "car" the ordinary way - reuse it as-is.
+    if (activeVehicle?.kind === "car") {
+      return renderCarDashboard(session.email, activeVehicle.car, existingCars, activeVehicle.hasAnyBike, userAccount, pendingDeletion);
+    }
+    // Forced past a cookie that resolved to "bike" (or no cookie at all
+    // for an account with both, defaulting to bike) - existingCars.length
+    // > 0 is guaranteed here, since the addVehicle==="car" branch above
+    // already returned for the zero-cars case. activeVehicle?.kind ===
+    // "bike" is what got us here, which itself guarantees bikes exist.
+    const forcedCar = await pickActiveCar(existingCars);
+    if (forcedCar) {
+      return renderCarDashboard(session.email, forcedCar, existingCars, true, userAccount, pendingDeletion);
+    }
   }
 
   const bikes = await getBikesForUser(session.email);

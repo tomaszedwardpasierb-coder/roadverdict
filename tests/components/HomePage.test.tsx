@@ -47,7 +47,8 @@ describe("HomePage", () => {
     render(jsx);
 
     expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(/really costs/i);
-    expect(screen.getAllByRole("link", { name: /start tracking free/i }).length).toBeGreaterThan(0);
+    expect(screen.getAllByRole("link", { name: /start logging your motorcycle/i }).length).toBeGreaterThan(0);
+    expect(screen.getAllByRole("link", { name: /start logging your car/i }).length).toBeGreaterThan(0);
     expect(mockRedirect).not.toHaveBeenCalled();
   });
 
@@ -88,23 +89,32 @@ describe("HomePage", () => {
     }
   });
 
-  it("links both primary CTAs to /login", async () => {
+  // Straight to the correct add-vehicle flow, not a marketing-page
+  // detour that then asks the visitor to "start logging" a second time -
+  // see dashboard/page.tsx's addVehicle handling, which forces this exact
+  // kind once signed in, regardless of any activeVehicleKind cookie.
+  it("links every 'Start logging your motorcycle' CTA to the bike add-vehicle flow", async () => {
     mockGetSession.mockResolvedValue(null);
     const jsx = await HomePage();
     render(jsx);
 
-    const ctaLinks = screen.getAllByRole("link", { name: /start tracking free/i });
+    const ctaLinks = screen.getAllByRole("link", { name: /start logging your motorcycle/i });
+    expect(ctaLinks.length).toBeGreaterThan(0);
     for (const link of ctaLinks) {
-      expect(link).toHaveAttribute("href", "/login");
+      expect(link).toHaveAttribute("href", "/login?redirect=%2Fdashboard%3FaddVehicle%3Dbike");
     }
   });
 
-  it("links to /cars for a visitor who owns a car instead of a motorcycle", async () => {
+  it("links every 'Start logging your car' CTA to the car add-vehicle flow", async () => {
     mockGetSession.mockResolvedValue(null);
     const jsx = await HomePage();
     render(jsx);
 
-    expect(screen.getByRole("link", { name: /own a car instead/i })).toHaveAttribute("href", "/cars");
+    const ctaLinks = screen.getAllByRole("link", { name: /start logging your car/i });
+    expect(ctaLinks.length).toBeGreaterThan(0);
+    for (const link of ctaLinks) {
+      expect(link).toHaveAttribute("href", "/login?redirect=%2Fdashboard%3FaddVehicle%3Dcar");
+    }
   });
 
   // The three solution cards with a real standalone public page to send

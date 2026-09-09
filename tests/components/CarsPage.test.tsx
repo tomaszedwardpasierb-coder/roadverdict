@@ -53,7 +53,7 @@ describe("CarsPage", () => {
     }
   });
 
-  it("points the CTA at the dashboard for a signed-in visitor who already has a car", async () => {
+  it("points the CTA at the dashboard for a signed-in visitor who already has a car, still forcing the car view", async () => {
     mockGetSession.mockResolvedValue({ email: "driver@example.com" });
     mockGetCarsForUser.mockResolvedValue([{ id: "car-1" }]);
 
@@ -63,7 +63,10 @@ describe("CarsPage", () => {
     const ctas = screen.getAllByRole("link", { name: /go to your dashboard/i });
     expect(ctas.length).toBeGreaterThan(0);
     for (const cta of ctas) {
-      expect(cta).toHaveAttribute("href", "/dashboard");
+      // Not just "/dashboard" - a returning visitor who also has a bike
+      // needs addVehicle=car preserved, or dashboard/page.tsx would fall
+      // back to whatever kind their activeVehicleKind cookie remembers.
+      expect(cta).toHaveAttribute("href", "/dashboard?addVehicle=car");
     }
   });
 
@@ -91,12 +94,29 @@ describe("CarsPage", () => {
     expect(screen.getByRole("link", { name: /buying guide/i })).toHaveAttribute("href", "/cars/buying-guide");
   });
 
-  it("links back to the motorcycle homepage", async () => {
+  it("links back to the motorcycle homepage for a signed-out visitor", async () => {
     mockGetSession.mockResolvedValue(null);
     const jsx = await CarsPage();
     render(jsx);
 
     expect(screen.getByRole("link", { name: /ride a motorcycle instead/i })).toHaveAttribute("href", "/");
+  });
+
+  // Plain "/" would bounce a signed-in visitor straight back to
+  // /dashboard showing whatever kind their activeVehicleKind cookie
+  // remembers - forcing addVehicle=bike is what actually gets them to
+  // their bike, the same reasoning as the car-side ctaHref above.
+  it("forces the bike view for a signed-in visitor clicking 'Ride a motorcycle instead?'", async () => {
+    mockGetSession.mockResolvedValue({ email: "driver@example.com" });
+    mockGetCarsForUser.mockResolvedValue([{ id: "car-1" }]);
+
+    const jsx = await CarsPage();
+    render(jsx);
+
+    expect(screen.getByRole("link", { name: /ride a motorcycle instead/i })).toHaveAttribute(
+      "href",
+      "/dashboard?addVehicle=bike"
+    );
   });
 
   it("embeds the WebApplication JSON-LD script with the nonce read from request headers", async () => {

@@ -105,11 +105,14 @@ export default async function HomePage() {
             Know exactly what you&apos;re looking at before you buy.
           </p>
           <div className="rv-hero-actions">
-            <Link href="/login" className="rv-cta-primary">
-              Start tracking free
+            <Link href="/login?redirect=%2Fdashboard%3FaddVehicle%3Dbike" className="rv-cta-primary">
+              Start logging your motorcycle
               <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M2 7h10M8 3l4 4-4 4"/></svg>
             </Link>
-            <Link href="/cars" className="rv-cta-secondary">Own a car instead?</Link>
+            <Link href="/login?redirect=%2Fdashboard%3FaddVehicle%3Dcar" className="rv-cta-outline">
+              Start logging your car
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M2 7h10M8 3l4 4-4 4"/></svg>
+            </Link>
           </div>
           <ul className="rv-hero-proof" aria-label="Key facts">
             <li className="rv-proof-item">
@@ -238,9 +241,14 @@ export default async function HomePage() {
             Free to start. No password. Works for motorcycles and cars.<br />
             Your data is yours - export it any time.
           </p>
-          <Link href="/login" className="rv-cta-dark">
-            Start tracking free - takes 30 seconds
-          </Link>
+          <div className="rv-verdict-actions">
+            <Link href="/login?redirect=%2Fdashboard%3FaddVehicle%3Dbike" className="rv-cta-dark">
+              Start logging your motorcycle
+            </Link>
+            <Link href="/login?redirect=%2Fdashboard%3FaddVehicle%3Dcar" className="rv-cta-dark">
+              Start logging your car
+            </Link>
+          </div>
         </div>
       </section>
     </>
