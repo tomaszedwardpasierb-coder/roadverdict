@@ -5,10 +5,14 @@ const mocks = vi.hoisted(() => ({
   getSession: vi.fn(),
   getShareLink: vi.fn(),
   extendShareLink: vi.fn(),
+  logImpersonationActivityForCurrentRequest: vi.fn(),
 }));
 
 vi.mock("@/lib/auth/session", () => ({ getSession: mocks.getSession }));
 vi.mock("@/lib/tracker/shareLink", () => ({ getShareLink: mocks.getShareLink, extendShareLink: mocks.extendShareLink }));
+vi.mock("@/lib/admin/impersonation", () => ({
+  logImpersonationActivityForCurrentRequest: mocks.logImpersonationActivityForCurrentRequest,
+}));
 
 import { POST } from "@/app/api/tracker/share-link/[token]/extend/route";
 
@@ -71,5 +75,6 @@ describe("POST /api/tracker/share-link/[token]/extend", () => {
     expect(mocks.extendShareLink).toHaveBeenCalledWith("tok-1", "1month");
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({ link: { id: "tok-1", expiresAt: "2026-01-01" } });
+    expect(mocks.logImpersonationActivityForCurrentRequest).toHaveBeenCalledWith("shareLink", "tok-1", "update");
   });
 });

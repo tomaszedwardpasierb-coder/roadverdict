@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   isCarReadOnly: vi.fn(),
   createCarReminder: vi.fn(),
   deleteCarRemindersBySourceKey: vi.fn(),
+  logImpersonationActivityForCurrentRequest: vi.fn(),
 }));
 
 vi.mock("@/lib/auth/session", () => ({ getSession: mocks.getSession }));
@@ -18,6 +19,9 @@ vi.mock("@/lib/tracker/car", () => ({
 vi.mock("@/lib/tracker/carReminder", () => ({
   createCarReminder: mocks.createCarReminder,
   deleteCarRemindersBySourceKey: mocks.deleteCarRemindersBySourceKey,
+}));
+vi.mock("@/lib/admin/impersonation", () => ({
+  logImpersonationActivityForCurrentRequest: mocks.logImpersonationActivityForCurrentRequest,
 }));
 
 import { POST } from "@/app/api/cars/car-reminders/route";
@@ -116,6 +120,7 @@ describe("POST /api/cars/car-reminders", () => {
     expect(mocks.createCarReminder).toHaveBeenCalledWith("owner@example.com", expect.objectContaining({
       carId: "car-1", name: "Cambelt", intervalType: "mileage", intervalValue: 60000,
     }));
+    expect(mocks.logImpersonationActivityForCurrentRequest).toHaveBeenCalledWith("carReminder", "reminder-1", "create");
   });
 
   it("clears any existing reminder for the same sourceKey before creating the new one", async () => {

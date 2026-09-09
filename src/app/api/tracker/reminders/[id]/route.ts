@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/session";
 import { updateReminder, deleteReminder } from "@/lib/tracker/reminder";
 import { getPrimaryBike, isBikeReadOnly, BIKE_READ_ONLY_MESSAGE } from "@/lib/tracker/bike";
+import { logImpersonationActivityForCurrentRequest } from "@/lib/admin/impersonation";
 
 export const dynamic = "force-dynamic";
 
@@ -34,6 +35,7 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
     return NextResponse.json({ error: "Reminder not found." }, { status: 404 });
   }
 
+  void logImpersonationActivityForCurrentRequest("reminder", id, "update");
   return NextResponse.json({ reminder });
 }
 
@@ -55,5 +57,6 @@ export async function DELETE(request: NextRequest, props: { params: Promise<{ id
   }
 
   await deleteReminder(session.email, id);
+  void logImpersonationActivityForCurrentRequest("reminder", id, "delete");
   return NextResponse.json({ ok: true });
 }

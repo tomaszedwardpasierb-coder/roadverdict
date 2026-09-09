@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/session";
 import { createShareLink, type ShareLinkDuration } from "@/lib/tracker/shareLink";
 import { getPrimaryBike } from "@/lib/tracker/bike";
+import { logImpersonationActivityForCurrentRequest } from "@/lib/admin/impersonation";
 
 export const dynamic = "force-dynamic";
 
@@ -49,6 +50,7 @@ export async function POST(request: NextRequest) {
   }
 
   const link = await createShareLink(session.email, bike.id, duration, recipientEmail, validatedAskingPrice);
+  void logImpersonationActivityForCurrentRequest("shareLink", link.id, "create");
   const appUrl = process.env.APP_URL ?? "https://roadverdict.co.uk";
   return NextResponse.json({
     url: `${appUrl}/report/${link.id}`,

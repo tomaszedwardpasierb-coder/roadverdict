@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/session";
 import { createCarReminder, deleteCarRemindersBySourceKey } from "@/lib/tracker/carReminder";
 import { getPrimaryCar, isCarReadOnly, CAR_READ_ONLY_MESSAGE } from "@/lib/tracker/car";
+import { logImpersonationActivityForCurrentRequest } from "@/lib/admin/impersonation";
 
 export const dynamic = "force-dynamic";
 
@@ -62,5 +63,6 @@ export async function POST(request: NextRequest) {
     sourceKey,
   });
 
+  void logImpersonationActivityForCurrentRequest("carReminder", reminder.id, "create");
   return NextResponse.json({ reminder });
 }

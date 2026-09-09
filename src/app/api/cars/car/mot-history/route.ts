@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/session";
 import { getCarById, getCurrentRegistration } from "@/lib/tracker/car";
 import { importMotHistoryForCar } from "@/lib/tracker/carMotHistoryImport";
+import { logImpersonationActivityForCurrentRequest } from "@/lib/admin/impersonation";
 
 export const dynamic = "force-dynamic";
 
@@ -41,5 +42,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: result.error }, { status: result.status });
   }
 
+  void logImpersonationActivityForCurrentRequest("car", carId, "update");
   return NextResponse.json(result);
 }

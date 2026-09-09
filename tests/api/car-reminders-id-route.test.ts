@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   isCarReadOnly: vi.fn(),
   updateCarReminder: vi.fn(),
   deleteCarReminder: vi.fn(),
+  logImpersonationActivityForCurrentRequest: vi.fn(),
 }));
 
 vi.mock("@/lib/auth/session", () => ({ getSession: mocks.getSession }));
@@ -16,6 +17,9 @@ vi.mock("@/lib/tracker/car", () => ({
   CAR_READ_ONLY_MESSAGE: "This car has been transferred and is now read-only.",
 }));
 vi.mock("@/lib/tracker/carReminder", () => ({ updateCarReminder: mocks.updateCarReminder, deleteCarReminder: mocks.deleteCarReminder }));
+vi.mock("@/lib/admin/impersonation", () => ({
+  logImpersonationActivityForCurrentRequest: mocks.logImpersonationActivityForCurrentRequest,
+}));
 
 import { PATCH, DELETE } from "@/app/api/cars/car-reminders/[id]/route";
 
@@ -64,6 +68,7 @@ describe("PATCH /api/cars/car-reminders/[id] (mark done)", () => {
       baseMileage: 40000,
       date: todayIso,
     });
+    expect(mocks.logImpersonationActivityForCurrentRequest).toHaveBeenCalledWith("carReminder", ownId, "update");
   });
 
   it("returns not found when the reminder itself doesn't exist", async () => {
@@ -106,5 +111,6 @@ describe("DELETE /api/cars/car-reminders/[id]", () => {
     const response = await DELETE(request(), { params: Promise.resolve({ id: ownId }) });
     expect(response.status).toBe(200);
     expect(mocks.deleteCarReminder).toHaveBeenCalledWith("owner@example.com", ownId);
+    expect(mocks.logImpersonationActivityForCurrentRequest).toHaveBeenCalledWith("carReminder", ownId, "delete");
   });
 });

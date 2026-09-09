@@ -11,6 +11,7 @@ import { getSession } from "@/lib/auth/session";
 import { getBike, getCurrentRegistration, updateBikeDvlaData, isBikeReadOnly, BIKE_READ_ONLY_MESSAGE } from "@/lib/tracker/bike";
 import { fetchDvlaDataFromVdg } from "@/lib/tracker/dvlaDataFetch";
 import { importMotHistoryForBike } from "@/lib/tracker/motHistoryImport";
+import { logImpersonationActivityForCurrentRequest } from "@/lib/admin/impersonation";
 
 export const dynamic = "force-dynamic";
 
@@ -74,5 +75,8 @@ export async function POST(request: NextRequest) {
     console.error("MOT refresh failed:", err);
   }
 
+  if (dvlaRefreshed || motCreated > 0) {
+    void logImpersonationActivityForCurrentRequest("bike", bike.id, "update");
+  }
   return NextResponse.json({ ok: true, dvlaRefreshed, motCreated, motSkipped });
 }

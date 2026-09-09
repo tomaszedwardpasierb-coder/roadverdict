@@ -1,4 +1,5 @@
 // Place at: src/lib/admin/impersonation.ts
+import { cookies } from "next/headers";
 import { getContainer } from "@/lib/cosmos";
 
 const ADMIN_PK = "admin";
@@ -142,11 +143,46 @@ export async function logImpersonationActivity(entry: ImpersonationActivityEntry
   }
 }
 
+// Called directly from the specific API routes that write genuine
+// account data (bike/car fields, reminders, share links, receipt-
+// request decisions - see each route's own call site) rather than from
+// a single shared data-layer choke point. That was tried first (see
+// git history) and patched cosmos.ts's own container singleton so every
+// write anywhere would be seen automatically - but cosmos.ts turns out
+// to be transitively reachable from a client component (ProGate.tsx ->
+// subscriptions.ts -> userDoc.ts -> cosmos.ts, since subscriptions.ts
+// exports a real constant a client component needs), and importing
+// next/headers there broke the production build outright (Next.js
+// refuses to bundle it for the client). Route Handlers, unlike shared
+// lib files, are guaranteed server-only by Next.js's own architecture,
+// so calling this from each one individually is the safe boundary -
+// more call sites to maintain, but zero risk of silently breaking the
+// client bundle again. Deliberately does NOT gate on the doc's own
+// partition key matching the impersonated account - by the time a
+// route handler is running, session.email (from getSession()) already
+// IS the impersonated account's own email, so there's nothing further
+// to check here beyond "is an impersonation session active at all."
+export async function logImpersonationActivityForCurrentRequest(
+  docType: string,
+  docId: string,
+  action: "create" | "update" | "delete"
+): Promise<void> {
+  try {
+    const cookieStore = await cookies();
+    const sessionId = cookieStore.get("impersonation_session_id")?.value;
+    const targetEmail = cookieStore.get("impersonating_as")?.value;
+    if (!sessionId || !targetEmail) return;
+    await logImpersonationActivity({ sessionId, targetEmail, docType, docId, action, at: new Date().toISOString() });
+  } catch (err) {
+    console.error("logImpersonationActivityForCurrentRequest: failed (the real write itself still succeeded):", err);
+  }
+}
+
 // Count of tracked changes for one impersonation session - "tracked"
-// meaning only the tracker doc types that funnel through
-// cosmosHelpers.ts's shared create/update/delete functions (see that
-// file's own comment on why this is a real, honest subset rather than
-// every record type in the app).
+// meaning only the specific routes that call
+// logImpersonationActivityForCurrentRequest above (see that function's
+// own comment for which ones, and why this is a real, honest subset
+// rather than every write in the app).
 export async function countImpersonationActivity(sessionId: string): Promise<number> {
   const container = getContainer();
   const { resources } = await container.items

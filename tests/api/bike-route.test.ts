@@ -16,9 +16,13 @@ const mocks = vi.hoisted(() => ({
   updateBikeDvlaData: vi.fn(),
   isBikeReadOnly: vi.fn(),
   fetchDvlaDataFromVdg: vi.fn(),
+  logImpersonationActivityForCurrentRequest: vi.fn(),
 }));
 
 vi.mock("@/lib/auth/session", () => ({ getSession: mocks.getSession }));
+vi.mock("@/lib/admin/impersonation", () => ({
+  logImpersonationActivityForCurrentRequest: mocks.logImpersonationActivityForCurrentRequest,
+}));
 vi.mock("@/lib/tracker/bike", () => ({
   createBike: mocks.createBike,
   getPrimaryBike: mocks.getPrimaryBike,
@@ -164,6 +168,7 @@ describe("POST /api/tracker/bike", () => {
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({ bike: { id: "bike-1", originalRegistration: "AB12CDE" } });
     expect(mocks.updateBikeDvlaData).not.toHaveBeenCalled();
+    expect(mocks.logImpersonationActivityForCurrentRequest).toHaveBeenCalledWith("bike", "bike-1", "create");
   });
 
   it("attaches DVLA data to the created bike when the lookup succeeds", async () => {
@@ -255,6 +260,7 @@ describe("PATCH /api/tracker/bike", () => {
     const response = await PATCH(request("PATCH", JSON.stringify({ currentMileage: 2000 })));
     expect(response.status).toBe(200);
     expect(mocks.updateBikeMileage).toHaveBeenCalledWith("owner@example.com", "bike-1", 2000);
+    expect(mocks.logImpersonationActivityForCurrentRequest).toHaveBeenCalledWith("bike", "bike-1", "update");
   });
 
   it("updates the region", async () => {
@@ -271,6 +277,7 @@ describe("PATCH /api/tracker/bike", () => {
     const response = await PATCH(request("PATCH", JSON.stringify({ annualBudget: 800 })));
     expect(response.status).toBe(200);
     expect(mocks.updateBikeBudget).toHaveBeenCalledWith("owner@example.com", "bike-1", 800);
+    expect(mocks.logImpersonationActivityForCurrentRequest).toHaveBeenCalledWith("bike", "bike-1", "update");
   });
 
   it("updates units when either distanceUnit or fuelEconomyUnit is supplied", async () => {

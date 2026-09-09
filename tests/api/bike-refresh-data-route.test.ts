@@ -9,9 +9,13 @@ const mocks = vi.hoisted(() => ({
   isBikeReadOnly: vi.fn(),
   fetchDvlaDataFromVdg: vi.fn(),
   importMotHistoryForBike: vi.fn(),
+  logImpersonationActivityForCurrentRequest: vi.fn(),
 }));
 
 vi.mock("@/lib/auth/session", () => ({ getSession: mocks.getSession }));
+vi.mock("@/lib/admin/impersonation", () => ({
+  logImpersonationActivityForCurrentRequest: mocks.logImpersonationActivityForCurrentRequest,
+}));
 vi.mock("@/lib/tracker/bike", () => ({
   getBike: mocks.getBike,
   getCurrentRegistration: mocks.getCurrentRegistration,
@@ -99,6 +103,7 @@ describe("POST /api/tracker/bike/refresh-data", () => {
     expect(response.status).toBe(200);
     expect(mocks.updateBikeDvlaData).toHaveBeenCalledWith("owner@example.com", "bike-1", dvlaData);
     await expect(response.json()).resolves.toMatchObject({ ok: true, dvlaRefreshed: true });
+    expect(mocks.logImpersonationActivityForCurrentRequest).toHaveBeenCalledWith("bike", "bike-1", "update");
   });
 
   it("reports dvlaRefreshed false without saving anything when the lookup finds nothing", async () => {
@@ -107,6 +112,7 @@ describe("POST /api/tracker/bike/refresh-data", () => {
     const response = await POST(request(JSON.stringify({ bikeId: "bike-1" })));
     expect(mocks.updateBikeDvlaData).not.toHaveBeenCalled();
     await expect(response.json()).resolves.toMatchObject({ dvlaRefreshed: false });
+    expect(mocks.logImpersonationActivityForCurrentRequest).not.toHaveBeenCalled();
   });
 
   // Explicit non-blocking guarantee in the source: a failed DVLA refresh
@@ -135,6 +141,7 @@ describe("POST /api/tracker/bike/refresh-data", () => {
     const response = await POST(request(JSON.stringify({ bikeId: "bike-1" })));
 
     await expect(response.json()).resolves.toMatchObject({ motCreated: 3, motSkipped: 1 });
+    expect(mocks.logImpersonationActivityForCurrentRequest).toHaveBeenCalledWith("bike", "bike-1", "update");
   });
 
   // The route checks `"error" in result` rather than a thrown exception -

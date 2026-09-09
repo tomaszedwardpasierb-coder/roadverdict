@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/session";
 import { getBikesForUser, deleteBike, isBikeReadOnly, BIKE_READ_ONLY_MESSAGE } from "@/lib/tracker/bike";
+import { logImpersonationActivityForCurrentRequest } from "@/lib/admin/impersonation";
 
 export const dynamic = "force-dynamic";
 
@@ -28,5 +29,6 @@ export async function DELETE(request: NextRequest, props: { params: Promise<{ bi
   }
 
   await deleteBike(session.email, bikeId);
+  void logImpersonationActivityForCurrentRequest("bike", bikeId, "delete");
   return NextResponse.json({ ok: true });
 }

@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/session";
 import { getPrimaryBike, setOriginalRegistration, isBikeReadOnly, BIKE_READ_ONLY_MESSAGE } from "@/lib/tracker/bike";
+import { logImpersonationActivityForCurrentRequest } from "@/lib/admin/impersonation";
 
 export const dynamic = "force-dynamic";
 
@@ -44,5 +45,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Bike not found." }, { status: 404 });
   }
 
+  void logImpersonationActivityForCurrentRequest("bike", bike.id, "update");
   return NextResponse.json({ bike: result.bike });
 }

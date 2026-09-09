@@ -5,12 +5,16 @@ const mocks = vi.hoisted(() => ({
   getSession: vi.fn(),
   getShareLink: vi.fn(),
   updateShareLinkAskingPrice: vi.fn(),
+  logImpersonationActivityForCurrentRequest: vi.fn(),
 }));
 
 vi.mock("@/lib/auth/session", () => ({ getSession: mocks.getSession }));
 vi.mock("@/lib/tracker/shareLink", () => ({
   getShareLink: mocks.getShareLink,
   updateShareLinkAskingPrice: mocks.updateShareLinkAskingPrice,
+}));
+vi.mock("@/lib/admin/impersonation", () => ({
+  logImpersonationActivityForCurrentRequest: mocks.logImpersonationActivityForCurrentRequest,
 }));
 
 import { POST } from "@/app/api/tracker/share-link/[token]/asking-price/route";
@@ -90,6 +94,7 @@ describe("POST /api/tracker/share-link/[token]/asking-price", () => {
     expect(mocks.updateShareLinkAskingPrice).toHaveBeenCalledWith("tok-1", 4500);
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({ askingPrice: 4500 });
+    expect(mocks.logImpersonationActivityForCurrentRequest).toHaveBeenCalledWith("shareLink", "tok-1", "update");
   });
 
   it("returns not found if the link vanishes between the ownership check and the update itself", async () => {

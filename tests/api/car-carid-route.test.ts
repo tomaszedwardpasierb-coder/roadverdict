@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => ({
   getCarsForUser: vi.fn(),
   deleteCar: vi.fn(),
   isCarReadOnly: vi.fn(),
+  logImpersonationActivityForCurrentRequest: vi.fn(),
 }));
 
 vi.mock("@/lib/auth/session", () => ({ getSession: mocks.getSession }));
@@ -14,6 +15,9 @@ vi.mock("@/lib/tracker/car", () => ({
   deleteCar: mocks.deleteCar,
   isCarReadOnly: mocks.isCarReadOnly,
   CAR_READ_ONLY_MESSAGE: "This car has been transferred and is now read-only.",
+}));
+vi.mock("@/lib/admin/impersonation", () => ({
+  logImpersonationActivityForCurrentRequest: mocks.logImpersonationActivityForCurrentRequest,
 }));
 
 import { DELETE } from "@/app/api/cars/car/[carId]/route";
@@ -80,5 +84,6 @@ describe("DELETE /api/cars/car/[carId]", () => {
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({ ok: true });
     expect(mocks.deleteCar).toHaveBeenCalledWith("owner@example.com", ownCarId);
+    expect(mocks.logImpersonationActivityForCurrentRequest).toHaveBeenCalledWith("car", ownCarId, "delete");
   });
 });

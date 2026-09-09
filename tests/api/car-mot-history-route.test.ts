@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
   getCarById: vi.fn(),
   getCurrentRegistration: vi.fn(),
   importMotHistoryForCar: vi.fn(),
+  logImpersonationActivityForCurrentRequest: vi.fn(),
 }));
 
 vi.mock("@/lib/auth/session", () => ({ getSession: mocks.getSession }));
@@ -19,6 +20,9 @@ vi.mock("@/lib/tracker/car", () => ({
 }));
 vi.mock("@/lib/tracker/carMotHistoryImport", () => ({
   importMotHistoryForCar: mocks.importMotHistoryForCar,
+}));
+vi.mock("@/lib/admin/impersonation", () => ({
+  logImpersonationActivityForCurrentRequest: mocks.logImpersonationActivityForCurrentRequest,
 }));
 
 import { POST } from "@/app/api/cars/car/mot-history/route";
@@ -95,6 +99,7 @@ describe("POST /api/cars/car/mot-history", () => {
     const response = await POST(request({ carId: "car-1" }));
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({ imported: 3, skipped: 0 });
+    expect(mocks.logImpersonationActivityForCurrentRequest).toHaveBeenCalledWith("car", "car-1", "update");
   });
 
   it("forwards the error and status code when importMotHistoryForCar returns an error object", async () => {

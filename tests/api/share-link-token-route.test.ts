@@ -5,10 +5,14 @@ const mocks = vi.hoisted(() => ({
   getSession: vi.fn(),
   getShareLink: vi.fn(),
   deleteShareLink: vi.fn(),
+  logImpersonationActivityForCurrentRequest: vi.fn(),
 }));
 
 vi.mock("@/lib/auth/session", () => ({ getSession: mocks.getSession }));
 vi.mock("@/lib/tracker/shareLink", () => ({ getShareLink: mocks.getShareLink, deleteShareLink: mocks.deleteShareLink }));
+vi.mock("@/lib/admin/impersonation", () => ({
+  logImpersonationActivityForCurrentRequest: mocks.logImpersonationActivityForCurrentRequest,
+}));
 
 import { DELETE } from "@/app/api/tracker/share-link/[token]/route";
 
@@ -55,5 +59,6 @@ describe("DELETE /api/tracker/share-link/[token]", () => {
     const response = await DELETE(req(), { params: Promise.resolve({ token: "tok-1" }) });
     expect(response.status).toBe(200);
     expect(mocks.deleteShareLink).toHaveBeenCalledWith("tok-1");
+    expect(mocks.logImpersonationActivityForCurrentRequest).toHaveBeenCalledWith("shareLink", "tok-1", "delete");
   });
 });

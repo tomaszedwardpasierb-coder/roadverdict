@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   isBikeReadOnly: vi.fn(),
   updateReminder: vi.fn(),
   deleteReminder: vi.fn(),
+  logImpersonationActivityForCurrentRequest: vi.fn(),
 }));
 
 vi.mock("@/lib/auth/session", () => ({ getSession: mocks.getSession }));
@@ -16,6 +17,9 @@ vi.mock("@/lib/tracker/bike", () => ({
   BIKE_READ_ONLY_MESSAGE: "This bike has been transferred and is now read-only.",
 }));
 vi.mock("@/lib/tracker/reminder", () => ({ updateReminder: mocks.updateReminder, deleteReminder: mocks.deleteReminder }));
+vi.mock("@/lib/admin/impersonation", () => ({
+  logImpersonationActivityForCurrentRequest: mocks.logImpersonationActivityForCurrentRequest,
+}));
 
 import { PATCH, DELETE } from "@/app/api/tracker/reminders/[id]/route";
 
@@ -67,6 +71,7 @@ describe("PATCH /api/tracker/reminders/[id] (mark done)", () => {
       baseMileage: 8000,
       date: todayIso,
     });
+    expect(mocks.logImpersonationActivityForCurrentRequest).toHaveBeenCalledWith("reminder", ownId, "update");
   });
 
   it("returns not found when the reminder itself doesn't exist", async () => {
@@ -109,5 +114,6 @@ describe("DELETE /api/tracker/reminders/[id]", () => {
     const response = await DELETE(request(), { params: Promise.resolve({ id: ownId }) });
     expect(response.status).toBe(200);
     expect(mocks.deleteReminder).toHaveBeenCalledWith("owner@example.com", ownId);
+    expect(mocks.logImpersonationActivityForCurrentRequest).toHaveBeenCalledWith("reminder", ownId, "delete");
   });
 });

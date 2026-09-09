@@ -5,11 +5,15 @@ const mocks = vi.hoisted(() => ({
   getSession: vi.fn(),
   getPrimaryBike: vi.fn(),
   createShareLink: vi.fn(),
+  logImpersonationActivityForCurrentRequest: vi.fn(),
 }));
 
 vi.mock("@/lib/auth/session", () => ({ getSession: mocks.getSession }));
 vi.mock("@/lib/tracker/bike", () => ({ getPrimaryBike: mocks.getPrimaryBike }));
 vi.mock("@/lib/tracker/shareLink", () => ({ createShareLink: mocks.createShareLink }));
+vi.mock("@/lib/admin/impersonation", () => ({
+  logImpersonationActivityForCurrentRequest: mocks.logImpersonationActivityForCurrentRequest,
+}));
 
 import { POST } from "@/app/api/tracker/share-link/route";
 
@@ -156,6 +160,7 @@ describe("POST /api/tracker/share-link", () => {
       recipientEmail: "buyer@example.com",
       askingPrice: null,
     });
+    expect(mocks.logImpersonationActivityForCurrentRequest).toHaveBeenCalledWith("shareLink", "share-token-abc", "create");
   });
 
   // No APP_URL configured shouldn't produce a broken link in the email

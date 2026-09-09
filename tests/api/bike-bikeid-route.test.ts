@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => ({
   getBikesForUser: vi.fn(),
   deleteBike: vi.fn(),
   isBikeReadOnly: vi.fn(),
+  logImpersonationActivityForCurrentRequest: vi.fn(),
 }));
 
 vi.mock("@/lib/auth/session", () => ({ getSession: mocks.getSession }));
@@ -14,6 +15,9 @@ vi.mock("@/lib/tracker/bike", () => ({
   deleteBike: mocks.deleteBike,
   isBikeReadOnly: mocks.isBikeReadOnly,
   BIKE_READ_ONLY_MESSAGE: "This bike has been transferred and is now read-only.",
+}));
+vi.mock("@/lib/admin/impersonation", () => ({
+  logImpersonationActivityForCurrentRequest: mocks.logImpersonationActivityForCurrentRequest,
 }));
 
 import { DELETE } from "@/app/api/tracker/bike/[bikeId]/route";
@@ -80,5 +84,6 @@ describe("DELETE /api/tracker/bike/[bikeId]", () => {
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({ ok: true });
     expect(mocks.deleteBike).toHaveBeenCalledWith("owner@example.com", ownBikeId);
+    expect(mocks.logImpersonationActivityForCurrentRequest).toHaveBeenCalledWith("bike", ownBikeId, "delete");
   });
 });

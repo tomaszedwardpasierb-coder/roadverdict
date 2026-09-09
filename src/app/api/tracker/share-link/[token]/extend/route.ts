@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/session";
 import { getShareLink, extendShareLink, type ShareLinkDuration } from "@/lib/tracker/shareLink";
+import { logImpersonationActivityForCurrentRequest } from "@/lib/admin/impersonation";
 
 export const dynamic = "force-dynamic";
 
@@ -32,5 +33,6 @@ export async function POST(request: NextRequest, props: { params: Promise<{ toke
   }
 
   const updated = await extendShareLink(params.token, duration);
+  void logImpersonationActivityForCurrentRequest("shareLink", params.token, "update");
   return NextResponse.json({ link: updated });
 }

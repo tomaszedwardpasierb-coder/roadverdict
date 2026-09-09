@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/session";
 import { decideReceiptRequestItems } from "@/lib/tracker/receiptRequest";
+import { logImpersonationActivityForCurrentRequest } from "@/lib/admin/impersonation";
 
 export const dynamic = "force-dynamic";
 
@@ -31,5 +32,6 @@ export async function POST(req: NextRequest, props: { params: Promise<{ requestI
   if (!updated) {
     return NextResponse.json({ error: "Request not found." }, { status: 404 });
   }
+  void logImpersonationActivityForCurrentRequest("receiptRequest", params.requestId, "update");
   return NextResponse.json({ ok: true, items: updated.items });
 }

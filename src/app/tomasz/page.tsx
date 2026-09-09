@@ -672,9 +672,11 @@ export default async function AdminDashboardPage(
       <h2 className={styles.sectionHeading}>Impersonate sessions</h2>
       <p className={styles.note} style={{ marginBottom: '0.8rem' }}>
         Every time an admin has viewed the app as another account, re-authenticated with a
-        password and TOTP code, and the reason given. &quot;Changes made&quot; covers changes made
-        through the standard logging forms (service, fuel, bills, etc.) - not every record type
-        is tracked here yet.
+        password and TOTP code, and the reason given. &quot;Changes made&quot; covers bike/car
+        field edits (mileage, budget, region, units, currency, registration), reminders, share
+        links, and receipt-request decisions, as well as service/fuel/mods/bills/labour entries
+        logged via the normal forms - not every write in the app is tracked here yet (bike/car
+        transfers and car sub-resource records aren&apos;t currently included).
       </p>
       <ImpersonationSessionsTable sessions={impersonationSessionsWithCounts} />
     </>

@@ -14,9 +14,13 @@ const mocks = vi.hoisted(() => ({
   updateCarDvlaData: vi.fn(),
   isCarReadOnly: vi.fn(),
   fetchDvlaDataFromVdg: vi.fn(),
+  logImpersonationActivityForCurrentRequest: vi.fn(),
 }));
 
 vi.mock("@/lib/auth/session", () => ({ getSession: mocks.getSession }));
+vi.mock("@/lib/admin/impersonation", () => ({
+  logImpersonationActivityForCurrentRequest: mocks.logImpersonationActivityForCurrentRequest,
+}));
 vi.mock("@/lib/tracker/car", () => ({
   createCar: mocks.createCar,
   getPrimaryCar: mocks.getPrimaryCar,
@@ -181,6 +185,7 @@ describe("POST /api/cars/car", () => {
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({ car: { id: "car-1", originalRegistration: "AB12CDE" } });
     expect(mocks.updateCarDvlaData).not.toHaveBeenCalled();
+    expect(mocks.logImpersonationActivityForCurrentRequest).toHaveBeenCalledWith("car", "car-1", "create");
   });
 
   it("attaches DVLA data to the created car when the lookup succeeds", async () => {
@@ -288,6 +293,7 @@ describe("PATCH /api/cars/car", () => {
     const response = await PATCH(request("PATCH", JSON.stringify({ annualBudget: 800 })));
     expect(response.status).toBe(200);
     expect(mocks.updateCarBudget).toHaveBeenCalledWith("owner@example.com", "car-1", 800);
+    expect(mocks.logImpersonationActivityForCurrentRequest).toHaveBeenCalledWith("car", "car-1", "update");
   });
 
   // CarDoc carries no fuelEconomyUnit (see car.ts's own ADR comment) -

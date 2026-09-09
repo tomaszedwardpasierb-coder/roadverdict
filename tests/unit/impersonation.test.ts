@@ -5,6 +5,7 @@ const mocks = vi.hoisted(() => ({
   create: vi.fn(),
   upsert: vi.fn(),
   deleteFn: vi.fn(),
+  cookieGet: vi.fn(),
 }));
 
 const mockContainer = {
@@ -17,6 +18,7 @@ const mockContainer = {
 };
 
 vi.mock("@/lib/cosmos", () => ({ getContainer: () => mockContainer }));
+vi.mock("next/headers", () => ({ cookies: async () => ({ get: mocks.cookieGet }) }));
 
 import {
   userExists,
@@ -24,6 +26,7 @@ import {
   newImpersonationSessionId,
   getAllImpersonationSessions,
   logImpersonationActivity,
+  logImpersonationActivityForCurrentRequest,
   countImpersonationActivity,
   purgeOldImpersonationLogs,
 } from "@/lib/admin/impersonation";
@@ -33,9 +36,11 @@ beforeEach(() => {
   mocks.create.mockReset();
   mocks.upsert.mockReset();
   mocks.deleteFn.mockReset();
+  mocks.cookieGet.mockReset();
   mocks.upsert.mockResolvedValue(undefined);
   mocks.create.mockResolvedValue(undefined);
   mocks.deleteFn.mockResolvedValue(undefined);
+  mocks.cookieGet.mockReturnValue(undefined);
   mockContainer.items.query.mockClear();
 });
 
@@ -118,6 +123,51 @@ describe("logImpersonation", () => {
     const at = new Date(doc.at).getTime();
     expect(at).toBeGreaterThanOrEqual(before);
     expect(at).toBeLessThanOrEqual(after);
+  });
+});
+
+describe("logImpersonationActivityForCurrentRequest", () => {
+  it("does nothing when there's no impersonation session at all", async () => {
+    await logImpersonationActivityForCurrentRequest("bike", "bike-1", "update");
+    expect(mocks.create).not.toHaveBeenCalled();
+  });
+
+  it("does nothing when only one of the two cookies is present", async () => {
+    mocks.cookieGet.mockImplementation((name: string) => (name === "impersonating_as" ? { value: "rider@example.com" } : undefined));
+    await logImpersonationActivityForCurrentRequest("bike", "bike-1", "update");
+    expect(mocks.create).not.toHaveBeenCalled();
+  });
+
+  it("logs an activity entry via the real logImpersonation writer when both cookies are present", async () => {
+    mocks.cookieGet.mockImplementation((name: string) => {
+      if (name === "impersonation_session_id") return { value: "session-abc" };
+      if (name === "impersonating_as") return { value: "rider@example.com" };
+      return undefined;
+    });
+
+    await logImpersonationActivityForCurrentRequest("bike", "bike-1", "update");
+
+    expect(mocks.create).toHaveBeenCalledOnce();
+    expect(mocks.create.mock.calls[0][0]).toMatchObject({
+      pk: "admin",
+      type: "impersonationActivity",
+      sessionId: "session-abc",
+      targetEmail: "rider@example.com",
+      docType: "bike",
+      docId: "bike-1",
+      action: "update",
+    });
+  });
+
+  it("never throws when the write itself fails - this must never be allowed to break the real request it's describing", async () => {
+    mocks.cookieGet.mockImplementation((name: string) => {
+      if (name === "impersonation_session_id") return { value: "session-abc" };
+      if (name === "impersonating_as") return { value: "rider@example.com" };
+      return undefined;
+    });
+    mocks.create.mockRejectedValue(new Error("cosmos unavailable"));
+
+    await expect(logImpersonationActivityForCurrentRequest("bike", "bike-1", "update")).resolves.toBeUndefined();
   });
 });
 

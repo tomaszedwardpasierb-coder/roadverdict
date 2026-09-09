@@ -18,6 +18,7 @@ import {
   type ChartKind,
 } from "@/lib/tracker/bike";
 import { fetchDvlaDataFromVdg } from "@/lib/tracker/dvlaDataFetch";
+import { logImpersonationActivityForCurrentRequest } from "@/lib/admin/impersonation";
 import { getBikeClassForCC } from "@/lib/motorcycleModels";
 import type { Region } from "@/lib/priceData";
 import type { DistanceUnit, FuelEconomyUnit } from "@/lib/tracker/unitFormat";
@@ -99,6 +100,7 @@ export async function POST(request: NextRequest) {
     console.error("DVLA data fetch failed during bike creation:", err);
   }
 
+  void logImpersonationActivityForCurrentRequest("bike", result.bike.id, "create");
   return NextResponse.json({ bike: result.bike });
 }
 
@@ -160,30 +162,38 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: "Enter a valid mileage." }, { status: 400 });
     }
     bike = await updateBikeMileage(session.email, bikeId, currentMileage);
+    void logImpersonationActivityForCurrentRequest("bike", bikeId, "update");
   }
   if (region) {
     bike = await updateBikeRegion(session.email, bikeId, region);
+    void logImpersonationActivityForCurrentRequest("bike", bikeId, "update");
   }
   if (annualBudget != null) {
     if (annualBudget <= 0) {
       return NextResponse.json({ error: "Enter a valid budget amount." }, { status: 400 });
     }
     bike = await updateBikeBudget(session.email, bikeId, annualBudget);
+    void logImpersonationActivityForCurrentRequest("bike", bikeId, "update");
   }
   if (distanceUnit || fuelEconomyUnit) {
     bike = await updateBikeUnits(session.email, bikeId, distanceUnit, fuelEconomyUnit);
+    void logImpersonationActivityForCurrentRequest("bike", bikeId, "update");
   }
   if (currency) {
     bike = await updateBikeCurrency(session.email, bikeId, currency);
+    void logImpersonationActivityForCurrentRequest("bike", bikeId, "update");
   }
   if (chartType?.chartId && chartType?.kind) {
     bike = await updateBikeChartType(session.email, bikeId, chartType.chartId, chartType.kind);
+    void logImpersonationActivityForCurrentRequest("bike", bikeId, "update");
   }
   if (includeInsuranceInReport !== undefined) {
     bike = await updateBikeIncludeInsuranceInReport(session.email, bikeId, includeInsuranceInReport);
+    void logImpersonationActivityForCurrentRequest("bike", bikeId, "update");
   }
   if (includeFinanceInReport !== undefined) {
     bike = await updateBikeIncludeFinanceInReport(session.email, bikeId, includeFinanceInReport);
+    void logImpersonationActivityForCurrentRequest("bike", bikeId, "update");
   }
 
   if (!bike) {

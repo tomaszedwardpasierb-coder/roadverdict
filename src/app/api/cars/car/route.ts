@@ -16,6 +16,7 @@ import {
   type CarFuelType,
 } from "@/lib/tracker/car";
 import { fetchDvlaDataFromVdg } from "@/lib/tracker/dvlaDataFetch";
+import { logImpersonationActivityForCurrentRequest } from "@/lib/admin/impersonation";
 import type { Region } from "@/lib/priceData";
 import type { ChartKind } from "@/lib/tracker/bike";
 import type { DistanceUnit, FuelEconomyUnit } from "@/lib/tracker/unitFormat";
@@ -96,6 +97,7 @@ export async function POST(request: NextRequest) {
     console.error("DVLA data fetch failed during car creation:", err);
   }
 
+  void logImpersonationActivityForCurrentRequest("car", car.id, "create");
   return NextResponse.json({ car });
 }
 
@@ -144,24 +146,30 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: "Enter a valid mileage." }, { status: 400 });
     }
     car = await updateCarMileage(session.email, carId, currentMileage);
+    void logImpersonationActivityForCurrentRequest("car", carId, "update");
   }
   if (region) {
     car = await updateCarRegion(session.email, carId, region);
+    void logImpersonationActivityForCurrentRequest("car", carId, "update");
   }
   if (annualBudget != null) {
     if (annualBudget <= 0) {
       return NextResponse.json({ error: "Enter a valid budget amount." }, { status: 400 });
     }
     car = await updateCarBudget(session.email, carId, annualBudget);
+    void logImpersonationActivityForCurrentRequest("car", carId, "update");
   }
   if (distanceUnit || fuelEconomyUnit) {
     car = await updateCarUnits(session.email, carId, distanceUnit, fuelEconomyUnit);
+    void logImpersonationActivityForCurrentRequest("car", carId, "update");
   }
   if (currency) {
     car = await updateCarCurrency(session.email, carId, currency);
+    void logImpersonationActivityForCurrentRequest("car", carId, "update");
   }
   if (chartType?.chartId && chartType?.kind) {
     car = await updateCarChartType(session.email, carId, chartType.chartId, chartType.kind);
+    void logImpersonationActivityForCurrentRequest("car", carId, "update");
   }
 
   if (!car) {

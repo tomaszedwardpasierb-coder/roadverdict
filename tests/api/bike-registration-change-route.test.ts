@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => ({
   getBikesForUser: vi.fn(),
   addRegistrationChange: vi.fn(),
   isBikeReadOnly: vi.fn(),
+  logImpersonationActivityForCurrentRequest: vi.fn(),
 }));
 
 vi.mock("@/lib/auth/session", () => ({ getSession: mocks.getSession }));
@@ -14,6 +15,9 @@ vi.mock("@/lib/tracker/bike", () => ({
   addRegistrationChange: mocks.addRegistrationChange,
   isBikeReadOnly: mocks.isBikeReadOnly,
   BIKE_READ_ONLY_MESSAGE: "This bike has been transferred and is now read-only.",
+}));
+vi.mock("@/lib/admin/impersonation", () => ({
+  logImpersonationActivityForCurrentRequest: mocks.logImpersonationActivityForCurrentRequest,
 }));
 
 import { POST } from "@/app/api/tracker/bike/registration-change/route";
@@ -132,5 +136,6 @@ describe("POST /api/tracker/bike/registration-change", () => {
     await expect(response.json()).resolves.toEqual({
       bike: { id: bikeId, registrationChanges: [{ plate: "XY99 ZZZ", reason: "private-plate-assigned" }] },
     });
+    expect(mocks.logImpersonationActivityForCurrentRequest).toHaveBeenCalledWith("bike", bikeId, "update");
   });
 });

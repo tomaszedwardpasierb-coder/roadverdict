@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   isBikeReadOnly: vi.fn(),
   createReminder: vi.fn(),
   deleteRemindersBySourceKey: vi.fn(),
+  logImpersonationActivityForCurrentRequest: vi.fn(),
 }));
 
 vi.mock("@/lib/auth/session", () => ({ getSession: mocks.getSession }));
@@ -18,6 +19,9 @@ vi.mock("@/lib/tracker/bike", () => ({
 vi.mock("@/lib/tracker/reminder", () => ({
   createReminder: mocks.createReminder,
   deleteRemindersBySourceKey: mocks.deleteRemindersBySourceKey,
+}));
+vi.mock("@/lib/admin/impersonation", () => ({
+  logImpersonationActivityForCurrentRequest: mocks.logImpersonationActivityForCurrentRequest,
 }));
 
 import { POST } from "@/app/api/tracker/reminders/route";
@@ -135,6 +139,7 @@ describe("POST /api/tracker/reminders", () => {
       intervalType: "mileage",
       intervalValue: 500,
     }));
+    expect(mocks.logImpersonationActivityForCurrentRequest).toHaveBeenCalledWith("reminder", "reminder-1", "create");
   });
 
   it("clears any existing reminder for the same sourceKey before creating the new one", async () => {

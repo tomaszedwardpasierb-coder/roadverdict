@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/session";
 import { getShareLink, updateShareLinkAskingPrice } from "@/lib/tracker/shareLink";
+import { logImpersonationActivityForCurrentRequest } from "@/lib/admin/impersonation";
 
 export const dynamic = "force-dynamic";
 
@@ -49,5 +50,6 @@ export async function POST(request: NextRequest, props: { params: Promise<{ toke
   if (!updated) {
     return NextResponse.json({ error: "Link not found." }, { status: 404 });
   }
+  void logImpersonationActivityForCurrentRequest("shareLink", params.token, "update");
   return NextResponse.json({ askingPrice: updated.askingPrice ?? null });
 }

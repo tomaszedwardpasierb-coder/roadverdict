@@ -4,11 +4,15 @@ import { NextRequest } from "next/server";
 const mocks = vi.hoisted(() => ({
   getSession: vi.fn(),
   decideReceiptRequestItems: vi.fn(),
+  logImpersonationActivityForCurrentRequest: vi.fn(),
 }));
 
 vi.mock("@/lib/auth/session", () => ({ getSession: mocks.getSession }));
 vi.mock("@/lib/tracker/receiptRequest", () => ({
   decideReceiptRequestItems: mocks.decideReceiptRequestItems,
+}));
+vi.mock("@/lib/admin/impersonation", () => ({
+  logImpersonationActivityForCurrentRequest: mocks.logImpersonationActivityForCurrentRequest,
 }));
 
 import { POST } from "@/app/api/tracker/receipt-request/[requestId]/decide/route";
@@ -114,6 +118,7 @@ describe("POST /api/tracker/receipt-request/[requestId]/decide", () => {
     );
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({ ok: true, items: updatedItems });
+    expect(mocks.logImpersonationActivityForCurrentRequest).toHaveBeenCalledWith("receiptRequest", requestId, "update");
   });
 
   it("defaults entryIds to 'all' when not provided", async () => {

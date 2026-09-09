@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/session";
 import { getShareLink, deleteShareLink } from "@/lib/tracker/shareLink";
+import { logImpersonationActivityForCurrentRequest } from "@/lib/admin/impersonation";
 
 export const dynamic = "force-dynamic";
 
@@ -18,5 +19,6 @@ export async function DELETE(request: NextRequest, props: { params: Promise<{ to
   }
 
   await deleteShareLink(params.token);
+  void logImpersonationActivityForCurrentRequest("shareLink", params.token, "delete");
   return NextResponse.json({ ok: true });
 }
