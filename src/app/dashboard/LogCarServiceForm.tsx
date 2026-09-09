@@ -11,17 +11,20 @@ import { useTrackerFormSubmit } from './useTrackerFormSubmit';
 import { ReminderFields, type ReminderTriggerRow } from './ReminderFields';
 import { MileageWarning } from './MileageWarning';
 import { AttachmentUploader } from './AttachmentUploader';
+import { useEstimatedMileage } from './useEstimatedMileage';
 import { CAR_JOB_LABELS, CAR_JOB_REMINDER_DEFAULTS } from '@/lib/tracker/carJobTypes';
 import { isBeforeProduction } from '@/lib/tracker/productionYearCheck';
 import { checkMileageConsistency, type HistoryPoint } from '@/lib/tracker/mileageCheck';
 import { convertDisplayToGbp, CURRENCY_SYMBOLS, type Currency, type ExchangeRates } from '@/lib/tracker/currency';
-import { convertMilesToDisplay, convertDisplayToMiles, distanceUnitLabel, type DistanceUnit } from '@/lib/tracker/unitFormat';
+import { convertDisplayToMiles, distanceUnitLabel, type DistanceUnit } from '@/lib/tracker/unitFormat';
 import type { Attachment } from '@/lib/tracker/cosmosHelpers';
 import type { CarReminderTrigger } from '@/lib/tracker/carReminder';
 
 interface Props {
   initialMileage: number;
   mileageHistory: HistoryPoint[];
+  startingMileage: number;
+  dateAdded: string;
   distanceUnit: DistanceUnit;
   currency: Currency;
   rates: ExchangeRates | null;
@@ -35,11 +38,18 @@ function rowToTrigger(row: ReminderTriggerRow): CarReminderTrigger {
     : { intervalType: row.intervalType, intervalValue: Number(row.intervalValue) };
 }
 
-export function LogCarServiceForm({ initialMileage, mileageHistory, distanceUnit, currency, rates, carYear, isCustomBuild }: Props) {
+export function LogCarServiceForm({ initialMileage, mileageHistory, startingMileage, dateAdded, distanceUnit, currency, rates, carYear, isCustomBuild }: Props) {
   const [jobType, setJobType] = useState('oil-filter');
   const [costDisplay, setCostDisplay] = useState('');
-  const [mileageDisplay, setMileageDisplay] = useState(String(Math.round(convertMilesToDisplay(initialMileage, distanceUnit))));
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
+  const { mileageDisplay, onMileageChange, estimateNote } = useEstimatedMileage({
+    date,
+    mileageHistory,
+    startingMileage,
+    currentMileage: initialMileage,
+    dateAdded,
+    distanceUnit,
+  });
   const [notes, setNotes] = useState('');
   const [mileageAcknowledged, setMileageAcknowledged] = useState(false);
   const [remindChecked, setRemindChecked] = useState(Boolean(CAR_JOB_REMINDER_DEFAULTS['oil-filter']));
@@ -116,7 +126,8 @@ export function LogCarServiceForm({ initialMileage, mileageHistory, distanceUnit
         </div>
         <div className="field" style={{ marginTop: '0.9rem' }}>
           <label htmlFor="carsvc-mileage">Mileage at the time ({unitLabel})</label>
-          <input id="carsvc-mileage" type="number" min="0" value={mileageDisplay} onChange={(e) => setMileageDisplay(e.target.value)} required />
+          <input id="carsvc-mileage" type="number" min="0" value={mileageDisplay} onChange={(e) => onMileageChange(e.target.value)} required />
+          {estimateNote && <p className="field-note">{estimateNote}</p>}
         </div>
         <MileageWarning result={mileageResult} distanceUnit={distanceUnit} acknowledged={mileageAcknowledged} onAcknowledgeChange={setMileageAcknowledged} />
         <div className="field" style={{ marginTop: '0.9rem' }}>

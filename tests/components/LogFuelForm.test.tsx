@@ -31,7 +31,7 @@ describe("LogFuelForm", () => {
   });
 
   it("prefills mileage from the bike's current mileage, converted into the display unit", () => {
-    render(<LogFuelForm initialMileage={1000} mileageHistory={[]} distanceUnit="km" currency="GBP" rates={null} />);
+    render(<LogFuelForm initialMileage={1000} startingMileage={0} dateAdded="2020-01-01" mileageHistory={[]} distanceUnit="km" currency="GBP" rates={null} />);
     // 1000 miles -> ~1609 km, rounded
     expect(screen.getByLabelText(/Mileage at the time/)).toHaveValue(1609);
     expect(screen.getByLabelText(/Mileage at the time/)).toHaveAccessibleName("Mileage at the time (km)");
@@ -39,7 +39,7 @@ describe("LogFuelForm", () => {
 
   it("blocks submission when the claimed date is before the bike's own production year", async () => {
     const user = userEvent.setup();
-    render(<LogFuelForm initialMileage={1000} mileageHistory={[]} distanceUnit="mi" currency="GBP" rates={null} bikeYear={2021} />);
+    render(<LogFuelForm initialMileage={1000} startingMileage={0} dateAdded="2020-01-01" mileageHistory={[]} distanceUnit="mi" currency="GBP" rates={null} bikeYear={2021} />);
     const dateInput = screen.getByLabelText("Date");
     await user.clear(dateInput);
     await user.type(dateInput, "2019-01-01");
@@ -50,7 +50,7 @@ describe("LogFuelForm", () => {
 
   it("blocks outright a today-dated entry claiming less mileage than the bike currently has", async () => {
     const user = userEvent.setup();
-    render(<LogFuelForm initialMileage={1000} mileageHistory={[]} distanceUnit="mi" currency="GBP" rates={null} />);
+    render(<LogFuelForm initialMileage={1000} startingMileage={0} dateAdded="2020-01-01" mileageHistory={[]} distanceUnit="mi" currency="GBP" rates={null} />);
     const mileageInput = screen.getByLabelText(/Mileage at the time/);
     await user.clear(mileageInput);
     await user.type(mileageInput, "500");
@@ -62,7 +62,7 @@ describe("LogFuelForm", () => {
   it("a past-dated entry that conflicts with logged history is a warning, not a block - and can be overridden by ticking 'this is correct'", async () => {
     const user = userEvent.setup();
     const history = [{ id: "h1", category: "service" as const, date: "2020-01-01", mileage: 2000 }];
-    render(<LogFuelForm initialMileage={1000} mileageHistory={history} distanceUnit="mi" currency="GBP" rates={null} />);
+    render(<LogFuelForm initialMileage={1000} startingMileage={0} dateAdded="2020-01-01" mileageHistory={history} distanceUnit="mi" currency="GBP" rates={null} />);
 
     const dateInput = screen.getByLabelText("Date");
     await user.clear(dateInput);
@@ -81,7 +81,7 @@ describe("LogFuelForm", () => {
   it("submits the real form state to /api/tracker/fuel, converting cost to GBP, then clears litres/cost but leaves mileage and date alone", async () => {
     (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({ ok: true, json: async () => ({}) });
     const user = userEvent.setup();
-    render(<LogFuelForm initialMileage={1000} mileageHistory={[]} distanceUnit="mi" currency="GBP" rates={null} />);
+    render(<LogFuelForm initialMileage={1000} startingMileage={0} dateAdded="2020-01-01" mileageHistory={[]} distanceUnit="mi" currency="GBP" rates={null} />);
     await user.type(screen.getByLabelText("Litres added"), "10");
     await user.type(screen.getByLabelText(/Cost paid/), "15");
     await user.click(screen.getByRole("button", { name: "Log it" }));
@@ -101,7 +101,7 @@ describe("LogFuelForm", () => {
   it("unticking 'filled the tank completely full' is reflected in the submitted body", async () => {
     (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({ ok: true, json: async () => ({}) });
     const user = userEvent.setup();
-    render(<LogFuelForm initialMileage={1000} mileageHistory={[]} distanceUnit="mi" currency="GBP" rates={null} />);
+    render(<LogFuelForm initialMileage={1000} startingMileage={0} dateAdded="2020-01-01" mileageHistory={[]} distanceUnit="mi" currency="GBP" rates={null} />);
     await user.click(screen.getByRole("checkbox", { name: "Filled the tank completely full" }));
     await user.type(screen.getByLabelText("Litres added"), "5");
     await user.type(screen.getByLabelText(/Cost paid/), "8");
@@ -116,7 +116,7 @@ describe("LogFuelForm", () => {
   });
 
   it("offers a receipt/invoice attachment field", () => {
-    render(<LogFuelForm initialMileage={1000} mileageHistory={[]} distanceUnit="mi" currency="GBP" rates={null} />);
+    render(<LogFuelForm initialMileage={1000} startingMileage={0} dateAdded="2020-01-01" mileageHistory={[]} distanceUnit="mi" currency="GBP" rates={null} />);
     expect(screen.getByLabelText("Receipt or invoice (optional)")).toBeInTheDocument();
   });
 });

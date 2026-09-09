@@ -18,14 +18,14 @@ describe("LogCarFuelForm", () => {
   });
 
   it("for a petrol car, shows a litres field and the 'filled to full' checkbox, defaulted checked", () => {
-    render(<LogCarFuelForm fuelType="petrol" initialMileage={40000} mileageHistory={[]} distanceUnit="mi" currency="GBP" rates={null} />);
+    render(<LogCarFuelForm fuelType="petrol" initialMileage={40000} startingMileage={0} dateAdded="2020-01-01" mileageHistory={[]} distanceUnit="mi" currency="GBP" rates={null} />);
     expect(screen.getByLabelText("Litres added")).toBeInTheDocument();
     expect(screen.queryByLabelText(/Energy added/)).not.toBeInTheDocument();
     expect(screen.getByLabelText("Filled the tank completely full")).toBeChecked();
   });
 
   it("for an electric car, shows a kWh field and no 'filled to full' checkbox", () => {
-    render(<LogCarFuelForm fuelType="electric" initialMileage={40000} mileageHistory={[]} distanceUnit="mi" currency="GBP" rates={null} />);
+    render(<LogCarFuelForm fuelType="electric" initialMileage={40000} startingMileage={0} dateAdded="2020-01-01" mileageHistory={[]} distanceUnit="mi" currency="GBP" rates={null} />);
     expect(screen.getByLabelText(/Energy added/)).toBeInTheDocument();
     expect(screen.queryByLabelText("Litres added")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Filled the tank completely full")).not.toBeInTheDocument();
@@ -33,7 +33,7 @@ describe("LogCarFuelForm", () => {
 
   it("blocks submit when the mileage is lower than the car's current mileage", async () => {
     const user = userEvent.setup();
-    render(<LogCarFuelForm fuelType="petrol" initialMileage={40000} mileageHistory={[]} distanceUnit="mi" currency="GBP" rates={null} />);
+    render(<LogCarFuelForm fuelType="petrol" initialMileage={40000} startingMileage={0} dateAdded="2020-01-01" mileageHistory={[]} distanceUnit="mi" currency="GBP" rates={null} />);
     const mileageInput = screen.getByLabelText("Mileage at the time (miles)");
     await user.clear(mileageInput);
     await user.type(mileageInput, "100");
@@ -43,7 +43,7 @@ describe("LogCarFuelForm", () => {
   it("submits litres for a petrol car, to /api/cars/car-fuel", async () => {
     (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({ ok: true, json: async () => ({}) });
     const user = userEvent.setup();
-    render(<LogCarFuelForm fuelType="petrol" initialMileage={40000} mileageHistory={[]} distanceUnit="mi" currency="GBP" rates={null} />);
+    render(<LogCarFuelForm fuelType="petrol" initialMileage={40000} startingMileage={0} dateAdded="2020-01-01" mileageHistory={[]} distanceUnit="mi" currency="GBP" rates={null} />);
 
     await user.type(screen.getByLabelText("Litres added"), "45");
     await user.type(screen.getByLabelText(/Cost paid/), "60");
@@ -70,7 +70,7 @@ describe("LogCarFuelForm", () => {
   it("submits kwh (never litres) for an electric car", async () => {
     (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({ ok: true, json: async () => ({}) });
     const user = userEvent.setup();
-    render(<LogCarFuelForm fuelType="electric" initialMileage={40000} mileageHistory={[]} distanceUnit="mi" currency="GBP" rates={null} />);
+    render(<LogCarFuelForm fuelType="electric" initialMileage={40000} startingMileage={0} dateAdded="2020-01-01" mileageHistory={[]} distanceUnit="mi" currency="GBP" rates={null} />);
 
     await user.type(screen.getByLabelText(/Energy added/), "30");
     await user.type(screen.getByLabelText(/Cost paid/), "12");

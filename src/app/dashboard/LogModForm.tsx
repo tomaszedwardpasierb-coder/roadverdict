@@ -4,12 +4,13 @@
 import { useState, useMemo } from 'react';
 import { MOD_GROUPS, MOD_LABELS, MOD_LABEL_TO_KEY, findGroupForCategory } from '@/lib/tracker/modTypes';
 import { checkMileageConsistency, type HistoryPoint } from '@/lib/tracker/mileageCheck';
-import { convertMilesToDisplay, convertDisplayToMiles, distanceUnitLabel, type DistanceUnit } from '@/lib/tracker/unitFormat';
+import { convertDisplayToMiles, distanceUnitLabel, type DistanceUnit } from '@/lib/tracker/unitFormat';
 import { convertDisplayToGbp, CURRENCY_SYMBOLS, type Currency, type ExchangeRates } from '@/lib/tracker/currency';
 import { useTrackerFormSubmit } from './useTrackerFormSubmit';
 import { MileageWarning } from './MileageWarning';
 import { AttachmentUploader } from './AttachmentUploader';
 import { ModSearchAutocomplete } from './ModSearchAutocomplete';
+import { useEstimatedMileage } from './useEstimatedMileage';
 import { isBackdated, backdateNotice } from '@/lib/tracker/backdateCheck';
 import { isBeforeProduction } from '@/lib/tracker/productionYearCheck';
 import type { Attachment } from '@/lib/tracker/cosmosHelpers';
@@ -18,6 +19,8 @@ import styles from './dashboard.module.css';
 export function LogModForm({
   initialMileage,
   mileageHistory,
+  startingMileage,
+  dateAdded,
   distanceUnit,
   currency,
   rates,
@@ -26,6 +29,8 @@ export function LogModForm({
 }: {
   initialMileage: number;
   mileageHistory: HistoryPoint[];
+  startingMileage: number;
+  dateAdded: string;
   distanceUnit: DistanceUnit;
   currency: Currency;
   rates: ExchangeRates | null;
@@ -37,10 +42,15 @@ export function LogModForm({
   const [categorySearch, setCategorySearch] = useState('');
   const [name, setName] = useState('');
   const [costDisplay, setCostDisplay] = useState('');
-  const [mileageDisplay, setMileageDisplay] = useState(
-    String(Math.round(convertMilesToDisplay(initialMileage, distanceUnit)))
-  );
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
+  const { mileageDisplay, onMileageChange, estimateNote } = useEstimatedMileage({
+    date,
+    mileageHistory,
+    startingMileage,
+    currentMileage: initialMileage,
+    dateAdded,
+    distanceUnit,
+  });
   const [notes, setNotes] = useState('');
   const [mileageAcknowledged, setMileageAcknowledged] = useState(false);
   const [attachment, setAttachment] = useState<Attachment | null>(null);
@@ -152,7 +162,8 @@ export function LogModForm({
         </div>
         <div className="field" style={{ marginTop: '0.9rem' }}>
           <label htmlFor="mod-mileage">Mileage at the time ({unitLabel})</label>
-          <input id="mod-mileage" type="number" min="0" value={mileageDisplay} onChange={(e) => setMileageDisplay(e.target.value)} required />
+          <input id="mod-mileage" type="number" min="0" value={mileageDisplay} onChange={(e) => onMileageChange(e.target.value)} required />
+          {estimateNote && <p className="field-note">{estimateNote}</p>}
         </div>
         <MileageWarning result={mileageResult} distanceUnit={distanceUnit} acknowledged={mileageAcknowledged} onAcknowledgeChange={setMileageAcknowledged} />
         <div className="field" style={{ marginTop: '0.9rem' }}>

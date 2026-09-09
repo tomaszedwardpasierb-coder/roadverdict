@@ -433,7 +433,7 @@ export default async function DashboardPage(props: { searchParams: Promise<{ add
         {mileagePill}
       </div>
       <p className={styles.subtext}>Every oil change, every brake job - a real maintenance record, not a hazy memory of &quot;I think I did it.&quot;</p>
-      <LogServiceForm initialMileage={bike.currentMileage} mileageHistory={mileagePoints} distanceUnit={distanceUnit} currency={currency} rates={rates} bikeYear={bike.year} isCustomBuild={bike.isCustomBuild} />
+      <LogServiceForm initialMileage={bike.currentMileage} mileageHistory={mileagePoints} startingMileage={bike.startingMileage} dateAdded={bike.dateAdded} distanceUnit={distanceUnit} currency={currency} rates={rates} bikeYear={bike.year} isCustomBuild={bike.isCustomBuild} />
       <h2 className={styles.sectionHeading}>Service history</h2>
       {records.length === 0 ? (
         <div className={styles.card}><p className={styles.cardBody}>No service records logged yet. Log your first one above.</p></div>
@@ -452,7 +452,7 @@ export default async function DashboardPage(props: { searchParams: Promise<{ add
         {mileagePill}
       </div>
       <p className={styles.subtext}>Log a fill-up in seconds, and watch your actual mpg emerge - not the manufacturer&apos;s claim, yours.</p>
-      <LogFuelForm initialMileage={bike.currentMileage} mileageHistory={mileagePoints} distanceUnit={distanceUnit} currency={currency} rates={rates} bikeYear={bike.year} isCustomBuild={bike.isCustomBuild} />
+      <LogFuelForm initialMileage={bike.currentMileage} mileageHistory={mileagePoints} startingMileage={bike.startingMileage} dateAdded={bike.dateAdded} distanceUnit={distanceUnit} currency={currency} rates={rates} bikeYear={bike.year} isCustomBuild={bike.isCustomBuild} />
       {actualMpg ? (
         <p className={styles.subtext} style={{ marginBottom: "0.9rem" }}>
           Your actual average from logged fill-ups: <strong>{formatFuelEconomy(actualMpg, fuelEconomyUnit)}</strong>{" "}
@@ -485,7 +485,7 @@ export default async function DashboardPage(props: { searchParams: Promise<{ add
         {mileagePill}
       </div>
       <p className={styles.subtext}>Every upgrade, with the receipt to prove it wasn&apos;t a bodge job.</p>
-      <LogModForm initialMileage={bike.currentMileage} mileageHistory={mileagePoints} distanceUnit={distanceUnit} currency={currency} rates={rates} bikeYear={bike.year} isCustomBuild={bike.isCustomBuild} />
+      <LogModForm initialMileage={bike.currentMileage} mileageHistory={mileagePoints} startingMileage={bike.startingMileage} dateAdded={bike.dateAdded} distanceUnit={distanceUnit} currency={currency} rates={rates} bikeYear={bike.year} isCustomBuild={bike.isCustomBuild} />
       <h2 className={styles.sectionHeading}>History</h2>
       {mods.length === 0 ? (
         <div className={styles.card}><p className={styles.cardBody}>No modifications or accessories logged yet.</p></div>
@@ -545,7 +545,7 @@ export default async function DashboardPage(props: { searchParams: Promise<{ add
         {mileagePill}
       </div>
       <p className={styles.subtext}>Workshop time and diagnostic hours - the part of the bill that&apos;s easy to forget once the parts themselves are paid for.</p>
-      <LogLabourForm initialMileage={bike.currentMileage} mileageHistory={mileagePoints} distanceUnit={distanceUnit} currency={currency} rates={rates} bikeYear={bike.year} isCustomBuild={bike.isCustomBuild} />
+      <LogLabourForm initialMileage={bike.currentMileage} mileageHistory={mileagePoints} startingMileage={bike.startingMileage} dateAdded={bike.dateAdded} distanceUnit={distanceUnit} currency={currency} rates={rates} bikeYear={bike.year} isCustomBuild={bike.isCustomBuild} />
       <h2 className={styles.sectionHeading}>History</h2>
       {labour.length === 0 ? (
         <div className={styles.card}><p className={styles.cardBody}>No labour logged yet.</p></div>
@@ -1058,7 +1058,7 @@ async function renderCarDashboard(email: string, car: CarDoc, allCars: CarDoc[],
         {mileagePill}
       </div>
       <p className={styles.subtext}>Every oil change, every brake job - a real maintenance record, not a hazy memory of &quot;I think I did it.&quot;</p>
-      <LogCarServiceForm initialMileage={car.currentMileage} mileageHistory={mileagePoints} distanceUnit={distanceUnit} currency={currency} rates={rates} carYear={car.year} isCustomBuild={car.isCustomBuild} />
+      <LogCarServiceForm initialMileage={car.currentMileage} mileageHistory={mileagePoints} startingMileage={car.startingMileage} dateAdded={car.dateAdded} distanceUnit={distanceUnit} currency={currency} rates={rates} carYear={car.year} isCustomBuild={car.isCustomBuild} />
       <h2 className={styles.sectionHeading}>Service history</h2>
       {records.length === 0 ? (
         <div className={styles.card}><p className={styles.cardBody}>No service records logged yet. Log your first one above.</p></div>
@@ -1075,7 +1075,7 @@ async function renderCarDashboard(email: string, car: CarDoc, allCars: CarDoc[],
         {mileagePill}
       </div>
       <p className={styles.subtext}>Log a fill-up or charge in seconds.</p>
-      <LogCarFuelForm fuelType={car.fuelType} initialMileage={car.currentMileage} mileageHistory={mileagePoints} distanceUnit={distanceUnit} currency={currency} rates={rates} carYear={car.year} isCustomBuild={car.isCustomBuild} />
+      <LogCarFuelForm fuelType={car.fuelType} initialMileage={car.currentMileage} mileageHistory={mileagePoints} startingMileage={car.startingMileage} dateAdded={car.dateAdded} distanceUnit={distanceUnit} currency={currency} rates={rates} carYear={car.year} isCustomBuild={car.isCustomBuild} />
       <h2 className={styles.sectionHeading}>Fuel log</h2>
       {fuelLogs.length === 0 ? (
         <div className={styles.card}><p className={styles.cardBody}>No fuel fill-ups or charges logged yet. Log your first one above.</p></div>
@@ -1092,7 +1092,7 @@ async function renderCarDashboard(email: string, car: CarDoc, allCars: CarDoc[],
         {mileagePill}
       </div>
       <p className={styles.subtext}>Every upgrade, with the receipt to prove it wasn&apos;t a bodge job.</p>
-      <LogCarModForm initialMileage={car.currentMileage} mileageHistory={mileagePoints} distanceUnit={distanceUnit} currency={currency} rates={rates} carYear={car.year} isCustomBuild={car.isCustomBuild} />
+      <LogCarModForm initialMileage={car.currentMileage} mileageHistory={mileagePoints} startingMileage={car.startingMileage} dateAdded={car.dateAdded} distanceUnit={distanceUnit} currency={currency} rates={rates} carYear={car.year} isCustomBuild={car.isCustomBuild} />
       <h2 className={styles.sectionHeading}>History</h2>
       {mods.length === 0 ? (
         <div className={styles.card}><p className={styles.cardBody}>No modifications or accessories logged yet.</p></div>
@@ -1126,7 +1126,7 @@ async function renderCarDashboard(email: string, car: CarDoc, allCars: CarDoc[],
         {mileagePill}
       </div>
       <p className={styles.subtext}>Workshop time and diagnostic hours - the part of the bill that&apos;s easy to forget once the parts themselves are paid for.</p>
-      <LogCarLabourForm initialMileage={car.currentMileage} mileageHistory={mileagePoints} distanceUnit={distanceUnit} currency={currency} rates={rates} carYear={car.year} isCustomBuild={car.isCustomBuild} />
+      <LogCarLabourForm initialMileage={car.currentMileage} mileageHistory={mileagePoints} startingMileage={car.startingMileage} dateAdded={car.dateAdded} distanceUnit={distanceUnit} currency={currency} rates={rates} carYear={car.year} isCustomBuild={car.isCustomBuild} />
       <h2 className={styles.sectionHeading}>History</h2>
       {labour.length === 0 ? (
         <div className={styles.card}><p className={styles.cardBody}>No labour logged yet.</p></div>

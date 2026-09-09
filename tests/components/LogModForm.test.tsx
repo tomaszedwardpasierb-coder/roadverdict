@@ -30,7 +30,7 @@ describe("LogModForm", () => {
   });
 
   it("renders real defaults: today's date, the first real group/category, and the current mileage", () => {
-    render(<LogModForm initialMileage={8000} mileageHistory={[]} distanceUnit="mi" currency="GBP" rates={null} />);
+    render(<LogModForm initialMileage={8000} startingMileage={0} dateAdded="2020-01-01" mileageHistory={[]} distanceUnit="mi" currency="GBP" rates={null} />);
 
     expect(screen.getByLabelText("Date")).toHaveValue(todayIso);
     expect(screen.getByLabelText("Group")).toHaveValue("Performance & exhaust");
@@ -40,7 +40,7 @@ describe("LogModForm", () => {
 
   it("changing Group resets Category to that group's own first item", async () => {
     const user = userEvent.setup();
-    render(<LogModForm initialMileage={8000} mileageHistory={[]} distanceUnit="mi" currency="GBP" rates={null} />);
+    render(<LogModForm initialMileage={8000} startingMileage={0} dateAdded="2020-01-01" mileageHistory={[]} distanceUnit="mi" currency="GBP" rates={null} />);
 
     await user.selectOptions(screen.getByLabelText("Group"), "Styling & protection");
     expect(screen.getByLabelText("Category")).toHaveValue("tank-pads");
@@ -48,7 +48,7 @@ describe("LogModForm", () => {
 
   it("the search box's real suggestions jump both Group and Category to the matched item", async () => {
     const user = userEvent.setup();
-    render(<LogModForm initialMileage={8000} mileageHistory={[]} distanceUnit="mi" currency="GBP" rates={null} />);
+    render(<LogModForm initialMileage={8000} startingMileage={0} dateAdded="2020-01-01" mileageHistory={[]} distanceUnit="mi" currency="GBP" rates={null} />);
 
     await user.type(screen.getByLabelText("Search for an item"), "tank bag");
     await user.click(screen.getByRole("button", { name: "Tank bag" }));
@@ -59,7 +59,7 @@ describe("LogModForm", () => {
 
   it("blocks submit when the mileage is lower than the bike's current mileage for a today-dated entry", async () => {
     const user = userEvent.setup();
-    render(<LogModForm initialMileage={8000} mileageHistory={[]} distanceUnit="mi" currency="GBP" rates={null} />);
+    render(<LogModForm initialMileage={8000} startingMileage={0} dateAdded="2020-01-01" mileageHistory={[]} distanceUnit="mi" currency="GBP" rates={null} />);
 
     const mileageInput = screen.getByLabelText("Mileage at the time (miles)");
     await user.clear(mileageInput);
@@ -73,7 +73,7 @@ describe("LogModForm", () => {
     const user = userEvent.setup();
     render(
       <LogModForm
-        initialMileage={8000}
+        initialMileage={8000} startingMileage={0} dateAdded="2020-01-01"
         mileageHistory={[{ date: "2024-01-01", mileage: 9000 }]}
         distanceUnit="mi"
         currency="GBP"
@@ -85,6 +85,14 @@ describe("LogModForm", () => {
     await user.clear(dateInput);
     await user.type(dateInput, "2024-06-01");
 
+    // Changing only the date, without touching mileage, now auto-corrects
+    // the mileage estimate to stay consistent with the logged history
+    // above (see useEstimatedMileage) - so the conflict below has to come
+    // from a mileage the person actually typed themselves.
+    const mileageInput = screen.getByLabelText(/Mileage at the time/);
+    await user.clear(mileageInput);
+    await user.type(mileageInput, "8000");
+
     expect(screen.getByText(/lower than an earlier entry on 1 Jan 2024/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Log it" })).toBeDisabled();
 
@@ -94,7 +102,7 @@ describe("LogModForm", () => {
 
   it("shows a pre-production note but does NOT block submit, unlike LogServiceForm's hard block", async () => {
     const user = userEvent.setup();
-    render(<LogModForm initialMileage={8000} mileageHistory={[]} distanceUnit="mi" currency="GBP" rates={null} bikeYear={2020} />);
+    render(<LogModForm initialMileage={8000} startingMileage={0} dateAdded="2020-01-01" mileageHistory={[]} distanceUnit="mi" currency="GBP" rates={null} bikeYear={2020} />);
 
     const dateInput = screen.getByLabelText("Date");
     await user.clear(dateInput);
@@ -107,7 +115,7 @@ describe("LogModForm", () => {
 
   it("shows a non-blocking backdate notice for an old, non-conflicting date", async () => {
     const user = userEvent.setup();
-    render(<LogModForm initialMileage={8000} mileageHistory={[]} distanceUnit="mi" currency="GBP" rates={null} />);
+    render(<LogModForm initialMileage={8000} startingMileage={0} dateAdded="2020-01-01" mileageHistory={[]} distanceUnit="mi" currency="GBP" rates={null} />);
 
     const dateInput = screen.getByLabelText("Date");
     await user.clear(dateInput);
@@ -121,7 +129,7 @@ describe("LogModForm", () => {
   it("submits the real form state to /api/tracker/mods", async () => {
     (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({ ok: true, json: async () => ({}) });
     const user = userEvent.setup();
-    render(<LogModForm initialMileage={8000} mileageHistory={[]} distanceUnit="mi" currency="GBP" rates={null} />);
+    render(<LogModForm initialMileage={8000} startingMileage={0} dateAdded="2020-01-01" mileageHistory={[]} distanceUnit="mi" currency="GBP" rates={null} />);
 
     await user.type(screen.getByLabelText("What is it?"), "Akrapovic slip-on can");
     await user.type(screen.getByLabelText("Cost (£)"), "450");
@@ -148,7 +156,7 @@ describe("LogModForm", () => {
   it("clears name, cost and notes after a successful submit, but keeps the date and category", async () => {
     (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({ ok: true, json: async () => ({}) });
     const user = userEvent.setup();
-    render(<LogModForm initialMileage={8000} mileageHistory={[]} distanceUnit="mi" currency="GBP" rates={null} />);
+    render(<LogModForm initialMileage={8000} startingMileage={0} dateAdded="2020-01-01" mileageHistory={[]} distanceUnit="mi" currency="GBP" rates={null} />);
 
     await user.type(screen.getByLabelText("What is it?"), "Tank bag");
     await user.type(screen.getByLabelText("Cost (£)"), "50");
@@ -164,7 +172,7 @@ describe("LogModForm", () => {
   it("shows the server's own error message when the submit fails, and does not reset the form", async () => {
     (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({ ok: false, json: async () => ({ error: "Something went wrong logging this part." }) });
     const user = userEvent.setup();
-    render(<LogModForm initialMileage={8000} mileageHistory={[]} distanceUnit="mi" currency="GBP" rates={null} />);
+    render(<LogModForm initialMileage={8000} startingMileage={0} dateAdded="2020-01-01" mileageHistory={[]} distanceUnit="mi" currency="GBP" rates={null} />);
 
     await user.type(screen.getByLabelText("What is it?"), "Tank bag");
     await user.type(screen.getByLabelText("Cost (£)"), "50");

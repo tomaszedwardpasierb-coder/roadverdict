@@ -18,7 +18,7 @@ describe("LogCarModForm", () => {
   });
 
   it("renders the first car mod category by default, with today's date and current mileage", () => {
-    render(<LogCarModForm initialMileage={40000} mileageHistory={[]} distanceUnit="mi" currency="GBP" rates={null} />);
+    render(<LogCarModForm initialMileage={40000} startingMileage={0} dateAdded="2020-01-01" mileageHistory={[]} distanceUnit="mi" currency="GBP" rates={null} />);
     expect(screen.getByLabelText("Category")).toHaveValue("dash-cam");
     expect(screen.getByLabelText("Date")).toHaveValue(todayIso);
     expect(screen.getByLabelText("Mileage at the time (miles)")).toHaveValue(40000);
@@ -26,7 +26,7 @@ describe("LogCarModForm", () => {
 
   it("does not block a date before the car's production year - only a soft note", async () => {
     const user = userEvent.setup();
-    render(<LogCarModForm initialMileage={40000} mileageHistory={[]} distanceUnit="mi" currency="GBP" rates={null} carYear={2020} />);
+    render(<LogCarModForm initialMileage={40000} startingMileage={0} dateAdded="2020-01-01" mileageHistory={[]} distanceUnit="mi" currency="GBP" rates={null} carYear={2020} />);
     const dateInput = screen.getByLabelText("Date");
     await user.clear(dateInput);
     await user.type(dateInput, "2019-06-01");
@@ -36,7 +36,7 @@ describe("LogCarModForm", () => {
 
   it("blocks submit when the mileage is lower than the car's current mileage", async () => {
     const user = userEvent.setup();
-    render(<LogCarModForm initialMileage={40000} mileageHistory={[]} distanceUnit="mi" currency="GBP" rates={null} />);
+    render(<LogCarModForm initialMileage={40000} startingMileage={0} dateAdded="2020-01-01" mileageHistory={[]} distanceUnit="mi" currency="GBP" rates={null} />);
     const mileageInput = screen.getByLabelText("Mileage at the time (miles)");
     await user.clear(mileageInput);
     await user.type(mileageInput, "100");
@@ -46,7 +46,7 @@ describe("LogCarModForm", () => {
   it("submits the real form state to /api/cars/car-mods", async () => {
     (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({ ok: true, json: async () => ({}) });
     const user = userEvent.setup();
-    render(<LogCarModForm initialMileage={40000} mileageHistory={[]} distanceUnit="mi" currency="GBP" rates={null} />);
+    render(<LogCarModForm initialMileage={40000} startingMileage={0} dateAdded="2020-01-01" mileageHistory={[]} distanceUnit="mi" currency="GBP" rates={null} />);
 
     await user.type(screen.getByLabelText("What is it?"), "Nextbase 622GW");
     await user.type(screen.getByLabelText(/Cost paid/), "150");

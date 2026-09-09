@@ -27,7 +27,7 @@ describe("LogLabourForm", () => {
   });
 
   it("renders real defaults: today's date, the first real category, and the current mileage", () => {
-    render(<LogLabourForm initialMileage={8000} mileageHistory={[]} distanceUnit="mi" currency="GBP" rates={null} />);
+    render(<LogLabourForm initialMileage={8000} startingMileage={0} dateAdded="2020-01-01" mileageHistory={[]} distanceUnit="mi" currency="GBP" rates={null} />);
 
     expect(screen.getByLabelText("Date")).toHaveValue(todayIso);
     expect(screen.getByLabelText("Category")).toHaveValue("full-service");
@@ -36,7 +36,7 @@ describe("LogLabourForm", () => {
 
   it("the search box's real suggestions jump the Category select to the matched item", async () => {
     const user = userEvent.setup();
-    render(<LogLabourForm initialMileage={8000} mileageHistory={[]} distanceUnit="mi" currency="GBP" rates={null} />);
+    render(<LogLabourForm initialMileage={8000} startingMileage={0} dateAdded="2020-01-01" mileageHistory={[]} distanceUnit="mi" currency="GBP" rates={null} />);
 
     await user.type(screen.getByLabelText("Search for a labour job"), "coolant replacement");
     await user.click(screen.getByRole("button", { name: "Coolant replacement" }));
@@ -46,7 +46,7 @@ describe("LogLabourForm", () => {
 
   it("blocks submit when the mileage is lower than the bike's current mileage for a today-dated entry", async () => {
     const user = userEvent.setup();
-    render(<LogLabourForm initialMileage={8000} mileageHistory={[]} distanceUnit="mi" currency="GBP" rates={null} />);
+    render(<LogLabourForm initialMileage={8000} startingMileage={0} dateAdded="2020-01-01" mileageHistory={[]} distanceUnit="mi" currency="GBP" rates={null} />);
 
     const mileageInput = screen.getByLabelText("Mileage at the time (miles)");
     await user.clear(mileageInput);
@@ -60,7 +60,7 @@ describe("LogLabourForm", () => {
     const user = userEvent.setup();
     render(
       <LogLabourForm
-        initialMileage={8000}
+        initialMileage={8000} startingMileage={0} dateAdded="2020-01-01"
         mileageHistory={[{ date: "2024-01-01", mileage: 9000 }]}
         distanceUnit="mi"
         currency="GBP"
@@ -72,6 +72,14 @@ describe("LogLabourForm", () => {
     await user.clear(dateInput);
     await user.type(dateInput, "2024-06-01");
 
+    // Changing only the date, without touching mileage, now auto-corrects
+    // the mileage estimate to stay consistent with the logged history
+    // above (see useEstimatedMileage) - so the conflict below has to come
+    // from a mileage the person actually typed themselves.
+    const mileageInput = screen.getByLabelText(/Mileage at the time/);
+    await user.clear(mileageInput);
+    await user.type(mileageInput, "8000");
+
     expect(screen.getByText(/lower than an earlier entry on 1 Jan 2024/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Log it" })).toBeDisabled();
 
@@ -81,7 +89,7 @@ describe("LogLabourForm", () => {
 
   it("shows a non-blocking pre-production note", async () => {
     const user = userEvent.setup();
-    render(<LogLabourForm initialMileage={8000} mileageHistory={[]} distanceUnit="mi" currency="GBP" rates={null} bikeYear={2020} />);
+    render(<LogLabourForm initialMileage={8000} startingMileage={0} dateAdded="2020-01-01" mileageHistory={[]} distanceUnit="mi" currency="GBP" rates={null} bikeYear={2020} />);
 
     const dateInput = screen.getByLabelText("Date");
     await user.clear(dateInput);
@@ -93,7 +101,7 @@ describe("LogLabourForm", () => {
 
   it("shows a non-blocking backdate notice for an old, non-conflicting date", async () => {
     const user = userEvent.setup();
-    render(<LogLabourForm initialMileage={8000} mileageHistory={[]} distanceUnit="mi" currency="GBP" rates={null} />);
+    render(<LogLabourForm initialMileage={8000} startingMileage={0} dateAdded="2020-01-01" mileageHistory={[]} distanceUnit="mi" currency="GBP" rates={null} />);
 
     const dateInput = screen.getByLabelText("Date");
     await user.clear(dateInput);
@@ -107,7 +115,7 @@ describe("LogLabourForm", () => {
   it("submits the real form state to /api/tracker/labour", async () => {
     (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({ ok: true, json: async () => ({}) });
     const user = userEvent.setup();
-    render(<LogLabourForm initialMileage={8000} mileageHistory={[]} distanceUnit="mi" currency="GBP" rates={null} />);
+    render(<LogLabourForm initialMileage={8000} startingMileage={0} dateAdded="2020-01-01" mileageHistory={[]} distanceUnit="mi" currency="GBP" rates={null} />);
 
     await user.type(screen.getByLabelText("Cost (£)"), "45");
     await user.click(screen.getByRole("button", { name: "Log it" }));
@@ -132,7 +140,7 @@ describe("LogLabourForm", () => {
   it("clears cost and notes after a successful submit, but keeps the date and category", async () => {
     (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({ ok: true, json: async () => ({}) });
     const user = userEvent.setup();
-    render(<LogLabourForm initialMileage={8000} mileageHistory={[]} distanceUnit="mi" currency="GBP" rates={null} />);
+    render(<LogLabourForm initialMileage={8000} startingMileage={0} dateAdded="2020-01-01" mileageHistory={[]} distanceUnit="mi" currency="GBP" rates={null} />);
 
     await user.type(screen.getByLabelText("Cost (£)"), "45");
     await user.type(screen.getByLabelText("Notes (optional)"), "Workshop invoice");
@@ -148,7 +156,7 @@ describe("LogLabourForm", () => {
   it("shows the server's own error message when the submit fails, and does not reset the form", async () => {
     (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({ ok: false, json: async () => ({ error: "Something went wrong logging this labour entry." }) });
     const user = userEvent.setup();
-    render(<LogLabourForm initialMileage={8000} mileageHistory={[]} distanceUnit="mi" currency="GBP" rates={null} />);
+    render(<LogLabourForm initialMileage={8000} startingMileage={0} dateAdded="2020-01-01" mileageHistory={[]} distanceUnit="mi" currency="GBP" rates={null} />);
 
     await user.type(screen.getByLabelText("Cost (£)"), "45");
     await user.click(screen.getByRole("button", { name: "Log it" }));
