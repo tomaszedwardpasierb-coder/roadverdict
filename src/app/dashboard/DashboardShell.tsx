@@ -271,6 +271,15 @@ export function DashboardShell({
       || (visibleItems.some((item) => item.key === 'transferOwnership') && hasIncomingRequest);
   }
 
+  // Static in NAV_GROUPS since that array is shared by both vehicle
+  // kinds - only buyingGuide's label actually mentions the vehicle kind
+  // by name, so this is the one spot needing an override rather than a
+  // second, mostly-duplicate NAV_GROUPS for cars.
+  function navLabelFor(item: NavItemDef): string {
+    if (item.key === 'buyingGuide' && vehicleKind === 'car') return 'Buying a used car';
+    return item.label;
+  }
+
   // Shared by the desktop sidebar and the mobile More sheet - same icon,
   // label, and pending/ready/request dots either way, just a different
   // className and an optional extra close-the-sheet callback.
@@ -286,7 +295,7 @@ export function DashboardShell({
         }}
       >
         <Icon name={item.icon} className={styles.navIcon} />
-        <span>{item.label}</span>
+        <span>{navLabelFor(item)}</span>
         {itemHasPending(item) && <PendingDot />}
         {item.key === 'story' && storyReady && <ReadyDot />}
         {item.key === 'transferOwnership' && hasIncomingRequest && <RequestDot />}

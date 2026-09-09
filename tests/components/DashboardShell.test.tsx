@@ -275,6 +275,15 @@ describe("DashboardShell", () => {
   // (Logbook/Insights/Selling/Buying Tools) rather than one flat 15-item
   // list - Logbook defaults open (daily-use tabs), the other three default
   // closed (the long-tail tabs that were causing the actual clutter).
+  it("shows the bike-flavoured 'Buying a used bike' label for a bike-active session", async () => {
+    const user = userEvent.setup();
+    render(<DashboardShell {...baseProps()} />);
+    const buyingToolsHeader = screen.getAllByRole("button", { name: /Buying Tools/ })[0];
+    await user.click(buyingToolsHeader);
+    expect(screen.getByRole("button", { name: "Buying a used bike" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Buying a used car" })).not.toBeInTheDocument();
+  });
+
   describe("collapsible nav groups", () => {
     it("Logbook's own items are visible with no interaction; the other three groups' items are not", () => {
       render(<DashboardShell {...baseProps()} />);
@@ -382,21 +391,26 @@ describe("DashboardShell", () => {
       expect(screen.getByText("Reports content")).toBeInTheDocument();
     });
 
-    // Quote Checker/Cost calculator/Buying a used bike all have real car
+    // Quote Checker/Cost calculator/Buying a used car all have real car
     // equivalents now (standalone /cars/quote-checker etc, wired into
     // the dashboard's own tabs) - they must render as real, clickable
     // nav items for a car-active session, not just be absent from the
     // unavailable-labels list above.
-    it("still shows all three buying tools as real, clickable nav items for a car-active session", async () => {
+    it("still shows all three buying tools as real, clickable nav items for a car-active session, with a car-flavoured buying-guide label", async () => {
       const user = userEvent.setup();
       render(<DashboardShell {...carProps()} />);
       const buyingToolsHeader = screen.getAllByRole("button", { name: /Buying Tools/ })[0];
       await user.click(buyingToolsHeader);
 
+      // Not "Buying a used bike" - that was a real bug (NAV_GROUPS is
+      // shared by both vehicle kinds, and only this one label mentions
+      // the kind by name; see DashboardShell.tsx's navLabelFor).
+      expect(screen.queryByRole("button", { name: "Buying a used bike" })).not.toBeInTheDocument();
+
       for (const [label, content] of [
         ["Quote Checker", "QuoteChecker content"],
         ["Cost calculator", "CostCalculator content"],
-        ["Buying a used bike", "BuyingGuide content"],
+        ["Buying a used car", "BuyingGuide content"],
       ]) {
         expect(screen.getByRole("button", { name: label })).toBeInTheDocument();
         await user.click(screen.getByRole("button", { name: label }));
