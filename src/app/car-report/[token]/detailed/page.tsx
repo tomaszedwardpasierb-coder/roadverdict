@@ -1,7 +1,5 @@
 // Place at: src/app/car-report/[token]/detailed/page.tsx
-// Car mirror of report/[token]/detailed/page.tsx. Deliberately omits
-// RequestHistoryCta - that CTA is ownership-transfer-dependent (slice
-// A of the sell-with-proof chain), not built yet for cars.
+// Car mirror of report/[token]/detailed/page.tsx.
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { resolveCarShareToken } from "@/lib/tracker/carShareLink";
@@ -19,6 +17,8 @@ import { buildCarWalkAwayIssues, CAR_INSPECTION_REQUIRED_RISKS } from "@/lib/tra
 import { buildBuyerActionPlan } from "@/lib/tracker/buyerActionPlan";
 import { MECHANICAL_CONFIDENCE_STATEMENT } from "@/lib/tracker/confidenceLimits";
 import { buildNegotiationSummary } from "@/lib/tracker/negotiationSummary";
+import { getSession } from "@/lib/auth/session";
+import { CarRequestHistoryCta } from "../CarRequestHistoryCta";
 import styles from "../report.module.css";
 import { PrintButton } from "@/app/report/[token]/PrintButton";
 import {
@@ -67,6 +67,17 @@ export default async function CarDetailedReportPage(props: { params: Promise<{ t
 
   const verified = await hasReportAccess(params.token);
   if (!verified) return <CarPlateGate token={params.token} />;
+
+  // Never used to gate viewing the report itself - only to decide
+  // whether the request-history CTA makes sense to show at all (never
+  // to the car's own current owner) and which state it should render.
+  let viewerSession: Awaited<ReturnType<typeof getSession>> = null;
+  try {
+    viewerSession = await getSession();
+  } catch (err) {
+    console.error("Car detailed report page: getSession() failed, continuing as signed out:", err);
+  }
+  const showRequestHistoryCta = viewerSession?.email !== resolved.email;
 
   const data = await getCarSellerReportData(params.token);
   const {
@@ -566,6 +577,14 @@ export default async function CarDetailedReportPage(props: { params: Promise<{ t
         receiptCount={receiptCount}
         entryRequestStatus={data.entryRequestStatus}
       />
+
+      {showRequestHistoryCta && currentRegistration && (
+        <CarRequestHistoryCta
+          registration={currentRegistration}
+          signedInEmail={viewerSession?.email ?? null}
+          currentPath={`/car-report/${params.token}/detailed`}
+        />
+      )}
 
       <p className={styles.caveat}>
         This report describes patterns in the logged record - what was entered, when, and how completely - not a

@@ -114,7 +114,7 @@ const NAV_GROUPS: NavGroupDef[] = [
 // (see sidebarNavEmptyGroupNote below), rather than disappearing
 // entirely. Additive later: once each has a real car equivalent, it
 // just comes off this list.
-const CAR_UNAVAILABLE_SECTIONS: Section[] = ['transferOwnership'];
+const CAR_UNAVAILABLE_SECTIONS: Section[] = [];
 function availableFor(vehicleKind: 'bike' | 'car', items: NavItemDef[]) {
   return vehicleKind === 'bike' ? items : items.filter((item) => !CAR_UNAVAILABLE_SECTIONS.includes(item.key));
 }
@@ -152,7 +152,9 @@ interface Props {
   labourContent: ReactNode;
   billsContent: ReactNode;
   remindersContent: ReactNode;
-  // Undefined for a car-active session - see CAR_UNAVAILABLE_SECTIONS.
+  // Optional because CAR_UNAVAILABLE_SECTIONS could hide any of these
+  // for a car-active session in principle - currently empty, so every
+  // one of these is actually supplied for both vehicle kinds today.
   reportsContent?: ReactNode;
   storyContent?: ReactNode;
   shareLinksContent?: ReactNode;

@@ -337,11 +337,13 @@ describe("DashboardShell", () => {
     });
   });
 
-  // The hybrid dashboard's own guard: Transfer ownership depends on
-  // features CarDoc doesn't have yet (ownership transfer itself isn't
-  // built for cars) - hidden rather than shown broken while a car is
-  // the active vehicle. Story and Shareable Links both have full car
-  // equivalents now and are no longer hidden.
+  // The hybrid dashboard's own guard used to hide Story/Shareable
+  // Links/Transfer ownership while a car was the active vehicle, one at
+  // a time, as each grew a real car equivalent. All three now have one,
+  // so CAR_UNAVAILABLE_SECTIONS is genuinely empty today - kept as a
+  // real (if currently empty) list in DashboardShell.tsx rather than
+  // removed outright, so a future feature that genuinely doesn't have a
+  // car equivalent yet has somewhere to go.
   describe("vehicleKind: car", () => {
     function carProps(overrides: Partial<Parameters<typeof DashboardShell>[0]> = {}) {
       return baseProps({
@@ -349,25 +351,23 @@ describe("DashboardShell", () => {
         vehicleName: "Focus",
         vehicles: [{ id: "car-1", kind: "car", name: "Focus", year: 2020, currentMileage: 40000 }],
         activeVehicleId: "car-1",
-        transferOwnershipContent: undefined,
         ...overrides,
       });
     }
 
-    // The one remaining entry of CAR_UNAVAILABLE_SECTIONS (DashboardShell.tsx).
+    // CAR_UNAVAILABLE_SECTIONS (DashboardShell.tsx) is empty today.
     // Reports, the three buying tools (Quote Checker/Cost calculator/Buying
-    // a used bike), Shareable Links, and Story all came off this list once
-    // their own car equivalents were built (see reportsContent/
-    // quoteCheckerContent/costCalculatorContent/buyingGuideContent/
-    // shareLinksContent/storyContent in dashboard/page.tsx's
-    // renderCarDashboard) - kept listed here as a comment, not silently
-    // dropped, so a future reader can see they were deliberately removed
-    // rather than forgotten.
-    const CAR_UNAVAILABLE_LABELS = [
-      "Transfer ownership",
-    ];
+    // a used bike), Shareable Links, Story, and Transfer ownership all came
+    // off this list once their own car equivalents were built (see
+    // reportsContent/quoteCheckerContent/costCalculatorContent/
+    // buyingGuideContent/shareLinksContent/storyContent/
+    // transferOwnershipContent in dashboard/page.tsx's renderCarDashboard) -
+    // kept as an empty list here as a comment, not silently dropped, so a
+    // future reader can see they were deliberately removed rather than
+    // forgotten.
+    const CAR_UNAVAILABLE_LABELS: string[] = [];
 
-    it("hides every CAR_UNAVAILABLE_SECTIONS label from the sidebar nav", () => {
+    it("hides every CAR_UNAVAILABLE_SECTIONS label from the sidebar nav (currently a no-op - the list is empty)", () => {
       render(<DashboardShell {...carProps()} />);
       for (const label of CAR_UNAVAILABLE_LABELS) {
         expect(screen.queryByRole("button", { name: label })).not.toBeInTheDocument();
@@ -403,9 +403,8 @@ describe("DashboardShell", () => {
       expect(screen.getByText("Story content")).toBeInTheDocument();
     });
 
-    // Shareable Links has a real car equivalent now (unlike its Selling
-    // sibling Transfer ownership) - it must actually render as
-    // a clickable nav item for a car-active session.
+    // Shareable Links has a real car equivalent now - it must actually
+    // render as a clickable nav item for a car-active session.
     it("still shows Shareable Links as a real, clickable nav item for a car-active session", async () => {
       const user = userEvent.setup();
       render(<DashboardShell {...carProps()} />);
@@ -415,6 +414,20 @@ describe("DashboardShell", () => {
       expect(screen.getByRole("button", { name: "Shareable Links" })).toBeInTheDocument();
       await user.click(screen.getByRole("button", { name: "Shareable Links" }));
       expect(screen.getByText("ShareLinks content")).toBeInTheDocument();
+    });
+
+    // Transfer ownership has a real car equivalent now too - same
+    // Selling group as Shareable Links, same expectation. This was the
+    // last entry of CAR_UNAVAILABLE_SECTIONS to come off the list.
+    it("still shows Transfer ownership as a real, clickable nav item for a car-active session", async () => {
+      const user = userEvent.setup();
+      render(<DashboardShell {...carProps()} />);
+      const sellingHeader = screen.getAllByRole("button", { name: /Selling/ })[0];
+      await user.click(sellingHeader);
+
+      expect(screen.getByRole("button", { name: "Transfer ownership" })).toBeInTheDocument();
+      await user.click(screen.getByRole("button", { name: "Transfer ownership" }));
+      expect(screen.getByText("TransferOwnership content")).toBeInTheDocument();
     });
 
     // Quote Checker/Cost calculator/Buying a used car all have real car
@@ -444,7 +457,7 @@ describe("DashboardShell", () => {
       }
     });
 
-    it("hides every CAR_UNAVAILABLE_SECTIONS label from the mobile More sheet", async () => {
+    it("hides every CAR_UNAVAILABLE_SECTIONS label from the mobile More sheet (currently a no-op - the list is empty)", async () => {
       const user = userEvent.setup();
       render(<DashboardShell {...carProps()} />);
       await user.click(screen.getByRole("button", { name: /More/ }));
@@ -452,17 +465,15 @@ describe("DashboardShell", () => {
         expect(screen.queryByText(label)).not.toBeInTheDocument();
       }
       // Also present in the always-mounted sidebar nav, hence getAllByText.
-      // Label is "Settings" now (see STANDALONE_ITEMS) - the key is still
-      // 'security', which is what CAR_UNAVAILABLE_LABELS never includes.
       expect(screen.getAllByText("Settings").length).toBeGreaterThan(0);
     });
 
-    // Selling is no longer a fully-empty group for a car session - it now
-    // has one real, available item (Shareable Links), alongside Story and
-    // Transfer ownership, which remain unavailable. Expanding it should
-    // show that one real item, not the empty-state note (that note is
-    // still exercised elsewhere for groups that genuinely have nothing).
-    it("shows the Selling group's one real car item (Shareable Links) rather than the empty-state note", async () => {
+    // Selling has two real, available items now (Shareable Links and
+    // Transfer ownership) - full car/bike parity, no unavailable items
+    // left in this group at all. Expanding it should show both real
+    // items, not the empty-state note (that note is still exercised
+    // elsewhere for groups that genuinely have nothing).
+    it("shows the Selling group's two real car items (Shareable Links, Transfer ownership) rather than the empty-state note", async () => {
       const user = userEvent.setup();
       render(<DashboardShell {...carProps()} />);
 
@@ -473,6 +484,7 @@ describe("DashboardShell", () => {
       expect(header).toBeInTheDocument();
       await user.click(header);
       expect(screen.getByRole("button", { name: "Shareable Links" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Transfer ownership" })).toBeInTheDocument();
     });
 
     it("labels the switcher card 'My car' and hides the DVLA-refresh button (no car route for it yet)", () => {

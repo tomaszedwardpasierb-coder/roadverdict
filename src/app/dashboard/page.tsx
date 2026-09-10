@@ -67,6 +67,9 @@ import { PrivacyContent } from "../privacy/PrivacyContent";
 import { TransferOwnershipSection } from "./TransferOwnershipSection";
 import { IncomingOwnershipRequestCard } from "./IncomingOwnershipRequestCard";
 import { getPendingTransferRequestsForOwner } from "@/lib/tracker/bikeTransferRequest";
+import { CarTransferOwnershipSection } from "./CarTransferOwnershipSection";
+import { IncomingCarOwnershipRequestCard } from "./IncomingCarOwnershipRequestCard";
+import { getPendingCarTransferRequestsForOwner } from "@/lib/tracker/carTransferRequest";
 import { getSellerReportCore } from "@/lib/tracker/sellerReportData";
 import { buildWalkAwayIssues } from "@/lib/tracker/walkAwayRisks";
 import { buildSellerPrepIssues, buildSellerPrepPlan } from "@/lib/tracker/sellerPrep";
@@ -92,7 +95,7 @@ import { getPendingDeletionInfo } from "@/lib/tracker/userAccount";
 
 // --- Car support (see RoadVerdict_Car_Plan_v3.md's ADR) ---
 import { resolveActiveVehicle } from "@/lib/tracker/activeVehicle";
-import { getCarsForUser, pickActiveCar, getCurrentRegistration as getCarCurrentRegistration, type CarDoc } from "@/lib/tracker/car";
+import { getCarsForUser, pickActiveCar, getCurrentRegistration as getCarCurrentRegistration, isCarReadOnly, type CarDoc } from "@/lib/tracker/car";
 import { getCarServiceRecords } from "@/lib/tracker/carServiceRecord";
 import { getCarFuelLogs } from "@/lib/tracker/carFuelLog";
 import { getCarMods } from "@/lib/tracker/carMod";
@@ -1458,6 +1461,32 @@ async function renderCarDashboard(
     </ProGate>
   );
 
+  const pendingCarTransferRequests = await getPendingCarTransferRequestsForOwner(email);
+  const carRequestsForThisCar = pendingCarTransferRequests.filter((r) => r.carId === car.id);
+  const carOutgoingOffer = carRequestsForThisCar.find((r) => r.initiatedBy === "owner");
+  const carIncomingRequest = carRequestsForThisCar.find((r) => r.initiatedBy === "recipient");
+
+  const carTransferOwnershipContent = (
+    <>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "0.75rem" }}>
+        <h1 className={styles.heading}>Transfer ownership{carTag}</h1>
+        {mileagePill}
+      </div>
+      <p className={styles.subtext}>Selling this car? Hand the buyer your logged history instead of them starting fresh.</p>
+      {carIncomingRequest && (
+        <IncomingCarOwnershipRequestCard
+          requestId={carIncomingRequest.id}
+          requesterEmail={carIncomingRequest.recipientEmail}
+          createdAt={carIncomingRequest.createdAt}
+        />
+      )}
+      <CarTransferOwnershipSection
+        pendingRequest={carOutgoingOffer ? { recipientEmail: carOutgoingOffer.recipientEmail, createdAt: carOutgoingOffer.createdAt, includeRecords: carOutgoingOffer.includeRecords } : null}
+        carIsReadOnly={isCarReadOnly(car)}
+      />
+    </>
+  );
+
   const privacyContent = <PrivacyContent />;
   const securityContent = (
     <SettingsTab
@@ -1512,10 +1541,11 @@ async function renderCarDashboard(
       costCalculatorContent={carCostCalculatorContent}
       buyingGuideContent={carBuyingGuideContent}
       storyContent={carStoryContent}
+      transferOwnershipContent={carTransferOwnershipContent}
       privacyContent={privacyContent}
       securityContent={securityContent}
       storyReady={carStoryReady}
-      hasIncomingRequest={false}
+      hasIncomingRequest={!!carIncomingRequest}
     />
   );
 }

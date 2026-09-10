@@ -1,11 +1,8 @@
 // Place at: src/app/dashboard/AddCarForm.tsx
 //
-// Car equivalent of AddBikeForm.tsx. Two deliberate simplifications
-// versus the motorcycle version remain, both documented in
+// Car equivalent of AddBikeForm.tsx. One deliberate simplification
+// versus the motorcycle version remains, documented in
 // RoadVerdict_Car_Plan_v3.md:
-// - No "request ownership" flow for an already-tracked car - car
-//   ownership transfer isn't built (see the ADR). A duplicate plate on
-//   another account can still be started fresh under this one.
 // - CAR_MODELS carries no engine-size/fuel-type per entry (unlike
 //   MotorcycleModel's engineCC) - a single nameplate spans every fuel
 //   type over its production run, so selecting a model never auto-fills
@@ -69,6 +66,9 @@ export function AddCarForm() {
   const [lookupMessage, setLookupMessage] = useState<{ text: string; tone: 'ok' | 'warn' | 'error' } | null>(null);
   const [existingCar, setExistingCar] = useState<{ status: 'own' | 'other'; carId?: string } | null>(null);
   const [switchingCar, setSwitchingCar] = useState(false);
+  const [requestingOwnership, setRequestingOwnership] = useState(false);
+  const [ownershipRequestSent, setOwnershipRequestSent] = useState(false);
+  const [ownershipRequestError, setOwnershipRequestError] = useState<string | null>(null);
   const [startedFreshDespiteDuplicate, setStartedFreshDespiteDuplicate] = useState(false);
   const [pendingLookupData, setPendingLookupData] = useState<{ make?: string; model?: string; year?: number; engineCapacityCc?: number; fuelType?: string; plateInRetention?: boolean } | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
@@ -244,6 +244,28 @@ export function AddCarForm() {
     setStartedFreshDespiteDuplicate(true);
     if (pendingLookupData) {
       await applyLookupData(pendingLookupData);
+    }
+  }
+
+  async function handleRequestOwnership() {
+    setRequestingOwnership(true);
+    setOwnershipRequestError(null);
+    try {
+      const res = await fetch('/api/cars/car-transfer/request-ownership', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ registration: registration.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setOwnershipRequestError(data.error ?? 'Could not send the request. Try again.');
+        return;
+      }
+      setOwnershipRequestSent(true);
+    } catch {
+      setOwnershipRequestError("Couldn't reach the server. Try again.");
+    } finally {
+      setRequestingOwnership(false);
     }
   }
 
@@ -431,14 +453,42 @@ export function AddCarForm() {
           )}
           {existingCar?.status === 'other' && (
             <div className={styles.card} style={{ marginTop: '0.6rem' }}>
-              <p style={{ fontWeight: 600, marginBottom: '0.3rem' }}>This car is already tracked on a different account.</p>
-              <p className="field-note">
-                Ownership requests aren&apos;t available for cars yet. If this is genuinely your car, you can still
-                start a fresh record under your own account.
-              </p>
-              <button type="button" className="btn-secondary" style={{ marginTop: '0.5rem' }} onClick={handleStartFresh}>
-                Start fresh
-              </button>
+              <p style={{ fontWeight: 600, marginBottom: '0.3rem' }}>This car already has a RoadVerdict history.</p>
+              {ownershipRequestSent ? (
+                <p className="field-note">
+                  Request sent. If the current owner approves it, this car&apos;s history moves to your account and
+                  you&apos;ll get an email either way.
+                </p>
+              ) : (
+                <>
+                  <p className="field-note">
+                    This car has previously been registered with RoadVerdict. If you&apos;ve bought it, you can
+                    request ownership and continue building its existing history.
+                  </p>
+                  <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginTop: '0.5rem' }}>
+                    <button
+                      type="button"
+                      className="btn-primary"
+                      disabled={requestingOwnership}
+                      onClick={handleRequestOwnership}
+                    >
+                      {requestingOwnership ? 'Sending…' : 'Request ownership'}
+                    </button>
+                    <button type="button" className="btn-secondary" onClick={handleStartFresh}>
+                      Start fresh, without requesting
+                    </button>
+                  </div>
+                  <p className="field-note" style={{ marginTop: '0.5rem' }}>
+                    Starting fresh begins a brand new record for this car under your account - the previous
+                    owner&apos;s logged history stays on theirs, and won&apos;t be included.
+                  </p>
+                  {ownershipRequestError && (
+                    <p className="error-text" role="alert" style={{ marginTop: '0.6rem' }}>
+                      {ownershipRequestError}
+                    </p>
+                  )}
+                </>
+              )}
             </div>
           )}
           <p className="field-note" style={{ marginTop: '0.4rem' }}>

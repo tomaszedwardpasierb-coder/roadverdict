@@ -1,0 +1,94 @@
+// Place at: src/app/dashboard/IncomingCarOwnershipRequestCard.tsx
+// Car mirror of IncomingOwnershipRequestCard.tsx.
+'use client';
+
+import { useState } from 'react';
+import styles from './dashboard.module.css';
+
+interface Props {
+  requestId: string;
+  requesterEmail: string;
+  createdAt: string;
+}
+
+export function IncomingCarOwnershipRequestCard({ requestId, requesterEmail, createdAt }: Props) {
+  const [includeRecords, setIncludeRecords] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [result, setResult] = useState<'approved' | 'declined' | null>(null);
+
+  async function handleDecision(decision: 'approve' | 'decline') {
+    setSubmitting(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/cars/car-transfer/incoming/${requestId}/${decision}`, {
+        method: 'POST',
+        ...(decision === 'approve'
+          ? { headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ includeRecords }) }
+          : {}),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error ?? 'Something went wrong. Try again.');
+        return;
+      }
+      setResult(decision === 'approve' ? 'approved' : 'declined');
+    } catch {
+      setError("Couldn't reach the server. Try again.");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  if (result === 'approved') {
+    return (
+      <div className={styles.card}>
+        <p className={styles.subtext}>
+          Approved. This car now belongs to {requesterEmail}&apos;s account, and your own copy is now read-only.{' '}
+          {includeRecords
+            ? 'Your logged service records, fuel logs, mods, bills, and any attached receipts went with it too.'
+            : "Your individual records stayed private on your own account - only the car's identity and a summary transferred."}
+        </p>
+      </div>
+    );
+  }
+  if (result === 'declined') {
+    return (
+      <div className={styles.card}>
+        <p className={styles.subtext}>Declined. Nothing has changed - this car is still fully yours.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className={styles.card}>
+      <p className={styles.subtext}>
+        <strong>{requesterEmail}</strong> has requested this car&apos;s RoadVerdict history - requested{' '}
+        {new Date(createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}. If
+        you&apos;ve sold them this car, approving hands over its logged history and makes your own copy read-only.
+      </p>
+      <label style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem', marginTop: '0.8rem', cursor: 'pointer' }}>
+        <input
+          type="checkbox"
+          checked={includeRecords}
+          onChange={(e) => setIncludeRecords(e.target.checked)}
+          style={{ marginTop: '0.2rem' }}
+        />
+        <span className="field-note">
+          Include my logged service records, fuel logs, mods, bills, and any attached receipts. If unchecked, only
+          the car&apos;s identity and a summary transfer - your individual records stay private on your own
+          account.
+        </span>
+      </label>
+      <div style={{ display: 'flex', gap: '0.6rem', marginTop: '0.8rem' }}>
+        <button type="button" className="btn-primary" disabled={submitting} onClick={() => handleDecision('approve')}>
+          {submitting ? 'Please wait…' : 'Approve'}
+        </button>
+        <button type="button" className="btn-secondary" disabled={submitting} onClick={() => handleDecision('decline')}>
+          {submitting ? 'Please wait…' : 'Decline'}
+        </button>
+      </div>
+      {error && <p className="error-text" role="alert" style={{ marginTop: '0.6rem' }}>{error}</p>}
+    </div>
+  );
+}

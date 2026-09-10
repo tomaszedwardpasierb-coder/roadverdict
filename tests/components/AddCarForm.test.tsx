@@ -200,6 +200,27 @@ describe("AddCarForm", () => {
     );
   });
 
+  it("look up: a duplicate on someone else's account offers request-ownership, which reports the server's own error on failure", async () => {
+    (fetch as ReturnType<typeof vi.fn>)
+      .mockResolvedValueOnce(jsonOk({ vrm: "AB12CDE", make: "Ford", model: "Focus", year: 2020, fuelType: "PETROL", engineCapacityCc: 1596, plateInRetention: false, vehicleType: "four-wheeled" }))
+      .mockResolvedValueOnce(jsonOk({ exists: true, belongsToCurrentUser: false }))
+      .mockResolvedValueOnce(jsonErr({ error: "Ownership requests are limited to 3 per day." }));
+
+    const user = userEvent.setup();
+    render(<AddCarForm />);
+    await user.type(screen.getByLabelText("Registration number"), "AB12CDE");
+    await user.click(screen.getByRole("button", { name: "Look up" }));
+
+    expect(await screen.findByText(/already has a RoadVerdict history/i)).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Request ownership" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("Ownership requests are limited to 3 per day.");
+    expect(fetch).toHaveBeenLastCalledWith(
+      "/api/cars/car-transfer/request-ownership",
+      expect.objectContaining({ method: "POST", body: JSON.stringify({ registration: "AB12CDE" }) })
+    );
+  });
+
   it("look up: 'start fresh' on a duplicate applies the held lookup data without a second network round-trip, and flags the eventual submit as mayHavePriorHistory", async () => {
     (fetch as ReturnType<typeof vi.fn>)
       .mockResolvedValueOnce(jsonOk({ vrm: "AB12CDE", make: "Ford", model: "Focus", year: 2020, fuelType: "PETROL", engineCapacityCc: 1596, plateInRetention: false, vehicleType: "four-wheeled" }))
@@ -212,10 +233,9 @@ describe("AddCarForm", () => {
     render(<AddCarForm />);
     await user.type(screen.getByLabelText("Registration number"), "AB12CDE");
     await user.click(screen.getByRole("button", { name: "Look up" }));
-    await screen.findByText(/already tracked on a different account/i);
-    expect(screen.queryByRole("button", { name: "Request ownership" })).not.toBeInTheDocument();
+    await screen.findByText(/already has a RoadVerdict history/i);
 
-    await user.click(screen.getByRole("button", { name: "Start fresh" }));
+    await user.click(screen.getByRole("button", { name: "Start fresh, without requesting" }));
     await waitFor(() => expect(screen.getByLabelText("Make")).toHaveValue("Ford"));
     // Calls so far: plate-lookup, car-exists, then the mot-history-preview
     // that applyLookupData made on the already-held data - a 4th call
