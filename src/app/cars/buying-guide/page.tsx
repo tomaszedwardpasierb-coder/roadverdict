@@ -4,6 +4,7 @@ import { headers } from 'next/headers';
 import { CarBuyingGuideForm } from '@/components/CarBuyingGuideForm';
 import { CarRelatedTools } from '@/components/CarRelatedTools';
 import { getSession } from '@/lib/auth/session';
+import { isPro } from '@/lib/subscriptions';
 
 export const dynamic = 'force-dynamic';
 
@@ -39,6 +40,7 @@ export default async function CarBuyingGuidePage() {
   } catch (err) {
     console.error("Car buying guide: getSession() failed, continuing as anonymous:", err);
   }
+  const userIsPro = session ? await isPro(session.email) : false;
 
   return (
     <>
@@ -52,7 +54,7 @@ export default async function CarBuyingGuidePage() {
         <h1>What should you check before buying it?</h1>
         <p>A buyer checklist weighted by how old the car actually is - not a generic list.</p>
       </div>
-      <CarBuyingGuideForm signedIn={!!session} />
+      <CarBuyingGuideForm signedIn={!!session} isPro={userIsPro} />
       <p className="disclaimer">
         General inspection guidance, not a substitute for a professional pre-purchase check -
         especially on anything safety-critical like brakes or structural condition.

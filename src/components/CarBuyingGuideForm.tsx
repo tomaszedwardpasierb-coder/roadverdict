@@ -46,6 +46,25 @@ interface CarBuyingGuideLookupResponse {
     modelNotes: string[];
     summary: string;
   } | null;
+  vdiCheck: {
+    isStolen: boolean;
+    hasWriteOffRecord: boolean;
+    writeOffRecordCount: number;
+    hasOutstandingFinance: boolean;
+    financeRecords: { agreementDate: string | null; agreementType: string | null; financeCompany: string | null }[];
+    keeperChangeCount: number;
+    plateChangeCount: number;
+    colourChangeCount: number;
+    currentColour: string | null;
+  } | null;
+  valuation: {
+    privateAverage: number | null;
+    privateClean: number | null;
+    dealerForecourt: number | null;
+    partExchange: number | null;
+  } | null;
+  vdiCheckBlockedReason?: 'cooldown';
+  vdiCheckAvailableAt?: string | null;
   error?: string;
 }
 
@@ -54,9 +73,10 @@ const AGE_BANDS = Object.keys(CAR_AGE_BAND_LABELS) as AgeBand[];
 
 interface Props {
   signedIn: boolean;
+  isPro?: boolean;
 }
 
-export function CarBuyingGuideForm({ signedIn }: Props) {
+export function CarBuyingGuideForm({ signedIn, isPro = false }: Props) {
   const [brand, setBrand] = useState(CAR_BRAND_OPTIONS[0].value);
   const [carClass, setCarClass] = useState<CarSizeClass>('medium');
   const [ageBand, setAgeBand] = useState<AgeBand>('used');
@@ -74,6 +94,9 @@ export function CarBuyingGuideForm({ signedIn }: Props) {
   const [lookupError, setLookupError] = useState<string | null>(null);
   const [lookupNote, setLookupNote] = useState<ReactNode>(null);
   const [motResult, setMotResult] = useState<CarBuyingGuideLookupResponse | null>(null);
+  // Free accounts opt in explicitly (it spends their 15-day allowance);
+  // Pro accounts always get it, no checkbox shown at all.
+  const [includeVdi, setIncludeVdi] = useState(false);
 
   async function handlePlateLookup() {
     if (!signedIn) {
@@ -96,7 +119,8 @@ export function CarBuyingGuideForm({ signedIn }: Props) {
     setLookupNote(null);
     setMotResult(null);
     try {
-      const res = await fetch(`/api/cars/buying-guide-lookup?vrm=${encodeURIComponent(cleaned)}`);
+      const vdiParam = isPro || includeVdi ? '&includeVdi=1' : '';
+      const res = await fetch(`/api/cars/buying-guide-lookup?vrm=${encodeURIComponent(cleaned)}${vdiParam}`);
       const data: CarBuyingGuideLookupResponse = await res.json();
       if (!res.ok) {
         setLookupError(data.error ?? 'No vehicle found for that registration. Pick it manually below instead.');
@@ -186,9 +210,64 @@ export function CarBuyingGuideForm({ signedIn }: Props) {
                 {lookupLoading ? 'Looking up…' : 'Look up'}
               </button>
             </div>
+            {!isPro && (
+              <div style={{ marginTop: '0.5rem' }}>
+                <label>
+                  <input
+                    type="checkbox"
+                    checked={includeVdi}
+                    onChange={(e) => setIncludeVdi(e.target.checked)}
+                    disabled={!!motResult?.vdiCheckBlockedReason}
+                  />{' '}
+                  Also run an independent VDI check and valuation (stolen/write-off/finance) - free once every 15 days
+                </label>
+                {motResult?.vdiCheckBlockedReason === 'cooldown' && (
+                  <p className="field-note">
+                    {motResult.vdiCheckAvailableAt
+                      ? `Your next free VDI check is available from ${new Date(motResult.vdiCheckAvailableAt).toLocaleDateString('en-GB')}.`
+                      : 'Your free VDI check for this period has already been used.'}
+                  </p>
+                )}
+              </div>
+            )}
             {lookupError && <p className="error-text" role="alert">{lookupError}</p>}
             {lookupNote && <p className="field-note">{lookupNote}</p>}
           </div>
+
+          {motResult?.vdiCheck && (
+            <div className="field" style={{ marginBottom: '1.1rem' }}>
+              <p className="field-note" style={{ fontWeight: 600, marginBottom: '0.5rem' }}>
+                Independent VDI check
+              </p>
+              <ul style={{ margin: 0, paddingLeft: '1.1rem' }}>
+                <li className="field-note">{motResult.vdiCheck.isStolen ? '⚠️ Recorded as stolen' : 'No stolen marker found'}</li>
+                <li className="field-note">
+                  {motResult.vdiCheck.hasWriteOffRecord
+                    ? `⚠️ ${motResult.vdiCheck.writeOffRecordCount} write-off record(s) on file`
+                    : 'No write-off record found'}
+                </li>
+                <li className="field-note">
+                  {motResult.vdiCheck.hasOutstandingFinance
+                    ? `⚠️ ${motResult.vdiCheck.financeRecords.length} outstanding finance agreement(s) on file`
+                    : 'No outstanding finance found'}
+                </li>
+                <li className="field-note">{motResult.vdiCheck.keeperChangeCount} keeper change(s) on record</li>
+              </ul>
+              {motResult.valuation && (
+                <>
+                  <p className="field-note" style={{ fontWeight: 600, margin: '0.6rem 0 0.3rem' }}>Independent valuation</p>
+                  <ul style={{ margin: 0, paddingLeft: '1.1rem' }}>
+                    {motResult.valuation.privateAverage != null && (
+                      <li className="field-note">Private average: £{motResult.valuation.privateAverage.toLocaleString()}</li>
+                    )}
+                    {motResult.valuation.dealerForecourt != null && (
+                      <li className="field-note">Dealer forecourt: £{motResult.valuation.dealerForecourt.toLocaleString()}</li>
+                    )}
+                  </ul>
+                </>
+              )}
+            </div>
+          )}
 
           {motResult?.briefing && (
             <div className="field" style={{ marginBottom: '1.1rem' }}>

@@ -21,6 +21,12 @@ import { getSession } from "@/lib/auth/session";
 import { parseMotHistory, type RawMotTest } from "@/lib/tracker/motHistory";
 import { classifyVehicleType, type VehicleTypeCheck } from "@/lib/tracker/vehicleTypeCheck";
 import { generateCarBuyingGuideBriefing, type CarBuyingGuideBriefingResult } from "@/lib/tracker/carBuyingGuideBriefing";
+import { isPro } from "@/lib/subscriptions";
+import { getUserDoc } from "@/lib/tracker/userDoc";
+import { canRunFreeVdiCheck, recordVdiCheckRun, nextFreeVdiCheckAt } from "@/lib/tracker/vdiCheckUsage";
+import { fetchVdiCheckFromVdg } from "@/lib/tracker/vdiCheckFetch";
+import { fetchValuationFromVdg } from "@/lib/tracker/valuationFetch";
+import type { VdiCheckResult, ValuationResult } from "@/lib/tracker/vdiUnlock";
 
 export const dynamic = "force-dynamic";
 
@@ -76,6 +82,15 @@ export interface CarBuyingGuideLookupResult {
     notes: string;
   }[];
   briefing: CarBuyingGuideBriefingResult | null;
+  // Only ever populated when ?includeVdi=1 was requested and the caller
+  // was actually allowed to run it (Pro, or a free account off cooldown) -
+  // see vdiCheckUsage.ts. vdiCheckBlockedReason/vdiCheckAvailableAt let
+  // the UI explain *why* a free account didn't get one, rather than the
+  // field just silently being absent. valuation is car-only.
+  vdiCheck: VdiCheckResult | null;
+  valuation: ValuationResult | null;
+  vdiCheckBlockedReason?: "cooldown";
+  vdiCheckAvailableAt?: string | null;
 }
 
 export async function GET(request: NextRequest) {
@@ -157,12 +172,37 @@ export async function GET(request: NextRequest) {
   // would just be a wasted Gemini call for a result nobody ever sees.
   // A missing GEMINI_API_KEY degrades the same way MOT history already
   // does above - the lookup still succeeds, this section just stays empty.
+  // Same "only spend the paid calls on a confirmed relevant vehicle
+  // type" gate as the briefing generation below - a buyer opting in (or
+  // a Pro account, which always gets it) never wastes a real VDG
+  // billing event on a result the UI is about to reject anyway.
+  let vdiCheck: VdiCheckResult | null = null;
+  let valuation: ValuationResult | null = null;
+  let vdiCheckBlockedReason: "cooldown" | undefined;
+  let vdiCheckAvailableAt: string | null = null;
+  const includeVdi = request.nextUrl.searchParams.get("includeVdi") === "1";
+  if (includeVdi && vehicleType === "four-wheeled") {
+    const userIsPro = await isPro(session.email);
+    const user = userIsPro ? null : await getUserDoc(session.email);
+    if (userIsPro || canRunFreeVdiCheck(user)) {
+      [vdiCheck, valuation] = await Promise.all([fetchVdiCheckFromVdg(vrm, apiKey), fetchValuationFromVdg(vrm, apiKey)]);
+      if (!userIsPro) await recordVdiCheckRun(session.email);
+    } else {
+      vdiCheckBlockedReason = "cooldown";
+      vdiCheckAvailableAt = nextFreeVdiCheckAt(user);
+    }
+  }
+
   let briefing: CarBuyingGuideBriefingResult | null = null;
   if (vehicleType === "four-wheeled") {
     const geminiKey = process.env.GEMINI_API_KEY;
     if (geminiKey) {
       briefing = await generateCarBuyingGuideBriefing(
-        { make, model, year: vd.VehicleIdentification.YearOfManufacture, fuelType, engineCapacityCc, motTests: motTestsOldestFirst },
+        {
+          make, model, year: vd.VehicleIdentification.YearOfManufacture, fuelType, engineCapacityCc, motTests: motTestsOldestFirst,
+          vdiCheck: vdiCheck ?? undefined,
+          valuation: valuation ?? undefined,
+        },
         geminiKey
       );
     }
@@ -181,6 +221,10 @@ export async function GET(request: NextRequest) {
     motDueDate,
     motTests,
     briefing,
+    vdiCheck,
+    valuation,
+    vdiCheckBlockedReason,
+    vdiCheckAvailableAt,
   };
 
   return NextResponse.json(result);

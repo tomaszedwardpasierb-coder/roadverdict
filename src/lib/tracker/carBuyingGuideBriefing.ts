@@ -16,6 +16,7 @@
 // concatenate-into-contents pattern - an intentional improvement on this
 // newer file, not a change to the bike one.
 import { logGeminiUsage } from "@/lib/tracker/geminiUsageLog";
+import type { VdiCheckResult, ValuationResult } from "@/lib/tracker/vdiUnlock";
 
 const GEMINI_MODEL = "gemini-3.7-flash";
 
@@ -33,6 +34,11 @@ export interface CarBuyingGuideBriefingInput {
     mileage: number | null;
     notes: string;
   }[];
+  // Only present when the buyer opted into (or is Pro and gets
+  // automatically) the paid VDI/valuation add-on - see
+  // buying-guide-lookup/route.ts. Absent for the plain, free lookup.
+  vdiCheck?: VdiCheckResult;
+  valuation?: ValuationResult;
 }
 
 export interface CarBuyingGuideBriefingResult {
@@ -64,6 +70,19 @@ function buildFactsBlock(input: CarBuyingGuideBriefingInput): string {
     lines.push("No MOT test history on record for this registration.");
   }
 
+  if (input.vdiCheck) {
+    lines.push("");
+    lines.push("VDI CHECK (independent, third-party):");
+    lines.push(input.vdiCheck.isStolen ? "- STOLEN MARKER: yes" : "- Stolen marker: none");
+    lines.push(input.vdiCheck.hasWriteOffRecord ? `- WRITE-OFF RECORD: yes, ${input.vdiCheck.writeOffRecordCount} record(s)` : "- Write-off record: none");
+    lines.push(input.vdiCheck.hasOutstandingFinance ? `- OUTSTANDING FINANCE: yes, ${input.vdiCheck.financeRecords.length} agreement(s)` : "- Outstanding finance: none found");
+  }
+
+  if (input.valuation?.privateAverage != null) {
+    lines.push("");
+    lines.push(`VALUATION (independent): private average £${input.valuation.privateAverage.toLocaleString()}`);
+  }
+
   return lines.join("\n");
 }
 
@@ -76,6 +95,7 @@ Strict rules:
 - General model knowledge (common faults, known issues, recalls) may draw on your own training knowledge of this make and model, since the facts below don't cover that - but be honest and specific, not generic filler that could apply to any car ("check the tyres" is not useful; naming an actual known weak point for this model is).
 - If an advisory or fail reason keeps reappearing across multiple tests without being fixed, say so plainly - that is a real pattern worth flagging clearly, not softening.
 - If the FUEL TYPE given below indicates this car is electric, hybrid, or plug-in hybrid, include specific due-diligence points for that in "modelNotes": battery state-of-health/degradation, whether a charging cable is included with the sale, and this manufacturer's battery warranty terms for this model. A petrol or diesel car needs none of this - only raise it when the fuel type actually calls for it.
+- If a VDI CHECK block is given below, a stolen marker, write-off record, or outstanding finance is the single most important thing here - lead with it as the first motFlag, whether or not the MOT history itself shows anything.
 - Do not tell the reader whether to buy the car. Give them specific things to check in person, not a purchase recommendation.
 - Plain and direct, the way a mechanic actually talks to a mate - not a generic listicle, not hyped.
 

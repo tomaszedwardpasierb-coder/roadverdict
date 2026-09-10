@@ -3,6 +3,7 @@ import { headers } from 'next/headers';
 import { BuyingGuideForm } from '@/components/BuyingGuideForm';
 import { RelatedTools } from '@/components/RelatedTools';
 import { getSession } from '@/lib/auth/session';
+import { isPro } from '@/lib/subscriptions';
 
 export const dynamic = 'force-dynamic';
 
@@ -38,6 +39,7 @@ export default async function BuyingGuidePage() {
   } catch (err) {
     console.error("Buying guide: getSession() failed, continuing as anonymous:", err);
   }
+  const userIsPro = session ? await isPro(session.email) : false;
 
   return (
     <>
@@ -51,7 +53,7 @@ export default async function BuyingGuidePage() {
         <h1>What should you check before buying it?</h1>
         <p>A buyer checklist weighted by how old the bike actually is - not a generic list.</p>
       </div>
-      <BuyingGuideForm signedIn={!!session} />
+      <BuyingGuideForm signedIn={!!session} isPro={userIsPro} />
       <p className="disclaimer">
         General inspection guidance, not a substitute for a professional pre-purchase check -
         especially on anything safety-critical like brakes or frame condition.

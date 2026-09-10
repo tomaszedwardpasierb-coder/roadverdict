@@ -141,4 +141,60 @@ describe("generateCarBuyingGuideBriefing", () => {
     const systemPrompt = JSON.parse(fetchMock.mock.calls[0][1].body).systemInstruction.parts[0].text;
     expect(systemPrompt).toContain("Do not tell the reader whether to buy the car");
   });
+
+  it("omits the VDI CHECK and VALUATION blocks entirely when neither was given (the plain, free lookup)", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(geminiResponse(JSON.stringify(validResult)));
+    vi.stubGlobal("fetch", fetchMock);
+    await generateCarBuyingGuideBriefing(baseInput, "key");
+    const prompt = JSON.parse(fetchMock.mock.calls[0][1].body).contents[0].parts[0].text;
+    expect(prompt).not.toContain("VDI CHECK");
+    expect(prompt).not.toContain("VALUATION");
+  });
+
+  it("flags a stolen marker, write-off, and outstanding finance in the VDI CHECK block when present", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(geminiResponse(JSON.stringify(validResult)));
+    vi.stubGlobal("fetch", fetchMock);
+    await generateCarBuyingGuideBriefing(
+      {
+        ...baseInput,
+        vdiCheck: {
+          isStolen: true, hasWriteOffRecord: true, writeOffRecordCount: 1, hasOutstandingFinance: true,
+          financeRecords: [{ agreementDate: "2024-01-01", agreementType: "HP", financeCompany: "Example Finance" }],
+          keeperChangeCount: 1, plateChangeCount: 0, colourChangeCount: 0, currentColour: null,
+          vedFirstYearTwelveMonths: null, vedStandardTwelveMonths: null,
+        },
+      },
+      "key"
+    );
+    const prompt = JSON.parse(fetchMock.mock.calls[0][1].body).contents[0].parts[0].text;
+    expect(prompt).toContain("STOLEN MARKER: yes");
+    expect(prompt).toContain("WRITE-OFF RECORD: yes, 1 record(s)");
+    expect(prompt).toContain("OUTSTANDING FINANCE: yes, 1 agreement(s)");
+  });
+
+  it("includes the independent private-average valuation figure when given", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(geminiResponse(JSON.stringify(validResult)));
+    vi.stubGlobal("fetch", fetchMock);
+    await generateCarBuyingGuideBriefing(
+      {
+        ...baseInput,
+        valuation: {
+          valuationTime: null, valuationMileage: null, vehicleDescription: null, onTheRoad: null,
+          dealerForecourt: null, tradeRetail: null, privateClean: null, privateAverage: 23994,
+          partExchange: null, auction: null, tradeAverage: null, tradePoor: null,
+        },
+      },
+      "key"
+    );
+    const prompt = JSON.parse(fetchMock.mock.calls[0][1].body).contents[0].parts[0].text;
+    expect(prompt).toContain("VALUATION (independent): private average £23,994");
+  });
+
+  it("instructs the model to lead with a VDI-sourced flag ahead of anything from the MOT history", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(geminiResponse(JSON.stringify(validResult)));
+    vi.stubGlobal("fetch", fetchMock);
+    await generateCarBuyingGuideBriefing(baseInput, "key");
+    const systemPrompt = JSON.parse(fetchMock.mock.calls[0][1].body).systemInstruction.parts[0].text;
+    expect(systemPrompt).toContain("a stolen marker, write-off record, or outstanding finance is the single most important thing here");
+  });
 });

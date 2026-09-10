@@ -10,6 +10,7 @@
 // no deterministic fallback text for this, so nothing shows rather than
 // something broken.
 import { logGeminiUsage } from "@/lib/tracker/geminiUsageLog";
+import type { VdiCheckResult } from "@/lib/tracker/vdiUnlock";
 
 // CANARY - deliberately the one call site testing gemini-3.7-flash
 // before it's rolled out anywhere else. Google's own models guide lists
@@ -36,6 +37,10 @@ export interface BuyingGuideBriefingInput {
     mileage: number | null;
     notes: string;
   }[];
+  // Only present when the rider opted into (or is Pro and gets
+  // automatically) the paid VDI add-on - see buying-guide-lookup/route.ts.
+  // Absent for the plain, free lookup.
+  vdiCheck?: VdiCheckResult;
 }
 
 export interface BuyingGuideBriefingResult {
@@ -66,6 +71,14 @@ function buildFactsBlock(input: BuyingGuideBriefingInput): string {
     lines.push("No MOT test history on record for this registration.");
   }
 
+  if (input.vdiCheck) {
+    lines.push("");
+    lines.push("VDI CHECK (independent, third-party):");
+    lines.push(input.vdiCheck.isStolen ? "- STOLEN MARKER: yes" : "- Stolen marker: none");
+    lines.push(input.vdiCheck.hasWriteOffRecord ? `- WRITE-OFF RECORD: yes, ${input.vdiCheck.writeOffRecordCount} record(s)` : "- Write-off record: none");
+    lines.push(input.vdiCheck.hasOutstandingFinance ? `- OUTSTANDING FINANCE: yes, ${input.vdiCheck.financeRecords.length} agreement(s)` : "- Outstanding finance: none found");
+  }
+
   return lines.join("\n");
 }
 
@@ -75,6 +88,7 @@ Strict rules:
 - Every MOT-related point must be traceable to a specific test or advisory given below - never invent a fact about THIS bike, never assume a fault exists unless it is actually recorded.
 - General model knowledge (common faults, known issues, recalls) may draw on your own training knowledge of this make and model, since the facts below don't cover that - but be honest and specific, not generic filler that could apply to any bike ("check the tyres" is not useful; naming an actual known weak point for this model is).
 - If an advisory or fail reason keeps reappearing across multiple tests without being fixed, say so plainly - that is a real pattern worth flagging clearly, not softening.
+- If a VDI CHECK block is given below, a stolen marker, write-off record, or outstanding finance is the single most important thing here - lead with it as the first motFlag, whether or not the MOT history itself shows anything.
 - Do not tell the reader whether to buy the bike. Give them specific things to check in person, not a purchase recommendation.
 - Plain and direct, the way a mechanic actually talks to a mate - not a generic listicle, not hyped.
 

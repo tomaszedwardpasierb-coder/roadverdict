@@ -6,6 +6,12 @@ const mocks = vi.hoisted(() => ({
   parseMotHistory: vi.fn(),
   classifyVehicleType: vi.fn(),
   generateBuyingGuideBriefing: vi.fn(),
+  isPro: vi.fn(),
+  getUserDoc: vi.fn(),
+  canRunFreeVdiCheck: vi.fn(),
+  recordVdiCheckRun: vi.fn(),
+  nextFreeVdiCheckAt: vi.fn(),
+  fetchVdiCheckFromVdg: vi.fn(),
   fetch: vi.fn(),
 }));
 
@@ -17,14 +23,24 @@ vi.mock("@/lib/tracker/vehicleTypeCheck", () => ({
 vi.mock("@/lib/tracker/buyingGuideBriefing", () => ({
   generateBuyingGuideBriefing: mocks.generateBuyingGuideBriefing,
 }));
+vi.mock("@/lib/subscriptions", () => ({ isPro: mocks.isPro }));
+vi.mock("@/lib/tracker/userDoc", () => ({ getUserDoc: mocks.getUserDoc }));
+vi.mock("@/lib/tracker/vdiCheckUsage", () => ({
+  canRunFreeVdiCheck: mocks.canRunFreeVdiCheck,
+  recordVdiCheckRun: mocks.recordVdiCheckRun,
+  nextFreeVdiCheckAt: mocks.nextFreeVdiCheckAt,
+}));
+vi.mock("@/lib/tracker/vdiCheckFetch", () => ({ fetchVdiCheckFromVdg: mocks.fetchVdiCheckFromVdg }));
 vi.stubGlobal("fetch", mocks.fetch);
 
 import { GET } from "@/app/api/tracker/buying-guide-lookup/route";
 
-function request(vrm?: string): NextRequest {
-  const url = vrm
-    ? `http://localhost/api/tracker/buying-guide-lookup?vrm=${encodeURIComponent(vrm)}`
-    : "http://localhost/api/tracker/buying-guide-lookup";
+function request(vrm?: string, includeVdi?: boolean): NextRequest {
+  const params = new URLSearchParams();
+  if (vrm) params.set("vrm", vrm);
+  if (includeVdi) params.set("includeVdi", "1");
+  const qs = params.toString();
+  const url = `http://localhost/api/tracker/buying-guide-lookup${qs ? `?${qs}` : ""}`;
   return new NextRequest(url, { method: "GET" });
 }
 
@@ -109,6 +125,15 @@ beforeEach(() => {
   mocks.classifyVehicleType.mockReturnValue("motorcycle");
   mocks.parseMotHistory.mockReturnValue(parsedMotResult);
   mocks.generateBuyingGuideBriefing.mockResolvedValue(null);
+  mocks.isPro.mockResolvedValue(false);
+  mocks.getUserDoc.mockResolvedValue(null);
+  mocks.canRunFreeVdiCheck.mockReturnValue(true);
+  mocks.nextFreeVdiCheckAt.mockReturnValue(null);
+  mocks.fetchVdiCheckFromVdg.mockResolvedValue({
+    isStolen: false, hasWriteOffRecord: false, writeOffRecordCount: 0, hasOutstandingFinance: false, financeRecords: [],
+    keeperChangeCount: 1, plateChangeCount: 0, colourChangeCount: 0, currentColour: null,
+    vedFirstYearTwelveMonths: null, vedStandardTwelveMonths: null,
+  });
   process.env.VDG_API_KEY = "test-key";
   delete process.env.GEMINI_API_KEY;
   // Default: both VDG calls succeed (vehicle first, MOT second)
@@ -302,5 +327,54 @@ describe("GET /api/tracker/buying-guide-lookup", () => {
     const urls = mocks.fetch.mock.calls.map((c: unknown[]) => c[0] as string);
     expect(urls.some((u: string) => u.includes("VehicleDetails"))).toBe(true);
     expect(urls.some((u: string) => u.includes("MotHistoryDetails"))).toBe(true);
+  });
+
+  // ── VDI add-on ───────────────────────────────────────────────────────
+
+  it("does not run a VDI check when includeVdi wasn't requested", async () => {
+    const response = await GET(request("AB20YAM"));
+    const body = await response.json();
+    expect(mocks.fetchVdiCheckFromVdg).not.toHaveBeenCalled();
+    expect(body.vdiCheck).toBeNull();
+  });
+
+  it("does not run a VDI check for a non-motorcycle even when includeVdi is requested", async () => {
+    mocks.classifyVehicleType.mockReturnValue("four-wheeled");
+    await GET(request("AB20YAM", true));
+    expect(mocks.fetchVdiCheckFromVdg).not.toHaveBeenCalled();
+  });
+
+  it("runs the VDI check for a free account off cooldown, and records the run", async () => {
+    const response = await GET(request("AB20YAM", true));
+    const body = await response.json();
+    expect(mocks.fetchVdiCheckFromVdg).toHaveBeenCalledWith("AB20YAM", "test-key");
+    expect(mocks.recordVdiCheckRun).toHaveBeenCalledWith("rider@example.com");
+    expect(body.vdiCheck).toMatchObject({ isStolen: false });
+  });
+
+  it("runs the VDI check for a Pro account without ever checking the cooldown or recording a run", async () => {
+    mocks.isPro.mockResolvedValue(true);
+    await GET(request("AB20YAM", true));
+    expect(mocks.canRunFreeVdiCheck).not.toHaveBeenCalled();
+    expect(mocks.fetchVdiCheckFromVdg).toHaveBeenCalled();
+    expect(mocks.recordVdiCheckRun).not.toHaveBeenCalled();
+  });
+
+  it("blocks a free account on cooldown, returning the reason and next-available date instead of a vdiCheck", async () => {
+    mocks.canRunFreeVdiCheck.mockReturnValue(false);
+    mocks.nextFreeVdiCheckAt.mockReturnValue("2026-02-01T00:00:00.000Z");
+    const response = await GET(request("AB20YAM", true));
+    const body = await response.json();
+    expect(mocks.fetchVdiCheckFromVdg).not.toHaveBeenCalled();
+    expect(body.vdiCheck).toBeNull();
+    expect(body.vdiCheckBlockedReason).toBe("cooldown");
+    expect(body.vdiCheckAvailableAt).toBe("2026-02-01T00:00:00.000Z");
+  });
+
+  it("passes the vdiCheck result through to the briefing generator when present", async () => {
+    process.env.GEMINI_API_KEY = "fake-key";
+    await GET(request("AB20YAM", true));
+    const callArg = mocks.generateBuyingGuideBriefing.mock.calls[0][0];
+    expect(callArg.vdiCheck).toMatchObject({ isStolen: false });
   });
 });

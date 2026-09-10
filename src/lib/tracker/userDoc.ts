@@ -54,6 +54,10 @@ export interface UserDoc {
   // cron job - never directly from the self-serve request route.
   deletionRequestedAt?: string;
   pendingDeletionAt?: string;
+  // Per-account cooldown on the Buying Guide's free VDI/valuation
+  // add-on (see vdiCheckUsage.ts) - Pro accounts skip this entirely, so
+  // it's only ever read/written for free accounts.
+  vdiCheckUsage?: { lastRunAt: string };
 }
 
 export async function getUserDoc(email: string): Promise<UserDoc | null> {

@@ -26,6 +26,11 @@ import { getSession } from "@/lib/auth/session";
 import { parseMotHistory, type RawMotTest } from "@/lib/tracker/motHistory";
 import { classifyVehicleType, type VehicleTypeCheck } from "@/lib/tracker/vehicleTypeCheck";
 import { generateBuyingGuideBriefing, type BuyingGuideBriefingResult } from "@/lib/tracker/buyingGuideBriefing";
+import { isPro } from "@/lib/subscriptions";
+import { getUserDoc } from "@/lib/tracker/userDoc";
+import { canRunFreeVdiCheck, recordVdiCheckRun, nextFreeVdiCheckAt } from "@/lib/tracker/vdiCheckUsage";
+import { fetchVdiCheckFromVdg } from "@/lib/tracker/vdiCheckFetch";
+import type { VdiCheckResult } from "@/lib/tracker/vdiUnlock";
 
 export const dynamic = "force-dynamic";
 
@@ -81,6 +86,14 @@ export interface BuyingGuideLookupResult {
     notes: string;
   }[];
   briefing: BuyingGuideBriefingResult | null;
+  // Only ever populated when ?includeVdi=1 was requested and the caller
+  // was actually allowed to run it (Pro, or a free account off cooldown) -
+  // see vdiCheckUsage.ts. vdiCheckBlockedReason/vdiCheckAvailableAt let
+  // the UI explain *why* a free account didn't get one, rather than the
+  // field just silently being absent.
+  vdiCheck: VdiCheckResult | null;
+  vdiCheckBlockedReason?: "cooldown";
+  vdiCheckAvailableAt?: string | null;
 }
 
 export async function GET(request: NextRequest) {
@@ -161,12 +174,38 @@ export async function GET(request: NextRequest) {
   // would just be a wasted Gemini call for a result nobody ever sees.
   // A missing GEMINI_API_KEY degrades the same way MOT history already
   // does above - the lookup still succeeds, this section just stays empty.
+  // Same "only spend the paid call on a confirmed relevant vehicle type"
+  // gate as the briefing generation below - a rider opting in (or a Pro
+  // account, which always gets it) never wastes a real VDG billing event
+  // on a result the UI is about to reject anyway.
+  let vdiCheck: VdiCheckResult | null = null;
+  let vdiCheckBlockedReason: "cooldown" | undefined;
+  let vdiCheckAvailableAt: string | null = null;
+  const includeVdi = request.nextUrl.searchParams.get("includeVdi") === "1";
+  if (includeVdi && vehicleType === "motorcycle") {
+    const userIsPro = await isPro(session.email);
+    const user = userIsPro ? null : await getUserDoc(session.email);
+    if (userIsPro || canRunFreeVdiCheck(user)) {
+      vdiCheck = await fetchVdiCheckFromVdg(vrm, apiKey);
+      if (!userIsPro) await recordVdiCheckRun(session.email);
+    } else {
+      vdiCheckBlockedReason = "cooldown";
+      vdiCheckAvailableAt = nextFreeVdiCheckAt(user);
+    }
+  }
+
+  // Only spent on a confirmed motorcycle - a car or an unclassifiable
+  // result gets rejected client-side regardless (vehicleTypeCheck.ts,
+  // BuyingGuideForm.tsx's gate), so generating a briefing for either
+  // would just be a wasted Gemini call for a result nobody ever sees.
+  // A missing GEMINI_API_KEY degrades the same way MOT history already
+  // does above - the lookup still succeeds, this section just stays empty.
   let briefing: BuyingGuideBriefingResult | null = null;
   if (vehicleType === "motorcycle") {
     const geminiKey = process.env.GEMINI_API_KEY;
     if (geminiKey) {
       briefing = await generateBuyingGuideBriefing(
-        { make, model, year: vd.VehicleIdentification.YearOfManufacture, engineCapacityCc, motTests: motTestsOldestFirst },
+        { make, model, year: vd.VehicleIdentification.YearOfManufacture, engineCapacityCc, motTests: motTestsOldestFirst, vdiCheck: vdiCheck ?? undefined },
         geminiKey
       );
     }
@@ -185,6 +224,9 @@ export async function GET(request: NextRequest) {
     motDueDate,
     motTests,
     briefing,
+    vdiCheck,
+    vdiCheckBlockedReason,
+    vdiCheckAvailableAt,
   };
 
   return NextResponse.json(result);

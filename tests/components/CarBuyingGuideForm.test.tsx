@@ -242,4 +242,107 @@ describe("CarBuyingGuideForm", () => {
 
     expect(await screen.findByRole("alert")).toHaveTextContent(/could not reach roadverdict/i);
   });
+
+  // ── VDI + valuation add-on ───────────────────────────────────────────
+
+  it("shows the VDI checkbox, unchecked by default, for a non-Pro account and doesn't request it unless ticked", async () => {
+    (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        vrm: "AB12CDE", make: "Ford", model: "Focus", year: 2021, fuelType: "Petrol", colour: "Blue",
+        engineCapacityCc: 1000, plateInRetention: false, vehicleType: "four-wheeled", motDueDate: null, motTests: [],
+        briefing: null, vdiCheck: null, valuation: null,
+      }),
+    });
+    const user = userEvent.setup();
+    render(<CarBuyingGuideForm signedIn />);
+    const checkbox = screen.getByRole("checkbox");
+    expect(checkbox).not.toBeChecked();
+
+    await user.type(screen.getByLabelText("Search by registration (optional)"), "AB12CDE");
+    await user.click(screen.getByRole("button", { name: "Look up" }));
+
+    expect(fetch).toHaveBeenCalledWith(expect.not.stringContaining("includeVdi"));
+  });
+
+  it("requests includeVdi=1 once the checkbox is ticked", async () => {
+    (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        vrm: "AB12CDE", make: "Ford", model: "Focus", year: 2021, fuelType: "Petrol", colour: "Blue",
+        engineCapacityCc: 1000, plateInRetention: false, vehicleType: "four-wheeled", motDueDate: null, motTests: [],
+        briefing: null, vdiCheck: null, valuation: null,
+      }),
+    });
+    const user = userEvent.setup();
+    render(<CarBuyingGuideForm signedIn />);
+    await user.click(screen.getByRole("checkbox"));
+    await user.type(screen.getByLabelText("Search by registration (optional)"), "AB12CDE");
+    await user.click(screen.getByRole("button", { name: "Look up" }));
+
+    expect(fetch).toHaveBeenCalledWith(expect.stringContaining("includeVdi=1"));
+  });
+
+  it("hides the checkbox entirely for a Pro account and always requests includeVdi=1", async () => {
+    (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        vrm: "AB12CDE", make: "Ford", model: "Focus", year: 2021, fuelType: "Petrol", colour: "Blue",
+        engineCapacityCc: 1000, plateInRetention: false, vehicleType: "four-wheeled", motDueDate: null, motTests: [],
+        briefing: null, vdiCheck: null, valuation: null,
+      }),
+    });
+    const user = userEvent.setup();
+    render(<CarBuyingGuideForm signedIn isPro />);
+    expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
+
+    await user.type(screen.getByLabelText("Search by registration (optional)"), "AB12CDE");
+    await user.click(screen.getByRole("button", { name: "Look up" }));
+
+    expect(fetch).toHaveBeenCalledWith(expect.stringContaining("includeVdi=1"));
+  });
+
+  it("renders the independent VDI check facts and valuation figures once returned", async () => {
+    (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        vrm: "AB12CDE", make: "Ford", model: "Focus", year: 2021, fuelType: "Petrol", colour: "Blue",
+        engineCapacityCc: 1000, plateInRetention: false, vehicleType: "four-wheeled", motDueDate: null, motTests: [],
+        briefing: null,
+        vdiCheck: {
+          isStolen: false, hasWriteOffRecord: true, writeOffRecordCount: 1, hasOutstandingFinance: false,
+          financeRecords: [], keeperChangeCount: 2, plateChangeCount: 0, colourChangeCount: 0, currentColour: null,
+        },
+        valuation: { privateAverage: 23994, privateClean: null, dealerForecourt: 27161, partExchange: null },
+      }),
+    });
+    const user = userEvent.setup();
+    render(<CarBuyingGuideForm signedIn />);
+    await user.click(screen.getByRole("checkbox"));
+    await user.type(screen.getByLabelText("Search by registration (optional)"), "AB12CDE");
+    await user.click(screen.getByRole("button", { name: "Look up" }));
+
+    expect(await screen.findByText(/1 write-off record\(s\) on file/)).toBeInTheDocument();
+    expect(screen.getByText("Private average: £23,994")).toBeInTheDocument();
+    expect(screen.getByText("Dealer forecourt: £27,161")).toBeInTheDocument();
+  });
+
+  it("shows the cooldown message and disables the checkbox when the free account is blocked", async () => {
+    (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        vrm: "AB12CDE", make: "Ford", model: "Focus", year: 2021, fuelType: "Petrol", colour: "Blue",
+        engineCapacityCc: 1000, plateInRetention: false, vehicleType: "four-wheeled", motDueDate: null, motTests: [],
+        briefing: null, vdiCheck: null, valuation: null, vdiCheckBlockedReason: "cooldown", vdiCheckAvailableAt: "2026-02-01T00:00:00.000Z",
+      }),
+    });
+    const user = userEvent.setup();
+    render(<CarBuyingGuideForm signedIn />);
+    await user.click(screen.getByRole("checkbox"));
+    await user.type(screen.getByLabelText("Search by registration (optional)"), "AB12CDE");
+    await user.click(screen.getByRole("button", { name: "Look up" }));
+
+    expect(await screen.findByText(/next free VDI check is available from/)).toBeInTheDocument();
+    expect(screen.getByRole("checkbox")).toBeDisabled();
+  });
 });

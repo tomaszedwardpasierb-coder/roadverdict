@@ -872,7 +872,7 @@ export default async function DashboardPage(props: { searchParams: Promise<{ add
         {mileagePill}
       </div>
       <p className={styles.subtext}>A buyer checklist weighted by how old the bike actually is - not a generic list.</p>
-      <BuyingGuideForm signedIn />
+      <BuyingGuideForm signedIn isPro={userIsPro} />
     </ProGate>
   );
 
@@ -1286,7 +1286,7 @@ async function renderCarDashboard(
         {mileagePill}
       </div>
       <p className={styles.subtext}>A buyer checklist weighted by how old the car actually is - not a generic list.</p>
-      <CarBuyingGuideForm signedIn />
+      <CarBuyingGuideForm signedIn isPro={userIsPro} />
     </ProGate>
   );
 
