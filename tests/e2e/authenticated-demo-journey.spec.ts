@@ -11,23 +11,25 @@
 // email round-trip) - but all tests DO share the same underlying demo
 // account data in the backend, so ordering matters.
 //
-// The reset-button test runs LAST on purpose, not first. Every real CI
-// run against the Linux Cosmos DB Emulator so far has crashed the
-// container at the same point: right after two full sequential ~150-
-// document demo-seed writes (auto-seed-on-first-login, immediately
-// followed by the reset button re-seeding again) landed back-to-back on
-// a container that had only just started. The very first login of this
-// file already triggers one full auto-seed cycle on its own - that
-// alone is a legitimate, deterministic starting point for the tests
-// that don't care about the reset button specifically, so they don't
-// need to wait for it. Deferring the second, redundant seed burst until
-// after the container/app have already handled a couple of lighter
-// round-trips is a cheap way to stop stacking two heavy write bursts at
-// the most fragile point in the emulator's lifetime.
+// The reset-button test runs LAST on purpose, not first. CI runs these
+// against a real, dedicated Azure Cosmos DB test account (not a local
+// emulator - see the workflow file), so there's no container-startup
+// fragility to worry about, but the reset button still triggers a full,
+// deliberately-sequential ~360-write reseed (demoSeedRunner.ts), which
+// is real network time no other test in this file needs to pay. The
+// very first login of this file already triggers one full auto-seed
+// cycle on its own - that alone is a legitimate, deterministic starting
+// point for the tests that don't care about the reset button
+// specifically, so ordering them first lets them run without waiting on
+// the heavier, redundant reseed the last test deliberately triggers.
 import { test, expect } from "@playwright/test";
 import { loginAsDemo, resetDemoAccount, DEMO_REGISTRATION, DEMO_NICKNAME } from "./helpers/demoAuth";
 
-test.describe.configure({ mode: "serial", timeout: 60_000 });
+// Generous relative to the happy-path duration (a login plus one reset)
+// - the reset itself is now allowed to wait up to 60s on its own (see
+// resetDemoAccount's comment), so the overall test needs enough extra
+// room on top of that for the login and final assertion around it.
+test.describe.configure({ mode: "serial", timeout: 90_000 });
 
 test.describe("Authenticated demo journeys", () => {
   test("logs a new fuel fill-up through the real form and sees it reflected in fuel history", async ({ page }) => {
