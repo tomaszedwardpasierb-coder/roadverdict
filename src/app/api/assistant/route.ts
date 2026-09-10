@@ -7,8 +7,14 @@
 // call is scoped to that session's own email - never anything supplied
 // by the request body or the model itself. See knowledge base section 5
 // for the full reasoning behind that boundary.
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/session";
+import {
+  canSendAnonAssistantMessage,
+  generateAnonId,
+  ANON_ID_COOKIE,
+  ANON_ID_COOKIE_MAX_AGE_SECONDS,
+} from "@/lib/tracker/assistantAnonUsage";
 import { getLivePrivacyPolicyText } from "@/lib/tracker/assistantKnowledge";
 import { getAssistantConfig, getCarAssistantConfig, type AssistantConfigDoc } from "@/lib/tracker/assistantConfig";
 import { resolveActiveVehicle } from "@/lib/tracker/activeVehicle";
@@ -211,7 +217,37 @@ function toGeminiContents(messages: ChatMessage[]): GeminiContent[] {
   }));
 }
 
-export async function POST(req: Request) {
+// Best-effort only - there's no IP-extraction utility anywhere else in
+// this app to reuse (confirmed: no other feature does IP-based rate
+// limiting). Whatever's proxying real traffic to this app is trusted to
+// set x-forwarded-for; "unknown" for anything else just means every such
+// request shares one IP-side bucket, which is an acceptable degradation,
+// not a correctness bug.
+function clientIp(req: NextRequest): string {
+  const forwarded = req.headers.get("x-forwarded-for");
+  if (forwarded) return forwarded.split(",")[0].trim();
+  return req.headers.get("x-real-ip") ?? "unknown";
+}
+
+// Every response after the anonymous-usage check below goes through
+// this, so a newly-generated anon id cookie (see canSendAnonAssistantMessage's
+// caller) reaches the browser regardless of which of this function's many
+// return points actually fires.
+function respond(anonIdToSetCookie: string | null, payload: unknown, init?: { status?: number }): NextResponse {
+  const res = NextResponse.json(payload, init);
+  if (anonIdToSetCookie) {
+    res.cookies.set(ANON_ID_COOKIE, anonIdToSetCookie, {
+      httpOnly: true,
+      secure: true,
+      sameSite: "lax",
+      maxAge: ANON_ID_COOKIE_MAX_AGE_SECONDS,
+      path: "/",
+    });
+  }
+  return res;
+}
+
+export async function POST(req: NextRequest) {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
     return NextResponse.json({ error: "Assistant is not configured." }, { status: 503 });
@@ -247,6 +283,27 @@ export async function POST(req: Request) {
     console.error("Assistant: getSession() failed, continuing as anonymous:", err);
   }
   const signedIn = !!session;
+
+  // 10 messages/day, only while signed out - see assistantAnonUsage.ts.
+  // Checked as early as possible once signedIn is known, before any
+  // Gemini call is made, so an over-the-cap visitor never actually
+  // consumes a real API call.
+  let anonIdToSetCookie: string | null = null;
+  if (!signedIn) {
+    let anonId = req.cookies.get(ANON_ID_COOKIE)?.value;
+    if (!anonId) {
+      anonId = generateAnonId();
+      anonIdToSetCookie = anonId;
+    }
+    const allowed = await canSendAnonAssistantMessage(anonId, clientIp(req));
+    if (!allowed) {
+      return respond(
+        anonIdToSetCookie,
+        { error: "You've reached today's free message limit - log in for unlimited messages, or try again tomorrow." },
+        { status: 429 }
+      );
+    }
+  }
 
   // Which knowledge base and log-entry gating apply for this request -
   // resolved once here via the same resolveActiveVehicle() every tool in
@@ -371,7 +428,7 @@ export async function POST(req: Request) {
   if (!config) {
     console.error("Assistant: getAssistantConfig() returned null - config document missing or unreadable.");
     await logAssistantQuestion(question, signedIn, true, session?.email);
-    return NextResponse.json({ error: "Assistant is temporarily unavailable." }, { status: 503 });
+    return respond(anonIdToSetCookie, { error: "Assistant is temporarily unavailable." }, { status: 503 });
   }
 
   // A car-active session gets its own, completely separate knowledge
@@ -428,7 +485,7 @@ export async function POST(req: Request) {
         console.error(`Assistant: Gemini API returned ${res.status} ${res.statusText}:`, errBody);
         await logGeminiUsage("assistant", GEMINI_MODEL, false);
         await logAssistantQuestion(question, signedIn, true, session?.email);
-        return NextResponse.json({ error: "Assistant is temporarily unavailable." }, { status: 502 });
+        return respond(anonIdToSetCookie, { error: "Assistant is temporarily unavailable." }, { status: 502 });
       }
       await logGeminiUsage("assistant", GEMINI_MODEL, true);
 
@@ -461,17 +518,17 @@ export async function POST(req: Request) {
       if (!replyText) {
         console.error("Assistant: Gemini response had no text part. Full parts:", JSON.stringify(parts));
         await logAssistantQuestion(question, signedIn, true, session?.email);
-        return NextResponse.json({ error: "Assistant is temporarily unavailable." }, { status: 502 });
+        return respond(anonIdToSetCookie, { error: "Assistant is temporarily unavailable." }, { status: 502 });
       }
       await logAssistantQuestion(question, signedIn, false, session?.email);
-      return NextResponse.json({ reply: replyText, ...(proposedEntry ? { proposedEntry } : {}) });
+      return respond(anonIdToSetCookie, { reply: replyText, ...(proposedEntry ? { proposedEntry } : {}) });
     }
 
     await logAssistantQuestion(question, signedIn, true, session?.email);
-    return NextResponse.json({ error: "Assistant took too many steps to answer that - try rephrasing." }, { status: 502 });
+    return respond(anonIdToSetCookie, { error: "Assistant took too many steps to answer that - try rephrasing." }, { status: 502 });
   } catch (err) {
     console.error("Assistant: unhandled error:", err);
     await logAssistantQuestion(question, signedIn, true, session?.email);
-    return NextResponse.json({ error: "Assistant is temporarily unavailable." }, { status: 502 });
+    return respond(anonIdToSetCookie, { error: "Assistant is temporarily unavailable." }, { status: 502 });
   }
 }

@@ -16,6 +16,8 @@ const mocks = vi.hoisted(() => ({
   resolveActiveVehicle: vi.fn(),
   getCarAssistantConfig: vi.fn(),
   getUserDoc: vi.fn(),
+  canSendAnonAssistantMessage: vi.fn(),
+  generateAnonId: vi.fn(),
 }));
 
 vi.mock("@/lib/auth/session", () => ({ getSession: mocks.getSession }));
@@ -37,23 +39,30 @@ vi.mock("@/lib/tracker/reportAccess", () => ({ hasReportAccess: mocks.hasReportA
 vi.mock("@/lib/tracker/geminiUsageLog", () => ({ logGeminiUsage: mocks.logGeminiUsage }));
 vi.mock("@/lib/tracker/bike", () => ({ getBikesForUser: mocks.getBikesForUser, isBikeReadOnly: mocks.isBikeReadOnly }));
 vi.mock("@/lib/subscriptions", () => ({ isPro: mocks.isPro }));
+vi.mock("@/lib/tracker/assistantAnonUsage", () => ({
+  canSendAnonAssistantMessage: mocks.canSendAnonAssistantMessage,
+  generateAnonId: mocks.generateAnonId,
+  ANON_ID_COOKIE: "rv_anon_id",
+  ANON_ID_COOKIE_MAX_AGE_SECONDS: 34560000,
+}));
 // bikeComparison.ts (MIN_COMPARE_BIKES/MAX_COMPARE_BIKES) is deliberately
 // NOT mocked - both are plain constants, no I/O, so this exercises the
 // real bounds rather than a stand-in for them.
 vi.stubGlobal("fetch", mocks.fetch);
 
+import { NextRequest } from "next/server";
 import { POST } from "@/app/api/assistant/route";
 
-function request(body: unknown): Request {
-  return new Request("http://localhost/api/assistant", {
+function request(body: unknown, headers?: Record<string, string>): NextRequest {
+  return new NextRequest("http://localhost/api/assistant", {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    headers: { "content-type": "application/json", ...headers },
     body: JSON.stringify(body),
   });
 }
 
-function badJsonRequest(): Request {
-  return new Request("http://localhost/api/assistant", {
+function badJsonRequest(): NextRequest {
+  return new NextRequest("http://localhost/api/assistant", {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: "not-json",
@@ -103,6 +112,8 @@ beforeEach(() => {
   mocks.isBikeReadOnly.mockReturnValue(false);
   mocks.resolveActiveVehicle.mockResolvedValue(null);
   mocks.getCarAssistantConfig.mockResolvedValue(null);
+  mocks.canSendAnonAssistantMessage.mockResolvedValue(true);
+  mocks.generateAnonId.mockReturnValue("new-anon-id");
 });
 
 const bikeA = { id: "bike-1", make: "Honda", model: "Africa Twin", nickname: "" };
@@ -686,5 +697,58 @@ describe("POST /api/assistant - car-active knowledge base and log-entry gating",
     const callBody = JSON.parse(mocks.fetch.mock.calls[0][1].body);
     const names = callBody.tools[0].functionDeclarations.map((d: { name: string }) => d.name);
     expect(names).toContain("proposeLogEntry");
+  });
+});
+
+// ── Anonymous message throttle (10/day, cookie + IP) ────────────────────
+
+describe("POST /api/assistant - anonymous message throttle", () => {
+  it("never checks the throttle at all for a signed-in session", async () => {
+    mocks.getSession.mockResolvedValue({ email: "rider@example.com" });
+
+    await POST(request({ messages: [{ role: "user", content: "hi" }] }));
+
+    expect(mocks.canSendAnonAssistantMessage).not.toHaveBeenCalled();
+  });
+
+  it("blocks with 429 and a log-in message once the anonymous cap is hit", async () => {
+    mocks.getSession.mockResolvedValue(null);
+    mocks.canSendAnonAssistantMessage.mockResolvedValue(false);
+
+    const response = await POST(request({ messages: [{ role: "user", content: "hi" }] }));
+
+    expect(response.status).toBe(429);
+    await expect(response.json()).resolves.toEqual({
+      error: "You've reached today's free message limit - log in for unlimited messages, or try again tomorrow.",
+    });
+    expect(mocks.fetch).not.toHaveBeenCalled();
+  });
+
+  it("generates and cookies a new anon id when none was present on the request", async () => {
+    mocks.getSession.mockResolvedValue(null);
+
+    const response = await POST(request({ messages: [{ role: "user", content: "hi" }] }));
+
+    expect(mocks.generateAnonId).toHaveBeenCalled();
+    expect(mocks.canSendAnonAssistantMessage).toHaveBeenCalledWith("new-anon-id", expect.any(String));
+    expect(response.headers.get("set-cookie")).toContain("rv_anon_id=new-anon-id");
+  });
+
+  it("reuses an existing anon id cookie instead of generating a new one", async () => {
+    mocks.getSession.mockResolvedValue(null);
+
+    const response = await POST(request({ messages: [{ role: "user", content: "hi" }] }, { cookie: "rv_anon_id=existing-anon-id" }));
+
+    expect(mocks.generateAnonId).not.toHaveBeenCalled();
+    expect(mocks.canSendAnonAssistantMessage).toHaveBeenCalledWith("existing-anon-id", expect.any(String));
+    expect(response.headers.get("set-cookie")).toBeNull();
+  });
+
+  it("passes the request's x-forwarded-for IP through to the throttle check", async () => {
+    mocks.getSession.mockResolvedValue(null);
+
+    await POST(request({ messages: [{ role: "user", content: "hi" }] }, { "x-forwarded-for": "203.0.113.5, 10.0.0.1" }));
+
+    expect(mocks.canSendAnonAssistantMessage).toHaveBeenCalledWith(expect.any(String), "203.0.113.5");
   });
 });
