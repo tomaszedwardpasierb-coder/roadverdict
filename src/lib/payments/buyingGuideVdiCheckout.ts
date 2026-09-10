@@ -8,12 +8,22 @@
 // vdiPurchase.ts doc instead of a field on a persistent share link
 // (a Buying Guide lookup isn't tied to any share link at all).
 import { getStripe } from "@/lib/payments/stripe";
-import { BUYING_GUIDE_VDI_CHECK_PRICE_PENCE, BUYING_GUIDE_VDI_CHECK_PRODUCT_NAME } from "@/lib/payments/pricing";
-import { createVdiPurchase, getVdiPurchase, markVdiPurchasePaid, type VdiPurchaseDoc } from "@/lib/tracker/vdiPurchase";
+import { BUYING_GUIDE_REPORT_PRICE_PENCE, BUYING_GUIDE_REPORT_PRODUCT_NAME } from "@/lib/payments/pricing";
+import { computeBuyingGuideReportTier } from "@/lib/payments/buyingGuideReportTier";
+import { getUserDoc } from "@/lib/tracker/userDoc";
+import { canRunFreeVehicleHistoryReport, recordVehicleHistoryReportRun } from "@/lib/tracker/vehicleHistoryReportUsage";
+import {
+  createVdiPurchase,
+  createFreeProVdiPurchase,
+  getVdiPurchase,
+  markVdiPurchasePaid,
+  type VdiPurchaseDoc,
+} from "@/lib/tracker/vdiPurchase";
 import type { VehicleKind } from "@/lib/tracker/vdiUnlock";
 
 export type CreateBuyingGuideVdiCheckoutResult =
   | { ok: true; url: string }
+  | { ok: true; freeReportReady: true; purchaseId: string }
   | { ok: false; reason: "creation_failed" };
 
 function buyingGuidePath(vehicleKind: VehicleKind): string {
@@ -26,7 +36,25 @@ export async function createBuyingGuideVdiCheckoutSession(
   vehicleKind: VehicleKind,
   appUrl: string
 ): Promise<CreateBuyingGuideVdiCheckoutResult> {
-  const purchase = await createVdiPurchase(email, vrm, vehicleKind);
+  const tierResult = await computeBuyingGuideReportTier(email);
+
+  if (tierResult.proFreeAvailable) {
+    // Re-check right before granting, not just trusting the read inside
+    // computeBuyingGuideReportTier above - closes the (rare) race where
+    // two requests both read "available" before either records a run.
+    // Losing this race isn't an error: it just falls through to the
+    // normal paid "pro" price below, same as a Pro account that's
+    // already used this month's free report.
+    const user = await getUserDoc(email);
+    if (canRunFreeVehicleHistoryReport(user)) {
+      await recordVehicleHistoryReportRun(email);
+      const purchase = await createFreeProVdiPurchase(email, vrm, vehicleKind, tierResult.tier);
+      return { ok: true, freeReportReady: true, purchaseId: purchase.id };
+    }
+  }
+
+  const pricePence = tierResult.proFreeAvailable ? BUYING_GUIDE_REPORT_PRICE_PENCE.pro : tierResult.pricePence;
+  const purchase = await createVdiPurchase(email, vrm, vehicleKind, tierResult.tier, pricePence);
   const path = buyingGuidePath(vehicleKind);
   try {
     const session = await getStripe().checkout.sessions.create({
@@ -38,8 +66,11 @@ export async function createBuyingGuideVdiCheckoutSession(
           quantity: 1,
           price_data: {
             currency: "gbp",
-            unit_amount: BUYING_GUIDE_VDI_CHECK_PRICE_PENCE,
-            product_data: { name: BUYING_GUIDE_VDI_CHECK_PRODUCT_NAME[vehicleKind] },
+            // Read back off the purchase doc - the single source of
+            // truth for what this specific purchase was priced at -
+            // rather than recomputed a third time here.
+            unit_amount: purchase.pricePence ?? pricePence,
+            product_data: { name: BUYING_GUIDE_REPORT_PRODUCT_NAME[vehicleKind] },
           },
         },
       ],

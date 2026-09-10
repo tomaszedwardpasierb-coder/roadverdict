@@ -197,6 +197,7 @@ export default async function HomePage() {
             </div>
             <h3 className="rv-sol-title">Buying guide</h3>
             <p className="rv-sol-body">Enter a plate or paste a listing. Get a real verdict - buy, negotiate, or walk away - before you hand over money.</p>
+            <p className="rv-sol-body">Full vehicle history report: £14.99 - free account with a registered vehicle: £12.99 - Premium: from free, one every 4 weeks.</p>
           </Link>
           <Link href="/cost-calculator" className="rv-sol-card">
             <div className="rv-sol-icon" aria-hidden="true">

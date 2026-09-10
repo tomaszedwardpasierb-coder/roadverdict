@@ -13,6 +13,7 @@ vi.mock("@/lib/cosmos", () => ({
 
 import {
   createVdiPurchase,
+  createFreeProVdiPurchase,
   getVdiPurchase,
   markVdiPurchasePaid,
   markVdiPurchaseConsumed,
@@ -43,6 +44,26 @@ describe("createVdiPurchase", () => {
     const first = await createVdiPurchase("a@example.com", "AB12CDE", "bike");
     const second = await createVdiPurchase("a@example.com", "AB12CDE", "bike");
     expect(first.id).not.toBe(second.id);
+  });
+
+  it("stamps tier/pricePence and defaults grantMethod to 'stripe'", async () => {
+    const doc = await createVdiPurchase("buyer@example.com", "AB12CDE", "bike", "freeWithVehicle", 1299);
+    expect(doc.tier).toBe("freeWithVehicle");
+    expect(doc.pricePence).toBe(1299);
+    expect(doc.grantMethod).toBe("stripe");
+  });
+});
+
+describe("createFreeProVdiPurchase", () => {
+  it("creates a doc already at status 'paid', grantMethod 'proFreeAllowance', pricePence 0, no stripeSessionId", async () => {
+    const doc = await createFreeProVdiPurchase("pro@example.com", "AB12CDE", "bike", "pro");
+    expect(doc.status).toBe("paid");
+    expect(doc.grantMethod).toBe("proFreeAllowance");
+    expect(doc.pricePence).toBe(0);
+    expect(doc.tier).toBe("pro");
+    expect(doc.paidAt).toBeDefined();
+    expect(doc.stripeSessionId).toBeUndefined();
+    expect(mocks.upsert).toHaveBeenCalledWith(doc);
   });
 });
 

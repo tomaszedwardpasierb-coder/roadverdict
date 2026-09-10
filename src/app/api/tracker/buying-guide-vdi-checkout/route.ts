@@ -1,11 +1,12 @@
 // Place at: src/app/api/tracker/buying-guide-vdi-checkout/route.ts
 //
-// Creates a Stripe Checkout Session for the Buying Guide's standalone,
-// pay-per-use VDI check (£9.99, no free tier, no Pro perk - see
-// pricing.ts). Requires a session, unlike the report page's own
-// vdi-checkout route - a Buying Guide lookup is always a signed-in
-// action (the plate lookup itself already requires it), and the
-// resulting vdiPurchase doc is bound to this exact email.
+// Creates a Stripe Checkout Session for the Buying Guide's vehicle-
+// history report - tiered pricing by account status, see
+// buyingGuideReportTier.ts/pricing.ts. Requires a session, unlike the
+// report page's own vdi-checkout route - a Buying Guide lookup is
+// always a signed-in action (the plate lookup itself already requires
+// it), and the resulting vdiPurchase doc is bound to this exact email.
+// Tier/price is never accepted from the client - only `vrm`.
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/session";
 import { createBuyingGuideVdiCheckoutSession } from "@/lib/payments/buyingGuideVdiCheckout";
@@ -35,6 +36,9 @@ export async function POST(request: NextRequest) {
   const result = await createBuyingGuideVdiCheckoutSession(session.email, cleaned, "bike", appUrl);
   if (!result.ok) {
     return NextResponse.json({ error: "Could not start checkout. Please try again." }, { status: 500 });
+  }
+  if ("freeReportReady" in result) {
+    return NextResponse.json({ freeReportReady: true, vdiPurchaseId: result.purchaseId });
   }
 
   return NextResponse.json({ url: result.url });

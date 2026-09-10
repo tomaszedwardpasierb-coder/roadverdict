@@ -20,6 +20,7 @@
 import crypto from "crypto";
 import { getContainer } from "@/lib/cosmos";
 import type { VehicleKind, VdiCheckResult } from "@/lib/tracker/vdiUnlock";
+import type { BuyingGuideReportTier } from "@/lib/payments/pricing";
 
 export const VDI_PURCHASE_RETRIEVAL_WINDOW_MS = 14 * 24 * 60 * 60 * 1000;
 
@@ -36,13 +37,26 @@ export interface VdiPurchaseDoc {
   paidAt?: string;
   consumedAt?: string;
   vdiCheck?: VdiCheckResult;
+  // Optional, additive - added once tiered pricing replaced the flat
+  // £9.99 (see buyingGuideReportTier.ts). Pre-existing docs from before
+  // this simply have neither field, and are implicitly grantMethod:
+  // "stripe" (the only way a purchase could ever be created before now).
+  tier?: BuyingGuideReportTier;
+  pricePence?: number;
+  grantMethod?: "stripe" | "proFreeAllowance";
 }
 
 function generatePurchaseId(): string {
   return crypto.randomBytes(24).toString("base64url");
 }
 
-export async function createVdiPurchase(email: string, vrm: string, vehicleKind: VehicleKind): Promise<VdiPurchaseDoc> {
+export async function createVdiPurchase(
+  email: string,
+  vrm: string,
+  vehicleKind: VehicleKind,
+  tier?: BuyingGuideReportTier,
+  pricePence?: number
+): Promise<VdiPurchaseDoc> {
   const container = getContainer();
   const id = generatePurchaseId();
   const doc: VdiPurchaseDoc = {
@@ -54,6 +68,48 @@ export async function createVdiPurchase(email: string, vrm: string, vehicleKind:
     vehicleKind,
     createdAt: new Date().toISOString(),
     status: "pending",
+    tier,
+    pricePence,
+    grantMethod: "stripe",
+  };
+  await container.items.upsert(doc);
+  return doc;
+}
+
+// A Pro account's free-allowance grant, distinct from the normal
+// pending->paid Stripe flow above: this doc is created ALREADY at
+// status "paid" (grantMethod "proFreeAllowance", pricePence 0, no
+// stripeSessionId ever set), so it falls straight through
+// resolveVdiCheck's existing "paid" handling in the buying-guide-lookup
+// routes with no new branch needed there - that function's
+// `status === "pending"` check (which requires a Stripe session_id to
+// self-heal) is simply never true for a doc created this way. Both
+// selfHealBuyingGuideVdiPurchase and
+// applyBuyingGuideVdiPurchaseFromWebhookSession already early-return
+// unless status is "pending", so a free grant can never be touched by
+// either Stripe code path.
+export async function createFreeProVdiPurchase(
+  email: string,
+  vrm: string,
+  vehicleKind: VehicleKind,
+  tier: BuyingGuideReportTier
+): Promise<VdiPurchaseDoc> {
+  const container = getContainer();
+  const id = generatePurchaseId();
+  const now = new Date().toISOString();
+  const doc: VdiPurchaseDoc = {
+    id,
+    pk: id,
+    type: "vdiPurchase",
+    email,
+    vrm,
+    vehicleKind,
+    createdAt: now,
+    status: "paid",
+    paidAt: now,
+    tier,
+    pricePence: 0,
+    grantMethod: "proFreeAllowance",
   };
   await container.items.upsert(doc);
   return doc;

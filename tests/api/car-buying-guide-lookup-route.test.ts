@@ -22,6 +22,7 @@ const mocks = vi.hoisted(() => ({
   fetchVdiCheckFromVdg: vi.fn(),
   fetchValuationFromVdg: vi.fn(),
   fetchVehicleTaxDetailsFromVdg: vi.fn(),
+  computeBuyingGuideReportTier: vi.fn(),
   fetch: vi.fn(),
 }));
 
@@ -49,6 +50,7 @@ vi.mock("@/lib/payments/buyingGuideVdiCheckout", () => ({
 vi.mock("@/lib/tracker/vdiCheckFetch", () => ({ fetchVdiCheckFromVdg: mocks.fetchVdiCheckFromVdg }));
 vi.mock("@/lib/tracker/valuationFetch", () => ({ fetchValuationFromVdg: mocks.fetchValuationFromVdg }));
 vi.mock("@/lib/tracker/vehicleTaxFetch", () => ({ fetchVehicleTaxDetailsFromVdg: mocks.fetchVehicleTaxDetailsFromVdg }));
+vi.mock("@/lib/payments/buyingGuideReportTier", () => ({ computeBuyingGuideReportTier: mocks.computeBuyingGuideReportTier }));
 vi.stubGlobal("fetch", mocks.fetch);
 
 import { GET } from "@/app/api/cars/buying-guide-lookup/route";
@@ -131,6 +133,12 @@ beforeEach(() => {
     valuationTime: null, valuationMileage: null, vehicleDescription: null, onTheRoad: null,
     dealerForecourt: null, tradeRetail: null, privateClean: null, privateAverage: 23994,
     partExchange: null, auction: null, tradeAverage: null, tradePoor: null,
+  });
+  mocks.computeBuyingGuideReportTier.mockResolvedValue({
+    tier: "freeNoVehicle",
+    pricePence: 1499,
+    proFreeAvailable: false,
+    nextFreeAt: null,
   });
   process.env.VDG_API_KEY = "test-key";
   delete process.env.GEMINI_API_KEY;
@@ -377,5 +385,47 @@ describe("GET /api/cars/buying-guide-lookup", () => {
     await GET(request("AB20FOC"));
     const callArg = mocks.generateCarBuyingGuideBriefing.mock.calls[0][0];
     expect(callArg.valuation).toMatchObject({ privateAverage: 23994 });
+  });
+
+  // ── Account-aware report pricing ─────────────────────────────────────
+
+  it("includes the computed report tier/price in the response", async () => {
+    mocks.computeBuyingGuideReportTier.mockResolvedValue({
+      tier: "freeWithVehicle",
+      pricePence: 1299,
+      proFreeAvailable: false,
+      nextFreeAt: null,
+    });
+    const response = await GET(request("AB20FOC"));
+    const body = await response.json();
+    expect(mocks.computeBuyingGuideReportTier).toHaveBeenCalledWith("buyer@example.com");
+    expect(body).toMatchObject({
+      reportTier: "freeWithVehicle",
+      reportPricePence: 1299,
+      reportPriceLabel: "£12.99",
+      proFreeAvailable: false,
+      nextFreeReportAt: null,
+    });
+  });
+
+  it("reports proFreeAvailable and nextFreeReportAt for a Pro account", async () => {
+    mocks.computeBuyingGuideReportTier.mockResolvedValue({
+      tier: "pro",
+      pricePence: 999,
+      proFreeAvailable: false,
+      nextFreeAt: "2026-02-01T00:00:00.000Z",
+    });
+    const response = await GET(request("AB20FOC"));
+    const body = await response.json();
+    expect(body.reportTier).toBe("pro");
+    expect(body.reportPriceLabel).toBe("£9.99");
+    expect(body.nextFreeReportAt).toBe("2026-02-01T00:00:00.000Z");
+  });
+
+  it("reports vdiCheckPricePaidPence 0 for a consumed free-Pro-allowance purchase", async () => {
+    mocks.getVdiPurchase.mockResolvedValue({ ...basePurchase({ status: "paid" }), pricePence: 0 });
+    const response = await GET(request("AB20FOC", { vdiPurchaseId: "purchase123" }));
+    const body = await response.json();
+    expect(body.vdiCheckPricePaidPence).toBe(0);
   });
 });

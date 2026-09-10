@@ -59,6 +59,12 @@ export interface UserDoc {
   // vdiCheckUsage above, since valuation stayed free while VDI moved to
   // a paid purchase. More generous for Pro accounts, never unlimited.
   valuationCheckUsage?: { lastRunAt: string };
+  // Per-account cooldown on Pro's one free Buying Guide vehicle-history
+  // report every 4 weeks (see vehicleHistoryReportUsage.ts) - separate
+  // field from valuationCheckUsage above since they're unrelated
+  // products with different cooldown lengths and only one of them
+  // (this one) is Pro-exclusive.
+  vehicleHistoryReportUsage?: { lastRunAt: string };
 }
 
 export async function getUserDoc(email: string): Promise<UserDoc | null> {

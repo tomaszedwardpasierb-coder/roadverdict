@@ -63,4 +63,11 @@ describe("POST /api/cars/buying-guide-vdi-checkout", () => {
     const response = await POST(request({ vrm: "AB12CDE" }));
     expect(response.status).toBe(500);
   });
+
+  it("returns freeReportReady/vdiPurchaseId, not a checkout url, when a free Pro report was granted", async () => {
+    mocks.createBuyingGuideVdiCheckoutSession.mockResolvedValue({ ok: true, freeReportReady: true, purchaseId: "free-purchase-1" });
+    const response = await POST(request({ vrm: "AB12CDE" }));
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ freeReportReady: true, vdiPurchaseId: "free-purchase-1" });
+  });
 });

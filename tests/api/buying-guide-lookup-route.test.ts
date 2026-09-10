@@ -11,6 +11,7 @@ const mocks = vi.hoisted(() => ({
   selfHealBuyingGuideVdiPurchase: vi.fn(),
   fetchVdiCheckFromVdg: vi.fn(),
   fetchVehicleTaxDetailsFromVdg: vi.fn(),
+  computeBuyingGuideReportTier: vi.fn(),
   fetch: vi.fn(),
 }));
 
@@ -30,6 +31,7 @@ vi.mock("@/lib/payments/buyingGuideVdiCheckout", () => ({
 }));
 vi.mock("@/lib/tracker/vdiCheckFetch", () => ({ fetchVdiCheckFromVdg: mocks.fetchVdiCheckFromVdg }));
 vi.mock("@/lib/tracker/vehicleTaxFetch", () => ({ fetchVehicleTaxDetailsFromVdg: mocks.fetchVehicleTaxDetailsFromVdg }));
+vi.mock("@/lib/payments/buyingGuideReportTier", () => ({ computeBuyingGuideReportTier: mocks.computeBuyingGuideReportTier }));
 vi.stubGlobal("fetch", mocks.fetch);
 
 import { GET } from "@/app/api/tracker/buying-guide-lookup/route";
@@ -103,6 +105,12 @@ beforeEach(() => {
     vedFirstYearTwelveMonths: null, vedStandardTwelveMonths: null, v5cReissueCount: 0,
     calculatedAverageAnnualMileage: null, averageMileageForAge: null, mileageAnomalyDetected: false,
     manufacturerWarrantyMiles: null, manufacturerWarrantyMonths: null,
+  });
+  mocks.computeBuyingGuideReportTier.mockResolvedValue({
+    tier: "freeNoVehicle",
+    pricePence: 1499,
+    proFreeAvailable: false,
+    nextFreeAt: null,
   });
   process.env.VDG_API_KEY = "test-key";
   delete process.env.GEMINI_API_KEY;
@@ -341,5 +349,57 @@ describe("GET /api/tracker/buying-guide-lookup", () => {
     await GET(request("AB20YAM", { vdiPurchaseId: "purchase123" }));
     const callArg = mocks.generateBuyingGuideBriefing.mock.calls[0][0];
     expect(callArg.vdiCheck).toMatchObject({ isStolen: false });
+  });
+
+  // ── Account-aware report pricing ─────────────────────────────────────
+
+  it("includes the computed report tier/price in the response", async () => {
+    mocks.computeBuyingGuideReportTier.mockResolvedValue({
+      tier: "freeWithVehicle",
+      pricePence: 1299,
+      proFreeAvailable: false,
+      nextFreeAt: null,
+    });
+    const response = await GET(request("AB20YAM"));
+    const body = await response.json();
+    expect(mocks.computeBuyingGuideReportTier).toHaveBeenCalledWith("rider@example.com");
+    expect(body).toMatchObject({
+      reportTier: "freeWithVehicle",
+      reportPricePence: 1299,
+      reportPriceLabel: "£12.99",
+      proFreeAvailable: false,
+      nextFreeReportAt: null,
+    });
+  });
+
+  it("reports proFreeAvailable and nextFreeReportAt for a Pro account", async () => {
+    mocks.computeBuyingGuideReportTier.mockResolvedValue({
+      tier: "pro",
+      pricePence: 999,
+      proFreeAvailable: false,
+      nextFreeAt: "2026-02-01T00:00:00.000Z",
+    });
+    const response = await GET(request("AB20YAM"));
+    const body = await response.json();
+    expect(body.reportTier).toBe("pro");
+    expect(body.reportPriceLabel).toBe("£9.99");
+    expect(body.nextFreeReportAt).toBe("2026-02-01T00:00:00.000Z");
+  });
+
+  it("reports vdiCheckPricePaidPence 0 for a consumed free-Pro-allowance purchase", async () => {
+    mocks.getVdiPurchase.mockResolvedValue({ ...basePurchase({ status: "paid" }), pricePence: 0 });
+    const response = await GET(request("AB20YAM", { vdiPurchaseId: "purchase123" }));
+    const body = await response.json();
+    expect(body.vdiCheckPricePaidPence).toBe(0);
+  });
+
+  it("reports vdiCheckPricePaidPence for a recent purchase re-shown without a vdiPurchaseId", async () => {
+    mocks.findRecentConsumedPurchase.mockResolvedValue({
+      id: "old-purchase", consumedAt: "2026-01-01T00:00:00.000Z", pricePence: 1299,
+      vdiCheck: { isStolen: true, hasWriteOffRecord: false, writeOffRecordCount: 0, hasOutstandingFinance: false, financeRecords: [], keeperChanges: [], keeperChangeCount: 0, plateChangeCount: 0, colourChangeCount: 0, currentColour: null, vedFirstYearTwelveMonths: null, vedStandardTwelveMonths: null, v5cReissueCount: 0, calculatedAverageAnnualMileage: null, averageMileageForAge: null, mileageAnomalyDetected: false, manufacturerWarrantyMiles: null, manufacturerWarrantyMonths: null },
+    });
+    const response = await GET(request("AB20YAM"));
+    const body = await response.json();
+    expect(body.vdiCheckPricePaidPence).toBe(1299);
   });
 });

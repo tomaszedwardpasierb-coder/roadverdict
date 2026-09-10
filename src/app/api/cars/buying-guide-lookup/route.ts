@@ -25,6 +25,8 @@ import { fetchVdiCheckFromVdg } from "@/lib/tracker/vdiCheckFetch";
 import { fetchValuationFromVdg } from "@/lib/tracker/valuationFetch";
 import { fetchVehicleTaxDetailsFromVdg, type VehicleTaxDetails } from "@/lib/tracker/vehicleTaxFetch";
 import type { VdiCheckResult, ValuationResult } from "@/lib/tracker/vdiUnlock";
+import { computeBuyingGuideReportTier } from "@/lib/payments/buyingGuideReportTier";
+import { BUYING_GUIDE_REPORT_PRICE_LABEL, type BuyingGuideReportTier } from "@/lib/payments/pricing";
 
 export const dynamic = "force-dynamic";
 
@@ -72,6 +74,10 @@ export interface CarBuyingGuideLookupResult {
   // invisible once the buyer navigates away and comes back.
   vdiCheckPurchasedAt: string | null;
   vdiCheckExpiresAt: string | null;
+  // What THIS specific purchase actually cost (0 for a Pro free-allowance
+  // grant) - distinct from reportPricePence below, which is what a NEW
+  // purchase would cost right now.
+  vdiCheckPricePaidPence: number | null;
   // Free but rate-limited - see valuationCheckUsage.ts. Attempted on
   // every lookup regardless of vdiPurchaseId; valuationBlockedReason
   // explains why it's null when the account is over its allowance.
@@ -81,6 +87,15 @@ export interface CarBuyingGuideLookupResult {
   // Free, always attempted alongside MOT history - real tax/SORN status,
   // not rate-limited or paid like vdiCheck/valuation above.
   taxDetails: VehicleTaxDetails | null;
+  // Account-aware pricing for the vehicle-history report purchase below
+  // - see buyingGuideReportTier.ts. Computed fresh on every lookup, so
+  // e.g. adding a vehicle to the garage is reflected the very next time
+  // this route is called, with no caching/staleness to worry about.
+  reportTier: BuyingGuideReportTier;
+  reportPricePence: number;
+  reportPriceLabel: string;
+  proFreeAvailable: boolean;
+  nextFreeReportAt: string | null;
 }
 
 async function resolveVdiCheck(
@@ -89,14 +104,19 @@ async function resolveVdiCheck(
   email: string,
   vrm: string,
   apiKey: string
-): Promise<{ vdiCheck: VdiCheckResult | null; blockedReason?: "already_used" | "payment_not_confirmed" | "invalid" | "fetch_failed"; purchasedAt?: string }> {
+): Promise<{
+  vdiCheck: VdiCheckResult | null;
+  blockedReason?: "already_used" | "payment_not_confirmed" | "invalid" | "fetch_failed";
+  purchasedAt?: string;
+  pricePaidPence?: number;
+}> {
   if (!vdiPurchaseId) {
     // No purchase referenced in the URL at all - still worth checking
     // whether this exact plate already has a recent, paid check on file
     // (the buyer looked it up before, or is revisiting after closing the
     // tab from a previous purchase) before concluding there's nothing to show.
     const recent = await findRecentConsumedPurchase(email, vrm, "car");
-    if (recent?.vdiCheck) return { vdiCheck: recent.vdiCheck, purchasedAt: recent.consumedAt };
+    if (recent?.vdiCheck) return { vdiCheck: recent.vdiCheck, purchasedAt: recent.consumedAt, pricePaidPence: recent.pricePence };
     return { vdiCheck: null };
   }
 
@@ -108,7 +128,7 @@ async function resolveVdiCheck(
     // A reload of the same return URL (or a bookmark of it) shouldn't
     // read as an error - the check was genuinely paid for and already run,
     // so just show it again rather than saying "already used."
-    if (purchase.vdiCheck) return { vdiCheck: purchase.vdiCheck, purchasedAt: purchase.consumedAt };
+    if (purchase.vdiCheck) return { vdiCheck: purchase.vdiCheck, purchasedAt: purchase.consumedAt, pricePaidPence: purchase.pricePence };
     return { vdiCheck: null, blockedReason: "already_used" };
   }
   if (purchase.status === "pending") {
@@ -126,7 +146,7 @@ async function resolveVdiCheck(
     return { vdiCheck: null, blockedReason: "fetch_failed" };
   }
   await markVdiPurchaseConsumed(vdiPurchaseId, vdiCheck);
-  return { vdiCheck, purchasedAt: new Date().toISOString() };
+  return { vdiCheck, purchasedAt: new Date().toISOString(), pricePaidPence: purchase.pricePence };
 }
 
 export async function GET(request: NextRequest) {
@@ -178,13 +198,12 @@ export async function GET(request: NextRequest) {
 
   const vdiPurchaseId = request.nextUrl.searchParams.get("vdiPurchaseId");
   const sessionId = request.nextUrl.searchParams.get("session_id");
-  const { vdiCheck, blockedReason: vdiCheckBlockedReason, purchasedAt: vdiCheckPurchasedAt } = await resolveVdiCheck(
-    vdiPurchaseId,
-    sessionId,
-    session.email,
-    vrm,
-    apiKey
-  );
+  const {
+    vdiCheck,
+    blockedReason: vdiCheckBlockedReason,
+    purchasedAt: vdiCheckPurchasedAt,
+    pricePaidPence: vdiCheckPricePaidPence,
+  } = await resolveVdiCheck(vdiPurchaseId, sessionId, session.email, vrm, apiKey);
   const vdiCheckExpiresAt = vdiCheckPurchasedAt
     ? new Date(new Date(vdiCheckPurchasedAt).getTime() + VDI_PURCHASE_RETRIEVAL_WINDOW_MS).toISOString()
     : null;
@@ -219,6 +238,8 @@ export async function GET(request: NextRequest) {
     );
   }
 
+  const reportTierResult = await computeBuyingGuideReportTier(session.email);
+
   const result: CarBuyingGuideLookupResult = {
     vrm,
     make: details.Make ?? "",
@@ -233,10 +254,16 @@ export async function GET(request: NextRequest) {
     vdiCheckBlockedReason,
     vdiCheckPurchasedAt: vdiCheckPurchasedAt ?? null,
     vdiCheckExpiresAt,
+    vdiCheckPricePaidPence: vdiCheckPricePaidPence ?? null,
     valuation,
     valuationBlockedReason,
     valuationAvailableAt,
     taxDetails,
+    reportTier: reportTierResult.tier,
+    reportPricePence: reportTierResult.pricePence,
+    reportPriceLabel: BUYING_GUIDE_REPORT_PRICE_LABEL[reportTierResult.tier],
+    proFreeAvailable: reportTierResult.proFreeAvailable,
+    nextFreeReportAt: reportTierResult.nextFreeAt,
   };
 
   return NextResponse.json(result);

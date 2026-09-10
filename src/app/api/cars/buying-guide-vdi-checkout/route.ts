@@ -32,6 +32,9 @@ export async function POST(request: NextRequest) {
   if (!result.ok) {
     return NextResponse.json({ error: "Could not start checkout. Please try again." }, { status: 500 });
   }
+  if ("freeReportReady" in result) {
+    return NextResponse.json({ freeReportReady: true, vdiPurchaseId: result.purchaseId });
+  }
 
   return NextResponse.json({ url: result.url });
 }

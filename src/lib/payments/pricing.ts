@@ -26,16 +26,33 @@ export const VDI_CHECK_PRODUCT_NAME: Record<VehicleKind, string> = {
   car: "RoadVerdict Independent Vehicle Check (car)",
 };
 
-// Standalone, pay-per-use VDI check inside the free Buying Guide plate
-// lookup - no free tier, no Pro perk, same flat price for bike and car
-// (see vdiPurchase.ts). Deliberately cheaper than the report-unlock
-// price above: this is VDICheck alone, no valuation bundled in - the
-// Buying Guide's independent valuation (car only) is its own free,
-// rate-limited feature instead (see valuationCheckUsage.ts).
-export const BUYING_GUIDE_VDI_CHECK_PRICE_PENCE = 999;
-export const BUYING_GUIDE_VDI_CHECK_PRICE_LABEL = "£9.99";
+// The Buying Guide's paid vehicle-history report (VDI check + the free
+// checklist/MOT-history/AI-briefing above it, which already becomes a
+// fuller report the moment a VDI check is present - see
+// buyingGuideBriefing.ts). Account-aware, tiered pricing rather than one
+// flat price for everyone (see buyingGuideReportTier.ts for how a tier
+// is chosen): Pro subscribers get one free every 4 weeks (see
+// vehicleHistoryReportUsage.ts) and pay this "pro" price only to bypass
+// that wait; free-tier pricing then depends on whether the account has
+// at least one active vehicle registered, as an incentive to sign up
+// and log one.
+export type BuyingGuideReportTier = "pro" | "freeWithVehicle" | "freeNoVehicle";
 
-export const BUYING_GUIDE_VDI_CHECK_PRODUCT_NAME: Record<VehicleKind, string> = {
-  bike: "RoadVerdict Independent Vehicle Check - Buying Guide (motorcycle)",
-  car: "RoadVerdict Independent Vehicle Check - Buying Guide (car)",
+export const BUYING_GUIDE_REPORT_PRICE_PENCE: Record<BuyingGuideReportTier, number> = {
+  pro: 999,
+  freeWithVehicle: 1299,
+  freeNoVehicle: 1499,
+};
+
+export const BUYING_GUIDE_REPORT_PRICE_LABEL: Record<BuyingGuideReportTier, string> = {
+  pro: "£9.99",
+  freeWithVehicle: "£12.99",
+  freeNoVehicle: "£14.99",
+};
+
+export const PRO_FREE_REPORT_COOLDOWN_MS = 28 * 24 * 60 * 60 * 1000;
+
+export const BUYING_GUIDE_REPORT_PRODUCT_NAME: Record<VehicleKind, string> = {
+  bike: "RoadVerdict Vehicle History Report (motorcycle)",
+  car: "RoadVerdict Vehicle History Report (car)",
 };
