@@ -64,17 +64,19 @@ describe("CostCalculatorForm", () => {
     );
   });
 
-  it("signed in: a matched plate result fills brand, model, and engine size from the real lookup data", async () => {
+  it("signed in: a matched plate result fills brand, model, and engine size by matching the returned model against the curated list", async () => {
     (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
       ok: true,
       json: async () => ({
         vrm: "AB12CDE",
         make: "Honda",
         model: "CB125R",
-        year: 2021,
-        engineCapacityCc: 125,
+        fuelType: "Petrol",
+        colour: "Red",
         plateInRetention: false,
-        vehicleType: "motorcycle",
+        motDueDate: "2026-06-01",
+        motTests: [],
+        taxDetails: null,
       }),
     });
 
@@ -85,6 +87,39 @@ describe("CostCalculatorForm", () => {
 
     await waitFor(() => expect(screen.getByLabelText("Model")).toHaveValue("CB125R"));
     expect(screen.getByText(/Small \(up to 400cc\)/)).toBeInTheDocument();
+  });
+
+  it("silently includes the looked-up MOT tests and tax status in the /api/cost-calculator submission", async () => {
+    (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        vrm: "AB12CDE",
+        make: "Honda",
+        model: "CB125R",
+        fuelType: "Petrol",
+        colour: "Red",
+        plateInRetention: false,
+        motDueDate: "2026-06-01",
+        motTests: [{ testDate: "2025-06-01", passed: true, mileage: 4200, mileageTrusted: true, notes: "" }],
+        taxDetails: { taxStatus: "Taxed", taxIsCurrentlyValid: true, taxDueDate: "2027-06-01", taxDaysRemaining: 263, vedStandardTwelveMonths: 27 },
+      }),
+    });
+
+    const user = userEvent.setup();
+    render(<CostCalculatorForm signedIn={true} />);
+    await user.type(screen.getByLabelText("Search by registration (optional)"), "AB12CDE");
+    await user.click(screen.getByRole("button", { name: "Look up" }));
+    await waitFor(() => expect(screen.getByLabelText("Model")).toHaveValue("CB125R"));
+
+    (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
+      ok: true,
+      json: async () => ({ breakdown: { servicing: 150, tyres: 100, mot: 30, tax: 40, fuel: 300, total: 620 }, brandLabel: "Honda", regionLabel: "Rest of England & Wales", advice: null }),
+    });
+    await user.click(screen.getByRole("button", { name: "Work it out" }));
+
+    const body = JSON.parse((fetch as ReturnType<typeof vi.fn>).mock.calls.at(-1)![1].body);
+    expect(body.motTests).toEqual([{ testDate: "2025-06-01", passed: true, notes: "" }]);
+    expect(body.taxStatus).toEqual({ taxStatus: "Taxed", taxIsCurrentlyValid: true, taxDueDate: "2027-06-01", taxDaysRemaining: 263, vedStandardTwelveMonths: 27 });
   });
 
   it("rejects a mileage of exactly zero client-side - passes the input's own min=0 but fails the mileage<=0 guard", async () => {

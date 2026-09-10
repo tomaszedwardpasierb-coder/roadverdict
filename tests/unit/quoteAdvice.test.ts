@@ -99,4 +99,35 @@ describe("generateQuoteAdvice", () => {
       });
     });
   });
+
+  it("omits the MOT history block entirely when no motTests were given (manual entry, no lookup)", async () => {
+    await generateQuoteAdvice(baseInput, "k");
+    const factsBlock = mocks.callGeminiForJson.mock.calls[0][1];
+    expect(factsBlock).not.toContain("REAL MOT HISTORY");
+  });
+
+  it("includes the real MOT history, oldest-to-newest, when motTests were given", async () => {
+    const input: QuoteAdviceInput = {
+      ...baseInput,
+      motTests: [
+        { testDate: "2025-06-01", passed: true, notes: "" },
+        { testDate: "2024-06-01", passed: false, notes: "Rear brake pads worn" },
+      ],
+    };
+    await generateQuoteAdvice(input, "k");
+    const factsBlock = mocks.callGeminiForJson.mock.calls[0][1];
+    expect(factsBlock).toContain("THIS BIKE'S REAL MOT HISTORY");
+    // oldest first: 2024 then 2025, even though the input was newest-first
+    const idx2024 = factsBlock.indexOf("2024");
+    const idx2025 = factsBlock.indexOf("2025");
+    expect(idx2024).toBeGreaterThan(-1);
+    expect(idx2025).toBeGreaterThan(idx2024);
+    expect(factsBlock).toContain("Rear brake pads worn");
+  });
+
+  it("instructs the model to connect a relevant MOT advisory to the quoted job as a legitimate reason for a higher price", async () => {
+    await generateQuoteAdvice(baseInput, "k");
+    const systemPrompt = mocks.callGeminiForJson.mock.calls[0][0];
+    expect(systemPrompt).toContain("legitimate reason the price might run above a generic benchmark");
+  });
 });

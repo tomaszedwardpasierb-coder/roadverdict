@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, type FormEvent, type ReactNode } from 'react';
+import { useState, useEffect, type FormEvent, type ReactNode } from 'react';
 import {
   BIKE_CLASS_LABELS,
   BRAND_OPTIONS,
@@ -12,7 +12,7 @@ import {
   slugifyMake,
 } from '@/lib/motorcycleModels';
 import { AGE_BAND_LABELS, type AgeBand, type Checklist } from '@/lib/buyerChecklist';
-import type { VehicleTypeCheck } from '@/lib/tracker/vehicleTypeCheck';
+import { BUYING_GUIDE_VDI_CHECK_PRICE_LABEL } from '@/lib/payments/pricing';
 import { BuyingGuideResult } from './BuyingGuideResult';
 
 interface ApiResponse {
@@ -29,12 +29,9 @@ interface BuyingGuideLookupResponse {
   vrm: string;
   make: string;
   model: string;
-  year: number;
   fuelType: string;
   colour: string;
-  engineCapacityCc: number | null;
   plateInRetention: boolean;
-  vehicleType: VehicleTypeCheck;
   motDueDate: string | null;
   motTests: {
     testDate: string;
@@ -48,6 +45,9 @@ interface BuyingGuideLookupResponse {
     modelNotes: string[];
     summary: string;
   } | null;
+  // Only ever populated once the standalone £9.99 VDI check has been
+  // bought and successfully run for this exact plate - see
+  // handleBuyVdiCheck below and vdiPurchase.ts.
   vdiCheck: {
     isStolen: boolean;
     hasWriteOffRecord: boolean;
@@ -59,8 +59,16 @@ interface BuyingGuideLookupResponse {
     colourChangeCount: number;
     currentColour: string | null;
   } | null;
-  vdiCheckBlockedReason?: 'cooldown';
-  vdiCheckAvailableAt?: string | null;
+  vdiCheckBlockedReason?: 'already_used' | 'payment_not_confirmed' | 'invalid';
+  // Free, always attempted alongside MOT history.
+  taxDetails: {
+    taxStatus: string | null;
+    taxIsCurrentlyValid: boolean;
+    taxDueDate: string | null;
+    taxDaysRemaining: number | null;
+    motStatus: string | null;
+    vedStandardTwelveMonths: number | null;
+  } | null;
   error?: string;
 }
 
@@ -69,10 +77,9 @@ const AGE_BANDS = Object.keys(AGE_BAND_LABELS) as AgeBand[];
 
 interface Props {
   signedIn: boolean;
-  isPro?: boolean;
 }
 
-export function BuyingGuideForm({ signedIn, isPro = false }: Props) {
+export function BuyingGuideForm({ signedIn }: Props) {
   const [brand, setBrand] = useState(BRAND_OPTIONS[0].value);
   const [model, setModel] = useState('');
   const [bikeClass, setBikeClass] = useState<BikeClass>('medium');
@@ -91,9 +98,8 @@ export function BuyingGuideForm({ signedIn, isPro = false }: Props) {
   const [lookupError, setLookupError] = useState<string | null>(null);
   const [lookupNote, setLookupNote] = useState<ReactNode>(null);
   const [motResult, setMotResult] = useState<BuyingGuideLookupResponse | null>(null);
-  // Free accounts opt in explicitly (it spends their 15-day allowance);
-  // Pro accounts always get it, no checkbox shown at all.
-  const [includeVdi, setIncludeVdi] = useState(false);
+  const [vdiPurchasing, setVdiPurchasing] = useState(false);
+  const [vdiPurchaseError, setVdiPurchaseError] = useState<string | null>(null);
 
   const modelsForBrand = getModelsForBrand(brand);
 
@@ -112,6 +118,69 @@ export function BuyingGuideForm({ signedIn, isPro = false }: Props) {
     }
   }
 
+  async function runLookup(cleaned: string, vdiPurchaseId?: string, stripeSessionId?: string) {
+    setLookupLoading(true);
+    setLookupError(null);
+    setLookupNote(null);
+    setMotResult(null);
+    try {
+      const params = new URLSearchParams({ vrm: cleaned });
+      if (vdiPurchaseId) params.set('vdiPurchaseId', vdiPurchaseId);
+      if (stripeSessionId) params.set('session_id', stripeSessionId);
+      const res = await fetch(`/api/tracker/buying-guide-lookup?${params.toString()}`);
+      const data: BuyingGuideLookupResponse = await res.json();
+      if (!res.ok) {
+        setLookupError(data.error ?? 'No vehicle found for that registration. Pick it manually below instead.');
+        return;
+      }
+
+      const matchedBrand = slugifyMake(data.make);
+      const resolvedBrand = BRAND_OPTIONS.some((b) => b.value === matchedBrand) ? matchedBrand : 'other';
+      setBrand(resolvedBrand);
+
+      // No EngineCapacityCc from this lookup (MotHistoryDetails doesn't
+      // carry it) - infer engine size by matching the returned Model
+      // against this brand's own curated model list instead.
+      const candidates = getModelsForBrand(resolvedBrand);
+      const matchedModel = candidates.find(
+        (m) => m.model.toLowerCase().includes(data.model.toLowerCase()) || data.model.toLowerCase().includes(m.model.toLowerCase())
+      );
+      setModel(matchedModel?.model ?? '');
+      if (matchedModel) {
+        setBikeClass(getBikeClassForCC(matchedModel.engineCC));
+      }
+
+      setMotResult(data);
+      setLookupNote(
+        `Found: ${data.make} ${data.model}${data.plateInRetention ? " - this plate isn't currently attached to a vehicle; showing the last one it was on" : ''}. Fields below updated - check them before getting your checklist.`
+      );
+    } catch {
+      setLookupError("Couldn't reach the lookup service. Pick the bike manually below instead.");
+    } finally {
+      setLookupLoading(false);
+    }
+  }
+
+  // Picks up a return from Stripe after buying the standalone VDI check
+  // (see handleBuyVdiCheck below) - the checkout session's success_url
+  // sends the buyer straight back here with the purchase id, the plate
+  // they were checking, and the raw Stripe session id (used by the
+  // lookup route's own self-heal if the webhook hasn't landed yet).
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const vdiPurchaseId = params.get('vdiPurchaseId');
+    const returnedVrm = params.get('vrm');
+    const stripeSessionId = params.get('session_id');
+    if (vdiPurchaseId && returnedVrm) {
+      window.history.replaceState(null, '', window.location.pathname);
+      setVrm(returnedVrm);
+      void runLookup(returnedVrm, vdiPurchaseId, stripeSessionId ?? undefined);
+    }
+    // Deliberately run-once-on-mount: this only ever matters for the
+    // single page load right after a Stripe redirect.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   async function handlePlateLookup() {
     if (!signedIn) {
       setLookupError(null);
@@ -128,56 +197,33 @@ export function BuyingGuideForm({ signedIn, isPro = false }: Props) {
       setLookupError('Enter a registration number first.');
       return;
     }
-    setLookupLoading(true);
-    setLookupError(null);
-    setLookupNote(null);
-    setMotResult(null);
+    await runLookup(cleaned);
+  }
+
+  async function handleBuyVdiCheck() {
+    const cleaned = vrm.trim().toUpperCase().replace(/\s+/g, '');
+    if (!cleaned) {
+      setVdiPurchaseError('Look up a registration first.');
+      return;
+    }
+    setVdiPurchasing(true);
+    setVdiPurchaseError(null);
     try {
-      const vdiParam = isPro || includeVdi ? '&includeVdi=1' : '';
-      const res = await fetch(`/api/tracker/buying-guide-lookup?vrm=${encodeURIComponent(cleaned)}${vdiParam}`);
-      const data: BuyingGuideLookupResponse = await res.json();
-      if (!res.ok) {
-        setLookupError(data.error ?? 'No vehicle found for that registration. Pick it manually below instead.');
+      const res = await fetch('/api/tracker/buying-guide-vdi-checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ vrm: cleaned }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.url) {
+        setVdiPurchaseError(data.error ?? 'Could not start checkout. Please try again.');
+        setVdiPurchasing(false);
         return;
       }
-
-      // Same gate as the "add a bike" flow in the dashboard, and the
-      // exact same wording - a definite non-motorcycle stops here
-      // entirely, before any of the fields below get auto-filled with
-      // a car's data, and a genuinely uncertain result is treated the
-      // same way rather than assumed to be a bike just because that's
-      // the more common case.
-      if (data.vehicleType === 'four-wheeled') {
-        setLookupError("Oops! Are you sure that's a bike? It looks like it has four wheels. 🏍️");
-        return;
-      }
-      if (data.vehicleType === 'unknown') {
-        setLookupError("Couldn't confirm what type of vehicle this registration belongs to. Double-check the registration number, or enter the bike's details manually below.");
-        return;
-      }
-
-      const matchedBrand = slugifyMake(data.make);
-      const resolvedBrand = BRAND_OPTIONS.some((b) => b.value === matchedBrand) ? matchedBrand : 'other';
-      setBrand(resolvedBrand);
-
-      const candidates = getModelsForBrand(resolvedBrand);
-      const matchedModel = candidates.find(
-        (m) => m.model.toLowerCase().includes(data.model.toLowerCase()) || data.model.toLowerCase().includes(m.model.toLowerCase())
-      );
-      setModel(matchedModel?.model ?? '');
-
-      if (data.engineCapacityCc) {
-        setBikeClass(getBikeClassForCC(data.engineCapacityCc));
-      }
-
-      setMotResult(data);
-      setLookupNote(
-        `Found: ${data.make} ${data.model} (${data.year})${data.plateInRetention ? " - this plate isn't currently attached to a vehicle; showing the last one it was on" : ''}. Fields below updated - check them before getting your checklist.`
-      );
+      window.location.href = data.url;
     } catch {
-      setLookupError("Couldn't reach the lookup service. Pick the bike manually below instead.");
-    } finally {
-      setLookupLoading(false);
+      setVdiPurchaseError("Couldn't reach the payment service. Please try again.");
+      setVdiPurchasing(false);
     }
   }
 
@@ -231,29 +277,27 @@ export function BuyingGuideForm({ signedIn, isPro = false }: Props) {
                 {lookupLoading ? 'Looking up…' : 'Look up'}
               </button>
             </div>
-            {!isPro && (
-              <div style={{ marginTop: '0.5rem' }}>
-                <label>
-                  <input
-                    type="checkbox"
-                    checked={includeVdi}
-                    onChange={(e) => setIncludeVdi(e.target.checked)}
-                    disabled={!!motResult?.vdiCheckBlockedReason}
-                  />{' '}
-                  Also run an independent VDI check (stolen/write-off/finance) - free once every 15 days
-                </label>
-                {motResult?.vdiCheckBlockedReason === 'cooldown' && (
-                  <p className="field-note">
-                    {motResult.vdiCheckAvailableAt
-                      ? `Your next free VDI check is available from ${new Date(motResult.vdiCheckAvailableAt).toLocaleDateString('en-GB')}.`
-                      : 'Your free VDI check for this period has already been used.'}
-                  </p>
-                )}
-              </div>
-            )}
             {lookupError && <p className="error-text" role="alert">{lookupError}</p>}
             {lookupNote && <p className="field-note">{lookupNote}</p>}
           </div>
+
+          {motResult && !motResult.vdiCheck && (
+            <div className="field" style={{ marginBottom: '1.1rem' }}>
+              <p className="field-note">
+                {motResult.vdiCheckBlockedReason === 'already_used' &&
+                  "That Independent Vehicle Check purchase has already been used - buy another to run it again."}
+                {motResult.vdiCheckBlockedReason === 'payment_not_confirmed' &&
+                  "We couldn't confirm that payment yet - please look up this registration again in a moment."}
+                {motResult.vdiCheckBlockedReason === 'invalid' &&
+                  "Something went wrong with that purchase - please buy again."}
+              </p>
+              <button type="button" className="btn-primary" onClick={handleBuyVdiCheck} disabled={vdiPurchasing}>
+                {vdiPurchasing ? 'Starting checkout…' : `Buy Independent Vehicle Check - ${BUYING_GUIDE_VDI_CHECK_PRICE_LABEL}`}
+              </button>
+              <p className="field-note">Stolen marker, write-off history, outstanding finance, and keeper/plate/colour change history, straight from police/DVLA data.</p>
+              {vdiPurchaseError && <p className="error-text" role="alert">{vdiPurchaseError}</p>}
+            </div>
+          )}
 
           {motResult?.vdiCheck && (
             <div className="field" style={{ marginBottom: '1.1rem' }}>
@@ -305,6 +349,16 @@ export function BuyingGuideForm({ signedIn, isPro = false }: Props) {
                 </div>
               )}
               <p className="field-note">{motResult.briefing.summary}</p>
+            </div>
+          )}
+
+          {motResult?.taxDetails && (
+            <div className="field" style={{ marginBottom: '1.1rem' }}>
+              <p className="field-note">
+                Tax status: <strong>{motResult.taxDetails.taxStatus ?? 'Unknown'}</strong>
+                {!motResult.taxDetails.taxIsCurrentlyValid && ' - NOT currently valid'}
+                {motResult.taxDetails.taxDueDate && ` (due ${new Date(motResult.taxDetails.taxDueDate).toLocaleDateString('en-GB')})`}
+              </p>
             </div>
           )}
 

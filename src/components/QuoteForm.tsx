@@ -12,7 +12,6 @@ import {
 } from '@/lib/priceData';
 import { getModelsForBrand, getBikeClassForCC, slugifyMake } from '@/lib/motorcycleModels';
 import type { Verdict } from '@/lib/verdict';
-import type { VehicleTypeCheck } from '@/lib/tracker/vehicleTypeCheck';
 import { VerdictResult } from './VerdictResult';
 
 interface ApiResponse {
@@ -26,14 +25,15 @@ interface ApiResponse {
   error?: string;
 }
 
-interface PlateLookupResponse {
+interface QuoteLookupResponse {
   vrm: string;
   make: string;
   model: string;
-  year: number;
-  engineCapacityCc: number | null;
+  fuelType: string;
+  colour: string;
   plateInRetention: boolean;
-  vehicleType: VehicleTypeCheck;
+  motDueDate: string | null;
+  motTests: { testDate: string; passed: boolean; mileage: number | null; mileageTrusted: boolean; notes: string }[];
   error?: string;
 }
 
@@ -66,6 +66,10 @@ export function QuoteForm({ signedIn, initialBrand, initialBikeClass }: Props) {
   const [lookupLoading, setLookupLoading] = useState(false);
   const [lookupError, setLookupError] = useState<string | null>(null);
   const [lookupNote, setLookupNote] = useState<ReactNode>(null);
+  // Silently carried through to the submit request - this tool's UI
+  // doesn't display MOT history itself, it just lets the AI advice
+  // reference real advisories relevant to the quoted job.
+  const [motTests, setMotTests] = useState<QuoteLookupResponse['motTests']>([]);
 
   async function handlePlateLookup() {
     if (!signedIn) {
@@ -87,25 +91,10 @@ export function QuoteForm({ signedIn, initialBrand, initialBikeClass }: Props) {
     setLookupError(null);
     setLookupNote(null);
     try {
-      const res = await fetch(`/api/tracker/plate-lookup?vrm=${encodeURIComponent(cleaned)}`);
-      const data: PlateLookupResponse = await res.json();
+      const res = await fetch(`/api/tracker/quote-lookup?vrm=${encodeURIComponent(cleaned)}`);
+      const data: QuoteLookupResponse = await res.json();
       if (!res.ok) {
         setLookupError(data.error ?? 'No vehicle found for that registration. Pick it manually below instead.');
-        return;
-      }
-
-      // Same gate as the "add a bike" flow in the dashboard, and the
-      // exact same wording - a definite non-motorcycle stops here
-      // entirely, before any of the fields below get auto-filled with
-      // a car's data, and a genuinely uncertain result is treated the
-      // same way rather than assumed to be a bike just because that's
-      // the more common case.
-      if (data.vehicleType === 'four-wheeled') {
-        setLookupError("Oops! Are you sure that's a bike? It looks like it has four wheels. 🏍️");
-        return;
-      }
-      if (data.vehicleType === 'unknown') {
-        setLookupError("Couldn't confirm what type of vehicle this registration belongs to. Double-check the registration number, or enter the bike's details manually below.");
         return;
       }
 
@@ -113,12 +102,22 @@ export function QuoteForm({ signedIn, initialBrand, initialBikeClass }: Props) {
       const resolvedBrand = BRAND_OPTIONS.some((b) => b.value === matchedBrand) ? matchedBrand : 'other';
       setBrand(resolvedBrand);
 
-      if (data.engineCapacityCc) {
-        setBikeClass(getBikeClassForCC(data.engineCapacityCc));
+      // No EngineCapacityCc from this lookup (MotHistoryDetails doesn't
+      // carry it) - infer engine size by matching the returned Model
+      // against this brand's own curated model list instead. Left
+      // unchanged if nothing matches, same as picking an unrecognised
+      // bike manually today.
+      const candidates = getModelsForBrand(resolvedBrand);
+      const matchedModel = candidates.find(
+        (m) => m.model.toLowerCase().includes(data.model.toLowerCase()) || data.model.toLowerCase().includes(m.model.toLowerCase())
+      );
+      if (matchedModel) {
+        setBikeClass(getBikeClassForCC(matchedModel.engineCC));
       }
 
+      setMotTests(data.motTests);
       setLookupNote(
-        `Found: ${data.make} ${data.model} (${data.year})${data.plateInRetention ? " - this plate isn't currently attached to a vehicle; showing the last one it was on" : ''}. Fields below updated - check them before checking your quote.`
+        `Found: ${data.make} ${data.model}${data.plateInRetention ? " - this plate isn't currently attached to a vehicle; showing the last one it was on" : ''}. Fields below updated - check them before checking your quote.`
       );
     } catch {
       setLookupError("Couldn't reach the lookup service. Pick your bike manually below instead.");
@@ -143,7 +142,10 @@ export function QuoteForm({ signedIn, initialBrand, initialBikeClass }: Props) {
       const response = await fetch('/api/verdict', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ bikeClass, brand, region, jobType, quotedPrice: price }),
+        body: JSON.stringify({
+          bikeClass, brand, region, jobType, quotedPrice: price,
+          motTests: motTests.length > 0 ? motTests.map(({ testDate, passed, notes }) => ({ testDate, passed, notes })) : undefined,
+        }),
       });
       const data: ApiResponse = await response.json();
 

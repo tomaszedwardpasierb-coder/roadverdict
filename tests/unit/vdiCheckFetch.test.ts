@@ -21,8 +21,14 @@ function vdgSuccess(overrides: Record<string, unknown> = {}) {
             },
             VehicleHistory: {
               ColourDetails: { CurrentColour: "SILVER", NumberOfColourChanges: 0 },
-              KeeperChangeList: [],
+              KeeperChangeList: [{ KeeperStartDate: "2025-11-12T00:00:00Z", PreviousKeeperDisposalDate: null }],
               PlateChangeList: [{ CurrentVrm: "AS3527", PreviousVrm: "PN74XSA" }],
+              V5cCertificateList: [{ IssueDate: "2024-09-07T00:00:00Z" }, { IssueDate: "2025-11-12T00:00:00Z" }],
+            },
+          },
+          ModelDetails: {
+            AdditionalInformation: {
+              VehicleWarrantyInformation: { ManufacturerWarrantyMiles: 37282, ManufacturerWarrantyMonths: 24 },
             },
           },
           PncDetails: { IsStolen: false },
@@ -32,6 +38,7 @@ function vdgSuccess(overrides: Record<string, unknown> = {}) {
               { AgreementDate: "2024-09-02T00:00:00", AgreementType: "HIRE PURCHASE", FinanceCompany: "LEXUS FINANCIAL SERVICES" },
             ],
           },
+          MileageCheckDetails: { CalculatedAverageAnnualMileage: 1120, AverageMileageForAge: 16000, MileageAnomalyDetected: false },
           ...overrides,
         },
       }),
@@ -70,12 +77,19 @@ describe("fetchVdiCheckFromVdg", () => {
       writeOffRecordCount: 0,
       hasOutstandingFinance: true,
       financeRecords: [{ agreementDate: "2024-09-02T00:00:00", agreementType: "HIRE PURCHASE", financeCompany: "LEXUS FINANCIAL SERVICES" }],
-      keeperChangeCount: 0,
+      keeperChanges: [{ keeperStartDate: "2025-11-12T00:00:00Z", previousKeeperDisposalDate: null }],
+      keeperChangeCount: 1,
       plateChangeCount: 1,
       colourChangeCount: 0,
       currentColour: "SILVER",
       vedFirstYearTwelveMonths: 405,
       vedStandardTwelveMonths: 200,
+      v5cReissueCount: 2,
+      calculatedAverageAnnualMileage: 1120,
+      averageMileageForAge: 16000,
+      mileageAnomalyDetected: false,
+      manufacturerWarrantyMiles: 37282,
+      manufacturerWarrantyMonths: 24,
     });
   });
 
@@ -106,12 +120,19 @@ describe("fetchVdiCheckFromVdg", () => {
       writeOffRecordCount: 0,
       hasOutstandingFinance: false,
       financeRecords: [],
+      keeperChanges: [],
       keeperChangeCount: 0,
       plateChangeCount: 0,
       colourChangeCount: 0,
       currentColour: null,
       vedFirstYearTwelveMonths: null,
       vedStandardTwelveMonths: null,
+      v5cReissueCount: 0,
+      calculatedAverageAnnualMileage: null,
+      averageMileageForAge: null,
+      mileageAnomalyDetected: false,
+      manufacturerWarrantyMiles: null,
+      manufacturerWarrantyMonths: null,
     });
   });
 

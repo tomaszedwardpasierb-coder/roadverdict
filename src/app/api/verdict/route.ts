@@ -54,7 +54,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const { bikeClass, jobType, brand, region, quotedPrice } = parsed.data;
+  const { bikeClass, jobType, brand, region, quotedPrice, motTests } = parsed.data;
   const adjusted = getAdjustedBenchmark(jobType, bikeClass, brand, region);
   const verdict = computeVerdict(quotedPrice, adjusted);
 
@@ -84,6 +84,7 @@ export async function POST(request: NextRequest) {
           sourceConfidence: adjusted.source.confidence,
           sourceNote: adjusted.source.note,
           communityStats,
+          motTests,
         },
         geminiKey
       )

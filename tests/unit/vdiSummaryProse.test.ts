@@ -19,12 +19,19 @@ const cleanVdiCheck: VdiCheckResult = {
   writeOffRecordCount: 0,
   hasOutstandingFinance: false,
   financeRecords: [],
+  keeperChanges: [],
   keeperChangeCount: 1,
   plateChangeCount: 0,
   colourChangeCount: 0,
   currentColour: "SILVER",
   vedFirstYearTwelveMonths: null,
   vedStandardTwelveMonths: 200,
+  v5cReissueCount: 0,
+  calculatedAverageAnnualMileage: null,
+  averageMileageForAge: null,
+  mileageAnomalyDetected: false,
+  manufacturerWarrantyMiles: null,
+  manufacturerWarrantyMonths: null,
 };
 
 const validResult = { keyFindings: ["No stolen marker, write-off record, or outstanding finance found."], summary: "This vehicle's independent record is clean." };
@@ -110,7 +117,7 @@ describe("generateVdiSummary", () => {
     );
     const prompt = JSON.parse(fetchMock.mock.calls[0][1].body).contents[0].parts[0].text;
     expect(prompt).toContain("WRITE-OFF RECORD: yes, 1 record(s) on file");
-    expect(prompt).toContain("OUTSTANDING FINANCE: yes, 1 agreement(s) on file (e.g. Example Finance)");
+    expect(prompt).toContain("OUTSTANDING FINANCE: yes, 1 agreement(s) on file (e.g. Example Finance, HIRE PURCHASE), agreement dated 1 Jan 2024");
   });
 
   it("flags a keeper-change discrepancy between the independent and logged figures in the facts block", async () => {
@@ -173,5 +180,65 @@ describe("generateVdiSummary", () => {
     await generateVdiSummary({ ...baseInput, year: null }, "key");
     const prompt = JSON.parse(fetchMock.mock.calls[0][1].body).contents[0].parts[0].text;
     expect(prompt).toContain("VEHICLE: Ford Focus");
+  });
+
+  it("lists keeper-change dates, most recent first, when given", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(geminiResponse(JSON.stringify(validResult)));
+    vi.stubGlobal("fetch", fetchMock);
+    await generateVdiSummary(
+      {
+        ...baseInput,
+        vdiCheck: {
+          ...cleanVdiCheck,
+          keeperChangeCount: 3,
+          keeperChanges: [
+            { keeperStartDate: "2025-11-12T00:00:00Z", previousKeeperDisposalDate: null },
+            { keeperStartDate: "2025-12-22T00:00:00Z", previousKeeperDisposalDate: "2025-12-22T00:00:00Z" },
+            { keeperStartDate: "2026-06-03T00:00:00Z", previousKeeperDisposalDate: "2026-04-23T00:00:00Z" },
+          ],
+        },
+      },
+      "key"
+    );
+    const prompt = JSON.parse(fetchMock.mock.calls[0][1].body).contents[0].parts[0].text;
+    expect(prompt).toContain("Keeper change dates (most recent first)");
+    const idxJune = prompt.indexOf("3 Jun 2026");
+    const idxNov = prompt.indexOf("12 Nov 2025");
+    expect(idxJune).toBeGreaterThan(-1);
+    expect(idxNov).toBeGreaterThan(idxJune);
+  });
+
+  it("includes the independent mileage-vs-average-for-age comparison when given", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(geminiResponse(JSON.stringify(validResult)));
+    vi.stubGlobal("fetch", fetchMock);
+    await generateVdiSummary(
+      { ...baseInput, vdiCheck: { ...cleanVdiCheck, calculatedAverageAnnualMileage: 1120, averageMileageForAge: 16000, mileageAnomalyDetected: false } },
+      "key"
+    );
+    const prompt = JSON.parse(fetchMock.mock.calls[0][1].body).contents[0].parts[0].text;
+    expect(prompt).toContain("INDEPENDENT MILEAGE CHECK");
+    expect(prompt).toContain("1,120 miles/year");
+    expect(prompt).toContain("16,000 miles/year");
+    expect(prompt).toContain("Anomaly flagged: no");
+  });
+
+  it("includes the manufacturer warranty window when given", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(geminiResponse(JSON.stringify(validResult)));
+    vi.stubGlobal("fetch", fetchMock);
+    await generateVdiSummary(
+      { ...baseInput, vdiCheck: { ...cleanVdiCheck, manufacturerWarrantyMiles: 37282, manufacturerWarrantyMonths: 24 } },
+      "key"
+    );
+    const prompt = JSON.parse(fetchMock.mock.calls[0][1].body).contents[0].parts[0].text;
+    expect(prompt).toContain("MANUFACTURER WARRANTY: 24 months / 37,282 miles from new");
+  });
+
+  it("instructs the model to name a rapid keeper-turnover pattern explicitly, and to check finance against the current keeper's start date", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(geminiResponse(JSON.stringify(validResult)));
+    vi.stubGlobal("fetch", fetchMock);
+    await generateVdiSummary(baseInput, "key");
+    const systemPrompt = JSON.parse(fetchMock.mock.calls[0][1].body).systemInstruction.parts[0].text;
+    expect(systemPrompt).toContain("name that specific pattern explicitly");
+    expect(systemPrompt).toContain("finance appears to be currently outstanding under this ownership");
   });
 });

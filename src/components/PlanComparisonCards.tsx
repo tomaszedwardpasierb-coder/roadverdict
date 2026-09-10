@@ -71,6 +71,12 @@ export function PlanComparisonCards({ userIsPro, showFreeCta = true }: Props) {
           </>
         )}
       </div>
+
+      <p className={styles.planCtaNote}>
+        Independent Vehicle Check (stolen/write-off/finance/valuation on a shared buyer report) - £9.99 bike / £13.99
+        car, one-time. Same check inside the free Buying Guide - £9.99, pay-per-use. Neither is a Free or Pro perk -
+        available to every account, on either plan.
+      </p>
     </div>
   );
 }

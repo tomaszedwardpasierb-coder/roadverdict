@@ -14,7 +14,6 @@ import {
   slugifyMake,
 } from '@/lib/motorcycleModels';
 import type { AnnualCostBreakdown } from '@/lib/costCalculator';
-import type { VehicleTypeCheck } from '@/lib/tracker/vehicleTypeCheck';
 import { CostBreakdownResult } from './CostBreakdownResult';
 
 interface ApiResponse {
@@ -25,14 +24,24 @@ interface ApiResponse {
   error?: string;
 }
 
-interface PlateLookupResponse {
+interface TaxDetails {
+  taxStatus: string | null;
+  taxIsCurrentlyValid: boolean;
+  taxDueDate: string | null;
+  taxDaysRemaining: number | null;
+  vedStandardTwelveMonths: number | null;
+}
+
+interface CostLookupResponse {
   vrm: string;
   make: string;
   model: string;
-  year: number;
-  engineCapacityCc: number | null;
+  fuelType: string;
+  colour: string;
   plateInRetention: boolean;
-  vehicleType: VehicleTypeCheck;
+  motDueDate: string | null;
+  motTests: { testDate: string; passed: boolean; mileage: number | null; mileageTrusted: boolean; notes: string }[];
+  taxDetails: TaxDetails | null;
   error?: string;
 }
 
@@ -67,6 +76,11 @@ export function CostCalculatorForm({ signedIn, initialBrand, initialModel, initi
   const [lookupLoading, setLookupLoading] = useState(false);
   const [lookupError, setLookupError] = useState<string | null>(null);
   const [lookupNote, setLookupNote] = useState<ReactNode>(null);
+  // Silently carried through to the submit request - this tool's UI
+  // doesn't display MOT/tax detail itself, it just lets the AI advice
+  // reference real facts about this exact bike.
+  const [motTests, setMotTests] = useState<CostLookupResponse['motTests']>([]);
+  const [taxDetails, setTaxDetails] = useState<TaxDetails | null>(null);
 
   const modelsForBrand = getModelsForBrand(brand);
 
@@ -105,25 +119,10 @@ export function CostCalculatorForm({ signedIn, initialBrand, initialModel, initi
     setLookupError(null);
     setLookupNote(null);
     try {
-      const res = await fetch(`/api/tracker/plate-lookup?vrm=${encodeURIComponent(cleaned)}`);
-      const data: PlateLookupResponse = await res.json();
+      const res = await fetch(`/api/tracker/cost-calculator-lookup?vrm=${encodeURIComponent(cleaned)}`);
+      const data: CostLookupResponse = await res.json();
       if (!res.ok) {
         setLookupError(data.error ?? 'No vehicle found for that registration. Pick it manually below instead.');
-        return;
-      }
-
-      // Same gate as the "add a bike" flow in the dashboard, and the
-      // exact same wording - a definite non-motorcycle stops here
-      // entirely, before any of the fields below get auto-filled with
-      // a car's data, and a genuinely uncertain result is treated the
-      // same way rather than assumed to be a bike just because that's
-      // the more common case.
-      if (data.vehicleType === 'four-wheeled') {
-        setLookupError("Oops! Are you sure that's a bike? It looks like it has four wheels. 🏍️");
-        return;
-      }
-      if (data.vehicleType === 'unknown') {
-        setLookupError("Couldn't confirm what type of vehicle this registration belongs to. Double-check the registration number, or enter the bike's details manually below.");
         return;
       }
 
@@ -131,22 +130,23 @@ export function CostCalculatorForm({ signedIn, initialBrand, initialModel, initi
       const resolvedBrand = BRAND_OPTIONS.some((b) => b.value === matchedBrand) ? matchedBrand : 'other';
       setBrand(resolvedBrand);
 
+      // No EngineCapacityCc from this lookup (MotHistoryDetails doesn't
+      // carry it) - engine size only updates when the returned Model
+      // matches something in this brand's curated list, same as picking
+      // an unrecognised bike manually today.
       const candidates = getModelsForBrand(resolvedBrand);
       const matchedModel = candidates.find(
         (m) => m.model.toLowerCase().includes(data.model.toLowerCase()) || data.model.toLowerCase().includes(m.model.toLowerCase())
       );
       setModel(matchedModel?.model ?? '');
-
-      // The engine size drives the actual price estimate - set from
-      // the looked-up figure directly rather than only from a matched
-      // model, since a real vehicle very often won't have an exact
-      // match in the curated model list even when the brand does.
-      if (data.engineCapacityCc) {
-        setBikeClass(getBikeClassForCC(data.engineCapacityCc));
+      if (matchedModel) {
+        setBikeClass(getBikeClassForCC(matchedModel.engineCC));
       }
 
+      setMotTests(data.motTests);
+      setTaxDetails(data.taxDetails);
       setLookupNote(
-        `Found: ${data.make} ${data.model} (${data.year})${data.plateInRetention ? " - this plate isn't currently attached to a vehicle; showing the last one it was on" : ''}. Fields below updated - check them before working it out.`
+        `Found: ${data.make} ${data.model}${data.plateInRetention ? " - this plate isn't currently attached to a vehicle; showing the last one it was on" : ''}. Fields below updated - check them before working it out.`
       );
     } catch {
       setLookupError("Couldn't reach the lookup service. Pick your bike manually below instead.");
@@ -171,7 +171,11 @@ export function CostCalculatorForm({ signedIn, initialBrand, initialModel, initi
       const response = await fetch('/api/cost-calculator', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ bikeClass, brand, region, annualMileage: mileage }),
+        body: JSON.stringify({
+          bikeClass, brand, region, annualMileage: mileage,
+          motTests: motTests.length > 0 ? motTests.map(({ testDate, passed, notes }) => ({ testDate, passed, notes })) : undefined,
+          taxStatus: taxDetails ?? undefined,
+        }),
       });
       const data: ApiResponse = await response.json();
 

@@ -17,15 +17,14 @@
 // newer file, not a change to the bike one.
 import { logGeminiUsage } from "@/lib/tracker/geminiUsageLog";
 import type { VdiCheckResult, ValuationResult } from "@/lib/tracker/vdiUnlock";
+import type { VehicleTaxDetails } from "@/lib/tracker/vehicleTaxFetch";
 
 const GEMINI_MODEL = "gemini-3.7-flash";
 
 export interface CarBuyingGuideBriefingInput {
   make: string;
   model: string;
-  year: number;
   fuelType: string;
-  engineCapacityCc: number | null;
   // Oldest first - lets the model read the history as a timeline and
   // notice a pattern repeating across tests, not just the most recent one.
   motTests: {
@@ -34,11 +33,17 @@ export interface CarBuyingGuideBriefingInput {
     mileage: number | null;
     notes: string;
   }[];
-  // Only present when the buyer opted into (or is Pro and gets
-  // automatically) the paid VDI/valuation add-on - see
-  // buying-guide-lookup/route.ts. Absent for the plain, free lookup.
+  // Only present once the buyer has paid for the standalone VDI check
+  // (see vdiPurchase.ts) and it's been fetched - absent for the plain,
+  // free lookup.
   vdiCheck?: VdiCheckResult;
+  // Free but rate-limited (see valuationCheckUsage.ts), fully decoupled
+  // from vdiCheck's paid-purchase gate above - present whenever the
+  // account was within its valuation allowance for this lookup.
   valuation?: ValuationResult;
+  // Free, always attempted alongside MOT history - unlike vdiCheck/
+  // valuation above, this isn't rate-limited or paid at all.
+  taxDetails?: VehicleTaxDetails;
 }
 
 export interface CarBuyingGuideBriefingResult {
@@ -53,8 +58,7 @@ function fmtDate(d: string): string {
 
 function buildFactsBlock(input: CarBuyingGuideBriefingInput): string {
   const lines: string[] = [];
-  lines.push(`CAR: ${input.year} ${input.make} ${input.model}`);
-  if (input.engineCapacityCc) lines.push(`ENGINE: ${input.engineCapacityCc}cc`);
+  lines.push(`CAR: ${input.make} ${input.model}`);
   lines.push(`FUEL TYPE: ${input.fuelType}`);
   lines.push("");
 
@@ -83,6 +87,13 @@ function buildFactsBlock(input: CarBuyingGuideBriefingInput): string {
     lines.push(`VALUATION (independent): private average £${input.valuation.privateAverage.toLocaleString()}`);
   }
 
+  if (input.taxDetails) {
+    lines.push("");
+    lines.push(
+      `TAX STATUS (DVLA-verified): ${input.taxDetails.taxStatus ?? "unknown"}${input.taxDetails.taxIsCurrentlyValid ? "" : " - NOT currently valid"}`
+    );
+  }
+
   return lines.join("\n");
 }
 
@@ -96,6 +107,7 @@ Strict rules:
 - If an advisory or fail reason keeps reappearing across multiple tests without being fixed, say so plainly - that is a real pattern worth flagging clearly, not softening.
 - If the FUEL TYPE given below indicates this car is electric, hybrid, or plug-in hybrid, include specific due-diligence points for that in "modelNotes": battery state-of-health/degradation, whether a charging cable is included with the sale, and this manufacturer's battery warranty terms for this model. A petrol or diesel car needs none of this - only raise it when the fuel type actually calls for it.
 - If a VDI CHECK block is given below, a stolen marker, write-off record, or outstanding finance is the single most important thing here - lead with it as the first motFlag, whether or not the MOT history itself shows anything.
+- If a TAX STATUS fact is given below and shows the car is SORN or not currently valid, mention it plainly as something to resolve before the car can be used on the road - a practical logistics point, not a comment on condition.
 - Do not tell the reader whether to buy the car. Give them specific things to check in person, not a purchase recommendation.
 - Plain and direct, the way a mechanic actually talks to a mate - not a generic listicle, not hyped.
 

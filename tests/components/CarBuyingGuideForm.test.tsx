@@ -1,8 +1,10 @@
 // Place at: tests/components/CarBuyingGuideForm.test.tsx
-// Mirrors BuyingGuideForm.test.tsx's own plate-lookup coverage, now that
-// CarBuyingGuideForm.tsx has a full plate-search path too - no "Model"
-// field to assert against here (the car form only has brand/size/age),
-// so a matched lookup is checked against "Make" and "Car size" instead.
+// Mirrors BuyingGuideForm.test.tsx's own plate-lookup coverage - no
+// "Model" field to assert against here (the car form only has
+// brand/size/age), so a matched lookup is checked against "Make" only;
+// car size can no longer be auto-filled at all (CAR_MODELS carries no
+// engine-size data, and this lookup has no EngineCapacityCc either), so
+// it always stays at whatever the buyer picks manually.
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -11,6 +13,7 @@ import { CarBuyingGuideForm } from "@/components/CarBuyingGuideForm";
 describe("CarBuyingGuideForm", () => {
   beforeEach(() => {
     vi.stubGlobal("fetch", vi.fn());
+    window.history.pushState({}, "", "/cars/buying-guide");
   });
 
   afterEach(() => {
@@ -37,19 +40,16 @@ describe("CarBuyingGuideForm", () => {
     expect(fetch).not.toHaveBeenCalled();
   });
 
-  it("signed in: a matched plate renders MOT history, the AI briefing, and updates make/car size", async () => {
+  it("signed in: a matched plate renders MOT history and the AI briefing, and updates make (car size stays manual)", async () => {
     (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
       ok: true,
       json: async () => ({
         vrm: "AB12CDE",
         make: "Ford",
         model: "Focus",
-        year: 2021,
         fuelType: "Petrol",
         colour: "Blue",
-        engineCapacityCc: 1000,
         plateInRetention: false,
-        vehicleType: "four-wheeled",
         motDueDate: "2026-06-01",
         motTests: [
           { testDate: "2025-06-01", passed: true, mileage: 24200, mileageTrusted: true, notes: "" },
@@ -60,6 +60,9 @@ describe("CarBuyingGuideForm", () => {
           modelNotes: ["Known for a dual-mass flywheel weak point on this generation"],
           summary: "Overall a solid, common family hatch with one past MOT fail worth asking about.",
         },
+        vdiCheck: null,
+        valuation: null,
+        taxDetails: null,
       }),
     });
 
@@ -69,39 +72,12 @@ describe("CarBuyingGuideForm", () => {
     await user.click(screen.getByRole("button", { name: "Look up" }));
 
     await waitFor(() => expect(screen.getByLabelText("Make")).toHaveValue("ford"));
-    expect(screen.getByLabelText("Car size")).toHaveValue("small");
+    expect(screen.getByLabelText("Car size")).toHaveValue("medium");
     expect(screen.getByText(/MOT due/)).toBeInTheDocument();
     expect(screen.getByText("Nearside front tyre worn")).toBeInTheDocument();
     expect(screen.getByText("Failed its 2024 MOT on tyre wear")).toBeInTheDocument();
     expect(screen.getByText("Known for a dual-mass flywheel weak point on this generation")).toBeInTheDocument();
     expect(screen.getByText(/solid, common family hatch/)).toBeInTheDocument();
-  });
-
-  it("an electric fuel type resolves car size to 'electric' regardless of engine capacity", async () => {
-    (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
-      ok: true,
-      json: async () => ({
-        vrm: "AB12CDE",
-        make: "Tesla",
-        model: "Model 3",
-        year: 2022,
-        fuelType: "Electricity",
-        colour: "White",
-        engineCapacityCc: null,
-        plateInRetention: false,
-        vehicleType: "four-wheeled",
-        motDueDate: null,
-        motTests: [],
-        briefing: null,
-      }),
-    });
-
-    const user = userEvent.setup();
-    render(<CarBuyingGuideForm signedIn />);
-    await user.type(screen.getByLabelText("Search by registration (optional)"), "AB12CDE");
-    await user.click(screen.getByRole("button", { name: "Look up" }));
-
-    await waitFor(() => expect(screen.getByLabelText("Car size")).toHaveValue("electric"));
   });
 
   it("a lookup result with no MOT test history at all says so plainly, without a briefing section", async () => {
@@ -111,15 +87,15 @@ describe("CarBuyingGuideForm", () => {
         vrm: "AB12CDE",
         make: "Ford",
         model: "Focus",
-        year: 2025,
         fuelType: "Petrol",
         colour: "Blue",
-        engineCapacityCc: 1000,
         plateInRetention: false,
-        vehicleType: "four-wheeled",
         motDueDate: null,
         motTests: [],
         briefing: null,
+        vdiCheck: null,
+        valuation: null,
+        taxDetails: null,
       }),
     });
 
@@ -133,22 +109,26 @@ describe("CarBuyingGuideForm", () => {
     expect(screen.queryByText(/AI-generated pre-purchase briefing/)).not.toBeInTheDocument();
   });
 
-  it("a definite motorcycle is refused with the not-a-car message and never shows any MOT data", async () => {
+  // The explicit "that's a bike, not a car" rejection no longer exists -
+  // MotHistoryDetails has no body-type field to classify vehicle kind
+  // from at all. A motorcycle's plate now just resolves to whatever
+  // brand match (or 'other') its make happens to hit.
+  it("a motorcycle's plate resolves quietly to the 'other' brand rather than being rejected", async () => {
     (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
       ok: true,
       json: async () => ({
         vrm: "AB12CDE",
-        make: "Honda",
-        model: "CB125R",
-        year: 2020,
+        make: "Ducati",
+        model: "Monster",
         fuelType: "Petrol",
         colour: "Black",
-        engineCapacityCc: 125,
         plateInRetention: false,
-        vehicleType: "motorcycle",
         motDueDate: "2026-01-01",
         motTests: [],
         briefing: null,
+        vdiCheck: null,
+        valuation: null,
+        taxDetails: null,
       }),
     });
 
@@ -157,35 +137,9 @@ describe("CarBuyingGuideForm", () => {
     await user.type(screen.getByLabelText("Search by registration (optional)"), "AB12CDE");
     await user.click(screen.getByRole("button", { name: "Look up" }));
 
-    expect(await screen.findByRole("alert")).toHaveTextContent(/two wheels/i);
-    expect(screen.queryByText(/MOT due/)).not.toBeInTheDocument();
-  });
-
-  it("an unknown vehicle type is refused with a distinct message, not treated as a car", async () => {
-    (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
-      ok: true,
-      json: async () => ({
-        vrm: "AB12CDE",
-        make: "",
-        model: "",
-        year: 0,
-        fuelType: "",
-        colour: "",
-        engineCapacityCc: null,
-        plateInRetention: false,
-        vehicleType: "unknown",
-        motDueDate: null,
-        motTests: [],
-        briefing: null,
-      }),
-    });
-
-    const user = userEvent.setup();
-    render(<CarBuyingGuideForm signedIn />);
-    await user.type(screen.getByLabelText("Search by registration (optional)"), "AB12CDE");
-    await user.click(screen.getByRole("button", { name: "Look up" }));
-
-    expect(await screen.findByRole("alert")).toHaveTextContent(/couldn't confirm what type of vehicle/i);
+    expect(await screen.findByText(/MOT due/)).toBeInTheDocument();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Make")).toHaveValue("other");
   });
 
   it("submits the real form state to /api/cars/buying-guide and renders the returned checklist", async () => {
@@ -243,72 +197,68 @@ describe("CarBuyingGuideForm", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent(/could not reach roadverdict/i);
   });
 
-  // ── VDI + valuation add-on ───────────────────────────────────────────
+  // ── Standalone, pay-per-use VDI check + free, rate-limited valuation ──
 
-  it("shows the VDI checkbox, unchecked by default, for a non-Pro account and doesn't request it unless ticked", async () => {
+  it("shows a Buy Independent Vehicle Check button once a lookup succeeds without a vdiCheck yet", async () => {
     (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
       ok: true,
       json: async () => ({
-        vrm: "AB12CDE", make: "Ford", model: "Focus", year: 2021, fuelType: "Petrol", colour: "Blue",
-        engineCapacityCc: 1000, plateInRetention: false, vehicleType: "four-wheeled", motDueDate: null, motTests: [],
-        briefing: null, vdiCheck: null, valuation: null,
+        vrm: "AB12CDE", make: "Ford", model: "Focus", fuelType: "Petrol", colour: "Blue",
+        plateInRetention: false, motDueDate: null, motTests: [], briefing: null,
+        vdiCheck: null, valuation: { privateAverage: 12000, privateClean: null, dealerForecourt: null, partExchange: null }, taxDetails: null,
       }),
     });
     const user = userEvent.setup();
     render(<CarBuyingGuideForm signedIn />);
-    const checkbox = screen.getByRole("checkbox");
-    expect(checkbox).not.toBeChecked();
-
     await user.type(screen.getByLabelText("Search by registration (optional)"), "AB12CDE");
     await user.click(screen.getByRole("button", { name: "Look up" }));
 
-    expect(fetch).toHaveBeenCalledWith(expect.not.stringContaining("includeVdi"));
+    expect(await screen.findByRole("button", { name: /Buy Independent Vehicle Check - £9.99/ })).toBeInTheDocument();
   });
 
-  it("requests includeVdi=1 once the checkbox is ticked", async () => {
-    (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
-      ok: true,
-      json: async () => ({
-        vrm: "AB12CDE", make: "Ford", model: "Focus", year: 2021, fuelType: "Petrol", colour: "Blue",
-        engineCapacityCc: 1000, plateInRetention: false, vehicleType: "four-wheeled", motDueDate: null, motTests: [],
-        briefing: null, vdiCheck: null, valuation: null,
-      }),
+  it("clicking Buy calls the checkout route with the current vrm and redirects to the returned url", async () => {
+    const fetchMock = fetch as ReturnType<typeof vi.fn>;
+    fetchMock.mockImplementation((url: string) => {
+      if (url.startsWith("/api/cars/buying-guide-lookup")) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            vrm: "AB12CDE", make: "Ford", model: "Focus", fuelType: "Petrol", colour: "Blue",
+            plateInRetention: false, motDueDate: null, motTests: [], briefing: null,
+            vdiCheck: null, valuation: null, taxDetails: null,
+          }),
+        });
+      }
+      return Promise.resolve({ ok: true, json: async () => ({ url: "https://checkout.stripe.com/test-session" }) });
     });
+    const originalLocation = window.location;
+    // @ts-expect-error - deliberately replacing location to observe the redirect without jsdom navigating for real
+    delete window.location;
+    // @ts-expect-error - see above
+    window.location = { ...originalLocation, href: "" };
+
     const user = userEvent.setup();
     render(<CarBuyingGuideForm signedIn />);
-    await user.click(screen.getByRole("checkbox"));
     await user.type(screen.getByLabelText("Search by registration (optional)"), "AB12CDE");
     await user.click(screen.getByRole("button", { name: "Look up" }));
+    await user.click(await screen.findByRole("button", { name: /Buy Independent Vehicle Check/ }));
 
-    expect(fetch).toHaveBeenCalledWith(expect.stringContaining("includeVdi=1"));
-  });
+    await waitFor(() => expect(window.location.href).toBe("https://checkout.stripe.com/test-session"));
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/cars/buying-guide-vdi-checkout",
+      expect.objectContaining({ method: "POST", body: JSON.stringify({ vrm: "AB12CDE" }) })
+    );
 
-  it("hides the checkbox entirely for a Pro account and always requests includeVdi=1", async () => {
-    (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
-      ok: true,
-      json: async () => ({
-        vrm: "AB12CDE", make: "Ford", model: "Focus", year: 2021, fuelType: "Petrol", colour: "Blue",
-        engineCapacityCc: 1000, plateInRetention: false, vehicleType: "four-wheeled", motDueDate: null, motTests: [],
-        briefing: null, vdiCheck: null, valuation: null,
-      }),
-    });
-    const user = userEvent.setup();
-    render(<CarBuyingGuideForm signedIn isPro />);
-    expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
-
-    await user.type(screen.getByLabelText("Search by registration (optional)"), "AB12CDE");
-    await user.click(screen.getByRole("button", { name: "Look up" }));
-
-    expect(fetch).toHaveBeenCalledWith(expect.stringContaining("includeVdi=1"));
+    // @ts-expect-error - restoring the real Location object after the stub above
+    window.location = originalLocation;
   });
 
   it("renders the independent VDI check facts and valuation figures once returned", async () => {
     (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
       ok: true,
       json: async () => ({
-        vrm: "AB12CDE", make: "Ford", model: "Focus", year: 2021, fuelType: "Petrol", colour: "Blue",
-        engineCapacityCc: 1000, plateInRetention: false, vehicleType: "four-wheeled", motDueDate: null, motTests: [],
-        briefing: null,
+        vrm: "AB12CDE", make: "Ford", model: "Focus", fuelType: "Petrol", colour: "Blue",
+        plateInRetention: false, motDueDate: null, motTests: [], briefing: null, taxDetails: null,
         vdiCheck: {
           isStolen: false, hasWriteOffRecord: true, writeOffRecordCount: 1, hasOutstandingFinance: false,
           financeRecords: [], keeperChangeCount: 2, plateChangeCount: 0, colourChangeCount: 0, currentColour: null,
@@ -318,31 +268,71 @@ describe("CarBuyingGuideForm", () => {
     });
     const user = userEvent.setup();
     render(<CarBuyingGuideForm signedIn />);
-    await user.click(screen.getByRole("checkbox"));
     await user.type(screen.getByLabelText("Search by registration (optional)"), "AB12CDE");
     await user.click(screen.getByRole("button", { name: "Look up" }));
 
     expect(await screen.findByText(/1 write-off record\(s\) on file/)).toBeInTheDocument();
     expect(screen.getByText("Private average: £23,994")).toBeInTheDocument();
     expect(screen.getByText("Dealer forecourt: £27,161")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Buy Independent Vehicle Check/ })).not.toBeInTheDocument();
   });
 
-  it("shows the cooldown message and disables the checkbox when the free account is blocked", async () => {
+  it("shows the valuation cooldown message when the free/Pro allowance is used up, independent of the VDI purchase state", async () => {
     (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
       ok: true,
       json: async () => ({
-        vrm: "AB12CDE", make: "Ford", model: "Focus", year: 2021, fuelType: "Petrol", colour: "Blue",
-        engineCapacityCc: 1000, plateInRetention: false, vehicleType: "four-wheeled", motDueDate: null, motTests: [],
-        briefing: null, vdiCheck: null, valuation: null, vdiCheckBlockedReason: "cooldown", vdiCheckAvailableAt: "2026-02-01T00:00:00.000Z",
+        vrm: "AB12CDE", make: "Ford", model: "Focus", fuelType: "Petrol", colour: "Blue",
+        plateInRetention: false, motDueDate: null, motTests: [], briefing: null, taxDetails: null,
+        vdiCheck: null, valuation: null, valuationBlockedReason: "cooldown", valuationAvailableAt: "2026-02-01T00:00:00.000Z",
       }),
     });
     const user = userEvent.setup();
     render(<CarBuyingGuideForm signedIn />);
-    await user.click(screen.getByRole("checkbox"));
     await user.type(screen.getByLabelText("Search by registration (optional)"), "AB12CDE");
     await user.click(screen.getByRole("button", { name: "Look up" }));
 
-    expect(await screen.findByText(/next free VDI check is available from/)).toBeInTheDocument();
-    expect(screen.getByRole("checkbox")).toBeDisabled();
+    expect(await screen.findByText(/next one is available from/)).toBeInTheDocument();
+  });
+
+  it("shows the already-used message and a fresh Buy button when a purchase has already been consumed", async () => {
+    (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        vrm: "AB12CDE", make: "Ford", model: "Focus", fuelType: "Petrol", colour: "Blue",
+        plateInRetention: false, motDueDate: null, motTests: [], briefing: null, taxDetails: null,
+        vdiCheck: null, vdiCheckBlockedReason: "already_used", valuation: null,
+      }),
+    });
+    const user = userEvent.setup();
+    render(<CarBuyingGuideForm signedIn />);
+    await user.type(screen.getByLabelText("Search by registration (optional)"), "AB12CDE");
+    await user.click(screen.getByRole("button", { name: "Look up" }));
+
+    expect(await screen.findByText(/already been used/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Buy Independent Vehicle Check/ })).toBeInTheDocument();
+  });
+
+  it("on load, a Stripe return with vdiPurchaseId and vrm in the URL auto-fills the plate and runs the paid lookup", async () => {
+    window.history.pushState({}, "", "/cars/buying-guide?vdiPurchaseId=purchase123&vrm=AB12CDE&session_id=cs_test_123");
+    (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        vrm: "AB12CDE", make: "Ford", model: "Focus", fuelType: "Petrol", colour: "Blue",
+        plateInRetention: false, motDueDate: null, motTests: [], briefing: null, taxDetails: null, valuation: null,
+        vdiCheck: {
+          isStolen: false, hasWriteOffRecord: false, writeOffRecordCount: 0, hasOutstandingFinance: false,
+          financeRecords: [], keeperChangeCount: 1, plateChangeCount: 0, colourChangeCount: 0, currentColour: null,
+        },
+      }),
+    });
+
+    render(<CarBuyingGuideForm signedIn />);
+
+    await waitFor(() => expect(screen.getByLabelText("Search by registration (optional)")).toHaveValue("AB12CDE"));
+    expect(await screen.findByText("1 keeper change(s) on record")).toBeInTheDocument();
+    const calledUrl = (fetch as ReturnType<typeof vi.fn>).mock.calls[0][0] as string;
+    expect(calledUrl).toContain("vdiPurchaseId=purchase123");
+    expect(calledUrl).toContain("session_id=cs_test_123");
+    expect(window.location.search).toBe("");
   });
 });

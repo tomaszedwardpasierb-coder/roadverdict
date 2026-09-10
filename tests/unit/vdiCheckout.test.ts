@@ -42,7 +42,7 @@ describe("createVdiCheckoutSession", () => {
     expect(mocks.create).not.toHaveBeenCalled();
   });
 
-  it("creates a bike checkout session at £7.99 with the right metadata and success/cancel URLs", async () => {
+  it("creates a bike checkout session at £9.99 with the right metadata and success/cancel URLs", async () => {
     mocks.resolveShareToken.mockResolvedValue({ email: "a@example.com", bikeId: "b1" });
     mocks.create.mockResolvedValue({ url: "https://checkout.stripe.com/session123" });
 
@@ -53,13 +53,13 @@ describe("createVdiCheckoutSession", () => {
     expect(args.mode).toBe("payment");
     expect(args.metadata).toEqual({ token: "tok_abc", vehicleKind: "bike" });
     expect(args.client_reference_id).toBe("tok_abc");
-    expect(args.line_items[0].price_data.unit_amount).toBe(799);
+    expect(args.line_items[0].price_data.unit_amount).toBe(999);
     expect(args.line_items[0].price_data.currency).toBe("gbp");
     expect(args.success_url).toBe("https://roadverdict.co.uk/report/tok_abc/detailed?session_id={CHECKOUT_SESSION_ID}");
     expect(args.cancel_url).toBe("https://roadverdict.co.uk/report/tok_abc/detailed");
   });
 
-  it("creates a car checkout session at £9.99 pointing at the car report path", async () => {
+  it("creates a car checkout session at £13.99 pointing at the car report path", async () => {
     mocks.resolveCarShareToken.mockResolvedValue({ email: "a@example.com", carId: "c1" });
     mocks.create.mockResolvedValue({ url: "https://checkout.stripe.com/session456" });
 
@@ -67,7 +67,7 @@ describe("createVdiCheckoutSession", () => {
 
     expect(result).toEqual({ ok: true, url: "https://checkout.stripe.com/session456" });
     const args = mocks.create.mock.calls[0][0];
-    expect(args.line_items[0].price_data.unit_amount).toBe(999);
+    expect(args.line_items[0].price_data.unit_amount).toBe(1399);
     expect(args.success_url).toBe("https://roadverdict.co.uk/car-report/tok_xyz/detailed?session_id={CHECKOUT_SESSION_ID}");
   });
 

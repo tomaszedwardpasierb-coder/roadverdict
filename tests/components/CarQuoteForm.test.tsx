@@ -96,17 +96,18 @@ describe("CarQuoteForm", () => {
     expect(fetch).not.toHaveBeenCalled();
   });
 
-  it("signed in: a found car plate updates the brand and car-size fields", async () => {
+  it("signed in: a found car plate updates the brand field (car size can't auto-fill from this lookup)", async () => {
     (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
       ok: true,
       json: async () => ({
         vrm: "AB12CDE",
         make: "Ford",
         model: "Focus",
-        year: 2020,
-        engineCapacityCc: 1600,
+        fuelType: "Petrol",
+        colour: "Blue",
         plateInRetention: false,
-        vehicleType: "four-wheeled",
+        motDueDate: "2026-01-01",
+        motTests: [],
       }),
     });
 
@@ -116,21 +117,28 @@ describe("CarQuoteForm", () => {
     await user.click(screen.getByRole("button", { name: "Look up" }));
 
     await waitFor(() => expect(screen.getByLabelText("Make")).toHaveValue("ford"));
-    expect(screen.getByLabelText("Car size")).toHaveValue("medium"); // 1600cc -> 1.6L -> medium
-    expect(screen.getByText(/Found: Ford Focus \(2020\)/)).toBeInTheDocument();
+    // Left on its default - MotHistoryDetails has no EngineCapacityCc,
+    // and CAR_MODELS deliberately carries no engine-size data either.
+    expect(screen.getByLabelText("Car size")).toHaveValue("medium");
+    expect(screen.getByText(/Found: Ford Focus/)).toBeInTheDocument();
   });
 
-  it("signed in: a motorcycle result is refused with the specific not-a-car message, fields left untouched", async () => {
+  // The explicit "that's a motorcycle, not a car" rejection no longer
+  // exists - MotHistoryDetails has no body-type field to classify
+  // vehicle kind from. A mismatched vehicle just resolves to "other"
+  // brand rather than being rejected outright.
+  it("signed in: a motorcycle's plate (no matching car brand) resolves to 'other' rather than being rejected", async () => {
     (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
       ok: true,
       json: async () => ({
         vrm: "AB12CDE",
         make: "Yamaha",
         model: "MT-07",
-        year: 2022,
-        engineCapacityCc: 689,
+        fuelType: "Petrol",
+        colour: "Blue",
         plateInRetention: false,
-        vehicleType: "motorcycle",
+        motDueDate: "2026-06-01",
+        motTests: [],
       }),
     });
 
@@ -139,7 +147,7 @@ describe("CarQuoteForm", () => {
     await user.type(screen.getByLabelText("Search by registration (optional)"), "AB12CDE");
     await user.click(screen.getByRole("button", { name: "Look up" }));
 
-    expect(await screen.findByRole("alert")).toHaveTextContent(/motorcycle/i);
-    expect(screen.getByLabelText("Make")).toHaveValue("abarth"); // untouched default
+    await waitFor(() => expect(screen.getByLabelText("Make")).toHaveValue("other"));
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 });

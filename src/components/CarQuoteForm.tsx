@@ -12,7 +12,6 @@ import {
   type CarRegion,
 } from '@/lib/carPriceData';
 import type { Verdict } from '@/lib/verdict';
-import type { VehicleTypeCheck } from '@/lib/tracker/vehicleTypeCheck';
 import { CarVerdictResult } from './CarVerdictResult';
 
 interface ApiResponse {
@@ -22,29 +21,25 @@ interface ApiResponse {
   brandLabel: string;
   regionLabel: string;
   communityStats: { sampleSize: number; low: number; high: number } | null;
+  advice: { explanation: string; questionsToAsk: string[] } | null;
   error?: string;
 }
 
-interface PlateLookupResponse {
+interface QuoteLookupResponse {
   vrm: string;
   make: string;
   model: string;
-  year: number;
-  engineCapacityCc: number | null;
+  fuelType: string;
+  colour: string;
   plateInRetention: boolean;
-  vehicleType: VehicleTypeCheck;
+  motDueDate: string | null;
+  motTests: { testDate: string; passed: boolean; mileage: number | null; mileageTrusted: boolean; notes: string }[];
   error?: string;
 }
 
 const CAR_CLASSES = Object.keys(CAR_SIZE_CLASS_LABELS) as CarBenchmarkClass[];
 const JOB_TYPES = Object.keys(CAR_JOB_LABELS_BENCHMARKED) as CarJobType[];
 const REGIONS = Object.keys(CAR_REGION_LABELS) as CarRegion[];
-
-function classFromEngineLitres(engineLitres: number): CarBenchmarkClass {
-  if (engineLitres <= 1.2) return 'small';
-  if (engineLitres <= 2.0) return 'medium';
-  return 'large';
-}
 
 interface Props {
   signedIn: boolean;
@@ -66,6 +61,10 @@ export function CarQuoteForm({ signedIn, initialBrand, initialCarClass }: Props)
   const [lookupLoading, setLookupLoading] = useState(false);
   const [lookupError, setLookupError] = useState<string | null>(null);
   const [lookupNote, setLookupNote] = useState<ReactNode>(null);
+  // Silently carried through to the submit request - this tool's UI
+  // doesn't display MOT history itself, it just lets the AI advice
+  // reference real advisories relevant to the quoted job.
+  const [motTests, setMotTests] = useState<QuoteLookupResponse['motTests']>([]);
 
   async function handlePlateLookup() {
     if (!signedIn) {
@@ -87,22 +86,10 @@ export function CarQuoteForm({ signedIn, initialBrand, initialCarClass }: Props)
     setLookupError(null);
     setLookupNote(null);
     try {
-      const res = await fetch(`/api/tracker/plate-lookup?vrm=${encodeURIComponent(cleaned)}`);
-      const data: PlateLookupResponse = await res.json();
+      const res = await fetch(`/api/tracker/quote-lookup?vrm=${encodeURIComponent(cleaned)}`);
+      const data: QuoteLookupResponse = await res.json();
       if (!res.ok) {
         setLookupError(data.error ?? 'No vehicle found for that registration. Pick it manually below instead.');
-        return;
-      }
-
-      // The reverse of AddCarForm's own gate - a genuine motorcycle stops
-      // here entirely, before any of the fields below get auto-filled
-      // with a bike's data.
-      if (data.vehicleType === 'motorcycle') {
-        setLookupError("That looks like a motorcycle, not a car - check your quote from the motorcycle quote checker instead.");
-        return;
-      }
-      if (data.vehicleType === 'unknown') {
-        setLookupError("Couldn't confirm what type of vehicle this registration belongs to. Double-check the registration number, or enter the car's details manually below.");
         return;
       }
 
@@ -110,12 +97,14 @@ export function CarQuoteForm({ signedIn, initialBrand, initialCarClass }: Props)
       const resolvedBrand = CAR_BRAND_OPTIONS.some((b) => b.value === matchedBrand) ? matchedBrand : 'other';
       setBrand(resolvedBrand);
 
-      if (data.engineCapacityCc) {
-        setCarClass(classFromEngineLitres(data.engineCapacityCc / 1000));
-      }
-
+      // Car size can no longer be auto-filled from this lookup -
+      // CAR_MODELS deliberately carries no engine-size data (see its own
+      // header comment), and this lookup has no EngineCapacityCc either.
+      // Left on whatever's already selected, same as an unrecognised car
+      // today.
+      setMotTests(data.motTests);
       setLookupNote(
-        `Found: ${data.make} ${data.model} (${data.year})${data.plateInRetention ? " - this plate isn't currently attached to a vehicle; showing the last one it was on" : ''}. Fields below updated - check them before checking your quote.`
+        `Found: ${data.make} ${data.model}${data.plateInRetention ? " - this plate isn't currently attached to a vehicle; showing the last one it was on" : ''}. Make updated below - check the car size, then check your quote.`
       );
     } catch {
       setLookupError("Couldn't reach the lookup service. Pick your car manually below instead.");
@@ -140,7 +129,10 @@ export function CarQuoteForm({ signedIn, initialBrand, initialCarClass }: Props)
       const response = await fetch('/api/cars/verdict', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ carClass, brand, region, jobType, quotedPrice: price }),
+        body: JSON.stringify({
+          carClass, brand, region, jobType, quotedPrice: price,
+          motTests: motTests.length > 0 ? motTests.map(({ testDate, passed, notes }) => ({ testDate, passed, notes })) : undefined,
+        }),
       });
       const data: ApiResponse = await response.json();
 
@@ -297,6 +289,7 @@ export function CarQuoteForm({ signedIn, initialBrand, initialCarClass }: Props)
           brandLabel={result.brandLabel}
           regionLabel={result.regionLabel}
           communityStats={result.communityStats}
+          advice={result.advice}
         />
       )}
     </>

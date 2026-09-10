@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { carCostCalculatorRequestSchema } from '@/lib/validation';
 import { computeCarAnnualCost } from '@/lib/carCostCalculator';
-import { CAR_BRAND_OPTIONS, CAR_REGION_LABELS } from '@/lib/carPriceData';
+import { CAR_BRAND_OPTIONS, CAR_REGION_LABELS, CAR_SIZE_CLASS_LABELS } from '@/lib/carPriceData';
+import { generateCarCostAdvice } from '@/lib/tracker/carCostAdvice';
 
 export const runtime = 'nodejs';
 
@@ -48,7 +49,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const { carClass, brand, region, fuelType, annualMileage, co2Gkm } = parsed.data;
+  const { carClass, brand, region, fuelType, annualMileage, co2Gkm, motTests, taxStatus } = parsed.data;
 
   // No try/catch around computeCarAnnualCost - same deliberate "let it
   // propagate" convention the motorcycle cost-calculator route already
@@ -64,9 +65,21 @@ export async function POST(request: NextRequest) {
   const brandLabel = CAR_BRAND_OPTIONS.find((b) => b.value === brand)?.label ?? brand;
   const regionLabel = CAR_REGION_LABELS[region];
 
+  // Additive only - the breakdown above already works standalone, so a
+  // missing GEMINI_API_KEY or a failed call just means this section
+  // stays empty rather than the whole response failing.
+  const geminiKey = process.env.GEMINI_API_KEY;
+  const advice = geminiKey
+    ? await generateCarCostAdvice(
+        { carClassLabel: CAR_SIZE_CLASS_LABELS[carClass], brandLabel, regionLabel, annualMileage, breakdown, motTests, taxStatus },
+        geminiKey
+      )
+    : null;
+
   return NextResponse.json({
     breakdown,
     brandLabel,
     regionLabel,
+    advice,
   });
 }

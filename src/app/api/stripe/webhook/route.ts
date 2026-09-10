@@ -7,15 +7,22 @@
 // actually passes - middleware.ts only sets a CSP header and never
 // touches the body, so nothing upstream interferes with that.
 //
-// Deliberately minimal: only ever writes the payment fields
-// (unlockedAt/stripeSessionId/amountPaidPence/currency) via
-// applyVdiUnlockFromWebhookSession - the VDG fetch + AI summary are done
-// lazily by the report page itself on next view, kept out of this
-// webhook's latency/failure path entirely.
+// Deliberately minimal: only ever writes the payment-confirmation
+// fields via applyVdiUnlockFromWebhookSession (report unlock) or
+// applyBuyingGuideVdiPurchaseFromWebhookSession (Buying Guide's
+// standalone purchase) - the VDG fetch (+ AI summary, for the report
+// unlock) is done lazily by the consuming page/route on next view/
+// lookup, kept out of this webhook's latency/failure path entirely.
+//
+// Distinguishes the two purchase kinds by which metadata key is present:
+// metadata.token identifies a report-unlock session, metadata.purchaseId
+// a Buying Guide one - a single checkout.session.completed event only
+// ever matches one of the two.
 import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
 import { getStripe } from "@/lib/payments/stripe";
 import { applyVdiUnlockFromWebhookSession } from "@/lib/payments/vdiCheckout";
+import { applyBuyingGuideVdiPurchaseFromWebhookSession } from "@/lib/payments/buyingGuideVdiCheckout";
 import type { VehicleKind } from "@/lib/tracker/vdiUnlock";
 
 export const dynamic = "force-dynamic";
@@ -39,14 +46,19 @@ export async function POST(request: NextRequest) {
 
   if (event.type === "checkout.session.completed") {
     const session = event.data.object as Stripe.Checkout.Session;
-    const token = session.metadata?.token;
     const vehicleKind = session.metadata?.vehicleKind as VehicleKind | undefined;
-    if (token && (vehicleKind === "bike" || vehicleKind === "car") && session.payment_status === "paid") {
-      await applyVdiUnlockFromWebhookSession(token, vehicleKind, {
-        id: session.id,
-        amount_total: session.amount_total,
-        currency: session.currency,
-      });
+    const token = session.metadata?.token;
+    const purchaseId = session.metadata?.purchaseId;
+    if (session.payment_status === "paid" && (vehicleKind === "bike" || vehicleKind === "car")) {
+      if (token) {
+        await applyVdiUnlockFromWebhookSession(token, vehicleKind, {
+          id: session.id,
+          amount_total: session.amount_total,
+          currency: session.currency,
+        });
+      } else if (purchaseId) {
+        await applyBuyingGuideVdiPurchaseFromWebhookSession(purchaseId, { id: session.id });
+      }
     }
   }
 

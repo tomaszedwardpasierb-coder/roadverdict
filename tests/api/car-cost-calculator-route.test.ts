@@ -4,12 +4,14 @@ import { NextRequest } from "next/server";
 const mocks = vi.hoisted(() => ({
   getCurrentPetrolPricePenceLitre: vi.fn(),
   getCurrentDieselPricePenceLitre: vi.fn(),
+  generateCarCostAdvice: vi.fn(),
 }));
 
 vi.mock("@/lib/fuelPrice", () => ({
   getCurrentPetrolPricePenceLitre: mocks.getCurrentPetrolPricePenceLitre,
   getCurrentDieselPricePenceLitre: mocks.getCurrentDieselPricePenceLitre,
 }));
+vi.mock("@/lib/tracker/carCostAdvice", () => ({ generateCarCostAdvice: mocks.generateCarCostAdvice }));
 
 import { POST } from "@/app/api/cars/cost-calculator/route";
 
@@ -43,6 +45,9 @@ beforeEach(() => {
   mocks.getCurrentPetrolPricePenceLitre.mockResolvedValue(150);
   mocks.getCurrentDieselPricePenceLitre.mockReset();
   mocks.getCurrentDieselPricePenceLitre.mockResolvedValue(157);
+  mocks.generateCarCostAdvice.mockReset();
+  mocks.generateCarCostAdvice.mockResolvedValue(null);
+  delete process.env.GEMINI_API_KEY;
 });
 
 describe("POST /api/cars/cost-calculator", () => {
@@ -120,6 +125,36 @@ describe("POST /api/cars/cost-calculator", () => {
   it("propagates a rejection from the fuel price lookup rather than hanging (no try/catch around computeCarAnnualCost in this route)", async () => {
     mocks.getCurrentPetrolPricePenceLitre.mockRejectedValue(new Error("Cosmos unreachable"));
     await expect(POST(request(validBody, "203.113.20.11"))).rejects.toThrow("Cosmos unreachable");
+  });
+
+  it("does not call generateCarCostAdvice when GEMINI_API_KEY is absent, and advice is null", async () => {
+    const response = await POST(request(validBody, "203.113.20.20"));
+    const body = await response.json();
+    expect(mocks.generateCarCostAdvice).not.toHaveBeenCalled();
+    expect(body.advice).toBeNull();
+  });
+
+  it("calls generateCarCostAdvice and includes its result when GEMINI_API_KEY is set", async () => {
+    process.env.GEMINI_API_KEY = "fake-key";
+    mocks.generateCarCostAdvice.mockResolvedValue({ explanation: "Fuel is the largest share.", watchOutFor: [] });
+
+    const response = await POST(request(validBody, "203.113.20.21"));
+    const body = await response.json();
+
+    expect(mocks.generateCarCostAdvice).toHaveBeenCalledOnce();
+    expect(body.advice).toEqual({ explanation: "Fuel is the largest share.", watchOutFor: [] });
+  });
+
+  it("passes motTests and taxStatus through to generateCarCostAdvice when given", async () => {
+    process.env.GEMINI_API_KEY = "fake-key";
+    const motTests = [{ testDate: "2025-06-01", passed: true, notes: "" }];
+    const taxStatus = { taxStatus: "Taxed", taxIsCurrentlyValid: true, taxDueDate: "2027-06-01", taxDaysRemaining: 263, vedStandardTwelveMonths: 190 };
+
+    await POST(request({ ...validBody, motTests, taxStatus }, "203.113.20.22"));
+
+    const callArg = mocks.generateCarCostAdvice.mock.calls[0][0];
+    expect(callArg.motTests).toEqual(motTests);
+    expect(callArg.taxStatus).toEqual(taxStatus);
   });
 
   it("rate-limits after too many requests from the same IP within the window", async () => {

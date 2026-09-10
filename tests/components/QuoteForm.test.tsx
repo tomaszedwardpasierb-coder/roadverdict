@@ -112,17 +112,18 @@ describe("QuoteForm", () => {
     expect(fetch).not.toHaveBeenCalled();
   });
 
-  it("signed in: a found motorcycle plate updates the brand and engine-size fields", async () => {
+  it("signed in: a found motorcycle plate updates the brand and, when the model matches the curated list, the engine-size field", async () => {
     (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
       ok: true,
       json: async () => ({
         vrm: "AB12CDE",
         make: "Yamaha",
         model: "MT-07",
-        year: 2022,
-        engineCapacityCc: 689,
+        fuelType: "Petrol",
+        colour: "Blue",
         plateInRetention: false,
-        vehicleType: "motorcycle",
+        motDueDate: "2026-06-01",
+        motTests: [],
       }),
     });
 
@@ -132,21 +133,27 @@ describe("QuoteForm", () => {
     await user.click(screen.getByRole("button", { name: "Look up" }));
 
     await waitFor(() => expect(screen.getByLabelText("Make")).toHaveValue("yamaha"));
-    expect(screen.getByLabelText("Engine size")).toHaveValue("medium"); // 689cc -> medium per getBikeClassForCC
-    expect(screen.getByText(/Found: Yamaha MT-07 \(2022\)/)).toBeInTheDocument();
+    expect(screen.getByLabelText("Engine size")).toHaveValue("medium"); // MT-07 matches the curated list at 689cc -> medium
+    expect(screen.getByText(/Found: Yamaha MT-07/)).toBeInTheDocument();
   });
 
-  it("signed in: a four-wheeled result is refused with the specific not-a-bike message, fields left untouched", async () => {
+  // The explicit "that's a car, not a bike" rejection no longer exists -
+  // MotHistoryDetails (this lookup's only VDG call) has no body-type
+  // field to classify vehicle kind from at all. A mismatched vehicle
+  // just resolves to "other" brand, same as any make this tool doesn't
+  // recognise, rather than being rejected outright.
+  it("signed in: a car's plate (no matching bike brand) resolves to 'other' rather than being rejected", async () => {
     (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
       ok: true,
       json: async () => ({
         vrm: "AB12CDE",
         make: "Ford",
         model: "Focus",
-        year: 2020,
-        engineCapacityCc: null,
+        fuelType: "Petrol",
+        colour: "Blue",
         plateInRetention: false,
-        vehicleType: "four-wheeled",
+        motDueDate: "2026-01-01",
+        motTests: [],
       }),
     });
 
@@ -155,7 +162,43 @@ describe("QuoteForm", () => {
     await user.type(screen.getByLabelText("Search by registration (optional)"), "AB12CDE");
     await user.click(screen.getByRole("button", { name: "Look up" }));
 
-    expect(await screen.findByRole("alert")).toHaveTextContent(/four wheels/i);
-    expect(screen.getByLabelText("Make")).toHaveValue("honda"); // untouched default
+    await waitFor(() => expect(screen.getByLabelText("Make")).toHaveValue("other"));
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("silently includes the looked-up MOT tests in the /api/verdict submission, without rendering them", async () => {
+    (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        vrm: "AB12CDE",
+        make: "Yamaha",
+        model: "MT-07",
+        fuelType: "Petrol",
+        colour: "Blue",
+        plateInRetention: false,
+        motDueDate: "2026-06-01",
+        motTests: [{ testDate: "2025-06-01", passed: false, mileage: 4200, mileageTrusted: true, notes: "Rear brake pads worn" }],
+      }),
+    });
+
+    const user = userEvent.setup();
+    render(<QuoteForm signedIn={true} />);
+    await user.type(screen.getByLabelText("Search by registration (optional)"), "AB12CDE");
+    await user.click(screen.getByRole("button", { name: "Look up" }));
+    await waitFor(() => expect(screen.getByLabelText("Make")).toHaveValue("yamaha"));
+
+    // Never rendered directly - Quote Checker's UI is unchanged, the
+    // lookup just enriches the AI advice silently.
+    expect(screen.queryByText(/Rear brake pads worn/)).not.toBeInTheDocument();
+
+    (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
+      ok: true,
+      json: async () => ({ verdict: "fair", range: { low: 100, high: 200 }, brandTier: "mainstream", brandLabel: "Yamaha", regionLabel: "Rest of England & Wales", communityStats: null, advice: null }),
+    });
+    await user.type(screen.getByLabelText("What you were quoted"), "180");
+    await user.click(screen.getByRole("button", { name: "Check my quote" }));
+
+    const body = JSON.parse((fetch as ReturnType<typeof vi.fn>).mock.calls.at(-1)![1].body);
+    expect(body.motTests).toEqual([{ testDate: "2025-06-01", passed: false, notes: "Rear brake pads worn" }]);
   });
 });

@@ -19,9 +19,7 @@ const validResult = { motFlags: [], modelNotes: ["Known dual-mass flywheel weak 
 const baseInput: CarBuyingGuideBriefingInput = {
   make: "Ford",
   model: "Focus",
-  year: 2018,
   fuelType: "PETROL",
-  engineCapacityCc: 1000,
   motTests: [],
 };
 
@@ -74,7 +72,7 @@ describe("generateCarBuyingGuideBriefing", () => {
     vi.stubGlobal("fetch", fetchMock);
     await generateCarBuyingGuideBriefing(baseInput, "key");
     const body = JSON.parse(fetchMock.mock.calls[0][1].body);
-    expect(body.contents[0].parts[0].text).toContain("CAR: 2018 Ford Focus");
+    expect(body.contents[0].parts[0].text).toContain("CAR: Ford Focus");
     expect(body.contents[0].parts[0].text).toContain("FUEL TYPE: PETROL");
   });
 
@@ -105,10 +103,10 @@ describe("generateCarBuyingGuideBriefing", () => {
     expect(prompt).toContain("1 May 2024 - Failed - 14,500 miles - DANGEROUS: Brakes: Rear brake pads worn beyond limit");
   });
 
-  it("omits the engine line when engineCapacityCc is null", async () => {
+  it("never includes an engine-size line - MotHistoryDetails has no EngineCapacityCc to report", async () => {
     const fetchMock = vi.fn().mockResolvedValue(geminiResponse(JSON.stringify(validResult)));
     vi.stubGlobal("fetch", fetchMock);
-    await generateCarBuyingGuideBriefing({ ...baseInput, engineCapacityCc: null }, "key");
+    await generateCarBuyingGuideBriefing(baseInput, "key");
     const body = JSON.parse(fetchMock.mock.calls[0][1].body);
     expect(body.contents[0].parts[0].text).not.toContain("ENGINE:");
   });
@@ -160,8 +158,10 @@ describe("generateCarBuyingGuideBriefing", () => {
         vdiCheck: {
           isStolen: true, hasWriteOffRecord: true, writeOffRecordCount: 1, hasOutstandingFinance: true,
           financeRecords: [{ agreementDate: "2024-01-01", agreementType: "HP", financeCompany: "Example Finance" }],
-          keeperChangeCount: 1, plateChangeCount: 0, colourChangeCount: 0, currentColour: null,
-          vedFirstYearTwelveMonths: null, vedStandardTwelveMonths: null,
+          keeperChanges: [], keeperChangeCount: 1, plateChangeCount: 0, colourChangeCount: 0, currentColour: null,
+          vedFirstYearTwelveMonths: null, vedStandardTwelveMonths: null, v5cReissueCount: 0,
+          calculatedAverageAnnualMileage: null, averageMileageForAge: null, mileageAnomalyDetected: false,
+          manufacturerWarrantyMiles: null, manufacturerWarrantyMonths: null,
         },
       },
       "key"

@@ -1,62 +1,43 @@
 // Place at: src/app/api/cars/buying-guide-lookup/route.ts
 //
 // Car equivalent of api/tracker/buying-guide-lookup/route.ts - same
-// mechanic (two parallel VDG calls for vehicle + MOT history, a Gemini
-// briefing only once the vehicle is confirmed the right vehicle kind),
-// just gated on 'four-wheeled' instead of 'motorcycle' and calling
-// generateCarBuyingGuideBriefing instead of generateBuyingGuideBriefing.
+// MotHistoryDetails + VehicleTaxDetails free tier, same paid-purchase
+// VDI check, calling generateCarBuyingGuideBriefing instead. Also adds
+// the car-only independent valuation, which is free but rate-limited
+// (see valuationCheckUsage.ts) - fully decoupled from the paid VDI
+// purchase below, since valuation is cheap enough (~20p/call) to give
+// away, just not unlimited.
 //
-// Costs two metered VDG calls per lookup, not one - vehicle details
-// and MOT history are separate VDG packages, run in parallel here to
-// keep latency down, but each still bills separately. Worth knowing
-// if VDG usage/cost is ever being watched.
-//
-// Also costs one Gemini call per lookup, but only once the vehicle is
-// confirmed a car - see the briefing generation below. Runs
-// sequentially after the VDG calls (needs their result first), so this
-// adds real latency to the response, not just cost. Worth revisiting
-// if that turns out to feel slow in practice.
+// Also costs one Gemini call per lookup - see the briefing generation
+// below. Runs sequentially after the VDG calls (needs their result
+// first), so this adds real latency to the response, not just cost.
+// Worth revisiting if that turns out to feel slow in practice.
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/session";
 import { parseMotHistory, type RawMotTest } from "@/lib/tracker/motHistory";
-import { classifyVehicleType, type VehicleTypeCheck } from "@/lib/tracker/vehicleTypeCheck";
 import { generateCarBuyingGuideBriefing, type CarBuyingGuideBriefingResult } from "@/lib/tracker/carBuyingGuideBriefing";
 import { isPro } from "@/lib/subscriptions";
 import { getUserDoc } from "@/lib/tracker/userDoc";
-import { canRunFreeVdiCheck, recordVdiCheckRun, nextFreeVdiCheckAt } from "@/lib/tracker/vdiCheckUsage";
+import { canRunValuationCheck, recordValuationCheckRun, nextValuationCheckAt } from "@/lib/tracker/valuationCheckUsage";
+import { getVdiPurchase, markVdiPurchaseConsumed } from "@/lib/tracker/vdiPurchase";
+import { selfHealBuyingGuideVdiPurchase } from "@/lib/payments/buyingGuideVdiCheckout";
 import { fetchVdiCheckFromVdg } from "@/lib/tracker/vdiCheckFetch";
 import { fetchValuationFromVdg } from "@/lib/tracker/valuationFetch";
+import { fetchVehicleTaxDetailsFromVdg, type VehicleTaxDetails } from "@/lib/tracker/vehicleTaxFetch";
 import type { VdiCheckResult, ValuationResult } from "@/lib/tracker/vdiUnlock";
 
 export const dynamic = "force-dynamic";
 
 const VDG_ENDPOINT = "https://uk.api.vehicledataglobal.com/r2/lookup";
 
-interface VdgVehicleResponse {
+interface VdgMotResponse {
   ResponseInformation: { StatusCode: number; IsSuccessStatusCode: boolean };
   Results: {
-    VehicleDetails?: {
-      VehicleIdentification: {
-        Vrm: string;
-        DvlaMake: string;
-        DvlaModel: string;
-        YearOfManufacture: number;
-        DvlaFuelType: string;
-        DvlaBodyType: string;
-      };
-      VehicleHistory?: { ColourDetails?: { CurrentColour: string } };
-    };
-    ModelDetails?: {
-      ModelIdentification: { Make: string; Model: string };
-      Powertrain?: { IceDetails?: { EngineCapacityCc: number } };
-    };
-  };
-}
-
-interface VdgMotResponse {
-  ResponseInformation: { IsSuccessStatusCode: boolean };
-  Results: {
     MotHistoryDetails?: {
+      Make?: string;
+      Model?: string;
+      FuelType?: string;
+      Colour?: string;
       MotDueDate?: string | null;
       MotTestDetailsList?: RawMotTest[];
     };
@@ -67,12 +48,9 @@ export interface CarBuyingGuideLookupResult {
   vrm: string;
   make: string;
   model: string;
-  year: number;
   fuelType: string;
   colour: string;
-  engineCapacityCc: number | null;
   plateInRetention: boolean;
-  vehicleType: VehicleTypeCheck;
   motDueDate: string | null;
   motTests: {
     testDate: string;
@@ -82,15 +60,46 @@ export interface CarBuyingGuideLookupResult {
     notes: string;
   }[];
   briefing: CarBuyingGuideBriefingResult | null;
-  // Only ever populated when ?includeVdi=1 was requested and the caller
-  // was actually allowed to run it (Pro, or a free account off cooldown) -
-  // see vdiCheckUsage.ts. vdiCheckBlockedReason/vdiCheckAvailableAt let
-  // the UI explain *why* a free account didn't get one, rather than the
-  // field just silently being absent. valuation is car-only.
+  // Only ever populated when a paid, consumed vdiPurchaseId was supplied
+  // and passed every check in resolveVdiCheck below - see vdiPurchase.ts.
   vdiCheck: VdiCheckResult | null;
+  vdiCheckBlockedReason?: "already_used" | "payment_not_confirmed" | "invalid";
+  // Free but rate-limited - see valuationCheckUsage.ts. Attempted on
+  // every lookup regardless of vdiPurchaseId; valuationBlockedReason
+  // explains why it's null when the account is over its allowance.
   valuation: ValuationResult | null;
-  vdiCheckBlockedReason?: "cooldown";
-  vdiCheckAvailableAt?: string | null;
+  valuationBlockedReason?: "cooldown";
+  valuationAvailableAt?: string | null;
+  // Free, always attempted alongside MOT history - real tax/SORN status,
+  // not rate-limited or paid like vdiCheck/valuation above.
+  taxDetails: VehicleTaxDetails | null;
+}
+
+async function resolveVdiCheck(
+  vdiPurchaseId: string | null,
+  sessionId: string | null,
+  email: string,
+  vrm: string,
+  apiKey: string
+): Promise<{ vdiCheck: VdiCheckResult | null; blockedReason?: "already_used" | "payment_not_confirmed" | "invalid" }> {
+  if (!vdiPurchaseId) return { vdiCheck: null };
+
+  let purchase = await getVdiPurchase(vdiPurchaseId);
+  if (!purchase || purchase.email !== email || purchase.vrm !== vrm || purchase.vehicleKind !== "car") {
+    return { vdiCheck: null, blockedReason: "invalid" };
+  }
+  if (purchase.status === "consumed") {
+    return { vdiCheck: null, blockedReason: "already_used" };
+  }
+  if (purchase.status === "pending") {
+    if (!sessionId) return { vdiCheck: null, blockedReason: "payment_not_confirmed" };
+    purchase = await selfHealBuyingGuideVdiPurchase(vdiPurchaseId, sessionId);
+    if (!purchase || purchase.status !== "paid") return { vdiCheck: null, blockedReason: "payment_not_confirmed" };
+  }
+
+  const vdiCheck = await fetchVdiCheckFromVdg(vrm, apiKey);
+  await markVdiPurchaseConsumed(vdiPurchaseId);
+  return { vdiCheck };
 }
 
 export async function GET(request: NextRequest) {
@@ -110,19 +119,15 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Lookup is not available right now." }, { status: 503 });
   }
 
-  const vehicleUrl = `${VDG_ENDPOINT}?apiKey=${apiKey}&packageName=VehicleDetails&vrm=${encodeURIComponent(vrm)}`;
-  const motUrl = `${VDG_ENDPOINT}?apiKey=${apiKey}&packageName=MotHistoryDetails&vrm=${encodeURIComponent(vrm)}`;
-
-  let vehicleData: VdgVehicleResponse;
-  let motData: VdgMotResponse | null;
+  let motData: VdgMotResponse;
+  let taxDetails: VehicleTaxDetails | null;
   try {
-    const [vehicleRes, motRes] = await Promise.all([fetch(vehicleUrl), fetch(motUrl)]);
-    vehicleData = await vehicleRes.json();
-    // MOT history failing to fetch isn't fatal to the whole lookup -
-    // the vehicle-identity half is the one that actually needs to
-    // succeed; MOT data is a bonus that degrades to "none found"
-    // rather than failing the request outright.
-    motData = await motRes.json().catch(() => null);
+    const [motRes, tax] = await Promise.all([
+      fetch(`${VDG_ENDPOINT}?apiKey=${apiKey}&packageName=MotHistoryDetails&vrm=${encodeURIComponent(vrm)}`),
+      fetchVehicleTaxDetailsFromVdg(vrm, apiKey),
+    ]);
+    motData = await motRes.json();
+    taxDetails = tax;
   } catch (err) {
     console.error("Car buying guide lookup request failed:", err);
     return NextResponse.json(
@@ -131,100 +136,69 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  if (!vehicleData.ResponseInformation?.IsSuccessStatusCode || !vehicleData.Results?.VehicleDetails) {
+  if (!motData.ResponseInformation?.IsSuccessStatusCode || !motData.Results?.MotHistoryDetails) {
     return NextResponse.json(
       { error: "No vehicle found for that registration. Enter the details manually." },
       { status: 404 }
     );
   }
 
-  const vd = vehicleData.Results.VehicleDetails;
-  const md = vehicleData.Results.ModelDetails;
+  const details = motData.Results.MotHistoryDetails;
+  const plateInRetention = motData.ResponseInformation.StatusCode === 21;
+  const parsed = parseMotHistory(details.MotDueDate ?? null, details.MotTestDetailsList ?? []);
+  const motTestsOldestFirst = parsed.tests;
+  const motTests = [...parsed.tests].reverse();
 
-  // StatusCode 21 = "PlateInRetentionLastVehicleReturned" - see
-  // plate-lookup/route.ts for the same handling, confirmed real
-  // during testing there, not a hypothetical edge case.
-  const plateInRetention = vehicleData.ResponseInformation.StatusCode === 21;
-  const vehicleType = classifyVehicleType(vd.VehicleIdentification.DvlaBodyType ?? "");
+  const vdiPurchaseId = request.nextUrl.searchParams.get("vdiPurchaseId");
+  const sessionId = request.nextUrl.searchParams.get("session_id");
+  const { vdiCheck, blockedReason: vdiCheckBlockedReason } = await resolveVdiCheck(vdiPurchaseId, sessionId, session.email, vrm, apiKey);
 
-  let motDueDate: string | null = null;
-  let motTests: CarBuyingGuideLookupResult["motTests"] = [];
-  let motTestsOldestFirst: CarBuyingGuideLookupResult["motTests"] = [];
-  const motDetails = motData?.ResponseInformation?.IsSuccessStatusCode ? motData.Results?.MotHistoryDetails : undefined;
-  if (motDetails) {
-    const parsed = parseMotHistory(motDetails.MotDueDate ?? null, motDetails.MotTestDetailsList ?? []);
-    motDueDate = parsed.motDueDate;
-    motTestsOldestFirst = parsed.tests;
-    // Newest first for display - parseMotHistory returns oldest-first
-    // internally (needed for its own retest-dedup logic), but a buyer
-    // reading this wants the most recent test at the top.
-    motTests = [...parsed.tests].reverse();
-  }
-
-  const make = md?.ModelIdentification?.Make || vd.VehicleIdentification.DvlaMake;
-  const model = md?.ModelIdentification?.Model || vd.VehicleIdentification.DvlaModel;
-  const engineCapacityCc = md?.Powertrain?.IceDetails?.EngineCapacityCc ?? null;
-  const fuelType = vd.VehicleIdentification.DvlaFuelType;
-
-  // Only spent on a confirmed car - a motorcycle or an unclassifiable
-  // result gets rejected client-side regardless (vehicleTypeCheck.ts,
-  // CarBuyingGuideForm.tsx's gate), so generating a briefing for either
-  // would just be a wasted Gemini call for a result nobody ever sees.
-  // A missing GEMINI_API_KEY degrades the same way MOT history already
-  // does above - the lookup still succeeds, this section just stays empty.
-  // Same "only spend the paid calls on a confirmed relevant vehicle
-  // type" gate as the briefing generation below - a buyer opting in (or
-  // a Pro account, which always gets it) never wastes a real VDG
-  // billing event on a result the UI is about to reject anyway.
-  let vdiCheck: VdiCheckResult | null = null;
+  const userIsPro = await isPro(session.email);
+  const user = await getUserDoc(session.email);
   let valuation: ValuationResult | null = null;
-  let vdiCheckBlockedReason: "cooldown" | undefined;
-  let vdiCheckAvailableAt: string | null = null;
-  const includeVdi = request.nextUrl.searchParams.get("includeVdi") === "1";
-  if (includeVdi && vehicleType === "four-wheeled") {
-    const userIsPro = await isPro(session.email);
-    const user = userIsPro ? null : await getUserDoc(session.email);
-    if (userIsPro || canRunFreeVdiCheck(user)) {
-      [vdiCheck, valuation] = await Promise.all([fetchVdiCheckFromVdg(vrm, apiKey), fetchValuationFromVdg(vrm, apiKey)]);
-      if (!userIsPro) await recordVdiCheckRun(session.email);
-    } else {
-      vdiCheckBlockedReason = "cooldown";
-      vdiCheckAvailableAt = nextFreeVdiCheckAt(user);
-    }
+  let valuationBlockedReason: "cooldown" | undefined;
+  let valuationAvailableAt: string | null = null;
+  if (canRunValuationCheck(user, userIsPro)) {
+    valuation = await fetchValuationFromVdg(vrm, apiKey);
+    await recordValuationCheckRun(session.email);
+  } else {
+    valuationBlockedReason = "cooldown";
+    valuationAvailableAt = nextValuationCheckAt(user, userIsPro);
   }
 
   let briefing: CarBuyingGuideBriefingResult | null = null;
-  if (vehicleType === "four-wheeled") {
-    const geminiKey = process.env.GEMINI_API_KEY;
-    if (geminiKey) {
-      briefing = await generateCarBuyingGuideBriefing(
-        {
-          make, model, year: vd.VehicleIdentification.YearOfManufacture, fuelType, engineCapacityCc, motTests: motTestsOldestFirst,
-          vdiCheck: vdiCheck ?? undefined,
-          valuation: valuation ?? undefined,
-        },
-        geminiKey
-      );
-    }
+  const geminiKey = process.env.GEMINI_API_KEY;
+  if (geminiKey) {
+    briefing = await generateCarBuyingGuideBriefing(
+      {
+        make: details.Make ?? "",
+        model: details.Model ?? "",
+        fuelType: details.FuelType ?? "",
+        motTests: motTestsOldestFirst,
+        vdiCheck: vdiCheck ?? undefined,
+        valuation: valuation ?? undefined,
+        taxDetails: taxDetails ?? undefined,
+      },
+      geminiKey
+    );
   }
 
   const result: CarBuyingGuideLookupResult = {
-    vrm: vd.VehicleIdentification.Vrm,
-    make,
-    model,
-    year: vd.VehicleIdentification.YearOfManufacture,
-    fuelType,
-    colour: vd.VehicleHistory?.ColourDetails?.CurrentColour ?? "",
-    engineCapacityCc,
+    vrm,
+    make: details.Make ?? "",
+    model: details.Model ?? "",
+    fuelType: details.FuelType ?? "",
+    colour: details.Colour ?? "",
     plateInRetention,
-    vehicleType,
-    motDueDate,
+    motDueDate: parsed.motDueDate,
     motTests,
     briefing,
     vdiCheck,
-    valuation,
     vdiCheckBlockedReason,
-    vdiCheckAvailableAt,
+    valuation,
+    valuationBlockedReason,
+    valuationAvailableAt,
+    taxDetails,
   };
 
   return NextResponse.json(result);

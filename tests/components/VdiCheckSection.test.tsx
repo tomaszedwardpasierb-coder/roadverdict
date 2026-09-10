@@ -24,13 +24,13 @@ describe("VdiCheckSection", () => {
 
   it("shows the locked state with the bike price and no facts when vdiUnlock is absent", () => {
     render(<VdiCheckSection vehicleKind="bike" token="tok_abc" registration="AB12CDE" make="Honda" model="CB125R" />);
-    expect(screen.getByText("Unlock for £7.99")).toBeInTheDocument();
+    expect(screen.getByText("Unlock for £9.99")).toBeInTheDocument();
     expect(screen.queryByText("Stolen marker")).not.toBeInTheDocument();
   });
 
   it("shows the car price and mentions the included valuation in the locked state", () => {
     render(<VdiCheckSection vehicleKind="car" token="tok_xyz" registration="AB12CDE" make="Ford" model="Focus" />);
-    expect(screen.getByText("Unlock for £9.99")).toBeInTheDocument();
+    expect(screen.getByText("Unlock for £13.99")).toBeInTheDocument();
     expect(screen.getByText(/Includes an independent valuation range/)).toBeInTheDocument();
   });
 
@@ -39,7 +39,7 @@ describe("VdiCheckSection", () => {
     const user = userEvent.setup();
     render(<VdiCheckSection vehicleKind="bike" token="tok_abc" registration="AB12CDE" make="Honda" model="CB125R" />);
 
-    await user.click(screen.getByText("Unlock for £7.99"));
+    await user.click(screen.getByText("Unlock for £9.99"));
 
     expect(fetch).toHaveBeenCalledWith(
       "/api/tracker/vdi-checkout",
@@ -53,7 +53,7 @@ describe("VdiCheckSection", () => {
     const user = userEvent.setup();
     render(<VdiCheckSection vehicleKind="car" token="tok_xyz" registration="AB12CDE" make="Ford" model="Focus" />);
 
-    await user.click(screen.getByText("Unlock for £9.99"));
+    await user.click(screen.getByText("Unlock for £13.99"));
 
     expect(fetch).toHaveBeenCalledWith("/api/cars/vdi-checkout", expect.objectContaining({ method: "POST" }));
   });
@@ -63,7 +63,7 @@ describe("VdiCheckSection", () => {
     const user = userEvent.setup();
     render(<VdiCheckSection vehicleKind="bike" token="tok_abc" registration="AB12CDE" make="Honda" model="CB125R" />);
 
-    await user.click(screen.getByText("Unlock for £7.99"));
+    await user.click(screen.getByText("Unlock for £9.99"));
 
     expect(await screen.findByRole("alert")).toHaveTextContent("already been unlocked");
     expect(window.location.href).toBe("");
@@ -74,7 +74,7 @@ describe("VdiCheckSection", () => {
     const user = userEvent.setup();
     render(<VdiCheckSection vehicleKind="bike" token="tok_abc" registration="AB12CDE" make="Honda" model="CB125R" />);
 
-    await user.click(screen.getByText("Unlock for £7.99"));
+    await user.click(screen.getByText("Unlock for £9.99"));
 
     expect(await screen.findByRole("alert")).toHaveTextContent(/couldn't reach the payment service/i);
   });
@@ -83,7 +83,7 @@ describe("VdiCheckSection", () => {
     const vdiUnlock: VdiUnlock = { unlockedAt: "2026-01-01T00:00:00.000Z", stripeSessionId: "cs_1", amountPaidPence: 799, currency: "gbp" };
     render(<VdiCheckSection vehicleKind="bike" token="tok_abc" registration="AB12CDE" make="Honda" model="CB125R" vdiUnlock={vdiUnlock} />);
     expect(screen.getByText(/being processed/)).toBeInTheDocument();
-    expect(screen.queryByText("Unlock for £7.99")).not.toBeInTheDocument();
+    expect(screen.queryByText("Unlock for £9.99")).not.toBeInTheDocument();
   });
 
   it("renders the independently-verified facts, registration, and make/model once vdiCheck is populated", () => {
@@ -98,12 +98,19 @@ describe("VdiCheckSection", () => {
         writeOffRecordCount: 0,
         hasOutstandingFinance: false,
         financeRecords: [],
+        keeperChanges: [],
         keeperChangeCount: 2,
         plateChangeCount: 1,
         colourChangeCount: 0,
         currentColour: "BLACK",
         vedFirstYearTwelveMonths: null,
         vedStandardTwelveMonths: 200,
+        v5cReissueCount: 0,
+        calculatedAverageAnnualMileage: null,
+        averageMileageForAge: null,
+        mileageAnomalyDetected: false,
+        manufacturerWarrantyMiles: null,
+        manufacturerWarrantyMonths: null,
       },
     };
     render(<VdiCheckSection vehicleKind="bike" token="tok_abc" registration="AB12CDE" make="Honda" model="CB125R" vdiUnlock={vdiUnlock} />);
@@ -126,12 +133,19 @@ describe("VdiCheckSection", () => {
         writeOffRecordCount: 1,
         hasOutstandingFinance: true,
         financeRecords: [{ agreementDate: "2024-01-01", agreementType: "HIRE PURCHASE", financeCompany: "Example Finance" }],
+        keeperChanges: [],
         keeperChangeCount: 0,
         plateChangeCount: 0,
         colourChangeCount: 0,
         currentColour: null,
         vedFirstYearTwelveMonths: null,
         vedStandardTwelveMonths: null,
+        v5cReissueCount: 0,
+        calculatedAverageAnnualMileage: null,
+        averageMileageForAge: null,
+        mileageAnomalyDetected: false,
+        manufacturerWarrantyMiles: null,
+        manufacturerWarrantyMonths: null,
       },
     };
     render(<VdiCheckSection vehicleKind="bike" token="tok_abc" registration="AB12CDE" make="Honda" model="CB125R" vdiUnlock={vdiUnlock} />);
@@ -149,8 +163,10 @@ describe("VdiCheckSection", () => {
       currency: "gbp",
       vdiCheck: {
         isStolen: false, hasWriteOffRecord: false, writeOffRecordCount: 0, hasOutstandingFinance: false, financeRecords: [],
-        keeperChangeCount: 1, plateChangeCount: 0, colourChangeCount: 0, currentColour: "SILVER",
-        vedFirstYearTwelveMonths: null, vedStandardTwelveMonths: 200,
+        keeperChanges: [], keeperChangeCount: 1, plateChangeCount: 0, colourChangeCount: 0, currentColour: "SILVER",
+        vedFirstYearTwelveMonths: null, vedStandardTwelveMonths: 200, v5cReissueCount: 0,
+        calculatedAverageAnnualMileage: null, averageMileageForAge: null, mileageAnomalyDetected: false,
+        manufacturerWarrantyMiles: null, manufacturerWarrantyMonths: null,
       },
       valuation: {
         valuationTime: null, valuationMileage: 23627, vehicleDescription: null, onTheRoad: 38015,
@@ -171,8 +187,10 @@ describe("VdiCheckSection", () => {
       currency: "gbp",
       vdiCheck: {
         isStolen: false, hasWriteOffRecord: false, writeOffRecordCount: 0, hasOutstandingFinance: false, financeRecords: [],
-        keeperChangeCount: 1, plateChangeCount: 0, colourChangeCount: 0, currentColour: "SILVER",
-        vedFirstYearTwelveMonths: null, vedStandardTwelveMonths: 200,
+        keeperChanges: [], keeperChangeCount: 1, plateChangeCount: 0, colourChangeCount: 0, currentColour: "SILVER",
+        vedFirstYearTwelveMonths: null, vedStandardTwelveMonths: 200, v5cReissueCount: 0,
+        calculatedAverageAnnualMileage: null, averageMileageForAge: null, mileageAnomalyDetected: false,
+        manufacturerWarrantyMiles: null, manufacturerWarrantyMonths: null,
       },
       aiSummary: {
         keyFindings: ["No stolen marker, write-off record, or outstanding finance found."],
@@ -193,8 +211,10 @@ describe("VdiCheckSection", () => {
       currency: "gbp",
       vdiCheck: {
         isStolen: false, hasWriteOffRecord: false, writeOffRecordCount: 0, hasOutstandingFinance: false, financeRecords: [],
-        keeperChangeCount: 1, plateChangeCount: 0, colourChangeCount: 0, currentColour: "SILVER",
-        vedFirstYearTwelveMonths: null, vedStandardTwelveMonths: 200,
+        keeperChanges: [], keeperChangeCount: 1, plateChangeCount: 0, colourChangeCount: 0, currentColour: "SILVER",
+        vedFirstYearTwelveMonths: null, vedStandardTwelveMonths: 200, v5cReissueCount: 0,
+        calculatedAverageAnnualMileage: null, averageMileageForAge: null, mileageAnomalyDetected: false,
+        manufacturerWarrantyMiles: null, manufacturerWarrantyMonths: null,
       },
       aiSummary: null,
     };

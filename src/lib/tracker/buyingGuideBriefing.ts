@@ -11,6 +11,7 @@
 // something broken.
 import { logGeminiUsage } from "@/lib/tracker/geminiUsageLog";
 import type { VdiCheckResult } from "@/lib/tracker/vdiUnlock";
+import type { VehicleTaxDetails } from "@/lib/tracker/vehicleTaxFetch";
 
 // CANARY - deliberately the one call site testing gemini-3.7-flash
 // before it's rolled out anywhere else. Google's own models guide lists
@@ -27,8 +28,6 @@ const GEMINI_MODEL = "gemini-3.7-flash";
 export interface BuyingGuideBriefingInput {
   make: string;
   model: string;
-  year: number;
-  engineCapacityCc: number | null;
   // Oldest first - lets the model read the history as a timeline and
   // notice a pattern repeating across tests, not just the most recent one.
   motTests: {
@@ -37,10 +36,13 @@ export interface BuyingGuideBriefingInput {
     mileage: number | null;
     notes: string;
   }[];
-  // Only present when the rider opted into (or is Pro and gets
-  // automatically) the paid VDI add-on - see buying-guide-lookup/route.ts.
-  // Absent for the plain, free lookup.
+  // Only present once the rider has paid for the standalone VDI check
+  // (see vdiPurchase.ts) and it's been fetched - absent for the plain,
+  // free lookup.
   vdiCheck?: VdiCheckResult;
+  // Free, always attempted alongside MOT history - unlike vdiCheck
+  // above, this isn't gated behind Pro/cooldown at all.
+  taxDetails?: VehicleTaxDetails;
 }
 
 export interface BuyingGuideBriefingResult {
@@ -55,8 +57,7 @@ function fmtDate(d: string): string {
 
 function buildFactsBlock(input: BuyingGuideBriefingInput): string {
   const lines: string[] = [];
-  lines.push(`BIKE: ${input.year} ${input.make} ${input.model}`);
-  if (input.engineCapacityCc) lines.push(`ENGINE: ${input.engineCapacityCc}cc`);
+  lines.push(`BIKE: ${input.make} ${input.model}`);
   lines.push("");
 
   if (input.motTests.length > 0) {
@@ -79,6 +80,13 @@ function buildFactsBlock(input: BuyingGuideBriefingInput): string {
     lines.push(input.vdiCheck.hasOutstandingFinance ? `- OUTSTANDING FINANCE: yes, ${input.vdiCheck.financeRecords.length} agreement(s)` : "- Outstanding finance: none found");
   }
 
+  if (input.taxDetails) {
+    lines.push("");
+    lines.push(
+      `TAX STATUS (DVLA-verified): ${input.taxDetails.taxStatus ?? "unknown"}${input.taxDetails.taxIsCurrentlyValid ? "" : " - NOT currently valid"}`
+    );
+  }
+
   return lines.join("\n");
 }
 
@@ -89,12 +97,13 @@ Strict rules:
 - General model knowledge (common faults, known issues, recalls) may draw on your own training knowledge of this make and model, since the facts below don't cover that - but be honest and specific, not generic filler that could apply to any bike ("check the tyres" is not useful; naming an actual known weak point for this model is).
 - If an advisory or fail reason keeps reappearing across multiple tests without being fixed, say so plainly - that is a real pattern worth flagging clearly, not softening.
 - If a VDI CHECK block is given below, a stolen marker, write-off record, or outstanding finance is the single most important thing here - lead with it as the first motFlag, whether or not the MOT history itself shows anything.
+- If a TAX STATUS fact is given below and shows the bike is SORN or not currently valid, mention it plainly as something to resolve before the bike can be used on the road - a practical logistics point, not a comment on condition.
 - Do not tell the reader whether to buy the bike. Give them specific things to check in person, not a purchase recommendation.
 - Plain and direct, the way a mechanic actually talks to a mate - not a generic listicle, not hyped.
 
 Produce exactly three things:
 1. "motFlags": 0 to 4 short, specific things to check in person, each directly tied to something in this bike's real MOT history (an advisory, a fail reason, a pattern across tests). Empty array if the MOT history is clean or there is none at all - do not invent something to flag.
-2. "modelNotes": 0 to 3 short, specific known issues or things worth checking for this exact make, model, and engine, drawn from your general knowledge of the model, not from the MOT data. Empty array if you genuinely don't have specific, reliable knowledge of common issues for this model - do not guess or generalise.
+2. "modelNotes": 0 to 3 short, specific known issues or things worth checking for this exact make and model, drawn from your general knowledge of the model, not from the MOT data. Empty array if you genuinely don't have specific, reliable knowledge of common issues for this model - do not guess or generalise.
 3. "summary": one short paragraph (2-3 sentences) pulling this together - the honest overall picture based on what is actually known, not a generic summary that could apply to any bike.
 
 Return ONLY valid JSON matching this shape, nothing else, no markdown fences:

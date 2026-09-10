@@ -106,11 +106,12 @@ describe("CarCostCalculatorForm", () => {
         vrm: "AB12CDE",
         make: "Tesla",
         model: "Model 3",
-        year: 2022,
         fuelType: "ELECTRICITY",
-        engineCapacityCc: null,
+        colour: "White",
         plateInRetention: false,
-        vehicleType: "four-wheeled",
+        motDueDate: null,
+        motTests: [],
+        taxDetails: null,
       }),
     });
 
@@ -130,11 +131,12 @@ describe("CarCostCalculatorForm", () => {
         vrm: "AB12CDE",
         make: "Ford",
         model: "Focus",
-        year: 2019,
         fuelType: "DIESEL",
-        engineCapacityCc: 1998,
+        colour: "Silver",
         plateInRetention: false,
-        vehicleType: "four-wheeled",
+        motDueDate: "2026-01-01",
+        motTests: [],
+        taxDetails: null,
       }),
     });
 
@@ -144,21 +146,28 @@ describe("CarCostCalculatorForm", () => {
     await user.click(screen.getByRole("button", { name: "Look up" }));
 
     await waitFor(() => expect(screen.getByLabelText("Fuel type")).toHaveValue("diesel"));
-    expect(screen.getByLabelText("Car size")).toHaveValue("medium"); // 1998cc -> 1.998L, at/under the 2.0L boundary
+    // Car size can no longer be auto-filled from this lookup at all -
+    // left untouched on its default.
+    expect(screen.getByLabelText("Car size")).toHaveValue("medium");
   });
 
-  it("signed in: a motorcycle result is refused with the specific not-a-car message", async () => {
+  // The explicit "that's a motorcycle, not a car" rejection no longer
+  // exists - MotHistoryDetails has no body-type field to classify
+  // vehicle kind from. A mismatched vehicle just resolves to "other"
+  // brand rather than being rejected outright.
+  it("signed in: a motorcycle's plate (no matching car brand) resolves to 'other' rather than being rejected", async () => {
     (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
       ok: true,
       json: async () => ({
         vrm: "AB12CDE",
         make: "Yamaha",
         model: "MT-07",
-        year: 2022,
         fuelType: "PETROL",
-        engineCapacityCc: 689,
+        colour: "Blue",
         plateInRetention: false,
-        vehicleType: "motorcycle",
+        motDueDate: "2026-06-01",
+        motTests: [],
+        taxDetails: null,
       }),
     });
 
@@ -167,6 +176,7 @@ describe("CarCostCalculatorForm", () => {
     await user.type(screen.getByLabelText("Search by registration (optional)"), "AB12CDE");
     await user.click(screen.getByRole("button", { name: "Look up" }));
 
-    expect(await screen.findByRole("alert")).toHaveTextContent(/motorcycle/i);
+    await waitFor(() => expect(screen.getByLabelText("Make")).toHaveValue("other"));
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 });

@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { carQuoteRequestSchema } from '@/lib/validation';
 import { getAdjustedCarBenchmark, CAR_REGION_LABELS, CAR_BRAND_OPTIONS, CAR_JOB_LABELS_BENCHMARKED, CAR_SIZE_CLASS_LABELS } from '@/lib/carPriceData';
-import { computeVerdict } from '@/lib/verdict';
+import { computeVerdict, VERDICT_LABELS } from '@/lib/verdict';
 import { logCarQuoteCheck, getCarCommunityStats } from '@/lib/db';
+import { generateCarQuoteAdvice } from '@/lib/tracker/carQuoteAdvice';
 
 // better-sqlite3 needs the Node.js runtime, not the Edge runtime.
 export const runtime = 'nodejs';
@@ -52,7 +53,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const { carClass, jobType, brand, region, quotedPrice } = parsed.data;
+  const { carClass, jobType, brand, region, quotedPrice, motTests } = parsed.data;
   const adjusted = getAdjustedCarBenchmark(jobType, carClass, brand, region);
   const verdict = computeVerdict(quotedPrice, adjusted);
 
@@ -64,15 +65,42 @@ export async function POST(request: NextRequest) {
   // the comment in db.ts for why this isn't used to calculate the
   // verdict itself.
   const communityStats = getCarCommunityStats(jobType, carClass);
+  const brandLabel = CAR_BRAND_OPTIONS.find((b) => b.value === brand)?.label ?? brand;
+  const regionLabel = CAR_REGION_LABELS[region];
+
+  // Additive only - the verdict stamp above already works standalone, so
+  // a missing GEMINI_API_KEY or a failed call just means this section
+  // stays empty rather than the whole response failing.
+  const geminiKey = process.env.GEMINI_API_KEY;
+  const advice = geminiKey
+    ? await generateCarQuoteAdvice(
+        {
+          jobLabel: CAR_JOB_LABELS_BENCHMARKED[jobType],
+          carClassLabel: CAR_SIZE_CLASS_LABELS[carClass],
+          brandLabel,
+          brandTier: adjusted.brandTier,
+          regionLabel,
+          quotedPrice,
+          range: { low: adjusted.low, high: adjusted.high },
+          verdictLabel: VERDICT_LABELS[verdict],
+          sourceConfidence: adjusted.source.confidence,
+          sourceNote: adjusted.source.note,
+          communityStats,
+          motTests,
+        },
+        geminiKey
+      )
+    : null;
 
   return NextResponse.json({
     verdict,
     range: { low: adjusted.low, high: adjusted.high },
     brandTier: adjusted.brandTier,
-    brandLabel: CAR_BRAND_OPTIONS.find((b) => b.value === brand)?.label ?? brand,
-    regionLabel: CAR_REGION_LABELS[region],
+    brandLabel,
+    regionLabel,
     jobLabel: CAR_JOB_LABELS_BENCHMARKED[jobType],
     carClassLabel: CAR_SIZE_CLASS_LABELS[carClass],
     communityStats,
+    advice,
   });
 }

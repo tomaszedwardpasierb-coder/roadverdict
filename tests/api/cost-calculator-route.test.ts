@@ -123,6 +123,18 @@ describe("POST /api/cost-calculator", () => {
     await expect(POST(request(validBody, "203.0.113.29"))).rejects.toThrow("Cosmos unreachable");
   });
 
+  it("passes motTests and taxStatus through to generateCostAdvice when given", async () => {
+    process.env.GEMINI_API_KEY = "fake-key";
+    const motTests = [{ testDate: "2025-06-01", passed: true, notes: "" }];
+    const taxStatus = { taxStatus: "Taxed", taxIsCurrentlyValid: true, taxDueDate: "2027-06-01", taxDaysRemaining: 263, vedStandardTwelveMonths: 27 };
+
+    await POST(request({ ...validBody, motTests, taxStatus }, "203.0.113.30"));
+
+    const callArg = mocks.generateCostAdvice.mock.calls[0][0];
+    expect(callArg.motTests).toEqual(motTests);
+    expect(callArg.taxStatus).toEqual(taxStatus);
+  });
+
   it("rate-limits after too many requests from the same IP within the window", async () => {
     const ip = "198.51.100.50";
     for (let i = 0; i < 20; i++) {

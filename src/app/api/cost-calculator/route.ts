@@ -48,7 +48,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const { bikeClass, brand, region, annualMileage } = parsed.data;
+  const { bikeClass, brand, region, annualMileage, motTests, taxStatus } = parsed.data;
   const breakdown = await computeAnnualCost(bikeClass, brand, region, annualMileage);
 
   // No logging here yet - this endpoint doesn't write to quote_logs. Could add
@@ -64,7 +64,7 @@ export async function POST(request: NextRequest) {
   const geminiKey = process.env.GEMINI_API_KEY;
   const advice = geminiKey
     ? await generateCostAdvice(
-        { bikeClassLabel: BIKE_CLASS_LABELS[bikeClass], brandLabel, regionLabel, annualMileage, breakdown },
+        { bikeClassLabel: BIKE_CLASS_LABELS[bikeClass], brandLabel, regionLabel, annualMileage, breakdown, motTests, taxStatus },
         geminiKey
       )
     : null;

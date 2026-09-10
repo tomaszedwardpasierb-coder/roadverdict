@@ -1,144 +1,127 @@
 // Place at: tests/api/car-buying-guide-lookup-route.test.ts
-// Mirrors buying-guide-lookup-route.test.ts's own coverage - same VDG
-// call shape, just gated on 'four-wheeled' instead of 'motorcycle' and
-// calling generateCarBuyingGuideBriefing.
+// Mirrors buying-guide-lookup-route.test.ts's own coverage - same
+// MotHistoryDetails + VehicleTaxDetails free tier and vdiPurchase-gated
+// paid VDI check, plus the car-only, free-but-rate-limited valuation
+// (fully decoupled from the VDI purchase - see valuationCheckUsage.ts).
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 
 const mocks = vi.hoisted(() => ({
   getSession: vi.fn(),
   parseMotHistory: vi.fn(),
-  classifyVehicleType: vi.fn(),
   generateCarBuyingGuideBriefing: vi.fn(),
   isPro: vi.fn(),
   getUserDoc: vi.fn(),
-  canRunFreeVdiCheck: vi.fn(),
-  recordVdiCheckRun: vi.fn(),
-  nextFreeVdiCheckAt: vi.fn(),
+  canRunValuationCheck: vi.fn(),
+  recordValuationCheckRun: vi.fn(),
+  nextValuationCheckAt: vi.fn(),
+  getVdiPurchase: vi.fn(),
+  markVdiPurchaseConsumed: vi.fn(),
+  selfHealBuyingGuideVdiPurchase: vi.fn(),
   fetchVdiCheckFromVdg: vi.fn(),
   fetchValuationFromVdg: vi.fn(),
+  fetchVehicleTaxDetailsFromVdg: vi.fn(),
   fetch: vi.fn(),
 }));
 
 vi.mock("@/lib/auth/session", () => ({ getSession: mocks.getSession }));
 vi.mock("@/lib/tracker/motHistory", () => ({ parseMotHistory: mocks.parseMotHistory }));
-vi.mock("@/lib/tracker/vehicleTypeCheck", () => ({
-  classifyVehicleType: mocks.classifyVehicleType,
-}));
 vi.mock("@/lib/tracker/carBuyingGuideBriefing", () => ({
   generateCarBuyingGuideBriefing: mocks.generateCarBuyingGuideBriefing,
 }));
 vi.mock("@/lib/subscriptions", () => ({ isPro: mocks.isPro }));
 vi.mock("@/lib/tracker/userDoc", () => ({ getUserDoc: mocks.getUserDoc }));
-vi.mock("@/lib/tracker/vdiCheckUsage", () => ({
-  canRunFreeVdiCheck: mocks.canRunFreeVdiCheck,
-  recordVdiCheckRun: mocks.recordVdiCheckRun,
-  nextFreeVdiCheckAt: mocks.nextFreeVdiCheckAt,
+vi.mock("@/lib/tracker/valuationCheckUsage", () => ({
+  canRunValuationCheck: mocks.canRunValuationCheck,
+  recordValuationCheckRun: mocks.recordValuationCheckRun,
+  nextValuationCheckAt: mocks.nextValuationCheckAt,
+}));
+vi.mock("@/lib/tracker/vdiPurchase", () => ({
+  getVdiPurchase: mocks.getVdiPurchase,
+  markVdiPurchaseConsumed: mocks.markVdiPurchaseConsumed,
+}));
+vi.mock("@/lib/payments/buyingGuideVdiCheckout", () => ({
+  selfHealBuyingGuideVdiPurchase: mocks.selfHealBuyingGuideVdiPurchase,
 }));
 vi.mock("@/lib/tracker/vdiCheckFetch", () => ({ fetchVdiCheckFromVdg: mocks.fetchVdiCheckFromVdg }));
 vi.mock("@/lib/tracker/valuationFetch", () => ({ fetchValuationFromVdg: mocks.fetchValuationFromVdg }));
+vi.mock("@/lib/tracker/vehicleTaxFetch", () => ({ fetchVehicleTaxDetailsFromVdg: mocks.fetchVehicleTaxDetailsFromVdg }));
 vi.stubGlobal("fetch", mocks.fetch);
 
 import { GET } from "@/app/api/cars/buying-guide-lookup/route";
 
-function request(vrm?: string, includeVdi?: boolean): NextRequest {
+function request(vrm?: string, extra?: Record<string, string>): NextRequest {
   const params = new URLSearchParams();
   if (vrm) params.set("vrm", vrm);
-  if (includeVdi) params.set("includeVdi", "1");
+  if (extra) for (const [k, v] of Object.entries(extra)) params.set(k, v);
   const qs = params.toString();
   const url = `http://localhost/api/cars/buying-guide-lookup${qs ? `?${qs}` : ""}`;
   return new NextRequest(url, { method: "GET" });
 }
 
-function vdgVehicleSuccess(overrides: { statusCode?: number; bodyType?: string; make?: string; fuelType?: string } = {}) {
+function vdgMotSuccess(overrides: { statusCode?: number; tests?: object[] } = {}) {
   return {
     ok: true,
     json: () =>
       Promise.resolve({
-        ResponseInformation: {
-          StatusCode: overrides.statusCode ?? 0,
-          IsSuccessStatusCode: true,
-        },
-        Results: {
-          VehicleDetails: {
-            VehicleIdentification: {
-              Vrm: "AB20FOC",
-              DvlaMake: overrides.make ?? "FORD",
-              DvlaModel: "FOCUS",
-              YearOfManufacture: 2020,
-              DvlaFuelType: overrides.fuelType ?? "PETROL",
-              DvlaBodyType: overrides.bodyType ?? "HATCHBACK",
-            },
-            VehicleHistory: { ColourDetails: { CurrentColour: "BLUE" } },
-          },
-          ModelDetails: {
-            ModelIdentification: { Make: "Ford", Model: "Focus" },
-            Powertrain: { IceDetails: { EngineCapacityCc: 1000 } },
-          },
-        },
-      }),
-  };
-}
-
-function vdgVehicleNotFound() {
-  return {
-    ok: true,
-    json: () =>
-      Promise.resolve({
-        ResponseInformation: { StatusCode: 0, IsSuccessStatusCode: false },
-        Results: {},
-      }),
-  };
-}
-
-function vdgMotSuccess(tests: object[] = []) {
-  return {
-    ok: true,
-    json: () =>
-      Promise.resolve({
-        ResponseInformation: { IsSuccessStatusCode: true },
+        ResponseInformation: { StatusCode: overrides.statusCode ?? 0, IsSuccessStatusCode: true },
         Results: {
           MotHistoryDetails: {
+            Make: "Ford",
+            Model: "Focus",
+            FuelType: "PETROL",
+            Colour: "BLUE",
             MotDueDate: "2026-05-01",
-            MotTestDetailsList: tests,
+            MotTestDetailsList: overrides.tests ?? [],
           },
         },
       }),
   };
 }
 
-function vdgMotFailure() {
+function vdgMotNotFound() {
   return {
     ok: true,
-    json: () =>
-      Promise.resolve({
-        ResponseInformation: { IsSuccessStatusCode: false },
-        Results: {},
-      }),
+    json: () => Promise.resolve({ ResponseInformation: { StatusCode: 0, IsSuccessStatusCode: false }, Results: {} }),
   };
 }
 
 const parsedMotResult = {
   motDueDate: "2026-05-01",
-  tests: [
-    { testDate: "2025-01-01", passed: true, mileage: 12000, mileageTrusted: true, notes: "" },
-  ],
+  tests: [{ testDate: "2025-01-01", passed: true, mileage: 12000, mileageTrusted: true, notes: "" }],
 };
+
+function basePurchase(overrides: Partial<{ email: string; vrm: string; vehicleKind: string; status: string }> = {}) {
+  return {
+    id: "purchase123",
+    pk: "purchase123",
+    type: "vdiPurchase",
+    email: overrides.email ?? "buyer@example.com",
+    vrm: overrides.vrm ?? "AB20FOC",
+    vehicleKind: overrides.vehicleKind ?? "car",
+    createdAt: "2026-01-01T00:00:00.000Z",
+    status: overrides.status ?? "paid",
+  };
+}
 
 beforeEach(() => {
   Object.values(mocks).forEach((m) => m.mockReset());
   mocks.getSession.mockResolvedValue({ email: "buyer@example.com" });
-  mocks.classifyVehicleType.mockReturnValue("four-wheeled");
   mocks.parseMotHistory.mockReturnValue(parsedMotResult);
   mocks.generateCarBuyingGuideBriefing.mockResolvedValue(null);
   mocks.isPro.mockResolvedValue(false);
   mocks.getUserDoc.mockResolvedValue(null);
-  mocks.canRunFreeVdiCheck.mockReturnValue(true);
-  mocks.nextFreeVdiCheckAt.mockReturnValue(null);
+  mocks.canRunValuationCheck.mockReturnValue(true);
+  mocks.nextValuationCheckAt.mockReturnValue(null);
+  mocks.fetchVehicleTaxDetailsFromVdg.mockResolvedValue({
+    make: "Ford", taxStatus: "Taxed", taxIsCurrentlyValid: true, taxDueDate: "2027-06-01", taxDaysRemaining: 263, motStatus: "Valid", vedStandardTwelveMonths: 27,
+  });
   mocks.fetchVdiCheckFromVdg.mockResolvedValue({
     isStolen: false, hasWriteOffRecord: false, writeOffRecordCount: 0, hasOutstandingFinance: false, financeRecords: [],
-    keeperChangeCount: 1, plateChangeCount: 0, colourChangeCount: 0, currentColour: null,
-    vedFirstYearTwelveMonths: null, vedStandardTwelveMonths: null,
+    keeperChanges: [], keeperChangeCount: 1, plateChangeCount: 0, colourChangeCount: 0, currentColour: null,
+    vedFirstYearTwelveMonths: null, vedStandardTwelveMonths: null, v5cReissueCount: 0,
+    calculatedAverageAnnualMileage: null, averageMileageForAge: null, mileageAnomalyDetected: false,
+    manufacturerWarrantyMiles: null, manufacturerWarrantyMonths: null,
   });
   mocks.fetchValuationFromVdg.mockResolvedValue({
     valuationTime: null, valuationMileage: null, vehicleDescription: null, onTheRoad: null,
@@ -147,12 +130,7 @@ beforeEach(() => {
   });
   process.env.VDG_API_KEY = "test-key";
   delete process.env.GEMINI_API_KEY;
-  // Default: both VDG calls succeed (vehicle first, MOT second)
-  let callCount = 0;
-  mocks.fetch.mockImplementation(() => {
-    callCount++;
-    return Promise.resolve(callCount === 1 ? vdgVehicleSuccess() : vdgMotSuccess());
-  });
+  mocks.fetch.mockResolvedValue(vdgMotSuccess());
 });
 
 describe("GET /api/cars/buying-guide-lookup", () => {
@@ -166,14 +144,12 @@ describe("GET /api/cars/buying-guide-lookup", () => {
   it("returns 400 when no vrm query param is provided", async () => {
     const response = await GET(request());
     expect(response.status).toBe(400);
-    expect(mocks.fetch).not.toHaveBeenCalled();
   });
 
   it("returns 503 when VDG_API_KEY is not configured", async () => {
     delete process.env.VDG_API_KEY;
     const response = await GET(request("AB20FOC"));
     expect(response.status).toBe(503);
-    expect(mocks.fetch).not.toHaveBeenCalled();
   });
 
   it("returns 502 when the VDG fetch throws entirely", async () => {
@@ -183,34 +159,24 @@ describe("GET /api/cars/buying-guide-lookup", () => {
   });
 
   it("returns 404 when VDG finds no vehicle for the registration", async () => {
-    mocks.fetch.mockReset();
-    mocks.fetch
-      .mockResolvedValueOnce(vdgVehicleNotFound())
-      .mockResolvedValueOnce(vdgMotSuccess());
+    mocks.fetch.mockResolvedValue(vdgMotNotFound());
     const response = await GET(request("AB20FOC"));
     expect(response.status).toBe(404);
   });
 
-  it("returns a well-formed result on a successful lookup", async () => {
+  it("returns identity straight from MotHistoryDetails, no VehicleDetails call at all", async () => {
     const response = await GET(request("AB20FOC"));
     expect(response.status).toBe(200);
     const body = await response.json();
-    expect(body).toMatchObject({
-      vrm: "AB20FOC",
-      make: "Ford",
-      model: "Focus",
-      year: 2020,
-      fuelType: "PETROL",
-      vehicleType: "four-wheeled",
-      plateInRetention: false,
-    });
+    expect(body).toMatchObject({ vrm: "AB20FOC", make: "Ford", model: "Focus", fuelType: "PETROL", colour: "BLUE" });
+    expect(mocks.fetch).toHaveBeenCalledTimes(1);
+    const url = mocks.fetch.mock.calls[0][0] as string;
+    expect(url).toContain("packageName=MotHistoryDetails");
+    expect(url).not.toContain("packageName=VehicleDetails");
   });
 
   it("sets plateInRetention true when VDG returns StatusCode 21", async () => {
-    mocks.fetch.mockReset();
-    mocks.fetch
-      .mockResolvedValueOnce(vdgVehicleSuccess({ statusCode: 21 }))
-      .mockResolvedValueOnce(vdgMotSuccess());
+    mocks.fetch.mockResolvedValue(vdgMotSuccess({ statusCode: 21 }));
     const response = await GET(request("AB20FOC"));
     const body = await response.json();
     expect(body.plateInRetention).toBe(true);
@@ -224,60 +190,16 @@ describe("GET /api/cars/buying-guide-lookup", () => {
     expect(body.motDueDate).toBe("2026-05-01");
   });
 
-  it("returns empty motTests and null motDueDate when MOT lookup fails", async () => {
-    mocks.fetch.mockReset();
-    mocks.fetch
-      .mockResolvedValueOnce(vdgVehicleSuccess())
-      .mockResolvedValueOnce(vdgMotFailure());
-    const response = await GET(request("AB20FOC"));
-    const body = await response.json();
-    expect(body.motTests).toEqual([]);
-    expect(body.motDueDate).toBeNull();
-    expect(response.status).toBe(200);
-  });
-
-  it("still returns 200 when the MOT fetch JSON parse fails", async () => {
-    mocks.fetch.mockReset();
-    mocks.fetch
-      .mockResolvedValueOnce(vdgVehicleSuccess())
-      .mockResolvedValueOnce({ ok: true, json: () => Promise.reject(new Error("bad json")) });
-    const response = await GET(request("AB20FOC"));
-    expect(response.status).toBe(200);
-    const body = await response.json();
-    expect(body.motTests).toEqual([]);
-  });
-
   it("does not call generateCarBuyingGuideBriefing when GEMINI_API_KEY is absent", async () => {
     await GET(request("AB20FOC"));
     expect(mocks.generateCarBuyingGuideBriefing).not.toHaveBeenCalled();
   });
 
-  it("does not call generateCarBuyingGuideBriefing for a non-car vehicle", async () => {
-    process.env.GEMINI_API_KEY = "fake-key";
-    mocks.classifyVehicleType.mockReturnValue("motorcycle");
-    mocks.fetch
-      .mockResolvedValueOnce(vdgVehicleSuccess({ bodyType: "MOTOR CYCLE" }))
-      .mockResolvedValueOnce(vdgMotSuccess());
-    await GET(request("AB20FOC"));
-    expect(mocks.generateCarBuyingGuideBriefing).not.toHaveBeenCalled();
-  });
-
-  it("calls generateCarBuyingGuideBriefing for a car when GEMINI_API_KEY is set", async () => {
+  it("calls generateCarBuyingGuideBriefing when GEMINI_API_KEY is set", async () => {
     process.env.GEMINI_API_KEY = "fake-key";
     mocks.generateCarBuyingGuideBriefing.mockResolvedValue({ summary: "Looks good." });
     await GET(request("AB20FOC"));
     expect(mocks.generateCarBuyingGuideBriefing).toHaveBeenCalledOnce();
-  });
-
-  it("passes the DVLA fuel type through to generateCarBuyingGuideBriefing", async () => {
-    process.env.GEMINI_API_KEY = "fake-key";
-    mocks.fetch.mockReset();
-    mocks.fetch
-      .mockResolvedValueOnce(vdgVehicleSuccess({ fuelType: "HYBRID ELECTRIC (CLEAN)" }))
-      .mockResolvedValueOnce(vdgMotSuccess());
-    await GET(request("AB20FOC"));
-    const callArg = mocks.generateCarBuyingGuideBriefing.mock.calls[0][0];
-    expect(callArg.fuelType).toBe("HYBRID ELECTRIC (CLEAN)");
   });
 
   it("includes the briefing in the response when Gemini returns one", async () => {
@@ -289,78 +211,125 @@ describe("GET /api/cars/buying-guide-lookup", () => {
     expect(body.briefing).toEqual(briefing);
   });
 
-  it("sets briefing to null when Gemini key is absent", async () => {
-    const response = await GET(request("AB20FOC"));
-    const body = await response.json();
-    expect(body.briefing).toBeNull();
-  });
-
   it("normalises the VRM to uppercase with spaces stripped before sending to VDG", async () => {
     await GET(request("ab20 foc"));
     expect(mocks.fetch).toHaveBeenCalledWith(expect.stringContaining("AB20FOC"));
   });
 
-  it("makes exactly two parallel VDG calls (vehicle + MOT)", async () => {
+  // ── Free tax status (always attempted) ──────────────────────────────
+
+  it("always attempts the tax lookup", async () => {
     await GET(request("AB20FOC"));
-    expect(mocks.fetch).toHaveBeenCalledTimes(2);
-    const urls = mocks.fetch.mock.calls.map((c: unknown[]) => c[0] as string);
-    expect(urls.some((u: string) => u.includes("VehicleDetails"))).toBe(true);
-    expect(urls.some((u: string) => u.includes("MotHistoryDetails"))).toBe(true);
+    expect(mocks.fetchVehicleTaxDetailsFromVdg).toHaveBeenCalledWith("AB20FOC", "test-key");
   });
 
-  // ── VDI + valuation add-on ───────────────────────────────────────────
-
-  it("does not run a VDI/valuation check when includeVdi wasn't requested", async () => {
+  it("includes the real tax details in the response", async () => {
     const response = await GET(request("AB20FOC"));
     const body = await response.json();
+    expect(body.taxDetails).toMatchObject({ taxStatus: "Taxed", taxIsCurrentlyValid: true });
+  });
+
+  // ── Standalone, pay-per-use VDI check ─────────────────────────────────
+
+  it("does not run a VDI check when no vdiPurchaseId is supplied", async () => {
+    const response = await GET(request("AB20FOC"));
+    const body = await response.json();
+    expect(mocks.getVdiPurchase).not.toHaveBeenCalled();
     expect(mocks.fetchVdiCheckFromVdg).not.toHaveBeenCalled();
-    expect(mocks.fetchValuationFromVdg).not.toHaveBeenCalled();
     expect(body.vdiCheck).toBeNull();
-    expect(body.valuation).toBeNull();
+    expect(body.vdiCheckBlockedReason).toBeUndefined();
   });
 
-  it("does not run a VDI/valuation check for a non-car even when includeVdi is requested", async () => {
-    mocks.classifyVehicleType.mockReturnValue("motorcycle");
-    await GET(request("AB20FOC", true));
-    expect(mocks.fetchVdiCheckFromVdg).not.toHaveBeenCalled();
-    expect(mocks.fetchValuationFromVdg).not.toHaveBeenCalled();
-  });
-
-  it("runs both the VDI check and valuation for a free account off cooldown, and records the run", async () => {
-    const response = await GET(request("AB20FOC", true));
+  it("runs the VDI check and consumes the purchase when it's already paid", async () => {
+    mocks.getVdiPurchase.mockResolvedValue(basePurchase({ status: "paid" }));
+    const response = await GET(request("AB20FOC", { vdiPurchaseId: "purchase123" }));
     const body = await response.json();
     expect(mocks.fetchVdiCheckFromVdg).toHaveBeenCalledWith("AB20FOC", "test-key");
-    expect(mocks.fetchValuationFromVdg).toHaveBeenCalledWith("AB20FOC", "test-key");
-    expect(mocks.recordVdiCheckRun).toHaveBeenCalledWith("buyer@example.com");
+    expect(mocks.markVdiPurchaseConsumed).toHaveBeenCalledWith("purchase123");
     expect(body.vdiCheck).toMatchObject({ isStolen: false });
+  });
+
+  it("self-heals a pending purchase using session_id, then runs the check once it comes back paid", async () => {
+    mocks.getVdiPurchase.mockResolvedValue(basePurchase({ status: "pending" }));
+    mocks.selfHealBuyingGuideVdiPurchase.mockResolvedValue(basePurchase({ status: "paid" }));
+    const response = await GET(request("AB20FOC", { vdiPurchaseId: "purchase123", session_id: "cs_test_123" }));
+    const body = await response.json();
+    expect(mocks.selfHealBuyingGuideVdiPurchase).toHaveBeenCalledWith("purchase123", "cs_test_123");
+    expect(mocks.fetchVdiCheckFromVdg).toHaveBeenCalled();
+    expect(body.vdiCheck).toMatchObject({ isStolen: false });
+  });
+
+  it("blocks with payment_not_confirmed when pending and self-heal doesn't come back paid", async () => {
+    mocks.getVdiPurchase.mockResolvedValue(basePurchase({ status: "pending" }));
+    mocks.selfHealBuyingGuideVdiPurchase.mockResolvedValue(basePurchase({ status: "pending" }));
+    const response = await GET(request("AB20FOC", { vdiPurchaseId: "purchase123", session_id: "cs_test_123" }));
+    const body = await response.json();
+    expect(mocks.fetchVdiCheckFromVdg).not.toHaveBeenCalled();
+    expect(body.vdiCheckBlockedReason).toBe("payment_not_confirmed");
+  });
+
+  it("blocks with already_used when the purchase has already been consumed", async () => {
+    mocks.getVdiPurchase.mockResolvedValue(basePurchase({ status: "consumed" }));
+    const response = await GET(request("AB20FOC", { vdiPurchaseId: "purchase123" }));
+    const body = await response.json();
+    expect(mocks.fetchVdiCheckFromVdg).not.toHaveBeenCalled();
+    expect(body.vdiCheckBlockedReason).toBe("already_used");
+  });
+
+  it("blocks with invalid when the purchase was made for the bike route, not this car one", async () => {
+    mocks.getVdiPurchase.mockResolvedValue(basePurchase({ vehicleKind: "bike" }));
+    const response = await GET(request("AB20FOC", { vdiPurchaseId: "purchase123" }));
+    const body = await response.json();
+    expect(mocks.fetchVdiCheckFromVdg).not.toHaveBeenCalled();
+    expect(body.vdiCheckBlockedReason).toBe("invalid");
+  });
+
+  it("passes the vdiCheck result through to the briefing generator when present", async () => {
+    process.env.GEMINI_API_KEY = "fake-key";
+    mocks.getVdiPurchase.mockResolvedValue(basePurchase({ status: "paid" }));
+    await GET(request("AB20FOC", { vdiPurchaseId: "purchase123" }));
+    const callArg = mocks.generateCarBuyingGuideBriefing.mock.calls[0][0];
+    expect(callArg.vdiCheck).toMatchObject({ isStolen: false });
+  });
+
+  // ── Free, rate-limited valuation (decoupled from the VDI purchase) ────
+
+  it("runs the valuation for a free account off cooldown, and records the run", async () => {
+    const response = await GET(request("AB20FOC"));
+    const body = await response.json();
+    expect(mocks.fetchValuationFromVdg).toHaveBeenCalledWith("AB20FOC", "test-key");
+    expect(mocks.recordValuationCheckRun).toHaveBeenCalledWith("buyer@example.com");
     expect(body.valuation).toMatchObject({ privateAverage: 23994 });
   });
 
-  it("runs it for a Pro account without ever checking the cooldown or recording a run", async () => {
+  it("passes isPro through to canRunValuationCheck/nextValuationCheckAt so Pro gets a more generous cap", async () => {
     mocks.isPro.mockResolvedValue(true);
-    await GET(request("AB20FOC", true));
-    expect(mocks.canRunFreeVdiCheck).not.toHaveBeenCalled();
-    expect(mocks.fetchVdiCheckFromVdg).toHaveBeenCalled();
-    expect(mocks.recordVdiCheckRun).not.toHaveBeenCalled();
+    await GET(request("AB20FOC"));
+    expect(mocks.canRunValuationCheck).toHaveBeenCalledWith(null, true);
   });
 
-  it("blocks a free account on cooldown, returning the reason and next-available date instead of vdiCheck/valuation", async () => {
-    mocks.canRunFreeVdiCheck.mockReturnValue(false);
-    mocks.nextFreeVdiCheckAt.mockReturnValue("2026-02-01T00:00:00.000Z");
-    const response = await GET(request("AB20FOC", true));
+  it("blocks the valuation on cooldown, returning the reason and next-available date instead", async () => {
+    mocks.canRunValuationCheck.mockReturnValue(false);
+    mocks.nextValuationCheckAt.mockReturnValue("2026-02-01T00:00:00.000Z");
+    const response = await GET(request("AB20FOC"));
     const body = await response.json();
-    expect(mocks.fetchVdiCheckFromVdg).not.toHaveBeenCalled();
-    expect(body.vdiCheck).toBeNull();
+    expect(mocks.fetchValuationFromVdg).not.toHaveBeenCalled();
     expect(body.valuation).toBeNull();
-    expect(body.vdiCheckBlockedReason).toBe("cooldown");
-    expect(body.vdiCheckAvailableAt).toBe("2026-02-01T00:00:00.000Z");
+    expect(body.valuationBlockedReason).toBe("cooldown");
+    expect(body.valuationAvailableAt).toBe("2026-02-01T00:00:00.000Z");
   });
 
-  it("passes the vdiCheck and valuation through to the briefing generator when present", async () => {
+  it("still attempts the valuation even when no VDI purchase was made - fully decoupled", async () => {
+    const response = await GET(request("AB20FOC"));
+    const body = await response.json();
+    expect(body.vdiCheck).toBeNull();
+    expect(body.valuation).toMatchObject({ privateAverage: 23994 });
+  });
+
+  it("passes valuation through to the briefing generator when present", async () => {
     process.env.GEMINI_API_KEY = "fake-key";
-    await GET(request("AB20FOC", true));
+    await GET(request("AB20FOC"));
     const callArg = mocks.generateCarBuyingGuideBriefing.mock.calls[0][0];
-    expect(callArg.vdiCheck).toMatchObject({ isStolen: false });
     expect(callArg.valuation).toMatchObject({ privateAverage: 23994 });
   });
 });

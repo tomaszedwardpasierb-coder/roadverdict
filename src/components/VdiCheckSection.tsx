@@ -11,9 +11,9 @@
 // widget in a different visual language.
 import { useState } from 'react';
 import type { VdiUnlock } from '@/lib/tracker/vdiUnlock';
+import { VDI_CHECK_PRICE_LABEL } from '@/lib/payments/pricing';
 import styles from '@/app/report/[token]/report.module.css';
 
-const PRICE_LABEL: Record<'bike' | 'car', string> = { bike: '£7.99', car: '£9.99' };
 const CHECKOUT_PATH: Record<'bike' | 'car', string> = { bike: '/api/tracker/vdi-checkout', car: '/api/cars/vdi-checkout' };
 
 interface Props {
@@ -74,7 +74,7 @@ export function VdiCheckSection({ vehicleKind, token, registration, make, model,
           {vehicleKind === 'car' && ' Includes an independent valuation range too.'}
         </p>
         <button className="btn-primary" type="button" onClick={handleUnlock} disabled={loading}>
-          {loading ? 'Starting checkout…' : `Unlock for ${PRICE_LABEL[vehicleKind]}`}
+          {loading ? 'Starting checkout…' : `Unlock for ${VDI_CHECK_PRICE_LABEL[vehicleKind]}`}
         </button>
         {error && <p className="error-text" role="alert">{error}</p>}
       </div>
@@ -126,7 +126,47 @@ export function VdiCheckSection({ vehicleKind, token, registration, make, model,
             {vdiCheck.currentColour ? ` (currently ${vdiCheck.currentColour.toLowerCase()})` : ''}
           </dd>
         </div>
+        {vdiCheck.calculatedAverageAnnualMileage != null && vdiCheck.averageMileageForAge != null && (
+          <div className={styles.itemByItemRow}>
+            <dt>Average annual mileage</dt>
+            <dd>
+              {vdiCheck.calculatedAverageAnnualMileage.toLocaleString()} mi/year (typical for this age: {vdiCheck.averageMileageForAge.toLocaleString()})
+              {vdiCheck.mileageAnomalyDetected ? ' - ⚠️ anomaly flagged' : ''}
+            </dd>
+          </div>
+        )}
+        {(vdiCheck.manufacturerWarrantyMonths != null || vdiCheck.manufacturerWarrantyMiles != null) && (
+          <div className={styles.itemByItemRow}>
+            <dt>Manufacturer warranty</dt>
+            <dd>
+              {[
+                vdiCheck.manufacturerWarrantyMonths ? `${vdiCheck.manufacturerWarrantyMonths} months` : null,
+                vdiCheck.manufacturerWarrantyMiles ? `${vdiCheck.manufacturerWarrantyMiles.toLocaleString()} miles` : null,
+              ]
+                .filter(Boolean)
+                .join(' / ')}{' '}
+              from new
+            </dd>
+          </div>
+        )}
       </dl>
+
+      {vdiCheck.keeperChanges.length > 0 && (
+        <>
+          <h2 className={styles.docHeading}>Keeper change history</h2>
+          <dl className={styles.itemByItemList}>
+            {[...vdiCheck.keeperChanges].reverse().map((k, i) => (
+              <div className={styles.itemByItemRow} key={i}>
+                <dt>{new Date(k.keeperStartDate).toLocaleDateString('en-GB')}</dt>
+                <dd>
+                  New keeper registered
+                  {k.previousKeeperDisposalDate ? ` (previous keeper disposed ${new Date(k.previousKeeperDisposalDate).toLocaleDateString('en-GB')})` : ''}
+                </dd>
+              </div>
+            ))}
+          </dl>
+        </>
+      )}
 
       {valuation && (
         <>

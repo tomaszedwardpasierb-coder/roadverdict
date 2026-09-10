@@ -10,25 +10,34 @@ import {
   type CarRegion,
 } from '@/lib/carPriceData';
 import type { CarAnnualCostBreakdown } from '@/lib/carCostCalculator';
-import type { VehicleTypeCheck } from '@/lib/tracker/vehicleTypeCheck';
 import { CarCostBreakdownResult } from './CarCostBreakdownResult';
 
 interface ApiResponse {
   breakdown: CarAnnualCostBreakdown;
   brandLabel: string;
   regionLabel: string;
+  advice: { explanation: string; watchOutFor: string[] } | null;
   error?: string;
 }
 
-interface PlateLookupResponse {
+interface TaxDetails {
+  taxStatus: string | null;
+  taxIsCurrentlyValid: boolean;
+  taxDueDate: string | null;
+  taxDaysRemaining: number | null;
+  vedStandardTwelveMonths: number | null;
+}
+
+interface CostLookupResponse {
   vrm: string;
   make: string;
   model: string;
-  year: number;
   fuelType: string;
-  engineCapacityCc: number | null;
+  colour: string;
   plateInRetention: boolean;
-  vehicleType: VehicleTypeCheck;
+  motDueDate: string | null;
+  motTests: { testDate: string; passed: boolean; mileage: number | null; mileageTrusted: boolean; notes: string }[];
+  taxDetails: TaxDetails | null;
   error?: string;
 }
 
@@ -43,12 +52,6 @@ const FUEL_TYPE_LABELS: Record<CarFuelTypeOption, string> = {
   phev: 'Plug-in hybrid (PHEV)',
 };
 const FUEL_TYPES = Object.keys(FUEL_TYPE_LABELS) as CarFuelTypeOption[];
-
-function classFromEngineLitres(engineLitres: number): CarBenchmarkClass {
-  if (engineLitres <= 1.2) return 'small';
-  if (engineLitres <= 2.0) return 'medium';
-  return 'large';
-}
 
 // Mirrors AddCarForm.tsx's own mapDvlaFuelType, duplicated rather than
 // imported - that one returns CarFuelType (includes 'electric'), which
@@ -83,6 +86,11 @@ export function CarCostCalculatorForm({ signedIn, initialBrand, initialCarClass 
   const [lookupLoading, setLookupLoading] = useState(false);
   const [lookupError, setLookupError] = useState<string | null>(null);
   const [lookupNote, setLookupNote] = useState<ReactNode>(null);
+  // Silently carried through to the submit request - this tool's UI
+  // doesn't display MOT/tax detail itself, it just lets the AI advice
+  // reference real facts about this exact car.
+  const [motTests, setMotTests] = useState<CostLookupResponse['motTests']>([]);
+  const [taxDetails, setTaxDetails] = useState<TaxDetails | null>(null);
 
   async function handlePlateLookup() {
     if (!signedIn) {
@@ -104,19 +112,10 @@ export function CarCostCalculatorForm({ signedIn, initialBrand, initialCarClass 
     setLookupError(null);
     setLookupNote(null);
     try {
-      const res = await fetch(`/api/tracker/plate-lookup?vrm=${encodeURIComponent(cleaned)}`);
-      const data: PlateLookupResponse = await res.json();
+      const res = await fetch(`/api/tracker/cost-calculator-lookup?vrm=${encodeURIComponent(cleaned)}`);
+      const data: CostLookupResponse = await res.json();
       if (!res.ok) {
         setLookupError(data.error ?? 'No vehicle found for that registration. Pick it manually below instead.');
-        return;
-      }
-
-      if (data.vehicleType === 'motorcycle') {
-        setLookupError("That looks like a motorcycle, not a car - try the motorcycle cost calculator instead.");
-        return;
-      }
-      if (data.vehicleType === 'unknown') {
-        setLookupError("Couldn't confirm what type of vehicle this registration belongs to. Double-check the registration number, or enter the car's details manually below.");
         return;
       }
 
@@ -124,21 +123,22 @@ export function CarCostCalculatorForm({ signedIn, initialBrand, initialCarClass 
       const resolvedBrand = CAR_BRAND_OPTIONS.some((b) => b.value === matchedBrand) ? matchedBrand : 'other';
       setBrand(resolvedBrand);
 
-      if (data.engineCapacityCc) {
-        setCarClass(classFromEngineLitres(data.engineCapacityCc / 1000));
-      }
-
+      // Car size can no longer be auto-filled from this lookup -
+      // CAR_MODELS deliberately carries no engine-size data, and this
+      // lookup has no EngineCapacityCc either.
       const guessedFuelType = mapDvlaFuelType(String(data.fuelType ?? ''));
       if (guessedFuelType === 'electric') {
         setLookupNote(
-          `Found: ${data.make} ${data.model} (${data.year}) - looks fully electric. Electric running costs aren't supported here yet, so the fields below are left as a similar-sized petrol/diesel estimate instead.`
+          `Found: ${data.make} ${data.model} - looks fully electric. Electric running costs aren't supported here yet, so the fields below are left as a similar-sized petrol/diesel estimate instead.`
         );
       } else {
         if (guessedFuelType) setFuelType(guessedFuelType);
         setLookupNote(
-          `Found: ${data.make} ${data.model} (${data.year})${data.plateInRetention ? " - this plate isn't currently attached to a vehicle; showing the last one it was on" : ''}. Fields below updated - check them before working it out.`
+          `Found: ${data.make} ${data.model}${data.plateInRetention ? " - this plate isn't currently attached to a vehicle; showing the last one it was on" : ''}. Make and fuel type updated - check the car size, then work it out.`
         );
       }
+      setMotTests(data.motTests);
+      setTaxDetails(data.taxDetails);
     } catch {
       setLookupError("Couldn't reach the lookup service. Pick your car manually below instead.");
     } finally {
@@ -167,7 +167,11 @@ export function CarCostCalculatorForm({ signedIn, initialBrand, initialCarClass 
       const response = await fetch('/api/cars/cost-calculator', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ carClass, brand, region, fuelType, annualMileage: mileage, co2Gkm: co2 }),
+        body: JSON.stringify({
+          carClass, brand, region, fuelType, annualMileage: mileage, co2Gkm: co2,
+          motTests: motTests.length > 0 ? motTests.map(({ testDate, passed, notes }) => ({ testDate, passed, notes })) : undefined,
+          taxStatus: taxDetails ?? undefined,
+        }),
       });
       const data: ApiResponse = await response.json();
 
@@ -327,6 +331,7 @@ export function CarCostCalculatorForm({ signedIn, initialBrand, initialCarClass 
           breakdown={result.breakdown}
           brandLabel={result.brandLabel}
           regionLabel={result.regionLabel}
+          advice={result.advice}
         />
       )}
     </>

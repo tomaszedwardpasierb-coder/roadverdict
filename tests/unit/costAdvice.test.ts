@@ -86,4 +86,56 @@ describe("generateCostAdvice", () => {
       });
     });
   });
+
+  it("omits the tax-status and MOT-history blocks entirely when neither was given", async () => {
+    await generateCostAdvice(baseInput, "k");
+    const factsBlock = mocks.callGeminiForJson.mock.calls[0][1];
+    expect(factsBlock).not.toContain("REAL DVLA TAX STATUS");
+    expect(factsBlock).not.toContain("REAL MOT HISTORY");
+  });
+
+  it("includes the real DVLA tax status when given, flagged as independent of the benchmark tax figure", async () => {
+    const input: CostAdviceInput = {
+      ...baseInput,
+      taxStatus: { taxStatus: "Taxed", taxIsCurrentlyValid: true, taxDueDate: "2027-06-01", taxDaysRemaining: 263, vedStandardTwelveMonths: 27 },
+    };
+    await generateCostAdvice(input, "k");
+    const factsBlock = mocks.callGeminiForJson.mock.calls[0][1];
+    expect(factsBlock).toContain("REAL DVLA TAX STATUS FOR THIS EXACT BIKE (independent of the benchmark tax figure above)");
+    expect(factsBlock).toContain("Status: Taxed");
+    expect(factsBlock).toContain("DVLA-confirmed standard rate: £27/year");
+  });
+
+  it("flags a not-currently-valid tax status plainly in the facts block", async () => {
+    const input: CostAdviceInput = {
+      ...baseInput,
+      taxStatus: { taxStatus: "SORN", taxIsCurrentlyValid: false, taxDueDate: null, taxDaysRemaining: null, vedStandardTwelveMonths: null },
+    };
+    await generateCostAdvice(input, "k");
+    const factsBlock = mocks.callGeminiForJson.mock.calls[0][1];
+    expect(factsBlock).toContain("Status: SORN - NOT currently valid");
+  });
+
+  it("includes real MOT history, oldest-to-newest, when given", async () => {
+    const input: CostAdviceInput = {
+      ...baseInput,
+      motTests: [
+        { testDate: "2025-06-01", passed: true, notes: "" },
+        { testDate: "2024-06-01", passed: false, notes: "Rear tyre worn" },
+      ],
+    };
+    await generateCostAdvice(input, "k");
+    const factsBlock = mocks.callGeminiForJson.mock.calls[0][1];
+    expect(factsBlock).toContain("THIS BIKE'S REAL MOT HISTORY");
+    const idx2024 = factsBlock.indexOf("2024");
+    const idx2025 = factsBlock.indexOf("2025");
+    expect(idx2024).toBeGreaterThan(-1);
+    expect(idx2025).toBeGreaterThan(idx2024);
+  });
+
+  it("instructs the model to treat a real DVLA tax correction as a correction, not a discrepancy to be suspicious of", async () => {
+    await generateCostAdvice(baseInput, "k");
+    const systemPrompt = mocks.callGeminiForJson.mock.calls[0][0];
+    expect(systemPrompt).toContain("note that plainly as a correction");
+  });
 });

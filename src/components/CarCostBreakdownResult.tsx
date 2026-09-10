@@ -4,6 +4,7 @@ interface CarCostBreakdownResultProps {
   breakdown: CarAnnualCostBreakdown;
   brandLabel: string;
   regionLabel: string;
+  advice: { explanation: string; watchOutFor: string[] } | null;
 }
 
 const LINE_LABELS: { key: keyof Omit<CarAnnualCostBreakdown, 'total' | 'vedUnknown' | 'vedCaveat'>; label: string }[] = [
@@ -14,7 +15,7 @@ const LINE_LABELS: { key: keyof Omit<CarAnnualCostBreakdown, 'total' | 'vedUnkno
   { key: 'fuel', label: 'Fuel' },
 ];
 
-export function CarCostBreakdownResult({ breakdown, brandLabel, regionLabel }: CarCostBreakdownResultProps) {
+export function CarCostBreakdownResult({ breakdown, brandLabel, regionLabel, advice }: CarCostBreakdownResultProps) {
   return (
     <div className="verdict-wrap">
       <div className="receipt">
@@ -58,6 +59,22 @@ export function CarCostBreakdownResult({ breakdown, brandLabel, regionLabel }: C
           Compare insurance quotes
         </a>
       </div>
+      {advice && (
+        <div className="field-note" style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid var(--border)' }}>
+          <p style={{ fontWeight: 600, marginBottom: '0.4rem' }}>Where this actually goes</p>
+          <p style={{ margin: '0 0 0.6rem' }}>{advice.explanation}</p>
+          {advice.watchOutFor.length > 0 && (
+            <>
+              <p style={{ fontWeight: 600, marginBottom: '0.3rem' }}>Worth knowing</p>
+              <ul style={{ margin: 0, paddingLeft: '1.1rem' }}>
+                {advice.watchOutFor.map((w, i) => (
+                  <li key={i}>{w}</li>
+                ))}
+              </ul>
+            </>
+          )}
+        </div>
+      )}
     </div>
   );
 }

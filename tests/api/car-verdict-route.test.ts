@@ -4,12 +4,14 @@ import { NextRequest } from "next/server";
 const mocks = vi.hoisted(() => ({
   logCarQuoteCheck: vi.fn(),
   getCarCommunityStats: vi.fn(),
+  generateCarQuoteAdvice: vi.fn(),
 }));
 
 vi.mock("@/lib/db", () => ({
   logCarQuoteCheck: mocks.logCarQuoteCheck,
   getCarCommunityStats: mocks.getCarCommunityStats,
 }));
+vi.mock("@/lib/tracker/carQuoteAdvice", () => ({ generateCarQuoteAdvice: mocks.generateCarQuoteAdvice }));
 
 import { POST } from "@/app/api/cars/verdict/route";
 
@@ -40,7 +42,10 @@ const validBody = {
 beforeEach(() => {
   mocks.logCarQuoteCheck.mockReset();
   mocks.getCarCommunityStats.mockReset();
+  mocks.generateCarQuoteAdvice.mockReset();
   mocks.getCarCommunityStats.mockReturnValue(null);
+  mocks.generateCarQuoteAdvice.mockResolvedValue(null);
+  delete process.env.GEMINI_API_KEY;
 });
 
 describe("POST /api/cars/verdict", () => {
@@ -138,5 +143,33 @@ describe("POST /api/cars/verdict", () => {
     const limited = await POST(request(validBody, ip));
     expect(limited.status).toBe(429);
     await expect(limited.json()).resolves.toEqual({ error: "Too many requests. Try again in a minute." });
+  });
+
+  it("does not call generateCarQuoteAdvice when GEMINI_API_KEY is absent, and advice is null", async () => {
+    const response = await POST(request(validBody, "203.113.10.20"));
+    const body = await response.json();
+    expect(mocks.generateCarQuoteAdvice).not.toHaveBeenCalled();
+    expect(body.advice).toBeNull();
+  });
+
+  it("calls generateCarQuoteAdvice and includes its result when GEMINI_API_KEY is set", async () => {
+    process.env.GEMINI_API_KEY = "fake-key";
+    mocks.generateCarQuoteAdvice.mockResolvedValue({ explanation: "Right in the middle of typical.", questionsToAsk: [] });
+
+    const response = await POST(request(validBody, "203.113.10.21"));
+    const body = await response.json();
+
+    expect(mocks.generateCarQuoteAdvice).toHaveBeenCalledOnce();
+    expect(body.advice).toEqual({ explanation: "Right in the middle of typical.", questionsToAsk: [] });
+  });
+
+  it("passes motTests through to generateCarQuoteAdvice when given", async () => {
+    process.env.GEMINI_API_KEY = "fake-key";
+    const motTests = [{ testDate: "2025-06-01", passed: true, notes: "" }];
+
+    await POST(request({ ...validBody, motTests }, "203.113.10.22"));
+
+    const callArg = mocks.generateCarQuoteAdvice.mock.calls[0][0];
+    expect(callArg.motTests).toEqual(motTests);
   });
 });

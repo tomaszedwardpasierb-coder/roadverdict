@@ -15,12 +15,21 @@ export interface VdiFinanceRecord {
   financeCompany: string | null;
 }
 
+export interface VdiKeeperChange {
+  keeperStartDate: string;
+  previousKeeperDisposalDate: string | null;
+}
+
 export interface VdiCheckResult {
   isStolen: boolean;
   hasWriteOffRecord: boolean;
   writeOffRecordCount: number;
   hasOutstandingFinance: boolean;
   financeRecords: VdiFinanceRecord[];
+  // Dates, not just a count - lets the AI summary reason about ownership
+  // turnover velocity (several changes within a year is a real, specific
+  // pattern worth naming), not just report a bare number.
+  keeperChanges: VdiKeeperChange[];
   keeperChangeCount: number;
   plateChangeCount: number;
   colourChangeCount: number;
@@ -29,6 +38,19 @@ export interface VdiCheckResult {
   // for bikes, so kept on the one shared shape rather than a car-only field.
   vedFirstYearTwelveMonths: number | null;
   vedStandardTwelveMonths: number | null;
+  // How many times the V5C logbook has been reissued - corroborates
+  // keeper-change velocity (a reissue accompanies most ownership changes).
+  v5cReissueCount: number;
+  // Independent, DVSA-derived mileage-consistency check - genuinely
+  // different from this app's own mileageCheck.ts (which only checks the
+  // owner's own logged entries against each other): this compares the
+  // vehicle's real calculated annual mileage against what's typical for
+  // its age.
+  calculatedAverageAnnualMileage: number | null;
+  averageMileageForAge: number | null;
+  mileageAnomalyDetected: boolean;
+  manufacturerWarrantyMiles: number | null;
+  manufacturerWarrantyMonths: number | null;
 }
 
 export interface ValuationResult {

@@ -155,6 +155,16 @@ describe("POST /api/verdict", () => {
     expect(body.verdict).toBeDefined();
   });
 
+  it("passes motTests through to generateQuoteAdvice when given", async () => {
+    process.env.GEMINI_API_KEY = "fake-key";
+    const motTests = [{ testDate: "2025-06-01", passed: true, notes: "" }];
+
+    await POST(request({ ...validBody, motTests }, "203.0.113.53"));
+
+    const callArg = mocks.generateQuoteAdvice.mock.calls[0][0];
+    expect(callArg.motTests).toEqual(motTests);
+  });
+
   it("rate-limits after too many requests from the same IP within the window", async () => {
     const ip = "198.51.100.60";
     for (let i = 0; i < 20; i++) {
