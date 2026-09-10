@@ -1,9 +1,4 @@
 // Place at: src/lib/tracker/carBill.ts
-//
-// Deliberately narrower than BillDoc: no seriesId/seriesIndex/source -
-// those belong to the recurring instalment-plan feature (billSeries.ts),
-// which isn't part of this build's scope. Adding them later, when a car
-// equivalent of billSeries.ts exists, is additive and safe.
 import { createTrackerDoc, updateTrackerDoc, deleteTrackerDoc, type TrackerDocBase, type Attachment, type CurrencyConversionInfo } from "./cosmosHelpers";
 import { queryCarTrackerDocs } from "./car";
 
@@ -16,6 +11,12 @@ export interface CarBillDoc extends TrackerDocBase {
   // Optional, additive - set only on an mot-test bill imported from MOT
   // history, same rationale as BillDoc's own field of the same name.
   mileage?: number;
+  // Optional, additive - set only on a bill that belongs to a recurring
+  // instalment plan (see carBillSeries.ts). Mirrors BillDoc's own fields
+  // of the same name exactly.
+  seriesId?: string;
+  seriesIndex?: number;
+  source?: "manual" | "auto";
 }
 
 export async function createCarBill(

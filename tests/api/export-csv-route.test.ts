@@ -9,6 +9,8 @@ const mocks = vi.hoisted(() => ({
   getMods: vi.fn(),
   getBills: vi.fn(),
   materializeAllDueForBike: vi.fn(),
+  isCarReadOnly: vi.fn(),
+  materializeAllDueForCar: vi.fn(),
   getCarServiceRecords: vi.fn(),
   getCarFuelLogs: vi.fn(),
   getCarMods: vi.fn(),
@@ -18,11 +20,13 @@ const mocks = vi.hoisted(() => ({
 vi.mock("@/lib/auth/session", () => ({ getSession: mocks.getSession }));
 vi.mock("@/lib/tracker/activeVehicle", () => ({ resolveActiveVehicle: mocks.resolveActiveVehicle }));
 vi.mock("@/lib/tracker/bike", () => ({ isBikeReadOnly: mocks.isBikeReadOnly }));
+vi.mock("@/lib/tracker/car", () => ({ isCarReadOnly: mocks.isCarReadOnly }));
 vi.mock("@/lib/tracker/serviceRecord", () => ({ getServiceRecords: mocks.getServiceRecords }));
 vi.mock("@/lib/tracker/fuelLog", () => ({ getFuelLogs: mocks.getFuelLogs }));
 vi.mock("@/lib/tracker/mod", () => ({ getMods: mocks.getMods }));
 vi.mock("@/lib/tracker/bill", () => ({ getBills: mocks.getBills }));
 vi.mock("@/lib/tracker/billSeries", () => ({ materializeAllDueForBike: mocks.materializeAllDueForBike }));
+vi.mock("@/lib/tracker/carBillSeries", () => ({ materializeAllDueForCar: mocks.materializeAllDueForCar }));
 vi.mock("@/lib/tracker/carServiceRecord", () => ({ getCarServiceRecords: mocks.getCarServiceRecords }));
 vi.mock("@/lib/tracker/carFuelLog", () => ({ getCarFuelLogs: mocks.getCarFuelLogs }));
 vi.mock("@/lib/tracker/carMod", () => ({ getCarMods: mocks.getCarMods }));
@@ -39,6 +43,8 @@ beforeEach(() => {
   mocks.resolveActiveVehicle.mockResolvedValue({ kind: "bike", bike, hasAnyCar: false });
   mocks.isBikeReadOnly.mockReturnValue(false);
   mocks.materializeAllDueForBike.mockResolvedValue(undefined);
+  mocks.isCarReadOnly.mockReturnValue(false);
+  mocks.materializeAllDueForCar.mockResolvedValue(undefined);
   mocks.getServiceRecords.mockResolvedValue([]);
   mocks.getFuelLogs.mockResolvedValue([]);
   mocks.getMods.mockResolvedValue([]);
@@ -212,6 +218,17 @@ describe("GET /api/tracker/export/csv", () => {
     it("never calls the bike-only materialize-instalments step for a car", async () => {
       await GET();
       expect(mocks.materializeAllDueForBike).not.toHaveBeenCalled();
+    });
+
+    it("materialises due instalments for an active car before reading its bills", async () => {
+      await GET();
+      expect(mocks.materializeAllDueForCar).toHaveBeenCalledWith("rider@example.com", "car-1");
+    });
+
+    it("skips materialisation for a transferred (read-only) car", async () => {
+      mocks.isCarReadOnly.mockReturnValue(true);
+      await GET();
+      expect(mocks.materializeAllDueForCar).not.toHaveBeenCalled();
     });
 
     it("outputs a car service record row using the car job labels", async () => {

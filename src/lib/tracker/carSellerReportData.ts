@@ -2,7 +2,8 @@
 //
 // Car equivalent of sellerReportData.ts.
 import { notFound } from "next/navigation";
-import { getCarById, getCurrentRegistration, type CarDoc } from "@/lib/tracker/car";
+import { getCarById, getCurrentRegistration, isCarReadOnly, type CarDoc } from "@/lib/tracker/car";
+import { materializeAllDueForCar } from "@/lib/tracker/carBillSeries";
 import { resolveCarShareToken } from "@/lib/tracker/carShareLink";
 import { getCarReceiptRequestsForShareToken, canSendCarReminder } from "@/lib/tracker/carReceiptRequest";
 import type { EntryRequestStatus } from "@/lib/tracker/sellerReportData";
@@ -202,9 +203,16 @@ export async function getCarSellerReportCore(email: string, carId: string): Prom
   const car = await getCarById(email, carId);
   if (!car) notFound();
 
-  // No materialize-due-instalments step here - unlike bikes, recurring
-  // bill series (billSeries.ts) has no car equivalent yet, so there's
-  // nothing to bring up to date before reading bills.
+  // Same lazy-materialisation call as the car dashboard - a buyer
+  // opening a share link (or the owner's own Story/Reports tabs, which
+  // reuse this exact core) should never see an instalment plan stuck
+  // showing stale, un-materialised payments just because nobody happened
+  // to load the dashboard first. Skipped for a transferred (read-only)
+  // car, same reasoning as the dashboard's own call.
+  if (!isCarReadOnly(car)) {
+    await materializeAllDueForCar(email, carId);
+  }
+
   const [records, mods, bills, fuelLogs, reminders] = await Promise.all([
     getCarServiceRecords(email, carId),
     getCarMods(email, carId),

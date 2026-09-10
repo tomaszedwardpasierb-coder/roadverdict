@@ -6,6 +6,7 @@ import { getFuelLogs } from "@/lib/tracker/fuelLog";
 import { getMods } from "@/lib/tracker/mod";
 import { getBills } from "@/lib/tracker/bill";
 import { materializeAllDueForBike } from "@/lib/tracker/billSeries";
+import { materializeAllDueForCar } from "@/lib/tracker/carBillSeries";
 import { isBikeReadOnly, type BikeDoc } from "@/lib/tracker/bike";
 import { JOB_LABELS } from "@/lib/tracker/jobTypes";
 import { MOD_LABELS } from "@/lib/tracker/modTypes";
@@ -18,7 +19,7 @@ import { getCarBills } from "@/lib/tracker/carBill";
 import { CAR_JOB_LABELS } from "@/lib/tracker/carJobTypes";
 import { CAR_MOD_LABELS } from "@/lib/tracker/carModTypes";
 import { CAR_BILL_LABELS } from "@/lib/tracker/carBillTypes";
-import type { CarDoc } from "@/lib/tracker/car";
+import { isCarReadOnly, type CarDoc } from "@/lib/tracker/car";
 
 export const dynamic = "force-dynamic";
 
@@ -104,10 +105,11 @@ async function buildBikeCsvResponse(email: string, bike: BikeDoc): Promise<NextR
 
 // Car equivalent of buildBikeCsvResponse - mirrored, not shared, same
 // sister-schema convention as every other bike/car pair in this app.
-// No materialize-due-instalments step here: recurring bill series
-// (billSeries.ts) has no car equivalent yet, so there's nothing to
-// materialize for a car's bills.
 async function buildCarCsvResponse(email: string, car: CarDoc): Promise<NextResponse> {
+  if (!isCarReadOnly(car)) {
+    await materializeAllDueForCar(email, car.id);
+  }
+
   const [records, fuelLogs, mods, bills] = await Promise.all([
     getCarServiceRecords(email, car.id),
     getCarFuelLogs(email, car.id),

@@ -11,6 +11,7 @@ import { getBills } from "@/lib/tracker/bill";
 import { getLabour } from "@/lib/tracker/labour";
 import { LABOUR_LABELS } from "@/lib/tracker/labourTypes";
 import { getBillSeriesForBike, materializeAllDueForBike } from "@/lib/tracker/billSeries";
+import { getBillSeriesForCar, materializeAllDueForCar } from "@/lib/tracker/carBillSeries";
 import { getReminders, computeReminderStatus } from "@/lib/tracker/reminder";
 import { getShareLinksForUser } from "@/lib/tracker/shareLink";
 import { getPendingReceiptRequestsForOwner } from "@/lib/tracker/receiptRequest";
@@ -46,6 +47,7 @@ import { ModCard } from "./ModCard";
 import { BillCard } from "./BillCard";
 import { LabourCard } from "./LabourCard";
 import { BillSeriesSummary } from "./BillSeriesSummary";
+import { CarBillSeriesSummary } from "./CarBillSeriesSummary";
 import { ExcludeFromReportToggle } from "./ExcludeFromReportToggle";
 import { ReminderItem } from "./ReminderItem";
 import { BudgetWidget } from "./BudgetWidget";
@@ -964,12 +966,21 @@ async function renderCarDashboard(
   const fuelEconomyUnit: FuelEconomyUnit = car.fuelEconomyUnit ?? "mpg";
   const currency: Currency = car.currency ?? "GBP";
 
-  const [records, fuelLogs, mods, bills, labour, reminders, rates, carShareLinks, pendingCarReceiptRequests] = await Promise.all([
+  // Must run before getCarBills, not in parallel with it, same reasoning
+  // as the bike dashboard's own materializeAllDueForBike call - a fresh
+  // dashboard load needs this to already be current. Skipped for a
+  // transferred (read-only) car for the same reason bikes skip it.
+  if (!isCarReadOnly(car)) {
+    await materializeAllDueForCar(email, car.id);
+  }
+
+  const [records, fuelLogs, mods, bills, labour, carBillSeries, reminders, rates, carShareLinks, pendingCarReceiptRequests] = await Promise.all([
     getCarServiceRecords(email, car.id),
     getCarFuelLogs(email, car.id),
     getCarMods(email, car.id),
     getCarBills(email, car.id),
     getCarLabour(email, car.id),
+    getBillSeriesForCar(email, car.id),
     getCarReminders(email, car.id),
     getExchangeRates(),
     getCarShareLinksForUser(email),
@@ -1338,6 +1349,7 @@ async function renderCarDashboard(
       </div>
       <p className={styles.subtext}>The paperwork you genuinely can&apos;t afford to forget, tracked in one place.</p>
       <LogCarBillForm currency={currency} rates={rates} carYear={car.year} isCustomBuild={car.isCustomBuild} />
+      {carBillSeries.length > 0 && <CarBillSeriesSummary series={carBillSeries} currency={currency} rates={rates} />}
       <CarExcludeFromReportToggle
         fieldName="includeInsuranceInReport"
         included={Boolean(car.includeInsuranceInReport)}

@@ -12,6 +12,7 @@ const mocks = vi.hoisted(() => ({
   getCarReminders: vi.fn(),
   resolveCarShareToken: vi.fn(),
   getCarReceiptRequestsForShareToken: vi.fn(),
+  materializeAllDueForCar: vi.fn(),
 }));
 
 vi.mock("next/navigation", () => ({ notFound: mocks.notFound }));
@@ -37,6 +38,7 @@ vi.mock("@/lib/tracker/carMod", () => ({ getCarMods: mocks.getCarMods }));
 vi.mock("@/lib/tracker/carBill", () => ({ getCarBills: mocks.getCarBills }));
 vi.mock("@/lib/tracker/carFuelLog", () => ({ getCarFuelLogs: mocks.getCarFuelLogs }));
 vi.mock("@/lib/tracker/carReminder", () => ({ getCarReminders: mocks.getCarReminders }));
+vi.mock("@/lib/tracker/carBillSeries", () => ({ materializeAllDueForCar: mocks.materializeAllDueForCar }));
 
 // Every other dependency (carReminderStatus, mileageAudit,
 // sellerReportVerdict, carReportQuestions, carConsumablesDueSoon,
@@ -188,6 +190,7 @@ describe("getCarSellerReportCore", () => {
     mocks.getCarBills.mockResolvedValue([]);
     mocks.getCarFuelLogs.mockResolvedValue([]);
     mocks.getCarReminders.mockResolvedValue([]);
+    mocks.materializeAllDueForCar.mockResolvedValue(undefined);
   });
 
   it("calls notFound() (rather than returning null/undefined) when the car doesn't exist", async () => {
@@ -211,13 +214,16 @@ describe("getCarSellerReportCore", () => {
     expect(core.mileageCheck).toEqual({ implausible: false });
   });
 
-  // The one behaviour genuinely distinct from the bike version - no
-  // materialize-due-instalments call exists at all (no car billSeries
-  // yet), so this just confirms nothing throws or expects one.
-  it("never calls a materialize-instalments step (no car billSeries exists yet)", async () => {
+  it("materialises due instalments before reading the car's bills, same as the bike version", async () => {
     mocks.getCarById.mockResolvedValue(makeCar());
-    const core = await getCarSellerReportCore("owner@example.com", "car-1");
-    expect(core).toBeDefined();
+    await getCarSellerReportCore("owner@example.com", "car-1");
+    expect(mocks.materializeAllDueForCar).toHaveBeenCalledWith("owner@example.com", "car-1");
+  });
+
+  it("skips materialisation for a transferred (read-only) car", async () => {
+    mocks.getCarById.mockResolvedValue(makeCar({ transferredTo: { newCarId: "x", newOwnerEmail: "buyer@example.com", transferredAt: "2025-01-01" } }));
+    await getCarSellerReportCore("owner@example.com", "car-1");
+    expect(mocks.materializeAllDueForCar).not.toHaveBeenCalled();
   });
 
   it("uses the car's own, higher mileage-plausibility ceiling, not the motorcycle one", async () => {
