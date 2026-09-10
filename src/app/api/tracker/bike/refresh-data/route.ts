@@ -80,13 +80,24 @@ export async function POST(request: NextRequest) {
     console.error("MOT refresh failed:", err);
   }
 
+  // taxStatus/taxDueDate are returned even when the vehicle is simply
+  // taxed and nothing is wrong - the button surfaces this either way
+  // (see RefreshVehicleDataButton.tsx), rather than only ever saying
+  // something for the SORN case and staying silent otherwise. Silence
+  // here (both left null) is itself a signal worth being able to see:
+  // it means the check didn't run at all (no VDG_API_KEY configured) or
+  // the VDG call itself failed, not that everything's fine.
   let sorned = false;
+  let taxStatus: string | null = null;
+  let taxDueDate: string | null = null;
   try {
     const apiKey = process.env.VDG_API_KEY;
     if (apiKey) {
       const taxDetails = await fetchVehicleTaxDetailsFromVdg(registration, apiKey);
       await syncSornReminder(session.email, bike.id, taxDetails?.taxStatus ?? null);
       sorned = taxDetails?.taxStatus?.trim().toUpperCase() === "SORN";
+      taxStatus = taxDetails?.taxStatus ?? null;
+      taxDueDate = taxDetails?.taxDueDate ?? null;
     }
   } catch (err) {
     console.error("Tax/SORN check failed during refresh:", err);
@@ -95,5 +106,5 @@ export async function POST(request: NextRequest) {
   if (dvlaRefreshed || motCreated > 0) {
     void logImpersonationActivityForCurrentRequest("bike", bike.id, "update");
   }
-  return NextResponse.json({ ok: true, dvlaRefreshed, motCreated, motSkipped, sorned });
+  return NextResponse.json({ ok: true, dvlaRefreshed, motCreated, motSkipped, sorned, taxStatus, taxDueDate });
 }

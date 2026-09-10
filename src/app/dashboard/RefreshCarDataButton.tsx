@@ -29,7 +29,15 @@ export function RefreshCarDataButton({ carId }: { carId: string }) {
       const parts: string[] = [];
       if (data.dvlaRefreshed) parts.push('vehicle data updated');
       if (data.motCreated > 0) parts.push(`${data.motCreated} new MOT test${data.motCreated === 1 ? '' : 's'} logged`);
-      if (data.sorned) parts.push('⚠️ this car is currently SORN (not taxed) - see reminders below');
+      // Shown either way, not just for SORN - see the bike button's own
+      // equivalent comment.
+      if (data.sorned) {
+        parts.push('⚠️ this car is currently SORN (not taxed) - see reminders below');
+      } else if (data.taxStatus) {
+        parts.push(
+          `tax status: ${data.taxStatus}${data.taxDueDate ? ` (due ${new Date(data.taxDueDate).toLocaleDateString('en-GB')})` : ''}`
+        );
+      }
       setResult(parts.length > 0 ? parts.join(', ') + '.' : 'Checked - nothing new to add.');
       router.refresh();
     } catch {

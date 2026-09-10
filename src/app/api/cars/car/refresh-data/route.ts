@@ -73,13 +73,21 @@ export async function POST(request: NextRequest) {
     console.error("MOT refresh failed:", err);
   }
 
+  // taxStatus/taxDueDate are returned even when the car is simply taxed
+  // and nothing is wrong - see the equivalent block in the bike route
+  // for why (the button surfaces this either way, and silence here is
+  // itself a signal that the check didn't run at all).
   let sorned = false;
+  let taxStatus: string | null = null;
+  let taxDueDate: string | null = null;
   try {
     const apiKey = process.env.VDG_API_KEY;
     if (apiKey) {
       const taxDetails = await fetchVehicleTaxDetailsFromVdg(registration, apiKey);
       await syncCarSornReminder(session.email, car.id, taxDetails?.taxStatus ?? null);
       sorned = taxDetails?.taxStatus?.trim().toUpperCase() === "SORN";
+      taxStatus = taxDetails?.taxStatus ?? null;
+      taxDueDate = taxDetails?.taxDueDate ?? null;
     }
   } catch (err) {
     console.error("Tax/SORN check failed during refresh:", err);
@@ -88,5 +96,5 @@ export async function POST(request: NextRequest) {
   if (dvlaRefreshed || motCreated > 0) {
     void logImpersonationActivityForCurrentRequest("car", car.id, "update");
   }
-  return NextResponse.json({ ok: true, dvlaRefreshed, motCreated, motSkipped, sorned });
+  return NextResponse.json({ ok: true, dvlaRefreshed, motCreated, motSkipped, sorned, taxStatus, taxDueDate });
 }

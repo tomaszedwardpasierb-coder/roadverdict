@@ -73,6 +73,32 @@ describe("RefreshCarDataButton", () => {
     expect(await screen.findByText("⚠️ this car is currently SORN (not taxed) - see reminders below.")).toBeInTheDocument();
   });
 
+  // A taxed (non-SORN) vehicle must still get a plain confirmation - see
+  // the bike button's own equivalent test for why.
+  it("shows the tax status with its due date when the car is taxed, not just for a SORN result", async () => {
+    (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
+      ok: true,
+      json: async () => ({ dvlaRefreshed: false, motCreated: 0, sorned: false, taxStatus: "Taxed", taxDueDate: "2027-06-01" }),
+    });
+    const user = userEvent.setup();
+    render(<RefreshCarDataButton carId="car-1" />);
+    await user.click(screen.getByRole("button", { name: "Refresh vehicle data" }));
+
+    expect(await screen.findByText("tax status: Taxed (due 01/06/2027).")).toBeInTheDocument();
+  });
+
+  it("says nothing new when the tax check found nothing to report (taxStatus null)", async () => {
+    (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
+      ok: true,
+      json: async () => ({ dvlaRefreshed: false, motCreated: 0, sorned: false, taxStatus: null, taxDueDate: null }),
+    });
+    const user = userEvent.setup();
+    render(<RefreshCarDataButton carId="car-1" />);
+    await user.click(screen.getByRole("button", { name: "Refresh vehicle data" }));
+
+    expect(await screen.findByText("Checked - nothing new to add.")).toBeInTheDocument();
+  });
+
   it("shows the server's own error and does not refresh the page", async () => {
     (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({ ok: false, json: async () => ({ error: "DVLA lookup failed." }) });
     const user = userEvent.setup();

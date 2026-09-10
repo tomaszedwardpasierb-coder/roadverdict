@@ -180,17 +180,26 @@ describe("POST /api/cars/car/refresh-data", () => {
 
     expect(mocks.fetchVehicleTaxDetailsFromVdg).toHaveBeenCalledWith("AB12 CDE", "test-key");
     expect(mocks.syncCarSornReminder).toHaveBeenCalledWith("owner@example.com", "car-1", "SORN");
-    await expect(response.json()).resolves.toMatchObject({ sorned: true });
+    await expect(response.json()).resolves.toMatchObject({ sorned: true, taxStatus: "SORN" });
   });
 
   it("reports sorned false and still syncs the reminder (to clear one if it exists) when the vehicle is taxed", async () => {
     mocks.getSession.mockResolvedValue({ email: "owner@example.com" });
-    mocks.fetchVehicleTaxDetailsFromVdg.mockResolvedValue({ taxStatus: "Taxed" });
+    mocks.fetchVehicleTaxDetailsFromVdg.mockResolvedValue({ taxStatus: "Taxed", taxDueDate: "2027-06-01" });
 
     const response = await POST(request(JSON.stringify({ carId: "car-1" })));
 
     expect(mocks.syncCarSornReminder).toHaveBeenCalledWith("owner@example.com", "car-1", "Taxed");
-    await expect(response.json()).resolves.toMatchObject({ sorned: false });
+    await expect(response.json()).resolves.toMatchObject({ sorned: false, taxStatus: "Taxed", taxDueDate: "2027-06-01" });
+  });
+
+  it("returns taxStatus/taxDueDate as null when the tax check didn't run or found nothing", async () => {
+    mocks.getSession.mockResolvedValue({ email: "owner@example.com" });
+    mocks.fetchVehicleTaxDetailsFromVdg.mockResolvedValue(null);
+
+    const response = await POST(request(JSON.stringify({ carId: "car-1" })));
+
+    await expect(response.json()).resolves.toMatchObject({ sorned: false, taxStatus: null, taxDueDate: null });
   });
 
   it("skips the tax/SORN check entirely when VDG_API_KEY isn't configured", async () => {

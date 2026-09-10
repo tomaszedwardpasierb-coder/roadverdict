@@ -27,7 +27,16 @@ export function RefreshVehicleDataButton({ bikeId }: { bikeId: string }) {
       const parts: string[] = [];
       if (data.dvlaRefreshed) parts.push('vehicle data updated');
       if (data.motCreated > 0) parts.push(`${data.motCreated} new MOT test${data.motCreated === 1 ? '' : 's'} logged`);
-      if (data.sorned) parts.push('⚠️ this vehicle is currently SORN (not taxed) - see reminders below');
+      // Shown either way, not just for SORN - a taxed vehicle gets a
+      // plain confirmation instead of the refresh looking like it
+      // silently skipped the tax check entirely.
+      if (data.sorned) {
+        parts.push('⚠️ this vehicle is currently SORN (not taxed) - see reminders below');
+      } else if (data.taxStatus) {
+        parts.push(
+          `tax status: ${data.taxStatus}${data.taxDueDate ? ` (due ${new Date(data.taxDueDate).toLocaleDateString('en-GB')})` : ''}`
+        );
+      }
       setResult(parts.length > 0 ? parts.join(', ') + '.' : 'Checked - nothing new to add.');
       router.refresh();
     } catch {
