@@ -13,6 +13,7 @@ import {
 } from '@/lib/motorcycleModels';
 import { AGE_BAND_LABELS, type AgeBand, type Checklist } from '@/lib/buyerChecklist';
 import { BUYING_GUIDE_VDI_CHECK_PRICE_LABEL } from '@/lib/payments/pricing';
+import type { VdiCheckResult } from '@/lib/tracker/vdiUnlock';
 import { BuyingGuideResult } from './BuyingGuideResult';
 
 interface ApiResponse {
@@ -48,24 +49,7 @@ interface BuyingGuideLookupResponse {
   // Only ever populated once the standalone £9.99 VDI check has been
   // bought and successfully run for this exact plate - see
   // handleBuyVdiCheck below and vdiPurchase.ts.
-  vdiCheck: {
-    isStolen: boolean;
-    hasWriteOffRecord: boolean;
-    writeOffRecordCount: number;
-    hasOutstandingFinance: boolean;
-    financeRecords: { agreementDate: string | null; agreementType: string | null; financeCompany: string | null }[];
-    keeperChanges: { keeperStartDate: string; previousKeeperDisposalDate: string | null }[];
-    keeperChangeCount: number;
-    plateChangeCount: number;
-    colourChangeCount: number;
-    currentColour: string | null;
-    v5cReissueCount: number;
-    calculatedAverageAnnualMileage: number | null;
-    averageMileageForAge: number | null;
-    mileageAnomalyDetected: boolean;
-    manufacturerWarrantyMiles: number | null;
-    manufacturerWarrantyMonths: number | null;
-  } | null;
+  vdiCheck: VdiCheckResult | null;
   vdiCheckBlockedReason?: 'already_used' | 'payment_not_confirmed' | 'invalid' | 'fetch_failed';
   // Set alongside vdiCheck - when it was paid for, and how long it stays
   // retrievable for free by looking up this same plate again (see
@@ -331,21 +315,86 @@ export function BuyingGuideForm({ signedIn }: Props) {
               <ul style={{ margin: 0, paddingLeft: '1.1rem' }}>
                 <li className="field-note">{motResult.vdiCheck.isStolen ? '⚠️ Recorded as stolen' : 'No stolen marker found'}</li>
                 <li className="field-note">
-                  {motResult.vdiCheck.hasWriteOffRecord
-                    ? `⚠️ ${motResult.vdiCheck.writeOffRecordCount} write-off record(s) on file`
-                    : 'No write-off record found'}
+                  {!motResult.vdiCheck.hasWriteOffRecord ? (
+                    'No write-off record found'
+                  ) : motResult.vdiCheck.writeOffRecords && motResult.vdiCheck.writeOffRecords.length > 0 ? (
+                    <ul style={{ margin: '0.2rem 0 0', paddingLeft: '1.1rem' }}>
+                      {motResult.vdiCheck.writeOffRecords.map((r, i) => (
+                        <li key={i}>
+                          ⚠️ {r.status ?? 'Write-off recorded'}
+                          {r.insurerName ? ` by ${r.insurerName}` : ''}
+                          {r.insurerCode ? ` - ${r.insurerCode}` : ''}
+                          {r.lossDate ? ` (${new Date(r.lossDate).toLocaleDateString('en-GB')})` : ''}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    `⚠️ ${motResult.vdiCheck.writeOffRecordCount} write-off record(s) on file`
+                  )}
                 </li>
                 <li className="field-note">
                   {motResult.vdiCheck.hasOutstandingFinance
                     ? `⚠️ ${motResult.vdiCheck.financeRecords.length} outstanding finance agreement(s) on file`
                     : 'No outstanding finance found'}
                 </li>
+                {motResult.vdiCheck.dateFirstRegisteredInUk && (
+                  <li className="field-note">
+                    Date first registered (UK): {new Date(motResult.vdiCheck.dateFirstRegisteredInUk).toLocaleDateString('en-GB')}
+                  </li>
+                )}
+                {motResult.vdiCheck.dateOfManufacture && (
+                  <li className="field-note">
+                    Date of manufacture: {new Date(motResult.vdiCheck.dateOfManufacture).toLocaleDateString('en-GB')}
+                  </li>
+                )}
+                <li className="field-note">
+                  Colour:{' '}
+                  {motResult.vdiCheck.originalColour &&
+                  motResult.vdiCheck.currentColour &&
+                  motResult.vdiCheck.originalColour !== motResult.vdiCheck.currentColour
+                    ? `${motResult.vdiCheck.originalColour.toLowerCase()} → ${motResult.vdiCheck.currentColour.toLowerCase()}`
+                    : motResult.vdiCheck.currentColour
+                      ? motResult.vdiCheck.currentColour.toLowerCase()
+                      : 'not recorded'}
+                  {motResult.vdiCheck.colourChangeCount > 0
+                    ? ` (${motResult.vdiCheck.colourChangeCount} change${motResult.vdiCheck.colourChangeCount === 1 ? '' : 's'} on record)`
+                    : ''}
+                </li>
                 <li className="field-note">{motResult.vdiCheck.keeperChangeCount} keeper change(s) on record</li>
                 <li className="field-note">{motResult.vdiCheck.plateChangeCount} plate change(s) on record</li>
-                <li className="field-note">
-                  {motResult.vdiCheck.colourChangeCount} colour change(s) on record
-                  {motResult.vdiCheck.currentColour ? ` (currently ${motResult.vdiCheck.currentColour.toLowerCase()})` : ''}
-                </li>
+                {(motResult.vdiCheck.vedStandardSixMonths != null || motResult.vdiCheck.vedStandardTwelveMonths != null) && (
+                  <li className="field-note">
+                    Road tax (standard rate):{' '}
+                    {[
+                      motResult.vdiCheck.vedStandardSixMonths != null ? `£${motResult.vdiCheck.vedStandardSixMonths.toLocaleString()} for 6 months` : null,
+                      motResult.vdiCheck.vedStandardTwelveMonths != null ? `£${motResult.vdiCheck.vedStandardTwelveMonths.toLocaleString()} for 12 months` : null,
+                    ]
+                      .filter(Boolean)
+                      .join(' · ')}
+                  </li>
+                )}
+                {motResult.vdiCheck.massInServiceKg != null && (
+                  <li className="field-note">Mass in service: {motResult.vdiCheck.massInServiceKg.toLocaleString()} kg</li>
+                )}
+                {motResult.vdiCheck.taxationClass && (
+                  <li className="field-note">Taxation class: {motResult.vdiCheck.taxationClass}</li>
+                )}
+                {motResult.vdiCheck.bhp != null && <li className="field-note">Power: {motResult.vdiCheck.bhp} bhp</li>}
+                {motResult.vdiCheck.soundLevels &&
+                  (motResult.vdiCheck.soundLevels.stationaryDb != null || motResult.vdiCheck.soundLevels.driveByDb != null) && (
+                    <li className="field-note">
+                      Sound levels:{' '}
+                      {[
+                        motResult.vdiCheck.soundLevels.stationaryDb != null ? `stationary ${motResult.vdiCheck.soundLevels.stationaryDb} dB` : null,
+                        motResult.vdiCheck.soundLevels.driveByDb != null ? `drive-by ${motResult.vdiCheck.soundLevels.driveByDb} dB` : null,
+                      ]
+                        .filter(Boolean)
+                        .join(' · ')}
+                      {motResult.vdiCheck.soundLevels.engineSpeedRpm != null
+                        ? ` (at ${motResult.vdiCheck.soundLevels.engineSpeedRpm.toLocaleString()} rpm)`
+                        : ''}
+                    </li>
+                  )}
                 {motResult.vdiCheck.calculatedAverageAnnualMileage != null && motResult.vdiCheck.averageMileageForAge != null && (
                   <li className="field-note">
                     Average annual mileage: {motResult.vdiCheck.calculatedAverageAnnualMileage.toLocaleString()} mi/year
@@ -366,6 +415,18 @@ export function BuyingGuideForm({ signedIn }: Props) {
                   </li>
                 )}
               </ul>
+              {motResult.vdiCheck.plateChanges && motResult.vdiCheck.plateChanges.length > 0 && (
+                <>
+                  <p className="field-note" style={{ fontWeight: 600, margin: '0.6rem 0 0.3rem' }}>Plate change history</p>
+                  <ul style={{ margin: 0, paddingLeft: '1.1rem' }}>
+                    {motResult.vdiCheck.plateChanges.map((p, i) => (
+                      <li key={i} className="field-note">
+                        {p.dateOfTransaction ? new Date(p.dateOfTransaction).toLocaleDateString('en-GB') : 'Date unknown'} - {p.previousVrm ?? '?'} → {p.currentVrm ?? '?'}
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              )}
               {motResult.vdiCheck.keeperChanges.length > 0 && (
                 <>
                   <p className="field-note" style={{ fontWeight: 600, margin: '0.6rem 0 0.3rem' }}>Keeper change history</p>

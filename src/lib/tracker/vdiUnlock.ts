@@ -20,6 +20,31 @@ export interface VdiKeeperChange {
   previousKeeperDisposalDate: string | null;
 }
 
+export interface VdiWriteOffRecord {
+  // e.g. "CAT N NON STRUCTURAL DAMAGE" - already human-readable from VDG,
+  // not something to reconstruct from category + description ourselves.
+  status: string | null;
+  category: string | null;
+  lossDate: string | null;
+  insurerName: string | null;
+  insurerCode: string | null;
+}
+
+export interface VdiPlateChange {
+  currentVrm: string | null;
+  previousVrm: string | null;
+  dateOfTransaction: string | null;
+}
+
+export interface VdiSoundLevels {
+  stationaryDb: number | null;
+  driveByDb: number | null;
+  // The engine speed the drive-by figure was measured at, not the
+  // stationary test's own (different) rev point - VDG gives one shared
+  // EngineSpeedRpm value for the pair.
+  engineSpeedRpm: number | null;
+}
+
 export interface VdiCheckResult {
   isStolen: boolean;
   hasWriteOffRecord: boolean;
@@ -51,6 +76,23 @@ export interface VdiCheckResult {
   mileageAnomalyDetected: boolean;
   manufacturerWarrantyMiles: number | null;
   manufacturerWarrantyMonths: number | null;
+  // Optional, additive - added after the original VDICheck fetch/type
+  // were first built, so an already-cached vdiUnlock.vdiCheck from a
+  // check paid for before this change simply won't have these (a fresh
+  // fetch always populates every one of them, never leaving them
+  // undefined - see vdiCheckFetch.ts).
+  writeOffRecords?: VdiWriteOffRecord[];
+  plateChanges?: VdiPlateChange[];
+  originalColour?: string | null;
+  dateFirstRegisteredInUk?: string | null;
+  dateOfManufacture?: string | null;
+  // The standard rate's 6-month VED option, alongside the existing
+  // 12-month figures above (vedFirstYearTwelveMonths/vedStandardTwelveMonths).
+  vedStandardSixMonths?: number | null;
+  massInServiceKg?: number | null;
+  taxationClass?: string | null;
+  bhp?: number | null;
+  soundLevels?: VdiSoundLevels | null;
 }
 
 export interface ValuationResult {

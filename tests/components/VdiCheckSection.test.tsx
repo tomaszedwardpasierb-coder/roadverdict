@@ -203,6 +203,69 @@ describe("VdiCheckSection", () => {
     expect(screen.getByText("This vehicle's independent record is clean.")).toBeInTheDocument();
   });
 
+  it("renders the enriched write-off record (status, insurer, loss date), not just a bare count", () => {
+    const vdiUnlock: VdiUnlock = {
+      unlockedAt: "x",
+      stripeSessionId: "cs_1",
+      amountPaidPence: 799,
+      currency: "gbp",
+      vdiCheck: {
+        isStolen: false, hasWriteOffRecord: true, writeOffRecordCount: 1, hasOutstandingFinance: false, financeRecords: [],
+        keeperChanges: [], keeperChangeCount: 0, plateChangeCount: 0, colourChangeCount: 0, currentColour: "RED",
+        vedFirstYearTwelveMonths: null, vedStandardTwelveMonths: 125, v5cReissueCount: 0,
+        calculatedAverageAnnualMileage: null, averageMileageForAge: null, mileageAnomalyDetected: false,
+        manufacturerWarrantyMiles: null, manufacturerWarrantyMonths: null,
+        writeOffRecords: [
+          {
+            status: "CAT N NON STRUCTURAL DAMAGE",
+            category: "N",
+            lossDate: "2025-08-11T00:00:00Z",
+            insurerName: "4th Dimension Innovation Ltd",
+            insurerCode: "560",
+          },
+        ],
+      },
+    };
+    render(<VdiCheckSection vehicleKind="bike" token="tok_abc" registration="AB12CDE" make="Honda" model="CB125R" vdiUnlock={vdiUnlock} />);
+    expect(screen.getByText(/CAT N NON STRUCTURAL DAMAGE by 4th Dimension Innovation Ltd - 560/)).toBeInTheDocument();
+  });
+
+  it("renders date first registered, date of manufacture, original→current colour, VED rates, technical spec, and sound levels", () => {
+    const vdiUnlock: VdiUnlock = {
+      unlockedAt: "x",
+      stripeSessionId: "cs_1",
+      amountPaidPence: 799,
+      currency: "gbp",
+      vdiCheck: {
+        isStolen: false, hasWriteOffRecord: false, writeOffRecordCount: 0, hasOutstandingFinance: false, financeRecords: [],
+        keeperChanges: [], keeperChangeCount: 4, plateChangeCount: 0, colourChangeCount: 1, currentColour: "BLUE",
+        vedFirstYearTwelveMonths: null, vedStandardTwelveMonths: 125, v5cReissueCount: 4,
+        calculatedAverageAnnualMileage: 1310, averageMileageForAge: 64000, mileageAnomalyDetected: false,
+        manufacturerWarrantyMiles: null, manufacturerWarrantyMonths: null,
+        originalColour: "RED",
+        dateFirstRegisteredInUk: "2010-12-11T00:00:00Z",
+        dateOfManufacture: "2010-11-01T00:00:00Z",
+        vedStandardSixMonths: 68.75,
+        massInServiceKg: 202,
+        taxationClass: "L3",
+        bhp: 71,
+        soundLevels: { stationaryDb: 90, driveByDb: 79, engineSpeedRpm: 4200 },
+        plateChanges: [{ currentVrm: "DU60OAL", previousVrm: "PN74XSA", dateOfTransaction: "2020-05-15T00:00:00Z" }],
+      },
+    };
+    render(<VdiCheckSection vehicleKind="bike" token="tok_abc" registration="DU60OAL" make="Suzuki" model="SFV650" vdiUnlock={vdiUnlock} />);
+
+    expect(screen.getByText("11/12/2010")).toBeInTheDocument();
+    expect(screen.getByText(/red → blue/)).toBeInTheDocument();
+    expect(screen.getByText(/£68\.75 for 6 months.*£125 for 12 months/)).toBeInTheDocument();
+    expect(screen.getByText("202 kg")).toBeInTheDocument();
+    expect(screen.getByText("L3")).toBeInTheDocument();
+    expect(screen.getByText("71 bhp")).toBeInTheDocument();
+    expect(screen.getByText(/stationary 90 dB.*drive-by 79 dB.*at 4,200 rpm/)).toBeInTheDocument();
+    expect(screen.getByText("Plate change history")).toBeInTheDocument();
+    expect(screen.getByText(/PN74XSA → DU60OAL/)).toBeInTheDocument();
+  });
+
   it("omits the 'What this means' section entirely when aiSummary generation failed (null)", () => {
     const vdiUnlock: VdiUnlock = {
       unlockedAt: "x",

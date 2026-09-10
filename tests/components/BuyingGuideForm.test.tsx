@@ -263,6 +263,59 @@ describe("BuyingGuideForm", () => {
     expect(screen.queryByRole("button", { name: /Buy Independent Vehicle Check/ })).not.toBeInTheDocument();
   });
 
+  it("renders the enriched write-off record, registration/manufacture dates, VED rates, and technical spec", async () => {
+    (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        vrm: "DU60OAL", make: "Suzuki", model: "SFV650", fuelType: "Petrol", colour: "Red",
+        plateInRetention: false, motDueDate: null, motTests: [], briefing: null, taxDetails: null,
+        vdiCheck: {
+          isStolen: false, hasWriteOffRecord: true, writeOffRecordCount: 1, hasOutstandingFinance: false,
+          financeRecords: [], keeperChanges: [], keeperChangeCount: 4, plateChangeCount: 0, colourChangeCount: 1,
+          currentColour: "RED", v5cReissueCount: 4, calculatedAverageAnnualMileage: 1310, averageMileageForAge: 64000,
+          mileageAnomalyDetected: false, manufacturerWarrantyMiles: null, manufacturerWarrantyMonths: null,
+          writeOffRecords: [
+            {
+              status: "CAT N NON STRUCTURAL DAMAGE",
+              category: "N",
+              lossDate: "2025-08-11T00:00:00Z",
+              insurerName: "4th Dimension Innovation Ltd",
+              insurerCode: "560",
+            },
+          ],
+          originalColour: "RED",
+          dateFirstRegisteredInUk: "2010-12-11T00:00:00Z",
+          dateOfManufacture: "2010-12-11T00:00:00Z",
+          vedStandardSixMonths: 68.75,
+          vedStandardTwelveMonths: 125,
+          massInServiceKg: 202,
+          taxationClass: "L3",
+          bhp: 71,
+          soundLevels: { stationaryDb: 90, driveByDb: 79, engineSpeedRpm: 4200 },
+          plateChanges: [{ currentVrm: "DU60OAL", previousVrm: "PN74XSA", dateOfTransaction: "2020-05-15T00:00:00Z" }],
+        },
+        vdiCheckPurchasedAt: "2026-01-01T00:00:00.000Z",
+        vdiCheckExpiresAt: "2026-01-15T00:00:00.000Z",
+      }),
+    });
+    const user = userEvent.setup();
+    render(<BuyingGuideForm signedIn />);
+    await user.type(screen.getByLabelText("Search by registration (optional)"), "DU60OAL");
+    await user.click(screen.getByRole("button", { name: "Look up" }));
+
+    expect(await screen.findByText(/CAT N NON STRUCTURAL DAMAGE by 4th Dimension Innovation Ltd - 560/)).toBeInTheDocument();
+    expect(screen.getByText(/Date first registered \(UK\): 11\/12\/2010/)).toBeInTheDocument();
+    expect(screen.getByText(/Date of manufacture: 11\/12\/2010/)).toBeInTheDocument();
+    expect(screen.getByText(/Colour: red \(1 change on record\)/)).toBeInTheDocument();
+    expect(screen.getByText(/Road tax \(standard rate\): £68\.75 for 6 months.*£125 for 12 months/)).toBeInTheDocument();
+    expect(screen.getByText(/Mass in service: 202 kg/)).toBeInTheDocument();
+    expect(screen.getByText(/Taxation class: L3/)).toBeInTheDocument();
+    expect(screen.getByText(/Power: 71 bhp/)).toBeInTheDocument();
+    expect(screen.getByText(/Sound levels: stationary 90 dB.*drive-by 79 dB.*at 4,200 rpm/)).toBeInTheDocument();
+    expect(screen.getByText("Plate change history")).toBeInTheDocument();
+    expect(screen.getByText(/PN74XSA → DU60OAL/)).toBeInTheDocument();
+  });
+
   it("shows the already-used message and a fresh Buy button when a purchase has already been consumed", async () => {
     (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
       ok: true,

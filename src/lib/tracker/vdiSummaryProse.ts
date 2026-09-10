@@ -44,11 +44,20 @@ function buildFactsBlock(input: VdiSummaryInput): string {
 
   lines.push("INDEPENDENT VDI CHECK (third-party, not self-reported):");
   lines.push(vdiCheck.isStolen ? "- STOLEN MARKER: yes, currently recorded as stolen" : "- Stolen marker: none");
-  lines.push(
-    vdiCheck.hasWriteOffRecord
-      ? `- WRITE-OFF RECORD: yes, ${vdiCheck.writeOffRecordCount} record(s) on file`
-      : "- Write-off record: none"
-  );
+  if (vdiCheck.hasWriteOffRecord) {
+    if (vdiCheck.writeOffRecords && vdiCheck.writeOffRecords.length > 0) {
+      lines.push(`- WRITE-OFF RECORD: yes, ${vdiCheck.writeOffRecords.length} record(s) on file:`);
+      for (const r of vdiCheck.writeOffRecords) {
+        lines.push(
+          `  - ${r.status ?? "Write-off recorded"}${r.insurerName ? ` by ${r.insurerName}` : ""}${r.insurerCode ? ` (insurer code ${r.insurerCode})` : ""}${r.lossDate ? `, recorded ${fmtDate(r.lossDate)}` : ""}`
+        );
+      }
+    } else {
+      lines.push(`- WRITE-OFF RECORD: yes, ${vdiCheck.writeOffRecordCount} record(s) on file`);
+    }
+  } else {
+    lines.push("- Write-off record: none");
+  }
   if (vdiCheck.hasOutstandingFinance) {
     const record = vdiCheck.financeRecords[0];
     lines.push(
@@ -105,7 +114,7 @@ function buildFactsBlock(input: VdiSummaryInput): string {
 const SYSTEM_PROMPT = `You are an independent vehicle-history analyst giving a buyer the plain-English meaning of a third-party data check on a specific vehicle, alongside what its own seller already documented. Use ONLY the facts given below - never invent, estimate, or assume a fact not explicitly stated.
 
 Strict rules:
-- A stolen marker or write-off record is the single most important thing here if present - lead with it.
+- A stolen marker or write-off record is the single most important thing here if present - lead with it. When a write-off record gives a specific status (e.g. "CAT N NON STRUCTURAL DAMAGE") and insurer, name them exactly rather than a vague "the vehicle was written off".
 - If outstanding finance is recorded and its agreement date sits at or after the current keeper's start date, say plainly that finance appears to be currently outstanding under this ownership, not just "on file historically" - this matters because it can mean the vehicle isn't legally the seller's to sell outright.
 - If keeper change dates show multiple changes within a short span (say, under a year apart), name that specific pattern explicitly ("this vehicle changed hands twice within about X months") and suggest asking why - do not just report the count.
 - If the independent keeper-change count and the owner's own logged figure disagree, say so plainly as a discrepancy worth asking about.

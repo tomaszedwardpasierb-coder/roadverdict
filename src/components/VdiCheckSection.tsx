@@ -29,6 +29,10 @@ function fmtGbp(n: number): string {
   return `£${n.toLocaleString()}`;
 }
 
+function fmtDate(d: string): string {
+  return new Date(d).toLocaleDateString('en-GB');
+}
+
 export function VdiCheckSection({ vehicleKind, token, registration, make, model, vdiUnlock }: Props) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -105,11 +109,51 @@ export function VdiCheckSection({ vehicleKind, token, registration, make, model,
         </div>
         <div className={styles.itemByItemRow}>
           <dt>Write-off record</dt>
-          <dd>{vdiCheck.hasWriteOffRecord ? `⚠️ ${vdiCheck.writeOffRecordCount} record(s) on file` : 'None found'}</dd>
+          <dd>
+            {!vdiCheck.hasWriteOffRecord ? (
+              'None found'
+            ) : vdiCheck.writeOffRecords && vdiCheck.writeOffRecords.length > 0 ? (
+              <ul style={{ margin: 0, paddingLeft: '1.1rem' }}>
+                {vdiCheck.writeOffRecords.map((r, i) => (
+                  <li key={i}>
+                    ⚠️ {r.status ?? 'Write-off recorded'}
+                    {r.insurerName ? ` by ${r.insurerName}` : ''}
+                    {r.insurerCode ? ` - ${r.insurerCode}` : ''}
+                    {r.lossDate ? ` (${fmtDate(r.lossDate)})` : ''}
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              `⚠️ ${vdiCheck.writeOffRecordCount} record(s) on file`
+            )}
+          </dd>
         </div>
         <div className={styles.itemByItemRow}>
           <dt>Outstanding finance</dt>
           <dd>{vdiCheck.hasOutstandingFinance ? `⚠️ ${vdiCheck.financeRecords.length} agreement(s) on file` : 'None found'}</dd>
+        </div>
+        {vdiCheck.dateFirstRegisteredInUk && (
+          <div className={styles.itemByItemRow}>
+            <dt>Date first registered (UK)</dt>
+            <dd>{fmtDate(vdiCheck.dateFirstRegisteredInUk)}</dd>
+          </div>
+        )}
+        {vdiCheck.dateOfManufacture && (
+          <div className={styles.itemByItemRow}>
+            <dt>Date of manufacture</dt>
+            <dd>{fmtDate(vdiCheck.dateOfManufacture)}</dd>
+          </div>
+        )}
+        <div className={styles.itemByItemRow}>
+          <dt>Colour</dt>
+          <dd>
+            {vdiCheck.originalColour && vdiCheck.currentColour && vdiCheck.originalColour !== vdiCheck.currentColour
+              ? `${vdiCheck.originalColour.toLowerCase()} → ${vdiCheck.currentColour.toLowerCase()}`
+              : vdiCheck.currentColour
+                ? vdiCheck.currentColour.toLowerCase()
+                : 'Not recorded'}
+            {vdiCheck.colourChangeCount > 0 ? ` (${vdiCheck.colourChangeCount} change${vdiCheck.colourChangeCount === 1 ? '' : 's'} on record)` : ''}
+          </dd>
         </div>
         <div className={styles.itemByItemRow}>
           <dt>Keeper changes</dt>
@@ -119,13 +163,51 @@ export function VdiCheckSection({ vehicleKind, token, registration, make, model,
           <dt>Plate changes</dt>
           <dd>{vdiCheck.plateChangeCount}</dd>
         </div>
-        <div className={styles.itemByItemRow}>
-          <dt>Colour changes</dt>
-          <dd>
-            {vdiCheck.colourChangeCount}
-            {vdiCheck.currentColour ? ` (currently ${vdiCheck.currentColour.toLowerCase()})` : ''}
-          </dd>
-        </div>
+        {(vdiCheck.vedStandardSixMonths != null || vdiCheck.vedStandardTwelveMonths != null) && (
+          <div className={styles.itemByItemRow}>
+            <dt>Road tax (standard rate)</dt>
+            <dd>
+              {[
+                vdiCheck.vedStandardSixMonths != null ? `${fmtGbp(vdiCheck.vedStandardSixMonths)} for 6 months` : null,
+                vdiCheck.vedStandardTwelveMonths != null ? `${fmtGbp(vdiCheck.vedStandardTwelveMonths)} for 12 months` : null,
+              ]
+                .filter(Boolean)
+                .join(' · ')}
+            </dd>
+          </div>
+        )}
+        {vdiCheck.massInServiceKg != null && (
+          <div className={styles.itemByItemRow}>
+            <dt>Mass in service</dt>
+            <dd>{vdiCheck.massInServiceKg.toLocaleString()} kg</dd>
+          </div>
+        )}
+        {vdiCheck.taxationClass && (
+          <div className={styles.itemByItemRow}>
+            <dt>Taxation class</dt>
+            <dd>{vdiCheck.taxationClass}</dd>
+          </div>
+        )}
+        {vdiCheck.bhp != null && (
+          <div className={styles.itemByItemRow}>
+            <dt>Power</dt>
+            <dd>{vdiCheck.bhp} bhp</dd>
+          </div>
+        )}
+        {vdiCheck.soundLevels && (vdiCheck.soundLevels.stationaryDb != null || vdiCheck.soundLevels.driveByDb != null) && (
+          <div className={styles.itemByItemRow}>
+            <dt>Sound levels</dt>
+            <dd>
+              {[
+                vdiCheck.soundLevels.stationaryDb != null ? `stationary ${vdiCheck.soundLevels.stationaryDb} dB` : null,
+                vdiCheck.soundLevels.driveByDb != null ? `drive-by ${vdiCheck.soundLevels.driveByDb} dB` : null,
+              ]
+                .filter(Boolean)
+                .join(' · ')}
+              {vdiCheck.soundLevels.engineSpeedRpm != null ? ` (at ${vdiCheck.soundLevels.engineSpeedRpm.toLocaleString()} rpm)` : ''}
+            </dd>
+          </div>
+        )}
         {vdiCheck.calculatedAverageAnnualMileage != null && vdiCheck.averageMileageForAge != null && (
           <div className={styles.itemByItemRow}>
             <dt>Average annual mileage</dt>
@@ -150,6 +232,22 @@ export function VdiCheckSection({ vehicleKind, token, registration, make, model,
           </div>
         )}
       </dl>
+
+      {vdiCheck.plateChanges && vdiCheck.plateChanges.length > 0 && (
+        <>
+          <h2 className={styles.docHeading}>Plate change history</h2>
+          <dl className={styles.itemByItemList}>
+            {vdiCheck.plateChanges.map((p, i) => (
+              <div className={styles.itemByItemRow} key={i}>
+                <dt>{p.dateOfTransaction ? fmtDate(p.dateOfTransaction) : 'Date unknown'}</dt>
+                <dd>
+                  {p.previousVrm ?? '?'} → {p.currentVrm ?? '?'}
+                </dd>
+              </div>
+            ))}
+          </dl>
+        </>
+      )}
 
       {vdiCheck.keeperChanges.length > 0 && (
         <>

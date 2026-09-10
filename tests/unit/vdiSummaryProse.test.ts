@@ -120,6 +120,35 @@ describe("generateVdiSummary", () => {
     expect(prompt).toContain("OUTSTANDING FINANCE: yes, 1 agreement(s) on file (e.g. Example Finance, HIRE PURCHASE), agreement dated 1 Jan 2024");
   });
 
+  it("names the write-off status and insurer explicitly when full record detail is present", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(geminiResponse(JSON.stringify(validResult)));
+    vi.stubGlobal("fetch", fetchMock);
+    await generateVdiSummary(
+      {
+        ...baseInput,
+        vdiCheck: {
+          ...cleanVdiCheck,
+          hasWriteOffRecord: true,
+          writeOffRecordCount: 1,
+          writeOffRecords: [
+            {
+              status: "CAT N NON STRUCTURAL DAMAGE",
+              category: "N",
+              lossDate: "2025-08-11T00:00:00Z",
+              insurerName: "4th Dimension Innovation Ltd",
+              insurerCode: "560",
+            },
+          ],
+        },
+      },
+      "key"
+    );
+    const prompt = JSON.parse(fetchMock.mock.calls[0][1].body).contents[0].parts[0].text;
+    expect(prompt).toContain(
+      "CAT N NON STRUCTURAL DAMAGE by 4th Dimension Innovation Ltd (insurer code 560), recorded 11 Aug 2025"
+    );
+  });
+
   it("flags a keeper-change discrepancy between the independent and logged figures in the facts block", async () => {
     const fetchMock = vi.fn().mockResolvedValue(geminiResponse(JSON.stringify(validResult)));
     vi.stubGlobal("fetch", fetchMock);

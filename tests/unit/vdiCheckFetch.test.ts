@@ -14,22 +14,30 @@ function vdgSuccess(overrides: Record<string, unknown> = {}) {
         ResponseInformation: { IsSuccessStatusCode: true },
         Results: {
           VehicleDetails: {
+            VehicleIdentification: {
+              DateFirstRegisteredInUk: "2010-12-11T00:00:00Z",
+              DateOfManufacture: "2010-12-11T00:00:00Z",
+            },
             VehicleStatus: {
               VehicleExciseDutyDetails: {
-                VedRate: { FirstYear: { TwelveMonths: 405 }, Standard: { TwelveMonths: 200 } },
+                VedRate: { FirstYear: { TwelveMonths: 405 }, Standard: { SixMonths: 68.75, TwelveMonths: 200 } },
               },
             },
             VehicleHistory: {
-              ColourDetails: { CurrentColour: "SILVER", NumberOfColourChanges: 0 },
+              ColourDetails: { CurrentColour: "SILVER", OriginalColour: "SILVER", NumberOfColourChanges: 0 },
               KeeperChangeList: [{ KeeperStartDate: "2025-11-12T00:00:00Z", PreviousKeeperDisposalDate: null }],
-              PlateChangeList: [{ CurrentVrm: "AS3527", PreviousVrm: "PN74XSA" }],
+              PlateChangeList: [{ CurrentVrm: "AS3527", PreviousVrm: "PN74XSA", DateOfTransaction: "2020-05-15T00:00:00Z" }],
               V5cCertificateList: [{ IssueDate: "2024-09-07T00:00:00Z" }, { IssueDate: "2025-11-12T00:00:00Z" }],
             },
+            DvlaTechnicalDetails: { MassInServiceKg: 202 },
           },
           ModelDetails: {
+            ModelClassification: { TaxationClass: "L3" },
             AdditionalInformation: {
               VehicleWarrantyInformation: { ManufacturerWarrantyMiles: 37282, ManufacturerWarrantyMonths: 24 },
             },
+            Emissions: { SoundLevels: { StationaryDb: 90, DriveByDb: 79, EngineSpeedRpm: 4200 } },
+            Performance: { Power: { Bhp: 71 } },
           },
           PncDetails: { IsStolen: false },
           MiaftrDetails: { WriteOffRecordList: [] },
@@ -90,6 +98,16 @@ describe("fetchVdiCheckFromVdg", () => {
       mileageAnomalyDetected: false,
       manufacturerWarrantyMiles: 37282,
       manufacturerWarrantyMonths: 24,
+      writeOffRecords: [],
+      plateChanges: [{ currentVrm: "AS3527", previousVrm: "PN74XSA", dateOfTransaction: "2020-05-15T00:00:00Z" }],
+      originalColour: "SILVER",
+      dateFirstRegisteredInUk: "2010-12-11T00:00:00Z",
+      dateOfManufacture: "2010-12-11T00:00:00Z",
+      vedStandardSixMonths: 68.75,
+      massInServiceKg: 202,
+      taxationClass: "L3",
+      bhp: 71,
+      soundLevels: { stationaryDb: 90, driveByDb: 79, engineSpeedRpm: 4200 },
     });
   });
 
@@ -106,6 +124,36 @@ describe("fetchVdiCheckFromVdg", () => {
     expect(result?.hasWriteOffRecord).toBe(true);
     expect(result?.writeOffRecordCount).toBe(1);
     expect(result?.hasOutstandingFinance).toBe(false);
+  });
+
+  // A real MIAFTR write-off record - status/category/insurer detail,
+  // not just a bare count (see the DU60OAL sample this was built from).
+  it("parses full write-off record detail (status, category, insurer, loss date)", async () => {
+    mocks.fetch.mockResolvedValue(
+      vdgSuccess({
+        MiaftrDetails: {
+          WriteOffRecordList: [
+            {
+              Status: "CAT N NON STRUCTURAL DAMAGE",
+              Category: "N",
+              LossDate: "2025-08-11T00:00:00Z",
+              InsurerName: "4th Dimension Innovation Ltd",
+              InsurerCode: "560",
+            },
+          ],
+        },
+      })
+    );
+    const result = await fetchVdiCheckFromVdg("AS3527", "test-key");
+    expect(result?.writeOffRecords).toEqual([
+      {
+        status: "CAT N NON STRUCTURAL DAMAGE",
+        category: "N",
+        lossDate: "2025-08-11T00:00:00Z",
+        insurerName: "4th Dimension Innovation Ltd",
+        insurerCode: "560",
+      },
+    ]);
   });
 
   it("defaults every count/flag safely when the nested detail blocks are entirely absent", async () => {
@@ -133,6 +181,16 @@ describe("fetchVdiCheckFromVdg", () => {
       mileageAnomalyDetected: false,
       manufacturerWarrantyMiles: null,
       manufacturerWarrantyMonths: null,
+      writeOffRecords: [],
+      plateChanges: [],
+      originalColour: null,
+      dateFirstRegisteredInUk: null,
+      dateOfManufacture: null,
+      vedStandardSixMonths: null,
+      massInServiceKg: null,
+      taxationClass: null,
+      bhp: null,
+      soundLevels: null,
     });
   });
 
