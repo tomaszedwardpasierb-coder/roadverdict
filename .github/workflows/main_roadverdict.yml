@@ -13,8 +13,19 @@ jobs:
         uses: actions/setup-node@v3
         with:
           node-version: '24.x'
+      # npm install, not npm ci - sharp's optional wasm32 fallback chain
+      # (@emnapi/core/@emnapi/runtime) has two versions with conflicting
+      # exact sub-dependency pins, and which one a Windows dev machine's
+      # lockfile records differs from what's needed on this Linux
+      # runner. npm install tolerates that benign mismatch and resolves
+      # it correctly for THIS platform at install time; npm ci hard-fails
+      # instead, since it requires an exact lockfile round-trip. We never
+      # actually use sharp's wasm32 fallback (only the real linux-x64
+      # native binding matters here), so losing npm ci's stricter
+      # reproducibility guarantee for this one irrelevant subtree is a
+      # fine trade.
       - name: Install dependencies
-        run: npm ci
+        run: npm install
       - name: Typecheck
         run: npm run typecheck
       - name: Lint
@@ -48,8 +59,9 @@ jobs:
         uses: actions/setup-node@v3
         with:
           node-version: '24.x'
+      # npm install, not npm ci - see the test job's own comment above.
       - name: Install dependencies
-        run: npm ci
+        run: npm install
       - name: Build
         run: npm run build
       - name: Install Playwright browser
@@ -135,8 +147,9 @@ jobs:
         uses: actions/setup-node@v3
         with:
           node-version: '24.x'
+      # npm install, not npm ci - see the test job's own comment above.
       - name: Install dependencies
-        run: npm ci
+        run: npm install
       - name: Build
         run: npm run build
       - name: Login to Azure
