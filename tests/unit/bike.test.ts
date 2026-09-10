@@ -52,8 +52,12 @@ import {
   addRegistrationChange,
   deleteBike,
   updateBikeChartType,
+  canRefreshBikeData,
+  nextBikeDataRefreshAt,
+  updateBikeLastRefreshedAt,
   type BikeDoc,
 } from "@/lib/tracker/bike";
+import { REFRESH_DATA_COOLDOWN_MS } from "@/lib/tracker/refreshDataCooldown";
 
 function resetAllMocks() {
   Object.values(mocks).forEach((m) => m.mockReset());
@@ -488,6 +492,65 @@ describe("updateBikeDvlaData", () => {
     const data = { ...dvlaBase, fuelTankCapacityLitres: 17, officialCombinedMpg: 55 };
     const result = await updateBikeDvlaData("owner@example.com", "bike-1", data);
     expect(result?.dvlaData).toEqual(data);
+  });
+});
+
+// ---------------------------------------------------------------------
+// "Refresh vehicle data" button cooldown
+// ---------------------------------------------------------------------
+
+describe("canRefreshBikeData", () => {
+  it("allows it when the bike has never been refreshed before", () => {
+    expect(canRefreshBikeData(makeBike())).toBe(true);
+  });
+
+  it("blocks within the 5-day cooldown", () => {
+    const bike = makeBike({ lastRefreshedAt: new Date(Date.now() - 1000).toISOString() });
+    expect(canRefreshBikeData(bike)).toBe(false);
+  });
+
+  it("allows it again once 5 days have passed", () => {
+    const bike = makeBike({ lastRefreshedAt: new Date(Date.now() - REFRESH_DATA_COOLDOWN_MS - 1000).toISOString() });
+    expect(canRefreshBikeData(bike)).toBe(true);
+  });
+});
+
+describe("nextBikeDataRefreshAt", () => {
+  it("returns null when the bike has never been refreshed before", () => {
+    expect(nextBikeDataRefreshAt(makeBike())).toBeNull();
+  });
+
+  it("returns null once the cooldown has already elapsed", () => {
+    const bike = makeBike({ lastRefreshedAt: new Date(Date.now() - REFRESH_DATA_COOLDOWN_MS - 1000).toISOString() });
+    expect(nextBikeDataRefreshAt(bike)).toBeNull();
+  });
+
+  it("returns the date the cooldown ends when still within it", () => {
+    const lastRefreshedAt = new Date(Date.now() - 1000).toISOString();
+    const bike = makeBike({ lastRefreshedAt });
+    const next = nextBikeDataRefreshAt(bike);
+    expect(next).not.toBeNull();
+    expect(new Date(next!).getTime()).toBe(new Date(lastRefreshedAt).getTime() + REFRESH_DATA_COOLDOWN_MS);
+  });
+});
+
+describe("updateBikeLastRefreshedAt", () => {
+  beforeEach(() => {
+    resetAllMocks();
+    mocks.upsert.mockResolvedValue(undefined);
+  });
+
+  it("returns null when the bike doesn't exist", async () => {
+    mocks.read.mockResolvedValue({ resource: undefined });
+    expect(await updateBikeLastRefreshedAt("owner@example.com", "missing")).toBeNull();
+  });
+
+  it("stamps lastRefreshedAt with the current time and upserts", async () => {
+    mocks.read.mockResolvedValue({ resource: makeBike() });
+    const before = Date.now();
+    const result = await updateBikeLastRefreshedAt("owner@example.com", "bike-1");
+    expect(new Date(result!.lastRefreshedAt!).getTime()).toBeGreaterThanOrEqual(before);
+    expect(mocks.upsert).toHaveBeenCalledWith(expect.objectContaining({ lastRefreshedAt: result!.lastRefreshedAt }));
   });
 });
 

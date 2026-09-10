@@ -7,7 +7,16 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import styles from './dashboard.module.css';
 
-export function RefreshCarDataButton({ carId }: { carId: string }) {
+interface Props {
+  carId: string;
+  // Server-computed from the car's own lastRefreshedAt (see car.ts's
+  // canRefreshCarData/nextCarDataRefreshAt) - mirrors
+  // RefreshVehicleDataButton.tsx's own props exactly.
+  available: boolean;
+  nextAvailableAt: string | null;
+}
+
+export function RefreshCarDataButton({ carId, available, nextAvailableAt }: Props) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<string | null>(null);
@@ -46,6 +55,14 @@ export function RefreshCarDataButton({ carId }: { carId: string }) {
     } finally {
       setLoading(false);
     }
+  }
+
+  if (!available) {
+    return (
+      <p className="field-note" style={{ fontSize: '0.72rem' }}>
+        Refresh available again{nextAvailableAt ? ` on ${new Date(nextAvailableAt).toLocaleDateString('en-GB')}` : ' soon'}.
+      </p>
+    );
   }
 
   return (

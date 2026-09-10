@@ -7,6 +7,9 @@ const mocks = vi.hoisted(() => ({
   getCurrentRegistration: vi.fn(),
   updateBikeDvlaData: vi.fn(),
   isBikeReadOnly: vi.fn(),
+  canRefreshBikeData: vi.fn(),
+  nextBikeDataRefreshAt: vi.fn(),
+  updateBikeLastRefreshedAt: vi.fn(),
   fetchDvlaDataFromVdg: vi.fn(),
   importMotHistoryForBike: vi.fn(),
   fetchVehicleTaxDetailsFromVdg: vi.fn(),
@@ -24,6 +27,9 @@ vi.mock("@/lib/tracker/bike", () => ({
   getCurrentRegistration: mocks.getCurrentRegistration,
   updateBikeDvlaData: mocks.updateBikeDvlaData,
   isBikeReadOnly: mocks.isBikeReadOnly,
+  canRefreshBikeData: mocks.canRefreshBikeData,
+  nextBikeDataRefreshAt: mocks.nextBikeDataRefreshAt,
+  updateBikeLastRefreshedAt: mocks.updateBikeLastRefreshedAt,
   BIKE_READ_ONLY_MESSAGE: "This bike has been transferred and is now read-only.",
 }));
 vi.mock("@/lib/tracker/dvlaDataFetch", () => ({ fetchDvlaDataFromVdg: mocks.fetchDvlaDataFromVdg }));
@@ -49,6 +55,9 @@ describe("POST /api/tracker/bike/refresh-data", () => {
     Object.values(mocks).forEach((m) => m.mockReset());
     mocks.getBike.mockResolvedValue(bike);
     mocks.isBikeReadOnly.mockReturnValue(false);
+    mocks.canRefreshBikeData.mockReturnValue(true);
+    mocks.nextBikeDataRefreshAt.mockReturnValue(null);
+    mocks.updateBikeLastRefreshedAt.mockResolvedValue(bike);
     mocks.getCurrentRegistration.mockReturnValue("AB12 CDE");
     mocks.fetchDvlaDataFromVdg.mockResolvedValue(null);
     mocks.importMotHistoryForBike.mockResolvedValue({ createdCount: 0, skippedCount: 0, skipped: [], motDueDate: null, reminderSet: false });
@@ -91,6 +100,26 @@ describe("POST /api/tracker/bike/refresh-data", () => {
     const response = await POST(request(JSON.stringify({ bikeId: "bike-1" })));
     expect(response.status).toBe(403);
     expect(mocks.fetchDvlaDataFromVdg).not.toHaveBeenCalled();
+  });
+
+  // Once every 5 days - see bike.ts's canRefreshBikeData.
+  it("blocks refreshing again within the 5-day cooldown", async () => {
+    mocks.getSession.mockResolvedValue({ email: "owner@example.com" });
+    mocks.canRefreshBikeData.mockReturnValue(false);
+    mocks.nextBikeDataRefreshAt.mockReturnValue("2027-06-05T00:00:00.000Z");
+    const response = await POST(request(JSON.stringify({ bikeId: "bike-1" })));
+    expect(response.status).toBe(429);
+    await expect(response.json()).resolves.toEqual({
+      error: "Vehicle data was refreshed recently.",
+      nextAvailableAt: "2027-06-05T00:00:00.000Z",
+    });
+    expect(mocks.fetchDvlaDataFromVdg).not.toHaveBeenCalled();
+  });
+
+  it("stamps lastRefreshedAt after a successful refresh", async () => {
+    mocks.getSession.mockResolvedValue({ email: "owner@example.com" });
+    await POST(request(JSON.stringify({ bikeId: "bike-1" })));
+    expect(mocks.updateBikeLastRefreshedAt).toHaveBeenCalledWith("owner@example.com", "bike-1");
   });
 
   it("refuses a bike with no registration on record", async () => {

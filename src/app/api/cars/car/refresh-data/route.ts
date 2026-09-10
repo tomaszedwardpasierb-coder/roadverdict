@@ -6,7 +6,16 @@
 // own comment for the full reasoning.
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/session";
-import { getCarById, getCurrentRegistration, updateCarDvlaData, isCarReadOnly, CAR_READ_ONLY_MESSAGE } from "@/lib/tracker/car";
+import {
+  getCarById,
+  getCurrentRegistration,
+  updateCarDvlaData,
+  isCarReadOnly,
+  CAR_READ_ONLY_MESSAGE,
+  canRefreshCarData,
+  nextCarDataRefreshAt,
+  updateCarLastRefreshedAt,
+} from "@/lib/tracker/car";
 import { fetchDvlaDataFromVdg } from "@/lib/tracker/dvlaDataFetch";
 import { importMotHistoryForCar } from "@/lib/tracker/carMotHistoryImport";
 import { fetchVehicleTaxDetailsFromVdg } from "@/lib/tracker/vehicleTaxFetch";
@@ -41,6 +50,12 @@ export async function POST(request: NextRequest) {
   }
   if (isCarReadOnly(car)) {
     return NextResponse.json({ error: CAR_READ_ONLY_MESSAGE }, { status: 403 });
+  }
+  if (!canRefreshCarData(car)) {
+    return NextResponse.json(
+      { error: "Vehicle data was refreshed recently.", nextAvailableAt: nextCarDataRefreshAt(car) },
+      { status: 429 }
+    );
   }
 
   const registration = getCurrentRegistration(car);
@@ -97,6 +112,8 @@ export async function POST(request: NextRequest) {
   } catch (err) {
     console.error("Tax/SORN check failed during refresh:", err);
   }
+
+  await updateCarLastRefreshedAt(session.email, car.id);
 
   if (dvlaRefreshed || motCreated > 0 || taxBillLogged) {
     void logImpersonationActivityForCurrentRequest("car", car.id, "update");

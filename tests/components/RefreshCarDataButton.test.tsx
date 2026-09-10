@@ -26,7 +26,7 @@ describe("RefreshCarDataButton", () => {
       json: async () => ({ dvlaRefreshed: true, motCreated: 2 }),
     });
     const user = userEvent.setup();
-    render(<RefreshCarDataButton carId="car-1" />);
+    render(<RefreshCarDataButton carId="car-1" available nextAvailableAt={null} />);
     await user.click(screen.getByRole("button", { name: "Refresh vehicle data" }));
 
     expect(await screen.findByText("vehicle data updated, 2 new MOT tests logged.")).toBeInTheDocument();
@@ -43,7 +43,7 @@ describe("RefreshCarDataButton", () => {
       json: async () => ({ dvlaRefreshed: false, motCreated: 1 }),
     });
     const user = userEvent.setup();
-    render(<RefreshCarDataButton carId="car-1" />);
+    render(<RefreshCarDataButton carId="car-1" available nextAvailableAt={null} />);
     await user.click(screen.getByRole("button", { name: "Refresh vehicle data" }));
 
     expect(await screen.findByText("1 new MOT test logged.")).toBeInTheDocument();
@@ -55,7 +55,7 @@ describe("RefreshCarDataButton", () => {
       json: async () => ({ dvlaRefreshed: false, motCreated: 0 }),
     });
     const user = userEvent.setup();
-    render(<RefreshCarDataButton carId="car-1" />);
+    render(<RefreshCarDataButton carId="car-1" available nextAvailableAt={null} />);
     await user.click(screen.getByRole("button", { name: "Refresh vehicle data" }));
 
     expect(await screen.findByText("Checked - nothing new to add.")).toBeInTheDocument();
@@ -67,7 +67,7 @@ describe("RefreshCarDataButton", () => {
       json: async () => ({ dvlaRefreshed: false, motCreated: 0, sorned: true }),
     });
     const user = userEvent.setup();
-    render(<RefreshCarDataButton carId="car-1" />);
+    render(<RefreshCarDataButton carId="car-1" available nextAvailableAt={null} />);
     await user.click(screen.getByRole("button", { name: "Refresh vehicle data" }));
 
     expect(await screen.findByText("⚠️ this car is currently SORN (not taxed) - see reminders below.")).toBeInTheDocument();
@@ -81,7 +81,7 @@ describe("RefreshCarDataButton", () => {
       json: async () => ({ dvlaRefreshed: false, motCreated: 0, sorned: false, taxStatus: "Taxed", taxDueDate: "2027-06-01" }),
     });
     const user = userEvent.setup();
-    render(<RefreshCarDataButton carId="car-1" />);
+    render(<RefreshCarDataButton carId="car-1" available nextAvailableAt={null} />);
     await user.click(screen.getByRole("button", { name: "Refresh vehicle data" }));
 
     expect(await screen.findByText("tax status: Taxed (due 01/06/2027).")).toBeInTheDocument();
@@ -93,7 +93,7 @@ describe("RefreshCarDataButton", () => {
       json: async () => ({ dvlaRefreshed: false, motCreated: 0, sorned: false, taxStatus: null, taxDueDate: null }),
     });
     const user = userEvent.setup();
-    render(<RefreshCarDataButton carId="car-1" />);
+    render(<RefreshCarDataButton carId="car-1" available nextAvailableAt={null} />);
     await user.click(screen.getByRole("button", { name: "Refresh vehicle data" }));
 
     expect(await screen.findByText("Checked - nothing new to add.")).toBeInTheDocument();
@@ -112,7 +112,7 @@ describe("RefreshCarDataButton", () => {
       }),
     });
     const user = userEvent.setup();
-    render(<RefreshCarDataButton carId="car-1" />);
+    render(<RefreshCarDataButton carId="car-1" available nextAvailableAt={null} />);
     await user.click(screen.getByRole("button", { name: "Refresh vehicle data" }));
 
     expect(await screen.findByText("tax status: Taxed (due 01/06/2027), road tax logged as an expense.")).toBeInTheDocument();
@@ -121,7 +121,7 @@ describe("RefreshCarDataButton", () => {
   it("shows the server's own error and does not refresh the page", async () => {
     (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({ ok: false, json: async () => ({ error: "DVLA lookup failed." }) });
     const user = userEvent.setup();
-    render(<RefreshCarDataButton carId="car-1" />);
+    render(<RefreshCarDataButton carId="car-1" available nextAvailableAt={null} />);
     await user.click(screen.getByRole("button", { name: "Refresh vehicle data" }));
 
     expect(await screen.findByText("DVLA lookup failed.")).toBeInTheDocument();
@@ -131,9 +131,22 @@ describe("RefreshCarDataButton", () => {
   it("shows a connection error when fetch itself throws", async () => {
     (fetch as ReturnType<typeof vi.fn>).mockRejectedValue(new Error("down"));
     const user = userEvent.setup();
-    render(<RefreshCarDataButton carId="car-1" />);
+    render(<RefreshCarDataButton carId="car-1" available nextAvailableAt={null} />);
     await user.click(screen.getByRole("button", { name: "Refresh vehicle data" }));
 
     expect(await screen.findByText("Could not reach the server.")).toBeInTheDocument();
+  });
+
+  it("shows the next-available date instead of a button when on cooldown", () => {
+    render(<RefreshCarDataButton carId="car-1" available={false} nextAvailableAt="2027-06-05T00:00:00.000Z" />);
+
+    expect(screen.queryByRole("button")).not.toBeInTheDocument();
+    expect(screen.getByText("Refresh available again on 05/06/2027.")).toBeInTheDocument();
+  });
+
+  it("says 'soon' when on cooldown with no next-available date given", () => {
+    render(<RefreshCarDataButton carId="car-1" available={false} nextAvailableAt={null} />);
+
+    expect(screen.getByText("Refresh available again soon.")).toBeInTheDocument();
   });
 });

@@ -7,6 +7,7 @@ import type { BikeClass, Region } from "@/lib/priceData";
 import type { DistanceUnit, FuelEconomyUnit } from "@/lib/tracker/unitFormat";
 import type { Currency } from "@/lib/tracker/currency";
 import type { BikeIdentity, CategorySpend } from "@/lib/tracker/storyFacts";
+import { REFRESH_DATA_COOLDOWN_MS } from "@/lib/tracker/refreshDataCooldown";
 
 // Free-tier cap - Pro accounts (see isPro() below) skip it entirely.
 // Kept in sync with vehicleLimit.ts's MAX_FREE_VEHICLES by convention,
@@ -211,6 +212,11 @@ export interface BikeDoc {
     newOwnerEmail: string;
     transferredAt: string;
   };
+  // Cooldown anchor for the "Refresh vehicle data" button (see
+  // refreshDataCooldown.ts) - deliberately its own field rather than
+  // reusing dvlaData.fetchedAt, which is also set at bike-creation time
+  // and wouldn't cleanly represent "the button was clicked."
+  lastRefreshedAt?: string;
 }
 
 export interface DvlaKeeperChange {
@@ -427,6 +433,29 @@ export async function updateBikeDvlaData(email: string, bikeId: string, dvlaData
   if (dvlaData.fuelTankCapacityLitres && !resource.tankCapacityLitres) {
     resource.tankCapacityLitres = dvlaData.fuelTankCapacityLitres;
   }
+  await container.items.upsert(resource);
+  return resource;
+}
+
+// "Refresh vehicle data" button cooldown - see refreshDataCooldown.ts.
+export function canRefreshBikeData(bike: BikeDoc): boolean {
+  if (!bike.lastRefreshedAt) return true;
+  return Date.now() - new Date(bike.lastRefreshedAt).getTime() > REFRESH_DATA_COOLDOWN_MS;
+}
+
+// Null once the cooldown has already elapsed (or never started) - a
+// refresh is available right now, so there is no "next" date to show.
+export function nextBikeDataRefreshAt(bike: BikeDoc): string | null {
+  if (!bike.lastRefreshedAt) return null;
+  const nextMs = new Date(bike.lastRefreshedAt).getTime() + REFRESH_DATA_COOLDOWN_MS;
+  return nextMs > Date.now() ? new Date(nextMs).toISOString() : null;
+}
+
+export async function updateBikeLastRefreshedAt(email: string, bikeId: string): Promise<BikeDoc | null> {
+  const container = getContainer();
+  const { resource } = await container.item(bikeId, email).read<BikeDoc>();
+  if (!resource) return null;
+  resource.lastRefreshedAt = new Date().toISOString();
   await container.items.upsert(resource);
   return resource;
 }

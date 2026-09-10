@@ -10,6 +10,9 @@ const mocks = vi.hoisted(() => ({
   getCurrentRegistration: vi.fn(),
   updateCarDvlaData: vi.fn(),
   isCarReadOnly: vi.fn(),
+  canRefreshCarData: vi.fn(),
+  nextCarDataRefreshAt: vi.fn(),
+  updateCarLastRefreshedAt: vi.fn(),
   fetchDvlaDataFromVdg: vi.fn(),
   importMotHistoryForCar: vi.fn(),
   fetchVehicleTaxDetailsFromVdg: vi.fn(),
@@ -27,6 +30,9 @@ vi.mock("@/lib/tracker/car", () => ({
   getCurrentRegistration: mocks.getCurrentRegistration,
   updateCarDvlaData: mocks.updateCarDvlaData,
   isCarReadOnly: mocks.isCarReadOnly,
+  canRefreshCarData: mocks.canRefreshCarData,
+  nextCarDataRefreshAt: mocks.nextCarDataRefreshAt,
+  updateCarLastRefreshedAt: mocks.updateCarLastRefreshedAt,
   CAR_READ_ONLY_MESSAGE: "This car has been transferred and is now read-only.",
 }));
 vi.mock("@/lib/tracker/dvlaDataFetch", () => ({ fetchDvlaDataFromVdg: mocks.fetchDvlaDataFromVdg }));
@@ -52,6 +58,9 @@ describe("POST /api/cars/car/refresh-data", () => {
     Object.values(mocks).forEach((m) => m.mockReset());
     mocks.getCarById.mockResolvedValue(car);
     mocks.isCarReadOnly.mockReturnValue(false);
+    mocks.canRefreshCarData.mockReturnValue(true);
+    mocks.nextCarDataRefreshAt.mockReturnValue(null);
+    mocks.updateCarLastRefreshedAt.mockResolvedValue(car);
     mocks.getCurrentRegistration.mockReturnValue("AB12 CDE");
     mocks.fetchDvlaDataFromVdg.mockResolvedValue(null);
     mocks.importMotHistoryForCar.mockResolvedValue({ createdCount: 0, skippedCount: 0, skipped: [], motDueDate: null, reminderSet: false });
@@ -94,6 +103,25 @@ describe("POST /api/cars/car/refresh-data", () => {
     const response = await POST(request(JSON.stringify({ carId: "car-1" })));
     expect(response.status).toBe(403);
     expect(mocks.fetchDvlaDataFromVdg).not.toHaveBeenCalled();
+  });
+
+  it("blocks refreshing again within the 5-day cooldown", async () => {
+    mocks.getSession.mockResolvedValue({ email: "owner@example.com" });
+    mocks.canRefreshCarData.mockReturnValue(false);
+    mocks.nextCarDataRefreshAt.mockReturnValue("2027-06-05T00:00:00.000Z");
+    const response = await POST(request(JSON.stringify({ carId: "car-1" })));
+    expect(response.status).toBe(429);
+    await expect(response.json()).resolves.toEqual({
+      error: "Vehicle data was refreshed recently.",
+      nextAvailableAt: "2027-06-05T00:00:00.000Z",
+    });
+    expect(mocks.fetchDvlaDataFromVdg).not.toHaveBeenCalled();
+  });
+
+  it("stamps lastRefreshedAt after a successful refresh", async () => {
+    mocks.getSession.mockResolvedValue({ email: "owner@example.com" });
+    await POST(request(JSON.stringify({ carId: "car-1" })));
+    expect(mocks.updateCarLastRefreshedAt).toHaveBeenCalledWith("owner@example.com", "car-1");
   });
 
   it("refuses a car with no registration on record", async () => {

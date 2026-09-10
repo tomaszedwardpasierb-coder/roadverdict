@@ -37,6 +37,8 @@ function baseProps(overrides: Partial<Parameters<typeof DashboardShell>[0]> = {}
     isPro: false,
     vehicles: [{ id: "bike-1", kind: "bike" as const, name: "Trusty Steed", year: 2020, currentMileage: 15000 }],
     activeVehicleId: "bike-1",
+    refreshAvailable: true,
+    nextRefreshAvailableAt: null,
     pendingReviewIds: emptyPendingIds,
     hasPendingReceiptRequests: false,
     dashboardContent: <div>Dashboard content</div>,

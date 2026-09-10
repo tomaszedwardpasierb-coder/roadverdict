@@ -17,6 +17,7 @@ import type { Region } from "@/lib/priceData";
 import type { DistanceUnit, FuelEconomyUnit } from "@/lib/tracker/unitFormat";
 import type { Currency } from "@/lib/tracker/currency";
 import type { ChartKind, DvlaVehicleData, RegistrationChangeEntry, RegistrationChangeReason } from "@/lib/tracker/bike";
+import { REFRESH_DATA_COOLDOWN_MS } from "@/lib/tracker/refreshDataCooldown";
 
 export type CarFuelType = "petrol" | "diesel" | "hybrid" | "phev" | "electric";
 export type CarSizeClass = "small" | "medium" | "large" | "electric";
@@ -140,6 +141,9 @@ export interface CarDoc {
       mileageAtTransfer: number;
     };
   };
+  // Cooldown anchor for the "Refresh vehicle data" button - mirrors
+  // bike.ts's own field of the same name exactly.
+  lastRefreshedAt?: string;
 }
 
 export function getCurrentRegistration(car: CarDoc): string | undefined {
@@ -263,6 +267,28 @@ export async function updateCarDvlaData(email: string, carId: string, dvlaData: 
   const { resource } = await container.item(carId, email).read<CarDoc>();
   if (!resource) return null;
   resource.dvlaData = dvlaData;
+  await container.items.upsert(resource);
+  return resource;
+}
+
+// "Refresh vehicle data" button cooldown - mirrors bike.ts's own
+// functions of the same name exactly.
+export function canRefreshCarData(car: CarDoc): boolean {
+  if (!car.lastRefreshedAt) return true;
+  return Date.now() - new Date(car.lastRefreshedAt).getTime() > REFRESH_DATA_COOLDOWN_MS;
+}
+
+export function nextCarDataRefreshAt(car: CarDoc): string | null {
+  if (!car.lastRefreshedAt) return null;
+  const nextMs = new Date(car.lastRefreshedAt).getTime() + REFRESH_DATA_COOLDOWN_MS;
+  return nextMs > Date.now() ? new Date(nextMs).toISOString() : null;
+}
+
+export async function updateCarLastRefreshedAt(email: string, carId: string): Promise<CarDoc | null> {
+  const container = getContainer();
+  const { resource } = await container.item(carId, email).read<CarDoc>();
+  if (!resource) return null;
+  resource.lastRefreshedAt = new Date().toISOString();
   await container.items.upsert(resource);
   return resource;
 }

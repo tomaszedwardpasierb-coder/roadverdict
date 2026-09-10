@@ -3,7 +3,7 @@ import { getSession } from "@/lib/auth/session";
 import { redirect } from "next/navigation";
 import styles from "./dashboard.module.css";
 import LogoutButton from "./LogoutButton";
-import { getBikesForUser, pickActiveBike, getCurrentRegistration, isBikeReadOnly } from "@/lib/tracker/bike";
+import { getBikesForUser, pickActiveBike, getCurrentRegistration, isBikeReadOnly, canRefreshBikeData, nextBikeDataRefreshAt } from "@/lib/tracker/bike";
 import { getServiceRecords } from "@/lib/tracker/serviceRecord";
 import { getFuelLogs, computeActualMPG, computeMPGSeries } from "@/lib/tracker/fuelLog";
 import { getMods } from "@/lib/tracker/mod";
@@ -97,7 +97,7 @@ import { getPendingDeletionInfo } from "@/lib/tracker/userAccount";
 
 // --- Car support (see RoadVerdict_Car_Plan_v3.md's ADR) ---
 import { resolveActiveVehicle } from "@/lib/tracker/activeVehicle";
-import { getCarsForUser, pickActiveCar, getCurrentRegistration as getCarCurrentRegistration, isCarReadOnly, type CarDoc } from "@/lib/tracker/car";
+import { getCarsForUser, pickActiveCar, getCurrentRegistration as getCarCurrentRegistration, isCarReadOnly, canRefreshCarData, nextCarDataRefreshAt, type CarDoc } from "@/lib/tracker/car";
 import { getCarServiceRecords } from "@/lib/tracker/carServiceRecord";
 import { getCarFuelLogs } from "@/lib/tracker/carFuelLog";
 import { getCarMods } from "@/lib/tracker/carMod";
@@ -340,13 +340,13 @@ export default async function DashboardPage(props: { searchParams: Promise<{ add
   // built once here so all eight headers (plus Story So Far and
   // Shareable Links, which render it themselves from the props passed
   // below) stay in sync rather than drifting from copy-pasted markup.
-  const bikeTag = (bike.nickname || currentRegistration) ? (
+  const bikeTag = (
     <span className={styles.headingBikeTag}>
-      {bike.nickname}
-      {bike.nickname && currentRegistration && " · "}
+      {bike.nickname || `${bike.make} ${bike.model}`}
+      {currentRegistration && " · "}
       {currentRegistration}
     </span>
-  ) : null;
+  );
   // Same pill (now with the notification bell alongside it) shown next
   // to every tab's page title, not just Dashboard - built once here for
   // the same reuse reason as bikeTag above. Story So Far and Shareable
@@ -923,6 +923,8 @@ export default async function DashboardPage(props: { searchParams: Promise<{ add
       proDaysRemaining={proStatus.daysRemaining}
       vehicles={switcherVehicles}
       activeVehicleId={bike.id}
+      refreshAvailable={canRefreshBikeData(bike)}
+      nextRefreshAvailableAt={nextBikeDataRefreshAt(bike)}
       pendingReviewIds={pendingReviewIds}
       hasPendingReceiptRequests={pendingReceiptRequests.length > 0}
       dashboardContent={dashboardContent}
@@ -1067,13 +1069,13 @@ async function renderCarDashboard(
 
   const carName = car.nickname ? `${car.nickname} - ${car.make} ${car.model}` : `${car.make} ${car.model}`;
   const currentRegistration = getCarCurrentRegistration(car);
-  const carTag = (car.nickname || currentRegistration) ? (
+  const carTag = (
     <span className={styles.headingBikeTag}>
-      {car.nickname}
-      {car.nickname && currentRegistration && " · "}
+      {car.nickname || `${car.make} ${car.model}`}
+      {currentRegistration && " · "}
       {currentRegistration}
     </span>
-  ) : null;
+  );
   const mileagePill = (
     <div style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
       <NotificationBell />
@@ -1547,6 +1549,8 @@ async function renderCarDashboard(
       proDaysRemaining={proStatus.daysRemaining}
       vehicles={switcherVehicles}
       activeVehicleId={car.id}
+      refreshAvailable={canRefreshCarData(car)}
+      nextRefreshAvailableAt={nextCarDataRefreshAt(car)}
       pendingReviewIds={pendingReviewIds}
       hasPendingReceiptRequests={pendingCarReceiptRequests.length > 0}
       dashboardContent={dashboardContent}

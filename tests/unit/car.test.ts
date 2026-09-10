@@ -46,8 +46,12 @@ import {
   updateCarIncludeFinanceInReport,
   updateCarBuyerOpinionCache,
   queryCarTrackerDocs,
+  canRefreshCarData,
+  nextCarDataRefreshAt,
+  updateCarLastRefreshedAt,
   type CarDoc,
 } from "@/lib/tracker/car";
+import { REFRESH_DATA_COOLDOWN_MS } from "@/lib/tracker/refreshDataCooldown";
 
 function resetAllMocks() {
   Object.values(mocks).forEach((m) => m.mockReset());
@@ -364,6 +368,60 @@ describe("updateCarDvlaData", () => {
     const data = { ...dvlaBase, officialCombinedMpg: 55 };
     const result = await updateCarDvlaData("owner@example.com", "car-1", data);
     expect(result?.dvlaData).toEqual(data);
+  });
+});
+
+// ---------------------------------------------------------------------
+// "Refresh vehicle data" button cooldown
+// ---------------------------------------------------------------------
+
+describe("canRefreshCarData", () => {
+  it("allows it when the car has never been refreshed before", () => {
+    expect(canRefreshCarData(makeCar())).toBe(true);
+  });
+
+  it("blocks within the 5-day cooldown", () => {
+    const car = makeCar({ lastRefreshedAt: new Date(Date.now() - 1000).toISOString() });
+    expect(canRefreshCarData(car)).toBe(false);
+  });
+
+  it("allows it again once 5 days have passed", () => {
+    const car = makeCar({ lastRefreshedAt: new Date(Date.now() - REFRESH_DATA_COOLDOWN_MS - 1000).toISOString() });
+    expect(canRefreshCarData(car)).toBe(true);
+  });
+});
+
+describe("nextCarDataRefreshAt", () => {
+  it("returns null when the car has never been refreshed before", () => {
+    expect(nextCarDataRefreshAt(makeCar())).toBeNull();
+  });
+
+  it("returns the date the cooldown ends when still within it", () => {
+    const lastRefreshedAt = new Date(Date.now() - 1000).toISOString();
+    const car = makeCar({ lastRefreshedAt });
+    const next = nextCarDataRefreshAt(car);
+    expect(next).not.toBeNull();
+    expect(new Date(next!).getTime()).toBe(new Date(lastRefreshedAt).getTime() + REFRESH_DATA_COOLDOWN_MS);
+  });
+});
+
+describe("updateCarLastRefreshedAt", () => {
+  beforeEach(() => {
+    resetAllMocks();
+    mocks.upsert.mockResolvedValue(undefined);
+  });
+
+  it("returns null when the car doesn't exist", async () => {
+    mocks.read.mockResolvedValue({ resource: undefined });
+    expect(await updateCarLastRefreshedAt("owner@example.com", "missing")).toBeNull();
+  });
+
+  it("stamps lastRefreshedAt with the current time and upserts", async () => {
+    mocks.read.mockResolvedValue({ resource: makeCar() });
+    const before = Date.now();
+    const result = await updateCarLastRefreshedAt("owner@example.com", "car-1");
+    expect(new Date(result!.lastRefreshedAt!).getTime()).toBeGreaterThanOrEqual(before);
+    expect(mocks.upsert).toHaveBeenCalledWith(expect.objectContaining({ lastRefreshedAt: result!.lastRefreshedAt }));
   });
 });
 

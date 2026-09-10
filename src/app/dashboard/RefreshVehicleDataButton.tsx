@@ -5,7 +5,17 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import styles from './dashboard.module.css';
 
-export function RefreshVehicleDataButton({ bikeId }: { bikeId: string }) {
+interface Props {
+  bikeId: string;
+  // Server-computed from the bike's own lastRefreshedAt (see bike.ts's
+  // canRefreshBikeData/nextBikeDataRefreshAt) - the button is only ever
+  // shown when a refresh is actually allowed; otherwise this component
+  // shows the next-available date instead, never a disabled button.
+  available: boolean;
+  nextAvailableAt: string | null;
+}
+
+export function RefreshVehicleDataButton({ bikeId, available, nextAvailableAt }: Props) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<string | null>(null);
@@ -45,6 +55,14 @@ export function RefreshVehicleDataButton({ bikeId }: { bikeId: string }) {
     } finally {
       setLoading(false);
     }
+  }
+
+  if (!available) {
+    return (
+      <p className="field-note" style={{ fontSize: '0.72rem' }}>
+        Refresh available again{nextAvailableAt ? ` on ${new Date(nextAvailableAt).toLocaleDateString('en-GB')}` : ' soon'}.
+      </p>
+    );
   }
 
   return (

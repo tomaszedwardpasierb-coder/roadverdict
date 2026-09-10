@@ -141,6 +141,12 @@ interface Props {
   proDaysRemaining?: number | null;
   vehicles: SwitcherVehicle[];
   activeVehicleId: string;
+  // Server-computed cooldown for the "Refresh vehicle data" button (see
+  // bike.ts/car.ts's canRefreshBikeData/canRefreshCarData) - one shared
+  // pair of props since only one of the two buttons ever renders at a
+  // time (see vehicleKind branch below).
+  refreshAvailable: boolean;
+  nextRefreshAvailableAt: string | null;
   // Real, server-computed counts of needsReview records per category -
   // drives the pulsing nav dots directly from actual data, not an
   // in-memory queue that could disagree with what's really been saved.
@@ -198,6 +204,8 @@ export function DashboardShell({
   proDaysRemaining = null,
   vehicles,
   activeVehicleId,
+  refreshAvailable,
+  nextRefreshAvailableAt,
   pendingReviewIds,
   hasPendingReceiptRequests,
   dashboardContent,
@@ -404,9 +412,9 @@ export function DashboardShell({
           </div>
           <div style={{ marginTop: '0.6rem' }}>
             {vehicleKind === 'bike' ? (
-              <RefreshVehicleDataButton bikeId={activeVehicleId} />
+              <RefreshVehicleDataButton bikeId={activeVehicleId} available={refreshAvailable} nextAvailableAt={nextRefreshAvailableAt} />
             ) : (
-              <RefreshCarDataButton carId={activeVehicleId} />
+              <RefreshCarDataButton carId={activeVehicleId} available={refreshAvailable} nextAvailableAt={nextRefreshAvailableAt} />
             )}
           </div>
 

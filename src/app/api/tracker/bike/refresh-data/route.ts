@@ -11,7 +11,16 @@
 // permanent reminder gets created and, eventually, cleared.
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/session";
-import { getBike, getCurrentRegistration, updateBikeDvlaData, isBikeReadOnly, BIKE_READ_ONLY_MESSAGE } from "@/lib/tracker/bike";
+import {
+  getBike,
+  getCurrentRegistration,
+  updateBikeDvlaData,
+  isBikeReadOnly,
+  BIKE_READ_ONLY_MESSAGE,
+  canRefreshBikeData,
+  nextBikeDataRefreshAt,
+  updateBikeLastRefreshedAt,
+} from "@/lib/tracker/bike";
 import { fetchDvlaDataFromVdg } from "@/lib/tracker/dvlaDataFetch";
 import { importMotHistoryForBike } from "@/lib/tracker/motHistoryImport";
 import { fetchVehicleTaxDetailsFromVdg } from "@/lib/tracker/vehicleTaxFetch";
@@ -48,6 +57,12 @@ export async function POST(request: NextRequest) {
   }
   if (isBikeReadOnly(bike)) {
     return NextResponse.json({ error: BIKE_READ_ONLY_MESSAGE }, { status: 403 });
+  }
+  if (!canRefreshBikeData(bike)) {
+    return NextResponse.json(
+      { error: "Vehicle data was refreshed recently.", nextAvailableAt: nextBikeDataRefreshAt(bike) },
+      { status: 429 }
+    );
   }
 
   const registration = getCurrentRegistration(bike);
@@ -109,6 +124,8 @@ export async function POST(request: NextRequest) {
   } catch (err) {
     console.error("Tax/SORN check failed during refresh:", err);
   }
+
+  await updateBikeLastRefreshedAt(session.email, bike.id);
 
   if (dvlaRefreshed || motCreated > 0 || taxBillLogged) {
     void logImpersonationActivityForCurrentRequest("bike", bike.id, "update");
