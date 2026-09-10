@@ -3,10 +3,13 @@
 // Car equivalent of bikeTransfer.ts - same mechanic (a new car document
 // under the recipient's account, linked back to the old one via
 // transferredFrom/transferredTo, old one marked read-only rather than
-// deleted or mutated), just against CarDoc. No billSeries handling here
-// at all - recurring bill series (billSeries.ts) has no car equivalent
-// yet (see the parity backlog's item 8), so there's nothing to copy or
-// end on transfer.
+// deleted or mutated), just against CarDoc. Bill series (carBillSeries.ts)
+// are handled exactly the same way bikeTransfer.ts handles its own: an
+// active series is copied to the recipient when includeRecords is true
+// (lastMaterializedIndex carries over unchanged, so future auto-
+// materialized instalments keep numbering correctly), and the previous
+// owner's own active series is always ended regardless of includeRecords,
+// since their car is read-only from this point on either way.
 //
 // The recipient-limit check deliberately differs from bikeTransfer.ts's
 // own (which checks only countActiveBikes against the old bike-only
@@ -27,6 +30,7 @@ import { getCarMods } from "@/lib/tracker/carMod";
 import { getCarBills } from "@/lib/tracker/carBill";
 import { getCarFuelLogs } from "@/lib/tracker/carFuelLog";
 import { getCarReminders } from "@/lib/tracker/carReminder";
+import { getBillSeriesForCar, endCarBillSeries } from "@/lib/tracker/carBillSeries";
 import { computeCarSellerReportRowsAndMetrics } from "@/lib/tracker/carSellerReportData";
 import { computeSellerVerdict } from "@/lib/tracker/sellerReportVerdict";
 
@@ -76,13 +80,15 @@ export async function transferCar(
     }
   }
 
-  const [records, mods, bills, fuelLogs, reminders] = await Promise.all([
+  const [records, mods, bills, fuelLogs, reminders, billSeries] = await Promise.all([
     getCarServiceRecords(fromEmail, carId),
     getCarMods(fromEmail, carId),
     getCarBills(fromEmail, carId),
     getCarFuelLogs(fromEmail, carId),
     getCarReminders(fromEmail, carId),
+    getBillSeriesForCar(fromEmail, carId),
   ]);
+  const activeBillSeries = billSeries.filter((s) => s.status === "active");
   const { rows, total, verdictMetrics } = computeCarSellerReportRowsAndMetrics(oldCar, records, mods, bills, fuelLogs, reminders);
   const verdict = computeSellerVerdict(verdictMetrics);
 
@@ -137,16 +143,36 @@ export async function transferCar(
   await container.items.upsert(newCar);
 
   if (includeRecords) {
+    // An active instalment plan continues under the new owner rather
+    // than silently stopping - lastMaterializedIndex carries over
+    // unchanged, so future auto-materialized instalments keep numbering
+    // correctly from wherever the plan actually is (e.g. "6 of 12", not
+    // restarting at 1). Same reasoning as bikeTransfer.ts's own handling.
     const copyResults = await Promise.allSettled([
       ...records.map((r) => copyCarTrackerDoc(r, "carService", toEmail, newCarId)),
       ...mods.map((m) => copyCarTrackerDoc(m, "carMod", toEmail, newCarId)),
       ...bills.map((b) => copyCarTrackerDoc(b, "carBill", toEmail, newCarId)),
       ...fuelLogs.map((f) => copyCarTrackerDoc(f, "carFuel", toEmail, newCarId)),
       ...reminders.map((rm) => copyCarTrackerDoc(rm, "carReminder", toEmail, newCarId, { notifiedAt: null })),
+      ...activeBillSeries.map((s) => copyCarTrackerDoc(s, "carBillSeries", toEmail, newCarId)),
     ]);
     const failures = copyResults.filter((r) => r.status === "rejected");
     if (failures.length > 0) {
       console.error(`transferCar: ${failures.length} record(s) failed to copy for car ${newCarId}:`, failures);
+    }
+  }
+
+  // Ends the previous owner's own active instalment plan(s) regardless
+  // of includeRecords - the old car is read-only from this point on no
+  // matter what, so a plan left "active" would otherwise keep
+  // auto-materializing new instalment bills against a car its former
+  // owner no longer has any real reason to be paying for. Same
+  // reasoning as bikeTransfer.ts's own handling.
+  if (activeBillSeries.length > 0) {
+    const endResults = await Promise.allSettled(activeBillSeries.map((s) => endCarBillSeries(fromEmail, s.id)));
+    const endFailures = endResults.filter((r) => r.status === "rejected");
+    if (endFailures.length > 0) {
+      console.error(`transferCar: ${endFailures.length} bill series failed to end for the previous owner of car ${carId}:`, endFailures);
     }
   }
 

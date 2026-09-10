@@ -1,8 +1,7 @@
-// Mirrors bikeTransfer.test.ts for the car equivalent - no billSeries
-// section at all, since recurring bill series has no car equivalent
-// yet, and the recipient-limit check here is combined bike+car count
-// against MAX_FREE_VEHICLES rather than a car-only cap (see
-// carTransfer.ts's own comment for why).
+// Mirrors bikeTransfer.test.ts for the car equivalent, including its
+// billSeries section - the recipient-limit check here is combined
+// bike+car count against MAX_FREE_VEHICLES rather than a car-only cap
+// (see carTransfer.ts's own comment for why).
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
@@ -22,6 +21,8 @@ const mocks = vi.hoisted(() => ({
   getCarBills: vi.fn(),
   getCarFuelLogs: vi.fn(),
   getCarReminders: vi.fn(),
+  getBillSeriesForCar: vi.fn(),
+  endCarBillSeries: vi.fn(),
   computeCarSellerReportRowsAndMetrics: vi.fn(),
   computeSellerVerdict: vi.fn(),
   upsert: vi.fn(),
@@ -51,6 +52,10 @@ vi.mock("@/lib/tracker/carMod", () => ({ getCarMods: mocks.getCarMods }));
 vi.mock("@/lib/tracker/carBill", () => ({ getCarBills: mocks.getCarBills }));
 vi.mock("@/lib/tracker/carFuelLog", () => ({ getCarFuelLogs: mocks.getCarFuelLogs }));
 vi.mock("@/lib/tracker/carReminder", () => ({ getCarReminders: mocks.getCarReminders }));
+vi.mock("@/lib/tracker/carBillSeries", () => ({
+  getBillSeriesForCar: mocks.getBillSeriesForCar,
+  endCarBillSeries: mocks.endCarBillSeries,
+}));
 vi.mock("@/lib/tracker/carSellerReportData", () => ({
   computeCarSellerReportRowsAndMetrics: mocks.computeCarSellerReportRowsAndMetrics,
 }));
@@ -101,6 +106,8 @@ beforeEach(() => {
   mocks.getCarBills.mockResolvedValue([]);
   mocks.getCarFuelLogs.mockResolvedValue([]);
   mocks.getCarReminders.mockResolvedValue([]);
+  mocks.getBillSeriesForCar.mockResolvedValue([]);
+  mocks.endCarBillSeries.mockResolvedValue({});
   mocks.computeCarSellerReportRowsAndMetrics.mockReturnValue({
     rows: [], total: 0, verdictMetrics: {},
   });
@@ -293,6 +300,60 @@ describe("transferCar", () => {
     mocks.getCarServiceRecords.mockResolvedValue([{ id: "sr-1" }]);
     mocks.copyCarTrackerDoc.mockRejectedValue(new Error("copy failed"));
     const result = await transferCar(fromEmail, carId, toEmail, true);
+    expect(result).toMatchObject({ ok: true });
+  });
+
+  // ── billSeries (recurring instalment plans) - mirrors bikeTransfer.test.ts ──
+
+  it("copies an active bill series to the recipient when includeRecords is true", async () => {
+    mocks.getBillSeriesForCar.mockResolvedValue([{ id: "series-1", status: "active" }]);
+    await transferCar(fromEmail, carId, toEmail, true);
+    const seriesCopy = mocks.copyCarTrackerDoc.mock.calls.find((c: any[]) => c[1] === "carBillSeries");
+    expect(seriesCopy).toBeDefined();
+    expect(seriesCopy![0]).toMatchObject({ id: "series-1" });
+    expect(seriesCopy![2]).toBe(toEmail);
+    expect(seriesCopy![3]).toBe("new-car-id");
+  });
+
+  it("does not copy an already-ended or completed bill series", async () => {
+    mocks.getBillSeriesForCar.mockResolvedValue([
+      { id: "ended-series", status: "ended" },
+      { id: "completed-series", status: "completed" },
+    ]);
+    await transferCar(fromEmail, carId, toEmail, true);
+    const seriesCopy = mocks.copyCarTrackerDoc.mock.calls.find((c: any[]) => c[1] === "carBillSeries");
+    expect(seriesCopy).toBeUndefined();
+  });
+
+  it("does not copy any bill series when includeRecords is false", async () => {
+    mocks.getBillSeriesForCar.mockResolvedValue([{ id: "series-1", status: "active" }]);
+    await transferCar(fromEmail, carId, toEmail, false);
+    expect(mocks.copyCarTrackerDoc).not.toHaveBeenCalled();
+  });
+
+  it("ends the previous owner's active bill series even when includeRecords is false", async () => {
+    mocks.getBillSeriesForCar.mockResolvedValue([{ id: "series-1", status: "active" }]);
+    await transferCar(fromEmail, carId, toEmail, false);
+    expect(mocks.endCarBillSeries).toHaveBeenCalledWith(fromEmail, "series-1");
+  });
+
+  it("ends every active bill series when includeRecords is true, alongside copying them", async () => {
+    mocks.getBillSeriesForCar.mockResolvedValue([{ id: "series-1", status: "active" }, { id: "series-2", status: "active" }]);
+    await transferCar(fromEmail, carId, toEmail, true);
+    expect(mocks.endCarBillSeries).toHaveBeenCalledWith(fromEmail, "series-1");
+    expect(mocks.endCarBillSeries).toHaveBeenCalledWith(fromEmail, "series-2");
+  });
+
+  it("does not call endCarBillSeries when there are no active bill series", async () => {
+    mocks.getBillSeriesForCar.mockResolvedValue([{ id: "ended-series", status: "ended" }]);
+    await transferCar(fromEmail, carId, toEmail, true);
+    expect(mocks.endCarBillSeries).not.toHaveBeenCalled();
+  });
+
+  it("still returns ok:true if ending the previous owner's bill series fails", async () => {
+    mocks.getBillSeriesForCar.mockResolvedValue([{ id: "series-1", status: "active" }]);
+    mocks.endCarBillSeries.mockRejectedValue(new Error("update failed"));
+    const result = await transferCar(fromEmail, carId, toEmail, false);
     expect(result).toMatchObject({ ok: true });
   });
 });
