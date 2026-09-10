@@ -283,7 +283,7 @@ describe("POST /api/cars/car", () => {
     await POST(request("POST", JSON.stringify(validCreatePayload)));
 
     expect(mocks.fetchVehicleTaxDetailsFromVdg).toHaveBeenCalledWith("AB12CDE", "test-key");
-    expect(mocks.syncCarSornReminder).toHaveBeenCalledWith("owner@example.com", "car-1", "SORN");
+    expect(mocks.syncCarSornReminder).toHaveBeenCalledWith("owner@example.com", "car-1", "SORN", null);
   });
 
   // See carBill.ts's logVedCarBillIfNeeded - a confirmed-taxed vehicle
@@ -297,6 +297,17 @@ describe("POST /api/cars/car", () => {
     await POST(request("POST", JSON.stringify(validCreatePayload)));
 
     expect(mocks.logVedCarBillIfNeeded).toHaveBeenCalledWith("owner@example.com", "car-1", taxDetails);
+  });
+
+  // See carReminder.ts's syncCarSornReminder - a taxed car with a due
+  // date gets a "Road tax renewal due" reminder synced too.
+  it("passes the tax due date through to syncCarSornReminder for a taxed car", async () => {
+    mocks.getSession.mockResolvedValue({ email: "owner@example.com" });
+    mocks.fetchVehicleTaxDetailsFromVdg.mockResolvedValue({ taxStatus: "Taxed", taxDueDate: "2027-06-01" });
+
+    await POST(request("POST", JSON.stringify(validCreatePayload)));
+
+    expect(mocks.syncCarSornReminder).toHaveBeenCalledWith("owner@example.com", "car-1", "Taxed", "2027-06-01");
   });
 
   it("skips the tax/SORN check entirely when VDG_API_KEY isn't configured", async () => {

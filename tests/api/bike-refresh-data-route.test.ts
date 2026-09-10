@@ -187,7 +187,7 @@ describe("POST /api/tracker/bike/refresh-data", () => {
     const response = await POST(request(JSON.stringify({ bikeId: "bike-1" })));
 
     expect(mocks.fetchVehicleTaxDetailsFromVdg).toHaveBeenCalledWith("AB12 CDE", "test-key");
-    expect(mocks.syncSornReminder).toHaveBeenCalledWith("owner@example.com", "bike-1", "SORN");
+    expect(mocks.syncSornReminder).toHaveBeenCalledWith("owner@example.com", "bike-1", "SORN", null);
     await expect(response.json()).resolves.toMatchObject({ sorned: true, taxStatus: "SORN" });
   });
 
@@ -197,7 +197,7 @@ describe("POST /api/tracker/bike/refresh-data", () => {
 
     const response = await POST(request(JSON.stringify({ bikeId: "bike-1" })));
 
-    expect(mocks.syncSornReminder).toHaveBeenCalledWith("owner@example.com", "bike-1", "Taxed");
+    expect(mocks.syncSornReminder).toHaveBeenCalledWith("owner@example.com", "bike-1", "Taxed", "2027-06-01");
     await expect(response.json()).resolves.toMatchObject({ sorned: false, taxStatus: "Taxed", taxDueDate: "2027-06-01" });
   });
 

@@ -135,7 +135,7 @@ export async function POST(request: NextRequest) {
     const apiKey = process.env.VDG_API_KEY;
     if (apiKey) {
       const taxDetails = await fetchVehicleTaxDetailsFromVdg(car.originalRegistration ?? "", apiKey);
-      await syncCarSornReminder(session.email, car.id, taxDetails?.taxStatus ?? null);
+      await syncCarSornReminder(session.email, car.id, taxDetails?.taxStatus ?? null, taxDetails?.taxDueDate ?? null);
       // A confirmed-taxed vehicle also gets its current VED period
       // logged as a real expense right away - see carBill.ts's
       // logVedCarBillIfNeeded.

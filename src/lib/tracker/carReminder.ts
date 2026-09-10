@@ -107,13 +107,22 @@ export async function markCarReminderNotified(email: string, id: string): Promis
 // Mirrors reminder.ts's syncSornReminder exactly - see its own comment.
 export const CAR_SORN_REMINDER_SOURCE_KEY = "vdg-tax-status";
 export const CAR_SORN_REMINDER_NAME = "Vehicle is SORN (not taxed)";
+export const CAR_TAX_DUE_REMINDER_SOURCE_KEY = "vdg-tax-due-date";
+export const CAR_TAX_DUE_REMINDER_NAME = "Road tax renewal due";
 
-export async function syncCarSornReminder(email: string, carId: string, taxStatus: string | null): Promise<void> {
+export async function syncCarSornReminder(
+  email: string,
+  carId: string,
+  taxStatus: string | null,
+  taxDueDate?: string | null
+): Promise<void> {
   const isSorn = taxStatus?.trim().toUpperCase() === "SORN";
   const existing = await getCarReminders(email, carId);
-  const current = existing.find((r) => r.sourceKey === CAR_SORN_REMINDER_SOURCE_KEY);
+  const currentSorn = existing.find((r) => r.sourceKey === CAR_SORN_REMINDER_SOURCE_KEY);
+  const currentTaxDue = existing.find((r) => r.sourceKey === CAR_TAX_DUE_REMINDER_SOURCE_KEY);
+
   if (isSorn) {
-    if (!current) {
+    if (!currentSorn) {
       await createCarReminder(email, {
         carId,
         name: CAR_SORN_REMINDER_NAME,
@@ -122,7 +131,27 @@ export async function syncCarSornReminder(email: string, carId: string, taxStatu
         sourceKey: CAR_SORN_REMINDER_SOURCE_KEY,
       });
     }
-  } else if (current) {
+    if (currentTaxDue) {
+      await deleteCarRemindersBySourceKey(email, carId, CAR_TAX_DUE_REMINDER_SOURCE_KEY);
+    }
+    return;
+  }
+
+  if (currentSorn) {
     await deleteCarRemindersBySourceKey(email, carId, CAR_SORN_REMINDER_SOURCE_KEY);
+  }
+
+  if (taxDueDate) {
+    await deleteCarRemindersBySourceKey(email, carId, CAR_TAX_DUE_REMINDER_SOURCE_KEY);
+    await createCarReminder(email, {
+      carId,
+      name: CAR_TAX_DUE_REMINDER_NAME,
+      intervalType: "date",
+      exactDate: taxDueDate,
+      date: new Date().toISOString().slice(0, 10),
+      sourceKey: CAR_TAX_DUE_REMINDER_SOURCE_KEY,
+    });
+  } else if (currentTaxDue) {
+    await deleteCarRemindersBySourceKey(email, carId, CAR_TAX_DUE_REMINDER_SOURCE_KEY);
   }
 }

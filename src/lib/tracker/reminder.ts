@@ -120,20 +120,47 @@ export async function markReminderNotified(email: string, id: string): Promise<v
 // reminder per bike at a time.
 export const SORN_REMINDER_SOURCE_KEY = "vdg-tax-status";
 export const SORN_REMINDER_NAME = "Vehicle is SORN (not taxed)";
+// A second, independent reminder covering the opposite case: the
+// vehicle IS currently taxed, so there's a real renewal date worth
+// surfacing ahead of time - and, since this is a normal "date" reminder
+// (not "permanent"), reminderStatus.ts's own date math already reports
+// "overdue" for it without any extra code here if DVLA's own
+// TaxDueDate ever turns out to be in the past (e.g. stale data between
+// refreshes) - the same date-reminder machinery every other due-date
+// reminder in this app already uses.
+export const TAX_DUE_REMINDER_SOURCE_KEY = "vdg-tax-due-date";
+export const TAX_DUE_REMINDER_NAME = "Road tax renewal due";
 
 // The only place a "permanent" reminder is ever created or removed - see
 // ReminderTrigger's own comment on why. Called after every DVLA tax-
-// status check (vehicle creation, and the "Refresh vehicle data" button):
-// creates the reminder the first time the vehicle is found SORN'd, does
-// nothing on every later check that's still SORN'd (so an already-set
-// reminder doesn't get its createdAt/notifiedAt state reset for no
-// reason), and removes it the moment the vehicle is confirmed taxed again.
-export async function syncSornReminder(email: string, bikeId: string, taxStatus: string | null): Promise<void> {
+// status check (vehicle creation, and the "Refresh vehicle data"
+// button): keeps exactly one of two mutually-exclusive reminders in
+// sync with the vehicle's current DVLA tax status, so there's always a
+// reminder that reflects reality either way, never neither:
+// - SORN'd: creates (or leaves alone, if already set) the permanent
+//   "Vehicle is SORN" reminder, and removes any leftover tax-due
+//   reminder from before it went SORN.
+// - Taxed with a due date: removes the SORN reminder if present, and
+//   replaces the tax-due reminder with one pointed at the current
+//   TaxDueDate (a plain delete-then-recreate, same as MOT renewal
+//   reminders in motHistoryImport.ts - safe to repeat on every refresh,
+//   and rolls forward on its own once TaxDueDate advances to the next
+//   period).
+// - Taxed with no due date on record: removes both reminders - there's
+//   nothing dated to point a reminder at.
+export async function syncSornReminder(
+  email: string,
+  bikeId: string,
+  taxStatus: string | null,
+  taxDueDate?: string | null
+): Promise<void> {
   const isSorn = taxStatus?.trim().toUpperCase() === "SORN";
   const existing = await getReminders(email, bikeId);
-  const current = existing.find((r) => r.sourceKey === SORN_REMINDER_SOURCE_KEY);
+  const currentSorn = existing.find((r) => r.sourceKey === SORN_REMINDER_SOURCE_KEY);
+  const currentTaxDue = existing.find((r) => r.sourceKey === TAX_DUE_REMINDER_SOURCE_KEY);
+
   if (isSorn) {
-    if (!current) {
+    if (!currentSorn) {
       await createReminder(email, {
         bikeId,
         name: SORN_REMINDER_NAME,
@@ -142,8 +169,28 @@ export async function syncSornReminder(email: string, bikeId: string, taxStatus:
         sourceKey: SORN_REMINDER_SOURCE_KEY,
       });
     }
-  } else if (current) {
+    if (currentTaxDue) {
+      await deleteRemindersBySourceKey(email, bikeId, TAX_DUE_REMINDER_SOURCE_KEY);
+    }
+    return;
+  }
+
+  if (currentSorn) {
     await deleteRemindersBySourceKey(email, bikeId, SORN_REMINDER_SOURCE_KEY);
+  }
+
+  if (taxDueDate) {
+    await deleteRemindersBySourceKey(email, bikeId, TAX_DUE_REMINDER_SOURCE_KEY);
+    await createReminder(email, {
+      bikeId,
+      name: TAX_DUE_REMINDER_NAME,
+      intervalType: "date",
+      exactDate: taxDueDate,
+      date: new Date().toISOString().slice(0, 10),
+      sourceKey: TAX_DUE_REMINDER_SOURCE_KEY,
+    });
+  } else if (currentTaxDue) {
+    await deleteRemindersBySourceKey(email, bikeId, TAX_DUE_REMINDER_SOURCE_KEY);
   }
 }
 

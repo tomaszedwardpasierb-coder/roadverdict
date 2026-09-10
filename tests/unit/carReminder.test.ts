@@ -35,6 +35,8 @@ import {
   syncCarSornReminder,
   CAR_SORN_REMINDER_SOURCE_KEY,
   CAR_SORN_REMINDER_NAME,
+  CAR_TAX_DUE_REMINDER_SOURCE_KEY,
+  CAR_TAX_DUE_REMINDER_NAME,
 } from "@/lib/tracker/carReminder";
 
 const email = "driver@example.com";
@@ -251,5 +253,47 @@ describe("syncCarSornReminder", () => {
     await syncCarSornReminder(email, carId, null);
     expect(mocks.createTrackerDoc).not.toHaveBeenCalled();
     expect(mocks.delete).not.toHaveBeenCalled();
+  });
+
+  it("creates a tax-due reminder for a taxed car with a due date", async () => {
+    mocks.queryCarTrackerDocs.mockResolvedValue([]);
+    await syncCarSornReminder(email, carId, "Taxed", "2027-06-01");
+    expect(mocks.createTrackerDoc).toHaveBeenCalledWith(
+      email, "carReminder", "carReminder",
+      expect.objectContaining({ name: CAR_TAX_DUE_REMINDER_NAME, intervalType: "date", exactDate: "2027-06-01", sourceKey: CAR_TAX_DUE_REMINDER_SOURCE_KEY })
+    );
+  });
+
+  it("replaces an existing tax-due reminder (delete then recreate) once the due date has moved on", async () => {
+    mocks.queryCarTrackerDocs.mockResolvedValue([
+      { ...baseReminder, id: "existing-tax-due", sourceKey: CAR_TAX_DUE_REMINDER_SOURCE_KEY, intervalType: "date", exactDate: "2026-06-01" },
+    ]);
+    await syncCarSornReminder(email, carId, "Taxed", "2027-06-01");
+    expect(mocks.delete).toHaveBeenCalledTimes(1);
+    expect(mocks.createTrackerDoc).toHaveBeenCalledWith(
+      email, "carReminder", "carReminder",
+      expect.objectContaining({ exactDate: "2027-06-01" })
+    );
+  });
+
+  it("removes a leftover tax-due reminder when there's no due date on record", async () => {
+    mocks.queryCarTrackerDocs.mockResolvedValue([
+      { ...baseReminder, id: "existing-tax-due", sourceKey: CAR_TAX_DUE_REMINDER_SOURCE_KEY, intervalType: "date", exactDate: "2026-06-01" },
+    ]);
+    await syncCarSornReminder(email, carId, "Taxed", null);
+    expect(mocks.delete).toHaveBeenCalledTimes(1);
+    expect(mocks.createTrackerDoc).not.toHaveBeenCalled();
+  });
+
+  it("removes a leftover tax-due reminder when the car goes SORN, alongside creating the SORN reminder", async () => {
+    mocks.queryCarTrackerDocs.mockResolvedValue([
+      { ...baseReminder, id: "existing-tax-due", sourceKey: CAR_TAX_DUE_REMINDER_SOURCE_KEY, intervalType: "date", exactDate: "2026-06-01" },
+    ]);
+    await syncCarSornReminder(email, carId, "SORN", "2026-06-01");
+    expect(mocks.delete).toHaveBeenCalledTimes(1);
+    expect(mocks.createTrackerDoc).toHaveBeenCalledWith(
+      email, "carReminder", "carReminder",
+      expect.objectContaining({ name: CAR_SORN_REMINDER_NAME, sourceKey: CAR_SORN_REMINDER_SOURCE_KEY })
+    );
   });
 });
