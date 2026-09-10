@@ -2,7 +2,13 @@
 // Car mirror of report/[token]/detailed/page.tsx.
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { resolveCarShareToken } from "@/lib/tracker/carShareLink";
+import { resolveCarShareToken, updateCarShareLinkVdiUnlock } from "@/lib/tracker/carShareLink";
+import { selfHealVdiUnlock } from "@/lib/payments/vdiCheckout";
+import { fetchVdiCheckFromVdg } from "@/lib/tracker/vdiCheckFetch";
+import { fetchValuationFromVdg } from "@/lib/tracker/valuationFetch";
+import { generateVdiSummary } from "@/lib/tracker/vdiSummaryProse";
+import { VdiCheckSection } from "@/components/VdiCheckSection";
+import type { VdiUnlock } from "@/lib/tracker/vdiUnlock";
 import { getCarSellerReportData } from "@/lib/tracker/carSellerReportData";
 import { hasReportAccess } from "@/lib/tracker/reportAccess";
 import { CarPlateGate } from "../CarPlateGate";
@@ -60,10 +66,22 @@ function engineDescription(car: CarDoc): string {
   return car.fuelType === "hybrid" || car.fuelType === "phev" ? `${litres} hybrid` : litres;
 }
 
-export default async function CarDetailedReportPage(props: { params: Promise<{ token: string }> }) {
+export default async function CarDetailedReportPage(props: {
+  params: Promise<{ token: string }>;
+  searchParams: Promise<{ session_id?: string }>;
+}) {
   const params = await props.params;
+  const searchParams = await props.searchParams;
   const resolved = await resolveCarShareToken(params.token);
   if (!resolved) notFound();
+
+  // Covers the case where the browser returns from Stripe before the
+  // webhook has landed - see selfHealVdiUnlock's own comment. The
+  // webhook remains the authoritative path either way.
+  let vdiUnlock: VdiUnlock | undefined = resolved.vdiUnlock;
+  if (!vdiUnlock && searchParams.session_id) {
+    vdiUnlock = (await selfHealVdiUnlock(params.token, "car", searchParams.session_id)) ?? undefined;
+  }
 
   const verified = await hasReportAccess(params.token);
   if (!verified) return <CarPlateGate token={params.token} />;
@@ -86,6 +104,38 @@ export default async function CarDetailedReportPage(props: { params: Promise<{ t
     evidenceQuality, motCheckUrl, mileageCheck, storyParagraphs, jobTypeGroups, supportedFindings,
     unconfirmedFindings, detailedQuestions, verdict, askingPrice,
   } = data;
+
+  // Lazy-fill, generate-once: unlike buyerOpinionCache's rolling 7-day
+  // cooldown, this was paid for once - so VDG/Gemini are only ever
+  // spent the first time this section renders after purchase, then
+  // cached forever on the share link's own vdiUnlock field.
+  if (vdiUnlock && !vdiUnlock.vdiCheck && currentRegistration) {
+    const vdgApiKey = process.env.VDG_API_KEY;
+    const [vdiCheck, valuation] = vdgApiKey
+      ? await Promise.all([fetchVdiCheckFromVdg(currentRegistration, vdgApiKey), fetchValuationFromVdg(currentRegistration, vdgApiKey)])
+      : [null, null];
+    let aiSummary = null;
+    const geminiApiKey = process.env.GEMINI_API_KEY;
+    if (vdiCheck && geminiApiKey) {
+      aiSummary = await generateVdiSummary(
+        {
+          make: car.make,
+          model: car.model,
+          year: car.year ?? null,
+          vdiCheck,
+          valuation: valuation ?? undefined,
+          askingPrice: askingPrice ?? undefined,
+          verdictLabel: verdict.label,
+          loggedKeeperChangeCount: car.dvlaData?.keeperChangeList.length ?? 0,
+        },
+        geminiApiKey
+      );
+    }
+    if (vdiCheck) {
+      const updated = await updateCarShareLinkVdiUnlock(params.token, { vdiCheck, valuation: valuation ?? undefined, aiSummary });
+      if (updated?.vdiUnlock) vdiUnlock = updated.vdiUnlock;
+    }
+  }
 
   const canonicalReportUrl = `${process.env.APP_URL ?? "https://roadverdict.co.uk"}/car-report/${params.token}/detailed`;
   const qrDataUrl = await QRCode.toDataURL(canonicalReportUrl, { margin: 1, width: 150 });
@@ -151,7 +201,7 @@ export default async function CarDetailedReportPage(props: { params: Promise<{ t
     }
   }
 
-  const jumpNavItems: { href: string; label: string }[] = [{ href: "#known-facts", label: "Known facts" }];
+  const jumpNavItems: { href: string; label: string }[] = [{ href: "#independent-check", label: "Independent check" }, { href: "#known-facts", label: "Known facts" }];
   if (motHistory && motHistory.tests.length > 0) jumpNavItems.push({ href: "#mot-history", label: "MOT history" });
   if (car.dvlaData && (car.dvlaData.keeperChangeList.length > 0 || car.dvlaData.v5cIssueDates.length > 0)) {
     jumpNavItems.push({ href: "#ownership-history", label: "Ownership" });
@@ -207,6 +257,15 @@ export default async function CarDetailedReportPage(props: { params: Promise<{ t
           ))}
         </div>
       </nav>
+
+      <VdiCheckSection
+        vehicleKind="car"
+        token={params.token}
+        registration={currentRegistration}
+        make={car.make}
+        model={car.model}
+        vdiUnlock={vdiUnlock}
+      />
 
       <div className={styles.docPage}>
         {car.dvlaData && (car.dvlaData.warrantyMonths || car.dvlaData.warrantyMiles) && car.dvlaData.dateFirstRegistered && (() => {

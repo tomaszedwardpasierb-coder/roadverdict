@@ -1,7 +1,12 @@
 // Place at: src/app/report/[token]/detailed/page.tsx
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { resolveShareToken } from "@/lib/tracker/shareLink";
+import { resolveShareToken, updateShareLinkVdiUnlock } from "@/lib/tracker/shareLink";
+import { selfHealVdiUnlock } from "@/lib/payments/vdiCheckout";
+import { fetchVdiCheckFromVdg } from "@/lib/tracker/vdiCheckFetch";
+import { generateVdiSummary } from "@/lib/tracker/vdiSummaryProse";
+import { VdiCheckSection } from "@/components/VdiCheckSection";
+import type { VdiUnlock } from "@/lib/tracker/vdiUnlock";
 import { getSellerReportData } from "@/lib/tracker/sellerReportData";
 import { hasReportAccess } from "@/lib/tracker/reportAccess";
 import { PlateGate } from "../PlateGate";
@@ -62,10 +67,22 @@ function fmtDate(d: string): string {
   return new Date(d).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
 }
 
-export default async function DetailedReportPage(props: { params: Promise<{ token: string }> }) {
+export default async function DetailedReportPage(props: {
+  params: Promise<{ token: string }>;
+  searchParams: Promise<{ session_id?: string }>;
+}) {
   const params = await props.params;
+  const searchParams = await props.searchParams;
   const resolved = await resolveShareToken(params.token);
   if (!resolved) notFound();
+
+  // Covers the case where the browser returns from Stripe before the
+  // webhook has landed - see selfHealVdiUnlock's own comment. The
+  // webhook remains the authoritative path either way.
+  let vdiUnlock: VdiUnlock | undefined = resolved.vdiUnlock;
+  if (!vdiUnlock && searchParams.session_id) {
+    vdiUnlock = (await selfHealVdiUnlock(params.token, "bike", searchParams.session_id)) ?? undefined;
+  }
 
   const verified = await hasReportAccess(params.token);
   if (!verified) return <PlateGate token={params.token} />;
@@ -88,6 +105,34 @@ export default async function DetailedReportPage(props: { params: Promise<{ toke
     evidenceQuality, motCheckUrl, mileageCheck, storyParagraphs, jobTypeGroups, supportedFindings,
     unconfirmedFindings, detailedQuestions, verdict, askingPrice,
   } = data;
+
+  // Lazy-fill, generate-once: unlike buyerOpinionCache's rolling 7-day
+  // cooldown, this was paid for once - so VDG/Gemini are only ever
+  // spent the first time this section renders after purchase, then
+  // cached forever on the share link's own vdiUnlock field.
+  if (vdiUnlock && !vdiUnlock.vdiCheck && currentRegistration) {
+    const vdgApiKey = process.env.VDG_API_KEY;
+    const vdiCheck = vdgApiKey ? await fetchVdiCheckFromVdg(currentRegistration, vdgApiKey) : null;
+    let aiSummary = null;
+    const geminiApiKey = process.env.GEMINI_API_KEY;
+    if (vdiCheck && geminiApiKey) {
+      aiSummary = await generateVdiSummary(
+        {
+          make: bike.make,
+          model: bike.model,
+          year: bike.year ?? null,
+          vdiCheck,
+          verdictLabel: verdict.label,
+          loggedKeeperChangeCount: bike.dvlaData?.keeperChangeList.length ?? 0,
+        },
+        geminiApiKey
+      );
+    }
+    if (vdiCheck) {
+      const updated = await updateShareLinkVdiUnlock(params.token, { vdiCheck, aiSummary });
+      if (updated?.vdiUnlock) vdiUnlock = updated.vdiUnlock;
+    }
+  }
 
   const canonicalReportUrl = `${process.env.APP_URL ?? "https://roadverdict.co.uk"}/report/${params.token}/detailed`;
   const qrDataUrl = await QRCode.toDataURL(canonicalReportUrl, { margin: 1, width: 150 });
@@ -169,7 +214,7 @@ export default async function DetailedReportPage(props: { params: Promise<{ toke
   // Curated, data-driven jump-nav - only ever includes a pill for a
   // section that actually renders on THIS report, so a link can never
   // point at a heading that isn't there for this particular bike.
-  const jumpNavItems: { href: string; label: string }[] = [{ href: "#known-facts", label: "Known facts" }];
+  const jumpNavItems: { href: string; label: string }[] = [{ href: "#independent-check", label: "Independent check" }, { href: "#known-facts", label: "Known facts" }];
   if (motHistory && motHistory.tests.length > 0) jumpNavItems.push({ href: "#mot-history", label: "MOT history" });
   if (bike.dvlaData && (bike.dvlaData.keeperChangeList.length > 0 || bike.dvlaData.v5cIssueDates.length > 0)) {
     jumpNavItems.push({ href: "#ownership-history", label: "Ownership" });
@@ -225,6 +270,15 @@ export default async function DetailedReportPage(props: { params: Promise<{ toke
           ))}
         </div>
       </nav>
+
+      <VdiCheckSection
+        vehicleKind="bike"
+        token={params.token}
+        registration={currentRegistration}
+        make={bike.make}
+        model={bike.model}
+        vdiUnlock={vdiUnlock}
+      />
 
       <div className={styles.docPage}>
         {bike.dvlaData && (bike.dvlaData.warrantyMonths || bike.dvlaData.warrantyMiles) && bike.dvlaData.dateFirstRegistered && (() => {
