@@ -102,6 +102,25 @@ describe("RefreshVehicleDataButton", () => {
     expect(await screen.findByText("Checked - nothing new to add.")).toBeInTheDocument();
   });
 
+  it("mentions the road-tax bill being logged alongside the tax status", async () => {
+    (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        dvlaRefreshed: false,
+        motCreated: 0,
+        sorned: false,
+        taxStatus: "Taxed",
+        taxDueDate: "2027-06-01",
+        taxBillLogged: true,
+      }),
+    });
+    const user = userEvent.setup();
+    render(<RefreshVehicleDataButton bikeId="bike-1" />);
+    await user.click(screen.getByRole("button", { name: "Refresh vehicle data" }));
+
+    expect(await screen.findByText("tax status: Taxed (due 01/06/2027), road tax logged as an expense.")).toBeInTheDocument();
+  });
+
   it("shows the server's own error and does not refresh the page", async () => {
     (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({ ok: false, json: async () => ({ error: "DVLA lookup failed." }) });
     const user = userEvent.setup();

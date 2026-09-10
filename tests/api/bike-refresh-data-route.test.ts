@@ -11,6 +11,7 @@ const mocks = vi.hoisted(() => ({
   importMotHistoryForBike: vi.fn(),
   fetchVehicleTaxDetailsFromVdg: vi.fn(),
   syncSornReminder: vi.fn(),
+  logVedBillIfNeeded: vi.fn(),
   logImpersonationActivityForCurrentRequest: vi.fn(),
 }));
 
@@ -29,6 +30,7 @@ vi.mock("@/lib/tracker/dvlaDataFetch", () => ({ fetchDvlaDataFromVdg: mocks.fetc
 vi.mock("@/lib/tracker/motHistoryImport", () => ({ importMotHistoryForBike: mocks.importMotHistoryForBike }));
 vi.mock("@/lib/tracker/vehicleTaxFetch", () => ({ fetchVehicleTaxDetailsFromVdg: mocks.fetchVehicleTaxDetailsFromVdg }));
 vi.mock("@/lib/tracker/reminder", () => ({ syncSornReminder: mocks.syncSornReminder }));
+vi.mock("@/lib/tracker/bill", () => ({ logVedBillIfNeeded: mocks.logVedBillIfNeeded }));
 
 import { POST } from "@/app/api/tracker/bike/refresh-data/route";
 
@@ -52,6 +54,7 @@ describe("POST /api/tracker/bike/refresh-data", () => {
     mocks.importMotHistoryForBike.mockResolvedValue({ createdCount: 0, skippedCount: 0, skipped: [], motDueDate: null, reminderSet: false });
     mocks.fetchVehicleTaxDetailsFromVdg.mockResolvedValue(null);
     mocks.syncSornReminder.mockResolvedValue(undefined);
+    mocks.logVedBillIfNeeded.mockResolvedValue(false);
     process.env.VDG_API_KEY = "test-key";
   });
 
@@ -226,5 +229,30 @@ describe("POST /api/tracker/bike/refresh-data", () => {
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toMatchObject({ ok: true, sorned: false });
+  });
+
+  // Auto-logging the current VED period as an expense - see bill.ts's
+  // logVedBillIfNeeded, called right after the SORN reminder sync.
+  it("reports taxBillLogged true and logs the impersonation activity when a new road-tax bill is logged", async () => {
+    mocks.getSession.mockResolvedValue({ email: "owner@example.com" });
+    const taxDetails = { taxStatus: "Taxed", taxDueDate: "2027-06-01" };
+    mocks.fetchVehicleTaxDetailsFromVdg.mockResolvedValue(taxDetails);
+    mocks.logVedBillIfNeeded.mockResolvedValue(true);
+
+    const response = await POST(request(JSON.stringify({ bikeId: "bike-1" })));
+
+    expect(mocks.logVedBillIfNeeded).toHaveBeenCalledWith("owner@example.com", "bike-1", taxDetails);
+    await expect(response.json()).resolves.toMatchObject({ taxBillLogged: true });
+    expect(mocks.logImpersonationActivityForCurrentRequest).toHaveBeenCalledWith("bike", "bike-1", "update");
+  });
+
+  it("reports taxBillLogged false when the bill for this period already exists", async () => {
+    mocks.getSession.mockResolvedValue({ email: "owner@example.com" });
+    mocks.fetchVehicleTaxDetailsFromVdg.mockResolvedValue({ taxStatus: "Taxed", taxDueDate: "2027-06-01" });
+    mocks.logVedBillIfNeeded.mockResolvedValue(false);
+
+    const response = await POST(request(JSON.stringify({ bikeId: "bike-1" })));
+
+    await expect(response.json()).resolves.toMatchObject({ taxBillLogged: false });
   });
 });

@@ -16,6 +16,7 @@ import { fetchDvlaDataFromVdg } from "@/lib/tracker/dvlaDataFetch";
 import { importMotHistoryForBike } from "@/lib/tracker/motHistoryImport";
 import { fetchVehicleTaxDetailsFromVdg } from "@/lib/tracker/vehicleTaxFetch";
 import { syncSornReminder } from "@/lib/tracker/reminder";
+import { logVedBillIfNeeded } from "@/lib/tracker/bill";
 import { logImpersonationActivityForCurrentRequest } from "@/lib/admin/impersonation";
 
 export const dynamic = "force-dynamic";
@@ -90,11 +91,17 @@ export async function POST(request: NextRequest) {
   let sorned = false;
   let taxStatus: string | null = null;
   let taxDueDate: string | null = null;
+  let taxBillLogged = false;
   try {
     const apiKey = process.env.VDG_API_KEY;
     if (apiKey) {
       const taxDetails = await fetchVehicleTaxDetailsFromVdg(registration, apiKey);
       await syncSornReminder(session.email, bike.id, taxDetails?.taxStatus ?? null);
+      // A confirmed-taxed vehicle also gets its current VED period
+      // logged as a real expense, once per period - see
+      // bill.ts's logVedBillIfNeeded for how it avoids duplicating this
+      // on every refresh.
+      taxBillLogged = await logVedBillIfNeeded(session.email, bike.id, taxDetails);
       sorned = taxDetails?.taxStatus?.trim().toUpperCase() === "SORN";
       taxStatus = taxDetails?.taxStatus ?? null;
       taxDueDate = taxDetails?.taxDueDate ?? null;
@@ -103,8 +110,8 @@ export async function POST(request: NextRequest) {
     console.error("Tax/SORN check failed during refresh:", err);
   }
 
-  if (dvlaRefreshed || motCreated > 0) {
+  if (dvlaRefreshed || motCreated > 0 || taxBillLogged) {
     void logImpersonationActivityForCurrentRequest("bike", bike.id, "update");
   }
-  return NextResponse.json({ ok: true, dvlaRefreshed, motCreated, motSkipped, sorned, taxStatus, taxDueDate });
+  return NextResponse.json({ ok: true, dvlaRefreshed, motCreated, motSkipped, sorned, taxStatus, taxDueDate, taxBillLogged });
 }

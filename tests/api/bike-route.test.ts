@@ -21,6 +21,7 @@ const mocks = vi.hoisted(() => ({
   fetchDvlaDataFromVdg: vi.fn(),
   fetchVehicleTaxDetailsFromVdg: vi.fn(),
   syncSornReminder: vi.fn(),
+  logVedBillIfNeeded: vi.fn(),
   logImpersonationActivityForCurrentRequest: vi.fn(),
 }));
 
@@ -56,6 +57,7 @@ vi.mock("@/lib/subscriptions", () => ({ isPro: mocks.isPro }));
 vi.mock("@/lib/tracker/dvlaDataFetch", () => ({ fetchDvlaDataFromVdg: mocks.fetchDvlaDataFromVdg }));
 vi.mock("@/lib/tracker/vehicleTaxFetch", () => ({ fetchVehicleTaxDetailsFromVdg: mocks.fetchVehicleTaxDetailsFromVdg }));
 vi.mock("@/lib/tracker/reminder", () => ({ syncSornReminder: mocks.syncSornReminder }));
+vi.mock("@/lib/tracker/bill", () => ({ logVedBillIfNeeded: mocks.logVedBillIfNeeded }));
 // getBikeClassForCC (from @/lib/motorcycleModels) is deliberately NOT mocked -
 // it's a pure threshold function, so the tests exercise the real logic
 // rather than a stand-in for it.
@@ -88,6 +90,7 @@ describe("POST /api/tracker/bike", () => {
     mocks.fetchDvlaDataFromVdg.mockResolvedValue(null);
     mocks.fetchVehicleTaxDetailsFromVdg.mockResolvedValue(null);
     mocks.syncSornReminder.mockResolvedValue(undefined);
+    mocks.logVedBillIfNeeded.mockResolvedValue(false);
     process.env.VDG_API_KEY = "test-key";
     // Combined cap pre-check defaults: an account with nothing else
     // tracked and no Pro subscription never trips the new outer guard,
@@ -267,6 +270,19 @@ describe("POST /api/tracker/bike", () => {
     expect(mocks.syncSornReminder).toHaveBeenCalledWith("owner@example.com", "bike-1", "SORN");
   });
 
+  // See bill.ts's logVedBillIfNeeded - a confirmed-taxed vehicle also
+  // gets its current VED period logged as a real expense at creation
+  // time, not just on a later "Refresh vehicle data" click.
+  it("logs the current VED period as a bill using the tax check's result", async () => {
+    mocks.getSession.mockResolvedValue({ email: "owner@example.com" });
+    const taxDetails = { taxStatus: "Taxed", taxDueDate: "2027-06-01" };
+    mocks.fetchVehicleTaxDetailsFromVdg.mockResolvedValue(taxDetails);
+
+    await POST(request("POST", JSON.stringify(validCreatePayload)));
+
+    expect(mocks.logVedBillIfNeeded).toHaveBeenCalledWith("owner@example.com", "bike-1", taxDetails);
+  });
+
   it("skips the tax/SORN check entirely when VDG_API_KEY isn't configured", async () => {
     mocks.getSession.mockResolvedValue({ email: "owner@example.com" });
     delete process.env.VDG_API_KEY;
@@ -276,6 +292,7 @@ describe("POST /api/tracker/bike", () => {
     expect(response.status).toBe(200);
     expect(mocks.fetchVehicleTaxDetailsFromVdg).not.toHaveBeenCalled();
     expect(mocks.syncSornReminder).not.toHaveBeenCalled();
+    expect(mocks.logVedBillIfNeeded).not.toHaveBeenCalled();
   });
 
   // Same non-blocking guarantee as the DVLA fetch above, in its own

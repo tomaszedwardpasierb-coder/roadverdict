@@ -38,6 +38,7 @@ export function RefreshCarDataButton({ carId }: { carId: string }) {
           `tax status: ${data.taxStatus}${data.taxDueDate ? ` (due ${new Date(data.taxDueDate).toLocaleDateString('en-GB')})` : ''}`
         );
       }
+      if (data.taxBillLogged) parts.push('road tax logged as an expense');
       setResult(parts.length > 0 ? parts.join(', ') + '.' : 'Checked - nothing new to add.');
       router.refresh();
     } catch {

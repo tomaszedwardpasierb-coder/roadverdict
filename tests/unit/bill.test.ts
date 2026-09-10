@@ -14,7 +14,8 @@ vi.mock("@/lib/tracker/cosmosHelpers", () => ({
   deleteTrackerDoc: mocks.deleteTrackerDoc,
 }));
 
-import { createBill, getBills, updateBill, deleteBill } from "@/lib/tracker/bill";
+import { createBill, getBills, updateBill, deleteBill, logVedBillIfNeeded } from "@/lib/tracker/bill";
+import type { VehicleTaxDetails } from "@/lib/tracker/vehicleTaxFetch";
 
 const email = "rider@example.com";
 const bikeId = "bike-1";
@@ -123,5 +124,82 @@ describe("deleteBill", () => {
   it("delegates to deleteTrackerDoc with email and id", async () => {
     await deleteBill(email, baseBill.id);
     expect(mocks.deleteTrackerDoc).toHaveBeenCalledWith(email, baseBill.id);
+  });
+});
+
+describe("logVedBillIfNeeded", () => {
+  const taxedDetails: VehicleTaxDetails = {
+    make: "Honda",
+    taxStatus: "Taxed",
+    taxIsCurrentlyValid: true,
+    taxDueDate: "2025-07-01",
+    taxDaysRemaining: 300,
+    motStatus: "Valid",
+    vedStandardTwelveMonths: 117,
+  };
+
+  it("does nothing when taxDetails is null", async () => {
+    expect(await logVedBillIfNeeded(email, bikeId, null)).toBe(false);
+    expect(mocks.createTrackerDoc).not.toHaveBeenCalled();
+  });
+
+  it("does nothing when the vehicle isn't currently taxed", async () => {
+    const sorned: VehicleTaxDetails = { ...taxedDetails, taxIsCurrentlyValid: false, taxStatus: "SORN" };
+    expect(await logVedBillIfNeeded(email, bikeId, sorned)).toBe(false);
+    expect(mocks.createTrackerDoc).not.toHaveBeenCalled();
+  });
+
+  it("does nothing when there's no taxDueDate to anchor a period to", async () => {
+    const noDueDate: VehicleTaxDetails = { ...taxedDetails, taxDueDate: null };
+    expect(await logVedBillIfNeeded(email, bikeId, noDueDate)).toBe(false);
+    expect(mocks.createTrackerDoc).not.toHaveBeenCalled();
+  });
+
+  it("creates a road-tax bill for the inferred period when none exists yet", async () => {
+    mocks.queryTrackerDocs.mockResolvedValue([]);
+    const created = await logVedBillIfNeeded(email, bikeId, taxedDetails);
+    expect(created).toBe(true);
+    expect(mocks.createTrackerDoc).toHaveBeenCalledWith(
+      email,
+      "bill",
+      "bill",
+      expect.objectContaining({ bikeId, billType: "road-tax", cost: 117, date: "2024-07-01" })
+    );
+  });
+
+  it("does not duplicate a bill already logged for the same inferred period", async () => {
+    mocks.queryTrackerDocs.mockResolvedValue([
+      { ...baseBill, billType: "road-tax", date: "2024-07-01" },
+    ]);
+    const created = await logVedBillIfNeeded(email, bikeId, taxedDetails);
+    expect(created).toBe(false);
+    expect(mocks.createTrackerDoc).not.toHaveBeenCalled();
+  });
+
+  it("logs a new bill once taxDueDate rolls over to the next period", async () => {
+    mocks.queryTrackerDocs.mockResolvedValue([
+      { ...baseBill, billType: "road-tax", date: "2024-07-01" },
+    ]);
+    const nextPeriod: VehicleTaxDetails = { ...taxedDetails, taxDueDate: "2026-07-01" };
+    const created = await logVedBillIfNeeded(email, bikeId, nextPeriod);
+    expect(created).toBe(true);
+    expect(mocks.createTrackerDoc).toHaveBeenCalledWith(
+      email,
+      "bill",
+      "bill",
+      expect.objectContaining({ billType: "road-tax", date: "2025-07-01" })
+    );
+  });
+
+  it("falls back to a cost of 0 when vedStandardTwelveMonths is null", async () => {
+    mocks.queryTrackerDocs.mockResolvedValue([]);
+    const noRate: VehicleTaxDetails = { ...taxedDetails, vedStandardTwelveMonths: null };
+    await logVedBillIfNeeded(email, bikeId, noRate);
+    expect(mocks.createTrackerDoc).toHaveBeenCalledWith(
+      email,
+      "bill",
+      "bill",
+      expect.objectContaining({ cost: 0 })
+    );
   });
 });

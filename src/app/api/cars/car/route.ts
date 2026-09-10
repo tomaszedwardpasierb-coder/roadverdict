@@ -25,6 +25,7 @@ import { MAX_FREE_VEHICLES } from "@/lib/tracker/vehicleLimit";
 import { fetchDvlaDataFromVdg } from "@/lib/tracker/dvlaDataFetch";
 import { fetchVehicleTaxDetailsFromVdg } from "@/lib/tracker/vehicleTaxFetch";
 import { syncCarSornReminder } from "@/lib/tracker/carReminder";
+import { logVedCarBillIfNeeded } from "@/lib/tracker/carBill";
 import { logImpersonationActivityForCurrentRequest } from "@/lib/admin/impersonation";
 import type { Region } from "@/lib/priceData";
 import type { DistanceUnit, FuelEconomyUnit } from "@/lib/tracker/unitFormat";
@@ -135,6 +136,10 @@ export async function POST(request: NextRequest) {
     if (apiKey) {
       const taxDetails = await fetchVehicleTaxDetailsFromVdg(car.originalRegistration ?? "", apiKey);
       await syncCarSornReminder(session.email, car.id, taxDetails?.taxStatus ?? null);
+      // A confirmed-taxed vehicle also gets its current VED period
+      // logged as a real expense right away - see carBill.ts's
+      // logVedCarBillIfNeeded.
+      await logVedCarBillIfNeeded(session.email, car.id, taxDetails);
     }
   } catch (err) {
     console.error("Tax/SORN check failed during car creation:", err);

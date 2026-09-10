@@ -25,6 +25,7 @@ import { MAX_FREE_VEHICLES } from "@/lib/tracker/vehicleLimit";
 import { fetchDvlaDataFromVdg } from "@/lib/tracker/dvlaDataFetch";
 import { fetchVehicleTaxDetailsFromVdg } from "@/lib/tracker/vehicleTaxFetch";
 import { syncSornReminder } from "@/lib/tracker/reminder";
+import { logVedBillIfNeeded } from "@/lib/tracker/bill";
 import { logImpersonationActivityForCurrentRequest } from "@/lib/admin/impersonation";
 import { getBikeClassForCC } from "@/lib/motorcycleModels";
 import type { Region } from "@/lib/priceData";
@@ -141,6 +142,10 @@ export async function POST(request: NextRequest) {
     if (apiKey) {
       const taxDetails = await fetchVehicleTaxDetailsFromVdg(result.bike.originalRegistration ?? "", apiKey);
       await syncSornReminder(session.email, result.bike.id, taxDetails?.taxStatus ?? null);
+      // A confirmed-taxed vehicle also gets its current VED period
+      // logged as a real expense right away - see bill.ts's
+      // logVedBillIfNeeded.
+      await logVedBillIfNeeded(session.email, result.bike.id, taxDetails);
     }
   } catch (err) {
     console.error("Tax/SORN check failed during bike creation:", err);
