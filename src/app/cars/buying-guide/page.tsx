@@ -3,6 +3,7 @@ import type { Metadata } from 'next';
 import { headers } from 'next/headers';
 import { CarBuyingGuideForm } from '@/components/CarBuyingGuideForm';
 import { CarRelatedTools } from '@/components/CarRelatedTools';
+import { getSession } from '@/lib/auth/session';
 
 export const dynamic = 'force-dynamic';
 
@@ -27,6 +28,18 @@ const jsonLd = {
 export default async function CarBuyingGuidePage() {
   const nonce = (await headers()).get('x-nonce') ?? undefined;
 
+  // Same defensive wrapping as the motorcycle buying-guide page: this
+  // page previously had no Cosmos dependency, and getContainer() throws
+  // unconditionally if Cosmos config is ever missing - a problem there
+  // should degrade to "treat as anonymous", not take down a public,
+  // no-account-needed tool for every visitor.
+  let session: Awaited<ReturnType<typeof getSession>> = null;
+  try {
+    session = await getSession();
+  } catch (err) {
+    console.error("Car buying guide: getSession() failed, continuing as anonymous:", err);
+  }
+
   return (
     <>
       <script
@@ -39,7 +52,7 @@ export default async function CarBuyingGuidePage() {
         <h1>What should you check before buying it?</h1>
         <p>A buyer checklist weighted by how old the car actually is - not a generic list.</p>
       </div>
-      <CarBuyingGuideForm />
+      <CarBuyingGuideForm signedIn={!!session} />
       <p className="disclaimer">
         General inspection guidance, not a substitute for a professional pre-purchase check -
         especially on anything safety-critical like brakes or structural condition.

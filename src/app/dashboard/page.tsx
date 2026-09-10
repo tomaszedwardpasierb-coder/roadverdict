@@ -1286,7 +1286,7 @@ async function renderCarDashboard(
         {mileagePill}
       </div>
       <p className={styles.subtext}>A buyer checklist weighted by how old the car actually is - not a generic list.</p>
-      <CarBuyingGuideForm />
+      <CarBuyingGuideForm signedIn />
     </ProGate>
   );
 
