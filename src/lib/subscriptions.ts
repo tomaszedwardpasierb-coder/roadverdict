@@ -51,9 +51,9 @@ export async function isPro(email: string): Promise<boolean> {
   return (await getProStatus(email)).isPro;
 }
 
-export const PRO_MONTHLY_PRICE = "£4.99";
-export const PRO_ANNUAL_PRICE = "£49";
-export const PRO_ANNUAL_MONTHLY_EQUIV = "£4.08";
+export const PRO_MONTHLY_PRICE = "£5.99";
+export const PRO_ANNUAL_PRICE = "£59";
+export const PRO_ANNUAL_MONTHLY_EQUIV = "£4.92";
 
 export const PRO_FEATURES = [
   "A second vehicle (bike or car) - with side-by-side cost comparison to see which one actually costs you more to run",
@@ -61,6 +61,7 @@ export const PRO_FEATURES = [
   "Category-by-category spend breakdown (which category, and how much)",
   "Exact reminder due dates, plus automatic reminder emails",
   "Quote Checker, Cost Calculator & Buying Guide, pre-filled with your bike's own details",
+  "One free Buying Guide vehicle-history report every 4 weeks (£9.99 for another sooner)",
   "AI-generated \"Story So Far\" summary",
   "Detailed buyer/seller verdict report",
   "Export your full history as CSV",

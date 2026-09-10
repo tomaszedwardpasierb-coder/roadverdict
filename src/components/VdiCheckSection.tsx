@@ -33,6 +33,25 @@ function fmtDate(d: string): string {
   return new Date(d).toLocaleDateString('en-GB');
 }
 
+// One glyph per fact row, purely visual - never load-bearing (nothing
+// reads these back out), just makes a long fact list easier to scan.
+const ICON = {
+  stolen: '🛡️',
+  writeOff: '💥',
+  finance: '💳',
+  registeredDate: '📅',
+  manufactureDate: '🏭',
+  colour: '🎨',
+  keeperChanges: '👤',
+  plateChanges: '🔢',
+  roadTax: '🧾',
+  massInService: '⚖️',
+  taxationClass: '🏷️',
+  power: '⚡',
+  soundLevels: '🔊',
+  mileage: '🛣️',
+} as const;
+
 export function VdiCheckSection({ vehicleKind, token, registration, make, model, vdiUnlock }: Props) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -74,7 +93,9 @@ export function VdiCheckSection({ vehicleKind, token, registration, make, model,
         <p className={styles.docParagraph}>
           A one-time, independently-run check on this exact vehicle - stolen marker, write-off history,
           outstanding finance, and keeper/plate/colour change history, straight from police/DVLA data, not
-          the seller&apos;s own account.
+          the seller&apos;s own account. This check cross-references data from the DVLA, the Police National
+          Computer (PNC), insurance databases (MIAFTR), and major finance houses, to help confirm this
+          vehicle is safe and legal to buy.
           {vehicleKind === 'car' && ' Includes an independent valuation range too.'}
         </p>
         <button className="btn-primary" type="button" onClick={handleUnlock} disabled={loading}>
@@ -104,11 +125,11 @@ export function VdiCheckSection({ vehicleKind, token, registration, make, model,
 
       <dl className={styles.itemByItemList}>
         <div className={styles.itemByItemRow}>
-          <dt>Stolen marker</dt>
+          <dt>{ICON.stolen} Stolen marker</dt>
           <dd>{vdiCheck.isStolen ? '⚠️ Recorded as stolen' : 'None found'}</dd>
         </div>
         <div className={styles.itemByItemRow}>
-          <dt>Write-off record</dt>
+          <dt>{ICON.writeOff} Write-off record</dt>
           <dd>
             {!vdiCheck.hasWriteOffRecord ? (
               'None found'
@@ -129,23 +150,23 @@ export function VdiCheckSection({ vehicleKind, token, registration, make, model,
           </dd>
         </div>
         <div className={styles.itemByItemRow}>
-          <dt>Outstanding finance</dt>
+          <dt>{ICON.finance} Outstanding finance</dt>
           <dd>{vdiCheck.hasOutstandingFinance ? `⚠️ ${vdiCheck.financeRecords.length} agreement(s) on file` : 'None found'}</dd>
         </div>
         {vdiCheck.dateFirstRegisteredInUk && (
           <div className={styles.itemByItemRow}>
-            <dt>Date first registered (UK)</dt>
+            <dt>{ICON.registeredDate} Date first registered (UK)</dt>
             <dd>{fmtDate(vdiCheck.dateFirstRegisteredInUk)}</dd>
           </div>
         )}
         {vdiCheck.dateOfManufacture && (
           <div className={styles.itemByItemRow}>
-            <dt>Date of manufacture</dt>
+            <dt>{ICON.manufactureDate} Date of manufacture</dt>
             <dd>{fmtDate(vdiCheck.dateOfManufacture)}</dd>
           </div>
         )}
         <div className={styles.itemByItemRow}>
-          <dt>Colour</dt>
+          <dt>{ICON.colour} Colour</dt>
           <dd>
             {vdiCheck.originalColour && vdiCheck.currentColour && vdiCheck.originalColour !== vdiCheck.currentColour
               ? `${vdiCheck.originalColour.toLowerCase()} → ${vdiCheck.currentColour.toLowerCase()}`
@@ -156,16 +177,16 @@ export function VdiCheckSection({ vehicleKind, token, registration, make, model,
           </dd>
         </div>
         <div className={styles.itemByItemRow}>
-          <dt>Keeper changes</dt>
+          <dt>{ICON.keeperChanges} Keeper changes</dt>
           <dd>{vdiCheck.keeperChangeCount}</dd>
         </div>
         <div className={styles.itemByItemRow}>
-          <dt>Plate changes</dt>
+          <dt>{ICON.plateChanges} Plate changes</dt>
           <dd>{vdiCheck.plateChangeCount}</dd>
         </div>
         {(vdiCheck.vedStandardSixMonths != null || vdiCheck.vedStandardTwelveMonths != null) && (
           <div className={styles.itemByItemRow}>
-            <dt>Road tax (standard rate)</dt>
+            <dt>{ICON.roadTax} Road tax (standard rate)</dt>
             <dd>
               {[
                 vdiCheck.vedStandardSixMonths != null ? `${fmtGbp(vdiCheck.vedStandardSixMonths)} for 6 months` : null,
@@ -178,25 +199,25 @@ export function VdiCheckSection({ vehicleKind, token, registration, make, model,
         )}
         {vdiCheck.massInServiceKg != null && (
           <div className={styles.itemByItemRow}>
-            <dt>Mass in service</dt>
+            <dt>{ICON.massInService} Mass in service</dt>
             <dd>{vdiCheck.massInServiceKg.toLocaleString()} kg</dd>
           </div>
         )}
         {vdiCheck.taxationClass && (
           <div className={styles.itemByItemRow}>
-            <dt>Taxation class</dt>
+            <dt>{ICON.taxationClass} Taxation class</dt>
             <dd>{vdiCheck.taxationClass}</dd>
           </div>
         )}
         {vdiCheck.bhp != null && (
           <div className={styles.itemByItemRow}>
-            <dt>Power</dt>
+            <dt>{ICON.power} Power</dt>
             <dd>{vdiCheck.bhp} bhp</dd>
           </div>
         )}
         {vdiCheck.soundLevels && (vdiCheck.soundLevels.stationaryDb != null || vdiCheck.soundLevels.driveByDb != null) && (
           <div className={styles.itemByItemRow}>
-            <dt>Sound levels</dt>
+            <dt>{ICON.soundLevels} Sound levels</dt>
             <dd>
               {[
                 vdiCheck.soundLevels.stationaryDb != null ? `stationary ${vdiCheck.soundLevels.stationaryDb} dB` : null,
@@ -210,7 +231,7 @@ export function VdiCheckSection({ vehicleKind, token, registration, make, model,
         )}
         {vdiCheck.calculatedAverageAnnualMileage != null && vdiCheck.averageMileageForAge != null && (
           <div className={styles.itemByItemRow}>
-            <dt>Average annual mileage</dt>
+            <dt>{ICON.mileage} Average annual mileage</dt>
             <dd>
               {vdiCheck.calculatedAverageAnnualMileage.toLocaleString()} mi/year (typical for this age: {vdiCheck.averageMileageForAge.toLocaleString()})
               {vdiCheck.mileageAnomalyDetected ? ' - ⚠️ anomaly flagged' : ''}

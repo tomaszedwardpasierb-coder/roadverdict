@@ -199,13 +199,14 @@ describe("CarBuyingGuideForm", () => {
 
   // ── Standalone, pay-per-use VDI check + free, rate-limited valuation ──
 
-  it("shows a Buy Independent Vehicle Check button once a lookup succeeds without a vdiCheck yet", async () => {
+  it("shows the priced report CTA once a lookup succeeds without a vdiCheck yet", async () => {
     (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
       ok: true,
       json: async () => ({
         vrm: "AB12CDE", make: "Ford", model: "Focus", fuelType: "Petrol", colour: "Blue",
         plateInRetention: false, motDueDate: null, motTests: [], briefing: null,
         vdiCheck: null, valuation: { privateAverage: 12000, privateClean: null, dealerForecourt: null, partExchange: null }, taxDetails: null,
+        reportTier: "freeNoVehicle", reportPricePence: 1499, reportPriceLabel: "£14.99", proFreeAvailable: false, nextFreeReportAt: null,
       }),
     });
     const user = userEvent.setup();
@@ -213,7 +214,7 @@ describe("CarBuyingGuideForm", () => {
     await user.type(screen.getByLabelText("Search by registration (optional)"), "AB12CDE");
     await user.click(screen.getByRole("button", { name: "Look up" }));
 
-    expect(await screen.findByRole("button", { name: /Buy Independent Vehicle Check - £9.99/ })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: /Buy the vehicle history report - £14\.99/ })).toBeInTheDocument();
   });
 
   it("clicking Buy calls the checkout route with the current vrm and redirects to the returned url", async () => {
@@ -226,6 +227,7 @@ describe("CarBuyingGuideForm", () => {
             vrm: "AB12CDE", make: "Ford", model: "Focus", fuelType: "Petrol", colour: "Blue",
             plateInRetention: false, motDueDate: null, motTests: [], briefing: null,
             vdiCheck: null, valuation: null, taxDetails: null,
+            reportTier: "freeNoVehicle", reportPricePence: 1499, reportPriceLabel: "£14.99", proFreeAvailable: false, nextFreeReportAt: null,
           }),
         });
       }
@@ -241,7 +243,7 @@ describe("CarBuyingGuideForm", () => {
     render(<CarBuyingGuideForm signedIn />);
     await user.type(screen.getByLabelText("Search by registration (optional)"), "AB12CDE");
     await user.click(screen.getByRole("button", { name: "Look up" }));
-    await user.click(await screen.findByRole("button", { name: /Buy Independent Vehicle Check/ }));
+    await user.click(await screen.findByRole("button", { name: /Buy the vehicle history report/ }));
 
     await waitFor(() => expect(window.location.href).toBe("https://checkout.stripe.com/test-session"));
     expect(fetchMock).toHaveBeenCalledWith(
@@ -273,6 +275,7 @@ describe("CarBuyingGuideForm", () => {
         valuation: { privateAverage: 23994, privateClean: null, dealerForecourt: 27161, partExchange: null },
         vdiCheckPurchasedAt: "2026-01-01T00:00:00.000Z",
         vdiCheckExpiresAt: "2026-01-15T00:00:00.000Z",
+        vdiCheckPricePaidPence: 1499,
       }),
     });
     const user = userEvent.setup();
@@ -281,7 +284,7 @@ describe("CarBuyingGuideForm", () => {
     await user.click(screen.getByRole("button", { name: "Look up" }));
 
     expect(await screen.findByText(/1 write-off record\(s\) on file/)).toBeInTheDocument();
-    expect(screen.getByText(/Independent VDI check - included with your £9.99 purchase/)).toBeInTheDocument();
+    expect(screen.getByText(/Vehicle history report - included with your £14\.99 purchase/)).toBeInTheDocument();
     expect(screen.getByText(/Bought 01\/01\/2026 - free to look up again until 15\/01\/2026/)).toBeInTheDocument();
     expect(screen.getByText(/1 colour change\(s\) on record \(currently grey\)/)).toBeInTheDocument();
     expect(screen.getByText(/Average annual mileage: 9,800 mi\/year/)).toBeInTheDocument();
@@ -290,7 +293,7 @@ describe("CarBuyingGuideForm", () => {
     expect(screen.getByText("Keeper change history")).toBeInTheDocument();
     expect(screen.getByText("Private average: £23,994")).toBeInTheDocument();
     expect(screen.getByText("Dealer forecourt: £27,161")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /Buy Independent Vehicle Check/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Buy the vehicle history report/ })).not.toBeInTheDocument();
   });
 
   it("shows the valuation cooldown message when the free/Pro allowance is used up, independent of the VDI purchase state", async () => {
@@ -317,6 +320,7 @@ describe("CarBuyingGuideForm", () => {
         vrm: "AB12CDE", make: "Ford", model: "Focus", fuelType: "Petrol", colour: "Blue",
         plateInRetention: false, motDueDate: null, motTests: [], briefing: null, taxDetails: null,
         vdiCheck: null, vdiCheckBlockedReason: "already_used", valuation: null,
+        reportTier: "freeNoVehicle", reportPricePence: 1499, reportPriceLabel: "£14.99", proFreeAvailable: false, nextFreeReportAt: null,
       }),
     });
     const user = userEvent.setup();
@@ -325,7 +329,7 @@ describe("CarBuyingGuideForm", () => {
     await user.click(screen.getByRole("button", { name: "Look up" }));
 
     expect(await screen.findByText(/already been used/)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Buy Independent Vehicle Check/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Buy the vehicle history report/ })).toBeInTheDocument();
   });
 
   it("on load, a Stripe return with vdiPurchaseId and vrm in the URL auto-fills the plate and runs the paid lookup", async () => {
@@ -347,7 +351,7 @@ describe("CarBuyingGuideForm", () => {
     render(<CarBuyingGuideForm signedIn />);
 
     await waitFor(() => expect(screen.getByLabelText("Search by registration (optional)")).toHaveValue("AB12CDE"));
-    expect(await screen.findByText("1 keeper change(s) on record")).toBeInTheDocument();
+    expect(await screen.findByText(/1 keeper change\(s\) on record/)).toBeInTheDocument();
     const calledUrl = (fetch as ReturnType<typeof vi.fn>).mock.calls[0][0] as string;
     expect(calledUrl).toContain("vdiPurchaseId=purchase123");
     expect(calledUrl).toContain("session_id=cs_test_123");

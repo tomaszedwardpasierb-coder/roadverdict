@@ -169,12 +169,13 @@ describe("BuyingGuideForm", () => {
 
   // ── Standalone, pay-per-use VDI check ─────────────────────────────────
 
-  it("shows a Buy Independent Vehicle Check button once a lookup succeeds without a vdiCheck yet", async () => {
+  it("shows the priced report CTA once a lookup succeeds without a vdiCheck yet", async () => {
     (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
       ok: true,
       json: async () => ({
         vrm: "AB12CDE", make: "Honda", model: "CB125R", fuelType: "Petrol", colour: "Black",
         plateInRetention: false, motDueDate: null, motTests: [], briefing: null, vdiCheck: null, taxDetails: null,
+        reportTier: "freeNoVehicle", reportPricePence: 1499, reportPriceLabel: "£14.99", proFreeAvailable: false, nextFreeReportAt: null,
       }),
     });
     const user = userEvent.setup();
@@ -182,7 +183,43 @@ describe("BuyingGuideForm", () => {
     await user.type(screen.getByLabelText("Search by registration (optional)"), "AB12CDE");
     await user.click(screen.getByRole("button", { name: "Look up" }));
 
-    expect(await screen.findByRole("button", { name: /Buy Independent Vehicle Check - £9.99/ })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: /Buy the vehicle history report - £14\.99/ })).toBeInTheDocument();
+    expect(screen.getByText(/Add a vehicle to your garage to unlock £12\.99/)).toBeInTheDocument();
+  });
+
+  it("shows the free-report CTA for a Pro account with its allowance available", async () => {
+    (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        vrm: "AB12CDE", make: "Honda", model: "CB125R", fuelType: "Petrol", colour: "Black",
+        plateInRetention: false, motDueDate: null, motTests: [], briefing: null, vdiCheck: null, taxDetails: null,
+        reportTier: "pro", reportPricePence: 0, reportPriceLabel: "£9.99", proFreeAvailable: true, nextFreeReportAt: null,
+      }),
+    });
+    const user = userEvent.setup();
+    render(<BuyingGuideForm signedIn />);
+    await user.type(screen.getByLabelText("Search by registration (optional)"), "AB12CDE");
+    await user.click(screen.getByRole("button", { name: "Look up" }));
+
+    expect(await screen.findByRole("button", { name: /Get your free vehicle history report/ })).toBeInTheDocument();
+  });
+
+  it("shows the priced CTA and next-free-date note for a Pro account off its allowance", async () => {
+    (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        vrm: "AB12CDE", make: "Honda", model: "CB125R", fuelType: "Petrol", colour: "Black",
+        plateInRetention: false, motDueDate: null, motTests: [], briefing: null, vdiCheck: null, taxDetails: null,
+        reportTier: "pro", reportPricePence: 999, reportPriceLabel: "£9.99", proFreeAvailable: false, nextFreeReportAt: "2026-02-01T00:00:00.000Z",
+      }),
+    });
+    const user = userEvent.setup();
+    render(<BuyingGuideForm signedIn />);
+    await user.type(screen.getByLabelText("Search by registration (optional)"), "AB12CDE");
+    await user.click(screen.getByRole("button", { name: "Look up" }));
+
+    expect(await screen.findByRole("button", { name: /Buy the vehicle history report - £9\.99/ })).toBeInTheDocument();
+    expect(screen.getByText(/Your next free report is available 01\/02\/2026/)).toBeInTheDocument();
   });
 
   it("clicking Buy calls the checkout route with the current vrm and redirects to the returned url", async () => {
@@ -194,6 +231,7 @@ describe("BuyingGuideForm", () => {
           json: async () => ({
             vrm: "AB12CDE", make: "Honda", model: "CB125R", fuelType: "Petrol", colour: "Black",
             plateInRetention: false, motDueDate: null, motTests: [], briefing: null, vdiCheck: null, taxDetails: null,
+            reportTier: "freeNoVehicle", reportPricePence: 1499, reportPriceLabel: "£14.99", proFreeAvailable: false, nextFreeReportAt: null,
           }),
         });
       }
@@ -209,7 +247,7 @@ describe("BuyingGuideForm", () => {
     render(<BuyingGuideForm signedIn />);
     await user.type(screen.getByLabelText("Search by registration (optional)"), "AB12CDE");
     await user.click(screen.getByRole("button", { name: "Look up" }));
-    await user.click(await screen.findByRole("button", { name: /Buy Independent Vehicle Check/ }));
+    await user.click(await screen.findByRole("button", { name: /Buy the vehicle history report/ }));
 
     await waitFor(() => expect(window.location.href).toBe("https://checkout.stripe.com/test-session"));
     expect(fetchMock).toHaveBeenCalledWith(
@@ -219,6 +257,58 @@ describe("BuyingGuideForm", () => {
 
     // @ts-expect-error - restoring the real Location object after the stub above
     window.location = originalLocation;
+  });
+
+  it("a Pro free-allowance grant re-runs the lookup directly, with no Stripe redirect", async () => {
+    const fetchMock = fetch as ReturnType<typeof vi.fn>;
+    let lookupCalls = 0;
+    fetchMock.mockImplementation((url: string) => {
+      if (url.startsWith("/api/tracker/buying-guide-lookup")) {
+        lookupCalls += 1;
+        if (lookupCalls === 1) {
+          return Promise.resolve({
+            ok: true,
+            json: async () => ({
+              vrm: "AB12CDE", make: "Honda", model: "CB125R", fuelType: "Petrol", colour: "Black",
+              plateInRetention: false, motDueDate: null, motTests: [], briefing: null, vdiCheck: null, taxDetails: null,
+              reportTier: "pro", reportPricePence: 0, reportPriceLabel: "£9.99", proFreeAvailable: true, nextFreeReportAt: null,
+            }),
+          });
+        }
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            vrm: "AB12CDE", make: "Honda", model: "CB125R", fuelType: "Petrol", colour: "Black",
+            plateInRetention: false, motDueDate: null, motTests: [], briefing: null, taxDetails: null,
+            vdiCheck: {
+              isStolen: false, hasWriteOffRecord: false, writeOffRecordCount: 0, hasOutstandingFinance: false,
+              financeRecords: [], keeperChanges: [], keeperChangeCount: 0, plateChangeCount: 0, colourChangeCount: 0, currentColour: null,
+              v5cReissueCount: 0, calculatedAverageAnnualMileage: null, averageMileageForAge: null,
+              mileageAnomalyDetected: false, manufacturerWarrantyMiles: null, manufacturerWarrantyMonths: null,
+            },
+            vdiCheckPurchasedAt: "2026-01-01T00:00:00.000Z",
+            vdiCheckExpiresAt: "2026-01-15T00:00:00.000Z",
+            vdiCheckPricePaidPence: 0,
+          }),
+        });
+      }
+      return Promise.resolve({ ok: true, json: async () => ({ freeReportReady: true, vdiPurchaseId: "free-purchase-1" }) });
+    });
+
+    const user = userEvent.setup();
+    render(<BuyingGuideForm signedIn />);
+    await user.type(screen.getByLabelText("Search by registration (optional)"), "AB12CDE");
+    await user.click(screen.getByRole("button", { name: "Look up" }));
+    await user.click(await screen.findByRole("button", { name: /Get your free vehicle history report/ }));
+
+    expect(await screen.findByText(/your free Premium report/)).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/tracker/buying-guide-vdi-checkout",
+      expect.objectContaining({ method: "POST", body: JSON.stringify({ vrm: "AB12CDE" }) })
+    );
+    const secondLookupUrl = fetchMock.mock.calls[2][0] as string;
+    expect(secondLookupUrl).toContain("vdiPurchaseId=free-purchase-1");
+    expect(window.location.search).toContain("vdiPurchaseId=free-purchase-1");
   });
 
   it("renders the independent VDI check facts once returned", async () => {
@@ -240,6 +330,7 @@ describe("BuyingGuideForm", () => {
         },
         vdiCheckPurchasedAt: "2026-01-01T00:00:00.000Z",
         vdiCheckExpiresAt: "2026-01-15T00:00:00.000Z",
+        vdiCheckPricePaidPence: 1499,
       }),
     });
     const user = userEvent.setup();
@@ -248,10 +339,10 @@ describe("BuyingGuideForm", () => {
     await user.click(screen.getByRole("button", { name: "Look up" }));
 
     expect(await screen.findByText(/Recorded as stolen/)).toBeInTheDocument();
-    expect(screen.getByText(/Independent VDI check - included with your £9.99 purchase/)).toBeInTheDocument();
+    expect(screen.getByText(/Vehicle history report - included with your £14\.99 purchase/)).toBeInTheDocument();
     expect(screen.getByText(/Bought 01\/01\/2026 - free to look up again until 15\/01\/2026/)).toBeInTheDocument();
-    expect(screen.getByText("2 keeper change(s) on record")).toBeInTheDocument();
-    expect(screen.getByText("1 plate change(s) on record")).toBeInTheDocument();
+    expect(screen.getByText(/2 keeper change\(s\) on record/)).toBeInTheDocument();
+    expect(screen.getByText(/1 plate change\(s\) on record/)).toBeInTheDocument();
     expect(screen.getByText(/Average annual mileage: 4,200 mi\/year/)).toBeInTheDocument();
     expect(screen.getByText(/⚠️ anomaly flagged/)).toBeInTheDocument();
     expect(screen.getByText(/Manufacturer warranty: 24 months \/ 12,000 miles from new/)).toBeInTheDocument();
@@ -260,7 +351,32 @@ describe("BuyingGuideForm", () => {
     const keeperEntries = screen.getAllByText(/new keeper registered/);
     expect(keeperEntries[0]).toHaveTextContent("01/06/2024");
     expect(keeperEntries[1]).toHaveTextContent("01/01/2023");
-    expect(screen.queryByRole("button", { name: /Buy Independent Vehicle Check/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Buy the vehicle history report/ })).not.toBeInTheDocument();
+  });
+
+  it("shows 'your free Premium report' when the check was granted free, not purchased", async () => {
+    (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        vrm: "AB12CDE", make: "Honda", model: "CB125R", fuelType: "Petrol", colour: "Black",
+        plateInRetention: false, motDueDate: null, motTests: [], briefing: null, taxDetails: null,
+        vdiCheck: {
+          isStolen: false, hasWriteOffRecord: false, writeOffRecordCount: 0, hasOutstandingFinance: false,
+          financeRecords: [], keeperChanges: [], keeperChangeCount: 0, plateChangeCount: 0, colourChangeCount: 0, currentColour: null,
+          v5cReissueCount: 0, calculatedAverageAnnualMileage: null, averageMileageForAge: null,
+          mileageAnomalyDetected: false, manufacturerWarrantyMiles: null, manufacturerWarrantyMonths: null,
+        },
+        vdiCheckPurchasedAt: "2026-01-01T00:00:00.000Z",
+        vdiCheckExpiresAt: "2026-01-15T00:00:00.000Z",
+        vdiCheckPricePaidPence: 0,
+      }),
+    });
+    const user = userEvent.setup();
+    render(<BuyingGuideForm signedIn />);
+    await user.type(screen.getByLabelText("Search by registration (optional)"), "AB12CDE");
+    await user.click(screen.getByRole("button", { name: "Look up" }));
+
+    expect(await screen.findByText(/Vehicle history report - your free Premium report/)).toBeInTheDocument();
   });
 
   it("renders the enriched write-off record, registration/manufacture dates, VED rates, and technical spec", async () => {
@@ -323,6 +439,7 @@ describe("BuyingGuideForm", () => {
         vrm: "AB12CDE", make: "Honda", model: "CB125R", fuelType: "Petrol", colour: "Black",
         plateInRetention: false, motDueDate: null, motTests: [], briefing: null, taxDetails: null,
         vdiCheck: null, vdiCheckBlockedReason: "already_used",
+        reportTier: "freeNoVehicle", reportPricePence: 1499, reportPriceLabel: "£14.99", proFreeAvailable: false, nextFreeReportAt: null,
       }),
     });
     const user = userEvent.setup();
@@ -331,7 +448,7 @@ describe("BuyingGuideForm", () => {
     await user.click(screen.getByRole("button", { name: "Look up" }));
 
     expect(await screen.findByText(/already been used/)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Buy Independent Vehicle Check/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Buy the vehicle history report/ })).toBeInTheDocument();
   });
 
   it("on load, a Stripe return with vdiPurchaseId and vrm in the URL auto-fills the plate and runs the paid lookup", async () => {
@@ -353,7 +470,7 @@ describe("BuyingGuideForm", () => {
     render(<BuyingGuideForm signedIn />);
 
     await waitFor(() => expect(screen.getByLabelText("Search by registration (optional)")).toHaveValue("AB12CDE"));
-    expect(await screen.findByText("1 keeper change(s) on record")).toBeInTheDocument();
+    expect(await screen.findByText(/1 keeper change\(s\) on record/)).toBeInTheDocument();
     const calledUrl = (fetch as ReturnType<typeof vi.fn>).mock.calls[0][0] as string;
     expect(calledUrl).toContain("vdiPurchaseId=purchase123");
     expect(calledUrl).toContain("session_id=cs_test_123");

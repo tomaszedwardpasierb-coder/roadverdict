@@ -5,7 +5,7 @@
 // one Pro subscription unlocks everything below, not just the feature
 // being gated at that spot.
 import Link from 'next/link';
-import { PRO_FEATURES } from '@/lib/subscriptions';
+import { PRO_FEATURES, PRO_MONTHLY_PRICE, PRO_ANNUAL_PRICE } from '@/lib/subscriptions';
 import styles from '@/app/pro/pro.module.css';
 
 interface Props {
@@ -45,8 +45,8 @@ export function PlanComparisonCards({ userIsPro, showFreeCta = true }: Props) {
       <div className={styles.planCard + ' ' + styles.planCardPro}>
         <div className={styles.planBadge}>Most popular</div>
         <div className={styles.planName}>Pro</div>
-        <div className={styles.planPrice}>£4.99<span className={styles.planPricePer}>/mo</span></div>
-        <div className={styles.planPriceSub}>or £49/year (2 months free)</div>
+        <div className={styles.planPrice}>{PRO_MONTHLY_PRICE}<span className={styles.planPricePer}>/mo</span></div>
+        <div className={styles.planPriceSub}>or {PRO_ANNUAL_PRICE}/year (2 months free)</div>
         <ul className={styles.featureList}>
           <li>Everything in Free, plus:</li>
           {PRO_FEATURES.map((f) => (
@@ -74,8 +74,10 @@ export function PlanComparisonCards({ userIsPro, showFreeCta = true }: Props) {
 
       <p className={styles.planCtaNote}>
         Independent Vehicle Check (stolen/write-off/finance/valuation on a shared buyer report) - £9.99 bike / £13.99
-        car, one-time. Same check inside the free Buying Guide - £9.99, pay-per-use. Neither is a Free or Pro perk -
-        available to every account, on either plan.
+        car, one-time, available to every account on either plan. The Buying Guide&apos;s own vehicle-history report
+        (VDI check plus a full public-data analysis and AI-written summary) is priced by account: £14.99 with no
+        vehicle registered, £12.99 once you&apos;ve added one, and free for Pro - one every 4 weeks, or £9.99 to get
+        another sooner.
       </p>
     </div>
   );

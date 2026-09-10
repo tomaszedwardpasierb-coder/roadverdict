@@ -1,6 +1,6 @@
 // Place at: src/app/pro/page.tsx
 import { getSession } from '@/lib/auth/session';
-import { isPro } from '@/lib/subscriptions';
+import { isPro, PRO_MONTHLY_PRICE } from '@/lib/subscriptions';
 import { PlanComparisonCards } from '@/components/PlanComparisonCards';
 import styles from './pro.module.css';
 
@@ -24,7 +24,7 @@ export default async function ProPage() {
           deeper insight, multiple bikes, and polished outputs when it matters.
         </p>
         <p className={styles.sub}>
-          One subscription, £4.99/month - it unlocks every Pro feature below together, not one at a time.
+          One subscription, {PRO_MONTHLY_PRICE}/month - it unlocks every Pro feature below together, not one at a time.
         </p>
       </div>
 
@@ -46,7 +46,7 @@ export default async function ProPage() {
         </div>
         <div className={styles.faqItem}>
           <strong>Is there a trial?</strong>
-          <p>Not yet - but at £4.99/month you can try it for a month and cancel if it&apos;s not for you.</p>
+          <p>Not yet - but at {PRO_MONTHLY_PRICE}/month you can try it for a month and cancel if it&apos;s not for you.</p>
         </div>
       </div>
     </main>

@@ -9,7 +9,7 @@ import {
   type AgeBand,
   type Checklist,
 } from '@/lib/tracker/carBuyerChecklist';
-import { BUYING_GUIDE_VDI_CHECK_PRICE_LABEL } from '@/lib/payments/pricing';
+import type { BuyingGuideReportTier } from '@/lib/payments/pricing';
 import { CarBuyingGuideResult } from './CarBuyingGuideResult';
 
 interface ApiResponse {
@@ -69,6 +69,10 @@ interface CarBuyingGuideLookupResponse {
   // vdiPurchase.ts's VDI_PURCHASE_RETRIEVAL_WINDOW_MS).
   vdiCheckPurchasedAt: string | null;
   vdiCheckExpiresAt: string | null;
+  // What THIS specific purchase actually cost (0 for a Pro free-allowance
+  // grant) - distinct from reportPricePence below, which is what a NEW
+  // purchase would cost right now.
+  vdiCheckPricePaidPence: number | null;
   // Free but rate-limited (see valuationCheckUsage.ts), fully decoupled
   // from vdiCheck's paid purchase above - always attempted on every
   // lookup while the account is within its allowance.
@@ -89,8 +93,27 @@ interface CarBuyingGuideLookupResponse {
     motStatus: string | null;
     vedStandardTwelveMonths: number | null;
   } | null;
+  // Account-aware pricing for the report purchase above - see
+  // buyingGuideReportTier.ts. Computed fresh on every lookup.
+  reportTier: BuyingGuideReportTier;
+  reportPricePence: number;
+  reportPriceLabel: string;
+  proFreeAvailable: boolean;
+  nextFreeReportAt: string | null;
   error?: string;
 }
+
+// One glyph per VDI fact row, purely visual - mirrors BuyingGuideForm.tsx's
+// own ICON map.
+const ICON = {
+  stolen: '🛡️',
+  writeOff: '💥',
+  finance: '💳',
+  colour: '🎨',
+  keeperChanges: '👤',
+  plateChanges: '🔢',
+  mileage: '🛣️',
+} as const;
 
 const CAR_CLASSES = Object.keys(CAR_CLASS_LABELS_FOR_BUYING_GUIDE) as CarSizeClass[];
 const AGE_BANDS = Object.keys(CAR_AGE_BAND_LABELS) as AgeBand[];
@@ -208,9 +231,24 @@ export function CarBuyingGuideForm({ signedIn }: Props) {
         body: JSON.stringify({ vrm: cleaned }),
       });
       const data = await res.json();
-      if (!res.ok || !data.url) {
+      if (!res.ok || (!data.url && !data.freeReportReady)) {
         setVdiPurchaseError(data.error ?? 'Could not start checkout. Please try again.');
         setVdiPurchasing(false);
+        return;
+      }
+      if (data.freeReportReady && data.vdiPurchaseId) {
+        // Pro's free-allowance grant - no Stripe involved, so there's no
+        // return URL to fall back on if the browser closes mid-request.
+        // Push the purchase id into the URL first (same shape as a real
+        // Stripe return) so a refresh can still recover it, then re-run
+        // the lookup immediately rather than redirecting anywhere.
+        const params = new URLSearchParams({ vdiPurchaseId: data.vdiPurchaseId, vrm: cleaned });
+        window.history.replaceState(null, '', `${window.location.pathname}?${params.toString()}`);
+        try {
+          await runLookup(cleaned, data.vdiPurchaseId);
+        } finally {
+          setVdiPurchasing(false);
+        }
         return;
       }
       window.location.href = data.url;
@@ -278,18 +316,32 @@ export function CarBuyingGuideForm({ signedIn }: Props) {
             <div className="field" style={{ marginBottom: '1.1rem' }}>
               <p className="field-note">
                 {motResult.vdiCheckBlockedReason === 'already_used' &&
-                  "That Independent Vehicle Check purchase has already been used - buy another to run it again."}
+                  "That report purchase has already been used - buy another to run it again."}
                 {motResult.vdiCheckBlockedReason === 'payment_not_confirmed' &&
                   "We couldn't confirm that payment yet - please look up this registration again in a moment."}
                 {motResult.vdiCheckBlockedReason === 'invalid' &&
                   "Something went wrong with that purchase - please buy again."}
                 {motResult.vdiCheckBlockedReason === 'fetch_failed' &&
-                  "Your payment went through, but we couldn't fetch the check just now - look up this registration again and it'll retry, at no extra cost."}
+                  "Your payment went through, but we couldn't fetch the report just now - look up this registration again and it'll retry, at no extra cost."}
               </p>
               <button type="button" className="btn-primary" onClick={handleBuyVdiCheck} disabled={vdiPurchasing}>
-                {vdiPurchasing ? 'Starting checkout…' : `Buy Independent Vehicle Check - ${BUYING_GUIDE_VDI_CHECK_PRICE_LABEL}`}
+                {vdiPurchasing
+                  ? 'Getting your report…'
+                  : motResult.proFreeAvailable
+                    ? 'Get your free vehicle history report (1 every 4 weeks)'
+                    : `Buy the vehicle history report - ${motResult.reportPriceLabel}`}
               </button>
-              <p className="field-note">Stolen marker, write-off history, outstanding finance, and keeper/plate/colour change history, straight from police/DVLA data.</p>
+              {motResult.reportTier === 'pro' && !motResult.proFreeAvailable && motResult.nextFreeReportAt && (
+                <p className="field-note">
+                  Your next free report is available {new Date(motResult.nextFreeReportAt).toLocaleDateString('en-GB')}.
+                </p>
+              )}
+              {motResult.reportTier === 'freeNoVehicle' && (
+                <p className="field-note">
+                  Add a vehicle to your garage to unlock £12.99, or go Premium for £9.99 - with one free every 4 weeks.
+                </p>
+              )}
+              <p className="field-note">Stolen marker, write-off history, outstanding finance, and keeper/plate/colour change history, straight from police/DVLA data. This check cross-references data from the DVLA, the Police National Computer (PNC), insurance databases (MIAFTR), and major finance houses, to help confirm this vehicle is safe and legal to buy.</p>
               {vdiPurchaseError && <p className="error-text" role="alert">{vdiPurchaseError}</p>}
             </div>
           )}
@@ -298,7 +350,10 @@ export function CarBuyingGuideForm({ signedIn }: Props) {
             <div className="field" style={{ marginBottom: '1.1rem' }}>
               <div style={{ borderLeft: '3px solid var(--verdict-green)', paddingLeft: '0.6rem', marginBottom: '0.6rem' }}>
                 <p className="field-note" style={{ fontWeight: 600, margin: 0 }}>
-                  ✓ Independent VDI check - included with your {BUYING_GUIDE_VDI_CHECK_PRICE_LABEL} purchase
+                  ✓ Vehicle history report
+                  {motResult.vdiCheckPricePaidPence
+                    ? ` - included with your £${(motResult.vdiCheckPricePaidPence / 100).toFixed(2)} purchase`
+                    : ' - your free Premium report'}
                 </p>
                 {motResult.vdiCheckPurchasedAt && (
                   <p className="field-note" style={{ margin: '0.2rem 0 0' }}>
@@ -310,26 +365,28 @@ export function CarBuyingGuideForm({ signedIn }: Props) {
                 )}
               </div>
               <ul style={{ margin: 0, paddingLeft: '1.1rem' }}>
-                <li className="field-note">{motResult.vdiCheck.isStolen ? '⚠️ Recorded as stolen' : 'No stolen marker found'}</li>
+                <li className="field-note">{ICON.stolen} {motResult.vdiCheck.isStolen ? '⚠️ Recorded as stolen' : 'No stolen marker found'}</li>
                 <li className="field-note">
+                  {ICON.writeOff}{' '}
                   {motResult.vdiCheck.hasWriteOffRecord
                     ? `⚠️ ${motResult.vdiCheck.writeOffRecordCount} write-off record(s) on file`
                     : 'No write-off record found'}
                 </li>
                 <li className="field-note">
+                  {ICON.finance}{' '}
                   {motResult.vdiCheck.hasOutstandingFinance
                     ? `⚠️ ${motResult.vdiCheck.financeRecords.length} outstanding finance agreement(s) on file`
                     : 'No outstanding finance found'}
                 </li>
-                <li className="field-note">{motResult.vdiCheck.keeperChangeCount} keeper change(s) on record</li>
-                <li className="field-note">{motResult.vdiCheck.plateChangeCount} plate change(s) on record</li>
+                <li className="field-note">{ICON.keeperChanges} {motResult.vdiCheck.keeperChangeCount} keeper change(s) on record</li>
+                <li className="field-note">{ICON.plateChanges} {motResult.vdiCheck.plateChangeCount} plate change(s) on record</li>
                 <li className="field-note">
-                  {motResult.vdiCheck.colourChangeCount} colour change(s) on record
+                  {ICON.colour} {motResult.vdiCheck.colourChangeCount} colour change(s) on record
                   {motResult.vdiCheck.currentColour ? ` (currently ${motResult.vdiCheck.currentColour.toLowerCase()})` : ''}
                 </li>
                 {motResult.vdiCheck.calculatedAverageAnnualMileage != null && motResult.vdiCheck.averageMileageForAge != null && (
                   <li className="field-note">
-                    Average annual mileage: {motResult.vdiCheck.calculatedAverageAnnualMileage.toLocaleString()} mi/year
+                    {ICON.mileage} Average annual mileage: {motResult.vdiCheck.calculatedAverageAnnualMileage.toLocaleString()} mi/year
                     (typical for this age: {motResult.vdiCheck.averageMileageForAge.toLocaleString()})
                     {motResult.vdiCheck.mileageAnomalyDetected ? ' - ⚠️ anomaly flagged' : ''}
                   </li>

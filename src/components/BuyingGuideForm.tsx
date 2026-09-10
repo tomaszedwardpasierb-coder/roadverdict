@@ -12,7 +12,7 @@ import {
   slugifyMake,
 } from '@/lib/motorcycleModels';
 import { AGE_BAND_LABELS, type AgeBand, type Checklist } from '@/lib/buyerChecklist';
-import { BUYING_GUIDE_VDI_CHECK_PRICE_LABEL } from '@/lib/payments/pricing';
+import type { BuyingGuideReportTier } from '@/lib/payments/pricing';
 import type { VdiCheckResult } from '@/lib/tracker/vdiUnlock';
 import { BuyingGuideResult } from './BuyingGuideResult';
 
@@ -56,6 +56,10 @@ interface BuyingGuideLookupResponse {
   // vdiPurchase.ts's VDI_PURCHASE_RETRIEVAL_WINDOW_MS).
   vdiCheckPurchasedAt: string | null;
   vdiCheckExpiresAt: string | null;
+  // What THIS specific purchase actually cost (0 for a Pro free-allowance
+  // grant) - distinct from reportPricePence below, which is what a NEW
+  // purchase would cost right now.
+  vdiCheckPricePaidPence: number | null;
   // Free, always attempted alongside MOT history.
   taxDetails: {
     taxStatus: string | null;
@@ -65,8 +69,35 @@ interface BuyingGuideLookupResponse {
     motStatus: string | null;
     vedStandardTwelveMonths: number | null;
   } | null;
+  // Account-aware pricing for the report purchase above - see
+  // buyingGuideReportTier.ts. Computed fresh on every lookup.
+  reportTier: BuyingGuideReportTier;
+  reportPricePence: number;
+  reportPriceLabel: string;
+  proFreeAvailable: boolean;
+  nextFreeReportAt: string | null;
   error?: string;
 }
+
+// One glyph per VDI fact row, purely visual - mirrors VdiCheckSection.tsx's
+// own ICON map exactly, kept as a separate const since this file has no
+// shared import path with that component-level constant.
+const ICON = {
+  stolen: '🛡️',
+  writeOff: '💥',
+  finance: '💳',
+  registeredDate: '📅',
+  manufactureDate: '🏭',
+  colour: '🎨',
+  keeperChanges: '👤',
+  plateChanges: '🔢',
+  roadTax: '🧾',
+  massInService: '⚖️',
+  taxationClass: '🏷️',
+  power: '⚡',
+  soundLevels: '🔊',
+  mileage: '🛣️',
+} as const;
 
 const BIKE_CLASSES = Object.keys(BIKE_CLASS_LABELS) as BikeClass[];
 const AGE_BANDS = Object.keys(AGE_BAND_LABELS) as AgeBand[];
@@ -211,9 +242,24 @@ export function BuyingGuideForm({ signedIn }: Props) {
         body: JSON.stringify({ vrm: cleaned }),
       });
       const data = await res.json();
-      if (!res.ok || !data.url) {
+      if (!res.ok || (!data.url && !data.freeReportReady)) {
         setVdiPurchaseError(data.error ?? 'Could not start checkout. Please try again.');
         setVdiPurchasing(false);
+        return;
+      }
+      if (data.freeReportReady && data.vdiPurchaseId) {
+        // Pro's free-allowance grant - no Stripe involved, so there's no
+        // return URL to fall back on if the browser closes mid-request.
+        // Push the purchase id into the URL first (same shape as a real
+        // Stripe return) so a refresh can still recover it, then re-run
+        // the lookup immediately rather than redirecting anywhere.
+        const params = new URLSearchParams({ vdiPurchaseId: data.vdiPurchaseId, vrm: cleaned });
+        window.history.replaceState(null, '', `${window.location.pathname}?${params.toString()}`);
+        try {
+          await runLookup(cleaned, data.vdiPurchaseId);
+        } finally {
+          setVdiPurchasing(false);
+        }
         return;
       }
       window.location.href = data.url;
@@ -281,18 +327,32 @@ export function BuyingGuideForm({ signedIn }: Props) {
             <div className="field" style={{ marginBottom: '1.1rem' }}>
               <p className="field-note">
                 {motResult.vdiCheckBlockedReason === 'already_used' &&
-                  "That Independent Vehicle Check purchase has already been used - buy another to run it again."}
+                  "That report purchase has already been used - buy another to run it again."}
                 {motResult.vdiCheckBlockedReason === 'payment_not_confirmed' &&
                   "We couldn't confirm that payment yet - please look up this registration again in a moment."}
                 {motResult.vdiCheckBlockedReason === 'invalid' &&
                   "Something went wrong with that purchase - please buy again."}
                 {motResult.vdiCheckBlockedReason === 'fetch_failed' &&
-                  "Your payment went through, but we couldn't fetch the check just now - look up this registration again and it'll retry, at no extra cost."}
+                  "Your payment went through, but we couldn't fetch the report just now - look up this registration again and it'll retry, at no extra cost."}
               </p>
               <button type="button" className="btn-primary" onClick={handleBuyVdiCheck} disabled={vdiPurchasing}>
-                {vdiPurchasing ? 'Starting checkout…' : `Buy Independent Vehicle Check - ${BUYING_GUIDE_VDI_CHECK_PRICE_LABEL}`}
+                {vdiPurchasing
+                  ? 'Getting your report…'
+                  : motResult.proFreeAvailable
+                    ? 'Get your free vehicle history report (1 every 4 weeks)'
+                    : `Buy the vehicle history report - ${motResult.reportPriceLabel}`}
               </button>
-              <p className="field-note">Stolen marker, write-off history, outstanding finance, and keeper/plate/colour change history, straight from police/DVLA data.</p>
+              {motResult.reportTier === 'pro' && !motResult.proFreeAvailable && motResult.nextFreeReportAt && (
+                <p className="field-note">
+                  Your next free report is available {new Date(motResult.nextFreeReportAt).toLocaleDateString('en-GB')}.
+                </p>
+              )}
+              {motResult.reportTier === 'freeNoVehicle' && (
+                <p className="field-note">
+                  Add a vehicle to your garage to unlock £12.99, or go Premium for £9.99 - with one free every 4 weeks.
+                </p>
+              )}
+              <p className="field-note">Stolen marker, write-off history, outstanding finance, keeper/plate/colour change history, road tax, and technical spec - straight from police/DVLA data, with an AI-written summary tying it all together. This check cross-references data from the DVLA, the Police National Computer (PNC), insurance databases (MIAFTR), and major finance houses, to help confirm this vehicle is safe and legal to buy.</p>
               {vdiPurchaseError && <p className="error-text" role="alert">{vdiPurchaseError}</p>}
             </div>
           )}
@@ -301,7 +361,10 @@ export function BuyingGuideForm({ signedIn }: Props) {
             <div className="field" style={{ marginBottom: '1.1rem' }}>
               <div style={{ borderLeft: '3px solid var(--verdict-green)', paddingLeft: '0.6rem', marginBottom: '0.6rem' }}>
                 <p className="field-note" style={{ fontWeight: 600, margin: 0 }}>
-                  ✓ Independent VDI check - included with your {BUYING_GUIDE_VDI_CHECK_PRICE_LABEL} purchase
+                  ✓ Vehicle history report
+                  {motResult.vdiCheckPricePaidPence
+                    ? ` - included with your £${(motResult.vdiCheckPricePaidPence / 100).toFixed(2)} purchase`
+                    : ' - your free Premium report'}
                 </p>
                 {motResult.vdiCheckPurchasedAt && (
                   <p className="field-note" style={{ margin: '0.2rem 0 0' }}>
@@ -313,8 +376,9 @@ export function BuyingGuideForm({ signedIn }: Props) {
                 )}
               </div>
               <ul style={{ margin: 0, paddingLeft: '1.1rem' }}>
-                <li className="field-note">{motResult.vdiCheck.isStolen ? '⚠️ Recorded as stolen' : 'No stolen marker found'}</li>
+                <li className="field-note">{ICON.stolen} {motResult.vdiCheck.isStolen ? '⚠️ Recorded as stolen' : 'No stolen marker found'}</li>
                 <li className="field-note">
+                  {ICON.writeOff}{' '}
                   {!motResult.vdiCheck.hasWriteOffRecord ? (
                     'No write-off record found'
                   ) : motResult.vdiCheck.writeOffRecords && motResult.vdiCheck.writeOffRecords.length > 0 ? (
@@ -333,22 +397,23 @@ export function BuyingGuideForm({ signedIn }: Props) {
                   )}
                 </li>
                 <li className="field-note">
+                  {ICON.finance}{' '}
                   {motResult.vdiCheck.hasOutstandingFinance
                     ? `⚠️ ${motResult.vdiCheck.financeRecords.length} outstanding finance agreement(s) on file`
                     : 'No outstanding finance found'}
                 </li>
                 {motResult.vdiCheck.dateFirstRegisteredInUk && (
                   <li className="field-note">
-                    Date first registered (UK): {new Date(motResult.vdiCheck.dateFirstRegisteredInUk).toLocaleDateString('en-GB')}
+                    {ICON.registeredDate} Date first registered (UK): {new Date(motResult.vdiCheck.dateFirstRegisteredInUk).toLocaleDateString('en-GB')}
                   </li>
                 )}
                 {motResult.vdiCheck.dateOfManufacture && (
                   <li className="field-note">
-                    Date of manufacture: {new Date(motResult.vdiCheck.dateOfManufacture).toLocaleDateString('en-GB')}
+                    {ICON.manufactureDate} Date of manufacture: {new Date(motResult.vdiCheck.dateOfManufacture).toLocaleDateString('en-GB')}
                   </li>
                 )}
                 <li className="field-note">
-                  Colour:{' '}
+                  {ICON.colour} Colour:{' '}
                   {motResult.vdiCheck.originalColour &&
                   motResult.vdiCheck.currentColour &&
                   motResult.vdiCheck.originalColour !== motResult.vdiCheck.currentColour
@@ -360,11 +425,11 @@ export function BuyingGuideForm({ signedIn }: Props) {
                     ? ` (${motResult.vdiCheck.colourChangeCount} change${motResult.vdiCheck.colourChangeCount === 1 ? '' : 's'} on record)`
                     : ''}
                 </li>
-                <li className="field-note">{motResult.vdiCheck.keeperChangeCount} keeper change(s) on record</li>
-                <li className="field-note">{motResult.vdiCheck.plateChangeCount} plate change(s) on record</li>
+                <li className="field-note">{ICON.keeperChanges} {motResult.vdiCheck.keeperChangeCount} keeper change(s) on record</li>
+                <li className="field-note">{ICON.plateChanges} {motResult.vdiCheck.plateChangeCount} plate change(s) on record</li>
                 {(motResult.vdiCheck.vedStandardSixMonths != null || motResult.vdiCheck.vedStandardTwelveMonths != null) && (
                   <li className="field-note">
-                    Road tax (standard rate):{' '}
+                    {ICON.roadTax} Road tax (standard rate):{' '}
                     {[
                       motResult.vdiCheck.vedStandardSixMonths != null ? `£${motResult.vdiCheck.vedStandardSixMonths.toLocaleString()} for 6 months` : null,
                       motResult.vdiCheck.vedStandardTwelveMonths != null ? `£${motResult.vdiCheck.vedStandardTwelveMonths.toLocaleString()} for 12 months` : null,
@@ -374,16 +439,16 @@ export function BuyingGuideForm({ signedIn }: Props) {
                   </li>
                 )}
                 {motResult.vdiCheck.massInServiceKg != null && (
-                  <li className="field-note">Mass in service: {motResult.vdiCheck.massInServiceKg.toLocaleString()} kg</li>
+                  <li className="field-note">{ICON.massInService} Mass in service: {motResult.vdiCheck.massInServiceKg.toLocaleString()} kg</li>
                 )}
                 {motResult.vdiCheck.taxationClass && (
-                  <li className="field-note">Taxation class: {motResult.vdiCheck.taxationClass}</li>
+                  <li className="field-note">{ICON.taxationClass} Taxation class: {motResult.vdiCheck.taxationClass}</li>
                 )}
-                {motResult.vdiCheck.bhp != null && <li className="field-note">Power: {motResult.vdiCheck.bhp} bhp</li>}
+                {motResult.vdiCheck.bhp != null && <li className="field-note">{ICON.power} Power: {motResult.vdiCheck.bhp} bhp</li>}
                 {motResult.vdiCheck.soundLevels &&
                   (motResult.vdiCheck.soundLevels.stationaryDb != null || motResult.vdiCheck.soundLevels.driveByDb != null) && (
                     <li className="field-note">
-                      Sound levels:{' '}
+                      {ICON.soundLevels} Sound levels:{' '}
                       {[
                         motResult.vdiCheck.soundLevels.stationaryDb != null ? `stationary ${motResult.vdiCheck.soundLevels.stationaryDb} dB` : null,
                         motResult.vdiCheck.soundLevels.driveByDb != null ? `drive-by ${motResult.vdiCheck.soundLevels.driveByDb} dB` : null,
@@ -397,7 +462,7 @@ export function BuyingGuideForm({ signedIn }: Props) {
                   )}
                 {motResult.vdiCheck.calculatedAverageAnnualMileage != null && motResult.vdiCheck.averageMileageForAge != null && (
                   <li className="field-note">
-                    Average annual mileage: {motResult.vdiCheck.calculatedAverageAnnualMileage.toLocaleString()} mi/year
+                    {ICON.mileage} Average annual mileage: {motResult.vdiCheck.calculatedAverageAnnualMileage.toLocaleString()} mi/year
                     (typical for this age: {motResult.vdiCheck.averageMileageForAge.toLocaleString()})
                     {motResult.vdiCheck.mileageAnomalyDetected ? ' - ⚠️ anomaly flagged' : ''}
                   </li>
