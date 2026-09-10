@@ -65,13 +65,13 @@ export async function transferCar(
     getBikesForUser(toEmail),
     getCarsForUser(toEmail),
   ]);
-  if (!(await isPro(toEmail)) && countActiveBikes(recipientBikes) + countActiveCars(recipientCars) >= MAX_FREE_VEHICLES) {
-    return { ok: false, reason: "recipient_limit_reached", limit: MAX_FREE_VEHICLES };
-  }
 
-  // Same collision guard as transferBike's own - see that file's
-  // comment for the full reasoning. Checked directly against the
-  // recipient's own cars, not via findCarByRegistrationAcrossAccounts.
+  // Same collision guard as transferBike's own - see that file's comment
+  // for the full reasoning, including why this runs BEFORE the free-tier
+  // cap check below (a recipient who already has this exact car isn't
+  // asking for a genuinely new vehicle, so that's the more specific
+  // answer even when they're also at their cap). Checked directly
+  // against the recipient's own cars, not via findCarByRegistrationAcrossAccounts.
   const currentReg = getCurrentRegistration(oldCar);
   if (currentReg) {
     const normalizedCurrentReg = normalizePlate(currentReg);
@@ -79,6 +79,10 @@ export async function transferCar(
     if (recipientAlreadyHasThisCar) {
       return { ok: false, reason: "recipient_already_has_car" };
     }
+  }
+
+  if (!(await isPro(toEmail)) && countActiveBikes(recipientBikes) + countActiveCars(recipientCars) >= MAX_FREE_VEHICLES) {
+    return { ok: false, reason: "recipient_limit_reached", limit: MAX_FREE_VEHICLES };
   }
 
   const [records, mods, bills, fuelLogs, reminders, billSeries] = await Promise.all([

@@ -64,21 +64,7 @@ export async function transferBike(
     return { ok: false, reason: "already_transferred" };
   }
 
-  // Combined bike+car cap, same one createCar/createBike enforce at
-  // creation time and carTransfer.ts enforces on its own side - a
-  // transfer shouldn't be a way to bypass the free-tier cap that adding
-  // a vehicle normally respects. This used to check only the
-  // recipient's bike count against the older, bike-only MAX_FREE_BIKES,
-  // which let a free account that already owned a car (and was thus
-  // already at the combined cap) still accept an incoming bike transfer
-  // - fixed to match carTransfer.ts's own check exactly. Counted the
-  // same way as everywhere else - a read-only vehicle the recipient
-  // already has doesn't cost them an active slot, so it shouldn't block
-  // them from accepting a genuinely new one either.
   const [recipientBikes, recipientCars] = await Promise.all([getBikesForUser(toEmail), getCarsForUser(toEmail)]);
-  if (!(await isPro(toEmail)) && countActiveBikes(recipientBikes) + countActiveCars(recipientCars) >= MAX_FREE_VEHICLES) {
-    return { ok: false, reason: "recipient_limit_reached", limit: MAX_FREE_VEHICLES };
-  }
 
   // Guards against a specific collision: the recipient may have already
   // clicked "Start fresh" on the add-bike flow for this exact
@@ -95,6 +81,14 @@ export async function transferBike(
   // (most likely by deleting the fresh one) before the transfer can go
   // through, rather than the system guessing which one should win.
   //
+  // Checked BEFORE the free-tier cap below, deliberately: a recipient
+  // who already has a record for this exact physical bike isn't asking
+  // for a genuinely new vehicle, so "you already have this" is the
+  // right, more specific answer even when they're also at their cap -
+  // this used to run after the cap check, which meant a recipient
+  // already at the (now lower) cap could never reach this branch at all,
+  // masking a real collision behind a generic limit-reached error.
+  //
   // Checked directly against the recipient's own bikes (recipientBikes,
   // already fetched above), not via findBikeByRegistrationAcrossAccounts
   // - that function returns a single best-effort cross-account match
@@ -109,6 +103,21 @@ export async function transferBike(
     if (recipientAlreadyHasThisBike) {
       return { ok: false, reason: "recipient_already_has_bike" };
     }
+  }
+
+  // Combined bike+car cap, same one createCar/createBike enforce at
+  // creation time and carTransfer.ts enforces on its own side - a
+  // transfer shouldn't be a way to bypass the free-tier cap that adding
+  // a vehicle normally respects. This used to check only the
+  // recipient's bike count against the older, bike-only MAX_FREE_BIKES,
+  // which let a free account that already owned a car (and was thus
+  // already at the combined cap) still accept an incoming bike transfer
+  // - fixed to match carTransfer.ts's own check exactly. Counted the
+  // same way as everywhere else - a read-only vehicle the recipient
+  // already has doesn't cost them an active slot, so it shouldn't block
+  // them from accepting a genuinely new one either.
+  if (!(await isPro(toEmail)) && countActiveBikes(recipientBikes) + countActiveCars(recipientCars) >= MAX_FREE_VEHICLES) {
+    return { ok: false, reason: "recipient_limit_reached", limit: MAX_FREE_VEHICLES };
   }
 
   // Same metrics/verdict logic the buyer report and Story So Far are

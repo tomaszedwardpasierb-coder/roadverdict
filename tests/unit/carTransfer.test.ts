@@ -179,6 +179,18 @@ describe("transferCar", () => {
     expect(result).toMatchObject({ ok: true });
   });
 
+  // Regression: same fix, same reasoning as bikeTransfer.test.ts's own
+  // equivalent test - the collision check must win over the cap check
+  // even when both conditions are true at once.
+  it("reports recipient_already_has_car, not recipient_limit_reached, when the recipient is both at the cap and already owns this exact car", async () => {
+    mocks.countActiveCars.mockReturnValue(1); // at MAX_FREE_VEHICLES = 1
+    mocks.getCarsForUser.mockResolvedValue([
+      { originalRegistration: "AB20FOC", registrationChanges: [] },
+    ]);
+    const result = await transferCar(fromEmail, carId, toEmail, false);
+    expect(result).toEqual({ ok: false, reason: "recipient_already_has_car" });
+  });
+
   it("does not check registration collision when the car has no current registration", async () => {
     mocks.getCurrentRegistration.mockReturnValue(null);
     mocks.getCarsForUser.mockResolvedValue([

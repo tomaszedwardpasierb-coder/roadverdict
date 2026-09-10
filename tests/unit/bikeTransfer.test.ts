@@ -191,6 +191,20 @@ describe("transferBike", () => {
     expect(result).toMatchObject({ ok: true });
   });
 
+  // Regression: with the free cap now this low, a recipient who already
+  // owns one bike is already "at the cap" - the collision check must
+  // still win when both conditions are true at once, otherwise a real
+  // collision gets masked behind a generic limit-reached error (the
+  // exact bug this test locks in).
+  it("reports recipient_already_has_bike, not recipient_limit_reached, when the recipient is both at the cap and already owns this exact bike", async () => {
+    mocks.countActiveBikes.mockReturnValue(1); // at MAX_FREE_VEHICLES = 1
+    mocks.getBikesForUser.mockResolvedValue([
+      { originalRegistration: "AB20YAM", registrationChanges: [] },
+    ]);
+    const result = await transferBike(fromEmail, bikeId, toEmail, false);
+    expect(result).toEqual({ ok: false, reason: "recipient_already_has_bike" });
+  });
+
   it("does not check registration collision when the bike has no current registration", async () => {
     mocks.getCurrentRegistration.mockReturnValue(null);
     mocks.getBikesForUser.mockResolvedValue([
