@@ -26,6 +26,7 @@ import {
   getShareLink,
   extendShareLink,
   updateShareLinkAskingPrice,
+  updateShareLinkVdiUnlock,
   deleteShareLink,
   deleteExpiredShareLinks,
   getShareLinksNeedingFollowUp,
@@ -125,6 +126,13 @@ describe("resolveShareToken", () => {
     expect(await resolveShareToken("tok_abc123")).toEqual({
       email: "owner@example.com", bikeId: "bike-1", recipientEmail: "buyer@example.com", askingPrice: 4500,
     });
+  });
+
+  it("passes through vdiUnlock when the Independent Vehicle Check has been paid for", async () => {
+    const vdiUnlock = { unlockedAt: "2026-01-01T00:00:00.000Z", stripeSessionId: "cs_test_123", amountPaidPence: 799, currency: "gbp" };
+    mocks.read.mockResolvedValue({ resource: makeLink({ vdiUnlock }) });
+    const result = await resolveShareToken("tok_abc123");
+    expect(result?.vdiUnlock).toEqual(vdiUnlock);
   });
 
   it("treats an expired link as if it doesn't exist", async () => {
@@ -261,6 +269,64 @@ describe("updateShareLinkAskingPrice", () => {
     mocks.read.mockResolvedValue({ resource: makeLink({ askingPrice: 6000 }) });
     const result = await updateShareLinkAskingPrice("tok_abc123", null);
     expect("askingPrice" in (result as object)).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------
+// updateShareLinkVdiUnlock
+// ---------------------------------------------------------------------
+
+describe("updateShareLinkVdiUnlock", () => {
+  beforeEach(() => {
+    resetAllMocks();
+    mocks.upsert.mockResolvedValue(undefined);
+  });
+
+  it("returns null and does not upsert when the link doesn't exist", async () => {
+    mocks.read.mockResolvedValue({ resource: undefined });
+    expect(await updateShareLinkVdiUnlock("missing", { unlockedAt: "2026-01-01T00:00:00.000Z" })).toBeNull();
+    expect(mocks.upsert).not.toHaveBeenCalled();
+  });
+
+  it("sets the initial unlock (webhook-shaped patch), leaving vdiCheck/valuation/aiSummary undefined", async () => {
+    mocks.read.mockResolvedValue({ resource: makeLink({ vdiUnlock: undefined }) });
+    const result = await updateShareLinkVdiUnlock("tok_abc123", {
+      unlockedAt: "2026-01-01T00:00:00.000Z",
+      stripeSessionId: "cs_test_123",
+      amountPaidPence: 799,
+      currency: "gbp",
+    });
+    expect(result?.vdiUnlock).toEqual({
+      unlockedAt: "2026-01-01T00:00:00.000Z",
+      stripeSessionId: "cs_test_123",
+      amountPaidPence: 799,
+      currency: "gbp",
+    });
+  });
+
+  it("merges a later patch (the lazy vdiCheck/aiSummary fill) on top of the existing unlock, without dropping the payment fields", async () => {
+    mocks.read.mockResolvedValue({
+      resource: makeLink({
+        vdiUnlock: { unlockedAt: "2026-01-01T00:00:00.000Z", stripeSessionId: "cs_test_123", amountPaidPence: 799, currency: "gbp" },
+      }),
+    });
+    const result = await updateShareLinkVdiUnlock("tok_abc123", {
+      vdiCheck: {
+        isStolen: false,
+        hasWriteOffRecord: false,
+        writeOffRecordCount: 0,
+        hasOutstandingFinance: false,
+        financeRecords: [],
+        keeperChangeCount: 1,
+        plateChangeCount: 0,
+        colourChangeCount: 0,
+        currentColour: "BLACK",
+        vedFirstYearTwelveMonths: null,
+        vedStandardTwelveMonths: 200,
+      },
+    });
+    expect(result?.vdiUnlock?.stripeSessionId).toBe("cs_test_123");
+    expect(result?.vdiUnlock?.vdiCheck?.keeperChangeCount).toBe(1);
   });
 });
 

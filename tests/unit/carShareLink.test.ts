@@ -31,6 +31,7 @@ import {
   getCarShareLink,
   extendCarShareLink,
   updateCarShareLinkAskingPrice,
+  updateCarShareLinkVdiUnlock,
   deleteCarShareLink,
   deleteExpiredCarShareLinks,
   type CarShareLinkDoc,
@@ -115,6 +116,13 @@ describe("resolveCarShareToken", () => {
     expect(await resolveCarShareToken("tok_abc123")).toEqual({
       email: "owner@example.com", carId: "car-1", recipientEmail: "buyer@example.com", askingPrice: 4500,
     });
+  });
+
+  it("passes through vdiUnlock when the Independent Vehicle Check has been paid for", async () => {
+    const vdiUnlock = { unlockedAt: "2026-01-01T00:00:00.000Z", stripeSessionId: "cs_test_123", amountPaidPence: 999, currency: "gbp" };
+    mocks.read.mockResolvedValue({ resource: makeLink({ vdiUnlock }) });
+    const result = await resolveCarShareToken("tok_abc123");
+    expect(result?.vdiUnlock).toEqual(vdiUnlock);
   });
 
   it("treats an expired link as if it doesn't exist", async () => {
@@ -218,6 +226,61 @@ describe("updateCarShareLinkAskingPrice", () => {
     mocks.read.mockResolvedValue({ resource: makeLink({ askingPrice: 6000 }) });
     const result = await updateCarShareLinkAskingPrice("tok_abc123", null);
     expect("askingPrice" in (result as object)).toBe(false);
+  });
+});
+
+describe("updateCarShareLinkVdiUnlock", () => {
+  beforeEach(() => {
+    resetAllMocks();
+    mocks.upsert.mockResolvedValue(undefined);
+  });
+
+  it("returns null and does not upsert when the link doesn't exist", async () => {
+    mocks.read.mockResolvedValue({ resource: undefined });
+    expect(await updateCarShareLinkVdiUnlock("missing", { unlockedAt: "2026-01-01T00:00:00.000Z" })).toBeNull();
+    expect(mocks.upsert).not.toHaveBeenCalled();
+  });
+
+  it("sets the initial unlock (webhook-shaped patch)", async () => {
+    mocks.read.mockResolvedValue({ resource: makeLink({ vdiUnlock: undefined }) });
+    const result = await updateCarShareLinkVdiUnlock("tok_abc123", {
+      unlockedAt: "2026-01-01T00:00:00.000Z",
+      stripeSessionId: "cs_test_123",
+      amountPaidPence: 999,
+      currency: "gbp",
+    });
+    expect(result?.vdiUnlock).toEqual({
+      unlockedAt: "2026-01-01T00:00:00.000Z",
+      stripeSessionId: "cs_test_123",
+      amountPaidPence: 999,
+      currency: "gbp",
+    });
+  });
+
+  it("merges a later patch (the lazy vdiCheck/valuation/aiSummary fill) on top of the existing unlock", async () => {
+    mocks.read.mockResolvedValue({
+      resource: makeLink({
+        vdiUnlock: { unlockedAt: "2026-01-01T00:00:00.000Z", stripeSessionId: "cs_test_123", amountPaidPence: 999, currency: "gbp" },
+      }),
+    });
+    const result = await updateCarShareLinkVdiUnlock("tok_abc123", {
+      valuation: {
+        valuationTime: "2026-01-02T00:00:00.000Z",
+        valuationMileage: 23627,
+        vehicleDescription: "Lexus LBX Takumi CVT",
+        onTheRoad: 38015,
+        dealerForecourt: 27161,
+        tradeRetail: 26240,
+        privateClean: 24257,
+        privateAverage: 23994,
+        partExchange: 23880,
+        auction: 23866,
+        tradeAverage: 23060,
+        tradePoor: 21471,
+      },
+    });
+    expect(result?.vdiUnlock?.stripeSessionId).toBe("cs_test_123");
+    expect(result?.vdiUnlock?.valuation?.privateAverage).toBe(23994);
   });
 });
 

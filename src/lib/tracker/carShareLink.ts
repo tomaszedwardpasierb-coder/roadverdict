@@ -14,6 +14,7 @@ import crypto from "crypto";
 import { getContainer } from "@/lib/cosmos";
 import { deleteCarReceiptRequestsForShareToken } from "@/lib/tracker/carReceiptRequest";
 import type { ShareLinkDuration } from "@/lib/tracker/shareLink";
+import type { VdiUnlock } from "@/lib/tracker/vdiUnlock";
 
 export interface CarShareLinkDoc {
   id: string;
@@ -25,6 +26,7 @@ export interface CarShareLinkDoc {
   expiresAt?: string;
   recipientEmail?: string;
   askingPrice?: number;
+  vdiUnlock?: VdiUnlock;
 }
 
 const DURATION_DAYS: Record<ShareLinkDuration, number> = {
@@ -67,13 +69,13 @@ export async function createCarShareLink(
   return doc;
 }
 
-export async function resolveCarShareToken(token: string): Promise<{ email: string; carId: string; recipientEmail?: string; askingPrice?: number } | null> {
+export async function resolveCarShareToken(token: string): Promise<{ email: string; carId: string; recipientEmail?: string; askingPrice?: number; vdiUnlock?: VdiUnlock } | null> {
   try {
     const container = getContainer();
     const { resource } = await container.item(token, token).read<CarShareLinkDoc>();
     if (!resource) return null;
     if (resource.expiresAt && new Date(resource.expiresAt) < new Date()) return null;
-    return { email: resource.email, carId: resource.carId, recipientEmail: resource.recipientEmail, askingPrice: resource.askingPrice };
+    return { email: resource.email, carId: resource.carId, recipientEmail: resource.recipientEmail, askingPrice: resource.askingPrice, vdiUnlock: resource.vdiUnlock };
   } catch {
     return null;
   }
@@ -118,6 +120,15 @@ export async function updateCarShareLinkAskingPrice(token: string, askingPrice: 
   } else {
     resource.askingPrice = askingPrice;
   }
+  await container.items.upsert(resource);
+  return resource;
+}
+
+export async function updateCarShareLinkVdiUnlock(token: string, patch: Partial<VdiUnlock>): Promise<CarShareLinkDoc | null> {
+  const container = getContainer();
+  const { resource } = await container.item(token, token).read<CarShareLinkDoc>();
+  if (!resource) return null;
+  resource.vdiUnlock = { ...resource.vdiUnlock, ...patch } as VdiUnlock;
   await container.items.upsert(resource);
   return resource;
 }

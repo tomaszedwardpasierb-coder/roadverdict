@@ -2,6 +2,7 @@
 import crypto from "crypto";
 import { getContainer } from "@/lib/cosmos";
 import { deleteReceiptRequestsForShareToken } from "@/lib/tracker/receiptRequest";
+import type { VdiUnlock } from "@/lib/tracker/vdiUnlock";
 
 export interface ShareLinkDoc {
   id: string;
@@ -36,6 +37,10 @@ export interface ShareLinkDoc {
   // genuinely changes during a sale. Absent (not zero, not null) is
   // "the seller chose not to share one," not "not yet decided."
   askingPrice?: number;
+  // Set once the one-time Independent Vehicle Check has been paid for
+  // through this link, via updateShareLinkVdiUnlock - see vdiUnlock.ts.
+  // Absent means not yet purchased, never a separate boolean flag.
+  vdiUnlock?: VdiUnlock;
 }
 
 export type ShareLinkDuration = "1week" | "1month" | "6months";
@@ -95,13 +100,13 @@ export async function createShareLink(
 // An expired link resolves as if it doesn't exist at all, even if the
 // cleanup cron hasn't physically deleted it yet - expiry is enforced the
 // moment it's checked, not just eventually.
-export async function resolveShareToken(token: string): Promise<{ email: string; bikeId: string; recipientEmail?: string; askingPrice?: number } | null> {
+export async function resolveShareToken(token: string): Promise<{ email: string; bikeId: string; recipientEmail?: string; askingPrice?: number; vdiUnlock?: VdiUnlock } | null> {
   try {
     const container = getContainer();
     const { resource } = await container.item(token, token).read<ShareLinkDoc>();
     if (!resource) return null;
     if (resource.expiresAt && new Date(resource.expiresAt) < new Date()) return null;
-    return { email: resource.email, bikeId: resource.bikeId, recipientEmail: resource.recipientEmail, askingPrice: resource.askingPrice };
+    return { email: resource.email, bikeId: resource.bikeId, recipientEmail: resource.recipientEmail, askingPrice: resource.askingPrice, vdiUnlock: resource.vdiUnlock };
   } catch {
     return null;
   }
@@ -153,6 +158,19 @@ export async function updateShareLinkAskingPrice(token: string, askingPrice: num
   } else {
     resource.askingPrice = askingPrice;
   }
+  await container.items.upsert(resource);
+  return resource;
+}
+
+// Partial patch, not a full replace - the webhook sets only the payment
+// fields (unlockedAt/stripeSessionId/amountPaidPence/currency), and the
+// detailed page's own lazy-fill step later adds vdiCheck/valuation/
+// aiSummary on top without clobbering what the webhook already wrote.
+export async function updateShareLinkVdiUnlock(token: string, patch: Partial<VdiUnlock>): Promise<ShareLinkDoc | null> {
+  const container = getContainer();
+  const { resource } = await container.item(token, token).read<ShareLinkDoc>();
+  if (!resource) return null;
+  resource.vdiUnlock = { ...resource.vdiUnlock, ...patch } as VdiUnlock;
   await container.items.upsert(resource);
   return resource;
 }
