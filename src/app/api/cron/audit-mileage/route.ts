@@ -6,11 +6,16 @@ import type { BikeDoc } from "@/lib/tracker/bike";
 import { getServiceRecords, type ServiceRecordDoc } from "@/lib/tracker/serviceRecord";
 import { getFuelLogs, type FuelLogDoc } from "@/lib/tracker/fuelLog";
 import { getMods, type ModDoc } from "@/lib/tracker/mod";
+import type { CarDoc } from "@/lib/tracker/car";
+import { getCarServiceRecords, type CarServiceRecordDoc } from "@/lib/tracker/carServiceRecord";
+import { getCarFuelLogs, type CarFuelLogDoc } from "@/lib/tracker/carFuelLog";
+import { getCarMods, type CarModDoc } from "@/lib/tracker/carMod";
 import { findMileageMonotonicityViolations, findImplausibleFuelFills, type AuditableRecord, type AuditableFuelLog } from "@/lib/tracker/mileageAudit";
 
 export const dynamic = "force-dynamic";
 
 type FlaggableType = "serviceRecord" | "fuelLog" | "mod";
+type CarFlaggableType = "carServiceRecord" | "carFuelLog" | "carMod";
 
 // Idempotent and safe to re-run, same as backfill-bike-id: it only ever
 // sets needsReview true (and downgrades a stale "confirmed" tag back to
@@ -35,7 +40,7 @@ export async function POST(req: NextRequest) {
     let bikesProcessed = 0;
     let recordsFlagged = 0;
     const perBike: { email: string; bikeId: string; flagged: number }[] = [];
-    const errors: { email: string; bikeId: string; error: string }[] = [];
+    const errors: ({ email: string; bikeId: string; error: string } | { email: string; carId: string; error: string })[] = [];
 
     for (const bike of bikes) {
       bikesProcessed++;
@@ -88,7 +93,77 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    return NextResponse.json({ bikesProcessed, recordsFlagged, perBike, ...(errors.length ? { errors } : {}) });
+    // Cars - mirrored, not shared, same sister-schema convention as
+    // every other bike/car pair in this app: getCarServiceRecords/
+    // getCarFuelLogs/getCarMods instead of their bike equivalents.
+    // findMileageMonotonicityViolations/findImplausibleFuelFills are
+    // reused directly (already vehicle-neutral, taking plain
+    // {id, date, mileage, mileageConfidence, ...} shapes). Flagged
+    // records are counted into the SAME recordsFlagged total as bikes -
+    // there's exactly one daily audit run, not two separately-tracked
+    // ones per vehicle kind - but kept in their own perCar/carsProcessed
+    // fields, since a bikeId and a carId aren't interchangeable.
+    const { resources: cars } = await container.items
+      .query<CarDoc>({ query: "SELECT * FROM c WHERE c.type = 'car'" })
+      .fetchAll();
+
+    let carsProcessed = 0;
+    const perCar: { email: string; carId: string; flagged: number }[] = [];
+
+    for (const car of cars) {
+      carsProcessed++;
+      try {
+        const [records, fuelLogs, mods] = await Promise.all([
+          getCarServiceRecords(car.pk, car.id),
+          getCarFuelLogs(car.pk, car.id),
+          getCarMods(car.pk, car.id),
+        ]);
+
+        const combined: (AuditableRecord & { type: CarFlaggableType })[] = [
+          ...records.map((r) => ({ id: r.id, date: r.date, mileage: r.mileage, mileageConfidence: r.mileageConfidence, type: "carServiceRecord" as const })),
+          ...fuelLogs.map((f) => ({ id: f.id, date: f.date, mileage: f.mileage, mileageConfidence: f.mileageConfidence, type: "carFuelLog" as const })),
+          ...mods.map((m) => ({ id: m.id, date: m.date, mileage: m.mileage, mileageConfidence: m.mileageConfidence, type: "carMod" as const })),
+        ];
+
+        const violatingIds = new Set(findMileageMonotonicityViolations(combined));
+
+        // Electric-only fill-ups (kWh charging, no litres) have no fuel
+        // efficiency to check for implausibility against - same reason
+        // dashboard/page.tsx's own MPG chart excludes them.
+        const fuelForPlausibilityCheck: AuditableFuelLog[] = fuelLogs
+          .filter((f): f is typeof f & { litres: number } => f.litres != null)
+          .map((f) => ({
+            id: f.id, date: f.date, mileage: f.mileage, mileageConfidence: f.mileageConfidence, litres: f.litres, filledToFull: f.filledToFull ?? false,
+          }));
+        for (const id of findImplausibleFuelFills(fuelForPlausibilityCheck)) violatingIds.add(id);
+
+        let flaggedForThisCar = 0;
+
+        for (const item of combined) {
+          if (!violatingIds.has(item.id)) continue;
+          const updates = {
+            needsReview: true,
+            mileageConfidence: "estimated" as const,
+            mileageConflictWarning: "This record's mileage looks chronologically inconsistent with another record for this car (found by the mileage audit) - please double-check the figure.",
+          };
+          if (item.type === "carServiceRecord") await updateTrackerDoc<CarServiceRecordDoc>(car.pk, item.id, updates);
+          else if (item.type === "carFuelLog") await updateTrackerDoc<CarFuelLogDoc>(car.pk, item.id, updates);
+          else await updateTrackerDoc<CarModDoc>(car.pk, item.id, updates);
+          flaggedForThisCar++;
+          recordsFlagged++;
+        }
+
+        if (flaggedForThisCar > 0) perCar.push({ email: car.pk, carId: car.id, flagged: flaggedForThisCar });
+      } catch (err) {
+        console.error(`Mileage audit failed for car ${car.id} (${car.pk}):`, err);
+        errors.push({ email: car.pk, carId: car.id, error: err instanceof Error ? err.message : String(err) });
+      }
+    }
+
+    return NextResponse.json({
+      bikesProcessed, carsProcessed, recordsFlagged, perBike, perCar,
+      ...(errors.length ? { errors } : {}),
+    });
   } catch (err) {
     return NextResponse.json(
       { error: "Audit failed.", detail: err instanceof Error ? err.message : String(err) },
