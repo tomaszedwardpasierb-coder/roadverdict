@@ -229,8 +229,17 @@ describe("BuyingGuideForm", () => {
         plateInRetention: false, motDueDate: null, motTests: [], briefing: null, taxDetails: null,
         vdiCheck: {
           isStolen: true, hasWriteOffRecord: false, writeOffRecordCount: 0, hasOutstandingFinance: false,
-          financeRecords: [], keeperChangeCount: 2, plateChangeCount: 0, colourChangeCount: 0, currentColour: null,
+          financeRecords: [],
+          keeperChanges: [
+            { keeperStartDate: "2023-01-01", previousKeeperDisposalDate: "2022-06-01" },
+            { keeperStartDate: "2024-06-01", previousKeeperDisposalDate: "2024-05-01" },
+          ],
+          keeperChangeCount: 2, plateChangeCount: 1, colourChangeCount: 0, currentColour: null,
+          v5cReissueCount: 2, calculatedAverageAnnualMileage: 4200, averageMileageForAge: 3500,
+          mileageAnomalyDetected: true, manufacturerWarrantyMiles: 12000, manufacturerWarrantyMonths: 24,
         },
+        vdiCheckPurchasedAt: "2026-01-01T00:00:00.000Z",
+        vdiCheckExpiresAt: "2026-01-15T00:00:00.000Z",
       }),
     });
     const user = userEvent.setup();
@@ -239,7 +248,18 @@ describe("BuyingGuideForm", () => {
     await user.click(screen.getByRole("button", { name: "Look up" }));
 
     expect(await screen.findByText(/Recorded as stolen/)).toBeInTheDocument();
+    expect(screen.getByText(/Independent VDI check - included with your £9.99 purchase/)).toBeInTheDocument();
+    expect(screen.getByText(/Bought 01\/01\/2026 - free to look up again until 15\/01\/2026/)).toBeInTheDocument();
     expect(screen.getByText("2 keeper change(s) on record")).toBeInTheDocument();
+    expect(screen.getByText("1 plate change(s) on record")).toBeInTheDocument();
+    expect(screen.getByText(/Average annual mileage: 4,200 mi\/year/)).toBeInTheDocument();
+    expect(screen.getByText(/⚠️ anomaly flagged/)).toBeInTheDocument();
+    expect(screen.getByText(/Manufacturer warranty: 24 months \/ 12,000 miles from new/)).toBeInTheDocument();
+    expect(screen.getByText("Keeper change history")).toBeInTheDocument();
+    // Rendered newest-first - the 2024 entry should come before the 2023 one.
+    const keeperEntries = screen.getAllByText(/new keeper registered/);
+    expect(keeperEntries[0]).toHaveTextContent("01/06/2024");
+    expect(keeperEntries[1]).toHaveTextContent("01/01/2023");
     expect(screen.queryByRole("button", { name: /Buy Independent Vehicle Check/ })).not.toBeInTheDocument();
   });
 
@@ -270,7 +290,9 @@ describe("BuyingGuideForm", () => {
         plateInRetention: false, motDueDate: null, motTests: [], briefing: null, taxDetails: null,
         vdiCheck: {
           isStolen: false, hasWriteOffRecord: false, writeOffRecordCount: 0, hasOutstandingFinance: false,
-          financeRecords: [], keeperChangeCount: 1, plateChangeCount: 0, colourChangeCount: 0, currentColour: null,
+          financeRecords: [], keeperChanges: [], keeperChangeCount: 1, plateChangeCount: 0, colourChangeCount: 0, currentColour: null,
+          v5cReissueCount: 0, calculatedAverageAnnualMileage: null, averageMileageForAge: null,
+          mileageAnomalyDetected: false, manufacturerWarrantyMiles: null, manufacturerWarrantyMonths: null,
         },
       }),
     });

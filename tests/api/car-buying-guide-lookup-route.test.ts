@@ -17,6 +17,7 @@ const mocks = vi.hoisted(() => ({
   nextValuationCheckAt: vi.fn(),
   getVdiPurchase: vi.fn(),
   markVdiPurchaseConsumed: vi.fn(),
+  findRecentConsumedPurchase: vi.fn(),
   selfHealBuyingGuideVdiPurchase: vi.fn(),
   fetchVdiCheckFromVdg: vi.fn(),
   fetchValuationFromVdg: vi.fn(),
@@ -39,6 +40,8 @@ vi.mock("@/lib/tracker/valuationCheckUsage", () => ({
 vi.mock("@/lib/tracker/vdiPurchase", () => ({
   getVdiPurchase: mocks.getVdiPurchase,
   markVdiPurchaseConsumed: mocks.markVdiPurchaseConsumed,
+  findRecentConsumedPurchase: mocks.findRecentConsumedPurchase,
+  VDI_PURCHASE_RETRIEVAL_WINDOW_MS: 14 * 24 * 60 * 60 * 1000,
 }));
 vi.mock("@/lib/payments/buyingGuideVdiCheckout", () => ({
   selfHealBuyingGuideVdiPurchase: mocks.selfHealBuyingGuideVdiPurchase,
@@ -113,6 +116,7 @@ beforeEach(() => {
   mocks.getUserDoc.mockResolvedValue(null);
   mocks.canRunValuationCheck.mockReturnValue(true);
   mocks.nextValuationCheckAt.mockReturnValue(null);
+  mocks.findRecentConsumedPurchase.mockResolvedValue(null);
   mocks.fetchVehicleTaxDetailsFromVdg.mockResolvedValue({
     make: "Ford", taxStatus: "Taxed", taxIsCurrentlyValid: true, taxDueDate: "2027-06-01", taxDaysRemaining: 263, motStatus: "Valid", vedStandardTwelveMonths: 27,
   });
@@ -231,22 +235,64 @@ describe("GET /api/cars/buying-guide-lookup", () => {
 
   // ── Standalone, pay-per-use VDI check ─────────────────────────────────
 
-  it("does not run a VDI check when no vdiPurchaseId is supplied", async () => {
+  it("does not run a VDI check when no vdiPurchaseId is supplied and no recent purchase exists for this plate", async () => {
     const response = await GET(request("AB20FOC"));
     const body = await response.json();
+    expect(mocks.findRecentConsumedPurchase).toHaveBeenCalledWith("buyer@example.com", "AB20FOC", "car");
     expect(mocks.getVdiPurchase).not.toHaveBeenCalled();
     expect(mocks.fetchVdiCheckFromVdg).not.toHaveBeenCalled();
     expect(body.vdiCheck).toBeNull();
     expect(body.vdiCheckBlockedReason).toBeUndefined();
+    expect(body.vdiCheckPurchasedAt).toBeNull();
+    expect(body.vdiCheckExpiresAt).toBeNull();
   });
 
-  it("runs the VDI check and consumes the purchase when it's already paid", async () => {
+  it("returns a cached VDI check for free when a recent purchase for this exact plate already exists, without a vdiPurchaseId", async () => {
+    mocks.findRecentConsumedPurchase.mockResolvedValue({
+      id: "old-purchase", consumedAt: "2026-01-01T00:00:00.000Z",
+      vdiCheck: { isStolen: true, hasWriteOffRecord: false, writeOffRecordCount: 0, hasOutstandingFinance: false, financeRecords: [], keeperChanges: [], keeperChangeCount: 0, plateChangeCount: 0, colourChangeCount: 0, currentColour: null, vedFirstYearTwelveMonths: null, vedStandardTwelveMonths: null, v5cReissueCount: 0, calculatedAverageAnnualMileage: null, averageMileageForAge: null, mileageAnomalyDetected: false, manufacturerWarrantyMiles: null, manufacturerWarrantyMonths: null },
+    });
+    const response = await GET(request("AB20FOC"));
+    const body = await response.json();
+    expect(mocks.fetchVdiCheckFromVdg).not.toHaveBeenCalled();
+    expect(body.vdiCheck).toMatchObject({ isStolen: true });
+    expect(body.vdiCheckPurchasedAt).toBe("2026-01-01T00:00:00.000Z");
+    expect(new Date(body.vdiCheckExpiresAt).getTime() - new Date(body.vdiCheckPurchasedAt).getTime()).toBe(14 * 24 * 60 * 60 * 1000);
+  });
+
+  it("runs the VDI check, caches it on the purchase doc, and consumes the purchase when it's already paid", async () => {
     mocks.getVdiPurchase.mockResolvedValue(basePurchase({ status: "paid" }));
     const response = await GET(request("AB20FOC", { vdiPurchaseId: "purchase123" }));
     const body = await response.json();
     expect(mocks.fetchVdiCheckFromVdg).toHaveBeenCalledWith("AB20FOC", "test-key");
-    expect(mocks.markVdiPurchaseConsumed).toHaveBeenCalledWith("purchase123");
+    expect(mocks.markVdiPurchaseConsumed).toHaveBeenCalledWith("purchase123", expect.objectContaining({ isStolen: false }));
     expect(body.vdiCheck).toMatchObject({ isStolen: false });
+    expect(body.vdiCheckPurchasedAt).not.toBeNull();
+    expect(body.vdiCheckExpiresAt).not.toBeNull();
+  });
+
+  it("returns fetch_failed without burning the purchase when the VDG fetch itself comes back empty", async () => {
+    mocks.getVdiPurchase.mockResolvedValue(basePurchase({ status: "paid" }));
+    mocks.fetchVdiCheckFromVdg.mockResolvedValue(null);
+    const response = await GET(request("AB20FOC", { vdiPurchaseId: "purchase123" }));
+    const body = await response.json();
+    expect(mocks.markVdiPurchaseConsumed).not.toHaveBeenCalled();
+    expect(body.vdiCheck).toBeNull();
+    expect(body.vdiCheckBlockedReason).toBe("fetch_failed");
+  });
+
+  it("re-shows the cached vdiCheck (not an already_used error) when reloading the return URL of an already-consumed purchase", async () => {
+    mocks.getVdiPurchase.mockResolvedValue({
+      ...basePurchase({ status: "consumed" }),
+      consumedAt: "2026-01-01T00:00:00.000Z",
+      vdiCheck: { isStolen: false, hasWriteOffRecord: false, writeOffRecordCount: 0, hasOutstandingFinance: false, financeRecords: [], keeperChanges: [], keeperChangeCount: 0, plateChangeCount: 0, colourChangeCount: 0, currentColour: null, vedFirstYearTwelveMonths: null, vedStandardTwelveMonths: null, v5cReissueCount: 0, calculatedAverageAnnualMileage: null, averageMileageForAge: null, mileageAnomalyDetected: false, manufacturerWarrantyMiles: null, manufacturerWarrantyMonths: null },
+    });
+    const response = await GET(request("AB20FOC", { vdiPurchaseId: "purchase123" }));
+    const body = await response.json();
+    expect(mocks.fetchVdiCheckFromVdg).not.toHaveBeenCalled();
+    expect(body.vdiCheck).toMatchObject({ isStolen: false });
+    expect(body.vdiCheckBlockedReason).toBeUndefined();
+    expect(body.vdiCheckPurchasedAt).toBe("2026-01-01T00:00:00.000Z");
   });
 
   it("self-heals a pending purchase using session_id, then runs the check once it comes back paid", async () => {

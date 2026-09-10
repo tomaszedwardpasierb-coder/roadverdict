@@ -25,7 +25,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/session";
 import { parseMotHistory, type RawMotTest } from "@/lib/tracker/motHistory";
 import { generateBuyingGuideBriefing, type BuyingGuideBriefingResult } from "@/lib/tracker/buyingGuideBriefing";
-import { getVdiPurchase, markVdiPurchaseConsumed } from "@/lib/tracker/vdiPurchase";
+import { getVdiPurchase, markVdiPurchaseConsumed, findRecentConsumedPurchase, VDI_PURCHASE_RETRIEVAL_WINDOW_MS } from "@/lib/tracker/vdiPurchase";
 import { selfHealBuyingGuideVdiPurchase } from "@/lib/payments/buyingGuideVdiCheckout";
 import { fetchVdiCheckFromVdg } from "@/lib/tracker/vdiCheckFetch";
 import { fetchVehicleTaxDetailsFromVdg, type VehicleTaxDetails } from "@/lib/tracker/vehicleTaxFetch";
@@ -65,13 +65,20 @@ export interface BuyingGuideLookupResult {
     notes: string;
   }[];
   briefing: BuyingGuideBriefingResult | null;
-  // Only ever populated when a paid, consumed vdiPurchaseId was supplied
-  // and passed every check in resolveVdiPurchase below - see
-  // vdiPurchase.ts. vdiCheckBlockedReason explains *why* it wasn't when
-  // a vdiPurchaseId was supplied but something about it didn't check out,
-  // rather than the field just silently being absent.
+  // Populated either by a fresh purchase (a paid, consumed vdiPurchaseId
+  // was supplied and passed every check in resolveVdiCheck below) or by
+  // finding an earlier purchase for this exact plate still within its
+  // retrieval window - see vdiPurchase.ts. vdiCheckBlockedReason explains
+  // *why* it wasn't when a vdiPurchaseId was supplied but something about
+  // it didn't check out, rather than the field just silently being absent.
   vdiCheck: VdiCheckResult | null;
-  vdiCheckBlockedReason?: "already_used" | "payment_not_confirmed" | "invalid";
+  vdiCheckBlockedReason?: "already_used" | "payment_not_confirmed" | "invalid" | "fetch_failed";
+  // When vdiCheck is populated, exactly when it was paid for and how long
+  // it stays retrievable for free - lets the UI say plainly "you paid for
+  // this on X, available until Y" rather than leaving the purchase
+  // invisible once the buyer navigates away and comes back.
+  vdiCheckPurchasedAt: string | null;
+  vdiCheckExpiresAt: string | null;
   // Free, always attempted alongside MOT history - real tax/SORN status,
   // not a paid add-on like vdiCheck above.
   taxDetails: VehicleTaxDetails | null;
@@ -83,14 +90,26 @@ async function resolveVdiCheck(
   email: string,
   vrm: string,
   apiKey: string
-): Promise<{ vdiCheck: VdiCheckResult | null; blockedReason?: "already_used" | "payment_not_confirmed" | "invalid" }> {
-  if (!vdiPurchaseId) return { vdiCheck: null };
+): Promise<{ vdiCheck: VdiCheckResult | null; blockedReason?: "already_used" | "payment_not_confirmed" | "invalid" | "fetch_failed"; purchasedAt?: string }> {
+  if (!vdiPurchaseId) {
+    // No purchase referenced in the URL at all - still worth checking
+    // whether this exact plate already has a recent, paid check on file
+    // (the buyer looked it up before, or is revisiting after closing the
+    // tab from a previous purchase) before concluding there's nothing to show.
+    const recent = await findRecentConsumedPurchase(email, vrm, "bike");
+    if (recent?.vdiCheck) return { vdiCheck: recent.vdiCheck, purchasedAt: recent.consumedAt };
+    return { vdiCheck: null };
+  }
 
   let purchase = await getVdiPurchase(vdiPurchaseId);
   if (!purchase || purchase.email !== email || purchase.vrm !== vrm || purchase.vehicleKind !== "bike") {
     return { vdiCheck: null, blockedReason: "invalid" };
   }
   if (purchase.status === "consumed") {
+    // A reload of the same return URL (or a bookmark of it) shouldn't
+    // read as an error - the check was genuinely paid for and already run,
+    // so just show it again rather than saying "already used."
+    if (purchase.vdiCheck) return { vdiCheck: purchase.vdiCheck, purchasedAt: purchase.consumedAt };
     return { vdiCheck: null, blockedReason: "already_used" };
   }
   if (purchase.status === "pending") {
@@ -100,8 +119,15 @@ async function resolveVdiCheck(
   }
 
   const vdiCheck = await fetchVdiCheckFromVdg(vrm, apiKey);
-  await markVdiPurchaseConsumed(vdiPurchaseId);
-  return { vdiCheck };
+  if (!vdiCheck) {
+    // The purchase itself is genuinely paid for - a VDG hiccup here
+    // shouldn't burn it. Left as "paid", not "consumed", so the buyer
+    // can just look the plate up again and it'll retry rather than
+    // silently losing what they paid for.
+    return { vdiCheck: null, blockedReason: "fetch_failed" };
+  }
+  await markVdiPurchaseConsumed(vdiPurchaseId, vdiCheck);
+  return { vdiCheck, purchasedAt: new Date().toISOString() };
 }
 
 export async function GET(request: NextRequest) {
@@ -153,7 +179,16 @@ export async function GET(request: NextRequest) {
 
   const vdiPurchaseId = request.nextUrl.searchParams.get("vdiPurchaseId");
   const sessionId = request.nextUrl.searchParams.get("session_id");
-  const { vdiCheck, blockedReason: vdiCheckBlockedReason } = await resolveVdiCheck(vdiPurchaseId, sessionId, session.email, vrm, apiKey);
+  const { vdiCheck, blockedReason: vdiCheckBlockedReason, purchasedAt: vdiCheckPurchasedAt } = await resolveVdiCheck(
+    vdiPurchaseId,
+    sessionId,
+    session.email,
+    vrm,
+    apiKey
+  );
+  const vdiCheckExpiresAt = vdiCheckPurchasedAt
+    ? new Date(new Date(vdiCheckPurchasedAt).getTime() + VDI_PURCHASE_RETRIEVAL_WINDOW_MS).toISOString()
+    : null;
 
   let briefing: BuyingGuideBriefingResult | null = null;
   const geminiKey = process.env.GEMINI_API_KEY;
@@ -182,6 +217,8 @@ export async function GET(request: NextRequest) {
     briefing,
     vdiCheck,
     vdiCheckBlockedReason,
+    vdiCheckPurchasedAt: vdiCheckPurchasedAt ?? null,
+    vdiCheckExpiresAt,
     taxDetails,
   };
 

@@ -51,12 +51,24 @@ interface CarBuyingGuideLookupResponse {
     writeOffRecordCount: number;
     hasOutstandingFinance: boolean;
     financeRecords: { agreementDate: string | null; agreementType: string | null; financeCompany: string | null }[];
+    keeperChanges: { keeperStartDate: string; previousKeeperDisposalDate: string | null }[];
     keeperChangeCount: number;
     plateChangeCount: number;
     colourChangeCount: number;
     currentColour: string | null;
+    v5cReissueCount: number;
+    calculatedAverageAnnualMileage: number | null;
+    averageMileageForAge: number | null;
+    mileageAnomalyDetected: boolean;
+    manufacturerWarrantyMiles: number | null;
+    manufacturerWarrantyMonths: number | null;
   } | null;
-  vdiCheckBlockedReason?: 'already_used' | 'payment_not_confirmed' | 'invalid';
+  vdiCheckBlockedReason?: 'already_used' | 'payment_not_confirmed' | 'invalid' | 'fetch_failed';
+  // Set alongside vdiCheck - when it was paid for, and how long it stays
+  // retrievable for free by looking up this same plate again (see
+  // vdiPurchase.ts's VDI_PURCHASE_RETRIEVAL_WINDOW_MS).
+  vdiCheckPurchasedAt: string | null;
+  vdiCheckExpiresAt: string | null;
   // Free but rate-limited (see valuationCheckUsage.ts), fully decoupled
   // from vdiCheck's paid purchase above - always attempted on every
   // lookup while the account is within its allowance.
@@ -271,6 +283,8 @@ export function CarBuyingGuideForm({ signedIn }: Props) {
                   "We couldn't confirm that payment yet - please look up this registration again in a moment."}
                 {motResult.vdiCheckBlockedReason === 'invalid' &&
                   "Something went wrong with that purchase - please buy again."}
+                {motResult.vdiCheckBlockedReason === 'fetch_failed' &&
+                  "Your payment went through, but we couldn't fetch the check just now - look up this registration again and it'll retry, at no extra cost."}
               </p>
               <button type="button" className="btn-primary" onClick={handleBuyVdiCheck} disabled={vdiPurchasing}>
                 {vdiPurchasing ? 'Starting checkout…' : `Buy Independent Vehicle Check - ${BUYING_GUIDE_VDI_CHECK_PRICE_LABEL}`}
@@ -282,9 +296,19 @@ export function CarBuyingGuideForm({ signedIn }: Props) {
 
           {motResult?.vdiCheck && (
             <div className="field" style={{ marginBottom: '1.1rem' }}>
-              <p className="field-note" style={{ fontWeight: 600, marginBottom: '0.5rem' }}>
-                Independent VDI check
-              </p>
+              <div style={{ borderLeft: '3px solid var(--verdict-green)', paddingLeft: '0.6rem', marginBottom: '0.6rem' }}>
+                <p className="field-note" style={{ fontWeight: 600, margin: 0 }}>
+                  ✓ Independent VDI check - included with your {BUYING_GUIDE_VDI_CHECK_PRICE_LABEL} purchase
+                </p>
+                {motResult.vdiCheckPurchasedAt && (
+                  <p className="field-note" style={{ margin: '0.2rem 0 0' }}>
+                    Bought {new Date(motResult.vdiCheckPurchasedAt).toLocaleDateString('en-GB')}
+                    {motResult.vdiCheckExpiresAt &&
+                      ` - free to look up again until ${new Date(motResult.vdiCheckExpiresAt).toLocaleDateString('en-GB')}`}
+                    .
+                  </p>
+                )}
+              </div>
               <ul style={{ margin: 0, paddingLeft: '1.1rem' }}>
                 <li className="field-note">{motResult.vdiCheck.isStolen ? '⚠️ Recorded as stolen' : 'No stolen marker found'}</li>
                 <li className="field-note">
@@ -298,7 +322,46 @@ export function CarBuyingGuideForm({ signedIn }: Props) {
                     : 'No outstanding finance found'}
                 </li>
                 <li className="field-note">{motResult.vdiCheck.keeperChangeCount} keeper change(s) on record</li>
+                <li className="field-note">{motResult.vdiCheck.plateChangeCount} plate change(s) on record</li>
+                <li className="field-note">
+                  {motResult.vdiCheck.colourChangeCount} colour change(s) on record
+                  {motResult.vdiCheck.currentColour ? ` (currently ${motResult.vdiCheck.currentColour.toLowerCase()})` : ''}
+                </li>
+                {motResult.vdiCheck.calculatedAverageAnnualMileage != null && motResult.vdiCheck.averageMileageForAge != null && (
+                  <li className="field-note">
+                    Average annual mileage: {motResult.vdiCheck.calculatedAverageAnnualMileage.toLocaleString()} mi/year
+                    (typical for this age: {motResult.vdiCheck.averageMileageForAge.toLocaleString()})
+                    {motResult.vdiCheck.mileageAnomalyDetected ? ' - ⚠️ anomaly flagged' : ''}
+                  </li>
+                )}
+                {(motResult.vdiCheck.manufacturerWarrantyMonths != null || motResult.vdiCheck.manufacturerWarrantyMiles != null) && (
+                  <li className="field-note">
+                    Manufacturer warranty:{' '}
+                    {[
+                      motResult.vdiCheck.manufacturerWarrantyMonths ? `${motResult.vdiCheck.manufacturerWarrantyMonths} months` : null,
+                      motResult.vdiCheck.manufacturerWarrantyMiles ? `${motResult.vdiCheck.manufacturerWarrantyMiles.toLocaleString()} miles` : null,
+                    ]
+                      .filter(Boolean)
+                      .join(' / ')}{' '}
+                    from new
+                  </li>
+                )}
               </ul>
+              {motResult.vdiCheck.keeperChanges.length > 0 && (
+                <>
+                  <p className="field-note" style={{ fontWeight: 600, margin: '0.6rem 0 0.3rem' }}>Keeper change history</p>
+                  <ul style={{ margin: 0, paddingLeft: '1.1rem' }}>
+                    {[...motResult.vdiCheck.keeperChanges].reverse().map((k, i) => (
+                      <li key={i} className="field-note">
+                        {new Date(k.keeperStartDate).toLocaleDateString('en-GB')} - new keeper registered
+                        {k.previousKeeperDisposalDate
+                          ? ` (previous keeper disposed ${new Date(k.previousKeeperDisposalDate).toLocaleDateString('en-GB')})`
+                          : ''}
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              )}
             </div>
           )}
 

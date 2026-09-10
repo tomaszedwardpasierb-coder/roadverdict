@@ -11,10 +11,17 @@
 // Bound to exactly one (email, vrm, vehicleKind) triple at creation time
 // and consumed exactly once - this is what stops a paid purchase id
 // being replayed to re-run the check for free, or against a different
-// plate than the one actually paid for.
+// plate than the one actually paid for. The fetched VdiCheckResult is
+// cached on the doc at consumption time (not re-fetched, and not
+// re-billed) so the same purchase can be re-surfaced for free on a later
+// lookup of the same plate, within VDI_PURCHASE_RETRIEVAL_WINDOW_MS -
+// otherwise the paid data would vanish the moment the browser tab
+// closed, which isn't what "you paid £9.99 for this" should mean.
 import crypto from "crypto";
 import { getContainer } from "@/lib/cosmos";
-import type { VehicleKind } from "@/lib/tracker/vdiUnlock";
+import type { VehicleKind, VdiCheckResult } from "@/lib/tracker/vdiUnlock";
+
+export const VDI_PURCHASE_RETRIEVAL_WINDOW_MS = 14 * 24 * 60 * 60 * 1000;
 
 export interface VdiPurchaseDoc {
   id: string;
@@ -28,6 +35,7 @@ export interface VdiPurchaseDoc {
   stripeSessionId?: string;
   paidAt?: string;
   consumedAt?: string;
+  vdiCheck?: VdiCheckResult;
 }
 
 function generatePurchaseId(): string {
@@ -79,11 +87,38 @@ export async function markVdiPurchasePaid(id: string, stripeSessionId: string): 
   return resource;
 }
 
-export async function markVdiPurchaseConsumed(id: string): Promise<void> {
+export async function markVdiPurchaseConsumed(id: string, vdiCheck: VdiCheckResult): Promise<void> {
   const container = getContainer();
   const { resource } = await container.item(id, id).read<VdiPurchaseDoc>();
   if (!resource) return;
   resource.status = "consumed";
   resource.consumedAt = new Date().toISOString();
+  resource.vdiCheck = vdiCheck;
   await container.items.upsert(resource);
+}
+
+// Cross-partition - same accepted trade-off as getShareLinksForUser
+// elsewhere in this app (a purchase's own id is its partition key, not
+// the buyer's email, so finding "the most recent paid check for this
+// plate" can't be a point-read). Only ever runs on a Buying Guide plate
+// lookup, not a hot path shared across the whole app. Lets a buyer look
+// up the same plate again within the retrieval window and get their
+// already-paid VDI check back for free, rather than needing to keep the
+// original purchase's return URL around or pay again.
+export async function findRecentConsumedPurchase(email: string, vrm: string, vehicleKind: VehicleKind): Promise<VdiPurchaseDoc | null> {
+  const container = getContainer();
+  const cutoff = new Date(Date.now() - VDI_PURCHASE_RETRIEVAL_WINDOW_MS).toISOString();
+  const { resources } = await container.items
+    .query<VdiPurchaseDoc>({
+      query:
+        "SELECT * FROM c WHERE c.type = 'vdiPurchase' AND c.email = @email AND c.vrm = @vrm AND c.vehicleKind = @vehicleKind AND c.status = 'consumed' AND c.consumedAt >= @cutoff ORDER BY c.consumedAt DESC",
+      parameters: [
+        { name: "@email", value: email },
+        { name: "@vrm", value: vrm },
+        { name: "@vehicleKind", value: vehicleKind },
+        { name: "@cutoff", value: cutoff },
+      ],
+    })
+    .fetchAll();
+  return resources[0] ?? null;
 }

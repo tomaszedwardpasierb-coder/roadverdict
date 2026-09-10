@@ -261,9 +261,18 @@ describe("CarBuyingGuideForm", () => {
         plateInRetention: false, motDueDate: null, motTests: [], briefing: null, taxDetails: null,
         vdiCheck: {
           isStolen: false, hasWriteOffRecord: true, writeOffRecordCount: 1, hasOutstandingFinance: false,
-          financeRecords: [], keeperChangeCount: 2, plateChangeCount: 0, colourChangeCount: 0, currentColour: null,
+          financeRecords: [],
+          keeperChanges: [
+            { keeperStartDate: "2023-01-01", previousKeeperDisposalDate: "2022-06-01" },
+            { keeperStartDate: "2024-06-01", previousKeeperDisposalDate: "2024-05-01" },
+          ],
+          keeperChangeCount: 2, plateChangeCount: 1, colourChangeCount: 1, currentColour: "Grey",
+          v5cReissueCount: 2, calculatedAverageAnnualMileage: 9800, averageMileageForAge: 8000,
+          mileageAnomalyDetected: true, manufacturerWarrantyMiles: 60000, manufacturerWarrantyMonths: 36,
         },
         valuation: { privateAverage: 23994, privateClean: null, dealerForecourt: 27161, partExchange: null },
+        vdiCheckPurchasedAt: "2026-01-01T00:00:00.000Z",
+        vdiCheckExpiresAt: "2026-01-15T00:00:00.000Z",
       }),
     });
     const user = userEvent.setup();
@@ -272,6 +281,13 @@ describe("CarBuyingGuideForm", () => {
     await user.click(screen.getByRole("button", { name: "Look up" }));
 
     expect(await screen.findByText(/1 write-off record\(s\) on file/)).toBeInTheDocument();
+    expect(screen.getByText(/Independent VDI check - included with your £9.99 purchase/)).toBeInTheDocument();
+    expect(screen.getByText(/Bought 01\/01\/2026 - free to look up again until 15\/01\/2026/)).toBeInTheDocument();
+    expect(screen.getByText(/1 colour change\(s\) on record \(currently grey\)/)).toBeInTheDocument();
+    expect(screen.getByText(/Average annual mileage: 9,800 mi\/year/)).toBeInTheDocument();
+    expect(screen.getByText(/⚠️ anomaly flagged/)).toBeInTheDocument();
+    expect(screen.getByText(/Manufacturer warranty: 36 months \/ 60,000 miles from new/)).toBeInTheDocument();
+    expect(screen.getByText("Keeper change history")).toBeInTheDocument();
     expect(screen.getByText("Private average: £23,994")).toBeInTheDocument();
     expect(screen.getByText("Dealer forecourt: £27,161")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Buy Independent Vehicle Check/ })).not.toBeInTheDocument();
@@ -321,7 +337,9 @@ describe("CarBuyingGuideForm", () => {
         plateInRetention: false, motDueDate: null, motTests: [], briefing: null, taxDetails: null, valuation: null,
         vdiCheck: {
           isStolen: false, hasWriteOffRecord: false, writeOffRecordCount: 0, hasOutstandingFinance: false,
-          financeRecords: [], keeperChangeCount: 1, plateChangeCount: 0, colourChangeCount: 0, currentColour: null,
+          financeRecords: [], keeperChanges: [], keeperChangeCount: 1, plateChangeCount: 0, colourChangeCount: 0, currentColour: null,
+          v5cReissueCount: 0, calculatedAverageAnnualMileage: null, averageMileageForAge: null,
+          mileageAnomalyDetected: false, manufacturerWarrantyMiles: null, manufacturerWarrantyMonths: null,
         },
       }),
     });
