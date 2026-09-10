@@ -7,6 +7,8 @@ const mocks = vi.hoisted(() => ({
   generateBikeId: vi.fn(),
   countActiveBikes: vi.fn(),
   getCurrentRegistration: vi.fn(),
+  getCarsForUser: vi.fn(),
+  countActiveCars: vi.fn(),
   getServiceRecords: vi.fn(),
   getMods: vi.fn(),
   getBills: vi.fn(),
@@ -30,8 +32,12 @@ vi.mock("@/lib/tracker/bike", () => ({
   generateBikeId: mocks.generateBikeId,
   countActiveBikes: mocks.countActiveBikes,
   getCurrentRegistration: mocks.getCurrentRegistration,
-  MAX_FREE_BIKES: 2,
 }));
+vi.mock("@/lib/tracker/car", () => ({
+  getCarsForUser: mocks.getCarsForUser,
+  countActiveCars: mocks.countActiveCars,
+}));
+vi.mock("@/lib/tracker/vehicleLimit", () => ({ MAX_FREE_VEHICLES: 1 }));
 vi.mock("@/lib/tracker/serviceRecord", () => ({ getServiceRecords: mocks.getServiceRecords }));
 vi.mock("@/lib/tracker/mod", () => ({ getMods: mocks.getMods }));
 vi.mock("@/lib/tracker/bill", () => ({ getBills: mocks.getBills }));
@@ -81,6 +87,8 @@ beforeEach(() => {
   mocks.getBike.mockResolvedValue({ ...oldBike });
   mocks.getBikesForUser.mockResolvedValue([]);
   mocks.countActiveBikes.mockReturnValue(0);
+  mocks.getCarsForUser.mockResolvedValue([]);
+  mocks.countActiveCars.mockReturnValue(0);
   mocks.getCurrentRegistration.mockReturnValue("AB20YAM");
   mocks.generateBikeId.mockReturnValue("new-bike-id");
   mocks.getServiceRecords.mockResolvedValue([]);
@@ -123,18 +131,31 @@ describe("transferBike", () => {
     expect(result).toEqual({ ok: false, reason: "already_transferred" });
   });
 
-  it("returns recipient_limit_reached when recipient is already at the free bike cap", async () => {
-    mocks.countActiveBikes.mockReturnValue(2); // MAX_FREE_BIKES = 2
+  it("returns recipient_limit_reached when recipient is already at the free combined vehicle cap", async () => {
+    mocks.countActiveBikes.mockReturnValue(1); // MAX_FREE_VEHICLES = 1
     const result = await transferBike(fromEmail, bikeId, toEmail, false);
-    expect(result).toMatchObject({ ok: false, reason: "recipient_limit_reached", limit: 2 });
+    expect(result).toMatchObject({ ok: false, reason: "recipient_limit_reached", limit: 1 });
+    expect(mocks.upsert).not.toHaveBeenCalled();
+  });
+
+  // The bug this used to have: checking only the recipient's bike count
+  // against the old bike-only MAX_FREE_BIKES let a free account that
+  // already owned a car (and was thus already at the combined cap)
+  // still accept an incoming bike transfer. Now checked combined, same
+  // as carTransfer.ts's own equivalent check.
+  it("returns recipient_limit_reached when the recipient has no bikes but is already at the cap via an owned car", async () => {
+    mocks.countActiveBikes.mockReturnValue(0);
+    mocks.countActiveCars.mockReturnValue(1); // MAX_FREE_VEHICLES = 1
+    const result = await transferBike(fromEmail, bikeId, toEmail, false);
+    expect(result).toMatchObject({ ok: false, reason: "recipient_limit_reached", limit: 1 });
     expect(mocks.upsert).not.toHaveBeenCalled();
   });
 
   // Pro accounts skip the cap entirely, per subscriptions.ts's isPro()
   // (temporarily true for everyone while no payment platform is wired
   // in - see that file's own comment).
-  it("lets a transfer through past the recipient's free bike cap when the recipient is Pro", async () => {
-    mocks.countActiveBikes.mockReturnValue(2); // MAX_FREE_BIKES = 2
+  it("lets a transfer through past the recipient's free combined vehicle cap when the recipient is Pro", async () => {
+    mocks.countActiveBikes.mockReturnValue(1); // MAX_FREE_VEHICLES = 1
     mocks.isPro.mockResolvedValue(true);
     const result = await transferBike(fromEmail, bikeId, toEmail, false);
     expect(result.ok).toBe(true);

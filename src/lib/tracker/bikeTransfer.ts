@@ -24,7 +24,9 @@
 // read-only from this point on either way.
 import { getContainer } from "@/lib/cosmos";
 import { isPro } from "@/lib/subscriptions";
-import { getBike, getBikesForUser, generateBikeId, countActiveBikes, getCurrentRegistration, MAX_FREE_BIKES, type BikeDoc } from "@/lib/tracker/bike";
+import { getBike, getBikesForUser, generateBikeId, countActiveBikes, getCurrentRegistration, type BikeDoc } from "@/lib/tracker/bike";
+import { getCarsForUser, countActiveCars } from "@/lib/tracker/car";
+import { MAX_FREE_VEHICLES } from "@/lib/tracker/vehicleLimit";
 import { normalizePlate, allKnownPlates } from "@/lib/tracker/reportAccess";
 import { getServiceRecords } from "@/lib/tracker/serviceRecord";
 import { getMods } from "@/lib/tracker/mod";
@@ -62,14 +64,20 @@ export async function transferBike(
     return { ok: false, reason: "already_transferred" };
   }
 
-  // Same limit createBike() enforces - a transfer shouldn't be a way
-  // to bypass the free-bike cap that adding a bike normally respects.
-  // Counted the same way as everywhere else - a read-only bike the
-  // recipient already has doesn't cost them an active slot, so it
-  // shouldn't block them from accepting a genuinely new one either.
-  const recipientBikes = await getBikesForUser(toEmail);
-  if (!(await isPro(toEmail)) && countActiveBikes(recipientBikes) >= MAX_FREE_BIKES) {
-    return { ok: false, reason: "recipient_limit_reached", limit: MAX_FREE_BIKES };
+  // Combined bike+car cap, same one createCar/createBike enforce at
+  // creation time and carTransfer.ts enforces on its own side - a
+  // transfer shouldn't be a way to bypass the free-tier cap that adding
+  // a vehicle normally respects. This used to check only the
+  // recipient's bike count against the older, bike-only MAX_FREE_BIKES,
+  // which let a free account that already owned a car (and was thus
+  // already at the combined cap) still accept an incoming bike transfer
+  // - fixed to match carTransfer.ts's own check exactly. Counted the
+  // same way as everywhere else - a read-only vehicle the recipient
+  // already has doesn't cost them an active slot, so it shouldn't block
+  // them from accepting a genuinely new one either.
+  const [recipientBikes, recipientCars] = await Promise.all([getBikesForUser(toEmail), getCarsForUser(toEmail)]);
+  if (!(await isPro(toEmail)) && countActiveBikes(recipientBikes) + countActiveCars(recipientCars) >= MAX_FREE_VEHICLES) {
+    return { ok: false, reason: "recipient_limit_reached", limit: MAX_FREE_VEHICLES };
   }
 
   // Guards against a specific collision: the recipient may have already

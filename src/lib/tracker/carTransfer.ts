@@ -11,13 +11,14 @@
 // owner's own active series is always ended regardless of includeRecords,
 // since their car is read-only from this point on either way.
 //
-// The recipient-limit check deliberately differs from bikeTransfer.ts's
-// own (which checks only countActiveBikes against the old bike-only
-// MAX_FREE_BIKES): createCar has no cap logic of its own at all (see
+// The recipient-limit check matches bikeTransfer.ts's own exactly - both
+// check the recipient's COMBINED bike+car count against
+// MAX_FREE_VEHICLES, the same cap car/bike creation actually respects
+// everywhere else. createCar has no cap logic of its own at all (see
 // POST /api/cars/car's own comment - the combined bike+car cap is only
-// ever enforced at the route layer), so this checks the recipient's
-// COMBINED bike+car count against MAX_FREE_VEHICLES instead, the same
-// cap car creation actually respects everywhere else.
+// ever enforced at the route layer); createBike still keeps its own
+// inner, bike-only safety net (MAX_FREE_BIKES) for a direct call, but
+// that's unrelated to this check.
 import { getContainer } from "@/lib/cosmos";
 import { isPro } from "@/lib/subscriptions";
 import { MAX_FREE_VEHICLES } from "@/lib/tracker/vehicleLimit";

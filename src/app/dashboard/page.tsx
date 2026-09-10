@@ -777,19 +777,28 @@ export default async function DashboardPage(props: { searchParams: Promise<{ add
     </>
   );
 
-  // Car entries aren't merged in here yet - this page's own data-fetching
-  // and every tab's content below are still entirely BikeDoc-based (see
-  // the ADR: rendering real car dashboard content - forms, history tabs -
-  // is separate, not-yet-built work). The switcher, DashboardShell's
-  // vehicle-kind branching, and the full car API layer are ready for it;
-  // wiring an active car into this specific function is the next step.
-  const switcherVehicles = bikes.map((b) => ({
-    id: b.id,
-    kind: 'bike' as const,
-    name: b.nickname ? `${b.nickname} - ${b.make} ${b.model}` : `${b.make} ${b.model}`,
-    year: b.year,
-    currentMileage: b.currentMileage,
-  }));
+  // This page's own data-fetching and every tab's content below are
+  // still entirely BikeDoc-based (see the ADR: rendering real car
+  // dashboard content - forms, history tabs - is separate, not-yet-built
+  // work) - but the switcher itself just needs identity/mileage for
+  // every vehicle on the account, which existingCars (already fetched
+  // above) already provides, so it's included here too. Without this, an
+  // account with both a bike and a car active on the bike side couldn't
+  // see or switch to its car from the switcher at all - it would only
+  // show up once that account switched to the car dashboard first,
+  // whose own switcherVehicles below already merges both kinds.
+  const switcherVehicles = [
+    ...bikes.map((b) => ({
+      id: b.id, kind: "bike" as const,
+      name: b.nickname ? `${b.nickname} - ${b.make} ${b.model}` : `${b.make} ${b.model}`,
+      year: b.year, currentMileage: b.currentMileage,
+    })),
+    ...existingCars.map((c) => ({
+      id: c.id, kind: "car" as const,
+      name: c.nickname ? `${c.nickname} - ${c.make} ${c.model}` : `${c.make} ${c.model}`,
+      year: c.year, currentMileage: c.currentMileage,
+    })),
+  ];
 
   // Pre-population for the three embedded tools below - always signed
   // in here (this is the dashboard), so unlike the standalone pages

@@ -110,7 +110,7 @@ describe("POST /api/cars/car", () => {
 
     expect(response.status).toBe(403);
     await expect(response.json()).resolves.toEqual({
-      error: "Free accounts can track up to 2 vehicles total (bikes and cars combined). Upgrade to add more.",
+      error: "Free accounts can track up to 1 vehicle total (bikes and cars combined). Upgrade to add more.",
       reason: "limit_reached",
     });
     expect(mocks.createCar).not.toHaveBeenCalled();

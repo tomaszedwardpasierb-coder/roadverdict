@@ -89,7 +89,7 @@ export async function POST(request: NextRequest) {
     if (combinedCount >= MAX_FREE_VEHICLES) {
       return NextResponse.json(
         {
-          error: `Free accounts can track up to ${MAX_FREE_VEHICLES} vehicles total (bikes and cars combined). Upgrade to add more.`,
+          error: `Free accounts can track up to ${MAX_FREE_VEHICLES} vehicle${MAX_FREE_VEHICLES === 1 ? "" : "s"} total (bikes and cars combined). Upgrade to add more.`,
           reason: "limit_reached",
         },
         { status: 403 }

@@ -20,33 +20,43 @@ import { AddAnotherVehicleSection } from "@/app/garage/AddAnotherVehicleSection"
 
 describe("AddAnotherVehicleSection", () => {
   it("shows the combined free-tier cap notice, with no add button, once vehicleCount reaches maxFreeVehicles", () => {
-    render(<AddAnotherVehicleSection vehicleCount={2} maxFreeVehicles={2} />);
-    expect(screen.getByText(/Free accounts can track up to 2 vehicles total \(bikes and cars combined\)/)).toBeInTheDocument();
+    render(<AddAnotherVehicleSection vehicleCount={1} maxFreeVehicles={1} />);
+    expect(screen.getByText(/Free accounts can track 1 vehicle\. Upgrade to Pro to add another/)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Add another vehicle/ })).not.toBeInTheDocument();
   });
 
   it("also shows the cap notice when vehicleCount somehow exceeds the cap", () => {
-    render(<AddAnotherVehicleSection vehicleCount={3} maxFreeVehicles={2} />);
-    expect(screen.getByText(/Free accounts can track up to 2 vehicles total/)).toBeInTheDocument();
+    render(<AddAnotherVehicleSection vehicleCount={2} maxFreeVehicles={1} />);
+    expect(screen.getByText(/Free accounts can track 1 vehicle\./)).toBeInTheDocument();
+  });
+
+  it("pluralizes correctly if the free allowance is ever more than one vehicle", () => {
+    render(<AddAnotherVehicleSection vehicleCount={2} maxFreeVehicles={2} />);
+    expect(screen.getByText(/Free accounts can track 2 vehicles\./)).toBeInTheDocument();
+  });
+
+  it("mentions comparing vehicles' running costs as the reason to upgrade, not just the raw limit", () => {
+    render(<AddAnotherVehicleSection vehicleCount={1} maxFreeVehicles={1} />);
+    expect(screen.getByText(/compare them side by side to see which one actually costs you more to run/)).toBeInTheDocument();
   });
 
   it("skips the cap notice entirely for a Pro account, even past the cap", () => {
-    render(<AddAnotherVehicleSection vehicleCount={5} maxFreeVehicles={2} isPro />);
-    expect(screen.queryByText(/Free accounts can track up to/)).not.toBeInTheDocument();
+    render(<AddAnotherVehicleSection vehicleCount={5} maxFreeVehicles={1} isPro />);
+    expect(screen.queryByText(/Free accounts can track/)).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "+ Add another vehicle" })).toBeInTheDocument();
   });
 
   it("under the cap, shows the add button instead of the kind picker or either form", () => {
-    render(<AddAnotherVehicleSection vehicleCount={1} maxFreeVehicles={2} />);
+    render(<AddAnotherVehicleSection vehicleCount={0} maxFreeVehicles={1} />);
     expect(screen.getByRole("button", { name: "+ Add another vehicle" })).toBeInTheDocument();
-    expect(screen.queryByText(/Free accounts can track up to/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Free accounts can track/)).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Motorcycle" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Car" })).not.toBeInTheDocument();
   });
 
   it("clicking the add button asks which kind of vehicle, not the form directly", async () => {
     const user = userEvent.setup();
-    render(<AddAnotherVehicleSection vehicleCount={1} maxFreeVehicles={2} />);
+    render(<AddAnotherVehicleSection vehicleCount={0} maxFreeVehicles={1} />);
     await user.click(screen.getByRole("button", { name: "+ Add another vehicle" }));
 
     expect(screen.queryByRole("button", { name: "+ Add another vehicle" })).not.toBeInTheDocument();
@@ -57,7 +67,7 @@ describe("AddAnotherVehicleSection", () => {
 
   it("picking Motorcycle swaps the kind picker for the real AddBikeForm", async () => {
     const user = userEvent.setup();
-    render(<AddAnotherVehicleSection vehicleCount={1} maxFreeVehicles={2} />);
+    render(<AddAnotherVehicleSection vehicleCount={0} maxFreeVehicles={1} />);
     await user.click(screen.getByRole("button", { name: "+ Add another vehicle" }));
     await user.click(screen.getByRole("button", { name: "Motorcycle" }));
 
@@ -70,7 +80,7 @@ describe("AddAnotherVehicleSection", () => {
 
   it("picking Car swaps the kind picker for the real AddCarForm", async () => {
     const user = userEvent.setup();
-    render(<AddAnotherVehicleSection vehicleCount={1} maxFreeVehicles={2} />);
+    render(<AddAnotherVehicleSection vehicleCount={0} maxFreeVehicles={1} />);
     await user.click(screen.getByRole("button", { name: "+ Add another vehicle" }));
     await user.click(screen.getByRole("button", { name: "Car" }));
 

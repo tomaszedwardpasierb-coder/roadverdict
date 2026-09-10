@@ -168,30 +168,31 @@ describe("POST /api/tracker/bike", () => {
 
   it("responds 403 with the account's limit when the free-tier cap is reached", async () => {
     mocks.getSession.mockResolvedValue({ email: "owner@example.com" });
-    mocks.createBike.mockResolvedValue({ ok: false, reason: "limit_reached", limit: 2 });
+    mocks.createBike.mockResolvedValue({ ok: false, reason: "limit_reached", limit: 1 });
 
     const response = await POST(request("POST", JSON.stringify(validCreatePayload)));
 
     expect(response.status).toBe(403);
     await expect(response.json()).resolves.toEqual({
-      error: "Free accounts can track up to 2 bikes. Upgrade to add more.",
+      error: "Free accounts can track up to 1 bike. Upgrade to add more.",
       reason: "limit_reached",
     });
   });
 
-  // The new combined cap - checked BEFORE createBike is ever called, so
-  // a free account with one bike and one car already can't add a second
-  // bike, even though createBike's own (bike-only) count would allow it.
+  // The combined cap - checked BEFORE createBike is ever called, so a
+  // free account that already owns a car (even with zero bikes of its
+  // own) can't add a bike either, even though createBike's own
+  // (bike-only) count would allow it.
   it("blocks a free account at the combined bike+car cap before ever calling createBike", async () => {
     mocks.getSession.mockResolvedValue({ email: "owner@example.com" });
-    mocks.getBikesForUser.mockResolvedValue([{ id: "bike-1", transferredTo: undefined }]);
+    mocks.getBikesForUser.mockResolvedValue([]);
     mocks.getCarsForUser.mockResolvedValue([{ id: "car-1", transferredTo: undefined }]);
 
     const response = await POST(request("POST", JSON.stringify(validCreatePayload)));
 
     expect(response.status).toBe(403);
     await expect(response.json()).resolves.toEqual({
-      error: "Free accounts can track up to 2 vehicles total (bikes and cars combined). Upgrade to add more.",
+      error: "Free accounts can track up to 1 vehicle total (bikes and cars combined). Upgrade to add more.",
       reason: "limit_reached",
     });
     expect(mocks.createBike).not.toHaveBeenCalled();

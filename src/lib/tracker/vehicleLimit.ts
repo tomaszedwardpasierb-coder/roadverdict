@@ -9,4 +9,4 @@
 // creation) are the layer that's already allowed to cross both domains
 // - see their own pre-check blocks - so this file only needs to export
 // the shared number, not any counting logic itself.
-export const MAX_FREE_VEHICLES = 2;
+export const MAX_FREE_VEHICLES = 1;

@@ -375,8 +375,7 @@ describe("createBike", () => {
   it("does not count a transferred bike toward the free-tier cap", async () => {
     mocks.fetchAll.mockResolvedValue({
       resources: [
-        makeBike({ id: "a" }),
-        makeBike({ id: "b", transferredTo: { newBikeId: "c", newOwnerEmail: "x@example.com", transferredAt: "2025-01-01" } }),
+        makeBike({ id: "a", transferredTo: { newBikeId: "c", newOwnerEmail: "x@example.com", transferredAt: "2025-01-01" } }),
       ],
     });
 

@@ -21,7 +21,8 @@ const mocks = vi.hoisted(() => ({ isPro: vi.fn(async () => false) }));
 vi.mock("@/lib/subscriptions", () => ({ isPro: mocks.isPro }));
 
 import { transferBike } from "@/lib/tracker/bikeTransfer";
-import { createBike, getBike, MAX_FREE_BIKES } from "@/lib/tracker/bike";
+import { createBike, getBike } from "@/lib/tracker/bike";
+import { MAX_FREE_VEHICLES } from "@/lib/tracker/vehicleLimit";
 import { createServiceRecord, getServiceRecords } from "@/lib/tracker/serviceRecord";
 import { createReminder, getReminders, markReminderNotified } from "@/lib/tracker/reminder";
 import { createBillSeries, getBillSeriesForBike } from "@/lib/tracker/billSeries";
@@ -149,14 +150,14 @@ describe("bikeTransfer.ts against a real Cosmos container (emulator)", () => {
     const fromEmail = trackPk("recipient-cap-from");
     const toEmail = trackPk("recipient-cap-to");
     const { bike } = (await createBike(fromEmail, newBikeData())) as { ok: true; bike: { id: string } };
-    for (let i = 0; i < MAX_FREE_BIKES; i++) {
+    for (let i = 0; i < MAX_FREE_VEHICLES; i++) {
       await createBike(toEmail, newBikeData({ registration: `CAP${i}-${Date.now()}` }));
     }
 
     expect(await transferBike(fromEmail, bike.id, toEmail, false)).toEqual({
       ok: false,
       reason: "recipient_limit_reached",
-      limit: MAX_FREE_BIKES,
+      limit: MAX_FREE_VEHICLES,
     });
   });
 
@@ -164,7 +165,7 @@ describe("bikeTransfer.ts against a real Cosmos container (emulator)", () => {
     const fromEmail = trackPk("recipient-pro-from");
     const toEmail = trackPk("recipient-pro-to");
     const { bike } = (await createBike(fromEmail, newBikeData())) as { ok: true; bike: { id: string } };
-    for (let i = 0; i < MAX_FREE_BIKES; i++) {
+    for (let i = 0; i < MAX_FREE_VEHICLES; i++) {
       await createBike(toEmail, newBikeData({ registration: `PROCAP${i}-${Date.now()}` }));
     }
 

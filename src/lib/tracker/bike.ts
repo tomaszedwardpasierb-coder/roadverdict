@@ -9,7 +9,12 @@ import type { Currency } from "@/lib/tracker/currency";
 import type { BikeIdentity, CategorySpend } from "@/lib/tracker/storyFacts";
 
 // Free-tier cap - Pro accounts (see isPro() below) skip it entirely.
-export const MAX_FREE_BIKES = 2;
+// Kept in sync with vehicleLimit.ts's MAX_FREE_VEHICLES by convention,
+// not by import (this file can't depend on car.ts - see vehicleLimit.ts's
+// own comment) - this is only ever the inner safety net for a direct
+// createBike() call; the route layer's combined-count pre-check is the
+// one that actually fires first for a real account (see bike/route.ts).
+export const MAX_FREE_BIKES = 1;
 
 // Which bike a browser is currently "looking at" - set by the bike
 // switcher / garage page, read here to resolve every request. A UI

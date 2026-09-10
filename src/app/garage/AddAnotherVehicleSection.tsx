@@ -28,7 +28,8 @@ export function AddAnotherVehicleSection({ vehicleCount, maxFreeVehicles, isPro 
   if (atCap) {
     return (
       <div className={styles.capNotice}>
-        Free accounts can track up to {maxFreeVehicles} vehicles total (bikes and cars combined). Upgrade to add more.
+        Free accounts can track {maxFreeVehicles} vehicle{maxFreeVehicles === 1 ? "" : "s"}. Upgrade to Pro to add
+        another (bike or car) - and compare them side by side to see which one actually costs you more to run.
       </div>
     );
   }

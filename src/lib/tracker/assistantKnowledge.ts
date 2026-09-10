@@ -77,10 +77,12 @@ fuel economy benchmarks, and vehicle lookups are all built around bike-specific 
   your email, click the link that arrives, you're in. There's no password to create, forget, or
   reset.
 - **Live.** One account can track a bike's full history for as long as you own it.
-- **Live.** Free accounts can track up to two bikes at once. If a bike's been handed over to a
-  new owner (see section 6.20), it becomes read-only on your account and stops counting toward
-  that limit - so handing off a bike frees up the slot it was using, rather than leaving you
-  stuck at your limit because of something you no longer actively use.
+- **Live.** Free accounts can track one vehicle. Upgrading to Pro adds a second (bike or car),
+  with side-by-side cost comparison between them so you can see which one actually costs more to
+  run. If a bike's been handed over to a new owner (see section 6.20), it becomes read-only on
+  your account and stops counting toward that limit - so handing off a bike frees up the slot it
+  was using, rather than leaving you stuck at your limit because of something you no longer
+  actively use.
 
 ---
 

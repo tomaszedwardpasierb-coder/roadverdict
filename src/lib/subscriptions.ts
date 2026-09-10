@@ -56,8 +56,7 @@ export const PRO_ANNUAL_PRICE = "£49";
 export const PRO_ANNUAL_MONTHLY_EQUIV = "£4.08";
 
 export const PRO_FEATURES = [
-  "Additional vehicles beyond your first",
-  "Multi-bike overview and cost comparison",
+  "A second vehicle (bike or car) - with side-by-side cost comparison to see which one actually costs you more to run",
   "Full Reports - fuel economy, running costs, and spend trends over time",
   "Category-by-category spend breakdown (which category, and how much)",
   "Exact reminder due dates, plus automatic reminder emails",

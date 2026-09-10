@@ -83,7 +83,7 @@ export async function POST(request: NextRequest) {
     if (combinedCount >= MAX_FREE_VEHICLES) {
       return NextResponse.json(
         {
-          error: `Free accounts can track up to ${MAX_FREE_VEHICLES} vehicles total (bikes and cars combined). Upgrade to add more.`,
+          error: `Free accounts can track up to ${MAX_FREE_VEHICLES} vehicle${MAX_FREE_VEHICLES === 1 ? "" : "s"} total (bikes and cars combined). Upgrade to add more.`,
           reason: "limit_reached",
         },
         { status: 403 }
@@ -110,7 +110,7 @@ export async function POST(request: NextRequest) {
     // Free-tier cap reached. 403 (not 400) since the request itself is
     // well-formed - it's disallowed by account limits, not bad input.
     return NextResponse.json(
-      { error: `Free accounts can track up to ${result.limit} bikes. Upgrade to add more.`, reason: result.reason },
+      { error: `Free accounts can track up to ${result.limit} bike${result.limit === 1 ? "" : "s"}. Upgrade to add more.`, reason: result.reason },
       { status: 403 }
     );
   }
