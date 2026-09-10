@@ -390,6 +390,143 @@ export async function sendOwnershipRequestDeclinedEmail(params: {
   });
 }
 
+// Car mirrors of the five bike-transfer emails above - formatBikeName is
+// reused directly (genuinely vehicle-neutral despite its name: it only
+// ever reads {make, model, year, isCustomBuild}), only the wording and
+// the /car-transfer/ URL differ.
+export async function sendCarTransferOfferEmail(params: {
+  recipientEmail: string;
+  ownerEmail: string;
+  carSummary: { make: string; model: string; year?: number; isCustomBuild: boolean };
+  token: string;
+}) {
+  const resend = getResend();
+  const appUrl = process.env.APP_URL ?? "https://roadverdict.co.uk";
+  const safeCarName = escapeHtml(formatBikeName(params.carSummary));
+  const offerUrl = `${appUrl}/car-transfer/${params.token}`;
+
+  const html = renderEmailLayout({
+    preheader: `${params.ownerEmail} wants to hand you the service history for a ${formatBikeName(params.carSummary)}`,
+    heading: `You've been offered a car's history`,
+    bodyHtml: `
+      <p style="margin:0 0 12px;"><strong>${escapeHtml(params.ownerEmail)}</strong> has offered to hand you the RoadVerdict record for their <strong>${safeCarName}</strong> — its full logged service history, mileage, and documentation, continuing under your account rather than starting fresh.</p>
+      ${emailButton("View the offer", offerUrl)}
+      <p style="margin:0 0 12px;color:#54555A;font-size:13px;">If you don't have a RoadVerdict account yet, sign in or create one at <a href="${appUrl}/login" style="color:#54555A;">roadverdict.co.uk/login</a> using this same email address (${escapeHtml(params.recipientEmail)}), then come back to this link to accept.</p>
+      <p style="margin:0;color:#54555A;font-size:13px;">This offer is valid for 7 days. If you're not expecting this, you can safely ignore this email or decline it from the link above.</p>
+    `,
+  });
+
+  await resend.emails.send({
+    from: FROM,
+    to: params.recipientEmail,
+    subject: `${params.ownerEmail} wants to hand you the RoadVerdict record for a ${safeCarName}`,
+    html,
+  });
+}
+
+export async function sendCarTransferAcceptedEmail(params: {
+  ownerEmail: string;
+  recipientEmail: string;
+  carSummary: { make: string; model: string; year?: number; isCustomBuild: boolean };
+}) {
+  const resend = getResend();
+  const safeCarName = escapeHtml(formatBikeName(params.carSummary));
+
+  const html = renderEmailLayout({
+    preheader: `${params.recipientEmail} has accepted the handover for your ${formatBikeName(params.carSummary)}`,
+    heading: `Handover accepted`,
+    bodyHtml: `
+      <p style="margin:0 0 12px;"><strong>${escapeHtml(params.recipientEmail)}</strong> has accepted the RoadVerdict record you offered for your <strong>${safeCarName}</strong>.</p>
+      <p style="margin:0 0 20px;">Your own copy is now read-only — a frozen record of everything you logged, kept for your own reference, but no longer editable.</p>
+      <p style="margin:0;color:#54555A;font-size:13px;">This is expected and can't be undone from here. If that doesn't sound right, reply to <a href="mailto:hello@roadverdict.co.uk" style="color:#54555A;">hello@roadverdict.co.uk</a> and we'll take a look.</p>
+    `,
+  });
+
+  await resend.emails.send({
+    from: FROM,
+    to: params.ownerEmail,
+    subject: `${params.recipientEmail} accepted the handover for your ${safeCarName}`,
+    html,
+  });
+}
+
+export async function sendIncomingCarOwnershipRequestEmail(params: {
+  ownerEmail: string;
+  requesterEmail: string;
+  carSummary: { make: string; model: string; year?: number; isCustomBuild: boolean };
+}) {
+  const resend = getResend();
+  const appUrl = process.env.APP_URL ?? "https://roadverdict.co.uk";
+  const safeCarName = escapeHtml(formatBikeName(params.carSummary));
+
+  const html = renderEmailLayout({
+    preheader: `${params.requesterEmail} is requesting your ${formatBikeName(params.carSummary)}'s RoadVerdict history`,
+    heading: `Someone is requesting your car's history`,
+    bodyHtml: `
+      <p style="margin:0 0 12px;"><strong>${escapeHtml(params.requesterEmail)}</strong> has requested the RoadVerdict history for your <strong>${safeCarName}</strong>.</p>
+      <p style="margin:0 0 20px;">If you've sold it to them, approving this hands over its logged service history, mileage, and documentation to their account — and your own copy becomes read-only.</p>
+      ${emailButton("Review this request", `${appUrl}/dashboard`)}
+      <p style="margin:0;color:#54555A;font-size:13px;">If you don't recognise this request, or haven't sold the car, you can safely decline it from the same place — nothing changes unless you approve it.</p>
+    `,
+  });
+
+  await resend.emails.send({
+    from: FROM,
+    to: params.ownerEmail,
+    subject: `${params.requesterEmail} is requesting your ${safeCarName}'s RoadVerdict history`,
+    html,
+  });
+}
+
+export async function sendCarOwnershipRequestApprovedEmail(params: {
+  requesterEmail: string;
+  carSummary: { make: string; model: string; year?: number; isCustomBuild: boolean };
+}) {
+  const resend = getResend();
+  const appUrl = process.env.APP_URL ?? "https://roadverdict.co.uk";
+  const safeCarName = escapeHtml(formatBikeName(params.carSummary));
+
+  const html = renderEmailLayout({
+    preheader: `Your request for the ${formatBikeName(params.carSummary)}'s history has been approved`,
+    heading: `History request approved`,
+    bodyHtml: `
+      <p style="margin:0 0 12px;">Your request for the <strong>${safeCarName}</strong>'s RoadVerdict history has been approved. It now appears on your account, with its full logged service history, mileage, and documentation intact.</p>
+      ${emailButton("Go to your dashboard", `${appUrl}/dashboard`)}
+    `,
+  });
+
+  await resend.emails.send({
+    from: FROM,
+    to: params.requesterEmail,
+    subject: `Your request for the ${safeCarName}'s history was approved`,
+    html,
+  });
+}
+
+export async function sendCarOwnershipRequestDeclinedEmail(params: {
+  requesterEmail: string;
+  carSummary: { make: string; model: string; year?: number; isCustomBuild: boolean };
+}) {
+  const resend = getResend();
+  const safeCarName = escapeHtml(formatBikeName(params.carSummary));
+
+  const html = renderEmailLayout({
+    preheader: `Your request for the ${formatBikeName(params.carSummary)}'s history wasn't approved`,
+    heading: `History request not approved`,
+    bodyHtml: `
+      <p style="margin:0 0 12px;">The current owner didn't approve your request for the <strong>${safeCarName}</strong>'s RoadVerdict history.</p>
+      <p style="margin:0;color:#54555A;font-size:13px;">If you believe this is a mistake, you're welcome to get in touch at <a href="mailto:hello@roadverdict.co.uk" style="color:#54555A;">hello@roadverdict.co.uk</a>.</p>
+    `,
+  });
+
+  await resend.emails.send({
+    from: FROM,
+    to: params.requesterEmail,
+    subject: `Your request for the ${safeCarName}'s history wasn't approved`,
+    html,
+  });
+}
+
 // deleteAfterLabel is pre-formatted by the caller (userAccount.ts's
 // requestAccountDeletion returns a raw ISO string; the API route turns
 // that into a human date), same convention as expiresAtLabel elsewhere

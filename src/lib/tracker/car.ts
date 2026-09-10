@@ -119,14 +119,26 @@ export interface CarDoc {
   // a RoadVerdict record under a different account - see bike.ts's own
   // field of the same name for the full reasoning, unchanged here.
   mayHavePriorHistory?: boolean;
-  // Never set by anything in this build yet (car ownership transfer is
-  // out of scope) - present only so isCarReadOnly/countActiveCars above
-  // have a real field to check, matching bike.ts's own shape, without
-  // needing a later breaking change to add it.
   transferredTo?: {
     newCarId: string;
     newOwnerEmail: string;
     transferredAt: string;
+  };
+  // Set on a NEW car document created by carTransfer.ts's transferCar -
+  // mirrors bike.ts's own field exactly. Points back at the old
+  // document under the previous owner's partition; see that file's own
+  // comment on transferredFrom for why a link between two documents,
+  // not an in-place partition change.
+  transferredFrom?: {
+    previousCarId: string;
+    previousOwnerEmail: string;
+    transferredAt: string;
+    summaryAtTransfer: {
+      totalEntries: number;
+      totalSpend: number;
+      documentationVerdictLabel: string;
+      mileageAtTransfer: number;
+    };
   };
 }
 
@@ -411,4 +423,31 @@ export async function queryCarTrackerDocs<TDoc extends TrackerDocBase & { carId:
     )
     .fetchAll();
   return resources.map(stripCosmosMetadata);
+}
+
+// The car equivalent of copyTrackerDoc (cosmosHelpers.ts) - not reused
+// directly for the same reason queryCarTrackerDocs above isn't:
+// copyTrackerDoc hardcodes a `bikeId` field onto the copy, which would
+// silently leave a car record's real `carId` untouched (still pointing
+// at the OLD car) while adding a meaningless `bikeId` field alongside
+// it - the new car would never actually see these records. Used by
+// carTransfer.ts when includeRecords is true.
+export async function copyCarTrackerDoc<TDoc extends TrackerDocBase & { carId: string }>(
+  original: TDoc,
+  idPrefix: string,
+  toEmail: string,
+  newCarId: string,
+  overrides?: Partial<TDoc>
+): Promise<TDoc> {
+  const container = getContainer();
+  const copy = {
+    ...original,
+    id: `${toEmail}::${idPrefix}::${Date.now()}::${Math.random().toString(36).slice(2, 8)}`,
+    pk: toEmail,
+    carId: newCarId,
+    createdAt: new Date().toISOString(),
+    ...overrides,
+  } as TDoc;
+  await container.items.upsert(copy);
+  return copy;
 }

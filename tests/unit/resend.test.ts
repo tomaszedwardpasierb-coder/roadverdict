@@ -282,3 +282,71 @@ describe("sendOwnershipRequestDeclinedEmail", () => {
     expect(call.subject).toBe("Your request for the 2021 Honda CB500F's history wasn't approved");
   });
 });
+
+// Car mirrors of the five bike-transfer email tests above.
+const carSummary = { make: "Ford", model: "Focus", year: 2021, isCustomBuild: false };
+
+describe("sendCarTransferOfferEmail", () => {
+  it("addresses the recipient, names the owner, and links to the offer with the token", async () => {
+    const { sendCarTransferOfferEmail } = await import("@/lib/resend");
+    await sendCarTransferOfferEmail({
+      recipientEmail: "buyer@example.com",
+      ownerEmail: "seller@example.com",
+      carSummary,
+      token: "tok-abc",
+    });
+    const call = mocks.send.mock.calls[0][0];
+    expect(call.to).toBe("buyer@example.com");
+    expect(call.subject).toBe("seller@example.com wants to hand you the RoadVerdict record for a 2021 Ford Focus");
+    expect(call.html).toContain("https://roadverdict.co.uk/car-transfer/tok-abc");
+  });
+});
+
+describe("sendCarTransferAcceptedEmail", () => {
+  it("notifies the owner naming the recipient who accepted", async () => {
+    const { sendCarTransferAcceptedEmail } = await import("@/lib/resend");
+    await sendCarTransferAcceptedEmail({
+      ownerEmail: "seller@example.com",
+      recipientEmail: "buyer@example.com",
+      carSummary,
+    });
+    const call = mocks.send.mock.calls[0][0];
+    expect(call.to).toBe("seller@example.com");
+    expect(call.subject).toBe("buyer@example.com accepted the handover for your 2021 Ford Focus");
+  });
+});
+
+describe("sendIncomingCarOwnershipRequestEmail", () => {
+  it("names the requester and links to the dashboard", async () => {
+    const { sendIncomingCarOwnershipRequestEmail } = await import("@/lib/resend");
+    await sendIncomingCarOwnershipRequestEmail({
+      ownerEmail: "seller@example.com",
+      requesterEmail: "buyer@example.com",
+      carSummary,
+    });
+    const call = mocks.send.mock.calls[0][0];
+    expect(call.to).toBe("seller@example.com");
+    expect(call.subject).toBe("buyer@example.com is requesting your 2021 Ford Focus's RoadVerdict history");
+    expect(call.html).toContain("https://roadverdict.co.uk/dashboard");
+  });
+});
+
+describe("sendCarOwnershipRequestApprovedEmail", () => {
+  it("notifies the requester of approval", async () => {
+    const { sendCarOwnershipRequestApprovedEmail } = await import("@/lib/resend");
+    await sendCarOwnershipRequestApprovedEmail({ requesterEmail: "buyer@example.com", carSummary });
+    const call = mocks.send.mock.calls[0][0];
+    expect(call.to).toBe("buyer@example.com");
+    expect(call.subject).toBe("Your request for the 2021 Ford Focus's history was approved");
+  });
+});
+
+describe("sendCarOwnershipRequestDeclinedEmail", () => {
+  it("notifies the requester of decline", async () => {
+    const { sendCarOwnershipRequestDeclinedEmail } = await import("@/lib/resend");
+    await sendCarOwnershipRequestDeclinedEmail({ requesterEmail: "buyer@example.com", carSummary });
+    const call = mocks.send.mock.calls[0][0];
+    expect(call.to).toBe("buyer@example.com");
+    expect(call.subject).toBe("Your request for the 2021 Ford Focus's history wasn't approved");
+  });
+});
