@@ -1,16 +1,21 @@
 // Place at: src/app/api/tracker/bike/refresh-data/route.ts
 //
 // Self-serve version of what today has otherwise needed a console fetch
-// or admin impersonation to do: re-run the DVLA vehicle-data fetch and
-// MOT import for a bike that already exists. Needed because both of
-// those only ever ran automatically once, at bike-creation time - any
-// bike added before either feature existed (or before its own plate was
-// correctly on record) never gets a second chance without this.
+// or admin impersonation to do: re-run the DVLA vehicle-data fetch, MOT
+// import, and tax/SORN check for a bike that already exists. Needed
+// because all three only ever ran automatically once, at bike-creation
+// time - any bike added before a feature existed (or before its own
+// plate was correctly on record) never gets a second chance without this.
+// The tax/SORN check also matters on an ongoing basis, not just once -
+// see reminder.ts's syncSornReminder for how a SORN'd vehicle's
+// permanent reminder gets created and, eventually, cleared.
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/session";
 import { getBike, getCurrentRegistration, updateBikeDvlaData, isBikeReadOnly, BIKE_READ_ONLY_MESSAGE } from "@/lib/tracker/bike";
 import { fetchDvlaDataFromVdg } from "@/lib/tracker/dvlaDataFetch";
 import { importMotHistoryForBike } from "@/lib/tracker/motHistoryImport";
+import { fetchVehicleTaxDetailsFromVdg } from "@/lib/tracker/vehicleTaxFetch";
+import { syncSornReminder } from "@/lib/tracker/reminder";
 import { logImpersonationActivityForCurrentRequest } from "@/lib/admin/impersonation";
 
 export const dynamic = "force-dynamic";
@@ -75,8 +80,20 @@ export async function POST(request: NextRequest) {
     console.error("MOT refresh failed:", err);
   }
 
+  let sorned = false;
+  try {
+    const apiKey = process.env.VDG_API_KEY;
+    if (apiKey) {
+      const taxDetails = await fetchVehicleTaxDetailsFromVdg(registration, apiKey);
+      await syncSornReminder(session.email, bike.id, taxDetails?.taxStatus ?? null);
+      sorned = taxDetails?.taxStatus?.trim().toUpperCase() === "SORN";
+    }
+  } catch (err) {
+    console.error("Tax/SORN check failed during refresh:", err);
+  }
+
   if (dvlaRefreshed || motCreated > 0) {
     void logImpersonationActivityForCurrentRequest("bike", bike.id, "update");
   }
-  return NextResponse.json({ ok: true, dvlaRefreshed, motCreated, motSkipped });
+  return NextResponse.json({ ok: true, dvlaRefreshed, motCreated, motSkipped, sorned });
 }

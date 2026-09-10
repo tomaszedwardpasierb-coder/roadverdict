@@ -1,8 +1,6 @@
-// Place at: tests/components/RefreshVehicleDataButton.test.tsx
-//
-// DVLA/MOT refresh trigger. Covers the real message-assembly branching
-// (which parts get joined, singular vs plural "test(s)") rather than
-// just checking a static success string.
+// Place at: tests/components/RefreshCarDataButton.test.tsx
+// Car equivalent of RefreshVehicleDataButton.test.tsx - same coverage,
+// posting carId to the car refresh-data route.
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -10,9 +8,9 @@ import userEvent from "@testing-library/user-event";
 const refresh = vi.fn();
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh }) }));
 
-import { RefreshVehicleDataButton } from "@/app/dashboard/RefreshVehicleDataButton";
+import { RefreshCarDataButton } from "@/app/dashboard/RefreshCarDataButton";
 
-describe("RefreshVehicleDataButton", () => {
+describe("RefreshCarDataButton", () => {
   beforeEach(() => {
     vi.stubGlobal("fetch", vi.fn());
     refresh.mockClear();
@@ -28,13 +26,13 @@ describe("RefreshVehicleDataButton", () => {
       json: async () => ({ dvlaRefreshed: true, motCreated: 2 }),
     });
     const user = userEvent.setup();
-    render(<RefreshVehicleDataButton bikeId="bike-1" />);
+    render(<RefreshCarDataButton carId="car-1" />);
     await user.click(screen.getByRole("button", { name: "Refresh vehicle data" }));
 
     expect(await screen.findByText("vehicle data updated, 2 new MOT tests logged.")).toBeInTheDocument();
     expect(fetch).toHaveBeenCalledWith(
-      "/api/tracker/bike/refresh-data",
-      expect.objectContaining({ method: "POST", body: JSON.stringify({ bikeId: "bike-1" }) })
+      "/api/cars/car/refresh-data",
+      expect.objectContaining({ method: "POST", body: JSON.stringify({ carId: "car-1" }) })
     );
     expect(refresh).toHaveBeenCalled();
   });
@@ -45,19 +43,19 @@ describe("RefreshVehicleDataButton", () => {
       json: async () => ({ dvlaRefreshed: false, motCreated: 1 }),
     });
     const user = userEvent.setup();
-    render(<RefreshVehicleDataButton bikeId="bike-1" />);
+    render(<RefreshCarDataButton carId="car-1" />);
     await user.click(screen.getByRole("button", { name: "Refresh vehicle data" }));
 
     expect(await screen.findByText("1 new MOT test logged.")).toBeInTheDocument();
   });
 
-  it("says nothing new when neither part changed", async () => {
+  it("says nothing new when nothing changed", async () => {
     (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
       ok: true,
       json: async () => ({ dvlaRefreshed: false, motCreated: 0 }),
     });
     const user = userEvent.setup();
-    render(<RefreshVehicleDataButton bikeId="bike-1" />);
+    render(<RefreshCarDataButton carId="car-1" />);
     await user.click(screen.getByRole("button", { name: "Refresh vehicle data" }));
 
     expect(await screen.findByText("Checked - nothing new to add.")).toBeInTheDocument();
@@ -69,16 +67,16 @@ describe("RefreshVehicleDataButton", () => {
       json: async () => ({ dvlaRefreshed: false, motCreated: 0, sorned: true }),
     });
     const user = userEvent.setup();
-    render(<RefreshVehicleDataButton bikeId="bike-1" />);
+    render(<RefreshCarDataButton carId="car-1" />);
     await user.click(screen.getByRole("button", { name: "Refresh vehicle data" }));
 
-    expect(await screen.findByText("⚠️ this vehicle is currently SORN (not taxed) - see reminders below.")).toBeInTheDocument();
+    expect(await screen.findByText("⚠️ this car is currently SORN (not taxed) - see reminders below.")).toBeInTheDocument();
   });
 
   it("shows the server's own error and does not refresh the page", async () => {
     (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({ ok: false, json: async () => ({ error: "DVLA lookup failed." }) });
     const user = userEvent.setup();
-    render(<RefreshVehicleDataButton bikeId="bike-1" />);
+    render(<RefreshCarDataButton carId="car-1" />);
     await user.click(screen.getByRole("button", { name: "Refresh vehicle data" }));
 
     expect(await screen.findByText("DVLA lookup failed.")).toBeInTheDocument();
@@ -88,7 +86,7 @@ describe("RefreshVehicleDataButton", () => {
   it("shows a connection error when fetch itself throws", async () => {
     (fetch as ReturnType<typeof vi.fn>).mockRejectedValue(new Error("down"));
     const user = userEvent.setup();
-    render(<RefreshVehicleDataButton bikeId="bike-1" />);
+    render(<RefreshCarDataButton carId="car-1" />);
     await user.click(screen.getByRole("button", { name: "Refresh vehicle data" }));
 
     expect(await screen.findByText("Could not reach the server.")).toBeInTheDocument();

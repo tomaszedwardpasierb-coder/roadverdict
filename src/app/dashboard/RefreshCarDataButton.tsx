@@ -1,11 +1,13 @@
-// Place at: src/app/dashboard/RefreshVehicleDataButton.tsx
+// Place at: src/app/dashboard/RefreshCarDataButton.tsx
+// Car equivalent of RefreshVehicleDataButton.tsx - same mechanic, just
+// posts carId to the car refresh-data route.
 'use client';
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import styles from './dashboard.module.css';
 
-export function RefreshVehicleDataButton({ bikeId }: { bikeId: string }) {
+export function RefreshCarDataButton({ carId }: { carId: string }) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<string | null>(null);
@@ -14,10 +16,10 @@ export function RefreshVehicleDataButton({ bikeId }: { bikeId: string }) {
     setLoading(true);
     setResult(null);
     try {
-      const res = await fetch('/api/tracker/bike/refresh-data', {
+      const res = await fetch('/api/cars/car/refresh-data', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ bikeId }),
+        body: JSON.stringify({ carId }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -27,7 +29,7 @@ export function RefreshVehicleDataButton({ bikeId }: { bikeId: string }) {
       const parts: string[] = [];
       if (data.dvlaRefreshed) parts.push('vehicle data updated');
       if (data.motCreated > 0) parts.push(`${data.motCreated} new MOT test${data.motCreated === 1 ? '' : 's'} logged`);
-      if (data.sorned) parts.push('⚠️ this vehicle is currently SORN (not taxed) - see reminders below');
+      if (data.sorned) parts.push('⚠️ this car is currently SORN (not taxed) - see reminders below');
       setResult(parts.length > 0 ? parts.join(', ') + '.' : 'Checked - nothing new to add.');
       router.refresh();
     } catch {

@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { UpdateMileageButton } from './UpdateMileageButton';
 import { RefreshVehicleDataButton } from './RefreshVehicleDataButton';
+import { RefreshCarDataButton } from './RefreshCarDataButton';
 import { VehicleSwitcher, type SwitcherVehicle } from './VehicleSwitcher';
 import LogoutButton from './LogoutButton';
 import { formatDistance, type DistanceUnit } from '@/lib/tracker/unitFormat';
@@ -401,14 +402,13 @@ export function DashboardShell({
           <div style={{ marginTop: '0.6rem' }}>
             <UpdateMileageButton currentMileage={currentMileage} distanceUnit={distanceUnit} vehicleKind={vehicleKind} />
           </div>
-          {/* No car equivalent yet (DVLA refresh + MOT import are both
-              bike-only routes today) - hidden rather than wired to an
-              endpoint that would 404 for a car. */}
-          {vehicleKind === 'bike' && (
-            <div style={{ marginTop: '0.6rem' }}>
+          <div style={{ marginTop: '0.6rem' }}>
+            {vehicleKind === 'bike' ? (
               <RefreshVehicleDataButton bikeId={activeVehicleId} />
-            </div>
-          )}
+            ) : (
+              <RefreshCarDataButton carId={activeVehicleId} />
+            )}
+          </div>
 
           <div className={styles.sidebarUserFooter}>
             {hasAvatar ? (

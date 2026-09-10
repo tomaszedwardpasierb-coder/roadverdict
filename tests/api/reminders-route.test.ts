@@ -96,6 +96,19 @@ describe("POST /api/tracker/reminders", () => {
     expect(mocks.getPrimaryBike).not.toHaveBeenCalled();
   });
 
+  it("rejects an attempt to create a permanent reminder directly - that's a system-only kind", async () => {
+    mocks.getSession.mockResolvedValue({ email: "owner@example.com" });
+
+    const response = await POST(request(JSON.stringify({
+      name: "Fake SORN reminder", intervalType: "permanent", date: "2025-01-01",
+    })));
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({ error: "This reminder type can't be created manually." });
+    expect(mocks.getPrimaryBike).not.toHaveBeenCalled();
+    expect(mocks.createReminder).not.toHaveBeenCalled();
+  });
+
   it("returns not found when the account has no bike yet", async () => {
     mocks.getSession.mockResolvedValue({ email: "owner@example.com" });
     mocks.getPrimaryBike.mockResolvedValue(null);

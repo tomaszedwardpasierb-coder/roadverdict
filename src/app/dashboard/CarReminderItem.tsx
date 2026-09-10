@@ -20,6 +20,9 @@ const STATUS_LABEL: Record<Props['status'], string> = {
 
 export function CarReminderItem({ reminder, status, isPro = false }: Props) {
   const { submit, submitting } = useTrackerFormSubmit(`/api/cars/car-reminders/${reminder.id}`);
+  // A permanent (SORN) reminder can't be dismissed by hand - see
+  // ReminderItem.tsx's own comment on why.
+  const isPermanent = reminder.intervalType === 'permanent';
 
   async function handleDone() {
     // A pure date-type reminder has no interval to roll forward - "mark
@@ -47,12 +50,14 @@ export function CarReminderItem({ reminder, status, isPro = false }: Props) {
         </span>
       </div>
       <div style={{ fontSize: '0.85rem', color: 'var(--ink-soft)', marginTop: '0.2rem' }}>
-        {isPro ? carReminderDetailLabel(reminder) : '🔒 Upgrade to Pro to see the exact due date/mileage'}
+        {isPermanent || isPro ? carReminderDetailLabel(reminder) : '🔒 Upgrade to Pro to see the exact due date/mileage'}
       </div>
-      <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.6rem' }}>
-        <button type="button" className="btn-primary" onClick={handleDone} disabled={submitting}>Mark done</button>
-        <button type="button" className={styles.iconBtn} onClick={handleDelete} disabled={submitting}>Delete</button>
-      </div>
+      {!isPermanent && (
+        <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.6rem' }}>
+          <button type="button" className="btn-primary" onClick={handleDone} disabled={submitting}>Mark done</button>
+          <button type="button" className={styles.iconBtn} onClick={handleDelete} disabled={submitting}>Delete</button>
+        </div>
+      )}
     </div>
   );
 }

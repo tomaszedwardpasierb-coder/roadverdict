@@ -23,6 +23,8 @@ import { getBikesForUser, countActiveBikes, type ChartKind } from "@/lib/tracker
 import { isPro } from "@/lib/subscriptions";
 import { MAX_FREE_VEHICLES } from "@/lib/tracker/vehicleLimit";
 import { fetchDvlaDataFromVdg } from "@/lib/tracker/dvlaDataFetch";
+import { fetchVehicleTaxDetailsFromVdg } from "@/lib/tracker/vehicleTaxFetch";
+import { syncCarSornReminder } from "@/lib/tracker/carReminder";
 import { logImpersonationActivityForCurrentRequest } from "@/lib/admin/impersonation";
 import type { Region } from "@/lib/priceData";
 import type { DistanceUnit, FuelEconomyUnit } from "@/lib/tracker/unitFormat";
@@ -122,6 +124,20 @@ export async function POST(request: NextRequest) {
     }
   } catch (err) {
     console.error("DVLA data fetch failed during car creation:", err);
+  }
+
+  // Same best-effort, non-blocking treatment as the DVLA fetch above -
+  // see the equivalent block in bike creation for why this is its own
+  // try/catch and why it runs at creation time rather than waiting for
+  // the first "Refresh vehicle data" click.
+  try {
+    const apiKey = process.env.VDG_API_KEY;
+    if (apiKey) {
+      const taxDetails = await fetchVehicleTaxDetailsFromVdg(car.originalRegistration ?? "", apiKey);
+      await syncCarSornReminder(session.email, car.id, taxDetails?.taxStatus ?? null);
+    }
+  } catch (err) {
+    console.error("Tax/SORN check failed during car creation:", err);
   }
 
   void logImpersonationActivityForCurrentRequest("car", car.id, "create");

@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   isBikeReadOnly: vi.fn(),
   updateReminder: vi.fn(),
   deleteReminder: vi.fn(),
+  getReminderById: vi.fn(),
   logImpersonationActivityForCurrentRequest: vi.fn(),
 }));
 
@@ -16,7 +17,11 @@ vi.mock("@/lib/tracker/bike", () => ({
   isBikeReadOnly: mocks.isBikeReadOnly,
   BIKE_READ_ONLY_MESSAGE: "This bike has been transferred and is now read-only.",
 }));
-vi.mock("@/lib/tracker/reminder", () => ({ updateReminder: mocks.updateReminder, deleteReminder: mocks.deleteReminder }));
+vi.mock("@/lib/tracker/reminder", () => ({
+  updateReminder: mocks.updateReminder,
+  deleteReminder: mocks.deleteReminder,
+  getReminderById: mocks.getReminderById,
+}));
 vi.mock("@/lib/admin/impersonation", () => ({
   logImpersonationActivityForCurrentRequest: mocks.logImpersonationActivityForCurrentRequest,
 }));
@@ -35,6 +40,7 @@ describe("PATCH /api/tracker/reminders/[id] (mark done)", () => {
     mocks.getPrimaryBike.mockResolvedValue({ id: "bike-1", currentMileage: 8000 });
     mocks.isBikeReadOnly.mockReturnValue(false);
     mocks.updateReminder.mockResolvedValue({ id: ownId });
+    mocks.getReminderById.mockResolvedValue({ id: ownId, intervalType: "months" });
   });
 
   it("rejects unauthenticated requests", async () => {
@@ -80,6 +86,14 @@ describe("PATCH /api/tracker/reminders/[id] (mark done)", () => {
     const response = await PATCH(request(), { params: Promise.resolve({ id: ownId }) });
     expect(response.status).toBe(404);
   });
+
+  it("refuses to mark a permanent (SORN) reminder done, without ever calling updateReminder", async () => {
+    mocks.getSession.mockResolvedValue({ email: "owner@example.com" });
+    mocks.getReminderById.mockResolvedValue({ id: ownId, intervalType: "permanent" });
+    const response = await PATCH(request(), { params: Promise.resolve({ id: ownId }) });
+    expect(response.status).toBe(403);
+    expect(mocks.updateReminder).not.toHaveBeenCalled();
+  });
 });
 
 describe("DELETE /api/tracker/reminders/[id]", () => {
@@ -87,6 +101,7 @@ describe("DELETE /api/tracker/reminders/[id]", () => {
     Object.values(mocks).forEach((mock) => mock.mockReset());
     mocks.getPrimaryBike.mockResolvedValue({ id: "bike-1" });
     mocks.isBikeReadOnly.mockReturnValue(false);
+    mocks.getReminderById.mockResolvedValue({ id: ownId, intervalType: "months" });
   });
 
   it("rejects unauthenticated requests", async () => {
@@ -115,5 +130,13 @@ describe("DELETE /api/tracker/reminders/[id]", () => {
     expect(response.status).toBe(200);
     expect(mocks.deleteReminder).toHaveBeenCalledWith("owner@example.com", ownId);
     expect(mocks.logImpersonationActivityForCurrentRequest).toHaveBeenCalledWith("reminder", ownId, "delete");
+  });
+
+  it("refuses to delete a permanent (SORN) reminder, without ever calling deleteReminder", async () => {
+    mocks.getSession.mockResolvedValue({ email: "owner@example.com" });
+    mocks.getReminderById.mockResolvedValue({ id: ownId, intervalType: "permanent" });
+    const response = await DELETE(request(), { params: Promise.resolve({ id: ownId }) });
+    expect(response.status).toBe(403);
+    expect(mocks.deleteReminder).not.toHaveBeenCalled();
   });
 });

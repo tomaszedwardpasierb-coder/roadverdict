@@ -5,7 +5,7 @@
 // It deliberately ignores the request body entirely.
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/session";
-import { updateCarReminder, deleteCarReminder } from "@/lib/tracker/carReminder";
+import { updateCarReminder, deleteCarReminder, getCarReminderById } from "@/lib/tracker/carReminder";
 import { getPrimaryCar, isCarReadOnly, CAR_READ_ONLY_MESSAGE } from "@/lib/tracker/car";
 import { logImpersonationActivityForCurrentRequest } from "@/lib/admin/impersonation";
 
@@ -26,6 +26,14 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
   const car = await getPrimaryCar(session.email);
   if (car && isCarReadOnly(car)) {
     return NextResponse.json({ error: CAR_READ_ONLY_MESSAGE }, { status: 403 });
+  }
+
+  const existing = await getCarReminderById(session.email, id);
+  if (existing?.intervalType === "permanent") {
+    return NextResponse.json(
+      { error: "This reminder clears automatically once the vehicle is confirmed taxed again - it can't be marked done manually." },
+      { status: 403 }
+    );
   }
 
   const reminder = await updateCarReminder(session.email, id, {
@@ -55,6 +63,14 @@ export async function DELETE(request: NextRequest, props: { params: Promise<{ id
   const car = await getPrimaryCar(session.email);
   if (car && isCarReadOnly(car)) {
     return NextResponse.json({ error: CAR_READ_ONLY_MESSAGE }, { status: 403 });
+  }
+
+  const existing = await getCarReminderById(session.email, id);
+  if (existing?.intervalType === "permanent") {
+    return NextResponse.json(
+      { error: "This reminder clears automatically once the vehicle is confirmed taxed again - it can't be deleted manually." },
+      { status: 403 }
+    );
   }
 
   await deleteCarReminder(session.email, id);

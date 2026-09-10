@@ -14,8 +14,12 @@ import { getContainer } from "@/lib/cosmos";
 import { createTrackerDoc, updateTrackerDoc, deleteTrackerDoc, type TrackerDocBase } from "./cosmosHelpers";
 import { queryCarTrackerDocs } from "./car";
 
+// Mirrors reminder.ts's own ReminderIntervalType - see its comment for
+// why "permanent" exists and is only ever used for the DVLA tax/SORN check.
+export type CarReminderIntervalType = "mileage" | "months" | "date" | "permanent";
+
 export interface CarReminderTrigger {
-  intervalType: "mileage" | "months" | "date";
+  intervalType: CarReminderIntervalType;
   intervalValue?: number;
   exactDate?: string;
 }
@@ -24,7 +28,7 @@ export interface CarReminderDoc extends TrackerDocBase {
   type: "carReminder";
   carId: string;
   name: string;
-  intervalType: "mileage" | "months" | "date";
+  intervalType: CarReminderIntervalType;
   intervalValue?: number;
   baseMileage?: number;
   exactDate?: string;
@@ -38,7 +42,7 @@ export async function createCarReminder(
   data: {
     carId: string;
     name: string;
-    intervalType: "mileage" | "months" | "date";
+    intervalType: CarReminderIntervalType;
     intervalValue?: number;
     baseMileage?: number;
     exactDate?: string;
@@ -52,6 +56,13 @@ export async function createCarReminder(
 
 export async function getCarReminders(email: string, carId: string): Promise<CarReminderDoc[]> {
   return queryCarTrackerDocs<CarReminderDoc>(email, "carReminder", carId);
+}
+
+// Point-read by id - see reminder.ts's getReminderById for why.
+export async function getCarReminderById(email: string, id: string): Promise<CarReminderDoc | null> {
+  const container = getContainer();
+  const { resource } = await container.item(id, email).read<CarReminderDoc>();
+  return resource ?? null;
 }
 
 export async function updateCarReminder(
@@ -91,4 +102,27 @@ export async function markCarReminderNotified(email: string, id: string): Promis
   if (!resource) return;
   resource.notifiedAt = new Date().toISOString();
   await container.items.upsert(resource);
+}
+
+// Mirrors reminder.ts's syncSornReminder exactly - see its own comment.
+export const CAR_SORN_REMINDER_SOURCE_KEY = "vdg-tax-status";
+export const CAR_SORN_REMINDER_NAME = "Vehicle is SORN (not taxed)";
+
+export async function syncCarSornReminder(email: string, carId: string, taxStatus: string | null): Promise<void> {
+  const isSorn = taxStatus?.trim().toUpperCase() === "SORN";
+  const existing = await getCarReminders(email, carId);
+  const current = existing.find((r) => r.sourceKey === CAR_SORN_REMINDER_SOURCE_KEY);
+  if (isSorn) {
+    if (!current) {
+      await createCarReminder(email, {
+        carId,
+        name: CAR_SORN_REMINDER_NAME,
+        intervalType: "permanent",
+        date: new Date().toISOString().slice(0, 10),
+        sourceKey: CAR_SORN_REMINDER_SOURCE_KEY,
+      });
+    }
+  } else if (current) {
+    await deleteCarRemindersBySourceKey(email, carId, CAR_SORN_REMINDER_SOURCE_KEY);
+  }
 }

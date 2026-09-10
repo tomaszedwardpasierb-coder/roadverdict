@@ -19,6 +19,8 @@ const mocks = vi.hoisted(() => ({
   updateBikeDvlaData: vi.fn(),
   isBikeReadOnly: vi.fn(),
   fetchDvlaDataFromVdg: vi.fn(),
+  fetchVehicleTaxDetailsFromVdg: vi.fn(),
+  syncSornReminder: vi.fn(),
   logImpersonationActivityForCurrentRequest: vi.fn(),
 }));
 
@@ -52,6 +54,8 @@ vi.mock("@/lib/tracker/car", async () => {
 });
 vi.mock("@/lib/subscriptions", () => ({ isPro: mocks.isPro }));
 vi.mock("@/lib/tracker/dvlaDataFetch", () => ({ fetchDvlaDataFromVdg: mocks.fetchDvlaDataFromVdg }));
+vi.mock("@/lib/tracker/vehicleTaxFetch", () => ({ fetchVehicleTaxDetailsFromVdg: mocks.fetchVehicleTaxDetailsFromVdg }));
+vi.mock("@/lib/tracker/reminder", () => ({ syncSornReminder: mocks.syncSornReminder }));
 // getBikeClassForCC (from @/lib/motorcycleModels) is deliberately NOT mocked -
 // it's a pure threshold function, so the tests exercise the real logic
 // rather than a stand-in for it.
@@ -82,6 +86,9 @@ describe("POST /api/tracker/bike", () => {
     Object.values(mocks).forEach((m) => m.mockReset());
     mocks.createBike.mockResolvedValue({ ok: true, bike: { id: "bike-1", originalRegistration: "AB12CDE" } });
     mocks.fetchDvlaDataFromVdg.mockResolvedValue(null);
+    mocks.fetchVehicleTaxDetailsFromVdg.mockResolvedValue(null);
+    mocks.syncSornReminder.mockResolvedValue(undefined);
+    process.env.VDG_API_KEY = "test-key";
     // Combined cap pre-check defaults: an account with nothing else
     // tracked and no Pro subscription never trips the new outer guard,
     // so every existing test below (written before that guard existed)
@@ -240,6 +247,42 @@ describe("POST /api/tracker/bike", () => {
   it("still returns the created bike when the DVLA lookup throws", async () => {
     mocks.getSession.mockResolvedValue({ email: "owner@example.com" });
     mocks.fetchDvlaDataFromVdg.mockRejectedValue(new Error("DVLA API unavailable"));
+
+    const response = await POST(request("POST", JSON.stringify(validCreatePayload)));
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ bike: { id: "bike-1", originalRegistration: "AB12CDE" } });
+  });
+
+  // Tax/SORN check - runs alongside the DVLA fetch, at creation time, so
+  // a SORN'd bike gets its permanent reminder immediately rather than
+  // only being discovered on the first "Refresh vehicle data" click.
+  it("checks tax/SORN status and syncs the reminder using the newly created bike's registration", async () => {
+    mocks.getSession.mockResolvedValue({ email: "owner@example.com" });
+    mocks.fetchVehicleTaxDetailsFromVdg.mockResolvedValue({ taxStatus: "SORN" });
+
+    await POST(request("POST", JSON.stringify(validCreatePayload)));
+
+    expect(mocks.fetchVehicleTaxDetailsFromVdg).toHaveBeenCalledWith("AB12CDE", "test-key");
+    expect(mocks.syncSornReminder).toHaveBeenCalledWith("owner@example.com", "bike-1", "SORN");
+  });
+
+  it("skips the tax/SORN check entirely when VDG_API_KEY isn't configured", async () => {
+    mocks.getSession.mockResolvedValue({ email: "owner@example.com" });
+    delete process.env.VDG_API_KEY;
+
+    const response = await POST(request("POST", JSON.stringify(validCreatePayload)));
+
+    expect(response.status).toBe(200);
+    expect(mocks.fetchVehicleTaxDetailsFromVdg).not.toHaveBeenCalled();
+    expect(mocks.syncSornReminder).not.toHaveBeenCalled();
+  });
+
+  // Same non-blocking guarantee as the DVLA fetch above, in its own
+  // try/catch - a tax-check failure must never fail bike creation.
+  it("still returns the created bike when the tax/SORN check throws", async () => {
+    mocks.getSession.mockResolvedValue({ email: "owner@example.com" });
+    mocks.fetchVehicleTaxDetailsFromVdg.mockRejectedValue(new Error("VDG unavailable"));
 
     const response = await POST(request("POST", JSON.stringify(validCreatePayload)));
 

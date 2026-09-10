@@ -60,4 +60,16 @@ describe("CarReminderItem", () => {
     await user.click(screen.getByRole("button", { name: "Delete" }));
     expect(fetch).toHaveBeenCalledWith("/api/cars/car-reminders/car-1::carReminder::1", expect.objectContaining({ method: "DELETE" }));
   });
+
+  // A permanent (SORN) reminder can only ever be cleared by the system -
+  // see ReminderItem.test.tsx's own equivalent test for why.
+  it("hides both Mark done and Delete for a permanent reminder, and shows the explanatory detail regardless of Pro status", () => {
+    const permanentReminder = { ...mileageReminder, intervalType: "permanent" as const, intervalValue: undefined, baseMileage: undefined };
+    render(<CarReminderItem reminder={permanentReminder} status="overdue" isPro={false} />);
+
+    expect(screen.queryByRole("button", { name: "Mark done" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Delete" })).not.toBeInTheDocument();
+    expect(screen.getByText("Clears automatically once the vehicle is confirmed taxed again")).toBeInTheDocument();
+    expect(screen.queryByText(/Upgrade to Pro/)).not.toBeInTheDocument();
+  });
 });

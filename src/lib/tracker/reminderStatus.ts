@@ -15,6 +15,10 @@ export function monthsBetween(d1: Date, d2: Date): number {
 }
 
 function triggerStatus(t: ReminderTrigger, r: ReminderDoc, currentMileage: number): "ok" | "due-soon" | "overdue" {
+  // A permanent reminder never resolves via date/mileage math - it's
+  // always the most urgent state, since (today, the only use of this)
+  // a SORN'd vehicle is unlawful to drive right now, not "due soon".
+  if (t.intervalType === "permanent") return "overdue";
   if (t.intervalType === "date" && t.exactDate) {
     const daysRemaining = (new Date(t.exactDate).getTime() - Date.now()) / 86400000;
     if (daysRemaining <= 0) return "overdue";
@@ -70,6 +74,13 @@ function triggerDetail(t: ReminderTrigger, r: ReminderDoc): string {
 // every existing reminder displays exactly as it always has. Multiple
 // triggers join with "or" and an explicit "whichever comes first".
 export function reminderDetailLabel(r: ReminderDoc): string {
+  // A permanent reminder has no due point to describe at all - explain
+  // what actually clears it instead. Always shown regardless of Pro
+  // status (see ReminderItem.tsx) - this isn't the kind of "exact due
+  // date/mileage" detail the Premium paywall is for.
+  if (r.intervalType === "permanent") {
+    return "Clears automatically once the vehicle is confirmed taxed again";
+  }
   const primary: ReminderTrigger = { intervalType: r.intervalType, intervalValue: r.intervalValue, exactDate: r.exactDate };
   const all = [primary, ...(r.additionalTriggers ?? [])];
   const details = all.map((t) => triggerDetail(t, r)).filter(Boolean);

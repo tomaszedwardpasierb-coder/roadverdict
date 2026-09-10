@@ -9,6 +9,7 @@
 import type { CarReminderDoc, CarReminderTrigger } from "./carReminder";
 
 function triggerStatus(t: CarReminderTrigger, r: CarReminderDoc, currentMileage: number): "ok" | "due-soon" | "overdue" {
+  if (t.intervalType === "permanent") return "overdue";
   if (t.intervalType === "date" && t.exactDate) {
     const daysRemaining = (new Date(t.exactDate).getTime() - Date.now()) / 86400000;
     if (daysRemaining <= 0) return "overdue";
@@ -57,6 +58,9 @@ function triggerDetail(t: CarReminderTrigger, r: CarReminderDoc): string {
 }
 
 export function carReminderDetailLabel(r: CarReminderDoc): string {
+  if (r.intervalType === "permanent") {
+    return "Clears automatically once the vehicle is confirmed taxed again";
+  }
   const primary: CarReminderTrigger = { intervalType: r.intervalType, intervalValue: r.intervalValue, exactDate: r.exactDate };
   const all = [primary, ...(r.additionalTriggers ?? [])];
   const details = all.map((t) => triggerDetail(t, r)).filter(Boolean);

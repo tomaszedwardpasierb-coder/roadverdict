@@ -23,6 +23,12 @@ export function ReminderItem({
 }) {
   const { submit, submitting } = useTrackerFormSubmit(`/api/tracker/reminders/${encodeURIComponent(reminder.id)}`);
   const [hidden, setHidden] = useState(false);
+  // A permanent (SORN) reminder can't be dismissed by hand - it only
+  // ever clears when a later DVLA tax check confirms the vehicle is
+  // taxed again (see reminder.ts's syncSornReminder). The API route
+  // rejects a manual PATCH/DELETE for one anyway; hiding the buttons
+  // here just avoids offering an action that would 403.
+  const isPermanent = reminder.intervalType === 'permanent';
 
   const statusLabel = status === 'ok' ? 'OK' : status === 'due-soon' ? 'Due soon' : 'Overdue';
   const statusClass =
@@ -51,7 +57,7 @@ export function ReminderItem({
     <div className={styles.reminderItem}>
       <div>
         <div className={styles.reminderItemName}>{reminder.name}</div>
-        {isPro ? (
+        {isPermanent || isPro ? (
           <div className={styles.reminderItemDetail}>{reminderDetailLabel(reminder)}</div>
         ) : (
           <div className={styles.reminderItemDetailLocked}>
@@ -61,8 +67,12 @@ export function ReminderItem({
       </div>
       <div className={styles.reminderItemActions}>
         <span className={`${styles.reminderStatus} ${statusClass}`}>{statusLabel}</span>
-        <button type="button" className={styles.iconBtn} onClick={handleDone} disabled={submitting}>✓ Done</button>
-        <button type="button" className={styles.iconBtn} onClick={handleDelete} disabled={submitting}>✕</button>
+        {!isPermanent && (
+          <>
+            <button type="button" className={styles.iconBtn} onClick={handleDone} disabled={submitting}>✓ Done</button>
+            <button type="button" className={styles.iconBtn} onClick={handleDelete} disabled={submitting}>✕</button>
+          </>
+        )}
       </div>
     </div>
   );

@@ -33,6 +33,12 @@ export async function POST(request: NextRequest) {
   if (!name || !intervalType || !date) {
     return NextResponse.json({ error: "Please fill in all required fields." }, { status: 400 });
   }
+  // "permanent" is a system-only reminder kind (see carReminder.ts's
+  // syncCarSornReminder) - never something this normal, user-facing
+  // creation route should accept.
+  if ((intervalType as string) === "permanent") {
+    return NextResponse.json({ error: "This reminder type can't be created manually." }, { status: 400 });
+  }
   if (intervalType !== "date" && intervalValue == null) {
     return NextResponse.json({ error: "Please enter an interval." }, { status: 400 });
   }

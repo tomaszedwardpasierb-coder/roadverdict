@@ -26,11 +26,15 @@ vi.mock("@/lib/tracker/car", () => ({ queryCarTrackerDocs: mocks.queryCarTracker
 import {
   createCarReminder,
   getCarReminders,
+  getCarReminderById,
   updateCarReminder,
   deleteCarReminder,
   deleteCarRemindersBySourceKey,
   getAllCarReminders,
   markCarReminderNotified,
+  syncCarSornReminder,
+  CAR_SORN_REMINDER_SOURCE_KEY,
+  CAR_SORN_REMINDER_NAME,
 } from "@/lib/tracker/carReminder";
 
 const email = "driver@example.com";
@@ -107,6 +111,20 @@ describe("getCarReminders", () => {
     mocks.queryCarTrackerDocs.mockResolvedValue([baseReminder]);
     const result = await getCarReminders(email, carId);
     expect(result).toEqual([baseReminder]);
+  });
+});
+
+describe("getCarReminderById", () => {
+  it("reads using item(id, email) and returns the resource", async () => {
+    mocks.read.mockResolvedValue({ resource: baseReminder });
+    const result = await getCarReminderById(email, baseReminder.id);
+    expect(mocks.item).toHaveBeenCalledWith(baseReminder.id, email);
+    expect(result).toEqual(baseReminder);
+  });
+
+  it("returns null when no such reminder exists", async () => {
+    mocks.read.mockResolvedValue({ resource: undefined });
+    expect(await getCarReminderById(email, "missing")).toBeNull();
   });
 });
 
@@ -190,5 +208,48 @@ describe("markCarReminderNotified", () => {
     const ts = new Date(upsertedDoc.notifiedAt).getTime();
     expect(ts).toBeGreaterThanOrEqual(before);
     expect(ts).toBeLessThanOrEqual(after);
+  });
+});
+
+describe("syncCarSornReminder", () => {
+  it("creates a permanent reminder the first time the car is found SORN'd", async () => {
+    mocks.queryCarTrackerDocs.mockResolvedValue([]);
+    await syncCarSornReminder(email, carId, "SORN");
+    expect(mocks.createTrackerDoc).toHaveBeenCalledWith(
+      email, "carReminder", "carReminder",
+      expect.objectContaining({ name: CAR_SORN_REMINDER_NAME, intervalType: "permanent", sourceKey: CAR_SORN_REMINDER_SOURCE_KEY })
+    );
+  });
+
+  it("does not create a second reminder when one already exists and the car is still SORN'd", async () => {
+    mocks.queryCarTrackerDocs.mockResolvedValue([
+      { ...baseReminder, id: "existing-sorn", sourceKey: CAR_SORN_REMINDER_SOURCE_KEY, intervalType: "permanent" },
+    ]);
+    await syncCarSornReminder(email, carId, "SORN");
+    expect(mocks.createTrackerDoc).not.toHaveBeenCalled();
+    expect(mocks.delete).not.toHaveBeenCalled();
+  });
+
+  it("removes the existing SORN reminder once the car is confirmed taxed", async () => {
+    mocks.queryCarTrackerDocs.mockResolvedValue([
+      { ...baseReminder, id: "existing-sorn", sourceKey: CAR_SORN_REMINDER_SOURCE_KEY, intervalType: "permanent" },
+    ]);
+    await syncCarSornReminder(email, carId, "Taxed");
+    expect(mocks.delete).toHaveBeenCalledTimes(1);
+    expect(mocks.createTrackerDoc).not.toHaveBeenCalled();
+  });
+
+  it("does nothing when the car isn't SORN'd and no reminder exists yet", async () => {
+    mocks.queryCarTrackerDocs.mockResolvedValue([]);
+    await syncCarSornReminder(email, carId, "Taxed");
+    expect(mocks.createTrackerDoc).not.toHaveBeenCalled();
+    expect(mocks.delete).not.toHaveBeenCalled();
+  });
+
+  it("does nothing when taxStatus is null and no reminder exists yet", async () => {
+    mocks.queryCarTrackerDocs.mockResolvedValue([]);
+    await syncCarSornReminder(email, carId, null);
+    expect(mocks.createTrackerDoc).not.toHaveBeenCalled();
+    expect(mocks.delete).not.toHaveBeenCalled();
   });
 });

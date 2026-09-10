@@ -23,6 +23,8 @@ import { getCarsForUser, countActiveCars } from "@/lib/tracker/car";
 import { isPro } from "@/lib/subscriptions";
 import { MAX_FREE_VEHICLES } from "@/lib/tracker/vehicleLimit";
 import { fetchDvlaDataFromVdg } from "@/lib/tracker/dvlaDataFetch";
+import { fetchVehicleTaxDetailsFromVdg } from "@/lib/tracker/vehicleTaxFetch";
+import { syncSornReminder } from "@/lib/tracker/reminder";
 import { logImpersonationActivityForCurrentRequest } from "@/lib/admin/impersonation";
 import { getBikeClassForCC } from "@/lib/motorcycleModels";
 import type { Region } from "@/lib/priceData";
@@ -127,6 +129,21 @@ export async function POST(request: NextRequest) {
     }
   } catch (err) {
     console.error("DVLA data fetch failed during bike creation:", err);
+  }
+
+  // Same best-effort, non-blocking treatment as the DVLA fetch above, kept
+  // in its own try/catch so a tax-lookup failure never affects the DVLA
+  // result. A SORN'd vehicle gets a permanent reminder immediately, rather
+  // than only being discovered the first time someone clicks "Refresh
+  // vehicle data" - see reminder.ts's syncSornReminder.
+  try {
+    const apiKey = process.env.VDG_API_KEY;
+    if (apiKey) {
+      const taxDetails = await fetchVehicleTaxDetailsFromVdg(result.bike.originalRegistration ?? "", apiKey);
+      await syncSornReminder(session.email, result.bike.id, taxDetails?.taxStatus ?? null);
+    }
+  } catch (err) {
+    console.error("Tax/SORN check failed during bike creation:", err);
   }
 
   void logImpersonationActivityForCurrentRequest("bike", result.bike.id, "create");

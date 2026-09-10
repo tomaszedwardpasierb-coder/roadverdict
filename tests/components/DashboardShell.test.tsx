@@ -487,10 +487,13 @@ describe("DashboardShell", () => {
       expect(screen.getByRole("button", { name: "Transfer ownership" })).toBeInTheDocument();
     });
 
-    it("labels the switcher card 'My car' and hides the DVLA-refresh button (no car route for it yet)", () => {
+    // RefreshCarDataButton now has its own real route
+    // (/api/cars/car/refresh-data), so a car-active session gets the
+    // refresh button too - it just posts carId instead of bikeId.
+    it("labels the switcher card 'My car' and shows the refresh button, wired to the car route", () => {
       render(<DashboardShell {...carProps()} />);
       expect(screen.getByText("My car")).toBeInTheDocument();
-      expect(screen.queryByRole("button", { name: /Refresh/ })).not.toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Refresh vehicle data" })).toBeInTheDocument();
     });
 
     it("PATCHes /api/cars/car (not /api/tracker/bike) when updating mileage", async () => {

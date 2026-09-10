@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   isCarReadOnly: vi.fn(),
   updateCarReminder: vi.fn(),
   deleteCarReminder: vi.fn(),
+  getCarReminderById: vi.fn(),
   logImpersonationActivityForCurrentRequest: vi.fn(),
 }));
 
@@ -16,7 +17,11 @@ vi.mock("@/lib/tracker/car", () => ({
   isCarReadOnly: mocks.isCarReadOnly,
   CAR_READ_ONLY_MESSAGE: "This car has been transferred and is now read-only.",
 }));
-vi.mock("@/lib/tracker/carReminder", () => ({ updateCarReminder: mocks.updateCarReminder, deleteCarReminder: mocks.deleteCarReminder }));
+vi.mock("@/lib/tracker/carReminder", () => ({
+  updateCarReminder: mocks.updateCarReminder,
+  deleteCarReminder: mocks.deleteCarReminder,
+  getCarReminderById: mocks.getCarReminderById,
+}));
 vi.mock("@/lib/admin/impersonation", () => ({
   logImpersonationActivityForCurrentRequest: mocks.logImpersonationActivityForCurrentRequest,
 }));
@@ -35,6 +40,7 @@ describe("PATCH /api/cars/car-reminders/[id] (mark done)", () => {
     mocks.getPrimaryCar.mockResolvedValue({ id: "car-1", currentMileage: 40000 });
     mocks.isCarReadOnly.mockReturnValue(false);
     mocks.updateCarReminder.mockResolvedValue({ id: ownId });
+    mocks.getCarReminderById.mockResolvedValue({ id: ownId, intervalType: "months" });
   });
 
   it("rejects unauthenticated requests", async () => {
@@ -77,6 +83,14 @@ describe("PATCH /api/cars/car-reminders/[id] (mark done)", () => {
     const response = await PATCH(request(), { params: Promise.resolve({ id: ownId }) });
     expect(response.status).toBe(404);
   });
+
+  it("refuses to mark a permanent (SORN) reminder done, without ever calling updateCarReminder", async () => {
+    mocks.getSession.mockResolvedValue({ email: "owner@example.com" });
+    mocks.getCarReminderById.mockResolvedValue({ id: ownId, intervalType: "permanent" });
+    const response = await PATCH(request(), { params: Promise.resolve({ id: ownId }) });
+    expect(response.status).toBe(403);
+    expect(mocks.updateCarReminder).not.toHaveBeenCalled();
+  });
 });
 
 describe("DELETE /api/cars/car-reminders/[id]", () => {
@@ -84,6 +98,7 @@ describe("DELETE /api/cars/car-reminders/[id]", () => {
     Object.values(mocks).forEach((mock) => mock.mockReset());
     mocks.getPrimaryCar.mockResolvedValue({ id: "car-1" });
     mocks.isCarReadOnly.mockReturnValue(false);
+    mocks.getCarReminderById.mockResolvedValue({ id: ownId, intervalType: "months" });
   });
 
   it("rejects unauthenticated requests", async () => {
@@ -112,5 +127,13 @@ describe("DELETE /api/cars/car-reminders/[id]", () => {
     expect(response.status).toBe(200);
     expect(mocks.deleteCarReminder).toHaveBeenCalledWith("owner@example.com", ownId);
     expect(mocks.logImpersonationActivityForCurrentRequest).toHaveBeenCalledWith("carReminder", ownId, "delete");
+  });
+
+  it("refuses to delete a permanent (SORN) reminder, without ever calling deleteCarReminder", async () => {
+    mocks.getSession.mockResolvedValue({ email: "owner@example.com" });
+    mocks.getCarReminderById.mockResolvedValue({ id: ownId, intervalType: "permanent" });
+    const response = await DELETE(request(), { params: Promise.resolve({ id: ownId }) });
+    expect(response.status).toBe(403);
+    expect(mocks.deleteCarReminder).not.toHaveBeenCalled();
   });
 });

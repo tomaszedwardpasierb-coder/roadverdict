@@ -66,6 +66,14 @@ describe("computeReminderStatus", () => {
     } as any;
     expect(computeReminderStatus(r, 100)).toBe("overdue");
   });
+
+  // A permanent (SORN) reminder never resolves via date/mileage math -
+  // it's always the most urgent state, regardless of current mileage.
+  it("is always overdue for a permanent-type trigger", () => {
+    const r = { intervalType: "permanent", date: "2025-01-01" } as any;
+    expect(computeReminderStatus(r, 999999)).toBe("overdue");
+    expect(computeReminderStatus(r, 0)).toBe("overdue");
+  });
 });
 
 describe("reminderDetailLabel", () => {
@@ -87,5 +95,10 @@ describe("reminderDetailLabel", () => {
       additionalTriggers: [{ intervalType: "date", exactDate: "2026-05-01" }],
     } as any;
     expect(reminderDetailLabel(r)).toBe("due around 5,000 miles (every 1,000 mi), or on 1 May 2026 - whichever comes first");
+  });
+
+  it("explains what clears a permanent-type reminder, rather than a due date/mileage it doesn't have", () => {
+    const r = { intervalType: "permanent", date: "2025-01-01" } as any;
+    expect(reminderDetailLabel(r)).toBe("Clears automatically once the vehicle is confirmed taxed again");
   });
 });

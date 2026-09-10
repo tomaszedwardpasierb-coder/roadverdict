@@ -1,7 +1,7 @@
 ﻿// Place at: src/app/api/tracker/reminders/[id]/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/session";
-import { updateReminder, deleteReminder } from "@/lib/tracker/reminder";
+import { updateReminder, deleteReminder, getReminderById } from "@/lib/tracker/reminder";
 import { getPrimaryBike, isBikeReadOnly, BIKE_READ_ONLY_MESSAGE } from "@/lib/tracker/bike";
 import { logImpersonationActivityForCurrentRequest } from "@/lib/admin/impersonation";
 
@@ -26,6 +26,19 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
   if (bike && isBikeReadOnly(bike)) {
     return NextResponse.json({ error: BIKE_READ_ONLY_MESSAGE }, { status: 403 });
   }
+
+  // A permanent (SORN) reminder only ever clears via a fresh DVLA tax
+  // check confirming the vehicle is taxed again - see
+  // reminder.ts's syncSornReminder. Rejected here too, not just hidden
+  // client-side, since this route is otherwise reachable directly.
+  const existing = await getReminderById(session.email, id);
+  if (existing?.intervalType === "permanent") {
+    return NextResponse.json(
+      { error: "This reminder clears automatically once the vehicle is confirmed taxed again - it can't be marked done manually." },
+      { status: 403 }
+    );
+  }
+
   const reminder = await updateReminder(session.email, id, {
     baseMileage: bike?.currentMileage,
     date: new Date().toISOString().slice(0, 10),
@@ -54,6 +67,14 @@ export async function DELETE(request: NextRequest, props: { params: Promise<{ id
   const bike = await getPrimaryBike(session.email);
   if (bike && isBikeReadOnly(bike)) {
     return NextResponse.json({ error: BIKE_READ_ONLY_MESSAGE }, { status: 403 });
+  }
+
+  const existing = await getReminderById(session.email, id);
+  if (existing?.intervalType === "permanent") {
+    return NextResponse.json(
+      { error: "This reminder clears automatically once the vehicle is confirmed taxed again - it can't be deleted manually." },
+      { status: 403 }
+    );
   }
 
   await deleteReminder(session.email, id);

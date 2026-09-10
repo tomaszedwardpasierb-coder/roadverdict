@@ -104,4 +104,16 @@ describe("ReminderItem", () => {
     expect(fetch).toHaveBeenCalledWith("/api/tracker/reminders/rem-1", expect.objectContaining({ method: "DELETE" }));
     expect(screen.queryByText("Chain lube")).not.toBeInTheDocument();
   });
+
+  // A permanent (SORN) reminder can only ever be cleared by the system
+  // (see reminder.ts's syncSornReminder) - no manual action should be
+  // offered for it at all.
+  it("hides both Done and Delete for a permanent reminder, and shows the explanatory detail regardless of Pro status", () => {
+    render(<ReminderItem reminder={makeReminder({ intervalType: "permanent", intervalValue: undefined, baseMileage: undefined })} status="overdue" isPro={false} />);
+
+    expect(screen.queryByRole("button", { name: "✓ Done" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "✕" })).not.toBeInTheDocument();
+    expect(screen.getByText("Clears automatically once the vehicle is confirmed taxed again")).toBeInTheDocument();
+    expect(screen.queryByText(/Exact due date\/mileage - Premium/)).not.toBeInTheDocument();
+  });
 });

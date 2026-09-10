@@ -1,16 +1,19 @@
+// Place at: tests/api/car-refresh-data-route.test.ts
+// Car equivalent of bike-refresh-data-route.test.ts - same coverage,
+// against CarDoc and the car-specific import/reminder modules.
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 
 const mocks = vi.hoisted(() => ({
   getSession: vi.fn(),
-  getBike: vi.fn(),
+  getCarById: vi.fn(),
   getCurrentRegistration: vi.fn(),
-  updateBikeDvlaData: vi.fn(),
-  isBikeReadOnly: vi.fn(),
+  updateCarDvlaData: vi.fn(),
+  isCarReadOnly: vi.fn(),
   fetchDvlaDataFromVdg: vi.fn(),
-  importMotHistoryForBike: vi.fn(),
+  importMotHistoryForCar: vi.fn(),
   fetchVehicleTaxDetailsFromVdg: vi.fn(),
-  syncSornReminder: vi.fn(),
+  syncCarSornReminder: vi.fn(),
   logImpersonationActivityForCurrentRequest: vi.fn(),
 }));
 
@@ -18,40 +21,40 @@ vi.mock("@/lib/auth/session", () => ({ getSession: mocks.getSession }));
 vi.mock("@/lib/admin/impersonation", () => ({
   logImpersonationActivityForCurrentRequest: mocks.logImpersonationActivityForCurrentRequest,
 }));
-vi.mock("@/lib/tracker/bike", () => ({
-  getBike: mocks.getBike,
+vi.mock("@/lib/tracker/car", () => ({
+  getCarById: mocks.getCarById,
   getCurrentRegistration: mocks.getCurrentRegistration,
-  updateBikeDvlaData: mocks.updateBikeDvlaData,
-  isBikeReadOnly: mocks.isBikeReadOnly,
-  BIKE_READ_ONLY_MESSAGE: "This bike has been transferred and is now read-only.",
+  updateCarDvlaData: mocks.updateCarDvlaData,
+  isCarReadOnly: mocks.isCarReadOnly,
+  CAR_READ_ONLY_MESSAGE: "This car has been transferred and is now read-only.",
 }));
 vi.mock("@/lib/tracker/dvlaDataFetch", () => ({ fetchDvlaDataFromVdg: mocks.fetchDvlaDataFromVdg }));
-vi.mock("@/lib/tracker/motHistoryImport", () => ({ importMotHistoryForBike: mocks.importMotHistoryForBike }));
+vi.mock("@/lib/tracker/carMotHistoryImport", () => ({ importMotHistoryForCar: mocks.importMotHistoryForCar }));
 vi.mock("@/lib/tracker/vehicleTaxFetch", () => ({ fetchVehicleTaxDetailsFromVdg: mocks.fetchVehicleTaxDetailsFromVdg }));
-vi.mock("@/lib/tracker/reminder", () => ({ syncSornReminder: mocks.syncSornReminder }));
+vi.mock("@/lib/tracker/carReminder", () => ({ syncCarSornReminder: mocks.syncCarSornReminder }));
 
-import { POST } from "@/app/api/tracker/bike/refresh-data/route";
+import { POST } from "@/app/api/cars/car/refresh-data/route";
 
 function request(body: string): NextRequest {
-  return new NextRequest("http://localhost/api/tracker/bike/refresh-data", {
+  return new NextRequest("http://localhost/api/cars/car/refresh-data", {
     method: "POST",
     headers: { "content-type": "application/json" },
     body,
   });
 }
 
-const bike = { id: "bike-1", originalRegistration: "AB12 CDE" };
+const car = { id: "car-1", originalRegistration: "AB12 CDE" };
 
-describe("POST /api/tracker/bike/refresh-data", () => {
+describe("POST /api/cars/car/refresh-data", () => {
   beforeEach(() => {
     Object.values(mocks).forEach((m) => m.mockReset());
-    mocks.getBike.mockResolvedValue(bike);
-    mocks.isBikeReadOnly.mockReturnValue(false);
+    mocks.getCarById.mockResolvedValue(car);
+    mocks.isCarReadOnly.mockReturnValue(false);
     mocks.getCurrentRegistration.mockReturnValue("AB12 CDE");
     mocks.fetchDvlaDataFromVdg.mockResolvedValue(null);
-    mocks.importMotHistoryForBike.mockResolvedValue({ createdCount: 0, skippedCount: 0, skipped: [], motDueDate: null, reminderSet: false });
+    mocks.importMotHistoryForCar.mockResolvedValue({ createdCount: 0, skippedCount: 0, skipped: [], motDueDate: null, reminderSet: false });
     mocks.fetchVehicleTaxDetailsFromVdg.mockResolvedValue(null);
-    mocks.syncSornReminder.mockResolvedValue(undefined);
+    mocks.syncCarSornReminder.mockResolvedValue(undefined);
     process.env.VDG_API_KEY = "test-key";
   });
 
@@ -59,7 +62,7 @@ describe("POST /api/tracker/bike/refresh-data", () => {
     mocks.getSession.mockResolvedValue(null);
     const response = await POST(request("{}"));
     expect(response.status).toBe(401);
-    expect(mocks.getBike).not.toHaveBeenCalled();
+    expect(mocks.getCarById).not.toHaveBeenCalled();
   });
 
   it("rejects malformed JSON", async () => {
@@ -68,35 +71,35 @@ describe("POST /api/tracker/bike/refresh-data", () => {
     expect(response.status).toBe(400);
   });
 
-  it("requires a bikeId", async () => {
+  it("requires a carId", async () => {
     mocks.getSession.mockResolvedValue({ email: "owner@example.com" });
     const response = await POST(request(JSON.stringify({})));
     expect(response.status).toBe(400);
-    await expect(response.json()).resolves.toEqual({ error: "bikeId is required." });
+    await expect(response.json()).resolves.toEqual({ error: "carId is required." });
   });
 
-  it("returns 404 when the bike isn't found for this account", async () => {
+  it("returns 404 when the car isn't found for this account", async () => {
     mocks.getSession.mockResolvedValue({ email: "owner@example.com" });
-    mocks.getBike.mockResolvedValue(null);
-    const response = await POST(request(JSON.stringify({ bikeId: "bike-1" })));
+    mocks.getCarById.mockResolvedValue(null);
+    const response = await POST(request(JSON.stringify({ carId: "car-1" })));
     expect(response.status).toBe(404);
   });
 
-  it("blocks refreshing a transferred (read-only) bike", async () => {
+  it("blocks refreshing a transferred (read-only) car", async () => {
     mocks.getSession.mockResolvedValue({ email: "owner@example.com" });
-    mocks.isBikeReadOnly.mockReturnValue(true);
-    const response = await POST(request(JSON.stringify({ bikeId: "bike-1" })));
+    mocks.isCarReadOnly.mockReturnValue(true);
+    const response = await POST(request(JSON.stringify({ carId: "car-1" })));
     expect(response.status).toBe(403);
     expect(mocks.fetchDvlaDataFromVdg).not.toHaveBeenCalled();
   });
 
-  it("refuses a bike with no registration on record", async () => {
+  it("refuses a car with no registration on record", async () => {
     mocks.getSession.mockResolvedValue({ email: "owner@example.com" });
     mocks.getCurrentRegistration.mockReturnValue(undefined);
-    const response = await POST(request(JSON.stringify({ bikeId: "bike-1" })));
+    const response = await POST(request(JSON.stringify({ carId: "car-1" })));
     expect(response.status).toBe(400);
     await expect(response.json()).resolves.toEqual({
-      error: "This bike has no registration on record, so it can't be looked up.",
+      error: "This car has no registration on record, so it can't be looked up.",
     });
   });
 
@@ -105,39 +108,37 @@ describe("POST /api/tracker/bike/refresh-data", () => {
     const dvlaData = { fetchedAt: "2025-01-01T00:00:00.000Z", keeperChangeList: [], plateChangeList: [], v5cIssueDates: [] };
     mocks.fetchDvlaDataFromVdg.mockResolvedValue(dvlaData);
 
-    const response = await POST(request(JSON.stringify({ bikeId: "bike-1" })));
+    const response = await POST(request(JSON.stringify({ carId: "car-1" })));
 
     expect(response.status).toBe(200);
-    expect(mocks.updateBikeDvlaData).toHaveBeenCalledWith("owner@example.com", "bike-1", dvlaData);
+    expect(mocks.updateCarDvlaData).toHaveBeenCalledWith("owner@example.com", "car-1", dvlaData);
     await expect(response.json()).resolves.toMatchObject({ ok: true, dvlaRefreshed: true });
-    expect(mocks.logImpersonationActivityForCurrentRequest).toHaveBeenCalledWith("bike", "bike-1", "update");
+    expect(mocks.logImpersonationActivityForCurrentRequest).toHaveBeenCalledWith("car", "car-1", "update");
   });
 
   it("reports dvlaRefreshed false without saving anything when the lookup finds nothing", async () => {
     mocks.getSession.mockResolvedValue({ email: "owner@example.com" });
     mocks.fetchDvlaDataFromVdg.mockResolvedValue(null);
-    const response = await POST(request(JSON.stringify({ bikeId: "bike-1" })));
-    expect(mocks.updateBikeDvlaData).not.toHaveBeenCalled();
+    const response = await POST(request(JSON.stringify({ carId: "car-1" })));
+    expect(mocks.updateCarDvlaData).not.toHaveBeenCalled();
     await expect(response.json()).resolves.toMatchObject({ dvlaRefreshed: false });
     expect(mocks.logImpersonationActivityForCurrentRequest).not.toHaveBeenCalled();
   });
 
-  // Explicit non-blocking guarantee in the source: a failed DVLA refresh
-  // must not fail the whole request or skip the MOT import that follows.
   it("still returns 200 and still attempts the MOT import when the DVLA refresh throws", async () => {
     mocks.getSession.mockResolvedValue({ email: "owner@example.com" });
     mocks.fetchDvlaDataFromVdg.mockRejectedValue(new Error("DVLA API unavailable"));
 
-    const response = await POST(request(JSON.stringify({ bikeId: "bike-1" })));
+    const response = await POST(request(JSON.stringify({ carId: "car-1" })));
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toMatchObject({ ok: true, dvlaRefreshed: false });
-    expect(mocks.importMotHistoryForBike).toHaveBeenCalledWith("owner@example.com", bike, "AB12 CDE");
+    expect(mocks.importMotHistoryForCar).toHaveBeenCalledWith("owner@example.com", car, "AB12 CDE");
   });
 
   it("reports the created/skipped counts from a successful MOT import", async () => {
     mocks.getSession.mockResolvedValue({ email: "owner@example.com" });
-    mocks.importMotHistoryForBike.mockResolvedValue({
+    mocks.importMotHistoryForCar.mockResolvedValue({
       createdCount: 3,
       skippedCount: 1,
       skipped: [{ date: "2024-01-01", reason: "Already logged." }],
@@ -145,20 +146,17 @@ describe("POST /api/tracker/bike/refresh-data", () => {
       reminderSet: true,
     });
 
-    const response = await POST(request(JSON.stringify({ bikeId: "bike-1" })));
+    const response = await POST(request(JSON.stringify({ carId: "car-1" })));
 
     await expect(response.json()).resolves.toMatchObject({ motCreated: 3, motSkipped: 1 });
-    expect(mocks.logImpersonationActivityForCurrentRequest).toHaveBeenCalledWith("bike", "bike-1", "update");
+    expect(mocks.logImpersonationActivityForCurrentRequest).toHaveBeenCalledWith("car", "car-1", "update");
   });
 
-  // The route checks `"error" in result` rather than a thrown exception -
-  // a well-formed error result (e.g. vehicle MOT-exempt) must not be
-  // mistaken for real created/skipped counts.
   it("leaves motCreated/motSkipped at 0 when the MOT import itself reports an error result", async () => {
     mocks.getSession.mockResolvedValue({ email: "owner@example.com" });
-    mocks.importMotHistoryForBike.mockResolvedValue({ error: "No MOT history found.", status: 404 });
+    mocks.importMotHistoryForCar.mockResolvedValue({ error: "No MOT history found.", status: 404 });
 
-    const response = await POST(request(JSON.stringify({ bikeId: "bike-1" })));
+    const response = await POST(request(JSON.stringify({ carId: "car-1" })));
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toMatchObject({ ok: true, motCreated: 0, motSkipped: 0 });
@@ -166,25 +164,22 @@ describe("POST /api/tracker/bike/refresh-data", () => {
 
   it("still returns 200 with motCreated/motSkipped at 0 when the MOT import throws", async () => {
     mocks.getSession.mockResolvedValue({ email: "owner@example.com" });
-    mocks.importMotHistoryForBike.mockRejectedValue(new Error("MOT API unavailable"));
+    mocks.importMotHistoryForCar.mockRejectedValue(new Error("MOT API unavailable"));
 
-    const response = await POST(request(JSON.stringify({ bikeId: "bike-1" })));
+    const response = await POST(request(JSON.stringify({ carId: "car-1" })));
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toMatchObject({ ok: true, motCreated: 0, motSkipped: 0 });
   });
 
-  // Tax/SORN check - runs after the MOT import, still within the same
-  // request, so an existing SORN reminder gets synced (created or
-  // cleared) on every refresh, not just at bike-creation time.
   it("reports sorned true and syncs the reminder when the vehicle comes back SORN'd", async () => {
     mocks.getSession.mockResolvedValue({ email: "owner@example.com" });
     mocks.fetchVehicleTaxDetailsFromVdg.mockResolvedValue({ taxStatus: "SORN" });
 
-    const response = await POST(request(JSON.stringify({ bikeId: "bike-1" })));
+    const response = await POST(request(JSON.stringify({ carId: "car-1" })));
 
     expect(mocks.fetchVehicleTaxDetailsFromVdg).toHaveBeenCalledWith("AB12 CDE", "test-key");
-    expect(mocks.syncSornReminder).toHaveBeenCalledWith("owner@example.com", "bike-1", "SORN");
+    expect(mocks.syncCarSornReminder).toHaveBeenCalledWith("owner@example.com", "car-1", "SORN");
     await expect(response.json()).resolves.toMatchObject({ sorned: true });
   });
 
@@ -192,9 +187,9 @@ describe("POST /api/tracker/bike/refresh-data", () => {
     mocks.getSession.mockResolvedValue({ email: "owner@example.com" });
     mocks.fetchVehicleTaxDetailsFromVdg.mockResolvedValue({ taxStatus: "Taxed" });
 
-    const response = await POST(request(JSON.stringify({ bikeId: "bike-1" })));
+    const response = await POST(request(JSON.stringify({ carId: "car-1" })));
 
-    expect(mocks.syncSornReminder).toHaveBeenCalledWith("owner@example.com", "bike-1", "Taxed");
+    expect(mocks.syncCarSornReminder).toHaveBeenCalledWith("owner@example.com", "car-1", "Taxed");
     await expect(response.json()).resolves.toMatchObject({ sorned: false });
   });
 
@@ -202,10 +197,10 @@ describe("POST /api/tracker/bike/refresh-data", () => {
     mocks.getSession.mockResolvedValue({ email: "owner@example.com" });
     delete process.env.VDG_API_KEY;
 
-    const response = await POST(request(JSON.stringify({ bikeId: "bike-1" })));
+    const response = await POST(request(JSON.stringify({ carId: "car-1" })));
 
     expect(mocks.fetchVehicleTaxDetailsFromVdg).not.toHaveBeenCalled();
-    expect(mocks.syncSornReminder).not.toHaveBeenCalled();
+    expect(mocks.syncCarSornReminder).not.toHaveBeenCalled();
     await expect(response.json()).resolves.toMatchObject({ sorned: false });
   });
 
@@ -213,7 +208,7 @@ describe("POST /api/tracker/bike/refresh-data", () => {
     mocks.getSession.mockResolvedValue({ email: "owner@example.com" });
     mocks.fetchVehicleTaxDetailsFromVdg.mockRejectedValue(new Error("VDG unavailable"));
 
-    const response = await POST(request(JSON.stringify({ bikeId: "bike-1" })));
+    const response = await POST(request(JSON.stringify({ carId: "car-1" })));
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toMatchObject({ ok: true, sorned: false });

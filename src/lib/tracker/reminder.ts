@@ -2,8 +2,20 @@
 import { getContainer } from "@/lib/cosmos";
 import { createTrackerDoc, queryTrackerDocs, updateTrackerDoc, deleteTrackerDoc, type TrackerDocBase } from "./cosmosHelpers";
 
+// "permanent" is a deliberate fourth kind alongside the normal
+// interval-based three: it never resolves via date/mileage math at all
+// (see reminderStatus.ts's triggerStatus - it always reports "overdue"
+// and never computes a due point). Used exclusively for the DVLA
+// tax/SORN check below - a SORN'd vehicle isn't "due soon", it's
+// unlawful to drive right now, and there is no sensible date or mileage
+// to roll the reminder forward to. Only ever created/removed by
+// syncSornReminder, never by a normal user-facing "add a reminder" form -
+// see ReminderItem.tsx, which hides the manual Done/Delete actions for
+// this type for exactly that reason.
+export type ReminderIntervalType = "mileage" | "months" | "date" | "permanent";
+
 export interface ReminderTrigger {
-  intervalType: "mileage" | "months" | "date";
+  intervalType: ReminderIntervalType;
   intervalValue?: number;
   exactDate?: string;
 }
@@ -11,7 +23,7 @@ export interface ReminderTrigger {
 export interface ReminderDoc extends TrackerDocBase {
   type: "reminder";
   name: string;
-  intervalType: "mileage" | "months" | "date";
+  intervalType: ReminderIntervalType;
   intervalValue?: number;
   baseMileage?: number;
   exactDate?: string;
@@ -29,7 +41,7 @@ export async function createReminder(
   data: {
     bikeId: string;
     name: string;
-    intervalType: "mileage" | "months" | "date";
+    intervalType: ReminderIntervalType;
     intervalValue?: number;
     baseMileage?: number;
     exactDate?: string;
@@ -43,6 +55,16 @@ export async function createReminder(
 
 export async function getReminders(email: string, bikeId: string): Promise<ReminderDoc[]> {
   return queryTrackerDocs<ReminderDoc>(email, "reminder", bikeId);
+}
+
+// Point-read by id, unlike getReminders above (which lists every
+// reminder for a bike) - needed wherever a route only has the reminder's
+// own id and must check something about it (its intervalType, say)
+// before deciding whether an action is even allowed.
+export async function getReminderById(email: string, id: string): Promise<ReminderDoc | null> {
+  const container = getContainer();
+  const { resource } = await container.item(id, email).read<ReminderDoc>();
+  return resource ?? null;
 }
 
 // Resetting also clears notifiedAt, so if it crosses back into "overdue"
@@ -89,6 +111,40 @@ export async function markReminderNotified(email: string, id: string): Promise<v
   if (!resource) return;
   resource.notifiedAt = new Date().toISOString();
   await container.items.upsert(resource);
+}
+
+// Deliberately a fixed, well-known sourceKey rather than one derived per
+// call site, matching deleteRemindersBySourceKey's existing dedup
+// convention (see LogBillForm's own "Remind me" checkbox for the other
+// established use of this pattern) - there is only ever at most one SORN
+// reminder per bike at a time.
+export const SORN_REMINDER_SOURCE_KEY = "vdg-tax-status";
+export const SORN_REMINDER_NAME = "Vehicle is SORN (not taxed)";
+
+// The only place a "permanent" reminder is ever created or removed - see
+// ReminderTrigger's own comment on why. Called after every DVLA tax-
+// status check (vehicle creation, and the "Refresh vehicle data" button):
+// creates the reminder the first time the vehicle is found SORN'd, does
+// nothing on every later check that's still SORN'd (so an already-set
+// reminder doesn't get its createdAt/notifiedAt state reset for no
+// reason), and removes it the moment the vehicle is confirmed taxed again.
+export async function syncSornReminder(email: string, bikeId: string, taxStatus: string | null): Promise<void> {
+  const isSorn = taxStatus?.trim().toUpperCase() === "SORN";
+  const existing = await getReminders(email, bikeId);
+  const current = existing.find((r) => r.sourceKey === SORN_REMINDER_SOURCE_KEY);
+  if (isSorn) {
+    if (!current) {
+      await createReminder(email, {
+        bikeId,
+        name: SORN_REMINDER_NAME,
+        intervalType: "permanent",
+        date: new Date().toISOString().slice(0, 10),
+        sourceKey: SORN_REMINDER_SOURCE_KEY,
+      });
+    }
+  } else if (current) {
+    await deleteRemindersBySourceKey(email, bikeId, SORN_REMINDER_SOURCE_KEY);
+  }
 }
 
 // Re-exported from reminderStatus.ts so existing server-side imports (the
