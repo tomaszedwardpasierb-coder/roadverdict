@@ -114,7 +114,7 @@ const NAV_GROUPS: NavGroupDef[] = [
 // (see sidebarNavEmptyGroupNote below), rather than disappearing
 // entirely. Additive later: once each has a real car equivalent, it
 // just comes off this list.
-const CAR_UNAVAILABLE_SECTIONS: Section[] = ['story', 'transferOwnership'];
+const CAR_UNAVAILABLE_SECTIONS: Section[] = ['transferOwnership'];
 function availableFor(vehicleKind: 'bike' | 'car', items: NavItemDef[]) {
   return vehicleKind === 'bike' ? items : items.filter((item) => !CAR_UNAVAILABLE_SECTIONS.includes(item.key));
 }

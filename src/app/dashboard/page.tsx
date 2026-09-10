@@ -71,6 +71,9 @@ import { getSellerReportCore } from "@/lib/tracker/sellerReportData";
 import { buildWalkAwayIssues } from "@/lib/tracker/walkAwayRisks";
 import { buildSellerPrepIssues, buildSellerPrepPlan } from "@/lib/tracker/sellerPrep";
 import { StorySoFarTab } from "./StorySoFarTab";
+import { getCarSellerReportCore } from "@/lib/tracker/carSellerReportData";
+import { buildCarWalkAwayIssues } from "@/lib/tracker/carWalkAwayRisks";
+import { CarStorySoFarTab } from "./CarStorySoFarTab";
 import { ChartFilterProvider } from "./ChartFilterContext";
 import { ChartFilterBar } from "./ChartFilterBar";
 import { DashboardStatCards } from "./DashboardStatCards";
@@ -1417,6 +1420,44 @@ async function renderCarDashboard(
     />
   );
 
+  // Same cooldown window as car-story-so-far/route.ts, duplicated for
+  // the same reason bike's own STORY_COOLDOWN_MS constant is: a route
+  // handler isn't a regular importable module.
+  const STORY_COOLDOWN_MS = 7 * 24 * 60 * 60 * 1000;
+  const initialCarStory = car.storyCache
+    ? {
+        generatedWithAi: car.storyCache.response.generatedWithAi,
+        sharedStory: car.storyCache.response.sharedStory,
+        ownerNotes: car.storyCache.response.ownerNotes,
+        verdict: car.storyCache.response.verdict,
+        generatedAt: car.storyCache.generatedAt,
+        cached: true,
+        nextAvailableAt: new Date(new Date(car.storyCache.generatedAt).getTime() + STORY_COOLDOWN_MS).toISOString(),
+      }
+    : null;
+
+  const carSellerCore = await getCarSellerReportCore(email, car.id);
+  const carStoryReady = carSellerCore.verdict.tier !== "limited-documentation";
+  const carSellerWalkAwayIssues = buildCarWalkAwayIssues(car, carSellerCore.mileageCheck, carSellerCore.evidenceQuality);
+  const carSellerPrep = {
+    evidenceQuality: carSellerCore.evidenceQuality,
+    prepIssues: buildSellerPrepIssues(carSellerWalkAwayIssues),
+    upcomingCostItems: carSellerCore.upcomingCostItems,
+    likelyQuestions: carSellerCore.detailedQuestions,
+    prepPlan: buildSellerPrepPlan(
+      carSellerCore.evidenceQuality.receiptCoveragePct,
+      carSellerWalkAwayIssues.length,
+      carSellerCore.upcomingCostItems.filter((i) => i.timing === "overdue").length,
+      carSellerCore.detailedQuestions.length
+    ),
+  };
+
+  const carStoryContent = (
+    <ProGate featureName="The Story So Far" description="An AI-generated narrative of your ownership - your car's history told as a story, with insights on what's been done, what's coming, and how your costs compare." isPro={userIsPro}>
+      <CarStorySoFarTab carNickname={car.nickname} registration={currentRegistration} currentMileage={car.currentMileage} distanceUnit={distanceUnit} initialStory={initialCarStory} sellerPrep={carSellerPrep} />
+    </ProGate>
+  );
+
   const privacyContent = <PrivacyContent />;
   const securityContent = (
     <SettingsTab
@@ -1470,9 +1511,10 @@ async function renderCarDashboard(
       quoteCheckerContent={carQuoteCheckerContent}
       costCalculatorContent={carCostCalculatorContent}
       buyingGuideContent={carBuyingGuideContent}
+      storyContent={carStoryContent}
       privacyContent={privacyContent}
       securityContent={securityContent}
-      storyReady={false}
+      storyReady={carStoryReady}
       hasIncomingRequest={false}
     />
   );

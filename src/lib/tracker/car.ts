@@ -97,6 +97,23 @@ export interface CarDoc {
       honestRead: string;
     };
   };
+  // Caches the last AI-generated Story So Far result, same weekly cap
+  // and same reasoning as bike.ts's own field: avoids burning an AI
+  // call every time the owner just wants to re-read their own story.
+  // Absent until the first generation. See
+  // src/app/api/cars/car-story-so-far/route.ts for the cooldown check
+  // that reads this.
+  storyCache?: {
+    generatedAt: string;
+    response: {
+      generatedWithAi: boolean;
+      sharedStory: string[];
+      ownerNotes: string[];
+      verdict: { tier: string; label: string; reasons: string[] };
+      identity: { make: string; model: string; year?: number; currentMileage: number; loggedSinceDate: string; loggedSpanYears: number; totalLoggedEvents: number };
+      categorySpend: { category: "Service" | "Fuel" | "Modifications" | "Bills"; total: number; count: number }[];
+    };
+  };
   dateAdded: string;
   // Set when this car was added despite the registration already having
   // a RoadVerdict record under a different account - see bike.ts's own
@@ -261,6 +278,15 @@ export async function updateCarBuyerOpinionCache(email: string, carId: string, b
   const { resource } = await container.item(carId, email).read<CarDoc>();
   if (!resource) return null;
   resource.buyerOpinionCache = buyerOpinionCache;
+  await container.items.upsert(resource);
+  return resource;
+}
+
+export async function updateCarStoryCache(email: string, carId: string, storyCache: CarDoc["storyCache"]): Promise<CarDoc | null> {
+  const container = getContainer();
+  const { resource } = await container.item(carId, email).read<CarDoc>();
+  if (!resource) return null;
+  resource.storyCache = storyCache;
   await container.items.upsert(resource);
   return resource;
 }

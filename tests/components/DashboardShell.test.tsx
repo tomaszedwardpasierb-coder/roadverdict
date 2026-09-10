@@ -337,10 +337,11 @@ describe("DashboardShell", () => {
     });
   });
 
-  // The hybrid dashboard's own guard: two tabs (Story, Transfer ownership)
-  // depend on BikeDoc fields/features CarDoc doesn't have yet - hidden
-  // rather than shown broken while a car is the active vehicle. Shareable
-  // Links has a full car equivalent now and is no longer hidden.
+  // The hybrid dashboard's own guard: Transfer ownership depends on
+  // features CarDoc doesn't have yet (ownership transfer itself isn't
+  // built for cars) - hidden rather than shown broken while a car is
+  // the active vehicle. Story and Shareable Links both have full car
+  // equivalents now and are no longer hidden.
   describe("vehicleKind: car", () => {
     function carProps(overrides: Partial<Parameters<typeof DashboardShell>[0]> = {}) {
       return baseProps({
@@ -348,22 +349,21 @@ describe("DashboardShell", () => {
         vehicleName: "Focus",
         vehicles: [{ id: "car-1", kind: "car", name: "Focus", year: 2020, currentMileage: 40000 }],
         activeVehicleId: "car-1",
-        storyContent: undefined,
         transferOwnershipContent: undefined,
         ...overrides,
       });
     }
 
-    // Both remaining entries of CAR_UNAVAILABLE_SECTIONS (DashboardShell.tsx).
+    // The one remaining entry of CAR_UNAVAILABLE_SECTIONS (DashboardShell.tsx).
     // Reports, the three buying tools (Quote Checker/Cost calculator/Buying
-    // a used bike), and Shareable Links all came off this list once their
-    // own car equivalents were built (see reportsContent/
+    // a used bike), Shareable Links, and Story all came off this list once
+    // their own car equivalents were built (see reportsContent/
     // quoteCheckerContent/costCalculatorContent/buyingGuideContent/
-    // shareLinksContent in dashboard/page.tsx's renderCarDashboard) - kept
-    // listed here as a comment, not silently dropped, so a future reader
-    // can see they were deliberately removed rather than forgotten.
+    // shareLinksContent/storyContent in dashboard/page.tsx's
+    // renderCarDashboard) - kept listed here as a comment, not silently
+    // dropped, so a future reader can see they were deliberately removed
+    // rather than forgotten.
     const CAR_UNAVAILABLE_LABELS = [
-      "The Story So Far",
       "Transfer ownership",
     ];
 
@@ -376,10 +376,9 @@ describe("DashboardShell", () => {
       expect(screen.getAllByRole("button", { name: "Fuel" }).length).toBeGreaterThan(0);
     });
 
-    // Reports has a real car equivalent now (unlike Story, its sibling in
-    // the Insights group) - it must actually render as a clickable nav
-    // item for a car-active session, not just be absent from the
-    // unavailable-labels list above.
+    // Reports has a real car equivalent now - it must actually render as
+    // a clickable nav item for a car-active session, not just be absent
+    // from the unavailable-labels list above.
     it("still shows Reports as a real, clickable nav item for a car-active session", async () => {
       const user = userEvent.setup();
       render(<DashboardShell {...carProps()} />);
@@ -391,8 +390,21 @@ describe("DashboardShell", () => {
       expect(screen.getByText("Reports content")).toBeInTheDocument();
     });
 
+    // Story has a real car equivalent now too - same Insights group as
+    // Reports, same expectation.
+    it("still shows The Story So Far as a real, clickable nav item for a car-active session", async () => {
+      const user = userEvent.setup();
+      render(<DashboardShell {...carProps()} />);
+      const insightsHeader = screen.getAllByRole("button", { name: /Insights/ })[0];
+      await user.click(insightsHeader);
+
+      expect(screen.getByRole("button", { name: "The Story So Far" })).toBeInTheDocument();
+      await user.click(screen.getByRole("button", { name: "The Story So Far" }));
+      expect(screen.getByText("Story content")).toBeInTheDocument();
+    });
+
     // Shareable Links has a real car equivalent now (unlike its Selling
-    // siblings Story and Transfer ownership) - it must actually render as
+    // sibling Transfer ownership) - it must actually render as
     // a clickable nav item for a car-active session.
     it("still shows Shareable Links as a real, clickable nav item for a car-active session", async () => {
       const user = userEvent.setup();
