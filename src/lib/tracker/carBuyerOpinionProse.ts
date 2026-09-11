@@ -36,6 +36,17 @@ export interface CarBuyerOpinionInput {
   keeperChangeCount: number;
   upcomingOverdueCount: number;
   upcomingDueSoonCount: number;
+  // Only present when the buyer has paid to unlock the Independent
+  // Vehicle Check on this share link - see buyerOpinionProse.ts's own
+  // comment on this same field for the full reasoning (identical here).
+  vdiCheck?: {
+    isStolen: boolean;
+    hasWriteOffRecord: boolean;
+    writeOffRecordCount: number;
+    hasOutstandingFinance: boolean;
+    mileageAnomaly: boolean;
+    ncapStarRating: number | null;
+  };
 }
 
 export interface CarBuyerOpinionResult {
@@ -93,6 +104,20 @@ function buildFactsBlock(input: CarBuyerOpinionInput): string {
     lines.push("UPCOMING MAINTENANCE A NEW OWNER WOULD INHERIT:");
     if (input.upcomingOverdueCount > 0) lines.push(`- ${input.upcomingOverdueCount} item${input.upcomingOverdueCount === 1 ? "" : "s"} currently overdue`);
     if (input.upcomingDueSoonCount > 0) lines.push(`- ${input.upcomingDueSoonCount} item${input.upcomingDueSoonCount === 1 ? "" : "s"} due soon`);
+    lines.push("");
+  }
+
+  if (input.vdiCheck) {
+    lines.push("INDEPENDENT VEHICLE CHECK (an official industry stolen/write-off/finance database, separate from and in addition to the DVLA/MOT facts above):");
+    lines.push(input.vdiCheck.isStolen ? "- Recorded as STOLEN" : "- Not recorded as stolen");
+    lines.push(
+      input.vdiCheck.hasWriteOffRecord
+        ? `- WRITE-OFF record on file (${input.vdiCheck.writeOffRecordCount} record${input.vdiCheck.writeOffRecordCount === 1 ? "" : "s"})`
+        : "- No write-off record"
+    );
+    lines.push(input.vdiCheck.hasOutstandingFinance ? "- Outstanding finance recorded against this car" : "- No outstanding finance recorded");
+    if (input.vdiCheck.mileageAnomaly) lines.push("- Mileage history includes a reading LOWER than an earlier one on record (a possible clocking flag)");
+    if (input.vdiCheck.ncapStarRating != null) lines.push(`- Euro NCAP safety rating: ${input.vdiCheck.ncapStarRating} / 5 stars`);
   }
 
   return lines.join("\n");
@@ -106,6 +131,7 @@ Strict rules:
 - Every claim must be clearly traceable to a specific fact given below - an opinion built on a real fact is fine; an opinion built on nothing is not.
 - Give a real, distinguishable assessment - not hedged into meaninglessness, not every car sounding the same. If the record is genuinely strong, say so plainly. If there's a real gap or a DVLA flag worth taking seriously, say that plainly too.
 - A DVLA scrapped, exported, or unscrapped flag is the single most important fact here if present - lead with it, don't bury it among smaller points.
+- If an INDEPENDENT VEHICLE CHECK section is present and reports the car as stolen, having a write-off record, or outstanding finance, that is the single most important fact in the entire read, ahead of everything else including the DVLA flags above - lead honestRead with it in plain terms, and always list it as a concern, never soften or bury it. A mileage reading lower than an earlier one in that same section is a serious concern too, worth its own mention. A Euro NCAP rating, if present, is only ever a minor supporting point, never as important as any of the above.
 - Do NOT tell the reader whether to buy the car or make an explicit purchase recommendation ("buy this" / "avoid this" / "this is a good deal"). Give them the informed read a dealer would give a mate before they decide for themselves - not the decision itself.
 - Never make any claim about the owner as a person - their honesty, character, or intentions. Stay with what the record and the DVLA/MOT data show about the machine, not a judgement of who's selling it.
 - Plain and direct, the way a dealer actually talks to someone they're not trying to sell to - not hyped, not salesy, no words like "amazing" or "fantastic". A skeptical buyer should find this credible.

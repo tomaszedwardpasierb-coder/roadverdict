@@ -27,6 +27,7 @@ import { getSession } from "@/lib/auth/session";
 import { CarRequestHistoryCta } from "../CarRequestHistoryCta";
 import styles from "../report.module.css";
 import { PrintButton } from "@/app/report/[token]/PrintButton";
+import { VdiIcon } from "@/components/VdiIcon";
 import {
   Search, FileCheck, ShieldCheck, ScrollText, ListChecks, AlertTriangle,
   HelpCircle, ListOrdered, Gauge, ClipboardCheck, Users, Handshake, Table2,
@@ -161,8 +162,23 @@ export default async function CarDetailedReportPage(props: {
     warrantyStatus = stillCovered ? "likely still within warranty" : "likely outside warranty";
   }
 
+  // Small, named subset of the VDI check handed to the buyer-opinion
+  // generator - see BuyerOpinionInput's own vdiCheck field comment in
+  // buyerOpinionProse.ts (identical reasoning here).
+  const vdiOpinionFacts = vdiUnlock?.vdiCheck
+    ? {
+        isStolen: vdiUnlock.vdiCheck.isStolen,
+        hasWriteOffRecord: vdiUnlock.vdiCheck.hasWriteOffRecord,
+        writeOffRecordCount: vdiUnlock.vdiCheck.writeOffRecordCount,
+        hasOutstandingFinance: vdiUnlock.vdiCheck.hasOutstandingFinance,
+        mileageAnomaly: !!vdiUnlock.vdiCheck.mileageReadings?.some((r) => !r.inSequence),
+        ncapStarRating: vdiUnlock.vdiCheck.ncapStarRating ?? null,
+      }
+    : undefined;
+
   let buyerOpinion = null;
-  if (car.buyerOpinionCache && Date.now() - new Date(car.buyerOpinionCache.generatedAt).getTime() < OPINION_COOLDOWN_MS) {
+  const cacheHasVdiCoverage = !vdiOpinionFacts || !!car.buyerOpinionCache?.hadVdiCheck;
+  if (car.buyerOpinionCache && cacheHasVdiCoverage && Date.now() - new Date(car.buyerOpinionCache.generatedAt).getTime() < OPINION_COOLDOWN_MS) {
     buyerOpinion = car.buyerOpinionCache.response;
   } else {
     const apiKey = process.env.GEMINI_API_KEY;
@@ -193,10 +209,15 @@ export default async function CarDetailedReportPage(props: {
         keeperChangeCount: car.dvlaData?.keeperChangeList.length ?? 0,
         upcomingOverdueCount: upcomingReminders.filter((r) => r.status === "overdue").length + consumablesDueSoon.filter((c) => c.status === "overdue").length,
         upcomingDueSoonCount: upcomingReminders.filter((r) => r.status === "due-soon").length + consumablesDueSoon.filter((c) => c.status !== "overdue").length,
+        vdiCheck: vdiOpinionFacts,
       };
       buyerOpinion = await generateCarBuyerOpinion(opinionInput, apiKey);
       if (buyerOpinion) {
-        await updateCarBuyerOpinionCache(car.pk, car.id, { generatedAt: new Date().toISOString(), response: buyerOpinion });
+        await updateCarBuyerOpinionCache(car.pk, car.id, {
+          generatedAt: new Date().toISOString(),
+          response: buyerOpinion,
+          hadVdiCheck: !!vdiOpinionFacts,
+        });
       }
     }
   }
@@ -234,8 +255,20 @@ export default async function CarDetailedReportPage(props: {
         <p className={styles.docParagraph} style={{ margin: 0 }}>
           {buyerOpinion ? buyerOpinion.honestRead : verdict.reasons[0] ?? "See the full record below for what's behind this documentation tier."}
         </p>
-        {(overdueCount > 0 || walkAwayIssues.length > 0 || (buyerOpinion && (buyerOpinion.strengths.length > 0 || buyerOpinion.concerns.length > 0))) && (
+        {(overdueCount > 0 || walkAwayIssues.length > 0 || vdiOpinionFacts || (buyerOpinion && (buyerOpinion.strengths.length > 0 || buyerOpinion.concerns.length > 0))) && (
           <div className={styles.verdictChips}>
+            {vdiOpinionFacts?.isStolen && (
+              <span className={styles.verdictChipWarn}><VdiIcon name="stolen" size={12} />Recorded stolen</span>
+            )}
+            {vdiOpinionFacts?.hasWriteOffRecord && (
+              <span className={styles.verdictChipWarn}><VdiIcon name="writeOff" size={12} />Write-off record</span>
+            )}
+            {vdiOpinionFacts?.hasOutstandingFinance && (
+              <span className={styles.verdictChipWarn}><VdiIcon name="finance" size={12} />Outstanding finance</span>
+            )}
+            {vdiOpinionFacts?.mileageAnomaly && (
+              <span className={styles.verdictChipWarn}><VdiIcon name="mileage" size={12} />VDI mileage anomaly</span>
+            )}
             {buyerOpinion && buyerOpinion.strengths.length > 0 && (
               <span className={styles.verdictChipGood}>{buyerOpinion.strengths.length} strength{buyerOpinion.strengths.length === 1 ? "" : "s"}</span>
             )}

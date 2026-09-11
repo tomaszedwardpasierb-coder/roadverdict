@@ -171,6 +171,14 @@ export interface BikeDoc {
       concerns: string[];
       honestRead: string;
     };
+    // Whether this cached opinion was generated with VDI check facts
+    // folded in (see buyerOpinionProse.ts's vdiCheck field) - lets
+    // report/[token]/detailed force a fresh regeneration the first time
+    // a VDI check becomes available on a share link, rather than serving
+    // a stale, VDI-unaware opinion for up to the full weekly cooldown.
+    // Absent on any cache written before this field existed, which reads
+    // the same as false.
+    hadVdiCheck?: boolean;
   };
   // Set on a NEW bike document when it was created by transferring
   // ownership from a previous account, rather than added fresh by this

@@ -25,6 +25,7 @@ import { getSession } from "@/lib/auth/session";
 import { RequestHistoryCta } from "../RequestHistoryCta";
 import styles from "../report.module.css";
 import { PrintButton } from "../PrintButton";
+import { VdiIcon } from "@/components/VdiIcon";
 import {
   Search, FileCheck, ShieldCheck, ScrollText, ListChecks, AlertTriangle,
   HelpCircle, ListOrdered, Gauge, ClipboardCheck, Users, Handshake, Table2,
@@ -165,12 +166,31 @@ export default async function DetailedReportPage(props: {
     warrantyStatus = stillCovered ? "likely still within warranty" : "likely outside warranty";
   }
 
+  // Small, named subset of the VDI check handed to the buyer-opinion
+  // generator - see BuyerOpinionInput's own vdiCheck field comment.
+  // Undefined whenever no VDI check has been unlocked on this link yet.
+  const vdiOpinionFacts = vdiUnlock?.vdiCheck
+    ? {
+        isStolen: vdiUnlock.vdiCheck.isStolen,
+        hasWriteOffRecord: vdiUnlock.vdiCheck.hasWriteOffRecord,
+        writeOffRecordCount: vdiUnlock.vdiCheck.writeOffRecordCount,
+        hasOutstandingFinance: vdiUnlock.vdiCheck.hasOutstandingFinance,
+        mileageAnomaly: !!vdiUnlock.vdiCheck.mileageReadings?.some((r) => !r.inSequence),
+        ncapStarRating: vdiUnlock.vdiCheck.ncapStarRating ?? null,
+      }
+    : undefined;
+
   // Cached on the bike doc, refreshed weekly - this page has no login
   // and no rate limit of its own, and can be opened by anyone with the
   // link any number of times, so without a cache an AI call would fire
-  // on every single view. See buyerOpinionCache on BikeDoc.
+  // on every single view. See buyerOpinionCache on BikeDoc. Bypassed
+  // early (regardless of the weekly cooldown) the first time a VDI check
+  // becomes available but the cached opinion predates it, so a buyer
+  // doesn't read a stolen/write-off/finance-unaware "honest read" for up
+  // to a week after paying to unlock exactly that information.
   let buyerOpinion = null;
-  if (bike.buyerOpinionCache && Date.now() - new Date(bike.buyerOpinionCache.generatedAt).getTime() < OPINION_COOLDOWN_MS) {
+  const cacheHasVdiCoverage = !vdiOpinionFacts || !!bike.buyerOpinionCache?.hadVdiCheck;
+  if (bike.buyerOpinionCache && cacheHasVdiCoverage && Date.now() - new Date(bike.buyerOpinionCache.generatedAt).getTime() < OPINION_COOLDOWN_MS) {
     buyerOpinion = bike.buyerOpinionCache.response;
   } else {
     const apiKey = process.env.GEMINI_API_KEY;
@@ -199,6 +219,7 @@ export default async function DetailedReportPage(props: {
         keeperChangeCount: bike.dvlaData?.keeperChangeList.length ?? 0,
         upcomingOverdueCount: upcomingReminders.filter((r) => r.status === "overdue").length + consumablesDueSoon.filter((c) => c.status === "overdue").length,
         upcomingDueSoonCount: upcomingReminders.filter((r) => r.status === "due-soon").length + consumablesDueSoon.filter((c) => c.status !== "overdue").length,
+        vdiCheck: vdiOpinionFacts,
       };
       buyerOpinion = await generateBuyerOpinion(opinionInput, apiKey);
       if (buyerOpinion) {
@@ -206,7 +227,11 @@ export default async function DetailedReportPage(props: {
         // Story So Far's cache save - if this fails, the visitor still
         // gets their opinion this once, they just won't get the free
         // cached re-read for the next visitor within the week.
-        await updateBikeBuyerOpinionCache(bike.pk, bike.id, { generatedAt: new Date().toISOString(), response: buyerOpinion });
+        await updateBikeBuyerOpinionCache(bike.pk, bike.id, {
+          generatedAt: new Date().toISOString(),
+          response: buyerOpinion,
+          hadVdiCheck: !!vdiOpinionFacts,
+        });
       }
     }
   }
@@ -247,8 +272,20 @@ export default async function DetailedReportPage(props: {
         <p className={styles.docParagraph} style={{ margin: 0 }}>
           {buyerOpinion ? buyerOpinion.honestRead : verdict.reasons[0] ?? "See the full record below for what's behind this documentation tier."}
         </p>
-        {(overdueCount > 0 || walkAwayIssues.length > 0 || (buyerOpinion && (buyerOpinion.strengths.length > 0 || buyerOpinion.concerns.length > 0))) && (
+        {(overdueCount > 0 || walkAwayIssues.length > 0 || vdiOpinionFacts || (buyerOpinion && (buyerOpinion.strengths.length > 0 || buyerOpinion.concerns.length > 0))) && (
           <div className={styles.verdictChips}>
+            {vdiOpinionFacts?.isStolen && (
+              <span className={styles.verdictChipWarn}><VdiIcon name="stolen" size={12} />Recorded stolen</span>
+            )}
+            {vdiOpinionFacts?.hasWriteOffRecord && (
+              <span className={styles.verdictChipWarn}><VdiIcon name="writeOff" size={12} />Write-off record</span>
+            )}
+            {vdiOpinionFacts?.hasOutstandingFinance && (
+              <span className={styles.verdictChipWarn}><VdiIcon name="finance" size={12} />Outstanding finance</span>
+            )}
+            {vdiOpinionFacts?.mileageAnomaly && (
+              <span className={styles.verdictChipWarn}><VdiIcon name="mileage" size={12} />VDI mileage anomaly</span>
+            )}
             {buyerOpinion && buyerOpinion.strengths.length > 0 && (
               <span className={styles.verdictChipGood}>{buyerOpinion.strengths.length} strength{buyerOpinion.strengths.length === 1 ? "" : "s"}</span>
             )}

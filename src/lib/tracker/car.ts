@@ -97,6 +97,9 @@ export interface CarDoc {
       concerns: string[];
       honestRead: string;
     };
+    // See bike.ts's own hadVdiCheck for the full reasoning - identical
+    // here.
+    hadVdiCheck?: boolean;
   };
   // Caches the last AI-generated Story So Far result, same weekly cap
   // and same reasoning as bike.ts's own field: avoids burning an AI
