@@ -172,6 +172,58 @@ describe("generateCarBuyingGuideBriefing", () => {
     expect(prompt).toContain("OUTSTANDING FINANCE: yes, 1 agreement(s)");
   });
 
+  it("includes real battery/rapid-charge/range facts from a paid VDI check when present, for an EV", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(geminiResponse(JSON.stringify(validResult)));
+    vi.stubGlobal("fetch", fetchMock);
+    await generateCarBuyingGuideBriefing(
+      {
+        ...baseInput,
+        fuelType: "ELECTRICITY",
+        vdiCheck: {
+          isStolen: false, hasWriteOffRecord: false, writeOffRecordCount: 0, hasOutstandingFinance: false,
+          financeRecords: [], keeperChanges: [], keeperChangeCount: 0, plateChangeCount: 0, colourChangeCount: 0, currentColour: null,
+          vedFirstYearTwelveMonths: null, vedStandardTwelveMonths: null, v5cReissueCount: 0,
+          calculatedAverageAnnualMileage: null, averageMileageForAge: null, mileageAnomalyDetected: false,
+          manufacturerWarrantyMiles: null, manufacturerWarrantyMonths: null,
+          batteries: [{ locationOnVehicle: "Under Floor/Middle", totalCapacityKwh: 71, usableCapacityKwh: 64, chemistry: "Lithium-Ion 375V", warrantyMonths: 96, warrantyMiles: 100000 }],
+          chargePorts: [
+            { portType: "Type 2", locationOnVehicle: "Left/Front", maxChargePowerKw: 11, isStandardChargePort: true, chargeTimes: [] },
+            { portType: "CCS", locationOnVehicle: "Right/Front", maxChargePowerKw: 120, isStandardChargePort: true, chargeTimes: [] },
+          ],
+          evRangeTestCycles: [{ testType: "WLTP", combinedRangeMiles: 180, combinedRangeKm: 289.68, cityRangeMiles: null, cityRangeKm: null }],
+        },
+      },
+      "key"
+    );
+    const prompt = JSON.parse(fetchMock.mock.calls[0][1].body).contents[0].parts[0].text;
+    expect(prompt).toContain("BATTERY: 71kWh total capacity, 64kWh usable, battery warranty 96 months/100,000 miles");
+    // The CCS port (120kW) is the one that qualifies as "rapid" (>=50kW), not the 11kW Type 2 one.
+    expect(prompt).toContain("RAPID CHARGE PORT: CCS, up to 120kW (standard)");
+    expect(prompt).toContain("OFFICIAL RANGE: 180 miles combined (WLTP)");
+  });
+
+  it("omits the battery/rapid-charge/range lines when a VDI check has no EV data at all (a combustion car)", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(geminiResponse(JSON.stringify(validResult)));
+    vi.stubGlobal("fetch", fetchMock);
+    await generateCarBuyingGuideBriefing(
+      {
+        ...baseInput,
+        vdiCheck: {
+          isStolen: false, hasWriteOffRecord: false, writeOffRecordCount: 0, hasOutstandingFinance: false,
+          financeRecords: [], keeperChanges: [], keeperChangeCount: 0, plateChangeCount: 0, colourChangeCount: 0, currentColour: null,
+          vedFirstYearTwelveMonths: null, vedStandardTwelveMonths: null, v5cReissueCount: 0,
+          calculatedAverageAnnualMileage: null, averageMileageForAge: null, mileageAnomalyDetected: false,
+          manufacturerWarrantyMiles: null, manufacturerWarrantyMonths: null,
+        },
+      },
+      "key"
+    );
+    const prompt = JSON.parse(fetchMock.mock.calls[0][1].body).contents[0].parts[0].text;
+    expect(prompt).not.toContain("BATTERY:");
+    expect(prompt).not.toContain("RAPID CHARGE PORT");
+    expect(prompt).not.toContain("OFFICIAL RANGE");
+  });
+
   it("includes the independent private-average valuation figure when given", async () => {
     const fetchMock = vi.fn().mockResolvedValue(geminiResponse(JSON.stringify(validResult)));
     vi.stubGlobal("fetch", fetchMock);

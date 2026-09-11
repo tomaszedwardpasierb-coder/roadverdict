@@ -445,6 +445,129 @@ describe("CarBuyingGuideForm", () => {
     expect(screen.queryByTestId("mileage-chart-bar")).not.toBeInTheDocument();
   });
 
+  // EV-specific fields, mirroring the real Audi e-tron VDICheck sample
+  // (WP22FUT) this block was built from - dual-motor AWD, 2 charge
+  // ports, a single battery pack, NCAP rating, and the general
+  // (non-EV-only) fields that sample also revealed: DriveType, torque
+  // LbFt, power Kw/Rpm, manufacturer-quoted CO2.
+  it("renders the EV powertrain groups (battery, motors with diffing, charge ports, range) alongside the general fields that sample also revealed", async () => {
+    (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        vrm: "WP22FUT", make: "Audi", model: "e-tron", fuelType: "Electric", colour: "Grey",
+        plateInRetention: false, motDueDate: null, motTests: [], briefing: null, taxDetails: null, valuation: null,
+        vdiCheck: {
+          isStolen: false, hasWriteOffRecord: false, writeOffRecordCount: 0, hasOutstandingFinance: false,
+          financeRecords: [], keeperChanges: [], keeperChangeCount: 0, plateChangeCount: 0, colourChangeCount: 0, currentColour: "Grey",
+          v5cReissueCount: 1, calculatedAverageAnnualMileage: 8233, averageMileageForAge: 48000,
+          mileageAnomalyDetected: false, manufacturerWarrantyMiles: 60000, manufacturerWarrantyMonths: 36,
+
+          powertrainType: "BEV",
+          driveType: "4x4",
+          drivingAxle: "All Permanent",
+          transmissionType: "Automatic",
+          numberOfGears: 1,
+          manufacturerCo2: 0,
+          torqueNm: 664, torqueLbFt: 490, torqueRpm: 5800,
+          bhp: 308.4, ps: 312.7, powerKw: 230, powerRpm: 5800,
+
+          ncapStarRating: 5, ncapChildPercent: 85, ncapAdultPercent: 91, ncapPedestrianPercent: 71, ncapSafetyAssistPercent: 76,
+
+          isTeslaSuperchargerCompatible: false,
+          chargePorts: [
+            {
+              portType: "Type 2", locationOnVehicle: "Left/Front", maxChargePowerKw: 11, isStandardChargePort: true,
+              chargeTimes: [
+                { chargePortKw: 2.3, timeInMinutes: 1441 },
+                { chargePortKw: 7.5, timeInMinutes: 442 },
+                { chargePortKw: 11, timeInMinutes: 301 },
+              ],
+            },
+            {
+              portType: "CCS", locationOnVehicle: "Right/Front", maxChargePowerKw: 120, isStandardChargePort: true,
+              chargeTimes: [
+                { chargePortKw: 50, timeInMinutes: 66 },
+                { chargePortKw: 100, timeInMinutes: 33 },
+                { chargePortKw: 150, timeInMinutes: 28 },
+              ],
+            },
+          ],
+          batteries: [
+            { locationOnVehicle: "Under Floor/Middle", totalCapacityKwh: 71, usableCapacityKwh: 64, chemistry: "Lithium-Ion 375V", warrantyMonths: 96, warrantyMiles: 100000 },
+          ],
+          motors: [
+            { motorType: "Permanent magnet synchronous", manufacturer: "Audi", model: "E-Tron", motorLocation: "Front", powerKw: 215, maxTorqueNm: 332, axleDrivenByMotor: "Front", supportsRegenerativeBraking: true, additionalInformation: null },
+            { motorType: "Permanent magnet synchronous", manufacturer: "Audi", model: "E-Tron", motorLocation: "Rear", powerKw: 215, maxTorqueNm: 332, axleDrivenByMotor: "Rear", supportsRegenerativeBraking: true, additionalInformation: null },
+          ],
+          evTransmissions: [{ transmissionType: "Automatic", numberOfGears: 1 }],
+          evWhPerMile: 394,
+          evMaxChargeInputPowerKw: null,
+          evRealRangeMiles: null,
+          evMilesPerChargeHour: 304,
+          evZeroEmissionMiles: 180,
+          evRangeTestCycles: [{ testType: "WLTP", combinedRangeMiles: 180, combinedRangeKm: 289.68, cityRangeMiles: null, cityRangeKm: null }],
+        },
+        vdiCheckPurchasedAt: "2026-01-01T00:00:00.000Z",
+        vdiCheckExpiresAt: "2026-01-15T00:00:00.000Z",
+        vdiCheckPricePaidPence: 1499,
+      }),
+    });
+    const user = userEvent.setup();
+    render(<CarBuyingGuideForm signedIn />);
+    await user.type(screen.getByLabelText("Search by registration (optional)"), "WP22FUT");
+    await user.click(screen.getByRole("button", { name: "Look up" }));
+
+    expect(await screen.findByText(/Powertrain type: BEV/)).toBeInTheDocument();
+
+    expect(screen.getByText("Euro NCAP safety rating")).toBeInTheDocument();
+    expect(screen.getByText(/Overall: 5 \/ 5 stars/)).toBeInTheDocument();
+    expect(screen.getByText(/Adult occupant: 91%/)).toBeInTheDocument();
+    expect(screen.getByText(/Pedestrian: 71%/)).toBeInTheDocument();
+
+    expect(screen.getByText(/Transmission: Automatic, 1-speed, 4x4, All Permanent drive/)).toBeInTheDocument();
+    expect(screen.getByText(/Manufacturer-quoted CO2: 0 g\/km/)).toBeInTheDocument();
+    expect(screen.getByText(/Power: 308\.4 bhp \/ 312\.7 PS \/ 230kW at 5,800 rpm/)).toBeInTheDocument();
+    expect(screen.getByText(/Torque: 664 Nm \(490 lb-ft\) at 5,800 rpm/)).toBeInTheDocument();
+
+    // The EV-specific TransmissionDetailsList is a pure duplicate of the
+    // top-level Transmission fields in this sample (Automatic/1-speed
+    // already shown above) - must NOT render a second time.
+    expect(screen.queryByText(/EV transmission/)).not.toBeInTheDocument();
+
+    expect(screen.getByText("Battery")).toBeInTheDocument();
+    expect(screen.getByText(/71kWh total, 64kWh usable, Lithium-Ion 375V, Under Floor\/Middle/)).toBeInTheDocument();
+    expect(screen.getByText(/battery warranty: 96 months \/ 100,000 miles/)).toBeInTheDocument();
+
+    expect(screen.getByText("Motors")).toBeInTheDocument();
+    expect(screen.getByText(/Motor 1 - Front/)).toBeInTheDocument();
+    expect(screen.getByText(/Motor 2 - Rear/)).toBeInTheDocument();
+    // Motor 2 is otherwise identical to Motor 1 - only its axle should
+    // show up as a difference, not every repeated field.
+    expect(screen.getByText("Axle driven: Rear")).toBeInTheDocument();
+    // Shared between both motors in this sample - shown once (motor 1's
+    // full card), not repeated a second time for motor 2's diff-only list.
+    expect(screen.getAllByText("Type: Permanent magnet synchronous")).toHaveLength(1);
+    expect(screen.getAllByText("Power: 215kW")).toHaveLength(1);
+
+    expect(screen.queryByText(/Charge ports \(Tesla Supercharger compatible\)/)).not.toBeInTheDocument(); // this sample isn't Supercharger-compatible
+    expect(screen.getByText("Charge ports")).toBeInTheDocument();
+    expect(screen.getByText(/Charge port 1 of 2: Type 2, Left\/Front, max 11kW, standard/)).toBeInTheDocument();
+    expect(screen.getByText(/Charge port 2 of 2: CCS, Right\/Front, max 120kW, standard/)).toBeInTheDocument();
+    expect(screen.getByText("2.3kW")).toBeInTheDocument();
+    expect(screen.getByText("24h 1m")).toBeInTheDocument(); // 1441 minutes
+    expect(screen.getByText("28m")).toBeInTheDocument(); // 150kW row, 28 minutes
+
+    expect(screen.getByText("EV performance & range")).toBeInTheDocument();
+    expect(screen.getByText(/Efficiency: 394Wh\/mile/)).toBeInTheDocument();
+    expect(screen.getByText(/Zero-emission range: 180 miles/)).toBeInTheDocument();
+    expect(screen.getByText(/Miles added per hour of charge: 304/)).toBeInTheDocument();
+    expect(screen.getByText(/WLTP range: 180 miles combined \(289\.68km\)/)).toBeInTheDocument();
+
+    // MPG genuinely doesn't apply to a BEV - no empty "Fuel economy"
+    // header should render when every one of its sub-fields is null.
+    expect(screen.queryByText("Fuel economy")).not.toBeInTheDocument();
+  });
+
   it("shows the valuation cooldown message when the free/Pro allowance is used up, independent of the VDI purchase state", async () => {
     (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
       ok: true,

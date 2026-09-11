@@ -80,6 +80,31 @@ function buildFactsBlock(input: CarBuyingGuideBriefingInput): string {
     lines.push(input.vdiCheck.isStolen ? "- STOLEN MARKER: yes" : "- Stolen marker: none");
     lines.push(input.vdiCheck.hasWriteOffRecord ? `- WRITE-OFF RECORD: yes, ${input.vdiCheck.writeOffRecordCount} record(s)` : "- Write-off record: none");
     lines.push(input.vdiCheck.hasOutstandingFinance ? `- OUTSTANDING FINANCE: yes, ${input.vdiCheck.financeRecords.length} agreement(s)` : "- Outstanding finance: none found");
+
+    // EV-specific VDI facts - only ever present for an electric/hybrid
+    // vehicle, and only when this check actually returned them. Gives the
+    // model real, specific figures to cite instead of the generic
+    // "check the battery health" line it would otherwise fall back to
+    // (see the fuel-type-conditional EV guidance in SYSTEM_PROMPT below).
+    const battery = input.vdiCheck.batteries?.[0];
+    if (battery && (battery.warrantyMonths != null || battery.warrantyMiles != null || battery.totalCapacityKwh != null)) {
+      const parts = [
+        battery.totalCapacityKwh != null ? `${battery.totalCapacityKwh}kWh total capacity` : null,
+        battery.usableCapacityKwh != null ? `${battery.usableCapacityKwh}kWh usable` : null,
+        battery.warrantyMonths != null || battery.warrantyMiles != null
+          ? `battery warranty ${[battery.warrantyMonths ? `${battery.warrantyMonths} months` : null, battery.warrantyMiles ? `${battery.warrantyMiles.toLocaleString()} miles` : null].filter(Boolean).join("/")}`
+          : null,
+      ].filter(Boolean);
+      lines.push(`- BATTERY: ${parts.join(", ")}`);
+    }
+    const rapidPort = input.vdiCheck.chargePorts?.find((p) => (p.maxChargePowerKw ?? 0) >= 50);
+    if (rapidPort) {
+      lines.push(`- RAPID CHARGE PORT: ${rapidPort.portType ?? "yes"}, up to ${rapidPort.maxChargePowerKw}kW${rapidPort.isStandardChargePort ? " (standard)" : " (optional)"}`);
+    }
+    const rangeCycle = input.vdiCheck.evRangeTestCycles?.[0];
+    if (rangeCycle?.combinedRangeMiles != null) {
+      lines.push(`- OFFICIAL RANGE: ${rangeCycle.combinedRangeMiles} miles combined (${rangeCycle.testType ?? "test cycle"})`);
+    }
   }
 
   if (input.valuation?.privateAverage != null) {
@@ -105,7 +130,7 @@ Strict rules:
 - A DANGEROUS-flagged item in the history is the single most important thing to surface, whether or not it was later fixed - never bury it among minor points.
 - General model knowledge (common faults, known issues, recalls) may draw on your own training knowledge of this make and model, since the facts below don't cover that - but be honest and specific, not generic filler that could apply to any car ("check the tyres" is not useful; naming an actual known weak point for this model is).
 - If an advisory or fail reason keeps reappearing across multiple tests without being fixed, say so plainly - that is a real pattern worth flagging clearly, not softening.
-- If the FUEL TYPE given below indicates this car is electric, hybrid, or plug-in hybrid, include specific due-diligence points for that in "modelNotes": battery state-of-health/degradation, whether a charging cable is included with the sale, and this manufacturer's battery warranty terms for this model. A petrol or diesel car needs none of this - only raise it when the fuel type actually calls for it.
+- If the FUEL TYPE given below indicates this car is electric, hybrid, or plug-in hybrid, include specific due-diligence points for that in "modelNotes": battery state-of-health/degradation, whether a charging cable is included with the sale, and this manufacturer's battery warranty terms for this model. A petrol or diesel car needs none of this - only raise it when the fuel type actually calls for it. If a BATTERY, RAPID CHARGE PORT, or OFFICIAL RANGE fact is given below (from a paid VDI check), cite those exact figures instead of generic advice - e.g. name the real battery warranty term rather than just suggesting the buyer ask about it.
 - If a VDI CHECK block is given below, a stolen marker, write-off record, or outstanding finance is the single most important thing here - lead with it as the first motFlag, whether or not the MOT history itself shows anything.
 - If a TAX STATUS fact is given below and shows the car is SORN or not currently valid, mention it plainly as something to resolve before the car can be used on the road - a practical logistics point, not a comment on condition.
 - Do not tell the reader whether to buy the car. Give them specific things to check in person, not a purchase recommendation.

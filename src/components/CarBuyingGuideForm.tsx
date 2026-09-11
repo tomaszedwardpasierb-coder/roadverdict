@@ -118,6 +118,61 @@ interface CarBuyingGuideLookupResponse {
       dateRecordAddedToPnc: string | null;
     } | null;
     mileageReadings?: { date: string; mileage: number; inSequence: boolean; dataSource: string | null }[];
+
+    powertrainType?: string | null;
+    driveType?: string | null;
+    manufacturerCo2?: number | null;
+    torqueLbFt?: number | null;
+    powerKw?: number | null;
+    powerRpm?: number | null;
+
+    ncapStarRating?: number | null;
+    ncapChildPercent?: number | null;
+    ncapAdultPercent?: number | null;
+    ncapPedestrianPercent?: number | null;
+    ncapSafetyAssistPercent?: number | null;
+
+    isTeslaSuperchargerCompatible?: boolean;
+    chargePorts?: {
+      portType: string | null;
+      locationOnVehicle: string | null;
+      maxChargePowerKw: number | null;
+      isStandardChargePort: boolean;
+      chargeTimes: { chargePortKw: number; timeInMinutes: number }[];
+    }[];
+    batteries?: {
+      locationOnVehicle: string | null;
+      totalCapacityKwh: number | null;
+      usableCapacityKwh: number | null;
+      chemistry: string | null;
+      warrantyMonths: number | null;
+      warrantyMiles: number | null;
+    }[];
+    motors?: {
+      motorType: string | null;
+      manufacturer: string | null;
+      model: string | null;
+      motorLocation: string | null;
+      powerKw: number | null;
+      maxTorqueNm: number | null;
+      axleDrivenByMotor: string | null;
+      supportsRegenerativeBraking: boolean;
+      additionalInformation: string | null;
+    }[];
+    evTransmissions?: { transmissionType: string | null; numberOfGears: number | null }[];
+    evMaxChargeInputPowerKw?: number | null;
+    evWhPerMile?: number | null;
+    evRealRangeMiles?: number | null;
+    evRealRangeKm?: number | null;
+    evMilesPerChargeHour?: number | null;
+    evZeroEmissionMiles?: number | null;
+    evRangeTestCycles?: {
+      testType: string | null;
+      combinedRangeMiles: number | null;
+      combinedRangeKm: number | null;
+      cityRangeMiles: number | null;
+      cityRangeKm: number | null;
+    }[];
   } | null;
   vdiCheckBlockedReason?: 'already_used' | 'payment_not_confirmed' | 'invalid' | 'fetch_failed';
   // Set alongside vdiCheck - when it was paid for, and how long it stays
@@ -188,10 +243,48 @@ const ICON = {
   soundLevel: '🔊',
   fuelEconomy: '📊',
   warranty: '🧾',
+  ev: '⚡',
+  chargePort: '🔌',
+  battery: '🔋',
+  motor: '🧲',
+  range: '🗺️',
+  ncap: '⭐',
 } as const;
 
 const CAR_CLASSES = Object.keys(CAR_CLASS_LABELS_FOR_BUYING_GUIDE) as CarSizeClass[];
 const AGE_BANDS = Object.keys(CAR_AGE_BAND_LABELS) as AgeBand[];
+
+function formatChargeMinutes(minutes: number): string {
+  if (minutes < 60) return `${minutes}m`;
+  const hours = Math.floor(minutes / 60);
+  const mins = minutes % 60;
+  return mins === 0 ? `${hours}h` : `${hours}h ${mins}m`;
+}
+
+type MotorEntry = NonNullable<NonNullable<CarBuyingGuideLookupResponse['vdiCheck']>['motors']>[number];
+
+// The first motor gets a full detail card; every motor after it only
+// lists the fields that actually differ (per the user's own explicit
+// request) - a dual-motor AWD EV's front/rear motors are usually
+// identical apart from location/axle, so repeating every field for each
+// one would just be noise.
+function motorDiffRows(motor: MotorEntry, reference: MotorEntry | null): { label: string; value: string }[] {
+  const rows: { label: string; value: string }[] = [];
+  const add = (label: string, value: string | number | boolean | null, refValue: string | number | boolean | null | undefined) => {
+    if (value == null) return;
+    if (reference && refValue === value) return;
+    rows.push({ label, value: typeof value === 'boolean' ? (value ? 'Yes' : 'No') : String(value) });
+  };
+  add('Type', motor.motorType, reference?.motorType);
+  add('Manufacturer', motor.manufacturer, reference?.manufacturer);
+  add('Model', motor.model, reference?.model);
+  add('Power', motor.powerKw != null ? `${motor.powerKw}kW` : null, reference?.powerKw != null ? `${reference.powerKw}kW` : null);
+  add('Max torque', motor.maxTorqueNm != null ? `${motor.maxTorqueNm}Nm` : null, reference?.maxTorqueNm != null ? `${reference.maxTorqueNm}Nm` : null);
+  add('Axle driven', motor.axleDrivenByMotor, reference?.axleDrivenByMotor);
+  add('Regenerative braking', motor.supportsRegenerativeBraking, reference?.supportsRegenerativeBraking);
+  add('Notes', motor.additionalInformation, reference?.additionalInformation);
+  return rows;
+}
 
 interface Props {
   signedIn: boolean;
@@ -474,12 +567,31 @@ export function CarBuyingGuideForm({ signedIn }: Props) {
                 </li>
               </ul>
 
+              {(motResult.vdiCheck.ncapStarRating != null || motResult.vdiCheck.ncapChildPercent != null ||
+                motResult.vdiCheck.ncapAdultPercent != null || motResult.vdiCheck.ncapPedestrianPercent != null ||
+                motResult.vdiCheck.ncapSafetyAssistPercent != null) && (
+                <>
+                  <p className="field-note" style={{ fontWeight: 600, margin: '0.6rem 0 0.3rem' }}>Euro NCAP safety rating</p>
+                  <ul style={{ margin: 0, paddingLeft: '1.1rem' }}>
+                    {motResult.vdiCheck.ncapStarRating != null && (
+                      <li className="field-note">{ICON.ncap} Overall: {motResult.vdiCheck.ncapStarRating} / 5 stars</li>
+                    )}
+                    {motResult.vdiCheck.ncapAdultPercent != null && <li className="field-note">{ICON.ncap} Adult occupant: {motResult.vdiCheck.ncapAdultPercent}%</li>}
+                    {motResult.vdiCheck.ncapChildPercent != null && <li className="field-note">{ICON.ncap} Child occupant: {motResult.vdiCheck.ncapChildPercent}%</li>}
+                    {motResult.vdiCheck.ncapPedestrianPercent != null && <li className="field-note">{ICON.ncap} Pedestrian: {motResult.vdiCheck.ncapPedestrianPercent}%</li>}
+                    {motResult.vdiCheck.ncapSafetyAssistPercent != null && <li className="field-note">{ICON.ncap} Safety assist: {motResult.vdiCheck.ncapSafetyAssistPercent}%</li>}
+                  </ul>
+                </>
+              )}
+
               {(motResult.vdiCheck.series || motResult.vdiCheck.platformName || motResult.vdiCheck.countryOfOrigin ||
                 motResult.vdiCheck.dvlaFuelType || motResult.vdiCheck.bodyStyle || motResult.vdiCheck.dvlaBodyType ||
-                motResult.vdiCheck.dvlaWheelPlan || motResult.vdiCheck.dateFirstRegisteredInUk || motResult.vdiCheck.dateOfManufacture) && (
+                motResult.vdiCheck.dvlaWheelPlan || motResult.vdiCheck.dateFirstRegisteredInUk || motResult.vdiCheck.dateOfManufacture ||
+                motResult.vdiCheck.powertrainType) && (
                 <>
                   <p className="field-note" style={{ fontWeight: 600, margin: '0.6rem 0 0.3rem' }}>Identity</p>
                   <ul style={{ margin: 0, paddingLeft: '1.1rem' }}>
+                    {motResult.vdiCheck.powertrainType && <li className="field-note">{ICON.ev} Powertrain type: {motResult.vdiCheck.powertrainType}</li>}
                     {motResult.vdiCheck.series && <li className="field-note">{ICON.identity} Series: {motResult.vdiCheck.series}</li>}
                     {motResult.vdiCheck.platformName && <li className="field-note">{ICON.identity} Platform: {motResult.vdiCheck.platformName}</li>}
                     {motResult.vdiCheck.countryOfOrigin && <li className="field-note">{ICON.origin} Country of origin: {motResult.vdiCheck.countryOfOrigin}</li>}
@@ -542,7 +654,8 @@ export function CarBuyingGuideForm({ signedIn }: Props) {
               )}
 
               {(motResult.vdiCheck.vedStandardSixMonths != null || motResult.vdiCheck.vedStandardTwelveMonths != null ||
-                motResult.vdiCheck.dvlaCo2 != null || motResult.vdiCheck.dvlaCo2Band || motResult.vdiCheck.euroStatus) && (
+                motResult.vdiCheck.dvlaCo2 != null || motResult.vdiCheck.dvlaCo2Band || motResult.vdiCheck.euroStatus ||
+                motResult.vdiCheck.manufacturerCo2 != null) && (
                 <>
                   <p className="field-note" style={{ fontWeight: 600, margin: '0.6rem 0 0.3rem' }}>Running costs</p>
                   <ul style={{ margin: 0, paddingLeft: '1.1rem' }}>
@@ -554,6 +667,9 @@ export function CarBuyingGuideForm({ signedIn }: Props) {
                     )}
                     {motResult.vdiCheck.dvlaCo2 != null && (
                       <li className="field-note">{ICON.co2} DVLA CO2: {motResult.vdiCheck.dvlaCo2} g/km{motResult.vdiCheck.dvlaCo2Band ? ` (band ${motResult.vdiCheck.dvlaCo2Band})` : ''}</li>
+                    )}
+                    {motResult.vdiCheck.manufacturerCo2 != null && (
+                      <li className="field-note">{ICON.co2} Manufacturer-quoted CO2: {motResult.vdiCheck.manufacturerCo2} g/km</li>
                     )}
                     {motResult.vdiCheck.euroStatus && <li className="field-note">{ICON.co2} Euro status: {motResult.vdiCheck.euroStatus}</li>}
                   </ul>
@@ -573,7 +689,7 @@ export function CarBuyingGuideForm({ signedIn }: Props) {
                     )}
                     {motResult.vdiCheck.transmissionType && (
                       <li className="field-note">
-                        {ICON.transmission} Transmission: {[motResult.vdiCheck.transmissionType, motResult.vdiCheck.numberOfGears != null ? `${motResult.vdiCheck.numberOfGears}-speed` : null, motResult.vdiCheck.drivingAxle ? `${motResult.vdiCheck.drivingAxle} drive` : null].filter(Boolean).join(', ')}
+                        {ICON.transmission} Transmission: {[motResult.vdiCheck.transmissionType, motResult.vdiCheck.numberOfGears != null ? `${motResult.vdiCheck.numberOfGears}-speed` : null, motResult.vdiCheck.driveType, motResult.vdiCheck.drivingAxle ? `${motResult.vdiCheck.drivingAxle} drive` : null].filter(Boolean).join(', ')}
                       </li>
                     )}
                     {motResult.vdiCheck.kerbWeightKg != null && <li className="field-note">{ICON.weight} Kerb weight: {motResult.vdiCheck.kerbWeightKg.toLocaleString()} kg</li>}
@@ -583,19 +699,112 @@ export function CarBuyingGuideForm({ signedIn }: Props) {
                 </>
               )}
 
+              {motResult.vdiCheck.batteries && motResult.vdiCheck.batteries.length > 0 && (
+                <>
+                  <p className="field-note" style={{ fontWeight: 600, margin: '0.6rem 0 0.3rem' }}>Battery</p>
+                  <ul style={{ margin: 0, paddingLeft: '1.1rem' }}>
+                    {motResult.vdiCheck.batteries.map((b, i) => (
+                      <li className="field-note" key={i}>
+                        {ICON.battery}{' '}
+                        {[
+                          b.totalCapacityKwh != null ? `${b.totalCapacityKwh}kWh total` : null,
+                          b.usableCapacityKwh != null ? `${b.usableCapacityKwh}kWh usable` : null,
+                          b.chemistry,
+                          b.locationOnVehicle,
+                        ].filter(Boolean).join(', ')}
+                        {(b.warrantyMonths != null || b.warrantyMiles != null) && (
+                          <>
+                            {' - battery warranty: '}
+                            {[b.warrantyMonths ? `${b.warrantyMonths} months` : null, b.warrantyMiles ? `${b.warrantyMiles.toLocaleString()} miles` : null].filter(Boolean).join(' / ')}
+                          </>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              )}
+
+              {motResult.vdiCheck.motors && motResult.vdiCheck.motors.length > 0 && (
+                <>
+                  <p className="field-note" style={{ fontWeight: 600, margin: '0.6rem 0 0.3rem' }}>Motor{motResult.vdiCheck.motors.length > 1 ? 's' : ''}</p>
+                  {motResult.vdiCheck.motors.map((m, i) => {
+                    const reference = i === 0 ? null : motResult.vdiCheck!.motors![0];
+                    const rows = motorDiffRows(m, reference);
+                    return (
+                      <div key={i} style={{ marginBottom: i < motResult.vdiCheck!.motors!.length - 1 ? '0.4rem' : 0 }}>
+                        <p className="field-note" style={{ margin: '0 0 0.15rem' }}>
+                          {ICON.motor} Motor {i + 1}{m.motorLocation ? ` - ${m.motorLocation}` : ''}
+                        </p>
+                        {rows.length > 0 ? (
+                          <ul style={{ margin: 0, paddingLeft: '1.1rem' }}>
+                            {rows.map((r, j) => (
+                              <li className="field-note" key={j}>{r.label}: {r.value}</li>
+                            ))}
+                          </ul>
+                        ) : (
+                          i > 0 && <p className="field-note" style={{ margin: 0, paddingLeft: '1.1rem' }}>Same as Motor 1</p>
+                        )}
+                      </div>
+                    );
+                  })}
+                </>
+              )}
+
+              {motResult.vdiCheck.chargePorts && motResult.vdiCheck.chargePorts.length > 0 && (
+                <>
+                  <p className="field-note" style={{ fontWeight: 600, margin: '0.6rem 0 0.3rem' }}>
+                    Charge port{motResult.vdiCheck.chargePorts.length > 1 ? 's' : ''}
+                    {motResult.vdiCheck.isTeslaSuperchargerCompatible ? ' (Tesla Supercharger compatible)' : ''}
+                  </p>
+                  {motResult.vdiCheck.chargePorts.map((p, i) => (
+                    <div key={i} style={{ marginBottom: '0.5rem' }}>
+                      <p className="field-note" style={{ margin: '0 0 0.15rem' }}>
+                        {ICON.chargePort} Charge port {i + 1} of {motResult.vdiCheck!.chargePorts!.length}:{' '}
+                        {[p.portType, p.locationOnVehicle, p.maxChargePowerKw != null ? `max ${p.maxChargePowerKw}kW` : null, p.isStandardChargePort ? 'standard' : 'optional'].filter(Boolean).join(', ')}
+                      </p>
+                      {p.chargeTimes.length > 0 && (
+                        <table style={{ borderCollapse: 'collapse', fontSize: '0.8rem' }}>
+                          <thead>
+                            <tr>
+                              <th style={{ textAlign: 'left', padding: '0.15rem 0.6rem 0.15rem 0', borderBottom: '1px solid var(--border)' }}>Charge rate</th>
+                              <th style={{ textAlign: 'left', padding: '0.15rem 0', borderBottom: '1px solid var(--border)' }}>10-80% time</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {p.chargeTimes.map((t, j) => (
+                              <tr key={j}>
+                                <td style={{ padding: '0.15rem 0.6rem 0.15rem 0' }} className="field-note">{t.chargePortKw}kW</td>
+                                <td style={{ padding: '0.15rem 0' }} className="field-note">{formatChargeMinutes(t.timeInMinutes)}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      )}
+                    </div>
+                  ))}
+                </>
+              )}
+
               {(motResult.vdiCheck.bhp != null || motResult.vdiCheck.ps != null || motResult.vdiCheck.torqueNm != null ||
                 motResult.vdiCheck.zeroToSixtyMph != null || motResult.vdiCheck.maxSpeedMph != null || motResult.vdiCheck.soundLevels) && (
                 <>
                   <p className="field-note" style={{ fontWeight: 600, margin: '0.6rem 0 0.3rem' }}>Performance</p>
                   <ul style={{ margin: 0, paddingLeft: '1.1rem' }}>
-                    {(motResult.vdiCheck.bhp != null || motResult.vdiCheck.ps != null) && (
+                    {(motResult.vdiCheck.bhp != null || motResult.vdiCheck.ps != null || motResult.vdiCheck.powerKw != null) && (
                       <li className="field-note">
-                        {ICON.performance} Power: {[motResult.vdiCheck.bhp != null ? `${motResult.vdiCheck.bhp} bhp` : null, motResult.vdiCheck.ps != null ? `${motResult.vdiCheck.ps} PS` : null].filter(Boolean).join(' / ')}
+                        {ICON.performance} Power: {[
+                          motResult.vdiCheck.bhp != null ? `${motResult.vdiCheck.bhp} bhp` : null,
+                          motResult.vdiCheck.ps != null ? `${motResult.vdiCheck.ps} PS` : null,
+                          motResult.vdiCheck.powerKw != null ? `${motResult.vdiCheck.powerKw}kW` : null,
+                        ].filter(Boolean).join(' / ')}
+                        {motResult.vdiCheck.powerRpm != null ? ` at ${motResult.vdiCheck.powerRpm.toLocaleString()} rpm` : ''}
                       </li>
                     )}
                     {motResult.vdiCheck.torqueNm != null && (
                       <li className="field-note">
-                        {ICON.torque} Torque: {motResult.vdiCheck.torqueNm} Nm{motResult.vdiCheck.torqueRpm != null ? ` at ${motResult.vdiCheck.torqueRpm.toLocaleString()} rpm` : ''}
+                        {ICON.torque} Torque: {motResult.vdiCheck.torqueNm} Nm
+                        {motResult.vdiCheck.torqueLbFt != null ? ` (${motResult.vdiCheck.torqueLbFt} lb-ft)` : ''}
+                        {motResult.vdiCheck.torqueRpm != null ? ` at ${motResult.vdiCheck.torqueRpm.toLocaleString()} rpm` : ''}
                       </li>
                     )}
                     {motResult.vdiCheck.zeroToSixtyMph != null && <li className="field-note">{ICON.topSpeed} 0-60mph: {motResult.vdiCheck.zeroToSixtyMph}s</li>}
@@ -616,6 +825,58 @@ export function CarBuyingGuideForm({ signedIn }: Props) {
                         ].filter(Boolean).join(', ')}
                       </li>
                     )}
+                  </ul>
+                </>
+              )}
+
+              {(() => {
+                const evT = motResult.vdiCheck!.evTransmissions;
+                if (!evT || evT.length === 0) return null;
+                // Only worth its own line when it actually adds something
+                // beyond the top-level transmissionType/numberOfGears
+                // already shown above - a single entry matching those is
+                // a pure duplicate (see vdiUnlock.ts's own comment).
+                const addsNewInfo =
+                  evT.length > 1 ||
+                  evT[0].transmissionType !== motResult.vdiCheck!.transmissionType ||
+                  evT[0].numberOfGears !== motResult.vdiCheck!.numberOfGears;
+                if (!addsNewInfo) return null;
+                return (
+                  <ul style={{ margin: '0.3rem 0 0', paddingLeft: '1.1rem' }}>
+                    {evT.map((t, i) => (
+                      <li className="field-note" key={i}>
+                        {ICON.transmission} EV transmission {evT.length > 1 ? `${i + 1} of ${evT.length}` : ''}: {[t.transmissionType, t.numberOfGears != null ? `${t.numberOfGears}-speed` : null].filter(Boolean).join(', ')}
+                      </li>
+                    ))}
+                  </ul>
+                );
+              })()}
+
+              {(motResult.vdiCheck.evWhPerMile != null || motResult.vdiCheck.evMaxChargeInputPowerKw != null ||
+                motResult.vdiCheck.evRealRangeMiles != null || motResult.vdiCheck.evMilesPerChargeHour != null ||
+                motResult.vdiCheck.evZeroEmissionMiles != null || (motResult.vdiCheck.evRangeTestCycles && motResult.vdiCheck.evRangeTestCycles.length > 0)) && (
+                <>
+                  <p className="field-note" style={{ fontWeight: 600, margin: '0.6rem 0 0.3rem' }}>EV performance &amp; range</p>
+                  <ul style={{ margin: 0, paddingLeft: '1.1rem' }}>
+                    {motResult.vdiCheck.evWhPerMile != null && <li className="field-note">{ICON.ev} Efficiency: {motResult.vdiCheck.evWhPerMile}Wh/mile</li>}
+                    {motResult.vdiCheck.evMaxChargeInputPowerKw != null && <li className="field-note">{ICON.chargePort} Max charge input power: {motResult.vdiCheck.evMaxChargeInputPowerKw}kW</li>}
+                    {motResult.vdiCheck.evZeroEmissionMiles != null && <li className="field-note">{ICON.range} Zero-emission range: {motResult.vdiCheck.evZeroEmissionMiles} miles</li>}
+                    {motResult.vdiCheck.evRealRangeMiles != null && (
+                      <li className="field-note">
+                        {ICON.range} Real-world range: {motResult.vdiCheck.evRealRangeMiles} miles{motResult.vdiCheck.evRealRangeKm != null ? ` (${motResult.vdiCheck.evRealRangeKm}km)` : ''}
+                      </li>
+                    )}
+                    {motResult.vdiCheck.evMilesPerChargeHour != null && <li className="field-note">{ICON.range} Miles added per hour of charge: {motResult.vdiCheck.evMilesPerChargeHour}</li>}
+                    {motResult.vdiCheck.evRangeTestCycles?.map((c, i) => (
+                      <li className="field-note" key={i}>
+                        {ICON.range} {c.testType ?? 'Test cycle'} range:{' '}
+                        {[
+                          c.combinedRangeMiles != null ? `${c.combinedRangeMiles} miles combined` : null,
+                          c.combinedRangeKm != null ? `(${c.combinedRangeKm}km)` : null,
+                          c.cityRangeMiles != null ? `${c.cityRangeMiles} miles city` : null,
+                        ].filter(Boolean).join(' ')}
+                      </li>
+                    ))}
                   </ul>
                 </>
               )}

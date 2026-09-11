@@ -188,6 +188,87 @@ export interface VdiCheckResult {
   // above (which are just the two summary figures that check produces).
   // Sorted oldest-first. Reserved for a chart, not shown as a plain list.
   mileageReadings?: VdiMileageReading[];
+
+  // Optional, additive - added for the car Buying Guide's EV-specific
+  // report (confirmed against a real Audi e-tron VDICheck sample, same
+  // discipline as every other field on this type). driveType/torqueLbFt/
+  // powerKw/powerRpm/manufacturerCo2/ncap* below apply to any vehicle,
+  // not just EVs - this sample simply happened to be the one that
+  // revealed them (the earlier BMW sample this type was first built
+  // against didn't include them, but the field paths are confirmed to
+  // exist on ModelDetails/ModelDetails.Emissions/ModelDetails.Safety
+  // regardless of powertrain type).
+
+  // From Powertrain.PowertrainType directly (e.g. "BEV", "ICE", "PHEV") -
+  // not EvDetails.TechnicalDetails' own copy of the same value, which is
+  // identical but only ever present when this already says something
+  // electric.
+  powertrainType?: string | null;
+
+  // Alongside the existing drivingAxle above - DriveType ("4x4") answers
+  // "is this AWD/4WD/2WD", DrivingAxle answers "how is that actually
+  // applied" (e.g. "All Permanent" vs on-demand) - genuinely two
+  // different facts, not a duplicate pair.
+  driveType?: string | null;
+  // The manufacturer's own declared CO2 figure, alongside the existing
+  // dvlaCo2/dvlaCo2Band above (DVLA's own registered figure for tax
+  // purposes) - usually close but not guaranteed identical, so kept as
+  // its own field rather than merged.
+  manufacturerCo2?: number | null;
+  // Alongside the existing torqueNm above.
+  torqueLbFt?: number | null;
+  // Alongside the existing bhp/ps above - this is the model's combined
+  // system output where relevant (an EV's own per-motor powerKw figures
+  // on VdiMotorDetail below are a different, narrower thing).
+  powerKw?: number | null;
+  powerRpm?: number | null;
+
+  // Euro NCAP - a vehicle-neutral safety rating, not EV-specific, just
+  // never previously captured. Absent entirely (not merely null) when a
+  // model has no rating on record - see ncapStarRating's own null check
+  // at every call site.
+  ncapStarRating?: number | null;
+  ncapChildPercent?: number | null;
+  ncapAdultPercent?: number | null;
+  ncapPedestrianPercent?: number | null;
+  ncapSafetyAssistPercent?: number | null;
+
+  // Whether this specific vehicle can rapid-charge at a Tesla
+  // Supercharger - distinct from (and not implied by) which physical
+  // port types it has, since a CCS port alone doesn't guarantee this.
+  isTeslaSuperchargerCompatible?: boolean;
+  // One entry per physical charge port this vehicle has (most EVs have
+  // just one; this Audi e-tron sample has three, including two Type 2
+  // ports on different sides) - never merged into a single figure, since
+  // each port has its own max power and charge-time curve.
+  chargePorts?: VdiChargePort[];
+  // One entry per battery pack - almost always a single entry, but kept
+  // as a list since the schema itself is a list (VDG's own modelling
+  // choice, not guessed).
+  batteries?: VdiBatteryDetail[];
+  // One entry per drive motor (a single-motor EV has one, a dual-motor
+  // AWD EV like this sample has two - front + rear). The Buying Guide
+  // form deliberately only shows the full detail for the first motor and
+  // just the differing fields for any others, per the user's own
+  // request - that's a display-layer decision, not enforced here.
+  motors?: VdiMotorDetail[];
+  // EvDetails.TechnicalDetails.TransmissionDetailsList - only ever worth
+  // showing separately from the existing transmissionType/numberOfGears
+  // above when it actually differs (e.g. per-axle gearing) or has more
+  // than one entry; a single entry matching the top-level figures is a
+  // pure duplicate, suppressed at display time.
+  evTransmissions?: VdiEvTransmission[];
+
+  evMaxChargeInputPowerKw?: number | null;
+  evWhPerMile?: number | null;
+  evRealRangeMiles?: number | null;
+  evRealRangeKm?: number | null;
+  evMilesPerChargeHour?: number | null;
+  evZeroEmissionMiles?: number | null;
+  // One entry per test standard the range was measured under (WLTP,
+  // sometimes also EPA/NEDC) - a list because the schema itself is one,
+  // even though most vehicles only ever have a single WLTP entry.
+  evRangeTestCycles?: VdiRangeTestCycle[];
 }
 
 export interface VdiMileageReading {
@@ -198,6 +279,59 @@ export interface VdiMileageReading {
   // just noise to filter out silently.
   inSequence: boolean;
   dataSource: string | null;
+}
+
+export interface VdiChargeTime {
+  chargePortKw: number;
+  // Null entries (a charge rate this specific port can't actually reach)
+  // are filtered out during parsing - see vdiCheckFetch.ts - so every
+  // entry that survives onto this array is a real, displayable figure.
+  timeInMinutes: number;
+}
+
+export interface VdiChargePort {
+  portType: string | null;
+  locationOnVehicle: string | null;
+  maxChargePowerKw: number | null;
+  isStandardChargePort: boolean;
+  chargeTimes: VdiChargeTime[];
+}
+
+export interface VdiBatteryDetail {
+  locationOnVehicle: string | null;
+  totalCapacityKwh: number | null;
+  usableCapacityKwh: number | null;
+  chemistry: string | null;
+  // This pack's own warranty - see the VdiCheckResult comment on why
+  // this is deliberately not merged with manufacturerWarrantyMonths/
+  // manufacturerWarrantyMiles above (the whole-vehicle warranty).
+  warrantyMonths: number | null;
+  warrantyMiles: number | null;
+}
+
+export interface VdiMotorDetail {
+  motorType: string | null;
+  manufacturer: string | null;
+  model: string | null;
+  motorLocation: string | null;
+  powerKw: number | null;
+  maxTorqueNm: number | null;
+  axleDrivenByMotor: string | null;
+  supportsRegenerativeBraking: boolean;
+  additionalInformation: string | null;
+}
+
+export interface VdiEvTransmission {
+  transmissionType: string | null;
+  numberOfGears: number | null;
+}
+
+export interface VdiRangeTestCycle {
+  testType: string | null;
+  combinedRangeMiles: number | null;
+  combinedRangeKm: number | null;
+  cityRangeMiles: number | null;
+  cityRangeKm: number | null;
 }
 
 export interface ValuationResult {

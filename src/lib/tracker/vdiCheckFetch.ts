@@ -22,6 +22,12 @@ import type {
   VdiPncDetail,
   VdiFuelEconomy,
   VdiMileageReading,
+  VdiChargePort,
+  VdiChargeTime,
+  VdiBatteryDetail,
+  VdiMotorDetail,
+  VdiEvTransmission,
+  VdiRangeTestCycle,
 } from "./vdiUnlock";
 
 const VDG_ENDPOINT = "https://uk.api.vehicledataglobal.com/r2/lookup";
@@ -57,6 +63,56 @@ interface RawMileageResult {
   DateRecorded?: string;
   InSequence?: boolean;
   DataSource?: string;
+}
+
+// EV field paths below are taken directly from a real Audi e-tron
+// VDICheck sample (same "never guess VDG schema" discipline as every
+// other block in this file).
+interface RawChargeTime {
+  ChargePortKw?: number;
+  TimeInMinutes?: number | null;
+}
+
+interface RawChargePort {
+  PortType?: string | null;
+  LocationOnVehicle?: string | null;
+  MaxChargePowerKw?: number | null;
+  IsStandardChargePort?: boolean;
+  ChargeTimes?: { AverageChargeTimes10To80Percent?: RawChargeTime[] };
+}
+
+interface RawBatteryDetail {
+  LocationOnVehicle?: string | null;
+  TotalCapacityKwh?: number | null;
+  UsableCapacityKwh?: number | null;
+  Chemistry?: string | null;
+  ManufacturerWarrantyMonths?: number | null;
+  ManufacturerWarrantyMiles?: number | null;
+}
+
+interface RawMotorDetail {
+  MotorType?: string | null;
+  Manufacturer?: string | null;
+  Model?: string | null;
+  MotorLocation?: string | null;
+  PowerKw?: number | null;
+  MaxTorqueNm?: number | null;
+  AxleDrivenByMotor?: string | null;
+  SupportsRegenerativeBraking?: boolean;
+  AdditionalInformation?: string | null;
+}
+
+interface RawEvTransmission {
+  TransmissionType?: string | null;
+  NumberOfGears?: number | null;
+}
+
+interface RawRangeTestCycle {
+  EvRangeTestType?: string | null;
+  CombinedRangeMiles?: number | null;
+  CombinedRangeKm?: number | null;
+  CityRangeMiles?: number | null;
+  CityRangeKm?: number | null;
 }
 
 // Field paths below are taken directly from a real, verified VDICheck
@@ -123,23 +179,55 @@ interface RawVdiCheckResponse {
       };
       Emissions?: {
         EuroStatus?: string | null;
+        ManufacturerCo2?: number | null;
         SoundLevels?: { StationaryDb?: number | null; DriveByDb?: number | null; EngineSpeedRpm?: number | null };
       };
       Powertrain?: {
+        PowertrainType?: string | null;
         IceDetails?: {
           Aspiration?: string | null;
           CylinderArrangement?: string | null;
           NumberOfCylinders?: number | null;
         };
+        EvDetails?: {
+          TechnicalDetails?: {
+            IsTeslaSuperchargerCompatible?: boolean;
+            ChargePortDetailsList?: RawChargePort[];
+            BatteryDetailsList?: RawBatteryDetail[];
+            MotorDetailsList?: RawMotorDetail[];
+            TransmissionDetailsList?: RawEvTransmission[];
+          };
+          Performance?: {
+            MaxChargeInputPowerKw?: number | null;
+            WhMile?: number | null;
+            RangeFigures?: {
+              RealRangeMiles?: number | null;
+              RealRangeKm?: number | null;
+              MilesPerChargeHour?: number | null;
+              ZeroEmissionMiles?: number | null;
+              RangeTestCycleList?: RawRangeTestCycle[];
+            };
+          };
+        };
         Transmission?: {
           TransmissionType?: string | null;
           NumberOfGears?: number | null;
+          DriveType?: string | null;
           DrivingAxle?: string | null;
         };
       };
+      Safety?: {
+        EuroNcap?: {
+          NcapStarRating?: number | null;
+          NcapChildPercent?: number | null;
+          NcapAdultPercent?: number | null;
+          NcapPedestrianPercent?: number | null;
+          NcapSafetyAssistPercent?: number | null;
+        };
+      };
       Performance?: {
-        Power?: { Bhp?: number | null; Ps?: number | null };
-        Torque?: { Nm?: number | null; Rpm?: number | null };
+        Power?: { Bhp?: number | null; Ps?: number | null; Kw?: number | null; Rpm?: number | null };
+        Torque?: { Nm?: number | null; LbFt?: number | null; Rpm?: number | null };
         Statistics?: {
           ZeroToSixtyMph?: number | null;
           ZeroToOneHundredKph?: number | null;
@@ -219,16 +307,77 @@ export async function fetchVdiCheckFromVdg(vrm: string, apiKey: string): Promise
 
     const modelDetails = data.Results.ModelDetails;
     const rawFuelEconomy = modelDetails?.Performance?.FuelEconomy;
-    const fuelEconomy: VdiFuelEconomy | null = rawFuelEconomy
+    // Guarded on at least one real figure, not just the object's own
+    // presence - an EV's FuelEconomy object exists in the raw response
+    // with every field null (MPG genuinely doesn't apply), which would
+    // otherwise produce a non-null-but-entirely-empty fuelEconomy value.
+    const hasRealFuelEconomy =
+      rawFuelEconomy != null &&
+      (rawFuelEconomy.UrbanColdMpg != null ||
+        rawFuelEconomy.ExtraUrbanMpg != null ||
+        rawFuelEconomy.CombinedMpg != null ||
+        rawFuelEconomy.UrbanColdL100Km != null ||
+        rawFuelEconomy.ExtraUrbanL100Km != null ||
+        rawFuelEconomy.CombinedL100Km != null);
+    const fuelEconomy: VdiFuelEconomy | null = hasRealFuelEconomy
       ? {
-          urbanColdMpg: rawFuelEconomy.UrbanColdMpg ?? null,
-          extraUrbanMpg: rawFuelEconomy.ExtraUrbanMpg ?? null,
-          combinedMpg: rawFuelEconomy.CombinedMpg ?? null,
-          urbanColdL100Km: rawFuelEconomy.UrbanColdL100Km ?? null,
-          extraUrbanL100Km: rawFuelEconomy.ExtraUrbanL100Km ?? null,
-          combinedL100Km: rawFuelEconomy.CombinedL100Km ?? null,
+          urbanColdMpg: rawFuelEconomy!.UrbanColdMpg ?? null,
+          extraUrbanMpg: rawFuelEconomy!.ExtraUrbanMpg ?? null,
+          combinedMpg: rawFuelEconomy!.CombinedMpg ?? null,
+          urbanColdL100Km: rawFuelEconomy!.UrbanColdL100Km ?? null,
+          extraUrbanL100Km: rawFuelEconomy!.ExtraUrbanL100Km ?? null,
+          combinedL100Km: rawFuelEconomy!.CombinedL100Km ?? null,
         }
       : null;
+
+    const evTechnical = modelDetails?.Powertrain?.EvDetails?.TechnicalDetails;
+    const chargePorts: VdiChargePort[] = (evTechnical?.ChargePortDetailsList ?? []).map((p) => {
+      const chargeTimes: VdiChargeTime[] = (p.ChargeTimes?.AverageChargeTimes10To80Percent ?? [])
+        .filter((t) => t.ChargePortKw != null && t.TimeInMinutes != null)
+        .map((t) => ({ chargePortKw: t.ChargePortKw as number, timeInMinutes: t.TimeInMinutes as number }));
+      return {
+        portType: p.PortType ?? null,
+        locationOnVehicle: p.LocationOnVehicle ?? null,
+        maxChargePowerKw: p.MaxChargePowerKw ?? null,
+        isStandardChargePort: p.IsStandardChargePort ?? false,
+        chargeTimes,
+      };
+    });
+    const batteries: VdiBatteryDetail[] = (evTechnical?.BatteryDetailsList ?? []).map((b) => ({
+      locationOnVehicle: b.LocationOnVehicle ?? null,
+      totalCapacityKwh: b.TotalCapacityKwh ?? null,
+      usableCapacityKwh: b.UsableCapacityKwh ?? null,
+      chemistry: b.Chemistry ?? null,
+      warrantyMonths: b.ManufacturerWarrantyMonths ?? null,
+      warrantyMiles: b.ManufacturerWarrantyMiles ?? null,
+    }));
+    const motors: VdiMotorDetail[] = (evTechnical?.MotorDetailsList ?? []).map((m) => ({
+      motorType: m.MotorType ?? null,
+      manufacturer: m.Manufacturer ?? null,
+      model: m.Model ?? null,
+      motorLocation: m.MotorLocation ?? null,
+      powerKw: m.PowerKw ?? null,
+      maxTorqueNm: m.MaxTorqueNm ?? null,
+      axleDrivenByMotor: m.AxleDrivenByMotor ?? null,
+      supportsRegenerativeBraking: m.SupportsRegenerativeBraking ?? false,
+      additionalInformation: m.AdditionalInformation ?? null,
+    }));
+    const evTransmissions: VdiEvTransmission[] = (evTechnical?.TransmissionDetailsList ?? []).map((t) => ({
+      transmissionType: t.TransmissionType ?? null,
+      numberOfGears: t.NumberOfGears ?? null,
+    }));
+
+    const evPerformance = modelDetails?.Powertrain?.EvDetails?.Performance;
+    const rangeFigures = evPerformance?.RangeFigures;
+    const evRangeTestCycles: VdiRangeTestCycle[] = (rangeFigures?.RangeTestCycleList ?? []).map((c) => ({
+      testType: c.EvRangeTestType ?? null,
+      combinedRangeMiles: c.CombinedRangeMiles ?? null,
+      combinedRangeKm: c.CombinedRangeKm ?? null,
+      cityRangeMiles: c.CityRangeMiles ?? null,
+      cityRangeKm: c.CityRangeKm ?? null,
+    }));
+
+    const ncap = modelDetails?.Safety?.EuroNcap;
 
     const rawPnc = data.Results.PncDetails;
     const pncDetail: VdiPncDetail | null =
@@ -322,6 +471,33 @@ export async function fetchVdiCheckFromVdg(vrm: string, apiKey: string): Promise
 
       pncDetail,
       mileageReadings,
+
+      powertrainType: modelDetails?.Powertrain?.PowertrainType ?? null,
+      driveType: modelDetails?.Powertrain?.Transmission?.DriveType ?? null,
+      manufacturerCo2: modelDetails?.Emissions?.ManufacturerCo2 ?? null,
+      torqueLbFt: modelDetails?.Performance?.Torque?.LbFt ?? null,
+      powerKw: modelDetails?.Performance?.Power?.Kw ?? null,
+      powerRpm: modelDetails?.Performance?.Power?.Rpm ?? null,
+
+      ncapStarRating: ncap?.NcapStarRating ?? null,
+      ncapChildPercent: ncap?.NcapChildPercent ?? null,
+      ncapAdultPercent: ncap?.NcapAdultPercent ?? null,
+      ncapPedestrianPercent: ncap?.NcapPedestrianPercent ?? null,
+      ncapSafetyAssistPercent: ncap?.NcapSafetyAssistPercent ?? null,
+
+      isTeslaSuperchargerCompatible: evTechnical?.IsTeslaSuperchargerCompatible ?? false,
+      chargePorts,
+      batteries,
+      motors,
+      evTransmissions,
+
+      evMaxChargeInputPowerKw: evPerformance?.MaxChargeInputPowerKw ?? null,
+      evWhPerMile: evPerformance?.WhMile ?? null,
+      evRealRangeMiles: rangeFigures?.RealRangeMiles ?? null,
+      evRealRangeKm: rangeFigures?.RealRangeKm ?? null,
+      evMilesPerChargeHour: rangeFigures?.MilesPerChargeHour ?? null,
+      evZeroEmissionMiles: rangeFigures?.ZeroEmissionMiles ?? null,
+      evRangeTestCycles,
     };
   } catch (err) {
     console.error("VDG VDICheck fetch failed:", err);

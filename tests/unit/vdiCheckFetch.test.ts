@@ -142,6 +142,29 @@ describe("fetchVdiCheckFromVdg", () => {
       previousColour: null,
       pncDetail: null,
       mileageReadings: [],
+      powertrainType: null,
+      driveType: null,
+      manufacturerCo2: null,
+      torqueLbFt: null,
+      powerKw: null,
+      powerRpm: null,
+      ncapStarRating: null,
+      ncapChildPercent: null,
+      ncapAdultPercent: null,
+      ncapPedestrianPercent: null,
+      ncapSafetyAssistPercent: null,
+      isTeslaSuperchargerCompatible: false,
+      chargePorts: [],
+      batteries: [],
+      motors: [],
+      evTransmissions: [],
+      evMaxChargeInputPowerKw: null,
+      evWhPerMile: null,
+      evRealRangeMiles: null,
+      evRealRangeKm: null,
+      evMilesPerChargeHour: null,
+      evZeroEmissionMiles: null,
+      evRangeTestCycles: [],
     });
   });
 
@@ -448,6 +471,29 @@ describe("fetchVdiCheckFromVdg", () => {
       previousColour: null,
       pncDetail: null,
       mileageReadings: [],
+      powertrainType: null,
+      driveType: null,
+      manufacturerCo2: null,
+      torqueLbFt: null,
+      powerKw: null,
+      powerRpm: null,
+      ncapStarRating: null,
+      ncapChildPercent: null,
+      ncapAdultPercent: null,
+      ncapPedestrianPercent: null,
+      ncapSafetyAssistPercent: null,
+      isTeslaSuperchargerCompatible: false,
+      chargePorts: [],
+      batteries: [],
+      motors: [],
+      evTransmissions: [],
+      evMaxChargeInputPowerKw: null,
+      evWhPerMile: null,
+      evRealRangeMiles: null,
+      evRealRangeKm: null,
+      evMilesPerChargeHour: null,
+      evZeroEmissionMiles: null,
+      evRangeTestCycles: [],
     });
   });
 
@@ -459,5 +505,254 @@ describe("fetchVdiCheckFromVdg", () => {
     expect(url).toContain("packageName=VDICheck");
     expect(url).toContain("apiKey=test-key");
     expect(url).toContain(encodeURIComponent("AS 3527"));
+  });
+
+  // EV-specific fields, confirmed against a real Audi e-tron VDICheck
+  // sample (WP22FUT) - a dual-motor AWD BEV with 3 charge port entries,
+  // a single battery pack, and a WLTP range test cycle.
+  describe("EV fields (from a real Audi e-tron sample)", () => {
+    function evSuccess(overrides: Record<string, unknown> = {}) {
+      return vdgSuccess({
+        ModelDetails: {
+          Emissions: { EuroStatus: "6", ManufacturerCo2: 0 },
+          Safety: { EuroNcap: { NcapStarRating: 5, NcapChildPercent: 85, NcapAdultPercent: 91, NcapPedestrianPercent: 71, NcapSafetyAssistPercent: 76 } },
+          Powertrain: {
+            PowertrainType: "BEV",
+            IceDetails: null,
+            EvDetails: {
+              TechnicalDetails: {
+                IsTeslaSuperchargerCompatible: false,
+                ChargePortDetailsList: [
+                  {
+                    PortType: "Type 2",
+                    LocationOnVehicle: "Left/Front",
+                    MaxChargePowerKw: 11.0,
+                    IsStandardChargePort: true,
+                    ChargeTimes: {
+                      AverageChargeTimes10To80Percent: [
+                        { ChargePortKw: 2.3, TimeInMinutes: 1441 },
+                        { ChargePortKw: 7.5, TimeInMinutes: 442 },
+                        { ChargePortKw: 11, TimeInMinutes: 301 },
+                        { ChargePortKw: 50, TimeInMinutes: null },
+                      ],
+                    },
+                  },
+                  {
+                    PortType: "CCS",
+                    LocationOnVehicle: "Right/Front",
+                    MaxChargePowerKw: 120.0,
+                    IsStandardChargePort: true,
+                    ChargeTimes: {
+                      AverageChargeTimes10To80Percent: [
+                        { ChargePortKw: 50, TimeInMinutes: 66 },
+                        { ChargePortKw: 100, TimeInMinutes: 33 },
+                        { ChargePortKw: 150, TimeInMinutes: 28 },
+                      ],
+                    },
+                  },
+                ],
+                BatteryDetailsList: [
+                  {
+                    TotalCapacityKwh: 71,
+                    UsableCapacityKwh: 64,
+                    Chemistry: "Lithium-Ion 375V",
+                    LocationOnVehicle: "Under Floor/Middle",
+                    ManufacturerWarrantyMonths: 96,
+                    ManufacturerWarrantyMiles: 100000,
+                  },
+                ],
+                MotorDetailsList: [
+                  {
+                    Manufacturer: "Audi",
+                    Model: "E-Tron",
+                    MotorType: "Permanent magnet synchronous",
+                    PowerKw: 215,
+                    MaxTorqueNm: 332,
+                    SupportsRegenerativeBraking: true,
+                    MotorLocation: "Front",
+                    AxleDrivenByMotor: "Front",
+                    AdditionalInformation: null,
+                  },
+                  {
+                    Manufacturer: "Audi",
+                    Model: "E-Tron",
+                    MotorType: "Permanent magnet synchronous",
+                    PowerKw: 215,
+                    MaxTorqueNm: 332,
+                    SupportsRegenerativeBraking: true,
+                    MotorLocation: "Rear",
+                    AxleDrivenByMotor: "Rear",
+                    AdditionalInformation: null,
+                  },
+                ],
+                TransmissionDetailsList: [{ TransmissionType: "Automatic", NumberOfGears: 1 }],
+              },
+              Performance: {
+                MaxChargeInputPowerKw: null,
+                WhMile: 394,
+                RangeFigures: {
+                  RealRangeMiles: null,
+                  RealRangeKm: null,
+                  MilesPerChargeHour: 304,
+                  ZeroEmissionMiles: 180,
+                  RangeTestCycleList: [{ EvRangeTestType: "WLTP", CombinedRangeMiles: 180, CombinedRangeKm: 289.68, CityRangeMiles: null, CityRangeKm: null }],
+                },
+              },
+            },
+            Transmission: { TransmissionType: "Automatic", NumberOfGears: 1, DriveType: "4x4", DrivingAxle: "All Permanent" },
+          },
+          Performance: {
+            Torque: { Nm: 664.0, LbFt: 490.0, Rpm: 5800 },
+            Power: { Bhp: 308.4, Ps: 312.7, Kw: 230.0, Rpm: 5800 },
+            Statistics: { ZeroToOneHundredKph: 6.8, MaxSpeedKph: 190, MaxSpeedMph: 118 },
+            FuelEconomy: { UrbanColdMpg: null, ExtraUrbanMpg: null, CombinedMpg: null, UrbanColdL100Km: null, ExtraUrbanL100Km: null, CombinedL100Km: null },
+          },
+        },
+        ...overrides,
+      });
+    }
+
+    it("parses powertrainType from the top-level Powertrain object, not EvDetails' own copy", async () => {
+      mocks.fetch.mockResolvedValue(evSuccess());
+      const result = await fetchVdiCheckFromVdg("WP22FUT", "test-key");
+      expect(result?.powertrainType).toBe("BEV");
+    });
+
+    it("parses driveType alongside the existing drivingAxle, as a distinct field", async () => {
+      mocks.fetch.mockResolvedValue(evSuccess());
+      const result = await fetchVdiCheckFromVdg("WP22FUT", "test-key");
+      expect(result?.driveType).toBe("4x4");
+      expect(result?.drivingAxle).toBe("All Permanent");
+    });
+
+    it("parses manufacturerCo2 distinctly from dvlaCo2", async () => {
+      mocks.fetch.mockResolvedValue(evSuccess());
+      const result = await fetchVdiCheckFromVdg("WP22FUT", "test-key");
+      expect(result?.manufacturerCo2).toBe(0);
+    });
+
+    it("parses torqueLbFt and powerKw/powerRpm alongside the existing Nm/Bhp/Ps figures", async () => {
+      mocks.fetch.mockResolvedValue(evSuccess());
+      const result = await fetchVdiCheckFromVdg("WP22FUT", "test-key");
+      expect(result?.torqueNm).toBe(664.0);
+      expect(result?.torqueLbFt).toBe(490.0);
+      expect(result?.bhp).toBe(308.4);
+      expect(result?.ps).toBe(312.7);
+      expect(result?.powerKw).toBe(230.0);
+      expect(result?.powerRpm).toBe(5800);
+    });
+
+    it("leaves fuelEconomy null when every one of its sub-fields is null, rather than an empty-but-truthy object", async () => {
+      mocks.fetch.mockResolvedValue(evSuccess());
+      const result = await fetchVdiCheckFromVdg("WP22FUT", "test-key");
+      expect(result?.fuelEconomy).toBeNull();
+    });
+
+    it("parses the Euro NCAP safety rating", async () => {
+      mocks.fetch.mockResolvedValue(evSuccess());
+      const result = await fetchVdiCheckFromVdg("WP22FUT", "test-key");
+      expect(result?.ncapStarRating).toBe(5);
+      expect(result?.ncapChildPercent).toBe(85);
+      expect(result?.ncapAdultPercent).toBe(91);
+      expect(result?.ncapPedestrianPercent).toBe(71);
+      expect(result?.ncapSafetyAssistPercent).toBe(76);
+    });
+
+    it("parses each charge port with its own filtered charge-time table (unreachable kW rates dropped)", async () => {
+      mocks.fetch.mockResolvedValue(evSuccess());
+      const result = await fetchVdiCheckFromVdg("WP22FUT", "test-key");
+      expect(result?.chargePorts).toEqual([
+        {
+          portType: "Type 2",
+          locationOnVehicle: "Left/Front",
+          maxChargePowerKw: 11.0,
+          isStandardChargePort: true,
+          chargeTimes: [
+            { chargePortKw: 2.3, timeInMinutes: 1441 },
+            { chargePortKw: 7.5, timeInMinutes: 442 },
+            { chargePortKw: 11, timeInMinutes: 301 },
+          ],
+        },
+        {
+          portType: "CCS",
+          locationOnVehicle: "Right/Front",
+          maxChargePowerKw: 120.0,
+          isStandardChargePort: true,
+          chargeTimes: [
+            { chargePortKw: 50, timeInMinutes: 66 },
+            { chargePortKw: 100, timeInMinutes: 33 },
+            { chargePortKw: 150, timeInMinutes: 28 },
+          ],
+        },
+      ]);
+      expect(result?.isTeslaSuperchargerCompatible).toBe(false);
+    });
+
+    it("parses the battery pack's own capacity/chemistry/warranty, distinct from the vehicle's own warranty", async () => {
+      mocks.fetch.mockResolvedValue(evSuccess());
+      const result = await fetchVdiCheckFromVdg("WP22FUT", "test-key");
+      expect(result?.batteries).toEqual([
+        {
+          locationOnVehicle: "Under Floor/Middle",
+          totalCapacityKwh: 71,
+          usableCapacityKwh: 64,
+          chemistry: "Lithium-Ion 375V",
+          warrantyMonths: 96,
+          warrantyMiles: 100000,
+        },
+      ]);
+    });
+
+    it("parses every motor in MotorDetailsList (a dual-motor AWD EV has two)", async () => {
+      mocks.fetch.mockResolvedValue(evSuccess());
+      const result = await fetchVdiCheckFromVdg("WP22FUT", "test-key");
+      expect(result?.motors).toEqual([
+        {
+          motorType: "Permanent magnet synchronous", manufacturer: "Audi", model: "E-Tron",
+          motorLocation: "Front", powerKw: 215, maxTorqueNm: 332, axleDrivenByMotor: "Front",
+          supportsRegenerativeBraking: true, additionalInformation: null,
+        },
+        {
+          motorType: "Permanent magnet synchronous", manufacturer: "Audi", model: "E-Tron",
+          motorLocation: "Rear", powerKw: 215, maxTorqueNm: 332, axleDrivenByMotor: "Rear",
+          supportsRegenerativeBraking: true, additionalInformation: null,
+        },
+      ]);
+    });
+
+    it("parses the EV-specific TransmissionDetailsList separately from the existing top-level Transmission fields", async () => {
+      mocks.fetch.mockResolvedValue(evSuccess());
+      const result = await fetchVdiCheckFromVdg("WP22FUT", "test-key");
+      expect(result?.evTransmissions).toEqual([{ transmissionType: "Automatic", numberOfGears: 1 }]);
+      // The existing top-level fields still parse from Transmission itself, unaffected.
+      expect(result?.transmissionType).toBe("Automatic");
+      expect(result?.numberOfGears).toBe(1);
+    });
+
+    it("parses EV performance/range figures, including the WLTP range test cycle list", async () => {
+      mocks.fetch.mockResolvedValue(evSuccess());
+      const result = await fetchVdiCheckFromVdg("WP22FUT", "test-key");
+      expect(result?.evWhPerMile).toBe(394);
+      expect(result?.evMaxChargeInputPowerKw).toBeNull();
+      expect(result?.evMilesPerChargeHour).toBe(304);
+      expect(result?.evZeroEmissionMiles).toBe(180);
+      expect(result?.evRealRangeMiles).toBeNull();
+      expect(result?.evRangeTestCycles).toEqual([
+        { testType: "WLTP", combinedRangeMiles: 180, combinedRangeKm: 289.68, cityRangeMiles: null, cityRangeKm: null },
+      ]);
+    });
+
+    it("defaults every EV field safely for a combustion car with no EvDetails/EuroNcap block at all", async () => {
+      mocks.fetch.mockResolvedValue(vdgSuccess());
+      const result = await fetchVdiCheckFromVdg("AS3527", "test-key");
+      expect(result?.powertrainType).toBeNull();
+      expect(result?.isTeslaSuperchargerCompatible).toBe(false);
+      expect(result?.chargePorts).toEqual([]);
+      expect(result?.batteries).toEqual([]);
+      expect(result?.motors).toEqual([]);
+      expect(result?.evTransmissions).toEqual([]);
+      expect(result?.evRangeTestCycles).toEqual([]);
+      expect(result?.ncapStarRating).toBeNull();
+    });
   });
 });
