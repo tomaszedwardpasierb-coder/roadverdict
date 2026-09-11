@@ -269,6 +269,38 @@ export interface VdiCheckResult {
   // sometimes also EPA/NEDC) - a list because the schema itself is one,
   // even though most vehicles only ever have a single WLTP entry.
   evRangeTestCycles?: VdiRangeTestCycle[];
+
+  // Optional, additive - confirmed against a real Royal Enfield
+  // Interceptor INT 650 VDICheck sample, and cross-checked back against
+  // the earlier BMW/Audi car samples (both present, sometimes populated
+  // there too - genuinely vehicle-neutral, not motorcycle-only).
+
+  // The manufacturer's own precise engine displacement, alongside DVLA's
+  // separately-registered (often rounded) figure below - the two can
+  // genuinely differ by a few cc, same reasoning as dvlaCo2/
+  // manufacturerCo2 being kept as two distinct fields.
+  engineCapacityCc?: number | null;
+  dvlaEngineCapacityCc?: number | null;
+  numberOfSeats?: number | null;
+  // DVLA's own registered power-to-weight figure (kW per kg) - a
+  // headline spec for a motorcycle in particular, but present in the
+  // schema for any vehicle kind.
+  powerToWeightRatio?: number | null;
+  // This exact model/generation's production run - not this specific
+  // vehicle's own dates (see dateFirstRegisteredInUk/dateOfManufacture
+  // above for that).
+  modelStartDate?: string | null;
+  modelEndDate?: string | null;
+  // e.g. "L3" (motorcycle >125cc) or "M1" (car) - a real DVLA/type-
+  // approval classification, distinct from taxationClass above.
+  typeApprovalCategory?: string | null;
+  heightMm?: number | null;
+  lengthMm?: number | null;
+  widthMm?: number | null;
+  wheelbaseLengthMm?: number | null;
+  // Alongside the existing kerbWeightKg above - unladen excludes fluids/
+  // driver, kerb includes them, a genuinely different figure.
+  unladenWeightKg?: number | null;
 }
 
 export interface VdiMileageReading {

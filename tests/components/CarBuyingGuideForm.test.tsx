@@ -563,9 +563,13 @@ describe("CarBuyingGuideForm", () => {
     expect(screen.getByText(/Miles added per hour of charge: 304/)).toBeInTheDocument();
     expect(screen.getByText(/WLTP range: 180 miles combined \(289\.68km\)/)).toBeInTheDocument();
 
-    // MPG genuinely doesn't apply to a BEV - no empty "Fuel economy"
-    // header should render when every one of its sub-fields is null.
-    expect(screen.queryByText("Fuel economy")).not.toBeInTheDocument();
+    // MPG genuinely doesn't apply to a BEV - the "Fuel economy" heading
+    // still renders (it's a real, supported check), just with the
+    // "not available" fallback note instead of an empty fact list. This
+    // fixture also leaves Dimensions/PNC unset, so several groups share
+    // the same fallback text - assert on count rather than a single match.
+    expect(screen.getByText("Fuel economy")).toBeInTheDocument();
+    expect(screen.getAllByText("Not available for this car.").length).toBeGreaterThan(0);
   });
 
   it("shows the valuation cooldown message when the free/Pro allowance is used up, independent of the VDI purchase state", async () => {

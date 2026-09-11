@@ -5,8 +5,37 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import type { VdiUnlock, VdiCheckResult } from "@/lib/tracker/vdiUnlock";
+
+// Same react-chartjs-2 stand-in convention as CarBuyingGuideForm.test.tsx
+// - real canvas rendering is exercised by VdiMileageChart.test.tsx itself.
+vi.mock("react-chartjs-2", () => ({
+  Line: () => <div data-testid="mileage-chart-line" />,
+  Bar: () => <div data-testid="mileage-chart-bar" />,
+}));
+
 import { VdiCheckSection } from "@/components/VdiCheckSection";
-import type { VdiUnlock } from "@/lib/tracker/vdiUnlock";
+
+const minimalVdi: VdiCheckResult = {
+  isStolen: false,
+  hasWriteOffRecord: false,
+  writeOffRecordCount: 0,
+  hasOutstandingFinance: false,
+  financeRecords: [],
+  keeperChanges: [],
+  keeperChangeCount: 0,
+  plateChangeCount: 0,
+  colourChangeCount: 0,
+  currentColour: null,
+  vedFirstYearTwelveMonths: null,
+  vedStandardTwelveMonths: null,
+  v5cReissueCount: 0,
+  calculatedAverageAnnualMileage: null,
+  averageMileageForAge: null,
+  mileageAnomalyDetected: false,
+  manufacturerWarrantyMiles: null,
+  manufacturerWarrantyMonths: null,
+};
 
 describe("VdiCheckSection", () => {
   beforeEach(() => {
@@ -283,5 +312,63 @@ describe("VdiCheckSection", () => {
     };
     render(<VdiCheckSection vehicleKind="bike" token="tok_abc" registration="AB12CDE" make="Honda" model="CB125R" vdiUnlock={vdiUnlock} />);
     expect(screen.queryByText("What this means")).not.toBeInTheDocument();
+  });
+
+  it("renders every icon as a real SVG element, not emoji text (unified with the Buying Guide's own icon set)", () => {
+    const vdiUnlock: VdiUnlock = { unlockedAt: "x", stripeSessionId: "cs_1", amountPaidPence: 799, currency: "gbp", vdiCheck: minimalVdi };
+    const { container } = render(<VdiCheckSection vehicleKind="bike" token="tok_abc" registration="AB12CDE" make="Honda" model="CB125R" vdiUnlock={vdiUnlock} />);
+    expect(container.querySelectorAll("svg").length).toBeGreaterThan(5);
+    expect(container.textContent).not.toMatch(/[🛡️💥💳🎨👤🔢🛣️🚓🚗📅🚙🌍📦♻️🏛️🌫️⚖️🔧⚙️⛽🏁💪🚀🔊📊🧾⚡🔌🔋🧲🗺️⭐🏷️]/u);
+  });
+
+  it("shows a plain 'not available' fallback for every group with no populated fields, matching the Buying Guide's own report", () => {
+    const vdiUnlock: VdiUnlock = { unlockedAt: "x", stripeSessionId: "cs_1", amountPaidPence: 799, currency: "gbp", vdiCheck: minimalVdi };
+    render(<VdiCheckSection vehicleKind="car" token="tok_xyz" registration="AB12CDE" make="Ford" model="Focus" vdiUnlock={vdiUnlock} />);
+    for (const heading of ["Euro NCAP safety rating", "Identity", "Dimensions", "Status flags", "Running costs", "Technical spec", "Performance", "EV performance & range", "Fuel economy", "Police National Computer record", "Mileage integrity", "Manufacturer warranty"]) {
+      expect(screen.getByText(heading)).toBeInTheDocument();
+    }
+    expect(screen.getAllByText("Not available for this car.").length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/Not available for this car - only applies to an electric/).length).toBeGreaterThan(0);
+  });
+
+  it("renders the new fields confirmed against the Royal Enfield motorcycle and Audi e-tron samples", () => {
+    const vdi: VdiCheckResult = {
+      ...minimalVdi,
+      engineCapacityCc: 648,
+      dvlaEngineCapacityCc: 650,
+      numberOfSeats: 2,
+      powerToWeightRatio: 0.17,
+      modelStartDate: "2019-01-04T00:00:00Z",
+      modelEndDate: "2022-10-10T00:00:00Z",
+      typeApprovalCategory: "L3",
+      heightMm: 1619,
+      lengthMm: 4901,
+      widthMm: 1935,
+      wheelbaseLengthMm: 2928,
+      unladenWeightKg: 2400,
+      powertrainType: "BEV",
+      ncapStarRating: 5,
+      batteries: [{ locationOnVehicle: "Under Floor/Middle", totalCapacityKwh: 71, usableCapacityKwh: 64, chemistry: "Lithium-Ion 375V", warrantyMonths: 96, warrantyMiles: 100000 }],
+      chargePorts: [{ portType: "CCS", locationOnVehicle: "Right/Front", maxChargePowerKw: 120, isStandardChargePort: true, chargeTimes: [{ chargePortKw: 50, timeInMinutes: 66 }] }],
+      mileageReadings: [
+        { date: "2024-02-03T10:10:16Z", mileage: 7759, inSequence: true, dataSource: "MOT" },
+        { date: "2026-02-07T10:19:11Z", mileage: 13943, inSequence: true, dataSource: "MOT" },
+      ],
+    };
+    const vdiUnlock: VdiUnlock = { unlockedAt: "x", stripeSessionId: "cs_1", amountPaidPence: 799, currency: "gbp", vdiCheck: vdi };
+    render(<VdiCheckSection vehicleKind="bike" token="tok_abc" registration="LA70GZF" make="Royal Enfield" model="Interceptor INT 650" vdiUnlock={vdiUnlock} />);
+
+    expect(screen.getByText("648cc")).toBeInTheDocument();
+    expect(screen.getByText("650cc")).toBeInTheDocument();
+    expect(screen.getByText("Seats")).toBeInTheDocument();
+    expect(screen.getByText("BEV")).toBeInTheDocument();
+    expect(screen.getByText("2019 - 2022")).toBeInTheDocument();
+    expect(screen.getByText("L3")).toBeInTheDocument();
+    expect(screen.getByText(/1,619mm/)).toBeInTheDocument();
+    expect(screen.getByText(/71kWh total/)).toBeInTheDocument();
+    expect(screen.getByText(/CCS, Right\/Front, max 120kW, standard/)).toBeInTheDocument();
+    expect(screen.getByText("5 / 5 stars")).toBeInTheDocument();
+    expect(screen.getByText("Mileage history")).toBeInTheDocument();
+    expect(screen.getByTestId("mileage-chart-bar")).toBeInTheDocument();
   });
 });

@@ -2,6 +2,15 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+
+// Real react-chartjs-2/chart.js rendering is exercised by
+// VdiMileageChart.test.tsx directly - see CarBuyingGuideForm.test.tsx's
+// own identical convention for why a lightweight stand-in is enough here.
+vi.mock("react-chartjs-2", () => ({
+  Line: () => <div data-testid="mileage-chart-line" />,
+  Bar: () => <div data-testid="mileage-chart-bar" />,
+}));
+
 import { BuyingGuideForm } from "@/components/BuyingGuideForm";
 
 describe("BuyingGuideForm", () => {
@@ -355,7 +364,8 @@ describe("BuyingGuideForm", () => {
     expect(screen.getByText(/1 plate change\(s\) on record/)).toBeInTheDocument();
     expect(screen.getByText(/Average annual mileage: 4,200 mi\/year/)).toBeInTheDocument();
     expect(screen.getByText(/⚠️ anomaly flagged/)).toBeInTheDocument();
-    expect(screen.getByText(/Manufacturer warranty: 24 months \/ 12,000 miles from new/)).toBeInTheDocument();
+    expect(screen.getByText("Manufacturer warranty")).toBeInTheDocument();
+    expect(screen.getByText(/24 months \/ 12,000 miles from new/)).toBeInTheDocument();
     expect(screen.getByText("Keeper change history")).toBeInTheDocument();
     // Rendered newest-first - the 2024 entry should come before the 2023 one.
     const keeperEntries = screen.getAllByText(/new keeper registered/);
@@ -430,16 +440,48 @@ describe("BuyingGuideForm", () => {
     await user.click(screen.getByRole("button", { name: "Look up" }));
 
     expect(await screen.findByText(/CAT N NON STRUCTURAL DAMAGE by 4th Dimension Innovation Ltd - 560/)).toBeInTheDocument();
-    expect(screen.getByText(/Date first registered \(UK\): 11\/12\/2010/)).toBeInTheDocument();
+    expect(screen.getByText(/First registered in the UK: 11\/12\/2010/)).toBeInTheDocument();
     expect(screen.getByText(/Date of manufacture: 11\/12\/2010/)).toBeInTheDocument();
-    expect(screen.getByText(/Colour: red \(1 change on record\)/)).toBeInTheDocument();
-    expect(screen.getByText(/Road tax \(standard rate\): £68\.75 for 6 months.*£125 for 12 months/)).toBeInTheDocument();
+    expect(screen.getByText(/Colour: red \(1 change\(s\) on record\)/)).toBeInTheDocument();
+    expect(screen.getByText(/Road tax \(6 months\): £68\.75/)).toBeInTheDocument();
+    expect(screen.getByText(/Road tax \(12 months\): £125\.00/)).toBeInTheDocument();
     expect(screen.getByText(/Mass in service: 202 kg/)).toBeInTheDocument();
     expect(screen.getByText(/Taxation class: L3/)).toBeInTheDocument();
     expect(screen.getByText(/Power: 71 bhp/)).toBeInTheDocument();
-    expect(screen.getByText(/Sound levels: stationary 90 dB.*drive-by 79 dB.*at 4,200 rpm/)).toBeInTheDocument();
+    expect(screen.getByText(/Sound level: 90dB stationary, 79dB drive-by at 4,200 rpm/)).toBeInTheDocument();
     expect(screen.getByText("Plate change history")).toBeInTheDocument();
     expect(screen.getByText(/PN74XSA → DU60OAL/)).toBeInTheDocument();
+  });
+
+  it("renders the mileage chart when mileageReadings has 2+ entries, mirroring the car Buying Guide's own", async () => {
+    (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        vrm: "LA70GZF", make: "Royal Enfield", model: "Interceptor INT 650", fuelType: "Petrol", colour: "White and red",
+        plateInRetention: false, motDueDate: null, motTests: [], briefing: null, taxDetails: null,
+        vdiCheck: {
+          isStolen: false, hasWriteOffRecord: false, writeOffRecordCount: 0, hasOutstandingFinance: false,
+          financeRecords: [], keeperChanges: [], keeperChangeCount: 0, plateChangeCount: 0, colourChangeCount: 0, currentColour: null,
+          v5cReissueCount: 1, calculatedAverageAnnualMileage: 2762, averageMileageForAge: 20000,
+          mileageAnomalyDetected: false, manufacturerWarrantyMiles: null, manufacturerWarrantyMonths: null,
+          mileageReadings: [
+            { date: "2024-02-03T10:10:16Z", mileage: 7759, inSequence: true, dataSource: "MOT" },
+            { date: "2025-02-08T11:06:53Z", mileage: 9130, inSequence: true, dataSource: "MOT" },
+            { date: "2026-02-07T10:19:11Z", mileage: 13943, inSequence: true, dataSource: "MOT" },
+          ],
+        },
+        vdiCheckPurchasedAt: "2026-01-01T00:00:00.000Z",
+        vdiCheckExpiresAt: "2026-01-15T00:00:00.000Z",
+        vdiCheckPricePaidPence: 1499,
+      }),
+    });
+    const user = userEvent.setup();
+    render(<BuyingGuideForm signedIn />);
+    await user.type(screen.getByLabelText("Search by registration (optional)"), "LA70GZF");
+    await user.click(screen.getByRole("button", { name: "Look up" }));
+
+    expect(await screen.findByText("Mileage history")).toBeInTheDocument();
+    expect(screen.getByTestId("mileage-chart-bar")).toBeInTheDocument();
   });
 
   it("shows the already-used message and a fresh Buy button when a purchase has already been consumed", async () => {

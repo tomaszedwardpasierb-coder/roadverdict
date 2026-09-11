@@ -165,6 +165,18 @@ describe("fetchVdiCheckFromVdg", () => {
       evMilesPerChargeHour: null,
       evZeroEmissionMiles: null,
       evRangeTestCycles: [],
+      engineCapacityCc: null,
+      dvlaEngineCapacityCc: null,
+      numberOfSeats: null,
+      powerToWeightRatio: null,
+      modelStartDate: null,
+      modelEndDate: null,
+      typeApprovalCategory: null,
+      heightMm: null,
+      lengthMm: null,
+      widthMm: null,
+      wheelbaseLengthMm: null,
+      unladenWeightKg: null,
     });
   });
 
@@ -494,6 +506,18 @@ describe("fetchVdiCheckFromVdg", () => {
       evMilesPerChargeHour: null,
       evZeroEmissionMiles: null,
       evRangeTestCycles: [],
+      engineCapacityCc: null,
+      dvlaEngineCapacityCc: null,
+      numberOfSeats: null,
+      powerToWeightRatio: null,
+      modelStartDate: null,
+      modelEndDate: null,
+      typeApprovalCategory: null,
+      heightMm: null,
+      lengthMm: null,
+      widthMm: null,
+      wheelbaseLengthMm: null,
+      unladenWeightKg: null,
     });
   });
 
@@ -753,6 +777,87 @@ describe("fetchVdiCheckFromVdg", () => {
       expect(result?.evTransmissions).toEqual([]);
       expect(result?.evRangeTestCycles).toEqual([]);
       expect(result?.ncapStarRating).toBeNull();
+    });
+  });
+
+  // Fields confirmed against a real Royal Enfield Interceptor INT 650
+  // VDICheck sample (LA70GZF) - a motorcycle, but every field here is
+  // genuinely vehicle-neutral (also confirmed present, sometimes
+  // populated, in the earlier BMW/Audi car samples).
+  describe("fields confirmed against a real motorcycle sample (Royal Enfield Interceptor INT 650)", () => {
+    function motorcycleSuccess(overrides: Record<string, unknown> = {}) {
+      return vdgSuccess({
+        VehicleDetails: {
+          VehicleIdentification: { DateFirstRegisteredInUk: "2021-01-22T00:00:00Z", DateOfManufacture: "2021-01-22T00:00:00Z" },
+          VehicleStatus: { VehicleExciseDutyDetails: { VedRate: { Standard: { SixMonths: 68.75, TwelveMonths: 125 } } } },
+          VehicleHistory: { ColourDetails: { CurrentColour: "WHITE AND RED", OriginalColour: "WHITE AND RED", NumberOfColourChanges: 0 } },
+          DvlaTechnicalDetails: { MassInServiceKg: 213, EngineCapacityCc: 650, NumberOfSeats: 2, PowerToWeightRatio: 0.17 },
+        },
+        ModelDetails: {
+          ModelIdentification: { Series: "INTERCEPTOR INT 650", StartDate: "2019-01-04T00:00:00Z", EndDate: "2022-10-10T00:00:00Z" },
+          ModelClassification: { TaxationClass: "L3", TypeApprovalCategory: "L3" },
+          Weights: { UnladenWeightKg: null },
+          Powertrain: { PowertrainType: "ICE", IceDetails: { EngineCapacityCc: 648 } },
+          Emissions: { EuroStatus: "5", ManufacturerCo2: 99, SoundLevels: { StationaryDb: 92, DriveByDb: 79, EngineSpeedRpm: 3625 } },
+          Performance: { Power: { Bhp: 46, Ps: 47, Kw: 35 } },
+        },
+        ...overrides,
+      });
+    }
+
+    it("parses the manufacturer's own engine capacity distinctly from DVLA's registered figure", async () => {
+      mocks.fetch.mockResolvedValue(motorcycleSuccess());
+      const result = await fetchVdiCheckFromVdg("LA70GZF", "test-key");
+      expect(result?.engineCapacityCc).toBe(648);
+      expect(result?.dvlaEngineCapacityCc).toBe(650);
+    });
+
+    it("parses numberOfSeats and powerToWeightRatio from DvlaTechnicalDetails", async () => {
+      mocks.fetch.mockResolvedValue(motorcycleSuccess());
+      const result = await fetchVdiCheckFromVdg("LA70GZF", "test-key");
+      expect(result?.numberOfSeats).toBe(2);
+      expect(result?.powerToWeightRatio).toBe(0.17);
+    });
+
+    it("parses this model's production run (start/end dates), distinct from this vehicle's own registration/manufacture dates", async () => {
+      mocks.fetch.mockResolvedValue(motorcycleSuccess());
+      const result = await fetchVdiCheckFromVdg("LA70GZF", "test-key");
+      expect(result?.modelStartDate).toBe("2019-01-04T00:00:00Z");
+      expect(result?.modelEndDate).toBe("2022-10-10T00:00:00Z");
+      expect(result?.dateFirstRegisteredInUk).toBe("2021-01-22T00:00:00Z");
+    });
+
+    it("parses the type-approval category (e.g. L3 for a motorcycle, M1 for a car)", async () => {
+      mocks.fetch.mockResolvedValue(motorcycleSuccess());
+      const result = await fetchVdiCheckFromVdg("LA70GZF", "test-key");
+      expect(result?.typeApprovalCategory).toBe("L3");
+    });
+
+    it("defaults dimensions/unladenWeightKg safely when Dimensions/Weights don't include them", async () => {
+      mocks.fetch.mockResolvedValue(motorcycleSuccess());
+      const result = await fetchVdiCheckFromVdg("LA70GZF", "test-key");
+      expect(result?.heightMm).toBeNull();
+      expect(result?.lengthMm).toBeNull();
+      expect(result?.widthMm).toBeNull();
+      expect(result?.wheelbaseLengthMm).toBeNull();
+      expect(result?.unladenWeightKg).toBeNull();
+    });
+
+    it("parses real dimensions when present (confirmed against the Audi e-tron sample)", async () => {
+      mocks.fetch.mockResolvedValue(
+        vdgSuccess({
+          ModelDetails: {
+            Dimensions: { HeightMm: 1619, LengthMm: 4901, WidthMm: 1935, WheelbaseLengthMm: 2928 },
+            Weights: { UnladenWeightKg: 2400 },
+          },
+        })
+      );
+      const result = await fetchVdiCheckFromVdg("WP22FUT", "test-key");
+      expect(result?.heightMm).toBe(1619);
+      expect(result?.lengthMm).toBe(4901);
+      expect(result?.widthMm).toBe(1935);
+      expect(result?.wheelbaseLengthMm).toBe(2928);
+      expect(result?.unladenWeightKg).toBe(2400);
     });
   });
 });

@@ -154,22 +154,34 @@ interface RawVdiCheckResponse {
       };
       DvlaTechnicalDetails?: {
         MassInServiceKg?: number | null;
+        EngineCapacityCc?: number | null;
+        NumberOfSeats?: number | null;
+        PowerToWeightRatio?: number | null;
       };
     };
     ModelDetails?: {
       ModelIdentification?: {
         Series?: string;
         CountryOfOrigin?: string | null;
+        StartDate?: string | null;
+        EndDate?: string | null;
       };
-      ModelClassification?: { TaxationClass?: string };
+      ModelClassification?: { TaxationClass?: string; TypeApprovalCategory?: string | null };
       BodyDetails?: {
         PlatformName?: string | null;
         BodyStyle?: string | null;
         FuelTankCapacityLitres?: number | null;
       };
+      Dimensions?: {
+        HeightMm?: number | null;
+        LengthMm?: number | null;
+        WidthMm?: number | null;
+        WheelbaseLengthMm?: number | null;
+      };
       Weights?: {
         KerbWeightKg?: number | null;
         GrossCombinedWeightKg?: number | null;
+        UnladenWeightKg?: number | null;
       };
       AdditionalInformation?: {
         VehicleWarrantyInformation?: {
@@ -188,6 +200,7 @@ interface RawVdiCheckResponse {
           Aspiration?: string | null;
           CylinderArrangement?: string | null;
           NumberOfCylinders?: number | null;
+          EngineCapacityCc?: number | null;
         };
         EvDetails?: {
           TechnicalDetails?: {
@@ -498,6 +511,19 @@ export async function fetchVdiCheckFromVdg(vrm: string, apiKey: string): Promise
       evMilesPerChargeHour: rangeFigures?.MilesPerChargeHour ?? null,
       evZeroEmissionMiles: rangeFigures?.ZeroEmissionMiles ?? null,
       evRangeTestCycles,
+
+      engineCapacityCc: modelDetails?.Powertrain?.IceDetails?.EngineCapacityCc ?? null,
+      dvlaEngineCapacityCc: vd?.DvlaTechnicalDetails?.EngineCapacityCc ?? null,
+      numberOfSeats: vd?.DvlaTechnicalDetails?.NumberOfSeats ?? null,
+      powerToWeightRatio: vd?.DvlaTechnicalDetails?.PowerToWeightRatio ?? null,
+      modelStartDate: modelDetails?.ModelIdentification?.StartDate ?? null,
+      modelEndDate: modelDetails?.ModelIdentification?.EndDate ?? null,
+      typeApprovalCategory: modelDetails?.ModelClassification?.TypeApprovalCategory ?? null,
+      heightMm: modelDetails?.Dimensions?.HeightMm ?? null,
+      lengthMm: modelDetails?.Dimensions?.LengthMm ?? null,
+      widthMm: modelDetails?.Dimensions?.WidthMm ?? null,
+      wheelbaseLengthMm: modelDetails?.Dimensions?.WheelbaseLengthMm ?? null,
+      unladenWeightKg: modelDetails?.Weights?.UnladenWeightKg ?? null,
     };
   } catch (err) {
     console.error("VDG VDICheck fetch failed:", err);
