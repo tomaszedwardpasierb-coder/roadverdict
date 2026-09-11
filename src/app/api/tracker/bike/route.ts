@@ -21,7 +21,7 @@ import {
 } from "@/lib/tracker/bike";
 import { getCarsForUser, countActiveCars } from "@/lib/tracker/car";
 import { isPro } from "@/lib/subscriptions";
-import { MAX_FREE_VEHICLES } from "@/lib/tracker/vehicleLimit";
+import { MAX_FREE_VEHICLES, MAX_PRO_VEHICLES } from "@/lib/tracker/vehicleLimit";
 import { fetchDvlaDataFromVdg } from "@/lib/tracker/dvlaDataFetch";
 import { fetchVehicleTaxDetailsFromVdg } from "@/lib/tracker/vehicleTaxFetch";
 import { syncSornReminder } from "@/lib/tracker/reminder";
@@ -77,16 +77,27 @@ export async function POST(request: NextRequest) {
   // inner safety net below, but is never actually reachable through this
   // route once this fires, since a bike-only count can never exceed the
   // combined count.
-  if (!(await isPro(session.email))) {
+  //
+  // Pro gets a higher cap, not an unlimited one - MAX_PRO_VEHICLES
+  // matches what Pro's own marketing copy already promises ("a second
+  // vehicle"), and closes a real cost gap: every vehicle adds recurring
+  // paid VDG calls (refresh-data alone is 3 calls every 5 days) with no
+  // ceiling of its own, so an uncapped vehicle count multiplied that
+  // cost indefinitely.
+  {
+    const userIsPro = await isPro(session.email);
+    const limit = userIsPro ? MAX_PRO_VEHICLES : MAX_FREE_VEHICLES;
     const [existingBikes, existingCars] = await Promise.all([
       getBikesForUser(session.email),
       getCarsForUser(session.email),
     ]);
     const combinedCount = countActiveBikes(existingBikes) + countActiveCars(existingCars);
-    if (combinedCount >= MAX_FREE_VEHICLES) {
+    if (combinedCount >= limit) {
       return NextResponse.json(
         {
-          error: `Free accounts can track up to ${MAX_FREE_VEHICLES} vehicle${MAX_FREE_VEHICLES === 1 ? "" : "s"} total (bikes and cars combined). Upgrade to add more.`,
+          error: userIsPro
+            ? `Pro accounts can track up to ${limit} vehicles total (bikes and cars combined).`
+            : `Free accounts can track up to ${limit} vehicle${limit === 1 ? "" : "s"} total (bikes and cars combined). Upgrade to add more.`,
           reason: "limit_reached",
         },
         { status: 403 }

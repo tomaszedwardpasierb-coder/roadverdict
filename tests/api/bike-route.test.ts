@@ -208,16 +208,33 @@ describe("POST /api/tracker/bike", () => {
     expect(mocks.createBike).not.toHaveBeenCalled();
   });
 
-  it("allows a Pro account past the combined cap", async () => {
+  it("allows a Pro account past the free cap, up to Pro's own higher cap", async () => {
+    mocks.getSession.mockResolvedValue({ email: "owner@example.com" });
+    mocks.isPro.mockResolvedValue(true);
+    mocks.getBikesForUser.mockResolvedValue([{ id: "bike-1", transferredTo: undefined }]);
+    mocks.getCarsForUser.mockResolvedValue([]);
+
+    const response = await POST(request("POST", JSON.stringify(validCreatePayload)));
+
+    expect(response.status).toBe(200);
+    expect(mocks.createBike).toHaveBeenCalled();
+  });
+
+  // Pro gets a higher cap (MAX_PRO_VEHICLES = 2), not an unlimited one -
+  // every vehicle carries real, recurring VDG cost with no ceiling of
+  // its own, so Pro being uncapped multiplied that cost indefinitely.
+  it("still blocks a Pro account once it's already at Pro's own combined cap", async () => {
     mocks.getSession.mockResolvedValue({ email: "owner@example.com" });
     mocks.isPro.mockResolvedValue(true);
     mocks.getBikesForUser.mockResolvedValue([{ id: "bike-1", transferredTo: undefined }]);
     mocks.getCarsForUser.mockResolvedValue([{ id: "car-1", transferredTo: undefined }]);
 
     const response = await POST(request("POST", JSON.stringify(validCreatePayload)));
+    const body = await response.json();
 
-    expect(response.status).toBe(200);
-    expect(mocks.createBike).toHaveBeenCalled();
+    expect(response.status).toBe(403);
+    expect(body.reason).toBe("limit_reached");
+    expect(mocks.createBike).not.toHaveBeenCalled();
   });
 
   it("creates the bike and returns it when the DVLA lookup finds nothing", async () => {

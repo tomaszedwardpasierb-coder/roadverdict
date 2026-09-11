@@ -126,16 +126,32 @@ describe("POST /api/cars/car", () => {
     expect(mocks.createCar).not.toHaveBeenCalled();
   });
 
-  it("allows a Pro account past the combined cap", async () => {
+  it("allows a Pro account past the free cap, up to Pro's own higher cap", async () => {
+    mocks.getSession.mockResolvedValue({ email: "owner@example.com" });
+    mocks.isPro.mockResolvedValue(true);
+    mocks.getBikesForUser.mockResolvedValue([{ id: "bike-1", transferredTo: undefined }]);
+    mocks.getCarsForUser.mockResolvedValue([]);
+
+    const response = await POST(request("POST", JSON.stringify(validCreatePayload)));
+
+    expect(response.status).toBe(200);
+    expect(mocks.createCar).toHaveBeenCalled();
+  });
+
+  // Pro gets a higher cap (MAX_PRO_VEHICLES = 2), not an unlimited one -
+  // see the equivalent test in bike-route.test.ts for the full reasoning.
+  it("still blocks a Pro account once it's already at Pro's own combined cap", async () => {
     mocks.getSession.mockResolvedValue({ email: "owner@example.com" });
     mocks.isPro.mockResolvedValue(true);
     mocks.getBikesForUser.mockResolvedValue([{ id: "bike-1", transferredTo: undefined }]);
     mocks.getCarsForUser.mockResolvedValue([{ id: "car-1", transferredTo: undefined }]);
 
     const response = await POST(request("POST", JSON.stringify(validCreatePayload)));
+    const body = await response.json();
 
-    expect(response.status).toBe(200);
-    expect(mocks.createCar).toHaveBeenCalled();
+    expect(response.status).toBe(403);
+    expect(body.reason).toBe("limit_reached");
+    expect(mocks.createCar).not.toHaveBeenCalled();
   });
 
   it("rejects malformed JSON", async () => {

@@ -1,19 +1,25 @@
 // Place at: src/lib/tracker/valuationCheckUsage.ts
 //
 // Per-account rate limit on the Buying Guide's free, car-only
-// independent valuation (ValuationDetails costs ~20p/call - cheap enough
-// to give away free, unlike VDICheck at ~£3, but not so cheap it should
-// be unlimited). Deliberately its own module and its own UserDoc field,
-// separate from vdiCheckUsage.ts/vdiCheckUsage - VDI moved to a pure
-// pay-per-use purchase with no cooldown concept at all (see
-// vdiPurchase.ts), so the two rate limits must not share state. Same
-// field+predicate+recorder shape as vdiCheckUsage.ts/
+// independent valuation (ValuationDetails costs a confirmed £0.20/call -
+// cheap enough to give away free, unlike VDICheck at a confirmed £3, but
+// not so cheap it should be unlimited). Deliberately its own module and
+// its own UserDoc field, separate from vdiCheckUsage.ts/vdiCheckUsage -
+// VDI moved to a pure pay-per-use purchase with no cooldown concept at
+// all (see vdiPurchase.ts), so the two rate limits must not share state.
+// Same field+predicate+recorder shape as vdiCheckUsage.ts/
 // receiptRequest.ts's canSendReminder/recordReminderSent.
+//
+// Pro's cooldown used to be 24h (vs Free's 7 days) - at £0.20/call that
+// alone worked out to roughly £6/month, more than Pro's entire £5.99
+// subscription price on this one feature alone. Matched to Free's 7-day
+// cooldown instead (~£0.86/month) - there's no product reason Pro needs
+// this specific check 7x more often than Free.
 import { getContainer } from "@/lib/cosmos";
 import type { UserDoc } from "@/lib/tracker/userDoc";
 
 export const VALUATION_CHECK_COOLDOWN_MS_FREE = 7 * 24 * 60 * 60 * 1000;
-export const VALUATION_CHECK_COOLDOWN_MS_PRO = 24 * 60 * 60 * 1000;
+export const VALUATION_CHECK_COOLDOWN_MS_PRO = 7 * 24 * 60 * 60 * 1000;
 
 function cooldownMs(isPro: boolean): number {
   return isPro ? VALUATION_CHECK_COOLDOWN_MS_PRO : VALUATION_CHECK_COOLDOWN_MS_FREE;

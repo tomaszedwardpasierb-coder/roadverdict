@@ -44,16 +44,22 @@ describe("canRunValuationCheck", () => {
     expect(canRunValuationCheck(user, false)).toBe(true);
   });
 
-  it("blocks a Pro account within its own, shorter 1-day cooldown", () => {
+  it("blocks a Pro account within the same cooldown as Free", () => {
     const user = makeUser({ valuationCheckUsage: { lastRunAt: new Date(Date.now() - 1000).toISOString() } });
     expect(canRunValuationCheck(user, true)).toBe(false);
   });
 
-  it("allows a Pro account again once its 1-day cooldown has passed, even though a free account would still be blocked", () => {
-    const lastRunAt = new Date(Date.now() - VALUATION_CHECK_COOLDOWN_MS_PRO - 1000).toISOString();
+  // Pro's cooldown used to be a separate, much shorter 24h window - at
+  // £0.20/call that alone worked out to more than Pro's entire monthly
+  // subscription price. Matched to Free's 7-day cooldown instead (see
+  // VALUATION_CHECK_COOLDOWN_MS_PRO's own comment) - this pins that both
+  // plans now share the exact same window, not a Pro-specific shortcut.
+  it("gives Pro the exact same cooldown as Free, not a shorter one", () => {
+    expect(VALUATION_CHECK_COOLDOWN_MS_PRO).toBe(VALUATION_CHECK_COOLDOWN_MS_FREE);
+    const lastRunAt = new Date(Date.now() - VALUATION_CHECK_COOLDOWN_MS_FREE - 1000).toISOString();
     const user = makeUser({ valuationCheckUsage: { lastRunAt } });
     expect(canRunValuationCheck(user, true)).toBe(true);
-    expect(canRunValuationCheck(user, false)).toBe(false);
+    expect(canRunValuationCheck(user, false)).toBe(true);
   });
 });
 
@@ -75,7 +81,7 @@ describe("nextValuationCheckAt", () => {
     expect(new Date(next!).getTime()).toBe(new Date(lastRunAt).getTime() + VALUATION_CHECK_COOLDOWN_MS_FREE);
   });
 
-  it("returns the shorter Pro cooldown end date when isPro is true", () => {
+  it("returns the same cooldown end date when isPro is true", () => {
     const lastRunAt = new Date(Date.now() - 1000).toISOString();
     const user = makeUser({ valuationCheckUsage: { lastRunAt } });
     const next = nextValuationCheckAt(user, true);

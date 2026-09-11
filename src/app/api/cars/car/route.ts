@@ -21,7 +21,7 @@ import {
 } from "@/lib/tracker/car";
 import { getBikesForUser, countActiveBikes, type ChartKind } from "@/lib/tracker/bike";
 import { isPro } from "@/lib/subscriptions";
-import { MAX_FREE_VEHICLES } from "@/lib/tracker/vehicleLimit";
+import { MAX_FREE_VEHICLES, MAX_PRO_VEHICLES } from "@/lib/tracker/vehicleLimit";
 import { fetchDvlaDataFromVdg } from "@/lib/tracker/dvlaDataFetch";
 import { fetchVehicleTaxDetailsFromVdg } from "@/lib/tracker/vehicleTaxFetch";
 import { syncCarSornReminder } from "@/lib/tracker/carReminder";
@@ -82,17 +82,22 @@ export async function POST(request: NextRequest) {
   // Combined bike+car cap - createCar itself has no cap logic of its own
   // (unlike createBike), so this route is the only gate for cars. See
   // the equivalent block in POST /api/tracker/bike for why this lives
-  // at the route layer rather than inside car.ts.
-  if (!(await isPro(session.email))) {
+  // at the route layer rather than inside car.ts, and for why Pro gets
+  // its own higher (not unlimited) cap.
+  {
+    const userIsPro = await isPro(session.email);
+    const limit = userIsPro ? MAX_PRO_VEHICLES : MAX_FREE_VEHICLES;
     const [existingBikes, existingCars] = await Promise.all([
       getBikesForUser(session.email),
       getCarsForUser(session.email),
     ]);
     const combinedCount = countActiveBikes(existingBikes) + countActiveCars(existingCars);
-    if (combinedCount >= MAX_FREE_VEHICLES) {
+    if (combinedCount >= limit) {
       return NextResponse.json(
         {
-          error: `Free accounts can track up to ${MAX_FREE_VEHICLES} vehicle${MAX_FREE_VEHICLES === 1 ? "" : "s"} total (bikes and cars combined). Upgrade to add more.`,
+          error: userIsPro
+            ? `Pro accounts can track up to ${limit} vehicles total (bikes and cars combined).`
+            : `Free accounts can track up to ${limit} vehicle${limit === 1 ? "" : "s"} total (bikes and cars combined). Upgrade to add more.`,
           reason: "limit_reached",
         },
         { status: 403 }

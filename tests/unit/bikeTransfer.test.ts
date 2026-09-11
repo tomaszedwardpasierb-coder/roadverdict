@@ -37,7 +37,7 @@ vi.mock("@/lib/tracker/car", () => ({
   getCarsForUser: mocks.getCarsForUser,
   countActiveCars: mocks.countActiveCars,
 }));
-vi.mock("@/lib/tracker/vehicleLimit", () => ({ MAX_FREE_VEHICLES: 1 }));
+vi.mock("@/lib/tracker/vehicleLimit", () => ({ MAX_FREE_VEHICLES: 1, MAX_PRO_VEHICLES: 2 }));
 vi.mock("@/lib/tracker/serviceRecord", () => ({ getServiceRecords: mocks.getServiceRecords }));
 vi.mock("@/lib/tracker/mod", () => ({ getMods: mocks.getMods }));
 vi.mock("@/lib/tracker/bill", () => ({ getBills: mocks.getBills }));
@@ -151,14 +151,21 @@ describe("transferBike", () => {
     expect(mocks.upsert).not.toHaveBeenCalled();
   });
 
-  // Pro accounts skip the cap entirely, per subscriptions.ts's isPro()
-  // (temporarily true for everyone while no payment platform is wired
-  // in - see that file's own comment).
-  it("lets a transfer through past the recipient's free combined vehicle cap when the recipient is Pro", async () => {
-    mocks.countActiveBikes.mockReturnValue(1); // MAX_FREE_VEHICLES = 1
+  // Pro gets its own higher cap (MAX_PRO_VEHICLES = 2), not an unlimited
+  // one - this pins that a Pro recipient already at the FREE cap (1) can
+  // still accept one more, since Pro's own limit hasn't been reached yet.
+  it("lets a transfer through past the recipient's free combined vehicle cap when the recipient is Pro but still under Pro's own cap", async () => {
+    mocks.countActiveBikes.mockReturnValue(1); // MAX_FREE_VEHICLES = 1, MAX_PRO_VEHICLES = 2
     mocks.isPro.mockResolvedValue(true);
     const result = await transferBike(fromEmail, bikeId, toEmail, false);
     expect(result.ok).toBe(true);
+  });
+
+  it("still blocks a transfer once the recipient is Pro but already at Pro's own cap", async () => {
+    mocks.countActiveBikes.mockReturnValue(2); // MAX_PRO_VEHICLES = 2
+    mocks.isPro.mockResolvedValue(true);
+    const result = await transferBike(fromEmail, bikeId, toEmail, false);
+    expect(result).toMatchObject({ ok: false, reason: "recipient_limit_reached", limit: 2 });
   });
 
   it("returns recipient_already_has_bike when the recipient's own bikes already include this registration", async () => {

@@ -21,7 +21,7 @@
 // that's unrelated to this check.
 import { getContainer } from "@/lib/cosmos";
 import { isPro } from "@/lib/subscriptions";
-import { MAX_FREE_VEHICLES } from "@/lib/tracker/vehicleLimit";
+import { MAX_FREE_VEHICLES, MAX_PRO_VEHICLES } from "@/lib/tracker/vehicleLimit";
 import { getBikesForUser, countActiveBikes } from "@/lib/tracker/bike";
 import { getCarById, getCarsForUser, generateCarId, countActiveCars, getCurrentRegistration, copyCarTrackerDoc, type CarDoc } from "@/lib/tracker/car";
 import { normalizePlate } from "@/lib/tracker/reportAccess";
@@ -81,8 +81,11 @@ export async function transferCar(
     }
   }
 
-  if (!(await isPro(toEmail)) && countActiveBikes(recipientBikes) + countActiveCars(recipientCars) >= MAX_FREE_VEHICLES) {
-    return { ok: false, reason: "recipient_limit_reached", limit: MAX_FREE_VEHICLES };
+  {
+    const recipientLimit = (await isPro(toEmail)) ? MAX_PRO_VEHICLES : MAX_FREE_VEHICLES;
+    if (countActiveBikes(recipientBikes) + countActiveCars(recipientCars) >= recipientLimit) {
+      return { ok: false, reason: "recipient_limit_reached", limit: recipientLimit };
+    }
   }
 
   const [records, mods, bills, fuelLogs, reminders, billSeries] = await Promise.all([

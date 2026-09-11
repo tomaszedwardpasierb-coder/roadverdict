@@ -44,7 +44,7 @@ vi.mock("@/lib/tracker/bike", () => ({
   getBikesForUser: mocks.getBikesForUser,
   countActiveBikes: mocks.countActiveBikes,
 }));
-vi.mock("@/lib/tracker/vehicleLimit", () => ({ MAX_FREE_VEHICLES: 1 }));
+vi.mock("@/lib/tracker/vehicleLimit", () => ({ MAX_FREE_VEHICLES: 1, MAX_PRO_VEHICLES: 2 }));
 vi.mock("@/lib/tracker/reportAccess", () => ({ normalizePlate: mocks.normalizePlate }));
 vi.mock("@/lib/tracker/carReportAccess", () => ({ allKnownCarPlates: mocks.allKnownCarPlates }));
 vi.mock("@/lib/tracker/carServiceRecord", () => ({ getCarServiceRecords: mocks.getCarServiceRecords }));
@@ -155,11 +155,18 @@ describe("transferCar", () => {
     expect(result).toMatchObject({ ok: false, reason: "recipient_limit_reached", limit: 1 });
   });
 
-  it("lets a transfer through past the recipient's free cap when the recipient is Pro", async () => {
-    mocks.countActiveCars.mockReturnValue(1);
+  it("lets a transfer through past the recipient's free cap when the recipient is Pro but still under Pro's own cap", async () => {
+    mocks.countActiveCars.mockReturnValue(1); // MAX_FREE_VEHICLES = 1, MAX_PRO_VEHICLES = 2
     mocks.isPro.mockResolvedValue(true);
     const result = await transferCar(fromEmail, carId, toEmail, false);
     expect(result.ok).toBe(true);
+  });
+
+  it("still blocks a transfer once the recipient is Pro but already at Pro's own cap", async () => {
+    mocks.countActiveCars.mockReturnValue(2); // MAX_PRO_VEHICLES = 2
+    mocks.isPro.mockResolvedValue(true);
+    const result = await transferCar(fromEmail, carId, toEmail, false);
+    expect(result).toMatchObject({ ok: false, reason: "recipient_limit_reached", limit: 2 });
   });
 
   it("returns recipient_already_has_car when the recipient's own cars already include this registration", async () => {

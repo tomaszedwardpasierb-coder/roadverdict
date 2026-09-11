@@ -26,7 +26,7 @@ import { getContainer } from "@/lib/cosmos";
 import { isPro } from "@/lib/subscriptions";
 import { getBike, getBikesForUser, generateBikeId, countActiveBikes, getCurrentRegistration, type BikeDoc } from "@/lib/tracker/bike";
 import { getCarsForUser, countActiveCars } from "@/lib/tracker/car";
-import { MAX_FREE_VEHICLES } from "@/lib/tracker/vehicleLimit";
+import { MAX_FREE_VEHICLES, MAX_PRO_VEHICLES } from "@/lib/tracker/vehicleLimit";
 import { normalizePlate, allKnownPlates } from "@/lib/tracker/reportAccess";
 import { getServiceRecords } from "@/lib/tracker/serviceRecord";
 import { getMods } from "@/lib/tracker/mod";
@@ -116,8 +116,11 @@ export async function transferBike(
   // same way as everywhere else - a read-only vehicle the recipient
   // already has doesn't cost them an active slot, so it shouldn't block
   // them from accepting a genuinely new one either.
-  if (!(await isPro(toEmail)) && countActiveBikes(recipientBikes) + countActiveCars(recipientCars) >= MAX_FREE_VEHICLES) {
-    return { ok: false, reason: "recipient_limit_reached", limit: MAX_FREE_VEHICLES };
+  {
+    const recipientLimit = (await isPro(toEmail)) ? MAX_PRO_VEHICLES : MAX_FREE_VEHICLES;
+    if (countActiveBikes(recipientBikes) + countActiveCars(recipientCars) >= recipientLimit) {
+      return { ok: false, reason: "recipient_limit_reached", limit: recipientLimit };
+    }
   }
 
   // Same metrics/verdict logic the buyer report and Story So Far are
