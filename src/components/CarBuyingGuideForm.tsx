@@ -199,13 +199,9 @@ export function CarBuyingGuideForm({ signedIn }: Props) {
 
   async function handlePlateLookup() {
     if (!signedIn) {
-      setLookupError(null);
-      setLookupNote(
-        <>
-          Sign in to search by the car&apos;s registration instead of picking it manually
-          below - <a href="/login">sign in here</a>.
-        </>
-      );
+      // No message set here - the persistent description shown near the
+      // field already explains why signing in is needed, before they
+      // ever click at all.
       return;
     }
     const cleaned = vrm.trim().toUpperCase().replace(/\s+/g, '');
@@ -292,6 +288,28 @@ export function CarBuyingGuideForm({ signedIn }: Props) {
             <span className="ticket__label">The car</span>
             <span className="ticket__step">Step 1 of 3</span>
           </div>
+
+          {!motResult && (
+            <p className="field-note" style={{ marginBottom: '0.9rem' }}>
+              {signedIn ? (
+                <>
+                  Enter a registration to get this car&apos;s real MOT and tax history from the DVLA, plus an
+                  AI-written briefing on what to check before you buy. Add the Independent Vehicle Check for the
+                  deeper picture - stolen, write-off, finance and keeper history in one place.
+                </>
+              ) : (
+                <>
+                  Search a registration and we pull this car&apos;s real MOT history and tax status straight from
+                  the DVLA - then AI reads through it, alongside what&apos;s known about this exact model, to write
+                  you a plain-English pre-purchase briefing: what&apos;s failed before, what&apos;s worth checking
+                  in person, what this model&apos;s known for going wrong. Want the full picture before you commit?
+                  A one-off Independent Vehicle Check - stolen marker, write-offs, outstanding finance, keeper
+                  history, cross-checked against DVLA, police and finance-house records - is available too. Sign in
+                  to search by registration - <a href="/login">sign in here</a>.
+                </>
+              )}
+            </p>
+          )}
 
           <div className="field" style={{ marginBottom: '1.1rem' }}>
             <label htmlFor="cbg-vrm">Search by registration (optional)</label>

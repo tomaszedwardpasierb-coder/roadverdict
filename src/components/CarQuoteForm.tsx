@@ -68,13 +68,9 @@ export function CarQuoteForm({ signedIn, initialBrand, initialCarClass }: Props)
 
   async function handlePlateLookup() {
     if (!signedIn) {
-      setLookupError(null);
-      setLookupNote(
-        <>
-          Sign in to search by your car&apos;s registration instead of picking it manually
-          below - <a href="/login">sign in here</a>.
-        </>
-      );
+      // No message set here - the persistent description shown near the
+      // field already explains why signing in is needed, before they
+      // ever click at all.
       return;
     }
     const cleaned = vrm.trim().toUpperCase().replace(/\s+/g, '');
@@ -156,6 +152,25 @@ export function CarQuoteForm({ signedIn, initialBrand, initialCarClass }: Props)
             <span className="ticket__label">Your car</span>
             <span className="ticket__step">Step 1 of 4</span>
           </div>
+
+          {motTests.length === 0 && (
+            <p className="field-note" style={{ marginBottom: '0.9rem' }}>
+              {signedIn ? (
+                <>
+                  Enter a registration and the job you&apos;ve been quoted for - we&apos;ll compare it against real
+                  regional pricing benchmarks and this car&apos;s own MOT history, so you know if it&apos;s a fair
+                  price before you agree to anything.
+                </>
+              ) : (
+                <>
+                  Search a registration and we&apos;ll check the quote against real pricing benchmarks for this
+                  car&apos;s region, brand and job type - plus its own MOT advisory history, so you know if a
+                  quoted repair matches something it&apos;s actually needed before. Sign in to search by
+                  registration - <a href="/login">sign in here</a>.
+                </>
+              )}
+            </p>
+          )}
 
           <div className="field" style={{ marginBottom: '1.1rem' }}>
             <label htmlFor="cqc-vrm">Search by registration (optional)</label>

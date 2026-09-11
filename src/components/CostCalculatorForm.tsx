@@ -101,13 +101,9 @@ export function CostCalculatorForm({ signedIn, initialBrand, initialModel, initi
 
   async function handlePlateLookup() {
     if (!signedIn) {
-      setLookupError(null);
-      setLookupNote(
-        <>
-          Sign in to search by your bike&apos;s registration instead of picking it manually
-          below - <a href="/login">sign in here</a>.
-        </>
-      );
+      // No message set here - the persistent description shown near the
+      // field already explains why signing in is needed, before they
+      // ever click at all.
       return;
     }
     const cleaned = vrm.trim().toUpperCase().replace(/\s+/g, '');
@@ -199,6 +195,24 @@ export function CostCalculatorForm({ signedIn, initialBrand, initialModel, initi
             <span className="ticket__label">Your bike</span>
             <span className="ticket__step">Step 1 of 3</span>
           </div>
+
+          {motTests.length === 0 && (
+            <p className="field-note" style={{ marginBottom: '0.9rem' }}>
+              {signedIn ? (
+                <>
+                  Enter a registration for real DVLA tax status and MOT history, then see what this bike
+                  actually costs to run per year - based on real benchmarks for its region, brand and class.
+                </>
+              ) : (
+                <>
+                  Search a registration and we pull real tax/SORN status and MOT history straight from the DVLA,
+                  then work out what this bike actually costs to run - fuel, tax, maintenance - for its region,
+                  brand and class, not a generic average. Sign in to search by registration - <a href="/login">sign
+                  in here</a>.
+                </>
+              )}
+            </p>
+          )}
 
           <div className="field" style={{ marginBottom: '1.1rem' }}>
             <label htmlFor="cc-vrm">Search by registration (optional)</label>

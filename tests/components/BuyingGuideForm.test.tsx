@@ -14,6 +14,16 @@ describe("BuyingGuideForm", () => {
     vi.unstubAllGlobals();
   });
 
+  it("shows a sell description before any lookup, tailored to signed-in vs anonymous", () => {
+    const { unmount } = render(<BuyingGuideForm signedIn />);
+    expect(screen.getByText(/AI-written briefing on what to check before you buy/)).toBeInTheDocument();
+    unmount();
+
+    render(<BuyingGuideForm signedIn={false} />);
+    expect(screen.getByText(/Sign in to search by registration/)).toBeInTheDocument();
+    expect(screen.getByText(/cross-checked against DVLA, police and finance-house records/)).toBeInTheDocument();
+  });
+
   it("signed in: a matched plate renders MOT history, the AI briefing, and updates the picked model", async () => {
     (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
       ok: true,

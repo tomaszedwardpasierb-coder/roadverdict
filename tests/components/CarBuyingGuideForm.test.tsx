@@ -20,6 +20,16 @@ describe("CarBuyingGuideForm", () => {
     vi.unstubAllGlobals();
   });
 
+  it("shows a sell description before any lookup, tailored to signed-in vs anonymous", () => {
+    const { unmount } = render(<CarBuyingGuideForm signedIn />);
+    expect(screen.getByText(/AI-written briefing on what to check before you buy/)).toBeInTheDocument();
+    unmount();
+
+    render(<CarBuyingGuideForm signedIn={false} />);
+    expect(screen.getByText(/Sign in to search by registration/)).toBeInTheDocument();
+    expect(screen.getByText(/cross-checked against DVLA, police and finance-house records/)).toBeInTheDocument();
+  });
+
   it("renders all three steps with their default selections, including the electric car-size option", () => {
     render(<CarBuyingGuideForm signedIn />);
     expect(screen.getByText("Step 1 of 3")).toBeInTheDocument();
@@ -36,7 +46,7 @@ describe("CarBuyingGuideForm", () => {
     await user.type(screen.getByLabelText("Search by registration (optional)"), "AB12CDE");
     await user.click(screen.getByRole("button", { name: "Look up" }));
 
-    expect(await screen.findByText(/sign in to search by the car's registration/i)).toBeInTheDocument();
+    expect(await screen.findByText(/sign in to search by registration/i)).toBeInTheDocument();
     expect(fetch).not.toHaveBeenCalled();
   });
 

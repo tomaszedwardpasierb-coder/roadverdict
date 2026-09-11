@@ -13,6 +13,16 @@ describe("CostCalculatorForm", () => {
     vi.unstubAllGlobals();
   });
 
+  it("shows a sell description before any lookup, tailored to signed-in vs anonymous", () => {
+    const { unmount } = render(<CostCalculatorForm signedIn />);
+    expect(screen.getByText(/see what this bike actually costs to run per year/)).toBeInTheDocument();
+    unmount();
+
+    render(<CostCalculatorForm signedIn={false} />);
+    expect(screen.getByText(/Sign in to search by registration/)).toBeInTheDocument();
+    expect(screen.getByText(/fuel, tax, maintenance/)).toBeInTheDocument();
+  });
+
   it("picking a real model from the curated list overrides the engine-size class it implies", async () => {
     const user = userEvent.setup();
     render(<CostCalculatorForm signedIn={false} />);

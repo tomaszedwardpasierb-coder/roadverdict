@@ -22,6 +22,16 @@ describe("CarCostCalculatorForm", () => {
     expect(screen.getByLabelText("Fuel type")).toHaveValue("petrol");
   });
 
+  it("shows a sell description before any lookup, tailored to signed-in vs anonymous", () => {
+    const { unmount } = render(<CarCostCalculatorForm signedIn />);
+    expect(screen.getByText(/see what this car actually costs to run per year/)).toBeInTheDocument();
+    unmount();
+
+    render(<CarCostCalculatorForm signedIn={false} />);
+    expect(screen.getByText(/Sign in to search by registration/)).toBeInTheDocument();
+    expect(screen.getByText(/fuel, tax, maintenance/)).toBeInTheDocument();
+  });
+
   it("submits the real form state, including an entered CO2 figure, to /api/cars/cost-calculator", async () => {
     (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
       ok: true,

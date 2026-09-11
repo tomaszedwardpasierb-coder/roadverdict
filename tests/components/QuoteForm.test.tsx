@@ -30,6 +30,16 @@ describe("QuoteForm", () => {
     expect(screen.getByLabelText("Engine size")).toHaveValue("medium");
   });
 
+  it("shows a sell description before any lookup, tailored to signed-in vs anonymous", () => {
+    const { unmount } = render(<QuoteForm signedIn />);
+    expect(screen.getByText(/we'll compare it against real regional pricing benchmarks/)).toBeInTheDocument();
+    unmount();
+
+    render(<QuoteForm signedIn={false} />);
+    expect(screen.getByText(/Sign in to search by registration/)).toBeInTheDocument();
+    expect(screen.getByText(/pricing benchmarks for this bike's region, brand and job type/)).toBeInTheDocument();
+  });
+
   it("the price input's own min=1/required attributes block a browser submit before any price is entered", () => {
     // handleSubmit's own `price <= 0` / non-finite guard is defense in
     // depth - reachable only if a submit somehow occurs with an empty or

@@ -26,6 +26,16 @@ describe("CarQuoteForm", () => {
     expect(screen.getByLabelText("Car size")).toHaveValue("medium");
   });
 
+  it("shows a sell description before any lookup, tailored to signed-in vs anonymous", () => {
+    const { unmount } = render(<CarQuoteForm signedIn />);
+    expect(screen.getByText(/we'll compare it against real regional pricing benchmarks/)).toBeInTheDocument();
+    unmount();
+
+    render(<CarQuoteForm signedIn={false} />);
+    expect(screen.getByText(/Sign in to search by registration/)).toBeInTheDocument();
+    expect(screen.getByText(/pricing benchmarks for this car's region, brand and job type/)).toBeInTheDocument();
+  });
+
   it("submits the real form state to /api/cars/verdict and renders the returned verdict", async () => {
     (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
       ok: true,
