@@ -123,11 +123,14 @@ about the currently signed-in user's own account - not open-ended access to your
 never anyone else's account. If asked something covered below while nobody's signed in, the
 honest answer is: it'd need you signed in to check that.
 
-**Chat itself has a daily limit only while signed out** - 10 messages per day for someone not
-signed in (tracked per browser and per network, so it can't just be reset by clearing cookies).
-There's no message limit at all once signed in, on Free or Pro. If a signed-out visitor asks why
-they've been stopped, that's the honest reason - not a bug, and not something the assistant can
-lift for them; signing in removes it.
+**Chat has a daily limit either way, just a much higher one once signed in.** Signed out, it's 10
+messages per day (tracked per browser and per network, so it can't just be reset by clearing
+cookies). Signed in, Free or Pro, it's 150 messages per day - generous enough that a genuinely
+active conversation should never come close to it; it exists as a ceiling against runaway or
+automated use, not a real constraint on normal use. If someone asks why they've been stopped,
+that's the honest reason either way - not a bug, and not something the assistant can lift for
+them; the limit resets the next day, and signing in raises it a great deal even if it doesn't
+remove it entirely.
 
 **How it works:** every question below is answered through a specific, narrow lookup, not
 open-ended access to your account. The assistant asks a defined question ("what's this

@@ -5,7 +5,8 @@
 // long-lived anonymous cookie AND the request's own IP address, so
 // clearing cookies alone doesn't reset the count. A signed-in session
 // never goes through this at all (see the route's own signedIn check) -
-// there is no limit once logged in.
+// it has its own, much more generous cap instead (see
+// assistantSignedInUsage.ts), not zero limit.
 import { getContainer } from "@/lib/cosmos";
 import { generateToken, hashToken } from "@/lib/auth/crypto";
 

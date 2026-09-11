@@ -20,6 +20,8 @@ const mocks = vi.hoisted(() => ({
   getUserDoc: vi.fn(),
   canSendAnonAssistantMessage: vi.fn(),
   generateAnonId: vi.fn(),
+  canSendAssistantMessage: vi.fn(),
+  recordAssistantMessage: vi.fn(),
 }));
 
 vi.mock("@/lib/auth/session", () => ({ getSession: mocks.getSession }));
@@ -47,6 +49,10 @@ vi.mock("@/lib/tracker/assistantAnonUsage", () => ({
   generateAnonId: mocks.generateAnonId,
   ANON_ID_COOKIE: "rv_anon_id",
   ANON_ID_COOKIE_MAX_AGE_SECONDS: 34560000,
+}));
+vi.mock("@/lib/tracker/assistantSignedInUsage", () => ({
+  canSendAssistantMessage: mocks.canSendAssistantMessage,
+  recordAssistantMessage: mocks.recordAssistantMessage,
 }));
 // vehicleComparison.ts (MIN_COMPARE_VEHICLES/MAX_COMPARE_VEHICLES) is
 // deliberately NOT mocked - both are plain constants, no I/O, so this
@@ -119,6 +125,8 @@ beforeEach(() => {
   mocks.getCarAssistantConfig.mockResolvedValue(null);
   mocks.canSendAnonAssistantMessage.mockResolvedValue(true);
   mocks.generateAnonId.mockReturnValue("new-anon-id");
+  mocks.canSendAssistantMessage.mockReturnValue(true);
+  mocks.recordAssistantMessage.mockResolvedValue(undefined);
 });
 
 const bikeA = { id: "bike-1", make: "Honda", model: "Africa Twin", nickname: "" };
@@ -278,6 +286,34 @@ describe("POST /api/assistant", () => {
 
     const callBody = JSON.parse(mocks.fetch.mock.calls[0][1].body);
     expect(callBody.systemInstruction.parts[0].text).not.toContain("lives inside");
+  });
+
+  it("blocks a signed-in message once the daily message cap is reached, without calling Gemini", async () => {
+    mocks.getSession.mockResolvedValue({ email: "rider@example.com" });
+    mocks.canSendAssistantMessage.mockReturnValue(false);
+
+    const response = await POST(request({ messages: [{ role: "user", content: "hi" }] }));
+
+    expect(response.status).toBe(429);
+    expect(mocks.fetch).not.toHaveBeenCalled();
+    expect(mocks.recordAssistantMessage).not.toHaveBeenCalled();
+  });
+
+  it("records a signed-in message against the daily cap", async () => {
+    mocks.getSession.mockResolvedValue({ email: "rider@example.com" });
+
+    await POST(request({ messages: [{ role: "user", content: "hi" }] }));
+
+    expect(mocks.recordAssistantMessage).toHaveBeenCalledWith("rider@example.com");
+  });
+
+  it("never checks or records the signed-in message cap for an anonymous visitor", async () => {
+    mocks.getSession.mockResolvedValue(null);
+
+    await POST(request({ messages: [{ role: "user", content: "hi" }] }));
+
+    expect(mocks.canSendAssistantMessage).not.toHaveBeenCalled();
+    expect(mocks.recordAssistantMessage).not.toHaveBeenCalled();
   });
 
   it("addresses the signed-in user by their Settings-tab display name, when one is set", async () => {

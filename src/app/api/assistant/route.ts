@@ -19,6 +19,7 @@ import { getLivePrivacyPolicyText } from "@/lib/tracker/assistantKnowledge";
 import { getAssistantConfig, getCarAssistantConfig, type AssistantConfigDoc } from "@/lib/tracker/assistantConfig";
 import { resolveActiveVehicle } from "@/lib/tracker/activeVehicle";
 import { getUserDoc } from "@/lib/tracker/userDoc";
+import { canSendAssistantMessage, recordAssistantMessage } from "@/lib/tracker/assistantSignedInUsage";
 import {
   ASSISTANT_TOOL_DECLARATIONS,
   REPORT_TOOL_DECLARATIONS,
@@ -306,6 +307,34 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  // 150 messages/day once signed in - see assistantSignedInUsage.ts for
+  // why this exists at all (previously truly unlimited) and why this
+  // number specifically (a generous anti-abuse floor, not a precisely
+  // computed budget). Checked as early as possible, same reasoning as
+  // the anonymous check above - an over-the-cap account never actually
+  // reaches a Gemini call. Reuses the same getUserDoc() read the
+  // display-name lookup below already needs, rather than a second one.
+  // Fails soft to "allowed" on a lookup error (same direction every
+  // other best-effort block in this route already fails), never soft to
+  // "blocked" - a Cosmos hiccup shouldn't lock a real account out of the
+  // assistant entirely.
+  let displayName: string | null = null;
+  if (signedIn && session) {
+    try {
+      const user = await getUserDoc(session.email);
+      displayName = user?.displayName ?? null;
+      if (!canSendAssistantMessage(user)) {
+        return NextResponse.json(
+          { error: "You've reached today's message limit for the assistant - try again tomorrow." },
+          { status: 429 }
+        );
+      }
+      await recordAssistantMessage(session.email);
+    } catch (err) {
+      console.error("Assistant: getUserDoc()/message-cap check failed, continuing without a display name:", err);
+    }
+  }
+
   // Which knowledge base and log-entry gating apply for this request -
   // resolved once here via the same resolveActiveVehicle() every tool in
   // assistantTools.ts already uses, rather than re-deriving it a second,
@@ -319,20 +348,6 @@ export async function POST(req: NextRequest) {
       activeVehicleKind = vehicle?.kind ?? null;
     } catch (err) {
       console.error("Assistant: resolveActiveVehicle() failed, continuing without a known vehicle kind:", err);
-    }
-  }
-
-  // Set from the Settings tab's own profile section - best-effort, same
-  // fail-soft-to-null reasoning as activeVehicleKind above: a lookup
-  // hiccup here should just mean the assistant addresses the user
-  // generically this request, never a broken/hanging chat.
-  let displayName: string | null = null;
-  if (signedIn && session) {
-    try {
-      const user = await getUserDoc(session.email);
-      displayName = user?.displayName ?? null;
-    } catch (err) {
-      console.error("Assistant: getUserDoc() failed, continuing without a display name:", err);
     }
   }
 
