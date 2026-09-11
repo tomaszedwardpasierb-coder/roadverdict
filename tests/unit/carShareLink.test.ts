@@ -1,8 +1,7 @@
-// Mirrors shareLink.test.ts - the follow-up mechanism
-// (getShareLinksNeedingFollowUp/markShareLinkFollowUpSent) isn't
-// mirrored here at all, since carShareLink.ts deliberately doesn't
-// implement it yet (see that file's own comment: it depends on car
-// ownership transfer, which isn't built).
+// Mirrors shareLink.test.ts, including the follow-up mechanism
+// (getCarShareLinksNeedingFollowUp/markCarShareLinkFollowUpSent) - that
+// was originally deferred pending car ownership transfer, which has
+// since shipped, so carShareLink.ts now implements it in full.
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
@@ -34,6 +33,8 @@ import {
   updateCarShareLinkVdiUnlock,
   deleteCarShareLink,
   deleteExpiredCarShareLinks,
+  getCarShareLinksNeedingFollowUp,
+  markCarShareLinkFollowUpSent,
   type CarShareLinkDoc,
 } from "@/lib/tracker/carShareLink";
 
@@ -338,5 +339,58 @@ describe("deleteExpiredCarShareLinks", () => {
     const [query] = mockContainer.items.query.mock.calls.at(-1) as any[];
     expect(query.query).toContain("IS_DEFINED(c.expiresAt)");
     expect(query.query).toContain("c.expiresAt < @now");
+  });
+});
+
+// ---------------------------------------------------------------------
+// getCarShareLinksNeedingFollowUp
+// ---------------------------------------------------------------------
+
+describe("getCarShareLinksNeedingFollowUp", () => {
+  beforeEach(resetAllMocks);
+
+  it("returns links that need a follow-up", async () => {
+    const links = [makeLink()];
+    mocks.fetchAll.mockResolvedValue({ resources: links });
+    expect(await getCarShareLinksNeedingFollowUp()).toEqual(links);
+  });
+
+  it("filters for links with a recipient and no follow-up sent yet, created at least 28 days ago", async () => {
+    mocks.fetchAll.mockResolvedValue({ resources: [] });
+    const before = new Date();
+
+    await getCarShareLinksNeedingFollowUp();
+
+    const [query] = mockContainer.items.query.mock.calls.at(-1) as any[];
+    expect(query.query).toContain("IS_DEFINED(c.recipientEmail)");
+    expect(query.query).toContain("NOT IS_DEFINED(c.followUpSentAt)");
+    const cutoffParam = query.parameters.find((p: any) => p.name === "@cutoff").value;
+    const expectedCutoff = addCalendarDays(before, -28);
+    expect(new Date(cutoffParam).getTime()).toBeGreaterThan(expectedCutoff.getTime() - 5000);
+    expect(new Date(cutoffParam).getTime()).toBeLessThan(expectedCutoff.getTime() + 5000);
+  });
+});
+
+// ---------------------------------------------------------------------
+// markCarShareLinkFollowUpSent
+// ---------------------------------------------------------------------
+
+describe("markCarShareLinkFollowUpSent", () => {
+  beforeEach(() => {
+    resetAllMocks();
+    mocks.upsert.mockResolvedValue(undefined);
+  });
+
+  it("silently does nothing when the link doesn't exist", async () => {
+    mocks.read.mockResolvedValue({ resource: undefined });
+    await expect(markCarShareLinkFollowUpSent("missing")).resolves.toBeUndefined();
+    expect(mocks.upsert).not.toHaveBeenCalled();
+  });
+
+  it("sets followUpSentAt and upserts", async () => {
+    mocks.read.mockResolvedValue({ resource: makeLink({ followUpSentAt: undefined }) });
+    await markCarShareLinkFollowUpSent("tok_abc123");
+    const [upserted] = mocks.upsert.mock.calls[0];
+    expect(typeof upserted.followUpSentAt).toBe("string");
   });
 });

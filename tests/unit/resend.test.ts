@@ -350,3 +350,19 @@ describe("sendCarOwnershipRequestDeclinedEmail", () => {
     expect(call.subject).toBe("Your request for the 2021 Ford Focus's history wasn't approved");
   });
 });
+
+// Car mirror of sendHistoryFollowUpEmail above.
+describe("sendCarHistoryFollowUpEmail", () => {
+  it("links to the provided report URL and names the car", async () => {
+    const { sendCarHistoryFollowUpEmail } = await import("@/lib/resend");
+    await sendCarHistoryFollowUpEmail({
+      recipientEmail: "buyer@example.com",
+      carSummary,
+      reportUrl: "https://app/car-report/detailed/abc",
+    });
+    const call = mocks.send.mock.calls[0][0];
+    expect(call.to).toBe("buyer@example.com");
+    expect(call.html).toContain('href="https://app/car-report/detailed/abc"');
+    expect(call.subject).toBe("Bought the 2021 Ford Focus? Keep its history alive");
+  });
+});
