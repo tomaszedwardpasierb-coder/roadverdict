@@ -118,9 +118,9 @@ describe("AssistantWidget", () => {
     expect(body.dashboardTab).toBe("shareLinks");
   });
 
-  it("on /garage/compare, includes the currently-selected bike ids and date filter in the request body", async () => {
+  it("on /garage/compare, includes the currently-selected vehicle ids and date filter in the request body", async () => {
     mockPathname.current = "/garage/compare";
-    mockSearchParams.current = new URLSearchParams([["bikes", "bike-1"], ["bikes", "bike-2"], ["from", "2025-01-01"]]);
+    mockSearchParams.current = new URLSearchParams([["vehicles", "bike-1"], ["vehicles", "car-1"], ["from", "2025-01-01"]]);
     (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
       ok: true,
       status: 200,
@@ -133,14 +133,14 @@ describe("AssistantWidget", () => {
 
     await screen.findByText("The Africa Twin is cheaper to run.");
     const body = JSON.parse((fetch as ReturnType<typeof vi.fn>).mock.calls[0][1].body);
-    expect(body.compareBikeIds).toEqual(["bike-1", "bike-2"]);
+    expect(body.compareVehicleIds).toEqual(["bike-1", "car-1"]);
     expect(body.compareFrom).toBe("2025-01-01");
     expect(body.compareTo).toBeUndefined();
   });
 
-  it("never includes compare context on a page other than /garage/compare, even if the URL happens to have a bikes param", async () => {
+  it("never includes compare context on a page other than /garage/compare, even if the URL happens to have a vehicles param", async () => {
     mockPathname.current = "/garage";
-    mockSearchParams.current = new URLSearchParams([["bikes", "bike-1"], ["bikes", "bike-2"]]);
+    mockSearchParams.current = new URLSearchParams([["vehicles", "bike-1"], ["vehicles", "bike-2"]]);
     (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
       ok: true,
       status: 200,
@@ -153,7 +153,7 @@ describe("AssistantWidget", () => {
 
     await screen.findByText("ok");
     const body = JSON.parse((fetch as ReturnType<typeof vi.fn>).mock.calls[0][1].body);
-    expect(body.compareBikeIds).toBeUndefined();
+    expect(body.compareVehicleIds).toBeUndefined();
   });
 
   it("never treats /report/receipt-request/decide as a report-token page", async () => {

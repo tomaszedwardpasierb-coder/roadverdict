@@ -8,6 +8,12 @@ const mocks = vi.hoisted(() => ({
   isBikeReadOnly: vi.fn(),
   hasActiveTransferRequestForBike: vi.fn(),
   sendHistoryFollowUpEmail: vi.fn(),
+  getCarShareLinksNeedingFollowUp: vi.fn(),
+  markCarShareLinkFollowUpSent: vi.fn(),
+  getCarById: vi.fn(),
+  isCarReadOnly: vi.fn(),
+  hasActiveCarTransferRequestForCar: vi.fn(),
+  sendCarHistoryFollowUpEmail: vi.fn(),
 }));
 
 vi.mock("@/lib/tracker/shareLink", () => ({
@@ -21,7 +27,21 @@ vi.mock("@/lib/tracker/bike", () => ({
 vi.mock("@/lib/tracker/bikeTransferRequest", () => ({
   hasActiveTransferRequestForBike: mocks.hasActiveTransferRequestForBike,
 }));
-vi.mock("@/lib/resend", () => ({ sendHistoryFollowUpEmail: mocks.sendHistoryFollowUpEmail }));
+vi.mock("@/lib/tracker/carShareLink", () => ({
+  getCarShareLinksNeedingFollowUp: mocks.getCarShareLinksNeedingFollowUp,
+  markCarShareLinkFollowUpSent: mocks.markCarShareLinkFollowUpSent,
+}));
+vi.mock("@/lib/tracker/car", () => ({
+  getCarById: mocks.getCarById,
+  isCarReadOnly: mocks.isCarReadOnly,
+}));
+vi.mock("@/lib/tracker/carTransferRequest", () => ({
+  hasActiveCarTransferRequestForCar: mocks.hasActiveCarTransferRequestForCar,
+}));
+vi.mock("@/lib/resend", () => ({
+  sendHistoryFollowUpEmail: mocks.sendHistoryFollowUpEmail,
+  sendCarHistoryFollowUpEmail: mocks.sendCarHistoryFollowUpEmail,
+}));
 
 import { POST } from "@/app/api/cron/send-history-follow-ups/route";
 
@@ -37,7 +57,16 @@ function link(overrides: Record<string, unknown> = {}) {
   };
 }
 
+function carLink(overrides: Record<string, unknown> = {}) {
+  return {
+    id: "car-token-1", email: "owner@example.com", carId: "car-1", recipientEmail: "buyer@example.com",
+    createdAt: "2025-01-01T00:00:00.000Z",
+    ...overrides,
+  };
+}
+
 const bike = { make: "Yamaha", model: "MT-07", year: 2020, isCustomBuild: false };
+const car = { make: "Ford", model: "Focus", year: 2020, isCustomBuild: false };
 
 describe("POST /api/cron/send-history-follow-ups", () => {
   const originalSecret = process.env.CRON_SECRET;
@@ -53,6 +82,12 @@ describe("POST /api/cron/send-history-follow-ups", () => {
     mocks.isBikeReadOnly.mockReturnValue(false);
     mocks.hasActiveTransferRequestForBike.mockResolvedValue(false);
     mocks.sendHistoryFollowUpEmail.mockResolvedValue(undefined);
+    mocks.getCarShareLinksNeedingFollowUp.mockResolvedValue([]);
+    mocks.markCarShareLinkFollowUpSent.mockResolvedValue(undefined);
+    mocks.getCarById.mockResolvedValue(car);
+    mocks.isCarReadOnly.mockReturnValue(false);
+    mocks.hasActiveCarTransferRequestForCar.mockResolvedValue(false);
+    mocks.sendCarHistoryFollowUpEmail.mockResolvedValue(undefined);
   });
 
   afterEach(() => {
@@ -83,7 +118,7 @@ describe("POST /api/cron/send-history-follow-ups", () => {
     await expect(response.json()).resolves.toEqual({ checked: 0, sent: 0, skipped: 0 });
   });
 
-  it("skips (without marking) a candidate that has no recipient email", async () => {
+  it("skips (without marking) a bike candidate that has no recipient email", async () => {
     mocks.getShareLinksNeedingFollowUp.mockResolvedValue([link({ recipientEmail: undefined })]);
     const response = await POST(request({ authorization: "Bearer top-secret" }));
     await expect(response.json()).resolves.toEqual({ checked: 1, sent: 0, skipped: 1 });
@@ -117,7 +152,7 @@ describe("POST /api/cron/send-history-follow-ups", () => {
     expect(mocks.sendHistoryFollowUpEmail).not.toHaveBeenCalled();
   });
 
-  it("sends the follow-up email and marks it sent for an eligible link", async () => {
+  it("sends the follow-up email and marks it sent for an eligible bike link", async () => {
     mocks.getShareLinksNeedingFollowUp.mockResolvedValue([link()]);
     const response = await POST(request({ authorization: "Bearer top-secret" }));
     await expect(response.json()).resolves.toEqual({ checked: 1, sent: 1, skipped: 0 });
@@ -183,5 +218,74 @@ describe("POST /api/cron/send-history-follow-ups", () => {
     await expect(second.json()).resolves.toEqual({ checked: 0, sent: 0, skipped: 0 });
 
     expect(mocks.sendHistoryFollowUpEmail).toHaveBeenCalledTimes(1);
+  });
+
+  // Car mirrors of the bike coverage above - same underlying loop logic,
+  // second pass over the car share-link candidates.
+  describe("car share links", () => {
+    it("skips (without marking) a car candidate that has no recipient email", async () => {
+      mocks.getCarShareLinksNeedingFollowUp.mockResolvedValue([carLink({ recipientEmail: undefined })]);
+      const response = await POST(request({ authorization: "Bearer top-secret" }));
+      await expect(response.json()).resolves.toEqual({ checked: 1, sent: 0, skipped: 1 });
+      expect(mocks.markCarShareLinkFollowUpSent).not.toHaveBeenCalled();
+      expect(mocks.sendCarHistoryFollowUpEmail).not.toHaveBeenCalled();
+    });
+
+    it("marks processed without emailing when the car has since been deleted", async () => {
+      mocks.getCarShareLinksNeedingFollowUp.mockResolvedValue([carLink()]);
+      mocks.getCarById.mockResolvedValue(null);
+      const response = await POST(request({ authorization: "Bearer top-secret" }));
+      await expect(response.json()).resolves.toEqual({ checked: 1, sent: 0, skipped: 1 });
+      expect(mocks.markCarShareLinkFollowUpSent).toHaveBeenCalledWith("car-token-1");
+      expect(mocks.sendCarHistoryFollowUpEmail).not.toHaveBeenCalled();
+    });
+
+    it("marks processed without emailing when the car is already read-only (handed off)", async () => {
+      mocks.getCarShareLinksNeedingFollowUp.mockResolvedValue([carLink()]);
+      mocks.isCarReadOnly.mockReturnValue(true);
+      const response = await POST(request({ authorization: "Bearer top-secret" }));
+      await expect(response.json()).resolves.toEqual({ checked: 1, sent: 0, skipped: 1 });
+      expect(mocks.sendCarHistoryFollowUpEmail).not.toHaveBeenCalled();
+    });
+
+    it("marks processed without emailing when the car already has an active transfer request", async () => {
+      mocks.getCarShareLinksNeedingFollowUp.mockResolvedValue([carLink()]);
+      mocks.hasActiveCarTransferRequestForCar.mockResolvedValue(true);
+      const response = await POST(request({ authorization: "Bearer top-secret" }));
+      await expect(response.json()).resolves.toEqual({ checked: 1, sent: 0, skipped: 1 });
+      expect(mocks.sendCarHistoryFollowUpEmail).not.toHaveBeenCalled();
+    });
+
+    it("sends the follow-up email and marks it sent for an eligible car link", async () => {
+      mocks.getCarShareLinksNeedingFollowUp.mockResolvedValue([carLink()]);
+      const response = await POST(request({ authorization: "Bearer top-secret" }));
+      await expect(response.json()).resolves.toEqual({ checked: 1, sent: 1, skipped: 0 });
+      expect(mocks.sendCarHistoryFollowUpEmail).toHaveBeenCalledWith({
+        recipientEmail: "buyer@example.com",
+        carSummary: { make: "Ford", model: "Focus", year: 2020, isCustomBuild: false },
+        reportUrl: "https://roadverdict.co.uk/car-report/car-token-1/detailed",
+      });
+      expect(mocks.markCarShareLinkFollowUpSent).toHaveBeenCalledWith("car-token-1");
+    });
+
+    it("combines bike and car totals into one set of checked/sent/skipped counts", async () => {
+      mocks.getShareLinksNeedingFollowUp.mockResolvedValue([link()]);
+      mocks.getCarShareLinksNeedingFollowUp.mockResolvedValue([carLink()]);
+      const response = await POST(request({ authorization: "Bearer top-secret" }));
+      await expect(response.json()).resolves.toEqual({ checked: 2, sent: 2, skipped: 0 });
+      expect(mocks.sendHistoryFollowUpEmail).toHaveBeenCalledTimes(1);
+      expect(mocks.sendCarHistoryFollowUpEmail).toHaveBeenCalledTimes(1);
+    });
+
+    it("a failed car send doesn't affect the bike batch, and vice versa", async () => {
+      mocks.getShareLinksNeedingFollowUp.mockResolvedValue([link()]);
+      mocks.getCarShareLinksNeedingFollowUp.mockResolvedValue([carLink()]);
+      mocks.sendCarHistoryFollowUpEmail.mockRejectedValue(new Error("Resend rejected"));
+
+      const response = await POST(request({ authorization: "Bearer top-secret" }));
+      await expect(response.json()).resolves.toEqual({ checked: 2, sent: 1, skipped: 0 });
+      expect(mocks.markShareLinkFollowUpSent).toHaveBeenCalledWith("token-1");
+      expect(mocks.markCarShareLinkFollowUpSent).not.toHaveBeenCalled();
+    });
   });
 });

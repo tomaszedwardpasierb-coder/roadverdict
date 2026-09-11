@@ -1,14 +1,23 @@
 // Place at: src/app/garage/CarCard.tsx
 //
-// Car equivalent of BikeCard.tsx - deliberately simpler: no registration-
-// change form and no "request prior history" flow, since neither has a
-// car-side route yet (car ownership transfer is a separate, larger gap -
-// see the ADR). View dashboard + delete only.
+// Car mirror of BikeCard.tsx - registration-change and "request prior
+// history" now have real car-side routes (/api/cars/car/registration-
+// change, /api/cars/car-transfer/request-ownership), so this carries
+// the same two flows BikeCard.tsx does, not just view dashboard + delete.
 'use client';
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import styles from './garage.module.css';
+
+type RegistrationChangeReason = 'private-plate-assigned' | 'private-plate-removed' | 'correction' | 'other';
+
+const REASON_OPTIONS: { value: RegistrationChangeReason; label: string }[] = [
+  { value: 'private-plate-assigned', label: 'Private plate assigned' },
+  { value: 'private-plate-removed', label: 'Private plate removed (reverted)' },
+  { value: 'correction', label: 'Correcting an entry error' },
+  { value: 'other', label: 'Other' },
+];
 
 interface Props {
   carId: string;
@@ -18,14 +27,24 @@ interface Props {
   currentMileage: number;
   isActive: boolean;
   currentRegistration?: string;
+  registrationChangeCount: number;
   transferredToEmail?: string;
+  mayHavePriorHistory?: boolean;
 }
 
-export function CarCard({ carId, name, year, isCustomBuild, currentMileage, isActive, currentRegistration, transferredToEmail }: Props) {
+export function CarCard({ carId, name, year, isCustomBuild, currentMileage, isActive, currentRegistration, registrationChangeCount, transferredToEmail, mayHavePriorHistory }: Props) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [requestingHistory, setRequestingHistory] = useState(false);
+  const [historyRequestSent, setHistoryRequestSent] = useState(false);
+  const [historyRequestError, setHistoryRequestError] = useState<string | null>(null);
+  const [showChangeForm, setShowChangeForm] = useState(false);
+  const [newPlate, setNewPlate] = useState('');
+  const [reason, setReason] = useState<RegistrationChangeReason>('private-plate-assigned');
+  const [changing, setChanging] = useState(false);
+  const [changeError, setChangeError] = useState<string | null>(null);
 
   async function handleViewDashboard() {
     if (isActive) {
@@ -70,6 +89,56 @@ export function CarCard({ carId, name, year, isCustomBuild, currentMileage, isAc
     }
   }
 
+  async function handleRequestHistory() {
+    if (!currentRegistration) return;
+    setRequestingHistory(true);
+    setHistoryRequestError(null);
+    try {
+      const res = await fetch('/api/cars/car-transfer/request-ownership', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ registration: currentRegistration }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setHistoryRequestError(data.error ?? 'Could not send the request. Try again.');
+        return;
+      }
+      setHistoryRequestSent(true);
+    } finally {
+      setRequestingHistory(false);
+    }
+  }
+
+  async function handleChangeRegistration(e: React.FormEvent) {
+    e.preventDefault();
+    if (!newPlate.trim()) return;
+    if (!confirm(`Record "${newPlate.trim().toUpperCase()}" as this car's new registration? The old one stays on permanent record - this can't be undone or edited afterward.`)) {
+      return;
+    }
+    setChanging(true);
+    setChangeError(null);
+    try {
+      const res = await fetch('/api/cars/car/registration-change', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ carId, plate: newPlate, reason }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setChangeError(data.error ?? 'Something went wrong.');
+        return;
+      }
+      setShowChangeForm(false);
+      setNewPlate('');
+      router.refresh();
+    } catch {
+      setChangeError('Could not reach the server.');
+    } finally {
+      setChanging(false);
+    }
+  }
+
   return (
     <div className={styles.card}>
       {isActive && <div className={styles.activeBadge}>Currently viewing</div>}
@@ -80,11 +149,25 @@ export function CarCard({ carId, name, year, isCustomBuild, currentMileage, isAc
       <div className={styles.cardMeta}>
         {isCustomBuild ? 'Custom build' : year} · {currentMileage.toLocaleString()} miles
       </div>
-      {currentRegistration && <div className={styles.cardRegistration}>{currentRegistration}</div>}
+      {currentRegistration && (
+        <div className={styles.cardRegistration}>
+          {currentRegistration}
+          {registrationChangeCount > 0 && <span className={styles.cardRegistrationNote}> ({registrationChangeCount} change{registrationChangeCount === 1 ? '' : 's'} on record)</span>}
+        </div>
+      )}
       <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
         <button type="button" className="submit-button" onClick={handleViewDashboard} disabled={loading || deleting}>
           {loading ? 'Switching…' : 'View dashboard'}
         </button>
+        {/* Change registration and Delete both reject a read-only car
+            server-side unconditionally, so there's no point showing
+            either here - it would just fail with no clear reason why,
+            which is very likely what actually happened before this. */}
+        {!transferredToEmail && currentRegistration && (
+          <button type="button" className={styles.deleteBtn} onClick={() => setShowChangeForm((s) => !s)} disabled={loading || deleting}>
+            {showChangeForm ? 'Cancel' : 'Change registration'}
+          </button>
+        )}
         {!transferredToEmail && (
           <button type="button" className={styles.deleteBtn} onClick={handleDelete} disabled={loading || deleting}>
             {deleting ? 'Deleting…' : 'Delete'}
@@ -92,6 +175,65 @@ export function CarCard({ carId, name, year, isCustomBuild, currentMileage, isAc
         )}
       </div>
       {deleteError && <p className="error-text" role="alert" style={{ marginTop: '0.5rem' }}>{deleteError}</p>}
+
+      {mayHavePriorHistory && !transferredToEmail && (
+        <div style={{ marginTop: '0.6rem', paddingTop: '0.6rem', borderTop: '1px solid var(--line)' }}>
+          {historyRequestSent ? (
+            <p className="field-note">
+              Request sent - if the current owner approves it, this car&apos;s earlier history moves to your account.
+            </p>
+          ) : (
+            <>
+              <p className="field-note">
+                This car may have RoadVerdict history logged by a previous owner.
+              </p>
+              <button
+                type="button"
+                className={styles.iconBtn}
+                style={{ marginTop: '0.3rem' }}
+                disabled={requestingHistory || !currentRegistration}
+                onClick={handleRequestHistory}
+              >
+                {requestingHistory ? 'Sending…' : 'Request it'}
+              </button>
+              {historyRequestError && (
+                <p className="error-text" role="alert" style={{ marginTop: '0.4rem' }}>{historyRequestError}</p>
+              )}
+            </>
+          )}
+        </div>
+      )}
+
+      {showChangeForm && (
+        <form onSubmit={handleChangeRegistration} className={styles.registrationChangeForm}>
+          <p className="field-note">
+            The current registration stays on permanent record - this adds a new one, it doesn&apos;t remove the old.
+          </p>
+          <div className="field" style={{ marginTop: '0.6rem' }}>
+            <label htmlFor={`new-plate-${carId}`}>New registration</label>
+            <input
+              id={`new-plate-${carId}`}
+              type="text"
+              value={newPlate}
+              onChange={(e) => setNewPlate(e.target.value)}
+              style={{ textTransform: 'uppercase' }}
+              required
+            />
+          </div>
+          <div className="field" style={{ marginTop: '0.6rem' }}>
+            <label htmlFor={`reason-${carId}`}>Reason</label>
+            <select id={`reason-${carId}`} value={reason} onChange={(e) => setReason(e.target.value as RegistrationChangeReason)}>
+              {REASON_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>{o.label}</option>
+              ))}
+            </select>
+          </div>
+          <button type="submit" className="submit-button" disabled={changing} style={{ marginTop: '0.7rem', width: 'auto' }}>
+            {changing ? 'Saving…' : 'Record change'}
+          </button>
+          {changeError && <p className="error-text" role="alert">{changeError}</p>}
+        </form>
+      )}
     </div>
   );
 }

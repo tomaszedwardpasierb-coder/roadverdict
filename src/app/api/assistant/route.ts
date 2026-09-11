@@ -33,8 +33,9 @@ import { logGeminiUsage } from "@/lib/tracker/geminiUsageLog";
 import { resolveShareToken } from "@/lib/tracker/shareLink";
 import { hasReportAccess } from "@/lib/tracker/reportAccess";
 import { getBikesForUser, isBikeReadOnly } from "@/lib/tracker/bike";
+import { getCarsForUser, isCarReadOnly } from "@/lib/tracker/car";
 import { isPro } from "@/lib/subscriptions";
-import { MIN_COMPARE_BIKES, MAX_COMPARE_BIKES } from "@/lib/tracker/bikeComparison";
+import { MIN_COMPARE_VEHICLES, MAX_COMPARE_VEHICLES } from "@/lib/tracker/vehicleComparison";
 
 export const dynamic = "force-dynamic";
 
@@ -122,7 +123,7 @@ const TAB_GROUP_LABELS: Record<string, string> = {
 const NO_CAR_KB_FALLBACK =
   "No car-specific knowledge base has been written yet for RoadVerdict's car support. Be honest that detailed car guidance isn't set up yet rather than guessing, and never use motorcycle-specific facts, terminology, or figures as if they applied to a car.";
 
-function buildSystemInstruction(config: AssistantConfigDoc, signedIn: boolean, privacyPolicyText: string | null, reportOpen: boolean, dashboardTabLabel: string | null, dashboardTabGroupLabel: string | null, compareBikeNames: string[] | null, logEntryAccess: "available" | "upsell" | "none", activeVehicleKind: "bike" | "car" | null, displayName: string | null, carKnowledgeBase?: string): string {
+function buildSystemInstruction(config: AssistantConfigDoc, signedIn: boolean, privacyPolicyText: string | null, reportOpen: boolean, dashboardTabLabel: string | null, dashboardTabGroupLabel: string | null, compareVehicleNames: string[] | null, logEntryAccess: "available" | "upsell" | "none", activeVehicleKind: "bike" | "car" | null, displayName: string | null, carKnowledgeBase?: string): string {
   // A car-active session's knowledge base is a completely separate
   // document (see the ADR: one shared assistant, two knowledge bases) -
   // swapped in here instead of config.knowledgeBase (motorcycle-only)
@@ -193,9 +194,9 @@ function buildSystemInstruction(config: AssistantConfigDoc, signedIn: boolean, p
     );
   }
 
-  if (compareBikeNames) {
+  if (compareVehicleNames) {
     parts.push(
-      `\n\n---\n\nCURRENT PAGE: the signed-in user has the Compare bikes page open, currently comparing: ${compareBikeNames.join(", ")}. The getViewedComparison tool is available now. Call it BEFORE answering any question that could plausibly be about this comparison, even a vague, pronoun-only, or unqualified question with no explicit mention of "this comparison" - e.g. "which is cheaper?", "what does this show?", "is that right?". While this page is open, an unqualified question about "these bikes" or "which one" defaults to being about THIS specific comparison, not a generic account-wide question - never fall back to a different personal-data tool without checking this one first just because the question didn't use those exact words.`
+      `\n\n---\n\nCURRENT PAGE: the signed-in user has the Compare vehicles page open, currently comparing: ${compareVehicleNames.join(", ")}. The getViewedComparison tool is available now. Call it BEFORE answering any question that could plausibly be about this comparison, even a vague, pronoun-only, or unqualified question with no explicit mention of "this comparison" - e.g. "which is cheaper?", "what does this show?", "is that right?". While this page is open, an unqualified question about "these vehicles" or "which one" defaults to being about THIS specific comparison, not a generic account-wide question - never fall back to a different personal-data tool without checking this one first just because the question didn't use those exact words.`
     );
   }
 
@@ -253,7 +254,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Assistant is not configured." }, { status: 503 });
   }
 
-  let body: { messages?: ChatMessage[]; reportToken?: string; dashboardTab?: string; compareBikeIds?: string[]; compareFrom?: string; compareTo?: string };
+  let body: { messages?: ChatMessage[]; reportToken?: string; dashboardTab?: string; compareVehicleIds?: string[]; compareFrom?: string; compareTo?: string };
   try {
     body = await req.json();
   } catch {
@@ -365,29 +366,39 @@ export async function POST(req: NextRequest) {
   const dashboardTabGroupLabel = dashboardTabKey ? TAB_GROUP_LABELS[dashboardTabKey] ?? null : null;
 
   // Only ever trusted after being cross-checked against this session's
-  // own real bikes and Pro status below - the client sends raw ids read
-  // straight from its own URL, which is just a hint about what's on
+  // own real bikes/cars and Pro status below - the client sends raw ids
+  // read straight from its own URL, which is just a hint about what's on
   // screen, never enough on its own to decide what the assistant can
   // see (same reasoning as reportToken above). Silently ends up null
   // (no tool offered) for anything that doesn't check out, rather than
-  // erroring the whole request over a stale or tampered hint.
+  // erroring the whole request over a stale or tampered hint. Matched
+  // against BOTH bikes and cars (the garage compare page mixes both
+  // kinds in one picker - see vehicleComparison.ts), preserving the
+  // original requested order so the merged comparison the tool returns
+  // lines up with what's actually on screen.
   let compareContext: CompareContext | null = null;
-  let compareBikeNames: string[] | null = null;
-  if (signedIn && session && Array.isArray(body.compareBikeIds) && body.compareBikeIds.length > 0) {
+  let compareVehicleNames: string[] | null = null;
+  if (signedIn && session && Array.isArray(body.compareVehicleIds) && body.compareVehicleIds.length > 0) {
     try {
       const userIsPro = await isPro(session.email);
       if (userIsPro) {
-        const bikes = await getBikesForUser(session.email);
+        const [bikes, cars] = await Promise.all([getBikesForUser(session.email), getCarsForUser(session.email)]);
         const ownActiveBikes = bikes.filter((b) => !isBikeReadOnly(b));
-        const requestedIds = body.compareBikeIds.filter((id): id is string => typeof id === "string");
-        const matched = requestedIds
-          .map((id) => ownActiveBikes.find((b) => b.id === id))
-          .filter((b): b is NonNullable<typeof b> => !!b);
-        if (matched.length >= MIN_COMPARE_BIKES && matched.length <= MAX_COMPARE_BIKES) {
+        const ownActiveCars = cars.filter((c) => !isCarReadOnly(c));
+        const requestedIds = body.compareVehicleIds.filter((id): id is string => typeof id === "string");
+        const matchedBikes = requestedIds.map((id) => ownActiveBikes.find((b) => b.id === id)).filter((b): b is NonNullable<typeof b> => !!b);
+        const matchedCars = requestedIds.map((id) => ownActiveCars.find((c) => c.id === id)).filter((c): c is NonNullable<typeof c> => !!c);
+        const matchedIds = new Set([...matchedBikes.map((b) => b.id), ...matchedCars.map((c) => c.id)]);
+        const vehicleIds = requestedIds.filter((id) => matchedIds.has(id));
+        if (vehicleIds.length >= MIN_COMPARE_VEHICLES && vehicleIds.length <= MAX_COMPARE_VEHICLES) {
           const from = typeof body.compareFrom === "string" && body.compareFrom ? body.compareFrom : undefined;
           const to = typeof body.compareTo === "string" && body.compareTo ? body.compareTo : undefined;
-          compareContext = { bikeIds: matched.map((b) => b.id), from, to };
-          compareBikeNames = matched.map((b) => (b.nickname ? `${b.nickname} (${b.make} ${b.model})` : `${b.make} ${b.model}`));
+          compareContext = { vehicleIds, bikeIds: matchedBikes.map((b) => b.id), carIds: matchedCars.map((c) => c.id), from, to };
+          const nameById = new Map([
+            ...matchedBikes.map((b): [string, string] => [b.id, b.nickname ? `${b.nickname} (${b.make} ${b.model})` : `${b.make} ${b.model}`]),
+            ...matchedCars.map((c): [string, string] => [c.id, c.nickname ? `${c.nickname} (${c.make} ${c.model})` : `${c.make} ${c.model}`]),
+          ]);
+          compareVehicleNames = vehicleIds.map((id) => nameById.get(id)!).filter(Boolean);
         }
       }
     } catch (err) {
@@ -447,7 +458,7 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  const systemInstruction = buildSystemInstruction(config, signedIn, privacyPolicyText, !!reportToken, dashboardTabLabel, dashboardTabGroupLabel, compareBikeNames, logEntryAccess, activeVehicleKind, displayName, carKnowledgeBase);
+  const systemInstruction = buildSystemInstruction(config, signedIn, privacyPolicyText, !!reportToken, dashboardTabLabel, dashboardTabGroupLabel, compareVehicleNames, logEntryAccess, activeVehicleKind, displayName, carKnowledgeBase);
 
   const contents: GeminiContent[] = toGeminiContents(messages);
   const toolDeclarations = [

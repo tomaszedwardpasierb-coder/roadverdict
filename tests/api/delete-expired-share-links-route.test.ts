@@ -3,10 +3,14 @@ import { NextRequest } from "next/server";
 
 const mocks = vi.hoisted(() => ({
   deleteExpiredShareLinks: vi.fn(),
+  deleteExpiredCarShareLinks: vi.fn(),
 }));
 
 vi.mock("@/lib/tracker/shareLink", () => ({
   deleteExpiredShareLinks: mocks.deleteExpiredShareLinks,
+}));
+vi.mock("@/lib/tracker/carShareLink", () => ({
+  deleteExpiredCarShareLinks: mocks.deleteExpiredCarShareLinks,
 }));
 
 import { POST } from "@/app/api/cron/delete-expired-share-links/route";
@@ -25,6 +29,7 @@ describe("POST /api/cron/delete-expired-share-links", () => {
     Object.values(mocks).forEach((m) => m.mockReset());
     process.env.CRON_SECRET = "top-secret";
     mocks.deleteExpiredShareLinks.mockResolvedValue(0);
+    mocks.deleteExpiredCarShareLinks.mockResolvedValue(0);
   });
 
   afterEach(() => {
@@ -54,14 +59,22 @@ describe("POST /api/cron/delete-expired-share-links", () => {
   it("proceeds and reports zero deletions when nothing is expired", async () => {
     const response = await POST(request({ authorization: "Bearer top-secret" }));
     expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toEqual({ ok: true, deletedCount: 0 });
+    await expect(response.json()).resolves.toEqual({ ok: true, deletedCount: 0, bikeDeletedCount: 0, carDeletedCount: 0 });
   });
 
   it("reports the deleted count from the underlying cleanup", async () => {
     mocks.deleteExpiredShareLinks.mockResolvedValue(7);
     const response = await POST(request({ authorization: "Bearer top-secret" }));
     expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toEqual({ ok: true, deletedCount: 7 });
+    await expect(response.json()).resolves.toEqual({ ok: true, deletedCount: 7, bikeDeletedCount: 7, carDeletedCount: 0 });
+  });
+
+  it("combines bike and car deletions into one total", async () => {
+    mocks.deleteExpiredShareLinks.mockResolvedValue(3);
+    mocks.deleteExpiredCarShareLinks.mockResolvedValue(4);
+    const response = await POST(request({ authorization: "Bearer top-secret" }));
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ ok: true, deletedCount: 7, bikeDeletedCount: 3, carDeletedCount: 4 });
   });
 
   it("degrades to a graceful JSON 500 when the cleanup fails, instead of propagating", async () => {

@@ -84,7 +84,9 @@ export default async function GaragePage() {
             currentMileage={car.currentMileage}
             isActive={activeVehicle?.kind === "car" && car.id === activeVehicle.car.id}
             currentRegistration={getCarCurrentRegistration(car)}
+            registrationChangeCount={car.registrationChanges?.length ?? 0}
             transferredToEmail={car.transferredTo?.newOwnerEmail}
+            mayHavePriorHistory={car.mayHavePriorHistory}
           />
         ))}
       </div>

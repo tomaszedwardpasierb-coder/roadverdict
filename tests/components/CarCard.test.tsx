@@ -1,10 +1,10 @@
 // Place at: tests/components/CarCard.test.tsx
 //
-// Car equivalent of BikeCard.test.tsx - deliberately smaller, since
-// CarCard itself has no registration-change form or prior-history
-// request flow (neither has a car-side route yet). Covers the
-// active-vs-inactive dashboard switch, the read-only/transferred state,
-// and delete confirmation. Only `fetch`, `window.confirm`, and
+// Car mirror of BikeCard.test.tsx - registration-change and prior-
+// history request now have real car-side routes, so this covers the
+// same active-vs-inactive dashboard switch, read-only/transferred
+// state, delete confirmation, the registration-change form, and the
+// prior-history request flow. Only `fetch`, `window.confirm`, and
 // next/navigation's useRouter are mocked.
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
@@ -23,6 +23,7 @@ const baseProps = {
   year: 2019,
   currentMileage: 12000,
   isActive: false,
+  registrationChangeCount: 0,
 };
 
 describe("CarCard", () => {
@@ -82,18 +83,30 @@ describe("CarCard", () => {
     expect(mockRouter.push).not.toHaveBeenCalled();
   });
 
-  it("a transferred (read-only) car shows the read-only badge and hides Delete", () => {
+  it("a transferred (read-only) car shows the read-only badge and hides Delete and Change registration", () => {
     render(<CarCard {...baseProps} transferredToEmail="newowner@example.com" currentRegistration="AB12CDE" />);
 
     expect(screen.getByText("Read-only - transferred to newowner@example.com")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Delete" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Change registration" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "View dashboard" })).toBeInTheDocument();
   });
 
-  it("an active, non-transferred car with a registration shows Delete and the registration", () => {
+  it("an active, non-transferred car with a registration shows both Delete and Change registration", () => {
     render(<CarCard {...baseProps} currentRegistration="AB12CDE" />);
     expect(screen.getByRole("button", { name: "Delete" })).toBeInTheDocument();
-    expect(screen.getByText("AB12CDE")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Change registration" })).toBeInTheDocument();
+  });
+
+  it("a car with no registration at all hides the Change registration button (nothing to change)", () => {
+    render(<CarCard {...baseProps} />);
+    expect(screen.queryByRole("button", { name: "Change registration" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Delete" })).toBeInTheDocument();
+  });
+
+  it("shows the registration-change count note when it's greater than zero", () => {
+    render(<CarCard {...baseProps} currentRegistration="AB12CDE" registrationChangeCount={2} />);
+    expect(screen.getByText("(2 changes on record)")).toBeInTheDocument();
   });
 
   it("clicking Delete without confirming makes no API call", async () => {
@@ -128,5 +141,103 @@ describe("CarCard", () => {
 
     expect(await screen.findByRole("alert")).toHaveTextContent("This car still has active reminders.");
     expect(mockRouter.refresh).not.toHaveBeenCalled();
+  });
+
+  it("opens and closes the registration-change form via the toggle button", async () => {
+    const user = userEvent.setup();
+    render(<CarCard {...baseProps} currentRegistration="AB12CDE" />);
+
+    await user.click(screen.getByRole("button", { name: "Change registration" }));
+    expect(screen.getByLabelText("New registration")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(screen.queryByLabelText("New registration")).not.toBeInTheDocument();
+  });
+
+  it("submitting the registration-change form without confirming makes no API call", async () => {
+    (window.confirm as ReturnType<typeof vi.fn>).mockReturnValue(false);
+    const user = userEvent.setup();
+    render(<CarCard {...baseProps} currentRegistration="AB12CDE" />);
+    await user.click(screen.getByRole("button", { name: "Change registration" }));
+    await user.type(screen.getByLabelText("New registration"), "XY99ZZZ");
+    await user.click(screen.getByRole("button", { name: "Record change" }));
+
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("confirming the registration change posts the new plate and reason, then closes the form and refreshes", async () => {
+    (window.confirm as ReturnType<typeof vi.fn>).mockReturnValue(true);
+    (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({ ok: true, json: async () => ({}) });
+    const user = userEvent.setup();
+    render(<CarCard {...baseProps} currentRegistration="AB12CDE" />);
+    await user.click(screen.getByRole("button", { name: "Change registration" }));
+    await user.type(screen.getByLabelText("New registration"), "XY99ZZZ");
+    await user.selectOptions(screen.getByLabelText("Reason"), "private-plate-removed");
+    await user.click(screen.getByRole("button", { name: "Record change" }));
+
+    expect(fetch).toHaveBeenCalledWith(
+      "/api/cars/car/registration-change",
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({ carId: "car-1", plate: "XY99ZZZ", reason: "private-plate-removed" }),
+      })
+    );
+    expect(await screen.findByRole("button", { name: "Change registration" })).toBeInTheDocument();
+    expect(mockRouter.refresh).toHaveBeenCalledTimes(1);
+  });
+
+  it("shows the server's own error and leaves the form open when the registration change fails", async () => {
+    (window.confirm as ReturnType<typeof vi.fn>).mockReturnValue(true);
+    (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
+      ok: false,
+      json: async () => ({ error: "That plate is already registered to another of your cars." }),
+    });
+    const user = userEvent.setup();
+    render(<CarCard {...baseProps} currentRegistration="AB12CDE" />);
+    await user.click(screen.getByRole("button", { name: "Change registration" }));
+    await user.type(screen.getByLabelText("New registration"), "XY99ZZZ");
+    await user.click(screen.getByRole("button", { name: "Record change" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("That plate is already registered to another of your cars.");
+    expect(screen.getByLabelText("New registration")).toBeInTheDocument();
+  });
+
+  it("shows the prior-history prompt only when mayHavePriorHistory is set and the car isn't already transferred", () => {
+    render(<CarCard {...baseProps} mayHavePriorHistory currentRegistration="AB12CDE" />);
+    expect(screen.getByText(/may have RoadVerdict history logged by a previous owner/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Request it" })).toBeInTheDocument();
+  });
+
+  it("hides the prior-history prompt on a transferred car even if mayHavePriorHistory is set", () => {
+    render(<CarCard {...baseProps} mayHavePriorHistory transferredToEmail="x@example.com" currentRegistration="AB12CDE" />);
+    expect(screen.queryByText(/may have RoadVerdict history/)).not.toBeInTheDocument();
+  });
+
+  it("requesting prior history posts this car's registration and shows a sent confirmation", async () => {
+    (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({ ok: true, json: async () => ({}) });
+    const user = userEvent.setup();
+    render(<CarCard {...baseProps} mayHavePriorHistory currentRegistration="AB12CDE" />);
+    await user.click(screen.getByRole("button", { name: "Request it" }));
+
+    expect(fetch).toHaveBeenCalledWith(
+      "/api/cars/car-transfer/request-ownership",
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({ registration: "AB12CDE" }),
+      })
+    );
+    expect(await screen.findByText(/Request sent/)).toBeInTheDocument();
+  });
+
+  it("shows the server's own error message when the history request fails", async () => {
+    (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
+      ok: false,
+      json: async () => ({ error: "You already have a pending request for this car." }),
+    });
+    const user = userEvent.setup();
+    render(<CarCard {...baseProps} mayHavePriorHistory currentRegistration="AB12CDE" />);
+    await user.click(screen.getByRole("button", { name: "Request it" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("You already have a pending request for this car.");
   });
 });

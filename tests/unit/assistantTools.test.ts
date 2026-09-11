@@ -14,8 +14,11 @@ const mocks = vi.hoisted(() => ({
   gatherMileagePoints: vi.fn(),
   getShareLinksForUser: vi.fn(),
   getPendingReceiptRequestsForOwner: vi.fn(),
+  getCarShareLinksForUser: vi.fn(),
+  getPendingCarReceiptRequestsForOwner: vi.fn(),
   getSellerReportData: vi.fn(),
   buildBikeComparison: vi.fn(),
+  buildCarComparison: vi.fn(),
   getCarServiceRecords: vi.fn(),
   getCarMods: vi.fn(),
   getCarBills: vi.fn(),
@@ -50,8 +53,11 @@ vi.mock("@/lib/tracker/mpgCalc", () => ({
 vi.mock("@/lib/tracker/summary", () => ({ gatherMileagePoints: mocks.gatherMileagePoints }));
 vi.mock("@/lib/tracker/shareLink", () => ({ getShareLinksForUser: mocks.getShareLinksForUser }));
 vi.mock("@/lib/tracker/receiptRequest", () => ({ getPendingReceiptRequestsForOwner: mocks.getPendingReceiptRequestsForOwner }));
+vi.mock("@/lib/tracker/carShareLink", () => ({ getCarShareLinksForUser: mocks.getCarShareLinksForUser }));
+vi.mock("@/lib/tracker/carReceiptRequest", () => ({ getPendingCarReceiptRequestsForOwner: mocks.getPendingCarReceiptRequestsForOwner }));
 vi.mock("@/lib/tracker/sellerReportData", () => ({ getSellerReportData: mocks.getSellerReportData }));
 vi.mock("@/lib/tracker/bikeComparison", () => ({ buildBikeComparison: mocks.buildBikeComparison }));
+vi.mock("@/lib/tracker/carComparison", () => ({ buildCarComparison: mocks.buildCarComparison }));
 vi.mock("@/lib/tracker/carServiceRecord", () => ({ getCarServiceRecords: mocks.getCarServiceRecords }));
 vi.mock("@/lib/tracker/carMod", () => ({ getCarMods: mocks.getCarMods }));
 vi.mock("@/lib/tracker/carBill", () => ({ getCarBills: mocks.getCarBills }));
@@ -132,6 +138,9 @@ beforeEach(() => {
   mocks.getCarReminders.mockResolvedValue([]);
   mocks.getLabour.mockResolvedValue([]);
   mocks.getCarLabour.mockResolvedValue([]);
+  mocks.buildCarComparison.mockResolvedValue([]);
+  mocks.getCarShareLinksForUser.mockResolvedValue([]);
+  mocks.getPendingCarReceiptRequestsForOwner.mockResolvedValue([]);
   // Safe default for every toolProposeLogEntry test that isn't itself
   // testing mileage estimation - individual tests below override this
   // with real points when they need to exercise estimateMileage's own
@@ -202,7 +211,7 @@ describe("runAssistantTool - the core security dispatch layer", () => {
       { bikeIds: ["attacker-supplied-id"] } as any,
       "real-owner@example.com",
       undefined,
-      { bikeIds: ["real-bike-1", "real-bike-2"] }
+      { vehicleIds: ["real-bike-1", "real-bike-2"], bikeIds: ["real-bike-1", "real-bike-2"], carIds: [] }
     );
 
     expect(mocks.buildBikeComparison).toHaveBeenCalledWith("real-owner@example.com", ["real-bike-1", "real-bike-2"], undefined);
@@ -212,37 +221,49 @@ describe("runAssistantTool - the core security dispatch layer", () => {
 describe("toolGetViewedComparison", () => {
   const bikeA = { bikeId: "b-1", name: "Africa Twin", costPerMile: 0.1, spend: { grandTotal: 500 }, milesRidden: 5000, actualMpg: 55, serviceCount: 3, documentationPct: 80, nextDue: null };
   const bikeB = { bikeId: "b-2", name: "Tiger 900", costPerMile: 0.2, spend: { grandTotal: 800 }, milesRidden: 4000, actualMpg: 45, serviceCount: 2, documentationPct: 60, nextDue: { name: "MOT", status: "due-soon" } };
+  const carC = { bikeId: "c-1", kind: "car" as const, name: "Focus", costPerMile: 0.15, spend: { grandTotal: 600 }, milesRidden: 4500, actualMpg: 48, serviceCount: 2, documentationPct: null, nextDue: null };
 
-  it("returns an error when fewer than two bikes could be loaded", async () => {
+  it("returns an error when fewer than two vehicles could be loaded", async () => {
     mocks.buildBikeComparison.mockResolvedValue([bikeA]);
-    const result = await toolGetViewedComparison("owner@example.com", { bikeIds: ["b-1", "b-2"] });
+    const result = await toolGetViewedComparison("owner@example.com", { vehicleIds: ["b-1", "b-2"], bikeIds: ["b-1", "b-2"], carIds: [] });
     expect(result).toEqual({ error: "Couldn't load this comparison right now." });
   });
 
-  it("returns the computed cheapest-to-run verdict alongside each bike's own figures", async () => {
+  it("returns the computed cheapest-to-run verdict alongside each vehicle's own figures", async () => {
     mocks.buildBikeComparison.mockResolvedValue([bikeA, bikeB]);
-    const result: any = await toolGetViewedComparison("owner@example.com", { bikeIds: ["b-1", "b-2"] });
+    const result: any = await toolGetViewedComparison("owner@example.com", { vehicleIds: ["b-1", "b-2"], bikeIds: ["b-1", "b-2"], carIds: [] });
 
     expect(result.period).toBe("overall");
     expect(result.cheapestToRunVerdict).toContain("Africa Twin");
-    expect(result.bikes).toEqual([
-      { name: "Africa Twin", costPerMile: 0.1, totalSpend: 500, milesRidden: 5000, actualMpg: 55, servicesLogged: 3, documentationCoveragePct: 80, dueSoonest: null },
-      { name: "Tiger 900", costPerMile: 0.2, totalSpend: 800, milesRidden: 4000, actualMpg: 45, servicesLogged: 2, documentationCoveragePct: 60, dueSoonest: { name: "MOT", status: "due-soon" } },
+    expect(result.vehicles).toEqual([
+      { name: "Africa Twin", kind: "bike", costPerMile: 0.1, totalSpend: 500, milesRidden: 5000, actualMpg: 55, servicesLogged: 3, documentationCoveragePct: 80, dueSoonest: null },
+      { name: "Tiger 900", kind: "bike", costPerMile: 0.2, totalSpend: 800, milesRidden: 4000, actualMpg: 45, servicesLogged: 2, documentationCoveragePct: 60, dueSoonest: { name: "MOT", status: "due-soon" } },
     ]);
   });
 
-  it("passes a from/to period through to buildBikeComparison and reports it back, rather than always 'overall'", async () => {
-    mocks.buildBikeComparison.mockResolvedValue([bikeA, bikeB]);
-    await toolGetViewedComparison("owner@example.com", { bikeIds: ["b-1", "b-2"], from: "2025-01-01" });
-    expect(mocks.buildBikeComparison).toHaveBeenCalledWith("owner@example.com", ["b-1", "b-2"], { from: "2025-01-01", to: undefined });
+  it("merges a mixed bike+car comparison, ordered by the original on-screen selection order rather than 'every bike then every car'", async () => {
+    mocks.buildBikeComparison.mockResolvedValue([bikeA]);
+    mocks.buildCarComparison.mockResolvedValue([carC]);
+    const result: any = await toolGetViewedComparison("owner@example.com", { vehicleIds: ["c-1", "b-1"], bikeIds: ["b-1"], carIds: ["c-1"] });
 
-    const result: any = await toolGetViewedComparison("owner@example.com", { bikeIds: ["b-1", "b-2"], from: "2025-01-01" });
+    expect(result.vehicles.map((v: any) => v.name)).toEqual(["Focus", "Africa Twin"]);
+    expect(result.vehicles[0].kind).toBe("car");
+    expect(result.vehicles[1].kind).toBe("bike");
+  });
+
+  it("passes a from/to period through to buildBikeComparison/buildCarComparison and reports it back, rather than always 'overall'", async () => {
+    mocks.buildBikeComparison.mockResolvedValue([bikeA, bikeB]);
+    await toolGetViewedComparison("owner@example.com", { vehicleIds: ["b-1", "b-2"], bikeIds: ["b-1", "b-2"], carIds: [], from: "2025-01-01" });
+    expect(mocks.buildBikeComparison).toHaveBeenCalledWith("owner@example.com", ["b-1", "b-2"], { from: "2025-01-01", to: undefined });
+    expect(mocks.buildCarComparison).toHaveBeenCalledWith("owner@example.com", [], { from: "2025-01-01", to: undefined });
+
+    const result: any = await toolGetViewedComparison("owner@example.com", { vehicleIds: ["b-1", "b-2"], bikeIds: ["b-1", "b-2"], carIds: [], from: "2025-01-01" });
     expect(result.period).toEqual({ from: "2025-01-01", to: null });
   });
 
   it("fails safely with a plain tool error, never an unhandled throw, if the underlying lookup rejects", async () => {
     mocks.buildBikeComparison.mockRejectedValue(new Error("Cosmos unavailable"));
-    const result = await toolGetViewedComparison("owner@example.com", { bikeIds: ["b-1", "b-2"] });
+    const result = await toolGetViewedComparison("owner@example.com", { vehicleIds: ["b-1", "b-2"], bikeIds: ["b-1", "b-2"], carIds: [] });
     expect(result).toEqual({ error: "Couldn't load this comparison right now." });
   });
 });
@@ -650,12 +671,25 @@ describe("toolGetShareLinks", () => {
     expect(await toolGetShareLinks("owner@example.com")).toEqual({ error: "No vehicle found on this account." });
   });
 
-  it("reports not-available for a car-active session, without calling any bike-only share-link lookup", async () => {
-    mocks.resolveActiveVehicle.mockResolvedValue(carActive());
-    const result: any = await toolGetShareLinks("owner@example.com");
-    expect(result.hasActiveLinks).toBe(false);
-    expect(result.note).toMatch(/available for cars/i);
-    expect(mocks.getShareLinksForUser).not.toHaveBeenCalled();
+  describe("car-active session", () => {
+    beforeEach(() => mocks.resolveActiveVehicle.mockResolvedValue(carActive()));
+
+    it("filters links down to the active car only, via the car-specific lookups, not the bike ones", async () => {
+      mocks.getCarShareLinksForUser.mockResolvedValue([
+        { carId: "car-1", recipientEmail: "buyer@example.com", createdAt: "2025-01-01" },
+        { carId: "some-other-car", recipientEmail: "x@example.com", createdAt: "2025-01-01" },
+      ]);
+      const result: any = await toolGetShareLinks("owner@example.com");
+      expect(result.activeLinkCount).toBe(1);
+      expect(mocks.getShareLinksForUser).not.toHaveBeenCalled();
+      expect(mocks.getPendingReceiptRequestsForOwner).not.toHaveBeenCalled();
+    });
+
+    it("still reports the pending receipt-request count for the car even when there are no active links", async () => {
+      mocks.getPendingCarReceiptRequestsForOwner.mockResolvedValue([{ carId: "car-1" }]);
+      const result: any = await toolGetShareLinks("owner@example.com");
+      expect(result).toEqual({ hasActiveLinks: false, pendingReceiptRequestCount: 1 });
+    });
   });
 });
 
@@ -683,11 +717,24 @@ describe("toolGetStorySoFar", () => {
     expect(await toolGetStorySoFar("owner@example.com")).toEqual({ error: "No vehicle found on this account." });
   });
 
-  it("reports not-available for a car-active session - CarDoc has no storyCache field at all", async () => {
-    mocks.resolveActiveVehicle.mockResolvedValue(carActive());
-    const result: any = await toolGetStorySoFar("owner@example.com");
-    expect(result.hasStory).toBe(false);
-    expect(result.note).toMatch(/available for cars/i);
+  describe("car-active session", () => {
+    it("gives clear guidance when no story has been generated yet for the car, rather than an empty result", async () => {
+      mocks.resolveActiveVehicle.mockResolvedValue(carActive({ storyCache: undefined } as any));
+      const result: any = await toolGetStorySoFar("owner@example.com");
+      expect(result.hasStory).toBe(false);
+      expect(result.note).toContain("click Generate my story");
+    });
+
+    it("returns the car's own cached story when one exists", async () => {
+      mocks.resolveActiveVehicle.mockResolvedValue(carActive({
+        storyCache: {
+          generatedAt: "2025-06-01",
+          response: { verdict: { label: "Well documented", reasons: [] }, sharedStory: ["A good car."], ownerNotes: ["Log more receipts."] },
+        },
+      } as any));
+      const result: any = await toolGetStorySoFar("owner@example.com");
+      expect(result).toMatchObject({ hasStory: true, story: ["A good car."], ownerOnlyNotes: ["Log more receipts."] });
+    });
   });
 });
 

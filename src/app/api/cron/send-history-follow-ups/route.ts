@@ -3,14 +3,21 @@
 // Runs daily (same cadence assumed as the other cron routes in this
 // app), finds every shareable report link that's at least 4 weeks old,
 // had a recipient email, and hasn't been followed up yet, and sends
-// the "bought the bike? take its history with you" email - unless the
-// bike's already been requested or handed off by then, in which case
-// it's marked processed without sending, so it isn't re-checked forever.
+// the "bought the vehicle? take its history with you" email - unless
+// the vehicle's already been requested or handed off by then, in which
+// case it's marked processed without sending, so it isn't re-checked
+// forever. A second loop over car share links, mirroring the bike loop
+// exactly - same pattern check-reminders/audit-mileage already
+// establish for this app's other cron routes (one combined run, one
+// combined set of totals, not two separately-tracked cron jobs).
 import { NextRequest, NextResponse } from "next/server";
 import { getShareLinksNeedingFollowUp, markShareLinkFollowUpSent } from "@/lib/tracker/shareLink";
+import { getCarShareLinksNeedingFollowUp, markCarShareLinkFollowUpSent } from "@/lib/tracker/carShareLink";
 import { getBike, isBikeReadOnly } from "@/lib/tracker/bike";
+import { getCarById, isCarReadOnly } from "@/lib/tracker/car";
 import { hasActiveTransferRequestForBike } from "@/lib/tracker/bikeTransferRequest";
-import { sendHistoryFollowUpEmail } from "@/lib/resend";
+import { hasActiveCarTransferRequestForCar } from "@/lib/tracker/carTransferRequest";
+import { sendHistoryFollowUpEmail, sendCarHistoryFollowUpEmail } from "@/lib/resend";
 
 export const dynamic = "force-dynamic";
 
@@ -22,12 +29,12 @@ export async function POST(req: NextRequest) {
   }
 
   const appUrl = process.env.APP_URL ?? "https://roadverdict.co.uk";
-  const candidates = await getShareLinksNeedingFollowUp();
   let checked = 0;
   let sent = 0;
   let skipped = 0;
 
-  for (const link of candidates) {
+  const bikeCandidates = await getShareLinksNeedingFollowUp();
+  for (const link of bikeCandidates) {
     checked++;
     if (!link.recipientEmail) {
       // Shouldn't happen given the query's own IS_DEFINED filter, but
@@ -67,6 +74,40 @@ export async function POST(req: NextRequest) {
       // run retries it, same as a transient failure anywhere else in
       // this app degrading to "try again next time" rather than lost.
       console.error("History follow-up email failed to send:", err);
+    }
+  }
+
+  const carCandidates = await getCarShareLinksNeedingFollowUp();
+  for (const link of carCandidates) {
+    checked++;
+    if (!link.recipientEmail) {
+      skipped++;
+      continue;
+    }
+
+    const car = await getCarById(link.email, link.carId);
+    if (!car) {
+      await markCarShareLinkFollowUpSent(link.id);
+      skipped++;
+      continue;
+    }
+
+    if (isCarReadOnly(car) || (await hasActiveCarTransferRequestForCar(link.email, link.carId))) {
+      await markCarShareLinkFollowUpSent(link.id);
+      skipped++;
+      continue;
+    }
+
+    try {
+      await sendCarHistoryFollowUpEmail({
+        recipientEmail: link.recipientEmail,
+        carSummary: { make: car.make, model: car.model, year: car.year, isCustomBuild: !!car.isCustomBuild },
+        reportUrl: `${appUrl}/car-report/${link.id}/detailed`,
+      });
+      await markCarShareLinkFollowUpSent(link.id);
+      sent++;
+    } catch (err) {
+      console.error("Car history follow-up email failed to send:", err);
     }
   }
 

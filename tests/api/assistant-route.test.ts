@@ -12,6 +12,8 @@ const mocks = vi.hoisted(() => ({
   logGeminiUsage: vi.fn(),
   getBikesForUser: vi.fn(),
   isBikeReadOnly: vi.fn(),
+  getCarsForUser: vi.fn(),
+  isCarReadOnly: vi.fn(),
   isPro: vi.fn(),
   resolveActiveVehicle: vi.fn(),
   getCarAssistantConfig: vi.fn(),
@@ -38,6 +40,7 @@ vi.mock("@/lib/tracker/shareLink", () => ({ resolveShareToken: mocks.resolveShar
 vi.mock("@/lib/tracker/reportAccess", () => ({ hasReportAccess: mocks.hasReportAccess }));
 vi.mock("@/lib/tracker/geminiUsageLog", () => ({ logGeminiUsage: mocks.logGeminiUsage }));
 vi.mock("@/lib/tracker/bike", () => ({ getBikesForUser: mocks.getBikesForUser, isBikeReadOnly: mocks.isBikeReadOnly }));
+vi.mock("@/lib/tracker/car", () => ({ getCarsForUser: mocks.getCarsForUser, isCarReadOnly: mocks.isCarReadOnly }));
 vi.mock("@/lib/subscriptions", () => ({ isPro: mocks.isPro }));
 vi.mock("@/lib/tracker/assistantAnonUsage", () => ({
   canSendAnonAssistantMessage: mocks.canSendAnonAssistantMessage,
@@ -45,9 +48,9 @@ vi.mock("@/lib/tracker/assistantAnonUsage", () => ({
   ANON_ID_COOKIE: "rv_anon_id",
   ANON_ID_COOKIE_MAX_AGE_SECONDS: 34560000,
 }));
-// bikeComparison.ts (MIN_COMPARE_BIKES/MAX_COMPARE_BIKES) is deliberately
-// NOT mocked - both are plain constants, no I/O, so this exercises the
-// real bounds rather than a stand-in for them.
+// vehicleComparison.ts (MIN_COMPARE_VEHICLES/MAX_COMPARE_VEHICLES) is
+// deliberately NOT mocked - both are plain constants, no I/O, so this
+// exercises the real bounds rather than a stand-in for them.
 vi.stubGlobal("fetch", mocks.fetch);
 
 import { NextRequest } from "next/server";
@@ -110,6 +113,8 @@ beforeEach(() => {
   mocks.isPro.mockResolvedValue(false);
   mocks.getBikesForUser.mockResolvedValue([]);
   mocks.isBikeReadOnly.mockReturnValue(false);
+  mocks.getCarsForUser.mockResolvedValue([]);
+  mocks.isCarReadOnly.mockReturnValue(false);
   mocks.resolveActiveVehicle.mockResolvedValue(null);
   mocks.getCarAssistantConfig.mockResolvedValue(null);
   mocks.canSendAnonAssistantMessage.mockResolvedValue(true);
@@ -118,6 +123,7 @@ beforeEach(() => {
 
 const bikeA = { id: "bike-1", make: "Honda", model: "Africa Twin", nickname: "" };
 const bikeB = { id: "bike-2", make: "Triumph", model: "Tiger 900", nickname: "" };
+const carA = { id: "car-1", make: "Ford", model: "Focus", nickname: "" };
 
 describe("POST /api/assistant", () => {
   it("returns 503 when the Gemini API key isn't configured, without calling anything else", async () => {
@@ -329,7 +335,7 @@ describe("POST /api/assistant", () => {
     mocks.isPro.mockResolvedValue(true);
     mocks.getBikesForUser.mockResolvedValue([bikeA, bikeB]);
 
-    await POST(request({ messages: [{ role: "user", content: "which is cheaper?" }], compareBikeIds: ["bike-1", "bike-2"] }));
+    await POST(request({ messages: [{ role: "user", content: "which is cheaper?" }], compareVehicleIds: ["bike-1", "bike-2"] }));
 
     const callBody = JSON.parse(mocks.fetch.mock.calls[0][1].body);
     const names = callBody.tools[0].functionDeclarations.map((d: { name: string }) => d.name);
@@ -338,32 +344,47 @@ describe("POST /api/assistant", () => {
     expect(callBody.systemInstruction.parts[0].text).toContain("Tiger 900");
   });
 
-  it("never attaches the comparison tool when the account isn't Pro, even with valid bike ids", async () => {
+  it("attaches the comparison tool and names both bike and car when comparing a mixed selection", async () => {
+    mocks.getSession.mockResolvedValue({ email: "rider@example.com" });
+    mocks.isPro.mockResolvedValue(true);
+    mocks.getBikesForUser.mockResolvedValue([bikeA]);
+    mocks.getCarsForUser.mockResolvedValue([carA]);
+
+    await POST(request({ messages: [{ role: "user", content: "which is cheaper?" }], compareVehicleIds: ["bike-1", "car-1"] }));
+
+    const callBody = JSON.parse(mocks.fetch.mock.calls[0][1].body);
+    const names = callBody.tools[0].functionDeclarations.map((d: { name: string }) => d.name);
+    expect(names).toContain("getViewedComparison");
+    expect(callBody.systemInstruction.parts[0].text).toContain("Africa Twin");
+    expect(callBody.systemInstruction.parts[0].text).toContain("Focus");
+  });
+
+  it("never attaches the comparison tool when the account isn't Pro, even with valid ids", async () => {
     mocks.getSession.mockResolvedValue({ email: "rider@example.com" });
     mocks.isPro.mockResolvedValue(false);
     mocks.getBikesForUser.mockResolvedValue([bikeA, bikeB]);
 
-    await POST(request({ messages: [{ role: "user", content: "which is cheaper?" }], compareBikeIds: ["bike-1", "bike-2"] }));
+    await POST(request({ messages: [{ role: "user", content: "which is cheaper?" }], compareVehicleIds: ["bike-1", "bike-2"] }));
 
     const callBody = JSON.parse(mocks.fetch.mock.calls[0][1].body);
     const names = callBody.tools[0].functionDeclarations.map((d: { name: string }) => d.name);
     expect(names).not.toContain("getViewedComparison");
   });
 
-  it("never trusts a bike id that doesn't actually belong to this account, even if the client sent it", async () => {
+  it("never trusts an id that doesn't actually belong to this account, even if the client sent it", async () => {
     mocks.getSession.mockResolvedValue({ email: "rider@example.com" });
     mocks.isPro.mockResolvedValue(true);
     mocks.getBikesForUser.mockResolvedValue([bikeA]); // only owns one real bike
 
     await POST(request({
       messages: [{ role: "user", content: "which is cheaper?" }],
-      compareBikeIds: ["bike-1", "someone-elses-bike"],
+      compareVehicleIds: ["bike-1", "someone-elses-bike"],
     }));
 
     const callBody = JSON.parse(mocks.fetch.mock.calls[0][1].body);
     const names = callBody.tools[0].functionDeclarations.map((d: { name: string }) => d.name);
-    // Only one id actually matched a real, owned bike - below the
-    // 2-bike minimum, so the tool never gets attached at all.
+    // Only one id actually matched a real, owned vehicle - below the
+    // 2-vehicle minimum, so the tool never gets attached at all.
     expect(names).not.toContain("getViewedComparison");
   });
 
@@ -373,17 +394,33 @@ describe("POST /api/assistant", () => {
     mocks.getBikesForUser.mockResolvedValue([bikeA, bikeB]);
     mocks.isBikeReadOnly.mockImplementation((b: { id: string }) => b.id === "bike-2");
 
-    await POST(request({ messages: [{ role: "user", content: "which is cheaper?" }], compareBikeIds: ["bike-1", "bike-2"] }));
+    await POST(request({ messages: [{ role: "user", content: "which is cheaper?" }], compareVehicleIds: ["bike-1", "bike-2"] }));
 
     const callBody = JSON.parse(mocks.fetch.mock.calls[0][1].body);
     const names = callBody.tools[0].functionDeclarations.map((d: { name: string }) => d.name);
     expect(names).not.toContain("getViewedComparison");
   });
 
-  it("never attaches the comparison tool when nobody is signed in, regardless of what compareBikeIds claims", async () => {
+  it("never attaches the comparison tool for a transferred (read-only) car", async () => {
+    mocks.getSession.mockResolvedValue({ email: "rider@example.com" });
+    mocks.isPro.mockResolvedValue(true);
+    mocks.getBikesForUser.mockResolvedValue([bikeA]);
+    mocks.getCarsForUser.mockResolvedValue([carA]);
+    mocks.isCarReadOnly.mockReturnValue(true);
+
+    await POST(request({ messages: [{ role: "user", content: "which is cheaper?" }], compareVehicleIds: ["bike-1", "car-1"] }));
+
+    const callBody = JSON.parse(mocks.fetch.mock.calls[0][1].body);
+    const names = callBody.tools[0].functionDeclarations.map((d: { name: string }) => d.name);
+    // Only the bike matched a real, owned, active vehicle - below the
+    // 2-vehicle minimum, so the tool never gets attached at all.
+    expect(names).not.toContain("getViewedComparison");
+  });
+
+  it("never attaches the comparison tool when nobody is signed in, regardless of what compareVehicleIds claims", async () => {
     mocks.getSession.mockResolvedValue(null);
 
-    await POST(request({ messages: [{ role: "user", content: "hi" }], compareBikeIds: ["bike-1", "bike-2"] }));
+    await POST(request({ messages: [{ role: "user", content: "hi" }], compareVehicleIds: ["bike-1", "bike-2"] }));
 
     const callBody = JSON.parse(mocks.fetch.mock.calls[0][1].body);
     expect(callBody.tools).toBeUndefined();
@@ -401,7 +438,7 @@ describe("POST /api/assistant", () => {
 
     await POST(request({
       messages: [{ role: "user", content: "which is cheaper?" }],
-      compareBikeIds: ["bike-1", "bike-2"],
+      compareVehicleIds: ["bike-1", "bike-2"],
       compareFrom: "2025-01-01",
     }));
 
@@ -410,7 +447,7 @@ describe("POST /api/assistant", () => {
       { bikeIds: ["attacker-id"] },
       "rider@example.com",
       undefined,
-      { bikeIds: ["bike-1", "bike-2"], from: "2025-01-01", to: undefined }
+      { vehicleIds: ["bike-1", "bike-2"], bikeIds: ["bike-1", "bike-2"], carIds: [], from: "2025-01-01", to: undefined }
     );
   });
 

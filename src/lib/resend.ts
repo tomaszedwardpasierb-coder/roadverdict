@@ -527,6 +527,37 @@ export async function sendCarOwnershipRequestDeclinedEmail(params: {
   });
 }
 
+// Car mirror of sendHistoryFollowUpEmail above - deferred until car
+// ownership transfer existed (see carShareLink.ts's own comment on why
+// this was originally left out), now that it does. reportUrl points at
+// /car-report/[token]/detailed, same reasoning as the bike version.
+export async function sendCarHistoryFollowUpEmail(params: {
+  recipientEmail: string;
+  carSummary: { make: string; model: string; year?: number; isCustomBuild: boolean };
+  reportUrl: string;
+}) {
+  const resend = getResend();
+  const safeCarName = escapeHtml(formatBikeName(params.carSummary));
+
+  const html = renderEmailLayout({
+    preheader: `Bought the ${formatBikeName(params.carSummary)}? Keep its history alive`,
+    heading: `Bought this car? Keep its history alive.`,
+    bodyHtml: `
+      <p style="margin:0 0 12px;">The RoadVerdict report you were sent for this <strong>${safeCarName}</strong> was real, logged history — not guesswork. If you've bought it, you can carry that same record forward under your own free RoadVerdict account, instead of starting from a blank page.</p>
+      <p style="margin:0 0 20px;">It's what will make your eventual buyer trust this car too, the same way you just did.</p>
+      ${emailButton("Request this car's history", params.reportUrl)}
+      <p style="margin:0;color:#54555A;font-size:13px;">You're receiving this because a RoadVerdict report for this car was shared with you a few weeks ago. If you didn't buy it, no action needed — you won't be emailed about it again.</p>
+    `,
+  });
+
+  await resend.emails.send({
+    from: FROM,
+    to: params.recipientEmail,
+    subject: `Bought the ${safeCarName}? Keep its history alive`,
+    html,
+  });
+}
+
 // deleteAfterLabel is pre-formatted by the caller (userAccount.ts's
 // requestAccountDeletion returns a raw ISO string; the API route turns
 // that into a human date), same convention as expiresAtLabel elsewhere

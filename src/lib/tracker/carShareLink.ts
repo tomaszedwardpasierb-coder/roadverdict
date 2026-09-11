@@ -5,11 +5,10 @@
 // ShareLinkDuration/SHARE_LINK_DURATION_LABELS are reused directly from
 // shareLink.ts (a plain string-literal union and its label map -
 // genuinely vehicle-neutral, nothing to duplicate). The history-request
-// follow-up mechanism (followUpSentAt/getShareLinksNeedingFollowUp/
-// markShareLinkFollowUpSent) is NOT mirrored here - it only makes sense
-// once car ownership transfer exists (there's no "request this car's
-// history" flow yet for a follow-up email to nudge a buyer toward), so
-// it's deferred to that slice of this same build.
+// follow-up mechanism (followUpSentAt/getCarShareLinksNeedingFollowUp/
+// markCarShareLinkFollowUpSent below) was originally deferred pending
+// car ownership transfer existing - that shipped since, so it's now
+// mirrored in full, same as everything else in this file.
 import crypto from "crypto";
 import { getContainer } from "@/lib/cosmos";
 import { deleteCarReceiptRequestsForShareToken } from "@/lib/tracker/carReceiptRequest";
@@ -25,6 +24,10 @@ export interface CarShareLinkDoc {
   createdAt: string;
   expiresAt?: string;
   recipientEmail?: string;
+  // Set once the 4-week history-request follow-up has been processed
+  // for this link, in either sense - see shareLink.ts's own comment on
+  // ShareLinkDoc.followUpSentAt for the exact reasoning, unchanged here.
+  followUpSentAt?: string;
   askingPrice?: number;
   vdiUnlock?: VdiUnlock;
 }
@@ -156,4 +159,31 @@ export async function deleteExpiredCarShareLinks(): Promise<number> {
     await container.item(r.id, r.id).delete();
   }
   return resources.length;
+}
+
+// Same 4-week delay and cross-partition-query trade-off as
+// shareLink.ts's getShareLinksNeedingFollowUp - only ever called once a
+// day from the follow-up cron, never a hot path.
+const FOLLOW_UP_DELAY_DAYS = 28;
+
+export async function getCarShareLinksNeedingFollowUp(): Promise<CarShareLinkDoc[]> {
+  const container = getContainer();
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - FOLLOW_UP_DELAY_DAYS);
+  const { resources } = await container.items
+    .query<CarShareLinkDoc>({
+      query:
+        "SELECT * FROM c WHERE c.type = 'carShareLink' AND IS_DEFINED(c.recipientEmail) AND NOT IS_DEFINED(c.followUpSentAt) AND c.createdAt <= @cutoff",
+      parameters: [{ name: "@cutoff", value: cutoff.toISOString() }],
+    })
+    .fetchAll();
+  return resources;
+}
+
+export async function markCarShareLinkFollowUpSent(token: string): Promise<void> {
+  const container = getContainer();
+  const { resource } = await container.item(token, token).read<CarShareLinkDoc>();
+  if (!resource) return;
+  resource.followUpSentAt = new Date().toISOString();
+  await container.items.upsert(resource);
 }

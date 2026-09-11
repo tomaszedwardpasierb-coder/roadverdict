@@ -3,10 +3,14 @@ import { NextRequest } from "next/server";
 
 const mocks = vi.hoisted(() => ({
   purgeOrphanedReceiptRequests: vi.fn(),
+  purgeOrphanedCarReceiptRequests: vi.fn(),
 }));
 
 vi.mock("@/lib/tracker/receiptRequest", () => ({
   purgeOrphanedReceiptRequests: mocks.purgeOrphanedReceiptRequests,
+}));
+vi.mock("@/lib/tracker/carReceiptRequest", () => ({
+  purgeOrphanedCarReceiptRequests: mocks.purgeOrphanedCarReceiptRequests,
 }));
 
 import { POST } from "@/app/api/cron/purge-orphaned-receipt-requests/route";
@@ -25,6 +29,7 @@ describe("POST /api/cron/purge-orphaned-receipt-requests", () => {
     Object.values(mocks).forEach((m) => m.mockReset());
     process.env.CRON_SECRET = "top-secret";
     mocks.purgeOrphanedReceiptRequests.mockResolvedValue(0);
+    mocks.purgeOrphanedCarReceiptRequests.mockResolvedValue(0);
   });
 
   afterEach(() => {
@@ -54,14 +59,22 @@ describe("POST /api/cron/purge-orphaned-receipt-requests", () => {
   it("proceeds and reports zero deletions when there's nothing orphaned", async () => {
     const response = await POST(request({ authorization: "Bearer top-secret" }));
     expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toEqual({ ok: true, deletedCount: 0 });
+    await expect(response.json()).resolves.toEqual({ ok: true, deletedCount: 0, bikeDeletedCount: 0, carDeletedCount: 0 });
   });
 
   it("reports the deleted count from the underlying purge", async () => {
     mocks.purgeOrphanedReceiptRequests.mockResolvedValue(3);
     const response = await POST(request({ authorization: "Bearer top-secret" }));
     expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toEqual({ ok: true, deletedCount: 3 });
+    await expect(response.json()).resolves.toEqual({ ok: true, deletedCount: 3, bikeDeletedCount: 3, carDeletedCount: 0 });
+  });
+
+  it("combines bike and car purges into one total", async () => {
+    mocks.purgeOrphanedReceiptRequests.mockResolvedValue(2);
+    mocks.purgeOrphanedCarReceiptRequests.mockResolvedValue(5);
+    const response = await POST(request({ authorization: "Bearer top-secret" }));
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ ok: true, deletedCount: 7, bikeDeletedCount: 2, carDeletedCount: 5 });
   });
 
   it("degrades to a graceful JSON 500 when the purge fails, instead of propagating", async () => {

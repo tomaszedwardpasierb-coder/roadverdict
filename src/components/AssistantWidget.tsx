@@ -56,7 +56,7 @@ function isRetryable(status: number | null): boolean {
 }
 
 interface CompareContext {
-  bikeIds: string[];
+  vehicleIds: string[];
   from: string | null;
   to: string | null;
 }
@@ -80,16 +80,17 @@ async function attemptSend(
       // knows about their own account, it gets server-side from their
       // own session, never from this request body. dashboardTab is just
       // the raw Section key (e.g. "shareLinks"), not a label, and
-      // compareContext's bike ids are just what's currently in this
+      // compareContext's vehicle ids are just what's currently in this
       // page's own URL - the server independently re-validates both
-      // against the real session before trusting either for anything.
+      // against the real session (bikes AND cars) before trusting
+      // either for anything.
       body: JSON.stringify({
         messages: payload.map((m) => ({ role: m.role, content: m.content })),
         ...(reportToken ? { reportToken } : {}),
         ...(dashboardTab ? { dashboardTab } : {}),
         ...(compareContext
           ? {
-              compareBikeIds: compareContext.bikeIds,
+              compareVehicleIds: compareContext.vehicleIds,
               ...(compareContext.from ? { compareFrom: compareContext.from } : {}),
               ...(compareContext.to ? { compareTo: compareContext.to } : {}),
             }
@@ -125,7 +126,7 @@ function AssistantWidgetInner() {
   // simply null, same as reportToken/dashboardTab elsewhere.
   const compareContext =
     pathname === '/garage/compare'
-      ? { bikeIds: searchParams.getAll('bikes'), from: searchParams.get('from'), to: searchParams.get('to') }
+      ? { vehicleIds: searchParams.getAll('vehicles'), from: searchParams.get('from'), to: searchParams.get('to') }
       : null;
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([GREETING]);

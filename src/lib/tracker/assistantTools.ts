@@ -17,18 +17,17 @@
 // one shared, vehicle-agnostic compute helper - exactly the same
 // "genuinely generic logic, vehicle-specific data-fetch" split every
 // other part of this build already uses (see carSummary.ts,
-// carReminderStatus.ts). Two tools stay bike-only for now, each
-// failing soft with an honest "not available for cars yet" result
-// rather than either guessing at a car equivalent or crashing:
-// getShareLinks (no share-link concept exists for cars), getStorySoFar
-// (CarDoc has no storyCache field - the AI narrative generator is
-// motorcycle-written). proposeLogEntry is bike-only for service/bill/mod/
-// fuel (the on-screen draft card, AssistantProposedEntryCard.tsx, is
-// deeply bike-shaped for those four - grouped job/mod catalogs, a
-// hardcoded /api/tracker/* endpoint, no litres-vs-kWh branching), but IS
-// available for a car-active session's Labour category specifically,
-// since Labour's own catalog and draft card were built vehicle-kind-aware
-// from the start - see the labourCategory/vehicleKind handling below.
+// carReminderStatus.ts). getShareLinks and getStorySoFar are now fully
+// car-aware too (both features shipped for cars after this file's
+// original bike-only branches were written - CarDoc does have its own
+// storyCache, and carShareLink.ts/carReceiptRequest.ts are full mirrors).
+// proposeLogEntry is bike-only for service/bill/mod/fuel (the on-screen
+// draft card, AssistantProposedEntryCard.tsx, is deeply bike-shaped for
+// those four - grouped job/mod catalogs, a hardcoded /api/tracker/*
+// endpoint, no litres-vs-kWh branching), but IS available for a
+// car-active session's Labour category specifically, since Labour's own
+// catalog and draft card were built vehicle-kind-aware from the start -
+// see the labourCategory/vehicleKind handling below.
 
 import { getServiceRecords } from "./serviceRecord";
 import { getMods } from "./mod";
@@ -44,8 +43,11 @@ import { BILL_LABELS } from "./billTypes";
 import { MOD_LABELS } from "./modTypes";
 import { getShareLinksForUser } from "./shareLink";
 import { getPendingReceiptRequestsForOwner } from "./receiptRequest";
+import { getCarShareLinksForUser } from "./carShareLink";
+import { getPendingCarReceiptRequestsForOwner } from "./carReceiptRequest";
 import { getSellerReportData } from "./sellerReportData";
 import { buildBikeComparison } from "./bikeComparison";
+import { buildCarComparison } from "./carComparison";
 import { buildCostPerMileVerdict } from "./bikeComparisonVerdict";
 import type { ComparisonPeriod } from "./bikeComparisonPeriod";
 import { resolveActiveVehicle } from "./activeVehicle";
@@ -470,22 +472,44 @@ export async function toolGetLastLoggedJob(email: string, args: Record<string, u
 
 // ---- Share links - whether any are active, and any pending receipt requests ----
 //
-// Same email-only scoping as every tool above: getShareLinksForUser and
-// getPendingReceiptRequestsForOwner both take the session's own email,
-// nothing model-supplied. Filtered down to the primary bike specifically
-// (rather than returning every link across every bike on the account),
-// matching how every other tool here answers about "this account's
-// bike" singular, not the account in general. No car equivalent exists
-// yet (see the ADR's out-of-scope list) - a car-active session gets an
-// honest "not available" result rather than either an error or a
-// silently-wrong bike-scoped answer.
+// Same email-only scoping as every tool above: getShareLinksForUser/
+// getCarShareLinksForUser and getPendingReceiptRequestsForOwner/
+// getPendingCarReceiptRequestsForOwner all take the session's own email,
+// nothing model-supplied. Filtered down to the active vehicle
+// specifically (rather than returning every link across every vehicle
+// on the account), matching how every other tool here answers about
+// "this account's vehicle" singular, not the account in general.
 
 export async function toolGetShareLinks(email: string) {
   const vehicle = await resolveActiveVehicle(email);
   if (!vehicle) return { error: "No vehicle found on this account." };
 
   if (vehicle.kind === "car") {
-    return { hasActiveLinks: false, pendingReceiptRequestCount: 0, note: "Shareable report links aren't available for cars yet." };
+    const car = vehicle.car;
+    const [allLinks, pendingRequests] = await Promise.all([
+      getCarShareLinksForUser(email),
+      getPendingCarReceiptRequestsForOwner(email),
+    ]);
+
+    const now = Date.now();
+    const activeLinks = allLinks.filter((l) => l.carId === car.id && (!l.expiresAt || new Date(l.expiresAt).getTime() > now));
+    const pendingForCar = pendingRequests.filter((r) => r.carId === car.id);
+
+    if (activeLinks.length === 0) {
+      return { hasActiveLinks: false, pendingReceiptRequestCount: pendingForCar.length };
+    }
+
+    return {
+      hasActiveLinks: true,
+      activeLinkCount: activeLinks.length,
+      links: activeLinks.map((l) => ({
+        sharedWith: l.recipientEmail ?? "not recorded (created before this was required)",
+        askingPrice: l.askingPrice ?? null,
+        createdAt: l.createdAt,
+        expiresAt: l.expiresAt ?? "never expires",
+      })),
+      pendingReceiptRequestCount: pendingForCar.length,
+    };
   }
 
   const bike = vehicle.bike;
@@ -517,21 +541,35 @@ export async function toolGetShareLinks(email: string) {
 
 // ---- The Story So Far - the cached AI narrative, if one's been generated ----
 //
-// Reads bike.storyCache directly off the already-fetched bike document -
-// no extra query needed, same document every other tool here already
-// loads via resolveActiveVehicle. Deliberately doesn't trigger a fresh
-// generation if none exists yet (that's a paid-in-AI-calls action with
-// its own weekly cooldown, gated behind an explicit button click on the
-// Story So Far tab - a chat question should never silently spend it).
-// No car equivalent - CarDoc has no storyCache field at all
-// (storyFacts.ts/storyProse.ts are motorcycle-written, see the ADR).
+// Reads bike.storyCache/car.storyCache directly off the already-fetched
+// vehicle document - no extra query needed, same document every other
+// tool here already loads via resolveActiveVehicle. Deliberately
+// doesn't trigger a fresh generation if none exists yet (that's a
+// paid-in-AI-calls action with its own weekly cooldown, gated behind an
+// explicit button click on the Story So Far tab - a chat question
+// should never silently spend it).
 
 export async function toolGetStorySoFar(email: string) {
   const vehicle = await resolveActiveVehicle(email);
   if (!vehicle) return { error: "No vehicle found on this account." };
 
   if (vehicle.kind === "car") {
-    return { hasStory: false, note: "The Story So Far feature isn't available for cars yet." };
+    const car = vehicle.car;
+    if (!car.storyCache) {
+      return {
+        hasStory: false,
+        note: "No Story So Far has been generated yet for this car - the owner needs to visit the Story So Far tab and click Generate my story.",
+      };
+    }
+    const { generatedAt, response } = car.storyCache;
+    return {
+      hasStory: true,
+      generatedAt,
+      documentationVerdict: response.verdict.label,
+      verdictReasons: response.verdict.reasons,
+      story: response.sharedStory,
+      ownerOnlyNotes: response.ownerNotes,
+    };
   }
 
   const bike = vehicle.bike;
@@ -623,12 +661,12 @@ export const ASSISTANT_TOOL_DECLARATIONS = [
   },
   {
     name: "getShareLinks",
-    description: "Get the signed-in user's own active shareable report links for their bike - who each was shared with, any asking price set, when it expires, and how many pending receipt requests are waiting on a decision. Use for any question about their share link(s), whether they've shared their bike, or receipt requests from a buyer. Not available for a car-active account yet.",
+    description: "Get the signed-in user's own active shareable report links for their bike or car - who each was shared with, any asking price set, when it expires, and how many pending receipt requests are waiting on a decision. Use for any question about their share link(s), whether they've shared their vehicle, or receipt requests from a buyer.",
     parameters: { type: "OBJECT", properties: {} },
   },
   {
     name: "getStorySoFar",
-    description: "Get the signed-in user's own cached 'Story So Far' - the AI-written narrative about their bike's logged history, its documentation verdict, and the private owner-only notes. Use for any question about their Story So Far, what it says, or whether one has been generated yet. Not available for a car-active account yet.",
+    description: "Get the signed-in user's own cached 'Story So Far' - the AI-written narrative about their bike's or car's logged history, its documentation verdict, and the private owner-only notes. Use for any question about their Story So Far, what it says, or whether one has been generated yet.",
     parameters: { type: "OBJECT", properties: {} },
   },
 ] as const;
@@ -690,20 +728,25 @@ export async function toolGetViewedReport(shareToken: string) {
   }
 }
 
-// ---- The specific bike comparison currently open, if any ----
+// ---- The specific vehicle comparison currently open, if any ----
 //
 // Deliberately its own separate declaration, same reasoning as
 // REPORT_TOOL_DECLARATIONS above - this needs its own extra gate beyond
-// plain "is signed in" (Pro, and every bike genuinely belongs to this
+// plain "is signed in" (Pro, and every vehicle genuinely belongs to this
 // account and isn't read-only), evaluated once by route.ts before this
-// is ever offered to the model. bikeIds/from/to here are never
-// model-supplied - they're the server-validated CompareContext route.ts
-// built from the client's OWN current page state, cross-checked against
-// this session's real bikes, exactly like reportToken above. Bike-only:
-// the garage comparison page has no car equivalent (see the ADR's
-// out-of-scope list).
+// is ever offered to the model. vehicleIds/bikeIds/carIds/from/to here
+// are never model-supplied - they're the server-validated CompareContext
+// route.ts built from the client's OWN current page state, cross-checked
+// against this session's real bikes AND cars, exactly like reportToken
+// above. The garage comparison page mixes both vehicle kinds in one
+// picker (see vehicleComparison.ts) - vehicleIds keeps the original
+// requested order (so the merged result below lines up with what's on
+// screen), while bikeIds/carIds are the same ids already split by kind,
+// ready to hand straight to each kind's own comparison builder.
 export interface CompareContext {
+  vehicleIds: string[];
   bikeIds: string[];
+  carIds: string[];
   from?: string;
   to?: string;
 }
@@ -711,7 +754,7 @@ export interface CompareContext {
 export const COMPARISON_TOOL_DECLARATIONS = [
   {
     name: "getViewedComparison",
-    description: "Get a summary of the bike comparison currently open on the Compare bikes page - cost per mile for each bike (and which one is cheapest to run), total spend, mileage ridden, actual fuel economy, servicing history, documentation completeness, and what's due soonest on each. Use this for any question about 'this comparison', 'these bikes', 'which one', 'which is cheaper', or a vague question asked while this page is open. Never use the signed-in user's other personal-data tools to answer a question about this specific comparison, and never use this tool to answer a general question about their account outside of it.",
+    description: "Get a summary of the vehicle comparison currently open on the Compare vehicles page - cost per mile for each bike or car (and which one is cheapest to run), total spend, mileage ridden, actual fuel economy, servicing history, documentation completeness, and what's due soonest on each. Use this for any question about 'this comparison', 'these vehicles', 'which one', 'which is cheaper', or a vague question asked while this page is open. Never use the signed-in user's other personal-data tools to answer a question about this specific comparison, and never use this tool to answer a general question about their account outside of it.",
     parameters: { type: "OBJECT", properties: {} },
   },
 ] as const;
@@ -720,7 +763,21 @@ export async function toolGetViewedComparison(email: string, compareContext: Com
   try {
     const period: ComparisonPeriod | undefined =
       compareContext.from || compareContext.to ? { from: compareContext.from, to: compareContext.to } : undefined;
-    const entries = await buildBikeComparison(email, compareContext.bikeIds, period);
+    const [bikeEntries, carEntries] = await Promise.all([
+      buildBikeComparison(email, compareContext.bikeIds, period),
+      buildCarComparison(email, compareContext.carIds, period),
+    ]);
+    // Re-ordered to match vehicleIds (the original on-screen selection
+    // order), not "every bike then every car" - same reasoning the
+    // garage compare page's own entryById/requestedIds.map pattern uses.
+    // bikeEntries has no `kind` of its own (BikeComparisonEntry predates
+    // the shared VehicleComparisonEntry shape) - tagged here the same
+    // way the compare page itself already does.
+    const entryById = new Map([
+      ...bikeEntries.map((e) => [e.bikeId, { ...e, kind: "bike" as const }] as const),
+      ...carEntries.map((e) => [e.bikeId, e] as const),
+    ]);
+    const entries = compareContext.vehicleIds.map((id) => entryById.get(id)).filter((e): e is NonNullable<typeof e> => !!e);
     if (entries.length < 2) return { error: "Couldn't load this comparison right now." };
 
     const verdict = buildCostPerMileVerdict(entries.map((e) => ({ bikeId: e.bikeId, name: e.name, costPerMile: e.costPerMile })));
@@ -730,10 +787,11 @@ export async function toolGetViewedComparison(email: string, compareContext: Com
       // Computed here, not left for the model to work out from the raw
       // numbers below - a plain sentence the model can relay verbatim is
       // far less likely to be wrong than the model doing its own "which
-      // is cheaper" arithmetic across several bikes' figures.
+      // is cheaper" arithmetic across several vehicles' figures.
       cheapestToRunVerdict: verdict,
-      bikes: entries.map((e) => ({
+      vehicles: entries.map((e) => ({
         name: e.name,
+        kind: e.kind,
         costPerMile: e.costPerMile,
         totalSpend: e.spend.grandTotal,
         milesRidden: e.milesRidden,
