@@ -52,6 +52,18 @@ export const BUYING_GUIDE_REPORT_PRICE_LABEL: Record<BuyingGuideReportTier, stri
 
 export const PRO_FREE_REPORT_COOLDOWN_MS = 28 * 24 * 60 * 60 * 1000;
 
+// Cap on the Buying Guide's free lookup itself (MOT history + tax
+// details - see buyingGuideLookupUsage.ts) - separate from
+// PRO_FREE_REPORT_COOLDOWN_MS above, which gates the paid VDI report,
+// not the free checklist/MOT-history/AI-briefing lookup underneath it.
+// Applies to every account alike, Free and Pro - there is no unlimited
+// tier for this one, and no free lookup at all beyond this one allowance.
+// A second, different plate within the same 30-day window needs the
+// paid report purchase instead (which also unlocks and caches the free
+// facts for that plate) - see buying-guide-lookup's own route for the
+// actual gating logic.
+export const BUYING_GUIDE_LOOKUP_COOLDOWN_MS = 30 * 24 * 60 * 60 * 1000;
+
 export const BUYING_GUIDE_REPORT_PRODUCT_NAME: Record<VehicleKind, string> = {
   bike: "RoadVerdict Vehicle History Report (motorcycle)",
   car: "RoadVerdict Vehicle History Report (car)",

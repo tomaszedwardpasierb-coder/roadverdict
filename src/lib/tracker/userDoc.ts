@@ -65,6 +65,21 @@ export interface UserDoc {
   // products with different cooldown lengths and only one of them
   // (this one) is Pro-exclusive.
   vehicleHistoryReportUsage?: { lastRunAt: string };
+  // Per-account cooldown on the Buying Guide's free lookup itself (MOT
+  // history + tax details, before any VDI report purchase) - see
+  // buyingGuideLookupUsage.ts. Applies to every account alike, unlike
+  // vehicleHistoryReportUsage above which is Pro-only.
+  buyingGuideLookupUsage?: { lastRunAt: string };
+  // Shared anti-spam-click floor across every previously-uncapped VDG
+  // vehicle-lookup route (plate-lookup, mot-history-preview, mot-history
+  // import, quote-lookup, cost-calculator-lookup) - see
+  // vehicleLookupCooldown.ts. One shared field, not one per route, so
+  // bouncing between tools doesn't dodge the cooldown.
+  vehicleLookupUsage?: { lastRunAt: string };
+  // Per-day message ceiling for the AI assistant once signed in - see
+  // assistantSignedInUsage.ts. date is a UTC calendar date
+  // ("YYYY-MM-DD"); count resets the moment it rolls over.
+  assistantMessageUsage?: { date: string; count: number };
 }
 
 export async function getUserDoc(email: string): Promise<UserDoc | null> {

@@ -23,6 +23,11 @@ const mocks = vi.hoisted(() => ({
   fetchValuationFromVdg: vi.fn(),
   fetchVehicleTaxDetailsFromVdg: vi.fn(),
   computeBuyingGuideReportTier: vi.fn(),
+  getCachedBuyingGuideLookup: vi.fn(),
+  setCachedBuyingGuideLookup: vi.fn(),
+  canRunFreeBuyingGuideLookup: vi.fn(),
+  nextFreeBuyingGuideLookupAt: vi.fn(),
+  recordBuyingGuideLookupRun: vi.fn(),
   fetch: vi.fn(),
 }));
 
@@ -42,7 +47,7 @@ vi.mock("@/lib/tracker/vdiPurchase", () => ({
   getVdiPurchase: mocks.getVdiPurchase,
   markVdiPurchaseConsumed: mocks.markVdiPurchaseConsumed,
   findRecentConsumedPurchase: mocks.findRecentConsumedPurchase,
-  VDI_PURCHASE_RETRIEVAL_WINDOW_MS: 14 * 24 * 60 * 60 * 1000,
+  VDI_PURCHASE_RETRIEVAL_WINDOW_MS: 42 * 24 * 60 * 60 * 1000,
 }));
 vi.mock("@/lib/payments/buyingGuideVdiCheckout", () => ({
   selfHealBuyingGuideVdiPurchase: mocks.selfHealBuyingGuideVdiPurchase,
@@ -51,6 +56,15 @@ vi.mock("@/lib/tracker/vdiCheckFetch", () => ({ fetchVdiCheckFromVdg: mocks.fetc
 vi.mock("@/lib/tracker/valuationFetch", () => ({ fetchValuationFromVdg: mocks.fetchValuationFromVdg }));
 vi.mock("@/lib/tracker/vehicleTaxFetch", () => ({ fetchVehicleTaxDetailsFromVdg: mocks.fetchVehicleTaxDetailsFromVdg }));
 vi.mock("@/lib/payments/buyingGuideReportTier", () => ({ computeBuyingGuideReportTier: mocks.computeBuyingGuideReportTier }));
+vi.mock("@/lib/tracker/buyingGuideLookupCache", () => ({
+  getCachedBuyingGuideLookup: mocks.getCachedBuyingGuideLookup,
+  setCachedBuyingGuideLookup: mocks.setCachedBuyingGuideLookup,
+}));
+vi.mock("@/lib/tracker/buyingGuideLookupUsage", () => ({
+  canRunFreeBuyingGuideLookup: mocks.canRunFreeBuyingGuideLookup,
+  nextFreeBuyingGuideLookupAt: mocks.nextFreeBuyingGuideLookupAt,
+  recordBuyingGuideLookupRun: mocks.recordBuyingGuideLookupRun,
+}));
 vi.stubGlobal("fetch", mocks.fetch);
 
 import { GET } from "@/app/api/cars/buying-guide-lookup/route";
@@ -140,6 +154,11 @@ beforeEach(() => {
     proFreeAvailable: false,
     nextFreeAt: null,
   });
+  mocks.getCachedBuyingGuideLookup.mockResolvedValue(null);
+  mocks.canRunFreeBuyingGuideLookup.mockReturnValue(true);
+  mocks.nextFreeBuyingGuideLookupAt.mockReturnValue(null);
+  mocks.setCachedBuyingGuideLookup.mockResolvedValue(undefined);
+  mocks.recordBuyingGuideLookupRun.mockResolvedValue(undefined);
   process.env.VDG_API_KEY = "test-key";
   delete process.env.GEMINI_API_KEY;
   mocks.fetch.mockResolvedValue(vdgMotSuccess());
@@ -265,7 +284,7 @@ describe("GET /api/cars/buying-guide-lookup", () => {
     expect(mocks.fetchVdiCheckFromVdg).not.toHaveBeenCalled();
     expect(body.vdiCheck).toMatchObject({ isStolen: true });
     expect(body.vdiCheckPurchasedAt).toBe("2026-01-01T00:00:00.000Z");
-    expect(new Date(body.vdiCheckExpiresAt).getTime() - new Date(body.vdiCheckPurchasedAt).getTime()).toBe(14 * 24 * 60 * 60 * 1000);
+    expect(new Date(body.vdiCheckExpiresAt).getTime() - new Date(body.vdiCheckPurchasedAt).getTime()).toBe(42 * 24 * 60 * 60 * 1000);
   });
 
   it("runs the VDI check, caches it on the purchase doc, and consumes the purchase when it's already paid", async () => {
@@ -356,7 +375,7 @@ describe("GET /api/cars/buying-guide-lookup", () => {
     expect(body.valuation).toMatchObject({ privateAverage: 23994 });
   });
 
-  it("passes isPro through to canRunValuationCheck/nextValuationCheckAt so Pro gets a more generous cap", async () => {
+  it("passes isPro through to canRunValuationCheck/nextValuationCheckAt", async () => {
     mocks.isPro.mockResolvedValue(true);
     await GET(request("AB20FOC"));
     expect(mocks.canRunValuationCheck).toHaveBeenCalledWith(null, true);
@@ -427,5 +446,158 @@ describe("GET /api/cars/buying-guide-lookup", () => {
     const response = await GET(request("AB20FOC", { vdiPurchaseId: "purchase123" }));
     const body = await response.json();
     expect(body.vdiCheckPricePaidPence).toBe(0);
+  });
+
+  // ── Free-lookup global cache and per-account quota gating ────────────
+
+  const cachedLookupData = {
+    make: "Toyota",
+    model: "Corolla",
+    fuelType: "PETROL",
+    colour: "SILVER",
+    plateInRetention: false,
+    motDueDate: "2026-07-01",
+    motTestsOldestFirst: [{ testDate: "2025-02-01", passed: true, mileage: 8000, mileageTrusted: true, notes: "" }],
+    taxDetails: { taxStatus: "Taxed", taxIsCurrentlyValid: true, taxDueDate: null, taxDaysRemaining: null, motStatus: "Valid", vedStandardTwelveMonths: 190 },
+  };
+
+  it("a cache hit skips the VDG fetch entirely and serves the cached facts straight from the cache", async () => {
+    mocks.getCachedBuyingGuideLookup.mockResolvedValue(cachedLookupData);
+    const response = await GET(request("AB20FOC"));
+    const body = await response.json();
+    expect(mocks.getCachedBuyingGuideLookup).toHaveBeenCalledWith("car", "AB20FOC");
+    expect(mocks.fetch).not.toHaveBeenCalled();
+    expect(body.make).toBe("Toyota");
+    expect(body.model).toBe("Corolla");
+    expect(body.motTests).toHaveLength(1);
+    expect(body.motTests[0].testDate).toBe("2025-02-01");
+    expect(body.motDueDate).toBe("2026-07-01");
+    expect(body.taxDetails).toMatchObject({ taxStatus: "Taxed", taxIsCurrentlyValid: true });
+    expect(mocks.recordBuyingGuideLookupRun).not.toHaveBeenCalled();
+    expect(mocks.setCachedBuyingGuideLookup).not.toHaveBeenCalled();
+  });
+
+  it("blocks with requiresPayment when nothing is cached, there's no paid access, and the free quota is used up - no VDG spend at all", async () => {
+    mocks.canRunFreeBuyingGuideLookup.mockReturnValue(false);
+    mocks.nextFreeBuyingGuideLookupAt.mockReturnValue("2026-03-01T00:00:00.000Z");
+    const response = await GET(request("AB20FOC"));
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.requiresPayment).toBe(true);
+    expect(body.nextFreeLookupAt).toBe("2026-03-01T00:00:00.000Z");
+    expect(body.make).toBe("");
+    expect(body.model).toBe("");
+    expect(body.fuelType).toBe("");
+    expect(body.colour).toBe("");
+    expect(body.motDueDate).toBeNull();
+    expect(body.motTests).toEqual([]);
+    expect(body.briefing).toBeNull();
+    expect(body.vdiCheck).toBeNull();
+    expect(body.valuation).toBeNull();
+    expect(body.taxDetails).toBeNull();
+    expect(mocks.fetch).not.toHaveBeenCalled();
+  });
+
+  it("still returns a correct, priced reportTier/reportPricePence in the blocked requiresPayment response", async () => {
+    mocks.canRunFreeBuyingGuideLookup.mockReturnValue(false);
+    mocks.computeBuyingGuideReportTier.mockResolvedValue({
+      tier: "freeWithVehicle",
+      pricePence: 1299,
+      proFreeAvailable: false,
+      nextFreeAt: null,
+    });
+    const response = await GET(request("AB20FOC"));
+    const body = await response.json();
+    expect(body.requiresPayment).toBe(true);
+    expect(body.reportTier).toBe("freeWithVehicle");
+    expect(body.reportPricePence).toBe(1299);
+    expect(body.reportPriceLabel).toBe("£12.99");
+    expect(body.proFreeAvailable).toBe(false);
+    expect(body.nextFreeReportAt).toBeNull();
+  });
+
+  it("a valid paid VDI purchase bypasses the exhausted free quota - the lookup proceeds normally", async () => {
+    mocks.canRunFreeBuyingGuideLookup.mockReturnValue(false);
+    mocks.getVdiPurchase.mockResolvedValue(basePurchase({ status: "paid" }));
+    const response = await GET(request("AB20FOC", { vdiPurchaseId: "purchase123" }));
+    const body = await response.json();
+    expect(mocks.canRunFreeBuyingGuideLookup).not.toHaveBeenCalled();
+    expect(mocks.fetch).toHaveBeenCalled();
+    expect(body.requiresPayment).toBe(false);
+    expect(body.make).toBe("Ford");
+    expect(body.model).toBe("Focus");
+    expect(body.vdiCheck).toMatchObject({ isStolen: false });
+  });
+
+  it("reuses a cached free-tier briefing without a Gemini call when there's no paid access", async () => {
+    process.env.GEMINI_API_KEY = "fake-key";
+    const cachedBriefing = { motFlags: [], modelNotes: [], summary: "Cached, no VDI facts." };
+    mocks.getCachedBuyingGuideLookup.mockResolvedValue({ ...cachedLookupData, briefing: cachedBriefing });
+    const response = await GET(request("AB20FOC"));
+    const body = await response.json();
+    expect(mocks.generateCarBuyingGuideBriefing).not.toHaveBeenCalled();
+    expect(body.briefing).toEqual(cachedBriefing);
+    expect(mocks.setCachedBuyingGuideLookup).not.toHaveBeenCalled();
+  });
+
+  it("regenerates a fresh, VDI-aware briefing instead of the cached one when this request has paid access", async () => {
+    process.env.GEMINI_API_KEY = "fake-key";
+    const cachedBriefing = { motFlags: [], modelNotes: [], summary: "Cached, no VDI facts." };
+    const freshBriefing = { motFlags: [], modelNotes: [], summary: "Fresh, with VDI facts." };
+    mocks.getCachedBuyingGuideLookup.mockResolvedValue({ ...cachedLookupData, briefing: cachedBriefing });
+    mocks.getVdiPurchase.mockResolvedValue(basePurchase({ status: "paid" }));
+    mocks.generateCarBuyingGuideBriefing.mockResolvedValue(freshBriefing);
+    const response = await GET(request("AB20FOC", { vdiPurchaseId: "purchase123" }));
+    const body = await response.json();
+    expect(mocks.generateCarBuyingGuideBriefing).toHaveBeenCalledOnce();
+    expect(body.briefing).toEqual(freshBriefing);
+    // Never overwrites the cache with a VDI-aware briefing - only ever
+    // the safe, VDI-free version belongs in the shared cache.
+    expect(mocks.setCachedBuyingGuideLookup).not.toHaveBeenCalled();
+  });
+
+  it("backfills a missing free-tier briefing onto an existing cache entry once a free visitor generates one", async () => {
+    process.env.GEMINI_API_KEY = "fake-key";
+    const freshBriefing = { motFlags: [], modelNotes: [], summary: "Backfilled." };
+    mocks.getCachedBuyingGuideLookup.mockResolvedValue({ ...cachedLookupData, briefing: null });
+    mocks.generateCarBuyingGuideBriefing.mockResolvedValue(freshBriefing);
+    const response = await GET(request("AB20FOC"));
+    const body = await response.json();
+    expect(mocks.generateCarBuyingGuideBriefing).toHaveBeenCalledOnce();
+    expect(body.briefing).toEqual(freshBriefing);
+    expect(mocks.setCachedBuyingGuideLookup).toHaveBeenCalledWith("car", "AB20FOC", { ...cachedLookupData, briefing: freshBriefing });
+  });
+
+  it("caches a fresh (non-cached, quota-available) lookup and records the free-quota run", async () => {
+    const response = await GET(request("AB20FOC"));
+    await response.json();
+    expect(mocks.setCachedBuyingGuideLookup).toHaveBeenCalledWith("car", "AB20FOC", {
+      make: "Ford",
+      model: "Focus",
+      fuelType: "PETROL",
+      colour: "BLUE",
+      plateInRetention: false,
+      motDueDate: "2026-05-01",
+      motTestsOldestFirst: parsedMotResult.tests,
+      taxDetails: {
+        make: "Ford",
+        taxStatus: "Taxed",
+        taxIsCurrentlyValid: true,
+        taxDueDate: "2027-06-01",
+        taxDaysRemaining: 263,
+        motStatus: "Valid",
+        vedStandardTwelveMonths: 27,
+      },
+      briefing: null,
+    });
+    expect(mocks.recordBuyingGuideLookupRun).toHaveBeenCalledWith("buyer@example.com");
+  });
+
+  it("caches a fresh lookup unlocked by paid access too, but does not spend the free quota for it", async () => {
+    mocks.getVdiPurchase.mockResolvedValue(basePurchase({ status: "paid" }));
+    const response = await GET(request("AB20FOC", { vdiPurchaseId: "purchase123" }));
+    await response.json();
+    expect(mocks.setCachedBuyingGuideLookup).toHaveBeenCalledWith("car", "AB20FOC", expect.objectContaining({ make: "Ford", model: "Focus" }));
+    expect(mocks.recordBuyingGuideLookupRun).not.toHaveBeenCalled();
   });
 });

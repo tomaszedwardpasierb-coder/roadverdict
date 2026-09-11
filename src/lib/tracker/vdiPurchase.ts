@@ -22,7 +22,13 @@ import { getContainer } from "@/lib/cosmos";
 import type { VehicleKind, VdiCheckResult } from "@/lib/tracker/vdiUnlock";
 import type { BuyingGuideReportTier } from "@/lib/payments/pricing";
 
-export const VDI_PURCHASE_RETRIEVAL_WINDOW_MS = 14 * 24 * 60 * 60 * 1000;
+// 6 weeks - every paid check stays retrievable for free on a later
+// lookup of the same plate for this long, not just a VDI purchase
+// specifically. buyingGuideLookupCache.ts reuses this same constant for
+// its own, unrelated free-facts cache, so "how long a check sticks
+// around" is one number across the whole Buying Guide, not two
+// independently-tuned ones that could quietly drift apart.
+export const VDI_PURCHASE_RETRIEVAL_WINDOW_MS = 42 * 24 * 60 * 60 * 1000;
 
 export interface VdiPurchaseDoc {
   id: string;

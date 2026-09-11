@@ -84,6 +84,7 @@ describe("CarBuyingGuideForm", () => {
         vdiCheck: null,
         valuation: null,
         taxDetails: null,
+        requiresPayment: false, nextFreeLookupAt: null,
       }),
     });
 
@@ -117,6 +118,7 @@ describe("CarBuyingGuideForm", () => {
         vdiCheck: null,
         valuation: null,
         taxDetails: null,
+        requiresPayment: false, nextFreeLookupAt: null,
       }),
     });
 
@@ -150,6 +152,7 @@ describe("CarBuyingGuideForm", () => {
         vdiCheck: null,
         valuation: null,
         taxDetails: null,
+        requiresPayment: false, nextFreeLookupAt: null,
       }),
     });
 
@@ -228,6 +231,7 @@ describe("CarBuyingGuideForm", () => {
         plateInRetention: false, motDueDate: null, motTests: [], briefing: null,
         vdiCheck: null, valuation: { privateAverage: 12000, privateClean: null, dealerForecourt: null, partExchange: null }, taxDetails: null,
         reportTier: "freeNoVehicle", reportPricePence: 1499, reportPriceLabel: "£14.99", proFreeAvailable: false, nextFreeReportAt: null,
+        requiresPayment: false, nextFreeLookupAt: null,
       }),
     });
     const user = userEvent.setup();
@@ -249,6 +253,7 @@ describe("CarBuyingGuideForm", () => {
             plateInRetention: false, motDueDate: null, motTests: [], briefing: null,
             vdiCheck: null, valuation: null, taxDetails: null,
             reportTier: "freeNoVehicle", reportPricePence: 1499, reportPriceLabel: "£14.99", proFreeAvailable: false, nextFreeReportAt: null,
+            requiresPayment: false, nextFreeLookupAt: null,
           }),
         });
       }
@@ -297,6 +302,7 @@ describe("CarBuyingGuideForm", () => {
         vdiCheckPurchasedAt: "2026-01-01T00:00:00.000Z",
         vdiCheckExpiresAt: "2026-01-15T00:00:00.000Z",
         vdiCheckPricePaidPence: 1499,
+        requiresPayment: false, nextFreeLookupAt: null,
       }),
     });
     const user = userEvent.setup();
@@ -363,6 +369,7 @@ describe("CarBuyingGuideForm", () => {
         vdiCheckPurchasedAt: "2026-01-01T00:00:00.000Z",
         vdiCheckExpiresAt: "2026-01-15T00:00:00.000Z",
         vdiCheckPricePaidPence: 1499,
+        requiresPayment: false, nextFreeLookupAt: null,
       }),
     });
     const user = userEvent.setup();
@@ -433,6 +440,7 @@ describe("CarBuyingGuideForm", () => {
         vdiCheckPurchasedAt: "2026-01-01T00:00:00.000Z",
         vdiCheckExpiresAt: "2026-01-15T00:00:00.000Z",
         vdiCheckPricePaidPence: 1499,
+        requiresPayment: false, nextFreeLookupAt: null,
       }),
     });
     const user = userEvent.setup();
@@ -510,6 +518,7 @@ describe("CarBuyingGuideForm", () => {
         vdiCheckPurchasedAt: "2026-01-01T00:00:00.000Z",
         vdiCheckExpiresAt: "2026-01-15T00:00:00.000Z",
         vdiCheckPricePaidPence: 1499,
+        requiresPayment: false, nextFreeLookupAt: null,
       }),
     });
     const user = userEvent.setup();
@@ -579,6 +588,7 @@ describe("CarBuyingGuideForm", () => {
         vrm: "AB12CDE", make: "Ford", model: "Focus", fuelType: "Petrol", colour: "Blue",
         plateInRetention: false, motDueDate: null, motTests: [], briefing: null, taxDetails: null,
         vdiCheck: null, valuation: null, valuationBlockedReason: "cooldown", valuationAvailableAt: "2026-02-01T00:00:00.000Z",
+        requiresPayment: false, nextFreeLookupAt: null,
       }),
     });
     const user = userEvent.setup();
@@ -597,6 +607,7 @@ describe("CarBuyingGuideForm", () => {
         plateInRetention: false, motDueDate: null, motTests: [], briefing: null, taxDetails: null,
         vdiCheck: null, vdiCheckBlockedReason: "already_used", valuation: null,
         reportTier: "freeNoVehicle", reportPricePence: 1499, reportPriceLabel: "£14.99", proFreeAvailable: false, nextFreeReportAt: null,
+        requiresPayment: false, nextFreeLookupAt: null,
       }),
     });
     const user = userEvent.setup();
@@ -606,6 +617,31 @@ describe("CarBuyingGuideForm", () => {
 
     expect(await screen.findByText(/already been used/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Buy the vehicle history report/ })).toBeInTheDocument();
+  });
+
+  it("shows the free-lookup-used-up message and a Buy button, without the MOT section, when requiresPayment is true", async () => {
+    (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        vrm: "AB12CDE", make: "", model: "", fuelType: "", colour: "",
+        plateInRetention: false, motDueDate: null, motTests: [], briefing: null,
+        vdiCheck: null, vdiCheckPurchasedAt: null, vdiCheckExpiresAt: null, vdiCheckPricePaidPence: null,
+        valuation: null, taxDetails: null,
+        reportTier: "freeNoVehicle", reportPricePence: 1499, reportPriceLabel: "£14.99", proFreeAvailable: false, nextFreeReportAt: null,
+        requiresPayment: true, nextFreeLookupAt: "2026-02-01T00:00:00.000Z",
+      }),
+    });
+    const user = userEvent.setup();
+    render(<CarBuyingGuideForm signedIn />);
+    await user.type(screen.getByLabelText("Search by registration (optional)"), "AB12CDE");
+    await user.click(screen.getByRole("button", { name: "Look up" }));
+
+    expect(await screen.findByText(/used your free car check for this period/)).toBeInTheDocument();
+    expect(screen.getByText(/01\/02\/2026/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Buy the vehicle history report - £14\.99/ })).toBeInTheDocument();
+    expect(screen.queryByText(/MOT due/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/no mot due date on record/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/no mot test history found/i)).not.toBeInTheDocument();
   });
 
   it("on load, a Stripe return with vdiPurchaseId and vrm in the URL auto-fills the plate and runs the paid lookup", async () => {
@@ -621,6 +657,7 @@ describe("CarBuyingGuideForm", () => {
           v5cReissueCount: 0, calculatedAverageAnnualMileage: null, averageMileageForAge: null,
           mileageAnomalyDetected: false, manufacturerWarrantyMiles: null, manufacturerWarrantyMonths: null,
         },
+        requiresPayment: false, nextFreeLookupAt: null,
       }),
     });
 

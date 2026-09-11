@@ -77,6 +77,12 @@ interface BuyingGuideLookupResponse {
   reportPriceLabel: string;
   proFreeAvailable: boolean;
   nextFreeReportAt: string | null;
+  // True when this account has already used its one free lookup this
+  // 30-day window and this plate isn't already covered by a cache or a
+  // paid report purchase - see buying-guide-lookup/route.ts. Every field
+  // above is left at its empty/null default in that case.
+  requiresPayment: boolean;
+  nextFreeLookupAt: string | null;
   error?: string;
 }
 
@@ -139,6 +145,15 @@ export function BuyingGuideForm({ signedIn }: Props) {
       const data: BuyingGuideLookupResponse = await res.json();
       if (!res.ok) {
         setLookupError(data.error ?? 'No vehicle found for that registration. Pick it manually below instead.');
+        return;
+      }
+
+      if (data.requiresPayment) {
+        // No vehicle data came back at all - this account's free monthly
+        // lookup is used up and this plate isn't cached or already paid
+        // for, so nothing was fetched. The dedicated block further down
+        // reads straight off motResult.requiresPayment.
+        setMotResult(data);
         return;
       }
 
@@ -322,7 +337,27 @@ export function BuyingGuideForm({ signedIn }: Props) {
             {lookupNote && <p className="field-note">{lookupNote}</p>}
           </div>
 
-          {motResult && !motResult.vdiCheck && (
+          {motResult?.requiresPayment && (
+            <div className="field" style={{ marginBottom: '1.1rem' }}>
+              <p className="field-note">
+                You&apos;ve used your free bike check for this period
+                {motResult.nextFreeLookupAt
+                  ? ` - your next free one is available ${new Date(motResult.nextFreeLookupAt).toLocaleDateString('en-GB')}`
+                  : ''}
+                . Buy the vehicle history report for this registration to check it now instead.
+              </p>
+              <button type="button" className="btn-primary" onClick={handleBuyVdiCheck} disabled={vdiPurchasing}>
+                {vdiPurchasing
+                  ? 'Getting your report…'
+                  : motResult.proFreeAvailable
+                    ? 'Get your free vehicle history report (1 every 4 weeks)'
+                    : `Buy the vehicle history report - ${motResult.reportPriceLabel}`}
+              </button>
+              {vdiPurchaseError && <p className="error-text" role="alert">{vdiPurchaseError}</p>}
+            </div>
+          )}
+
+          {motResult && !motResult.requiresPayment && !motResult.vdiCheck && (
             <div className="field" style={{ marginBottom: '1.1rem' }}>
               <p className="field-note">
                 {motResult.vdiCheckBlockedReason === 'already_used' &&
@@ -409,7 +444,7 @@ export function BuyingGuideForm({ signedIn }: Props) {
             </div>
           )}
 
-          {motResult && (
+          {motResult && !motResult.requiresPayment && (
             <div className="field" style={{ marginBottom: '1.1rem' }}>
               <p className="field-note" style={{ fontWeight: 600, marginBottom: '0.4rem' }}>
                 {motResult.motDueDate

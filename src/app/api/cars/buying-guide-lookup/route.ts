@@ -5,8 +5,8 @@
 // VDI check, calling generateCarBuyingGuideBriefing instead. Also adds
 // the car-only independent valuation, which is free but rate-limited
 // (see valuationCheckUsage.ts) - fully decoupled from the paid VDI
-// purchase below, since valuation is cheap enough (~20p/call) to give
-// away, just not unlimited.
+// purchase below, since valuation is cheap enough (a confirmed £0.20/
+// call) to give away, just not unlimited.
 //
 // Also costs one Gemini call per lookup - see the briefing generation
 // below. Runs sequentially after the VDG calls (needs their result
@@ -14,7 +14,7 @@
 // Worth revisiting if that turns out to feel slow in practice.
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/session";
-import { parseMotHistory, type RawMotTest } from "@/lib/tracker/motHistory";
+import { parseMotHistory, type RawMotTest, type ParsedMotTest } from "@/lib/tracker/motHistory";
 import { generateCarBuyingGuideBriefing, type CarBuyingGuideBriefingResult } from "@/lib/tracker/carBuyingGuideBriefing";
 import { isPro } from "@/lib/subscriptions";
 import { getUserDoc } from "@/lib/tracker/userDoc";
@@ -26,7 +26,9 @@ import { fetchValuationFromVdg } from "@/lib/tracker/valuationFetch";
 import { fetchVehicleTaxDetailsFromVdg, type VehicleTaxDetails } from "@/lib/tracker/vehicleTaxFetch";
 import type { VdiCheckResult, ValuationResult } from "@/lib/tracker/vdiUnlock";
 import { computeBuyingGuideReportTier } from "@/lib/payments/buyingGuideReportTier";
-import { BUYING_GUIDE_REPORT_PRICE_LABEL, type BuyingGuideReportTier } from "@/lib/payments/pricing";
+import { BUYING_GUIDE_REPORT_PRICE_LABEL, BUYING_GUIDE_LOOKUP_COOLDOWN_MS, type BuyingGuideReportTier } from "@/lib/payments/pricing";
+import { canRunFreeBuyingGuideLookup, nextFreeBuyingGuideLookupAt, recordBuyingGuideLookupRun } from "@/lib/tracker/buyingGuideLookupUsage";
+import { getCachedBuyingGuideLookup, setCachedBuyingGuideLookup } from "@/lib/tracker/buyingGuideLookupCache";
 
 export const dynamic = "force-dynamic";
 
@@ -96,6 +98,16 @@ export interface CarBuyingGuideLookupResult {
   reportPriceLabel: string;
   proFreeAvailable: boolean;
   nextFreeReportAt: string | null;
+  // True when this account has already used its one free lookup this
+  // 30-day window, this exact plate isn't already cached from someone
+  // else's lookup, and no valid VDI report purchase covers it either -
+  // see buyingGuideLookupUsage.ts. Every other field is left at its
+  // empty/null default when this is true: no VDG calls were made at all
+  // for this response, so there is nothing real to show yet.
+  requiresPayment: boolean;
+  // Only meaningful when requiresPayment is true - when this account's
+  // free lookup becomes available again.
+  nextFreeLookupAt: string | null;
 }
 
 async function resolveVdiCheck(
@@ -166,38 +178,16 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Lookup is not available right now." }, { status: 503 });
   }
 
-  let motData: VdgMotResponse;
-  let taxDetails: VehicleTaxDetails | null;
-  try {
-    const [motRes, tax] = await Promise.all([
-      fetch(`${VDG_ENDPOINT}?apiKey=${apiKey}&packageName=MotHistoryDetails&vrm=${encodeURIComponent(vrm)}`),
-      fetchVehicleTaxDetailsFromVdg(vrm, apiKey),
-    ]);
-    motData = await motRes.json();
-    taxDetails = tax;
-  } catch (err) {
-    console.error("Car buying guide lookup request failed:", err);
-    return NextResponse.json(
-      { error: "Couldn't reach the lookup service. Enter the details manually." },
-      { status: 502 }
-    );
-  }
-
-  if (!motData.ResponseInformation?.IsSuccessStatusCode || !motData.Results?.MotHistoryDetails) {
-    return NextResponse.json(
-      { error: "No vehicle found for that registration. Enter the details manually." },
-      { status: 404 }
-    );
-  }
-
-  const details = motData.Results.MotHistoryDetails;
-  const plateInRetention = motData.ResponseInformation.StatusCode === 21;
-  const parsed = parseMotHistory(details.MotDueDate ?? null, details.MotTestDetailsList ?? []);
-  const motTestsOldestFirst = parsed.tests;
-  const motTests = [...parsed.tests].reverse();
-
   const vdiPurchaseId = request.nextUrl.searchParams.get("vdiPurchaseId");
   const sessionId = request.nextUrl.searchParams.get("session_id");
+
+  // Resolved BEFORE the free lookup's own cache/quota gate below, even
+  // though it doesn't need any MOT/tax data itself - a real, paid VDI
+  // check for this exact plate is exactly what should let this account
+  // bypass the free lookup's monthly cap, not just having a
+  // vdiPurchaseId query param present (a bogus or already-used one still
+  // falls through to the ordinary free-quota check below, never a free
+  // pass around it).
   const {
     vdiCheck,
     blockedReason: vdiCheckBlockedReason,
@@ -207,6 +197,95 @@ export async function GET(request: NextRequest) {
   const vdiCheckExpiresAt = vdiCheckPurchasedAt
     ? new Date(new Date(vdiCheckPurchasedAt).getTime() + VDI_PURCHASE_RETRIEVAL_WINDOW_MS).toISOString()
     : null;
+  const hasPaidAccess = vdiCheck !== null;
+
+  const cached = await getCachedBuyingGuideLookup("car", vrm);
+
+  if (!cached && !hasPaidAccess) {
+    const gatingUser = await getUserDoc(session.email);
+    if (!canRunFreeBuyingGuideLookup(gatingUser)) {
+      const reportTierResult = await computeBuyingGuideReportTier(session.email);
+      const blockedResult: CarBuyingGuideLookupResult = {
+        vrm,
+        make: "",
+        model: "",
+        fuelType: "",
+        colour: "",
+        plateInRetention: false,
+        motDueDate: null,
+        motTests: [],
+        briefing: null,
+        vdiCheck: null,
+        vdiCheckPurchasedAt: null,
+        vdiCheckExpiresAt: null,
+        vdiCheckPricePaidPence: null,
+        valuation: null,
+        taxDetails: null,
+        reportTier: reportTierResult.tier,
+        reportPricePence: reportTierResult.pricePence,
+        reportPriceLabel: BUYING_GUIDE_REPORT_PRICE_LABEL[reportTierResult.tier],
+        proFreeAvailable: reportTierResult.proFreeAvailable,
+        nextFreeReportAt: reportTierResult.nextFreeAt,
+        requiresPayment: true,
+        nextFreeLookupAt: nextFreeBuyingGuideLookupAt(gatingUser),
+      };
+      return NextResponse.json(blockedResult);
+    }
+  }
+
+  let details: { Make?: string; Model?: string; FuelType?: string; Colour?: string };
+  let plateInRetention: boolean;
+  let motDueDate: string | null;
+  let motTestsOldestFirst: ParsedMotTest[];
+  let motTests: ParsedMotTest[];
+  let taxDetails: VehicleTaxDetails | null;
+
+  if (cached) {
+    details = { Make: cached.make, Model: cached.model, FuelType: cached.fuelType, Colour: cached.colour };
+    plateInRetention = cached.plateInRetention;
+    motDueDate = cached.motDueDate;
+    motTestsOldestFirst = cached.motTestsOldestFirst;
+    motTests = [...cached.motTestsOldestFirst].reverse();
+    taxDetails = cached.taxDetails;
+  } else {
+    let motData: VdgMotResponse;
+    try {
+      const [motRes, tax] = await Promise.all([
+        fetch(`${VDG_ENDPOINT}?apiKey=${apiKey}&packageName=MotHistoryDetails&vrm=${encodeURIComponent(vrm)}`),
+        fetchVehicleTaxDetailsFromVdg(vrm, apiKey),
+      ]);
+      motData = await motRes.json();
+      taxDetails = tax;
+    } catch (err) {
+      console.error("Car buying guide lookup request failed:", err);
+      return NextResponse.json(
+        { error: "Couldn't reach the lookup service. Enter the details manually." },
+        { status: 502 }
+      );
+    }
+
+    if (!motData.ResponseInformation?.IsSuccessStatusCode || !motData.Results?.MotHistoryDetails) {
+      return NextResponse.json(
+        { error: "No vehicle found for that registration. Enter the details manually." },
+        { status: 404 }
+      );
+    }
+
+    details = motData.Results.MotHistoryDetails;
+    plateInRetention = motData.ResponseInformation.StatusCode === 21;
+    const parsed = parseMotHistory(motData.Results.MotHistoryDetails.MotDueDate ?? null, motData.Results.MotHistoryDetails.MotTestDetailsList ?? []);
+    motDueDate = parsed.motDueDate;
+    motTestsOldestFirst = parsed.tests;
+    motTests = [...parsed.tests].reverse();
+
+    if (!hasPaidAccess) {
+      // Only the free path spends this account's monthly credit - a
+      // paid-access lookup (a real, valid VDI purchase for this plate)
+      // never touches the free quota, so buying the report doesn't cost
+      // an account its next month's free lookup too.
+      await recordBuyingGuideLookupRun(session.email);
+    }
+  }
 
   const userIsPro = await isPro(session.email);
   const user = await getUserDoc(session.email);
@@ -221,21 +300,53 @@ export async function GET(request: NextRequest) {
     valuationAvailableAt = nextValuationCheckAt(user, userIsPro);
   }
 
+  // Reused from the cache without a Gemini call whenever it's both
+  // present AND safe for this specific request: a cached briefing is
+  // only ever the VDI/valuation-free version (see
+  // buyingGuideLookupCache.ts), so it can only stand in for a request
+  // that itself has no paid access - a paying visitor always gets a
+  // freshly-generated, VDI-aware briefing instead, never the cached one.
   let briefing: CarBuyingGuideBriefingResult | null = null;
   const geminiKey = process.env.GEMINI_API_KEY;
   if (geminiKey) {
-    briefing = await generateCarBuyingGuideBriefing(
-      {
-        make: details.Make ?? "",
-        model: details.Model ?? "",
-        fuelType: details.FuelType ?? "",
-        motTests: motTestsOldestFirst,
-        vdiCheck: vdiCheck ?? undefined,
-        valuation: valuation ?? undefined,
-        taxDetails: taxDetails ?? undefined,
-      },
-      geminiKey
-    );
+    if (cached?.briefing && !hasPaidAccess) {
+      briefing = cached.briefing;
+    } else {
+      briefing = await generateCarBuyingGuideBriefing(
+        {
+          make: details.Make ?? "",
+          model: details.Model ?? "",
+          fuelType: details.FuelType ?? "",
+          motTests: motTestsOldestFirst,
+          vdiCheck: vdiCheck ?? undefined,
+          valuation: valuation ?? undefined,
+          taxDetails: taxDetails ?? undefined,
+        },
+        geminiKey
+      );
+    }
+  }
+
+  // Single cache write point, after the briefing decision above so it
+  // can include the right value: a fresh (non-cached) lookup always
+  // writes the full entry; an existing cache entry only gets touched
+  // again to backfill a still-missing free-tier briefing (its first
+  // visitor having been a paying one) - never to overwrite a
+  // already-cached briefing, and never with a VDI-aware one.
+  if (!cached) {
+    await setCachedBuyingGuideLookup("car", vrm, {
+      make: details.Make ?? "",
+      model: details.Model ?? "",
+      fuelType: details.FuelType ?? "",
+      colour: details.Colour ?? "",
+      plateInRetention,
+      motDueDate,
+      motTestsOldestFirst,
+      taxDetails,
+      briefing: !hasPaidAccess ? briefing : null,
+    });
+  } else if (!cached.briefing && !hasPaidAccess && briefing) {
+    await setCachedBuyingGuideLookup("car", vrm, { ...cached, briefing });
   }
 
   const reportTierResult = await computeBuyingGuideReportTier(session.email);
@@ -247,7 +358,7 @@ export async function GET(request: NextRequest) {
     fuelType: details.FuelType ?? "",
     colour: details.Colour ?? "",
     plateInRetention,
-    motDueDate: parsed.motDueDate,
+    motDueDate,
     motTests,
     briefing,
     vdiCheck,
@@ -264,6 +375,8 @@ export async function GET(request: NextRequest) {
     reportPriceLabel: BUYING_GUIDE_REPORT_PRICE_LABEL[reportTierResult.tier],
     proFreeAvailable: reportTierResult.proFreeAvailable,
     nextFreeReportAt: reportTierResult.nextFreeAt,
+    requiresPayment: false,
+    nextFreeLookupAt: null,
   };
 
   return NextResponse.json(result);

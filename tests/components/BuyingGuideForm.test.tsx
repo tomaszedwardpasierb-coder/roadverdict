@@ -55,6 +55,7 @@ describe("BuyingGuideForm", () => {
         },
         vdiCheck: null,
         taxDetails: null,
+        requiresPayment: false, nextFreeLookupAt: null,
       }),
     });
 
@@ -86,6 +87,7 @@ describe("BuyingGuideForm", () => {
         briefing: null,
         vdiCheck: null,
         taxDetails: null,
+        requiresPayment: false, nextFreeLookupAt: null,
       }),
     });
 
@@ -118,6 +120,7 @@ describe("BuyingGuideForm", () => {
         briefing: null,
         vdiCheck: null,
         taxDetails: null,
+        requiresPayment: false, nextFreeLookupAt: null,
       }),
     });
 
@@ -195,6 +198,7 @@ describe("BuyingGuideForm", () => {
         vrm: "AB12CDE", make: "Honda", model: "CB125R", fuelType: "Petrol", colour: "Black",
         plateInRetention: false, motDueDate: null, motTests: [], briefing: null, vdiCheck: null, taxDetails: null,
         reportTier: "freeNoVehicle", reportPricePence: 1499, reportPriceLabel: "£14.99", proFreeAvailable: false, nextFreeReportAt: null,
+        requiresPayment: false, nextFreeLookupAt: null,
       }),
     });
     const user = userEvent.setup();
@@ -213,6 +217,7 @@ describe("BuyingGuideForm", () => {
         vrm: "AB12CDE", make: "Honda", model: "CB125R", fuelType: "Petrol", colour: "Black",
         plateInRetention: false, motDueDate: null, motTests: [], briefing: null, vdiCheck: null, taxDetails: null,
         reportTier: "pro", reportPricePence: 0, reportPriceLabel: "£9.99", proFreeAvailable: true, nextFreeReportAt: null,
+        requiresPayment: false, nextFreeLookupAt: null,
       }),
     });
     const user = userEvent.setup();
@@ -230,6 +235,7 @@ describe("BuyingGuideForm", () => {
         vrm: "AB12CDE", make: "Honda", model: "CB125R", fuelType: "Petrol", colour: "Black",
         plateInRetention: false, motDueDate: null, motTests: [], briefing: null, vdiCheck: null, taxDetails: null,
         reportTier: "pro", reportPricePence: 999, reportPriceLabel: "£9.99", proFreeAvailable: false, nextFreeReportAt: "2026-02-01T00:00:00.000Z",
+        requiresPayment: false, nextFreeLookupAt: null,
       }),
     });
     const user = userEvent.setup();
@@ -251,6 +257,7 @@ describe("BuyingGuideForm", () => {
             vrm: "AB12CDE", make: "Honda", model: "CB125R", fuelType: "Petrol", colour: "Black",
             plateInRetention: false, motDueDate: null, motTests: [], briefing: null, vdiCheck: null, taxDetails: null,
             reportTier: "freeNoVehicle", reportPricePence: 1499, reportPriceLabel: "£14.99", proFreeAvailable: false, nextFreeReportAt: null,
+            requiresPayment: false, nextFreeLookupAt: null,
           }),
         });
       }
@@ -291,6 +298,7 @@ describe("BuyingGuideForm", () => {
               vrm: "AB12CDE", make: "Honda", model: "CB125R", fuelType: "Petrol", colour: "Black",
               plateInRetention: false, motDueDate: null, motTests: [], briefing: null, vdiCheck: null, taxDetails: null,
               reportTier: "pro", reportPricePence: 0, reportPriceLabel: "£9.99", proFreeAvailable: true, nextFreeReportAt: null,
+              requiresPayment: false, nextFreeLookupAt: null,
             }),
           });
         }
@@ -308,6 +316,7 @@ describe("BuyingGuideForm", () => {
             vdiCheckPurchasedAt: "2026-01-01T00:00:00.000Z",
             vdiCheckExpiresAt: "2026-01-15T00:00:00.000Z",
             vdiCheckPricePaidPence: 0,
+            requiresPayment: false, nextFreeLookupAt: null,
           }),
         });
       }
@@ -350,6 +359,7 @@ describe("BuyingGuideForm", () => {
         vdiCheckPurchasedAt: "2026-01-01T00:00:00.000Z",
         vdiCheckExpiresAt: "2026-01-15T00:00:00.000Z",
         vdiCheckPricePaidPence: 1499,
+        requiresPayment: false, nextFreeLookupAt: null,
       }),
     });
     const user = userEvent.setup();
@@ -389,6 +399,7 @@ describe("BuyingGuideForm", () => {
         vdiCheckPurchasedAt: "2026-01-01T00:00:00.000Z",
         vdiCheckExpiresAt: "2026-01-15T00:00:00.000Z",
         vdiCheckPricePaidPence: 0,
+        requiresPayment: false, nextFreeLookupAt: null,
       }),
     });
     const user = userEvent.setup();
@@ -432,6 +443,7 @@ describe("BuyingGuideForm", () => {
         },
         vdiCheckPurchasedAt: "2026-01-01T00:00:00.000Z",
         vdiCheckExpiresAt: "2026-01-15T00:00:00.000Z",
+        requiresPayment: false, nextFreeLookupAt: null,
       }),
     });
     const user = userEvent.setup();
@@ -473,6 +485,7 @@ describe("BuyingGuideForm", () => {
         vdiCheckPurchasedAt: "2026-01-01T00:00:00.000Z",
         vdiCheckExpiresAt: "2026-01-15T00:00:00.000Z",
         vdiCheckPricePaidPence: 1499,
+        requiresPayment: false, nextFreeLookupAt: null,
       }),
     });
     const user = userEvent.setup();
@@ -492,6 +505,7 @@ describe("BuyingGuideForm", () => {
         plateInRetention: false, motDueDate: null, motTests: [], briefing: null, taxDetails: null,
         vdiCheck: null, vdiCheckBlockedReason: "already_used",
         reportTier: "freeNoVehicle", reportPricePence: 1499, reportPriceLabel: "£14.99", proFreeAvailable: false, nextFreeReportAt: null,
+        requiresPayment: false, nextFreeLookupAt: null,
       }),
     });
     const user = userEvent.setup();
@@ -501,6 +515,31 @@ describe("BuyingGuideForm", () => {
 
     expect(await screen.findByText(/already been used/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Buy the vehicle history report/ })).toBeInTheDocument();
+  });
+
+  it("shows the free-lookup-used-up message and a Buy button, without the MOT section, when requiresPayment is true", async () => {
+    (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        vrm: "AB12CDE", make: "", model: "", fuelType: "", colour: "",
+        plateInRetention: false, motDueDate: null, motTests: [], briefing: null,
+        vdiCheck: null, vdiCheckPurchasedAt: null, vdiCheckExpiresAt: null, vdiCheckPricePaidPence: null,
+        taxDetails: null,
+        reportTier: "freeNoVehicle", reportPricePence: 1499, reportPriceLabel: "£14.99", proFreeAvailable: false, nextFreeReportAt: null,
+        requiresPayment: true, nextFreeLookupAt: "2026-02-01T00:00:00.000Z",
+      }),
+    });
+    const user = userEvent.setup();
+    render(<BuyingGuideForm signedIn />);
+    await user.type(screen.getByLabelText("Search by registration (optional)"), "AB12CDE");
+    await user.click(screen.getByRole("button", { name: "Look up" }));
+
+    expect(await screen.findByText(/used your free bike check for this period/)).toBeInTheDocument();
+    expect(screen.getByText(/01\/02\/2026/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Buy the vehicle history report - £14\.99/ })).toBeInTheDocument();
+    expect(screen.queryByText(/MOT due/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/no mot due date on record/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/no mot test history found/i)).not.toBeInTheDocument();
   });
 
   it("on load, a Stripe return with vdiPurchaseId and vrm in the URL auto-fills the plate and runs the paid lookup", async () => {
@@ -516,6 +555,7 @@ describe("BuyingGuideForm", () => {
           v5cReissueCount: 0, calculatedAverageAnnualMileage: null, averageMileageForAge: null,
           mileageAnomalyDetected: false, manufacturerWarrantyMiles: null, manufacturerWarrantyMonths: null,
         },
+        requiresPayment: false, nextFreeLookupAt: null,
       }),
     });
 
