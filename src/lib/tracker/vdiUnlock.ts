@@ -180,6 +180,24 @@ export interface VdiCheckResult {
 
   // Police National Computer detail
   pncDetail?: VdiPncDetail | null;
+
+  // The individual mileage readings VDG's own mileage-consistency check
+  // is derived from (each one a real reading recorded against this
+  // vehicle over time, e.g. from an MOT test) - distinct from, and more
+  // granular than, calculatedAverageAnnualMileage/averageMileageForAge
+  // above (which are just the two summary figures that check produces).
+  // Sorted oldest-first. Reserved for a chart, not shown as a plain list.
+  mileageReadings?: VdiMileageReading[];
+}
+
+export interface VdiMileageReading {
+  date: string;
+  mileage: number;
+  // False when this reading is LOWER than an earlier one - a genuine,
+  // specific red flag (the odometer appears to have gone backward), not
+  // just noise to filter out silently.
+  inSequence: boolean;
+  dataSource: string | null;
 }
 
 export interface ValuationResult {

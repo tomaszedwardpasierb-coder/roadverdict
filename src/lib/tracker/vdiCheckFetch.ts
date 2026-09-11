@@ -21,6 +21,7 @@ import type {
   VdiSoundLevels,
   VdiPncDetail,
   VdiFuelEconomy,
+  VdiMileageReading,
 } from "./vdiUnlock";
 
 const VDG_ENDPOINT = "https://uk.api.vehicledataglobal.com/r2/lookup";
@@ -49,6 +50,13 @@ interface RawWriteOffRecord {
   LossDate?: string | null;
   InsurerName?: string;
   InsurerCode?: string;
+}
+
+interface RawMileageResult {
+  Mileage?: number;
+  DateRecorded?: string;
+  InSequence?: boolean;
+  DataSource?: string;
 }
 
 // Field paths below are taken directly from a real, verified VDICheck
@@ -161,6 +169,7 @@ interface RawVdiCheckResponse {
       CalculatedAverageAnnualMileage?: number | null;
       AverageMileageForAge?: number | null;
       MileageAnomalyDetected?: boolean;
+      MileageResultList?: RawMileageResult[];
     };
   };
 }
@@ -232,6 +241,16 @@ export async function fetchVdiCheckFromVdg(vrm: string, apiKey: string): Promise
           }
         : null;
 
+    const mileageReadings: VdiMileageReading[] = (mileageCheck?.MileageResultList ?? [])
+      .filter((r) => r.DateRecorded != null && r.Mileage != null)
+      .map((r) => ({
+        date: r.DateRecorded as string,
+        mileage: r.Mileage as number,
+        inSequence: r.InSequence ?? true,
+        dataSource: r.DataSource ?? null,
+      }))
+      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
     return {
       isStolen: data.Results.PncDetails?.IsStolen ?? false,
       hasWriteOffRecord: writeOffRecordList.length > 0,
@@ -302,6 +321,7 @@ export async function fetchVdiCheckFromVdg(vrm: string, apiKey: string): Promise
       previousColour: vd?.VehicleHistory?.ColourDetails?.PreviousColour ?? null,
 
       pncDetail,
+      mileageReadings,
     };
   } catch (err) {
     console.error("VDG VDICheck fetch failed:", err);

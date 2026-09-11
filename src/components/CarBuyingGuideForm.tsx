@@ -11,6 +11,7 @@ import {
 } from '@/lib/tracker/carBuyerChecklist';
 import type { BuyingGuideReportTier } from '@/lib/payments/pricing';
 import { CarBuyingGuideResult } from './CarBuyingGuideResult';
+import { VdiMileageChart } from './VdiMileageChart';
 
 interface ApiResponse {
   checklist: Checklist;
@@ -116,6 +117,7 @@ interface CarBuyingGuideLookupResponse {
       dateReportedStolen: string | null;
       dateRecordAddedToPnc: string | null;
     } | null;
+    mileageReadings?: { date: string; mileage: number; inSequence: boolean; dataSource: string | null }[];
   } | null;
   vdiCheckBlockedReason?: 'already_used' | 'payment_not_confirmed' | 'invalid' | 'fetch_failed';
   // Set alongside vdiCheck - when it was paid for, and how long it stays
@@ -661,6 +663,7 @@ export function CarBuyingGuideForm({ signedIn }: Props) {
                   </li>
                 )}
               </ul>
+              {motResult.vdiCheck.mileageReadings && <VdiMileageChart readings={motResult.vdiCheck.mileageReadings} />}
 
               {(motResult.vdiCheck.manufacturerWarrantyMonths != null || motResult.vdiCheck.manufacturerWarrantyMiles != null) && (
                 <>

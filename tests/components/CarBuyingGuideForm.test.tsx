@@ -8,6 +8,17 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+
+// Real react-chartjs-2/chart.js rendering is exercised by
+// VdiMileageChart.test.tsx directly - here it's enough to confirm this
+// form renders (or doesn't render) that chart at all, so a lightweight
+// stand-in avoids dragging real canvas rendering into every other test
+// in this file.
+vi.mock("react-chartjs-2", () => ({
+  Line: () => <div data-testid="mileage-chart-line" />,
+  Bar: () => <div data-testid="mileage-chart-bar" />,
+}));
+
 import { CarBuyingGuideForm } from "@/components/CarBuyingGuideForm";
 
 describe("CarBuyingGuideForm", () => {
@@ -343,6 +354,10 @@ describe("CarBuyingGuideForm", () => {
             policeForceName: "Metropolitan Police", currentStatusOnRecord: "Recovered",
             dateReportedStolen: "2021-05-01T00:00:00Z", dateRecordAddedToPnc: "2021-05-02T00:00:00Z",
           },
+          mileageReadings: [
+            { date: "2021-06-01T00:00:00Z", mileage: 11000, inSequence: true, dataSource: "MOT" },
+            { date: "2022-06-01T00:00:00Z", mileage: 14000, inSequence: true, dataSource: "MOT" },
+          ],
         },
         valuation: null,
         vdiCheckPurchasedAt: "2026-01-01T00:00:00.000Z",
@@ -397,6 +412,37 @@ describe("CarBuyingGuideForm", () => {
 
     expect(screen.getByText("Plate change history")).toBeInTheDocument();
     expect(screen.getByText(/OLD123 → PA63ERB \(01\/05\/2015\)/)).toBeInTheDocument();
+
+    expect(screen.getByText("Mileage history")).toBeInTheDocument();
+    expect(screen.getByTestId("mileage-chart-bar")).toBeInTheDocument();
+  });
+
+  it("doesn't render a mileage chart when mileageReadings is absent or has fewer than 2 entries", async () => {
+    (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        vrm: "AB12CDE", make: "Ford", model: "Focus", fuelType: "Petrol", colour: "Blue",
+        plateInRetention: false, motDueDate: null, motTests: [], briefing: null, taxDetails: null, valuation: null,
+        vdiCheck: {
+          isStolen: false, hasWriteOffRecord: false, writeOffRecordCount: 0, hasOutstandingFinance: false,
+          financeRecords: [], keeperChanges: [], keeperChangeCount: 0, plateChangeCount: 0, colourChangeCount: 0, currentColour: null,
+          v5cReissueCount: 0, calculatedAverageAnnualMileage: null, averageMileageForAge: null,
+          mileageAnomalyDetected: false, manufacturerWarrantyMiles: null, manufacturerWarrantyMonths: null,
+          mileageReadings: [{ date: "2021-06-01T00:00:00Z", mileage: 11000, inSequence: true, dataSource: "MOT" }],
+        },
+        vdiCheckPurchasedAt: "2026-01-01T00:00:00.000Z",
+        vdiCheckExpiresAt: "2026-01-15T00:00:00.000Z",
+        vdiCheckPricePaidPence: 1499,
+      }),
+    });
+    const user = userEvent.setup();
+    render(<CarBuyingGuideForm signedIn />);
+    await user.type(screen.getByLabelText("Search by registration (optional)"), "AB12CDE");
+    await user.click(screen.getByRole("button", { name: "Look up" }));
+
+    expect(await screen.findByText("Mileage integrity")).toBeInTheDocument();
+    expect(screen.queryByText("Mileage history")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("mileage-chart-bar")).not.toBeInTheDocument();
   });
 
   it("shows the valuation cooldown message when the free/Pro allowance is used up, independent of the VDI purchase state", async () => {

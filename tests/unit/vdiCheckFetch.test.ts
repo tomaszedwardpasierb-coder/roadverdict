@@ -141,6 +141,7 @@ describe("fetchVdiCheckFromVdg", () => {
       fuelEconomy: null,
       previousColour: null,
       pncDetail: null,
+      mileageReadings: [],
     });
   });
 
@@ -266,6 +267,73 @@ describe("fetchVdiCheckFromVdg", () => {
     expect(result?.pncDetail).toBeNull();
   });
 
+  // Individual mileage readings behind the summary
+  // calculatedAverageAnnualMileage/averageMileageForAge figures - kept
+  // sorted oldest-first regardless of the order VDG returns them in, for
+  // the chart built from this list (VdiMileageChart.tsx).
+  it("parses and sorts the individual mileage readings oldest-first, defaulting a missing InSequence to true", async () => {
+    mocks.fetch.mockResolvedValue(
+      vdgSuccess({
+        MileageCheckDetails: {
+          CalculatedAverageAnnualMileage: 9000,
+          AverageMileageForAge: 8500,
+          MileageAnomalyDetected: false,
+          MileageResultList: [
+            { Mileage: 15000, DateRecorded: "2023-06-01T00:00:00Z", InSequence: true, DataSource: "MOT" },
+            { Mileage: 12000, DateRecorded: "2022-06-01T00:00:00Z", InSequence: true, DataSource: "MOT" },
+            { Mileage: 11000, DateRecorded: "2021-06-01T00:00:00Z" },
+          ],
+        },
+      })
+    );
+    const result = await fetchVdiCheckFromVdg("AS3527", "test-key");
+    expect(result?.mileageReadings).toEqual([
+      { date: "2021-06-01T00:00:00Z", mileage: 11000, inSequence: true, dataSource: null },
+      { date: "2022-06-01T00:00:00Z", mileage: 12000, inSequence: true, dataSource: "MOT" },
+      { date: "2023-06-01T00:00:00Z", mileage: 15000, inSequence: true, dataSource: "MOT" },
+    ]);
+  });
+
+  it("flags a reading recorded lower than an earlier one via inSequence: false, without dropping it", async () => {
+    mocks.fetch.mockResolvedValue(
+      vdgSuccess({
+        MileageCheckDetails: {
+          MileageResultList: [
+            { Mileage: 15000, DateRecorded: "2022-06-01T00:00:00Z", InSequence: true },
+            { Mileage: 9000, DateRecorded: "2023-06-01T00:00:00Z", InSequence: false, DataSource: "MOT" },
+          ],
+        },
+      })
+    );
+    const result = await fetchVdiCheckFromVdg("AS3527", "test-key");
+    expect(result?.mileageReadings).toEqual([
+      { date: "2022-06-01T00:00:00Z", mileage: 15000, inSequence: true, dataSource: null },
+      { date: "2023-06-01T00:00:00Z", mileage: 9000, inSequence: false, dataSource: "MOT" },
+    ]);
+  });
+
+  it("skips a malformed reading missing its date or mileage, rather than passing through a broken point", async () => {
+    mocks.fetch.mockResolvedValue(
+      vdgSuccess({
+        MileageCheckDetails: {
+          MileageResultList: [
+            { Mileage: 15000, DateRecorded: "2022-06-01T00:00:00Z" },
+            { DateRecorded: "2023-06-01T00:00:00Z" }, // no Mileage
+            { Mileage: 9000 }, // no DateRecorded
+          ],
+        },
+      })
+    );
+    const result = await fetchVdiCheckFromVdg("AS3527", "test-key");
+    expect(result?.mileageReadings).toEqual([{ date: "2022-06-01T00:00:00Z", mileage: 15000, inSequence: true, dataSource: null }]);
+  });
+
+  it("defaults to an empty mileageReadings array when MileageResultList is absent", async () => {
+    mocks.fetch.mockResolvedValue(vdgSuccess());
+    const result = await fetchVdiCheckFromVdg("AS3527", "test-key");
+    expect(result?.mileageReadings).toEqual([]);
+  });
+
   it("flags a stolen marker and a write-off record when present", async () => {
     mocks.fetch.mockResolvedValue(
       vdgSuccess({
@@ -379,6 +447,7 @@ describe("fetchVdiCheckFromVdg", () => {
       fuelEconomy: null,
       previousColour: null,
       pncDetail: null,
+      mileageReadings: [],
     });
   });
 
