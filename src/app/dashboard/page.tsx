@@ -147,10 +147,19 @@ function classFromEngineLitres(engineLitres: number): CarBenchmarkClass {
 
 export const dynamic = "force-dynamic";
 
-export default async function DashboardPage(props: { searchParams: Promise<{ addVehicle?: string }> }) {
+export default async function DashboardPage(props: { searchParams: Promise<{ addVehicle?: string; tab?: string }> }) {
   const searchParams = await props.searchParams;
   const session = await getSession();
   if (!session) redirect("/login");
+
+  // Reopens a specific tab on load instead of the default dashboard
+  // overview - currently only ever "buyingGuide", set by the Stripe
+  // checkout return URL for a buyer who started the Buying Guide's paid
+  // report purchase from inside the dashboard rather than the public
+  // page (see buyingGuideVdiCheckout.ts's BuyingGuideReturnContext).
+  // Deliberately a narrow allow-list of one value, not a general
+  // "deep link to any tab" mechanism - nothing else needs that yet.
+  const initialSection = searchParams.tab === "buyingGuide" ? ("buyingGuide" as const) : undefined;
 
   // Account-level, not bike/car-specific - fetched once here so it's
   // available before the car/bike branch decision below, and passed
@@ -207,7 +216,7 @@ export default async function DashboardPage(props: { searchParams: Promise<{ add
   if (effectiveKind === "car") {
     // Already resolved to "car" the ordinary way - reuse it as-is.
     if (activeVehicle?.kind === "car") {
-      return renderCarDashboard(session.email, activeVehicle.car, existingCars, activeVehicle.hasAnyBike, userAccount, pendingDeletion);
+      return renderCarDashboard(session.email, activeVehicle.car, existingCars, activeVehicle.hasAnyBike, userAccount, pendingDeletion, initialSection);
     }
     // Forced past a cookie that resolved to "bike" (or no cookie at all
     // for an account with both, defaulting to bike) - existingCars.length
@@ -216,7 +225,7 @@ export default async function DashboardPage(props: { searchParams: Promise<{ add
     // "bike" is what got us here, which itself guarantees bikes exist.
     const forcedCar = await pickActiveCar(existingCars);
     if (forcedCar) {
-      return renderCarDashboard(session.email, forcedCar, existingCars, true, userAccount, pendingDeletion);
+      return renderCarDashboard(session.email, forcedCar, existingCars, true, userAccount, pendingDeletion, initialSection);
     }
   }
 
@@ -945,6 +954,7 @@ export default async function DashboardPage(props: { searchParams: Promise<{ add
       securityContent={securityContent}
       storyReady={storyReady}
       hasIncomingRequest={!!incomingRequest}
+      initialSection={initialSection}
     />
   );
 }
@@ -964,7 +974,8 @@ async function renderCarDashboard(
   allCars: CarDoc[],
   hasAnyBike: boolean,
   userAccount: Awaited<ReturnType<typeof getUserDoc>>,
-  pendingDeletion: ReturnType<typeof getPendingDeletionInfo>
+  pendingDeletion: ReturnType<typeof getPendingDeletionInfo>,
+  initialSection?: "buyingGuide"
 ) {
   const [bikes, proStatus, twoFactorEnabled] = await Promise.all([
     hasAnyBike ? getBikesForUser(email) : Promise.resolve([]),
@@ -1571,6 +1582,7 @@ async function renderCarDashboard(
       securityContent={securityContent}
       storyReady={carStoryReady}
       hasIncomingRequest={!!carIncomingRequest}
+      initialSection={initialSection}
     />
   );
 }

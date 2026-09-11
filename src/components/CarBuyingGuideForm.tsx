@@ -212,10 +212,16 @@ export function CarBuyingGuideForm({ signedIn }: Props) {
     setVdiPurchasing(true);
     setVdiPurchaseError(null);
     try {
+      // This same form renders both as the public /cars/buying-guide page
+      // and inline as the dashboard's own Buying Guide tab - Stripe needs
+      // to know which one to send the buyer back to after checkout, since
+      // the two are genuinely different pages (see buyingGuideVdiCheckout.ts's
+      // BuyingGuideReturnContext).
+      const returnTo = window.location.pathname === '/dashboard' ? 'dashboard' : 'public';
       const res = await fetch('/api/cars/buying-guide-vdi-checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ vrm: cleaned }),
+        body: JSON.stringify({ vrm: cleaned, returnTo }),
       });
       const data = await res.json();
       if (!res.ok || (!data.url && !data.freeReportReady)) {

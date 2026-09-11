@@ -48,7 +48,19 @@ describe("POST /api/cars/buying-guide-vdi-checkout", () => {
   it("normalises the vrm to uppercase with spaces stripped, and calls with vehicleKind 'car'", async () => {
     mocks.createBuyingGuideVdiCheckoutSession.mockResolvedValue({ ok: true, url: "https://checkout.stripe.com/x" });
     await POST(request({ vrm: "ab12 cde" }));
-    expect(mocks.createBuyingGuideVdiCheckoutSession).toHaveBeenCalledWith("buyer@example.com", "AB12CDE", "car", expect.any(String));
+    expect(mocks.createBuyingGuideVdiCheckoutSession).toHaveBeenCalledWith("buyer@example.com", "AB12CDE", "car", expect.any(String), "public");
+  });
+
+  it("passes returnTo 'dashboard' through when the client says the checkout was started from the dashboard", async () => {
+    mocks.createBuyingGuideVdiCheckoutSession.mockResolvedValue({ ok: true, url: "https://checkout.stripe.com/x" });
+    await POST(request({ vrm: "AB12CDE", returnTo: "dashboard" }));
+    expect(mocks.createBuyingGuideVdiCheckoutSession).toHaveBeenCalledWith("buyer@example.com", "AB12CDE", "car", expect.any(String), "dashboard");
+  });
+
+  it("falls back to 'public' for any unrecognised returnTo value, never passing through an arbitrary string", async () => {
+    mocks.createBuyingGuideVdiCheckoutSession.mockResolvedValue({ ok: true, url: "https://checkout.stripe.com/x" });
+    await POST(request({ vrm: "AB12CDE", returnTo: "https://evil.example.com" }));
+    expect(mocks.createBuyingGuideVdiCheckoutSession).toHaveBeenCalledWith("buyer@example.com", "AB12CDE", "car", expect.any(String), "public");
   });
 
   it("returns the checkout URL on success", async () => {

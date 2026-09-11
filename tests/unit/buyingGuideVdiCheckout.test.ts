@@ -168,6 +168,39 @@ describe("createBuyingGuideVdiCheckoutSession", () => {
     expect(args.cancel_url).toBe("https://roadverdict.co.uk/cars/buying-guide");
   });
 
+  it("sends a buyer who started checkout from the dashboard back to the dashboard's Buying Guide tab", async () => {
+    mocks.createVdiPurchase.mockResolvedValue(purchase({ pricePence: 1499 }));
+    mocks.create.mockResolvedValue({ url: "https://checkout.stripe.com/session123" });
+
+    await createBuyingGuideVdiCheckoutSession("buyer@example.com", "AB12CDE", "bike", "https://roadverdict.co.uk", "dashboard");
+
+    const args = mocks.create.mock.calls[0][0];
+    expect(args.success_url).toBe(
+      "https://roadverdict.co.uk/dashboard?tab=buyingGuide&vdiPurchaseId=purchase123&vrm=AB12CDE&session_id={CHECKOUT_SESSION_ID}"
+    );
+    expect(args.cancel_url).toBe("https://roadverdict.co.uk/dashboard?tab=buyingGuide");
+  });
+
+  it("sends a car buyer who started checkout from the dashboard back to the dashboard too, not the public car page", async () => {
+    mocks.createVdiPurchase.mockResolvedValue(purchase({ pricePence: 1499 }));
+    mocks.create.mockResolvedValue({ url: "https://checkout.stripe.com/session456" });
+
+    await createBuyingGuideVdiCheckoutSession("buyer@example.com", "AB12CDE", "car", "https://roadverdict.co.uk", "dashboard");
+
+    const args = mocks.create.mock.calls[0][0];
+    expect(args.success_url).toContain("https://roadverdict.co.uk/dashboard?tab=buyingGuide&vdiPurchaseId=");
+    expect(args.cancel_url).toBe("https://roadverdict.co.uk/dashboard?tab=buyingGuide");
+  });
+
+  it("defaults to the public page when returnTo is omitted entirely", async () => {
+    mocks.createVdiPurchase.mockResolvedValue(purchase({ pricePence: 1499 }));
+    mocks.create.mockResolvedValue({ url: "https://checkout.stripe.com/session123" });
+
+    await createBuyingGuideVdiCheckoutSession("buyer@example.com", "AB12CDE", "bike", "https://roadverdict.co.uk");
+
+    expect(mocks.create.mock.calls[0][0].cancel_url).toBe("https://roadverdict.co.uk/buying-guide");
+  });
+
   it("returns creation_failed when Stripe returns no session url", async () => {
     mocks.createVdiPurchase.mockResolvedValue(purchase({ pricePence: 1499 }));
     mocks.create.mockResolvedValue({ url: null });

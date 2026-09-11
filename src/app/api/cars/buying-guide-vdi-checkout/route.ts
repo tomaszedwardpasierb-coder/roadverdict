@@ -4,7 +4,7 @@
 // mechanic, just "car" instead of "bike" as the vehicleKind.
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/session";
-import { createBuyingGuideVdiCheckoutSession } from "@/lib/payments/buyingGuideVdiCheckout";
+import { createBuyingGuideVdiCheckoutSession, type BuyingGuideReturnContext } from "@/lib/payments/buyingGuideVdiCheckout";
 
 export const dynamic = "force-dynamic";
 
@@ -21,14 +21,18 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
   }
 
-  const { vrm } = body as { vrm?: string };
+  const { vrm, returnTo } = body as { vrm?: string; returnTo?: string };
   const cleaned = vrm?.trim().toUpperCase().replace(/\s+/g, "");
   if (!cleaned) {
     return NextResponse.json({ error: "A registration number is required." }, { status: 400 });
   }
+  // Strict allow-list, not a raw client-supplied path - anything other
+  // than the one recognised value falls back to the existing public-page
+  // behaviour, never an arbitrary redirect target.
+  const returnContext: BuyingGuideReturnContext = returnTo === "dashboard" ? "dashboard" : "public";
 
   const appUrl = process.env.APP_URL ?? "https://roadverdict.co.uk";
-  const result = await createBuyingGuideVdiCheckoutSession(session.email, cleaned, "car", appUrl);
+  const result = await createBuyingGuideVdiCheckoutSession(session.email, cleaned, "car", appUrl, returnContext);
   if (!result.ok) {
     return NextResponse.json({ error: "Could not start checkout. Please try again." }, { status: 500 });
   }

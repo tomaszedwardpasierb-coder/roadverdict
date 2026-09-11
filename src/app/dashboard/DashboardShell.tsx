@@ -173,6 +173,13 @@ interface Props {
   securityContent: ReactNode;
   storyReady: boolean;
   hasIncomingRequest: boolean;
+  // Reopens a specific tab on load instead of the usual 'dashboard'
+  // default - currently only ever set to 'buyingGuide', for a buyer
+  // returning from Stripe checkout (see buyingGuideVdiCheckout.ts's
+  // BuyingGuideReturnContext and dashboard/page.tsx's own `tab` query
+  // param) - the dashboard has no URL per tab otherwise, since tab
+  // selection below is plain client-side state.
+  initialSection?: Section;
 }
 
 function PendingDot() {
@@ -226,9 +233,10 @@ export function DashboardShell({
   securityContent,
   storyReady,
   hasIncomingRequest,
+  initialSection,
 }: Props) {
   const router = useRouter();
-  const [active, setActive] = useState<Section>('dashboard');
+  const [active, setActive] = useState<Section>(initialSection ?? 'dashboard');
   const [cancellingDeletion, setCancellingDeletion] = useState(false);
   // Mobile only: which bottom-bar "shelf" is currently open - either a
   // bottom-bar group's own key (its shelf shows just that group's items)

@@ -79,6 +79,17 @@ describe("DashboardShell", () => {
     expect(screen.queryByText("Story content")).not.toBeInTheDocument();
   });
 
+  // A buyer returning from Stripe checkout after buying the Buying
+  // Guide's vehicle-history report from inside the dashboard should land
+  // back on that same tab, not the default Dashboard overview - see
+  // dashboard/page.tsx's own `tab` query param and
+  // buyingGuideVdiCheckout.ts's BuyingGuideReturnContext.
+  it("reopens the Buying Guide tab on load when initialSection is set, instead of the default Dashboard tab", () => {
+    render(<DashboardShell {...baseProps({ initialSection: "buyingGuide" })} />);
+    expect(screen.getByText("BuyingGuide content")).toBeInTheDocument();
+    expect(screen.queryByText("Dashboard content")).not.toBeInTheDocument();
+  });
+
   it("clicking a sidebar nav item switches the visible content to that tab's own real content", async () => {
     const user = userEvent.setup();
     render(<DashboardShell {...baseProps()} />);

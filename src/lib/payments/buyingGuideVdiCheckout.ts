@@ -26,15 +26,36 @@ export type CreateBuyingGuideVdiCheckoutResult =
   | { ok: true; freeReportReady: true; purchaseId: string }
   | { ok: false; reason: "creation_failed" };
 
-function buyingGuidePath(vehicleKind: VehicleKind): string {
+// Where to send the buyer back to after Stripe, in both the "it worked"
+// and "they cancelled" cases - the Buying Guide form is rendered in two
+// completely different places (the public marketing page, and inline as
+// a dashboard tab, see DashboardShell.tsx's Section type), and a buyer
+// who started checkout from inside their dashboard expects to land back
+// there, not on the public page. The dashboard has no URL of its own per
+// tab (tab selection is client-side React state - see DashboardShell.tsx),
+// so `tab=buyingGuide` is the one query param it already knows how to
+// read on load to reopen the right tab (see dashboard/page.tsx).
+export type BuyingGuideReturnContext = "dashboard" | "public";
+
+function buyingGuidePath(vehicleKind: VehicleKind, returnTo: BuyingGuideReturnContext): string {
+  if (returnTo === "dashboard") return "/dashboard?tab=buyingGuide";
   return vehicleKind === "bike" ? "/buying-guide" : "/cars/buying-guide";
+}
+
+// buyingGuidePath's "dashboard" case already carries its own `?tab=...`
+// query string, so blindly appending another `?...` (as the public-page
+// paths need) would produce an invalid URL with two `?`s - this picks
+// `&` or `?` based on whether the path already has one.
+function appendQuery(path: string, query: string): string {
+  return path.includes("?") ? `${path}&${query}` : `${path}?${query}`;
 }
 
 export async function createBuyingGuideVdiCheckoutSession(
   email: string,
   vrm: string,
   vehicleKind: VehicleKind,
-  appUrl: string
+  appUrl: string,
+  returnTo: BuyingGuideReturnContext = "public"
 ): Promise<CreateBuyingGuideVdiCheckoutResult> {
   const tierResult = await computeBuyingGuideReportTier(email);
 
@@ -55,7 +76,7 @@ export async function createBuyingGuideVdiCheckoutSession(
 
   const pricePence = tierResult.proFreeAvailable ? BUYING_GUIDE_REPORT_PRICE_PENCE.pro : tierResult.pricePence;
   const purchase = await createVdiPurchase(email, vrm, vehicleKind, tierResult.tier, pricePence);
-  const path = buyingGuidePath(vehicleKind);
+  const path = buyingGuidePath(vehicleKind, returnTo);
   try {
     const session = await getStripe().checkout.sessions.create({
       mode: "payment",
@@ -74,7 +95,7 @@ export async function createBuyingGuideVdiCheckoutSession(
           },
         },
       ],
-      success_url: `${appUrl}${path}?vdiPurchaseId=${purchase.id}&vrm=${encodeURIComponent(vrm)}&session_id={CHECKOUT_SESSION_ID}`,
+      success_url: `${appUrl}${appendQuery(path, `vdiPurchaseId=${purchase.id}&vrm=${encodeURIComponent(vrm)}&session_id={CHECKOUT_SESSION_ID}`)}`,
       cancel_url: `${appUrl}${path}`,
     });
     if (!session.url) return { ok: false, reason: "creation_failed" };
