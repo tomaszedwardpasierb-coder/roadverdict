@@ -6,11 +6,19 @@ const mocks = vi.hoisted(() => ({
   parseMotHistory: vi.fn(),
   fetchVehicleTaxDetailsFromVdg: vi.fn(),
   fetch: vi.fn(),
+  getUserDoc: vi.fn(),
+  canRunVehicleLookup: vi.fn(),
+  recordVehicleLookupRun: vi.fn(),
 }));
 
 vi.mock("@/lib/auth/session", () => ({ getSession: mocks.getSession }));
 vi.mock("@/lib/tracker/motHistory", () => ({ parseMotHistory: mocks.parseMotHistory }));
 vi.mock("@/lib/tracker/vehicleTaxFetch", () => ({ fetchVehicleTaxDetailsFromVdg: mocks.fetchVehicleTaxDetailsFromVdg }));
+vi.mock("@/lib/tracker/userDoc", () => ({ getUserDoc: mocks.getUserDoc }));
+vi.mock("@/lib/tracker/vehicleLookupCooldown", () => ({
+  canRunVehicleLookup: mocks.canRunVehicleLookup,
+  recordVehicleLookupRun: mocks.recordVehicleLookupRun,
+}));
 vi.stubGlobal("fetch", mocks.fetch);
 
 import { GET } from "@/app/api/tracker/cost-calculator-lookup/route";
@@ -70,10 +78,25 @@ beforeEach(() => {
   mocks.parseMotHistory.mockReturnValue(parsedMotResult);
   mocks.fetch.mockResolvedValue(vdgMotSuccess());
   mocks.fetchVehicleTaxDetailsFromVdg.mockResolvedValue(taxDetails);
+  mocks.getUserDoc.mockResolvedValue(null);
+  mocks.canRunVehicleLookup.mockReturnValue(true);
   process.env.VDG_API_KEY = "test-key";
 });
 
 describe("GET /api/tracker/cost-calculator-lookup", () => {
+  it("returns 429 and never calls VDG when the account is on cooldown", async () => {
+    mocks.canRunVehicleLookup.mockReturnValue(false);
+    const response = await GET(request("AB12CDE"));
+    expect(response.status).toBe(429);
+    expect(mocks.fetch).not.toHaveBeenCalled();
+  });
+
+  it("records the lookup run after a successful VDG call", async () => {
+    await GET(request("AB12CDE"));
+    expect(mocks.recordVehicleLookupRun).toHaveBeenCalledWith("rider@example.com");
+  });
+
+
   it("rejects unauthenticated requests", async () => {
     mocks.getSession.mockResolvedValue(null);
     const response = await GET(request("PA63ERB"));

@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth/session';
 import { classifyVehicleType, type VehicleTypeCheck } from '@/lib/tracker/vehicleTypeCheck';
+import { getUserDoc } from '@/lib/tracker/userDoc';
+import { canRunVehicleLookup, recordVehicleLookupRun } from '@/lib/tracker/vehicleLookupCooldown';
 
 export const dynamic = 'force-dynamic';
 
@@ -57,6 +59,11 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized.' }, { status: 401 });
   }
 
+  const lookupUser = await getUserDoc(session.email);
+  if (!canRunVehicleLookup(lookupUser)) {
+    return NextResponse.json({ error: 'Please wait a few seconds before looking up another registration.' }, { status: 429 });
+  }
+
   const vrm = request.nextUrl.searchParams.get('vrm')?.trim().toUpperCase().replace(/\s+/g, '');
   if (!vrm) {
     return NextResponse.json({ error: 'Registration number is required.' }, { status: 400 });
@@ -81,6 +88,7 @@ export async function GET(request: NextRequest) {
       { status: 502 }
     );
   }
+  await recordVehicleLookupRun(session.email);
 
   if (!data.ResponseInformation?.IsSuccessStatusCode || !data.Results?.VehicleDetails) {
     return NextResponse.json(

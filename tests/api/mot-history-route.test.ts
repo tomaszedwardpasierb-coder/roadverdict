@@ -6,6 +6,9 @@ const mocks = vi.hoisted(() => ({
   getBike: vi.fn(),
   getCurrentRegistration: vi.fn(),
   importMotHistoryForBike: vi.fn(),
+  getUserDoc: vi.fn(),
+  canRunVehicleLookup: vi.fn(),
+  recordVehicleLookupRun: vi.fn(),
 }));
 
 vi.mock("@/lib/auth/session", () => ({ getSession: mocks.getSession }));
@@ -15,6 +18,11 @@ vi.mock("@/lib/tracker/bike", () => ({
 }));
 vi.mock("@/lib/tracker/motHistoryImport", () => ({
   importMotHistoryForBike: mocks.importMotHistoryForBike,
+}));
+vi.mock("@/lib/tracker/userDoc", () => ({ getUserDoc: mocks.getUserDoc }));
+vi.mock("@/lib/tracker/vehicleLookupCooldown", () => ({
+  canRunVehicleLookup: mocks.canRunVehicleLookup,
+  recordVehicleLookupRun: mocks.recordVehicleLookupRun,
 }));
 
 import { POST } from "@/app/api/tracker/mot-history/route";
@@ -44,9 +52,24 @@ beforeEach(() => {
   mocks.getBike.mockResolvedValue(bike);
   mocks.getCurrentRegistration.mockReturnValue("AB12CDE");
   mocks.importMotHistoryForBike.mockResolvedValue({ imported: 3, skipped: 0 });
+  mocks.getUserDoc.mockResolvedValue(null);
+  mocks.canRunVehicleLookup.mockReturnValue(true);
 });
 
 describe("POST /api/tracker/mot-history", () => {
+  it("returns 429 and never imports when the account is on cooldown", async () => {
+    mocks.canRunVehicleLookup.mockReturnValue(false);
+    const response = await POST(request({ bikeId: "bike1" }));
+    expect(response.status).toBe(429);
+    expect(mocks.importMotHistoryForBike).not.toHaveBeenCalled();
+  });
+
+  it("records the lookup run after a successful import", async () => {
+    await POST(request({ bikeId: "bike1" }));
+    expect(mocks.recordVehicleLookupRun).toHaveBeenCalledWith(email);
+  });
+
+
   it("rejects unauthenticated requests", async () => {
     mocks.getSession.mockResolvedValue(null);
     const response = await POST(request({ bikeId: "bike-1" }));

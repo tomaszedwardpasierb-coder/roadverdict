@@ -2,6 +2,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/session";
 import { parseMotHistory, type RawMotTest } from "@/lib/tracker/motHistory";
+import { getUserDoc } from "@/lib/tracker/userDoc";
+import { canRunVehicleLookup, recordVehicleLookupRun } from "@/lib/tracker/vehicleLookupCooldown";
 
 export const dynamic = "force-dynamic";
 
@@ -15,6 +17,11 @@ export async function GET(request: NextRequest) {
   const session = await getSession();
   if (!session) {
     return NextResponse.json({ error: "Not signed in." }, { status: 401 });
+  }
+
+  const lookupUser = await getUserDoc(session.email);
+  if (!canRunVehicleLookup(lookupUser)) {
+    return NextResponse.json({ error: "Please wait a few seconds before looking up another registration." }, { status: 429 });
   }
 
   const vrm = request.nextUrl.searchParams.get("vrm")?.trim().toUpperCase().replace(/\s+/g, "");
@@ -38,6 +45,7 @@ export async function GET(request: NextRequest) {
     console.error("VDG MOT history preview request failed:", err);
     return NextResponse.json({ error: "Couldn't reach the MOT lookup service." }, { status: 502 });
   }
+  await recordVehicleLookupRun(session.email);
 
   if (!data?.ResponseInformation?.IsSuccessStatusCode || !data?.Results?.MotHistoryDetails) {
     // Genuinely normal, not an error - MOT-exempt (under 3 years old) or
