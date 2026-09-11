@@ -134,6 +134,29 @@ describe("CarCostCalculatorForm", () => {
     expect(screen.getByLabelText("Fuel type")).toHaveValue("petrol"); // left on the default, not switched to an unsupported option
   });
 
+  it("shows the car spinner alongside the lookup button's own 'Looking up…' text while the request is in flight", async () => {
+    let resolveFetch: (v: unknown) => void = () => {};
+    (fetch as ReturnType<typeof vi.fn>).mockReturnValue(new Promise((resolve) => { resolveFetch = resolve; }));
+
+    const user = userEvent.setup();
+    render(<CarCostCalculatorForm signedIn={true} />);
+    await user.type(screen.getByLabelText("Search by registration (optional)"), "AB12CDE");
+    await user.click(screen.getByRole("button", { name: "Look up" }));
+
+    const button = screen.getByRole("button", { name: "Looking up…" });
+    expect(button.querySelector("svg")).toBeInTheDocument();
+
+    resolveFetch({
+      ok: true,
+      json: async () => ({
+        vrm: "AB12CDE", make: "Ford", model: "Focus", fuelType: "PETROL", colour: "Silver",
+        plateInRetention: false, motDueDate: "2026-01-01", motTests: [], taxDetails: null,
+      }),
+    });
+    await screen.findByRole("button", { name: "Look up" });
+    expect(screen.getByRole("button", { name: "Look up" }).querySelector("svg")).not.toBeInTheDocument();
+  });
+
   it("signed in: a found diesel car updates the fuel type field", async () => {
     (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
       ok: true,

@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { useTrackerFormSubmit } from './useTrackerFormSubmit';
 import type { DistanceUnit, FuelEconomyUnit } from '@/lib/tracker/unitFormat';
 import { ALL_CURRENCIES, CURRENCY_LABELS, type Currency } from '@/lib/tracker/currency';
+import { VehicleSpinner } from '@/components/VehicleSpinner';
 import styles from './dashboard.module.css';
 
 interface Props {
@@ -64,6 +65,7 @@ export function UnitSettings({ distanceUnit, fuelEconomyUnit, currency, vehicleK
         </select>
       </div>
       <button className="submit-button" type="submit" disabled={submitting}>
+        {submitting && <VehicleSpinner kind={vehicleKind} size={14} />}
         {submitting ? 'Saving…' : 'Save'}
       </button>
       <button

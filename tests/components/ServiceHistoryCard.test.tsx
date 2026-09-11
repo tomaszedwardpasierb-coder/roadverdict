@@ -169,6 +169,51 @@ describe("ServiceHistoryCard", () => {
     expect(screen.queryByText("Mileage conflict")).not.toBeInTheDocument();
   });
 
+  it("shows the bike spinner on Save while the request is in flight", async () => {
+    let resolveFetch: (v: unknown) => void = () => {};
+    (fetch as ReturnType<typeof vi.fn>).mockReturnValue(new Promise((resolve) => { resolveFetch = resolve; }));
+    const user = userEvent.setup();
+    render(<ServiceHistoryCard {...defaultProps} record={baseRecord} />);
+    await user.click(screen.getByRole("button", { name: "Edit" }));
+    await user.click(screen.getByRole("button", { name: "Save" }));
+
+    const button = screen.getByRole("button", { name: "Saving…" });
+    expect(button.querySelector("svg")).toBeInTheDocument();
+
+    resolveFetch(jsonOk({}));
+    await screen.findByRole("button", { name: "Edit" });
+  });
+
+  it("shows the bike spinner on Delete while the request is in flight", async () => {
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    let resolveFetch: (v: unknown) => void = () => {};
+    (fetch as ReturnType<typeof vi.fn>).mockReturnValue(new Promise((resolve) => { resolveFetch = resolve; }));
+    const user = userEvent.setup();
+    render(<ServiceHistoryCard {...defaultProps} record={baseRecord} />);
+    await user.click(screen.getByRole("button", { name: "Delete" }));
+
+    const button = screen.getByRole("button", { name: "Deleting…" });
+    expect(button.querySelector("svg")).toBeInTheDocument();
+
+    resolveFetch(jsonOk({}));
+    await screen.findByRole("button", { name: "Delete" });
+  });
+
+  it("shows the bike spinner on Resolve while the conflict lookup is in flight", async () => {
+    let resolveFetch: (v: unknown) => void = () => {};
+    (fetch as ReturnType<typeof vi.fn>).mockReturnValue(new Promise((resolve) => { resolveFetch = resolve; }));
+    const record = { ...baseRecord, needsReview: true, mileageConflictWarning: "Something's off." };
+    const user = userEvent.setup();
+    render(<ServiceHistoryCard {...defaultProps} record={record} />);
+    await user.click(screen.getByRole("button", { name: "Resolve" }));
+
+    const button = screen.getByRole("button", { name: "Finding it..." });
+    expect(button.querySelector("svg")).toBeInTheDocument();
+
+    resolveFetch(jsonErr({ error: "Could not determine which entry conflicts." }));
+    await screen.findByRole("alert");
+  });
+
   it("opening Edit pre-fills cost and mileage converted to the rider's chosen currency and distance unit", async () => {
     const rates = { base: "GBP" as const, rates: { EUR: 1.15 }, fetchedAt: "2025-06-01T00:00:00.000Z" };
     const user = userEvent.setup();

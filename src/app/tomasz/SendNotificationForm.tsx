@@ -2,6 +2,7 @@
 'use client';
 
 import { useState } from 'react';
+import { VehicleSpinner } from '@/components/VehicleSpinner';
 import styles from './adminShell.module.css';
 
 interface Props {
@@ -153,6 +154,7 @@ export function SendNotificationForm({ allEmails }: Props) {
         )}
 
         <button type="submit" disabled={sending} className={styles.button}>
+          {sending && <VehicleSpinner size={14} />}
           {sending ? 'Sending\u2026' : 'Send notification'}
         </button>
       </form>

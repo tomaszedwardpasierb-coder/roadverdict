@@ -76,6 +76,24 @@ describe("BikeCard", () => {
     expect(mockRouter.push).toHaveBeenCalledWith("/dashboard");
   });
 
+  // Pins the actual visual feedback this was built for - a button click
+  // that's accepted but takes a moment shouldn't read as "did nothing
+  // happen?" (see VehicleSpinner.tsx).
+  it("shows the bike spinner alongside 'Switching…' on View dashboard while the request is in flight", async () => {
+    let resolveFetch: (v: unknown) => void = () => {};
+    (fetch as ReturnType<typeof vi.fn>).mockReturnValue(new Promise((resolve) => { resolveFetch = resolve; }));
+    const user = userEvent.setup();
+    render(<BikeCard {...baseProps} isActive={false} />);
+    await user.click(screen.getByRole("button", { name: "View dashboard" }));
+
+    const button = screen.getByRole("button", { name: "Switching…" });
+    expect(button).toBeDisabled();
+    expect(button.querySelector("svg")).toBeInTheDocument();
+
+    resolveFetch({ ok: true });
+    await vi.waitFor(() => expect(mockRouter.push).toHaveBeenCalledWith("/dashboard"));
+  });
+
   it("does not navigate if switching the active bike fails server-side", async () => {
     (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({ ok: false });
     const user = userEvent.setup();
@@ -129,6 +147,22 @@ describe("BikeCard", () => {
 
     expect(fetch).toHaveBeenCalledWith("/api/tracker/bike/bike%20with%20space", { method: "DELETE" });
     expect(mockRouter.refresh).toHaveBeenCalledTimes(1);
+  });
+
+  it("shows the bike spinner alongside 'Deleting…' while the delete request is in flight", async () => {
+    (window.confirm as ReturnType<typeof vi.fn>).mockReturnValue(true);
+    let resolveFetch: (v: unknown) => void = () => {};
+    (fetch as ReturnType<typeof vi.fn>).mockReturnValue(new Promise((resolve) => { resolveFetch = resolve; }));
+    const user = userEvent.setup();
+    render(<BikeCard {...baseProps} currentRegistration="AB12CDE" />);
+    await user.click(screen.getByRole("button", { name: "Delete" }));
+
+    const button = screen.getByRole("button", { name: "Deleting…" });
+    expect(button).toBeDisabled();
+    expect(button.querySelector("svg")).toBeInTheDocument();
+
+    resolveFetch({ ok: true });
+    await vi.waitFor(() => expect(mockRouter.refresh).toHaveBeenCalledTimes(1));
   });
 
   it("shows the server's own error message when delete fails, without refreshing", async () => {
@@ -188,6 +222,24 @@ describe("BikeCard", () => {
     expect(mockRouter.refresh).toHaveBeenCalledTimes(1);
   });
 
+  it("shows the bike spinner alongside 'Saving…' on Record change while the request is in flight", async () => {
+    (window.confirm as ReturnType<typeof vi.fn>).mockReturnValue(true);
+    let resolveFetch: (v: unknown) => void = () => {};
+    (fetch as ReturnType<typeof vi.fn>).mockReturnValue(new Promise((resolve) => { resolveFetch = resolve; }));
+    const user = userEvent.setup();
+    render(<BikeCard {...baseProps} currentRegistration="AB12CDE" />);
+    await user.click(screen.getByRole("button", { name: "Change registration" }));
+    await user.type(screen.getByLabelText("New registration"), "XY99ZZZ");
+    await user.click(screen.getByRole("button", { name: "Record change" }));
+
+    const button = screen.getByRole("button", { name: "Saving…" });
+    expect(button).toBeDisabled();
+    expect(button.querySelector("svg")).toBeInTheDocument();
+
+    resolveFetch({ ok: true, json: async () => ({}) });
+    await screen.findByRole("button", { name: "Change registration" });
+  });
+
   it("shows the server's own error and leaves the form open when the registration change fails", async () => {
     (window.confirm as ReturnType<typeof vi.fn>).mockReturnValue(true);
     (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
@@ -229,6 +281,21 @@ describe("BikeCard", () => {
       })
     );
     expect(await screen.findByText(/Request sent/)).toBeInTheDocument();
+  });
+
+  it("shows the bike spinner alongside 'Sending…' on Request it while the request is in flight", async () => {
+    let resolveFetch: (v: unknown) => void = () => {};
+    (fetch as ReturnType<typeof vi.fn>).mockReturnValue(new Promise((resolve) => { resolveFetch = resolve; }));
+    const user = userEvent.setup();
+    render(<BikeCard {...baseProps} mayHavePriorHistory currentRegistration="AB12CDE" />);
+    await user.click(screen.getByRole("button", { name: "Request it" }));
+
+    const button = screen.getByRole("button", { name: "Sending…" });
+    expect(button).toBeDisabled();
+    expect(button.querySelector("svg")).toBeInTheDocument();
+
+    resolveFetch({ ok: true, json: async () => ({}) });
+    await screen.findByText(/Request sent/);
   });
 
   it("shows the server's own error message when the history request fails", async () => {

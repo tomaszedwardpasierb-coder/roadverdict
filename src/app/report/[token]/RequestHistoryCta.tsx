@@ -2,6 +2,7 @@
 'use client';
 
 import { useState } from 'react';
+import { VehicleSpinner } from '@/components/VehicleSpinner';
 import styles from './report.module.css';
 
 interface Props {
@@ -59,6 +60,7 @@ export function RequestHistoryCta({ registration, signedInEmail, currentPath }: 
       </p>
       {signedInEmail ? (
         <button type="button" className="btn-primary" disabled={submitting} onClick={handleRequest} style={{ marginTop: '0.6rem' }}>
+          {submitting && <VehicleSpinner kind="bike" size={14} />}
           {submitting ? 'Sending…' : "Request this bike's history"}
         </button>
       ) : (

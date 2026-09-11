@@ -1,0 +1,36 @@
+/* Place at: src/components/NavigationLoadingOverlay.module.css */
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(23, 24, 27, 0.28);
+  /* A brief navigation that lands almost instantly shouldn't flash the
+     backdrop in and immediately back out - the fade-in delay means
+     genuinely fast loads never show this at all. */
+  animation: fadeIn 0.4s ease-in 0.15s both;
+}
+
+.card {
+  background: var(--paper);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-pop);
+  padding: 1.4rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .overlay {
+    animation: none;
+  }
+}

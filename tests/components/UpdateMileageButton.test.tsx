@@ -87,4 +87,42 @@ describe("UpdateMileageButton", () => {
     expect(screen.getByRole("button", { name: "Update mileage" })).toBeInTheDocument();
     expect(fetch).not.toHaveBeenCalled();
   });
+
+  // vehicleKind is already threaded through as a prop here (see the
+  // "PATCHes /api/cars/car instead" test above), so the spinner just
+  // reads that same prop rather than the dashboard's shared context.
+  it("shows the bike spinner on 'Save' while the request is in flight", async () => {
+    let resolveFetch: (v: unknown) => void = () => {};
+    (fetch as ReturnType<typeof vi.fn>).mockReturnValue(new Promise((resolve) => { resolveFetch = resolve; }));
+    const user = userEvent.setup();
+    render(<UpdateMileageButton currentMileage={1000} distanceUnit="mi" />);
+    await user.click(screen.getByRole("button", { name: "Update mileage" }));
+    const input = screen.getByRole("spinbutton");
+    await user.clear(input);
+    await user.type(input, "1500");
+    await user.click(screen.getByRole("button", { name: "Save" }));
+
+    const button = screen.getByRole("button", { name: "Saving…" });
+    expect(button.querySelector("svg")).toBeInTheDocument();
+    expect(button.querySelectorAll("path").length).toBe(0); // bike wheel, not car
+
+    resolveFetch({ ok: true, json: async () => ({}) });
+  });
+
+  it("shows the car spinner on 'Save' when vehicleKind is 'car'", async () => {
+    let resolveFetch: (v: unknown) => void = () => {};
+    (fetch as ReturnType<typeof vi.fn>).mockReturnValue(new Promise((resolve) => { resolveFetch = resolve; }));
+    const user = userEvent.setup();
+    render(<UpdateMileageButton currentMileage={1000} distanceUnit="mi" vehicleKind="car" />);
+    await user.click(screen.getByRole("button", { name: "Update mileage" }));
+    const input = screen.getByRole("spinbutton");
+    await user.clear(input);
+    await user.type(input, "1500");
+    await user.click(screen.getByRole("button", { name: "Save" }));
+
+    const button = screen.getByRole("button", { name: "Saving…" });
+    expect(button.querySelectorAll("path").length).toBeGreaterThan(0); // car wheel
+
+    resolveFetch({ ok: true, json: async () => ({}) });
+  });
 });

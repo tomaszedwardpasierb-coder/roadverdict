@@ -3,6 +3,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { VehicleSpinner } from '@/components/VehicleSpinner';
 import { Icon } from './Icon';
 import { NotificationBell } from './NotificationBell';
 import { convertMilesToDisplay, type DistanceUnit } from '@/lib/tracker/unitFormat';
@@ -219,6 +220,7 @@ function RequestCard({ request }: { request: ReceiptRequestDocView }) {
       {error && <p className="error-text" role="alert">{error}</p>}
       <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.8rem' }}>
         <button type="button" className="submit-button" onClick={save} disabled={submitting}>
+          {submitting && <VehicleSpinner kind="bike" size={14} />}
           {submitting ? 'Saving…' : 'Save decisions'}
         </button>
         <button type="button" className={styles.iconBtn} onClick={() => setCollapsed(true)}>

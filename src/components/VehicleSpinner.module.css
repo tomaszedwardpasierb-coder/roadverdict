@@ -1,0 +1,46 @@
+/* Place at: src/components/VehicleSpinner.module.css */
+
+.root {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  vertical-align: -4px;
+}
+
+.wheel {
+  transform-origin: 12px 12px;
+  animation: spin 0.9s linear infinite;
+}
+
+/* Slightly slower, weightier spin for the car's alloy wheel - a bike's
+   wire wheel reads better spinning briskly, a car's wheel looks more
+   like it's actually rolling at a touch slower. */
+.wheelCar {
+  animation-duration: 1.1s;
+}
+
+.gravelBit {
+  animation: kick 1.1s ease-out infinite;
+  transform-origin: center;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* A small puff of grit flung from under the wheel: starts tight at the
+   contact patch, flies out and down, fading as it goes - looped, each
+   particle offset with its own animation-delay (set inline per <circle>)
+   so they don't all fire in lockstep. */
+@keyframes kick {
+  0% { transform: translate(0, 0) scale(1); opacity: 0; }
+  15% { opacity: 0.9; }
+  100% { transform: translate(var(--kick-x, -6px), var(--kick-y, 5px)) scale(0.4); opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wheel,
+  .gravelBit {
+    animation: none;
+  }
+}

@@ -240,4 +240,68 @@ describe("CarCard", () => {
 
     expect(await screen.findByRole("alert")).toHaveTextContent("You already have a pending request for this car.");
   });
+
+  it("shows the spinner on 'View dashboard' while switching the active car is in flight", async () => {
+    let resolveFetch: (v: unknown) => void = () => {};
+    (fetch as ReturnType<typeof vi.fn>).mockReturnValue(new Promise((resolve) => { resolveFetch = resolve; }));
+    const user = userEvent.setup();
+    render(<CarCard {...baseProps} isActive={false} />);
+    await user.click(screen.getByRole("button", { name: "View dashboard" }));
+
+    const button = screen.getByRole("button", { name: "Switching…" });
+    expect(button).toBeDisabled();
+    expect(button.querySelector("svg")).toBeInTheDocument();
+
+    resolveFetch({ ok: true });
+    await vi.waitFor(() => expect(mockRouter.push).toHaveBeenCalledWith("/dashboard"));
+  });
+
+  it("shows the spinner on 'Delete' while the delete request is in flight", async () => {
+    (window.confirm as ReturnType<typeof vi.fn>).mockReturnValue(true);
+    let resolveFetch: (v: unknown) => void = () => {};
+    (fetch as ReturnType<typeof vi.fn>).mockReturnValue(new Promise((resolve) => { resolveFetch = resolve; }));
+    const user = userEvent.setup();
+    render(<CarCard {...baseProps} currentRegistration="AB12CDE" />);
+    await user.click(screen.getByRole("button", { name: "Delete" }));
+
+    const button = screen.getByRole("button", { name: "Deleting…" });
+    expect(button).toBeDisabled();
+    expect(button.querySelector("svg")).toBeInTheDocument();
+
+    resolveFetch({ ok: true });
+    await vi.waitFor(() => expect(mockRouter.refresh).toHaveBeenCalledTimes(1));
+  });
+
+  it("shows the spinner on 'Request it' while the prior-history request is in flight", async () => {
+    let resolveFetch: (v: unknown) => void = () => {};
+    (fetch as ReturnType<typeof vi.fn>).mockReturnValue(new Promise((resolve) => { resolveFetch = resolve; }));
+    const user = userEvent.setup();
+    render(<CarCard {...baseProps} mayHavePriorHistory currentRegistration="AB12CDE" />);
+    await user.click(screen.getByRole("button", { name: "Request it" }));
+
+    const button = screen.getByRole("button", { name: "Sending…" });
+    expect(button).toBeDisabled();
+    expect(button.querySelector("svg")).toBeInTheDocument();
+
+    resolveFetch({ ok: true, json: async () => ({}) });
+    await screen.findByText(/Request sent/);
+  });
+
+  it("shows the spinner on 'Record change' while the registration-change request is in flight", async () => {
+    (window.confirm as ReturnType<typeof vi.fn>).mockReturnValue(true);
+    let resolveFetch: (v: unknown) => void = () => {};
+    (fetch as ReturnType<typeof vi.fn>).mockReturnValue(new Promise((resolve) => { resolveFetch = resolve; }));
+    const user = userEvent.setup();
+    render(<CarCard {...baseProps} currentRegistration="AB12CDE" />);
+    await user.click(screen.getByRole("button", { name: "Change registration" }));
+    await user.type(screen.getByLabelText("New registration"), "XY99ZZZ");
+    await user.click(screen.getByRole("button", { name: "Record change" }));
+
+    const button = screen.getByRole("button", { name: "Saving…" });
+    expect(button).toBeDisabled();
+    expect(button.querySelector("svg")).toBeInTheDocument();
+
+    resolveFetch({ ok: true, json: async () => ({}) });
+    await vi.waitFor(() => expect(mockRouter.refresh).toHaveBeenCalledTimes(1));
+  });
 });

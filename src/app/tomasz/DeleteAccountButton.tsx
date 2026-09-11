@@ -2,6 +2,7 @@
 'use client';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { VehicleSpinner } from '@/components/VehicleSpinner';
 import styles from './adminShell.module.css';
 
 // The one irreversible action in this panel - a plain window.confirm
@@ -54,6 +55,7 @@ export function DeleteAccountButton({ email }: { email: string }) {
         onClick={handleClick}
         disabled={deleting}
       >
+        {deleting && <VehicleSpinner size={14} />}
         {deleting ? '…' : 'Delete'}
       </button>
       {error && <span style={{ color: 'var(--admin-danger)', fontSize: '0.72rem', marginLeft: '0.4rem' }}>{error}</span>}

@@ -42,6 +42,19 @@ describe("CarReminderItem", () => {
     expect(fetch).toHaveBeenCalledWith("/api/cars/car-reminders/car-1::carReminder::1", expect.objectContaining({ method: "PATCH" }));
   });
 
+  it("shows the car spinner on Mark done while the request is in flight", async () => {
+    let resolveFetch: (v: unknown) => void = () => {};
+    (fetch as ReturnType<typeof vi.fn>).mockReturnValue(new Promise((resolve) => { resolveFetch = resolve; }));
+    const user = userEvent.setup();
+    render(<CarReminderItem reminder={mileageReminder} status="overdue" isPro={true} />);
+    const button = screen.getByRole("button", { name: "Mark done" });
+    await user.click(button);
+
+    expect(button.querySelector("svg")).toBeInTheDocument();
+    resolveFetch({ ok: true, json: async () => ({}) });
+    await vi.waitFor(() => expect(button.querySelector("svg")).not.toBeInTheDocument());
+  });
+
   // A pure date-type reminder has no interval to roll forward, so "done"
   // deletes it instead of PATCHing a reset that wouldn't move exactDate.
   it("Mark done DELETEs a pure date-type reminder instead of PATCHing it", async () => {

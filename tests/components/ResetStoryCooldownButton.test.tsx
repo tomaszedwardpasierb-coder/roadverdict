@@ -49,4 +49,21 @@ describe("ResetStoryCooldownButton", () => {
     expect(await screen.findByText("No bikes found for that account.")).toBeInTheDocument();
     expect(mockRouter.refresh).not.toHaveBeenCalled();
   });
+
+  it("shows the spinner while the request is in flight", async () => {
+    vi.stubGlobal("confirm", vi.fn(() => true));
+    let resolveFetch: (v: unknown) => void = () => {};
+    vi.stubGlobal("fetch", vi.fn(() => new Promise((resolve) => { resolveFetch = resolve; })));
+
+    const user = userEvent.setup();
+    render(<ResetStoryCooldownButton email="rider@example.com" />);
+    const button = screen.getByRole("button", { name: "Unlock Story regen" });
+    await user.click(button);
+
+    expect(button).toBeDisabled();
+    expect(button.querySelector("svg")).toBeInTheDocument();
+
+    resolveFetch({ ok: true, json: async () => ({ ok: true, bikesReset: 1 }) });
+    await waitFor(() => expect(mockRouter.refresh).toHaveBeenCalled());
+  });
 });

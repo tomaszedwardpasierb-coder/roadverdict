@@ -6,6 +6,7 @@ import { isBackdated, backdateNotice } from '@/lib/tracker/backdateCheck';
 import { isBeforeProduction } from '@/lib/tracker/productionYearCheck';
 import type { ReportRow, EntryRequestStatus } from '@/lib/tracker/sellerReportData';
 import type { BikeDoc } from '@/lib/tracker/bike';
+import { VehicleSpinner } from '@/components/VehicleSpinner';
 import styles from './report.module.css';
 
 function fmtMoney(n: number): string {
@@ -219,6 +220,7 @@ export function ReportHistoryTable({
                         disabled={(!status.canRemind && !remindedNow.has(r.id)) || remindedNow.has(r.id) || remindingId === r.id}
                         onClick={() => handleRemind(r.id)}
                       >
+                        {remindingId === r.id && <VehicleSpinner kind="bike" size={14} />}
                         {remindedNow.has(r.id) ? 'Reminded' : remindingId === r.id ? 'Sending…' : 'Remind'}
                       </button>
                     </div>
@@ -269,6 +271,7 @@ export function ReportHistoryTable({
               {error && <p className="error-text" role="alert">{error}</p>}
               <div style={{ display: 'flex', gap: '0.5rem' }}>
                 <button type="button" className="submit-button" onClick={handleSubmit} disabled={submitting}>
+                  {submitting && <VehicleSpinner kind="bike" size={14} />}
                   {submitting ? 'Sending…' : 'Send request'}
                 </button>
                 <button type="button" className={styles.backLink} onClick={() => setShowForm(false)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}>

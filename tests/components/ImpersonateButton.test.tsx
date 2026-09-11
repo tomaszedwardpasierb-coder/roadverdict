@@ -108,6 +108,7 @@ describe("ImpersonateButton", () => {
 
     const runningButton = await screen.findByRole("button", { name: "…" });
     expect(runningButton).toBeDisabled();
+    expect(runningButton.querySelector("svg")).toBeInTheDocument();
 
     resolveFetch({ ok: true, json: async () => ({}) });
     await waitFor(() => expect(mockRouter.push).toHaveBeenCalled());

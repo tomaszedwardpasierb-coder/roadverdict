@@ -2,6 +2,7 @@
 'use client';
 
 import { useState } from 'react';
+import { VehicleSpinner } from '@/components/VehicleSpinner';
 import type { ReceiptRequestItem } from '@/lib/tracker/receiptRequest';
 import styles from '../../[token]/report.module.css';
 
@@ -102,6 +103,7 @@ export function DecideRequestForm({
           disabled={submitting}
           onClick={() => submitAll(preselectAll === 'approve' ? 'approved' : 'declined', 'all')}
         >
+          {submitting && <VehicleSpinner size={14} />}
           {submitting ? 'Saving…' : `Confirm - ${verb} all`}
         </button>
         <p className={styles.previewNote ?? styles.subtext} style={{ marginTop: '0.6rem' }}>
@@ -178,6 +180,7 @@ export function DecideRequestForm({
       ))}
       {error && <p className="error-text" role="alert">{error}</p>}
       <button type="button" className="submit-button" disabled={submitting} onClick={handleIndividualSubmit}>
+        {submitting && <VehicleSpinner size={14} />}
         {submitting ? 'Saving…' : 'Save decisions'}
       </button>
     </div>

@@ -94,6 +94,82 @@ describe("AddBikeForm", () => {
     expect(fetch).not.toHaveBeenCalled();
   });
 
+  it("shows the bike spinner on Look up while the request is in flight", async () => {
+    let resolveFetch: (v: unknown) => void = () => {};
+    (fetch as ReturnType<typeof vi.fn>).mockReturnValue(new Promise((resolve) => { resolveFetch = resolve; }));
+    const user = userEvent.setup();
+    render(<AddBikeForm />);
+    await user.type(screen.getByLabelText("Registration number"), "AB12CDE");
+    await user.click(screen.getByRole("button", { name: "Look up" }));
+
+    const button = screen.getByRole("button", { name: "Looking up…" });
+    expect(button.querySelector("svg")).toBeInTheDocument();
+
+    resolveFetch(
+      jsonOk({ vrm: "AB12CDE", make: null, model: null, year: null, engineCapacityCc: null, plateInRetention: false, vehicleType: "unknown" })
+    );
+    await screen.findByRole("alert");
+    expect(screen.getByRole("button", { name: "Look up" }).querySelector("svg")).not.toBeInTheDocument();
+  });
+
+  it("shows the bike spinner on Go to this bike while the request is in flight", async () => {
+    let resolveFetch: (v: unknown) => void = () => {};
+    (fetch as ReturnType<typeof vi.fn>)
+      .mockResolvedValueOnce(jsonOk({ vrm: "AB12CDE", make: "Yamaha", model: "MT-07", year: 2022, engineCapacityCc: 689, plateInRetention: false, vehicleType: "motorcycle" }))
+      .mockResolvedValueOnce(jsonOk({ exists: true, belongsToCurrentUser: true, bikeId: "bike-42" }))
+      .mockReturnValueOnce(new Promise((resolve) => { resolveFetch = resolve; }));
+
+    const user = userEvent.setup();
+    render(<AddBikeForm />);
+    await user.type(screen.getByLabelText("Registration number"), "AB12CDE");
+    await user.click(screen.getByRole("button", { name: "Look up" }));
+    await screen.findByText(/already added this bike/i);
+
+    await user.click(screen.getByRole("button", { name: "Go to this bike" }));
+    const button = screen.getByRole("button", { name: "Switching…" });
+    expect(button.querySelector("svg")).toBeInTheDocument();
+
+    resolveFetch({ ok: true, json: async () => ({}) });
+    await waitFor(() => expect(mockRouter.push).toHaveBeenCalledWith("/dashboard"));
+  });
+
+  it("shows the bike spinner on Request ownership while the request is in flight", async () => {
+    let resolveFetch: (v: unknown) => void = () => {};
+    (fetch as ReturnType<typeof vi.fn>)
+      .mockResolvedValueOnce(jsonOk({ vrm: "AB12CDE", make: "Yamaha", model: "MT-07", year: 2022, engineCapacityCc: 689, plateInRetention: false, vehicleType: "motorcycle" }))
+      .mockResolvedValueOnce(jsonOk({ exists: true, belongsToCurrentUser: false }))
+      .mockReturnValueOnce(new Promise((resolve) => { resolveFetch = resolve; }));
+
+    const user = userEvent.setup();
+    render(<AddBikeForm />);
+    await user.type(screen.getByLabelText("Registration number"), "AB12CDE");
+    await user.click(screen.getByRole("button", { name: "Look up" }));
+    await screen.findByText(/already has a RoadVerdict history/i);
+
+    await user.click(screen.getByRole("button", { name: "Request ownership" }));
+    const button = screen.getByRole("button", { name: "Sending…" });
+    expect(button.querySelector("svg")).toBeInTheDocument();
+
+    resolveFetch(jsonOk({}));
+    await screen.findByText(/Request sent/i);
+  });
+
+  it("shows the bike spinner on Add bike while the request is in flight", async () => {
+    let resolveFetch: (v: unknown) => void = () => {};
+    (fetch as ReturnType<typeof vi.fn>).mockReturnValue(new Promise((resolve) => { resolveFetch = resolve; }));
+    const user = userEvent.setup();
+    render(<AddBikeForm />);
+    await user.type(screen.getByLabelText("Registration number"), "AB12CDE");
+    await fillYearAndMileage(user);
+    await user.click(screen.getByRole("button", { name: "Add bike" }));
+
+    const button = screen.getByRole("button", { name: "Adding…" });
+    expect(button.querySelector("svg")).toBeInTheDocument();
+
+    resolveFetch(jsonOk({ bike: { id: "new-bike-1" } }));
+    await screen.findByRole("button", { name: "Add bike" });
+  });
+
   it("look up: a four-wheeled result is refused with the specific message and never checks for duplicates", async () => {
     (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce(
       jsonOk({ vrm: "AB12CDE", make: "Ford", model: "Focus", year: 2020, engineCapacityCc: null, plateInRetention: false, vehicleType: "four-wheeled" })

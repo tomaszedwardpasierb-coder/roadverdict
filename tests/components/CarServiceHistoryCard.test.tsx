@@ -51,6 +51,20 @@ describe("CarServiceHistoryCard", () => {
     );
   });
 
+  it("shows the car spinner on Save while the request is in flight", async () => {
+    let resolveFetch: (v: unknown) => void = () => {};
+    (fetch as ReturnType<typeof vi.fn>).mockReturnValue(new Promise((resolve) => { resolveFetch = resolve; }));
+    const user = userEvent.setup();
+    render(<CarServiceHistoryCard record={record} distanceUnit="mi" currency="GBP" rates={null} />);
+    await user.click(screen.getByRole("button", { name: "Edit" }));
+    await user.click(screen.getByRole("button", { name: "Save" }));
+
+    const button = screen.getByRole("button", { name: "Saving…" });
+    expect(button.querySelector("svg")).toBeInTheDocument();
+    resolveFetch({ ok: true, json: async () => ({}) });
+    await screen.findByRole("button", { name: "Edit" });
+  });
+
   it("Delete asks for confirmation first and does nothing if declined", async () => {
     vi.spyOn(window, "confirm").mockReturnValue(false);
     const user = userEvent.setup();

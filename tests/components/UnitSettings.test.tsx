@@ -3,7 +3,7 @@
 // Distance/fuel-economy/currency unit picker. Only fetch and
 // next/navigation's useRouter (via useTrackerFormSubmit) are mocked.
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn() }) }));
@@ -85,5 +85,38 @@ describe("UnitSettings", () => {
     await user.click(screen.getByRole("button", { name: "Units: Miles / MPG / GBP" }));
     expect(screen.getByLabelText("Distance")).toHaveValue("mi");
     expect(screen.getByLabelText("Currency")).toHaveValue("GBP");
+  });
+
+  // vehicleKind is already threaded through as a prop here (see the
+  // PATCHes-the-right-endpoint test above), so the spinner just reads
+  // that same prop rather than the dashboard's shared context.
+  it("shows the bike spinner on 'Save' while the request is in flight", async () => {
+    let resolveFetch: (v: unknown) => void = () => {};
+    (fetch as ReturnType<typeof vi.fn>).mockReturnValue(new Promise((resolve) => { resolveFetch = resolve; }));
+    const user = userEvent.setup();
+    render(<UnitSettings distanceUnit="mi" fuelEconomyUnit="mpg" currency="GBP" />);
+    await user.click(screen.getByRole("button", { name: "Units: Miles / MPG / GBP" }));
+    await user.click(screen.getByRole("button", { name: "Save" }));
+
+    const button = screen.getByRole("button", { name: "Saving…" });
+    expect(button.querySelector("svg")).toBeInTheDocument();
+    expect(button.querySelectorAll("path").length).toBe(0); // bike wheel, not car
+
+    resolveFetch({ ok: true, json: async () => ({}) });
+    await waitFor(() => expect(screen.queryByRole("button", { name: "Saving…" })).not.toBeInTheDocument());
+  });
+
+  it("shows the car spinner on 'Save' when vehicleKind is 'car'", async () => {
+    let resolveFetch: (v: unknown) => void = () => {};
+    (fetch as ReturnType<typeof vi.fn>).mockReturnValue(new Promise((resolve) => { resolveFetch = resolve; }));
+    const user = userEvent.setup();
+    render(<UnitSettings distanceUnit="mi" fuelEconomyUnit="mpg" currency="GBP" vehicleKind="car" />);
+    await user.click(screen.getByRole("button", { name: "Units: Miles / MPG / GBP" }));
+    await user.click(screen.getByRole("button", { name: "Save" }));
+
+    const button = screen.getByRole("button", { name: "Saving…" });
+    expect(button.querySelectorAll("path").length).toBeGreaterThan(0); // car wheel
+
+    resolveFetch({ ok: true, json: async () => ({}) });
   });
 });

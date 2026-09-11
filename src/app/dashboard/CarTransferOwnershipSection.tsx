@@ -3,6 +3,7 @@
 'use client';
 
 import { useState } from 'react';
+import { VehicleSpinner } from '@/components/VehicleSpinner';
 import styles from './dashboard.module.css';
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -90,6 +91,7 @@ export function CarTransferOwnershipSection({ pendingRequest, carIsReadOnly }: P
               style={{ flex: '1 1 200px' }}
             />
             <button type="button" className="btn-primary" disabled={submitting} onClick={handleSubmit}>
+              {submitting && <VehicleSpinner kind="car" size={14} />}
               {submitting ? 'Sending…' : 'Start handover'}
             </button>
           </div>

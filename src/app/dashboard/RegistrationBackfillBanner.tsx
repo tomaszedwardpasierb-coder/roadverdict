@@ -3,6 +3,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { VehicleSpinner } from '@/components/VehicleSpinner';
 import styles from './dashboard.module.css';
 
 export function RegistrationBackfillBanner({ bikeName }: { bikeName: string }) {
@@ -58,6 +59,7 @@ export function RegistrationBackfillBanner({ bikeName }: { bikeName: string }) {
           required
         />
         <button type="submit" className="submit-button" disabled={submitting} style={{ width: 'auto' }}>
+          {submitting && <VehicleSpinner kind="bike" size={14} />}
           {submitting ? 'Saving…' : 'Save registration'}
         </button>
       </form>

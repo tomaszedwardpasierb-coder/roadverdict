@@ -122,6 +122,29 @@ describe("QuoteForm", () => {
     expect(fetch).not.toHaveBeenCalled();
   });
 
+  it("shows the bike spinner alongside the lookup button's own 'Looking up…' text while the request is in flight", async () => {
+    let resolveFetch: (v: unknown) => void = () => {};
+    (fetch as ReturnType<typeof vi.fn>).mockReturnValue(new Promise((resolve) => { resolveFetch = resolve; }));
+
+    const user = userEvent.setup();
+    render(<QuoteForm signedIn={true} />);
+    await user.type(screen.getByLabelText("Search by registration (optional)"), "AB12CDE");
+    await user.click(screen.getByRole("button", { name: "Look up" }));
+
+    const button = screen.getByRole("button", { name: "Looking up…" });
+    expect(button.querySelector("svg")).toBeInTheDocument();
+
+    resolveFetch({
+      ok: true,
+      json: async () => ({
+        vrm: "AB12CDE", make: "Yamaha", model: "MT-07", fuelType: "Petrol", colour: "Blue",
+        plateInRetention: false, motDueDate: "2026-06-01", motTests: [],
+      }),
+    });
+    await screen.findByRole("button", { name: "Look up" });
+    expect(screen.getByRole("button", { name: "Look up" }).querySelector("svg")).not.toBeInTheDocument();
+  });
+
   it("signed in: a found motorcycle plate updates the brand and, when the model matches the curated list, the engine-size field", async () => {
     (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
       ok: true,

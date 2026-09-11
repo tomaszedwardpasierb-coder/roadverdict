@@ -158,6 +158,58 @@ describe("ScanReceiptButton", () => {
     await waitFor(() => expect(screen.queryByText(/waiting to be reviewed/)).not.toBeInTheDocument());
   });
 
+  it("shows the bike spinner on 'Discard' while the delete request is in flight", async () => {
+    let resolveDelete: (v: unknown) => void = () => {};
+    const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
+      const method = init?.method ?? "GET";
+      if (url.startsWith("/api/tracker/pending-scan-batch") && method === "GET") {
+        return { ok: true, json: async () => ({ batch: { items: [makeItem()] } }) };
+      }
+      if (url.startsWith("/api/tracker/pending-scan-batch") && method === "DELETE") {
+        return new Promise((resolve) => { resolveDelete = resolve; });
+      }
+      return { ok: false, json: async () => ({}) };
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const user = userEvent.setup();
+    render(<ScanReceiptButton />);
+    await screen.findByText(/waiting to be reviewed/);
+    await user.click(screen.getByRole("button", { name: "Discard" }));
+
+    const button = screen.getByRole("button", { name: "Discarding…" });
+    expect(button.querySelector("svg")).toBeInTheDocument();
+    expect(button.querySelectorAll("path").length).toBe(0); // bike wheel, not car
+
+    resolveDelete({ ok: true, json: async () => ({}) });
+    await waitFor(() => expect(screen.queryByText(/waiting to be reviewed/)).not.toBeInTheDocument());
+  });
+
+  it("shows the car spinner on 'Discard' when vehicleKind is 'car'", async () => {
+    let resolveDelete: (v: unknown) => void = () => {};
+    const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
+      const method = init?.method ?? "GET";
+      if (url.startsWith("/api/tracker/pending-scan-batch") && method === "GET") {
+        return { ok: true, json: async () => ({ batch: { items: [makeItem()] } }) };
+      }
+      if (url.startsWith("/api/tracker/pending-scan-batch") && method === "DELETE") {
+        return new Promise((resolve) => { resolveDelete = resolve; });
+      }
+      return { ok: false, json: async () => ({}) };
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const user = userEvent.setup();
+    render(<ScanReceiptButton vehicleKind="car" />);
+    await screen.findByText(/waiting to be reviewed/);
+    await user.click(screen.getByRole("button", { name: "Discard" }));
+
+    const button = screen.getByRole("button", { name: "Discarding…" });
+    expect(button.querySelectorAll("path").length).toBeGreaterThan(0); // car wheel
+
+    resolveDelete({ ok: true, json: async () => ({}) });
+  });
+
   it("free plan: the file input does not accept multiple files, and shows the upgrade note", async () => {
     render(<ScanReceiptButton isPro={false} />);
 

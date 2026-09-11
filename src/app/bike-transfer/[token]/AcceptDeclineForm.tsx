@@ -2,6 +2,7 @@
 'use client';
 
 import { useState } from 'react';
+import { VehicleSpinner } from '@/components/VehicleSpinner';
 import styles from '../../report/[token]/report.module.css';
 
 interface Props {
@@ -65,6 +66,7 @@ export function AcceptDeclineForm({ token, status, recipientEmail, signedInEmail
   // accept-side message fits the current sign-in state below.
   const declineButton = (
     <button type="button" className="btn-secondary" disabled={submitting} onClick={() => handleDecision('decline')}>
+      {submitting && <VehicleSpinner kind="bike" size={14} />}
       {submitting ? 'Please wait…' : 'Decline'}
     </button>
   );
@@ -99,6 +101,7 @@ export function AcceptDeclineForm({ token, status, recipientEmail, signedInEmail
     <div className={styles.wrapper} style={{ padding: 0 }}>
       <div style={{ display: 'flex', gap: '0.6rem' }}>
         <button type="button" className="btn-primary" disabled={submitting} onClick={() => handleDecision('accept')}>
+          {submitting && <VehicleSpinner kind="bike" size={14} />}
           {submitting ? 'Please wait…' : 'Accept'}
         </button>
         {declineButton}

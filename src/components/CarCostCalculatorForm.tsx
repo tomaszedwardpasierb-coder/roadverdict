@@ -11,6 +11,7 @@ import {
 } from '@/lib/carPriceData';
 import type { CarAnnualCostBreakdown } from '@/lib/carCostCalculator';
 import { CarCostBreakdownResult } from './CarCostBreakdownResult';
+import { VehicleSpinner } from './VehicleSpinner';
 
 interface ApiResponse {
   breakdown: CarAnnualCostBreakdown;
@@ -222,6 +223,7 @@ export function CarCostCalculatorForm({ signedIn, initialBrand, initialCarClass 
                 style={{ flex: '1 1 160px' }}
               />
               <button type="button" className="btn-primary" onClick={handlePlateLookup} disabled={lookupLoading}>
+                {lookupLoading && <VehicleSpinner kind="car" size={14} />}
                 {lookupLoading ? 'Looking up…' : 'Look up'}
               </button>
             </div>

@@ -179,6 +179,27 @@ describe("ReportHistoryTable", () => {
     expect(await screen.findByRole("button", { name: "Reminded" })).toBeDisabled();
   });
 
+  // Pins the actual visual feedback this was built for - a button click
+  // that's accepted but takes a moment shouldn't read as "did nothing
+  // happen?" (see VehicleSpinner.tsx).
+  it("shows the bike spinner alongside 'Sending…' on the Remind button while its request is in flight", async () => {
+    let resolveFetch: (v: unknown) => void = () => {};
+    (fetch as ReturnType<typeof vi.fn>).mockReturnValue(new Promise((resolve) => { resolveFetch = resolve; }));
+    const recent = new Date(Date.now() - 2 * 3600000).toISOString();
+    const rows = [row({ id: "r1", attachment: attachment() })];
+    const entryRequestStatus = { r1: { status: "pending", requestCreatedAt: recent, canRemind: true } as EntryRequestStatus };
+    const user = userEvent.setup();
+    render(<ReportHistoryTable {...baseTableProps} rows={rows} total={45.5} entryRequestStatus={entryRequestStatus} />);
+
+    await user.click(screen.getByRole("button", { name: "Remind" }));
+
+    const button = screen.getByRole("button", { name: "Sending…" });
+    expect(button.querySelector("svg")).toBeInTheDocument();
+
+    resolveFetch({ ok: true, json: async () => ({}) });
+    expect(await screen.findByRole("button", { name: "Reminded" })).toBeDisabled();
+  });
+
   it("shows an available checkbox for a selectable receipt with no prior request", () => {
     const rows = [row({ id: "r1", attachment: attachment() })];
     render(<ReportHistoryTable {...baseTableProps} rows={rows} total={45.5} />);
@@ -248,6 +269,25 @@ describe("ReportHistoryTable", () => {
 
     expect(await screen.findByRole("alert")).toHaveTextContent("Too many pending requests.");
     expect(screen.getByRole("button", { name: "Send request" })).toBeInTheDocument();
+  });
+
+  it("shows the bike spinner alongside 'Sending…' on the Send request button while its request is in flight", async () => {
+    let resolveFetch: (v: unknown) => void = () => {};
+    (fetch as ReturnType<typeof vi.fn>).mockReturnValue(new Promise((resolve) => { resolveFetch = resolve; }));
+    const rows = [row({ id: "r1", attachment: attachment() })];
+    const user = userEvent.setup();
+    render(<ReportHistoryTable {...baseTableProps} rows={rows} total={45.5} />);
+
+    await user.click(screen.getByRole("checkbox"));
+    await user.click(screen.getByRole("button", { name: "Request 1 receipt" }));
+    await user.click(screen.getByRole("button", { name: "Send request" }));
+
+    const button = screen.getByRole("button", { name: "Sending…" });
+    expect(button).toBeDisabled();
+    expect(button.querySelector("svg")).toBeInTheDocument();
+
+    resolveFetch({ ok: true, json: async () => ({}) });
+    await screen.findByText(/Requested/);
   });
 
   it("cancelling the request form keeps the selection but hides the message box", async () => {

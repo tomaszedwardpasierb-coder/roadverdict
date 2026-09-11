@@ -65,6 +65,22 @@ describe("CarRequestHistoryCta", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent(/couldn't reach the server/i);
   });
 
+  it("shows the spinner while the request is in flight", async () => {
+    let resolveFetch: (v: unknown) => void = () => {};
+    (fetch as ReturnType<typeof vi.fn>).mockReturnValue(new Promise((resolve) => { resolveFetch = resolve; }));
+
+    const user = userEvent.setup();
+    render(<CarRequestHistoryCta registration="AB12CDE" signedInEmail="buyer@example.com" currentPath="/car-report/tok123" />);
+    await user.click(screen.getByRole("button", { name: "Request this car's history" }));
+
+    const button = screen.getByRole("button", { name: "Sending…" });
+    expect(button).toBeDisabled();
+    expect(button.querySelector("svg")).toBeInTheDocument();
+
+    resolveFetch({ ok: true, json: async () => ({}) });
+    await screen.findByText("Request sent");
+  });
+
   it("once sent, no longer shows the request button even if re-rendered with the same props", async () => {
     (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
       ok: true,

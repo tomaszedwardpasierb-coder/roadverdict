@@ -2,6 +2,7 @@
 'use client';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { VehicleSpinner } from '@/components/VehicleSpinner';
 import styles from './adminShell.module.css';
 export function RunCronButton({ name, label }: { name: string; label: string }) {
   const router = useRouter();
@@ -28,6 +29,7 @@ export function RunCronButton({ name, label }: { name: string; label: string }) 
   return (
     <div>
       <button type="button" className={styles.button} onClick={handleClick} disabled={running}>
+        {running && <VehicleSpinner size={14} />}
         {running ? 'Running\u2026' : label}
       </button>
       {result && <div className={styles.jsonBlock}>{result}</div>}

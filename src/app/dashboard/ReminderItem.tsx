@@ -2,6 +2,7 @@
 'use client';
 
 import { useState } from 'react';
+import { VehicleSpinner } from '@/components/VehicleSpinner';
 import type { ReminderDoc } from '@/lib/tracker/reminder';
 import { reminderDetailLabel } from '@/lib/tracker/reminderStatus';
 import { useTrackerFormSubmit } from './useTrackerFormSubmit';
@@ -69,8 +70,12 @@ export function ReminderItem({
         <span className={`${styles.reminderStatus} ${statusClass}`}>{statusLabel}</span>
         {!isPermanent && (
           <>
-            <button type="button" className={styles.iconBtn} onClick={handleDone} disabled={submitting}>✓ Done</button>
-            <button type="button" className={styles.iconBtn} onClick={handleDelete} disabled={submitting}>✕</button>
+            <button type="button" className={styles.iconBtn} onClick={handleDone} disabled={submitting}>
+              {submitting && <VehicleSpinner kind="bike" size={14} />}✓ Done
+            </button>
+            <button type="button" className={styles.iconBtn} onClick={handleDelete} disabled={submitting}>
+              {submitting && <VehicleSpinner kind="bike" size={14} />}✕
+            </button>
           </>
         )}
       </div>

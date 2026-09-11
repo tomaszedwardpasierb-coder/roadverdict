@@ -8,6 +8,7 @@
 'use client';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { VehicleSpinner } from '@/components/VehicleSpinner';
 import styles from './adminShell.module.css';
 
 export function ImpersonateButton({ email }: { email: string }) {
@@ -106,6 +107,7 @@ export function ImpersonateButton({ email }: { email: string }) {
 
             <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1rem' }}>
               <button type="button" className={styles.button} disabled={!canConfirm || loading} onClick={handleConfirm}>
+                {loading && <VehicleSpinner size={14} />}
                 {loading ? '…' : 'Confirm'}
               </button>
               <button type="button" className={`${styles.button} ${styles.buttonSecondary}`} onClick={closeModal} disabled={loading}>

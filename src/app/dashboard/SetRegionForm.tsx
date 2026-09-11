@@ -4,6 +4,7 @@
 import { useState } from 'react';
 import { REGION_LABELS, type Region } from '@/lib/priceData';
 import { useTrackerFormSubmit } from './useTrackerFormSubmit';
+import { VehicleSpinner } from '@/components/VehicleSpinner';
 
 const REGIONS = Object.keys(REGION_LABELS) as Region[];
 
@@ -36,6 +37,7 @@ export function SetRegionForm() {
       <hr className="ticket__divider" />
       <div className="ticket__section">
         <button className="submit-button" type="submit" disabled={submitting}>
+          {submitting && <VehicleSpinner kind="bike" size={14} />}
           {submitting ? 'Saving…' : 'Save and continue'}
         </button>
         {error && <p className="error-text" role="alert">{error}</p>}

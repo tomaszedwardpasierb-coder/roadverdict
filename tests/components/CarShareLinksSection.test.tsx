@@ -230,6 +230,22 @@ describe("CarShareLinksSection", () => {
     expect(JSON.parse(options.body)).toEqual({ entryIds: ["e2"], decision: "pending" });
   });
 
+  it("shows the car spinner on Save decisions while the request is in flight", async () => {
+    let resolveFetch: (v: unknown) => void = () => {};
+    (fetch as ReturnType<typeof vi.fn>).mockReturnValue(new Promise((resolve) => { resolveFetch = resolve; }));
+    const req = request({ items: [item({ entryId: "e1", status: "pending" })] });
+    const user = userEvent.setup();
+    render(<CarShareLinksSection {...baseSectionProps} requests={[req]} />);
+    await user.click(screen.getByRole("button", { name: /Request for receipt access/ }));
+    await user.click(screen.getByRole("radio", { name: "Don't share" }));
+    await user.click(screen.getByRole("button", { name: "Save decisions" }));
+
+    const button = screen.getByRole("button", { name: "Saving…" });
+    expect(button.querySelector("svg")).toBeInTheDocument();
+    resolveFetch({ ok: true, json: async () => ({}) });
+    await vi.waitFor(() => expect(screen.queryByRole("button", { name: "Save decisions" })).not.toBeInTheDocument());
+  });
+
   it("collapses the card and shows a decided tally after a successful save", async () => {
     const req = request({
       items: [item({ entryId: "e1", status: "pending" }), item({ entryId: "e2", status: "approved" })],

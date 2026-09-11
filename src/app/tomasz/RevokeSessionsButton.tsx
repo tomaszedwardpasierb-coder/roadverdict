@@ -2,6 +2,7 @@
 'use client';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { VehicleSpinner } from '@/components/VehicleSpinner';
 import styles from './adminShell.module.css';
 
 export function RevokeSessionsButton({ email }: { email: string }) {
@@ -37,6 +38,7 @@ export function RevokeSessionsButton({ email }: { email: string }) {
   return (
     <span>
       <button type="button" className={`${styles.button} ${styles.buttonSmall}`} onClick={handleClick} disabled={loading}>
+        {loading && <VehicleSpinner size={14} />}
         {loading ? '…' : 'Force re-auth'}
       </button>
       {error && <span style={{ color: 'var(--admin-danger)', fontSize: '0.72rem', marginLeft: '0.4rem' }}>{error}</span>}

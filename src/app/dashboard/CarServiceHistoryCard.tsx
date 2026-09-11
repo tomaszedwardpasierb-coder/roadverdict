@@ -11,6 +11,7 @@
 'use client';
 
 import { useState } from 'react';
+import { VehicleSpinner } from '@/components/VehicleSpinner';
 import { useTrackerFormSubmit } from './useTrackerFormSubmit';
 import { CAR_JOB_LABELS } from '@/lib/tracker/carJobTypes';
 import { formatCurrency, type Currency, type ExchangeRates } from '@/lib/tracker/currency';
@@ -73,7 +74,10 @@ export function CarServiceHistoryCard({ record, distanceUnit, currency, rates }:
           <textarea id={`carsvc-edit-notes-${record.id}`} value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} />
         </div>
         <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.6rem' }}>
-          <button type="submit" className="btn-primary" disabled={submitting}>{submitting ? 'Saving…' : 'Save'}</button>
+          <button type="submit" className="btn-primary" disabled={submitting}>
+            {submitting && <VehicleSpinner kind="car" size={14} />}
+            {submitting ? 'Saving…' : 'Save'}
+          </button>
           <button type="button" className={styles.iconBtn} onClick={() => setIsEditing(false)} disabled={submitting}>Cancel</button>
         </div>
         {error && <p className="error-text" role="alert" style={{ marginTop: '0.5rem' }}>{error}</p>}
@@ -94,7 +98,10 @@ export function CarServiceHistoryCard({ record, distanceUnit, currency, rates }:
       {record.notes && <p style={{ marginTop: '0.4rem' }}>{record.notes}</p>}
       <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.6rem' }}>
         <button type="button" className={styles.iconBtn} onClick={() => setIsEditing(true)}>Edit</button>
-        <button type="button" className={styles.iconBtn} onClick={handleDelete} disabled={submitting}>Delete</button>
+        <button type="button" className={styles.iconBtn} onClick={handleDelete} disabled={submitting}>
+          {submitting && <VehicleSpinner kind="car" size={14} />}
+          Delete
+        </button>
       </div>
       {error && <p className="error-text" role="alert" style={{ marginTop: '0.5rem' }}>{error}</p>}
     </div>

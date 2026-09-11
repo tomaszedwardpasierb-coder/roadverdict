@@ -8,6 +8,7 @@ import { ReviewQueueModal } from './ReviewQueueModal';
 import type { ParsedReceiptItem } from '@/lib/tracker/receiptParse';
 import { classifyReceiptTier, receiptTierSortWeight } from '@/lib/tracker/receiptTiering';
 import { Icon } from './Icon';
+import { VehicleSpinner } from '@/components/VehicleSpinner';
 import styles from './dashboard.module.css';
 
 interface FileParseOutcome {
@@ -150,6 +151,7 @@ export function ScanReceiptButton({ isPro = false, vehicleKind = 'bike' }: { isP
             Resume
           </button>
           <button type="button" className={styles.scanDiscardBtn} disabled={discarding} onClick={handleDiscardPending}>
+            {discarding && <VehicleSpinner kind={vehicleKind} size={13} />}
             {discarding ? 'Discarding…' : 'Discard'}
           </button>
         </div>

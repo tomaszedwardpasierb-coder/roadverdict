@@ -5,6 +5,7 @@ import { Suspense, useEffect, useRef, useState } from 'react';
 import { usePathname, useSearchParams } from 'next/navigation';
 import { useActiveSection } from './ActiveSectionContext';
 import { AssistantProposedEntryCard, type ProposedEntry } from './AssistantProposedEntryCard';
+import { VehicleSpinner } from './VehicleSpinner';
 import styles from './AssistantWidget.module.css';
 
 interface Message {
@@ -118,7 +119,7 @@ function AssistantWidgetInner() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const reportToken = extractReportToken(pathname ?? '');
-  const { activeSection: dashboardTab } = useActiveSection();
+  const { activeSection: dashboardTab, vehicleKind } = useActiveSection();
   // Read fresh from the URL on every render rather than stored in state -
   // this only ever needs to reflect whatever's currently on screen, the
   // same "just a hint, server re-validates it" role reportToken already
@@ -211,7 +212,11 @@ function AssistantWidgetInner() {
                 {m.proposedEntry && <AssistantProposedEntryCard entry={m.proposedEntry} />}
               </div>
             ))}
-            {sending && <div className={styles.bubbleAssistant}>…</div>}
+            {sending && (
+              <div className={styles.bubbleAssistant}>
+                <VehicleSpinner kind={vehicleKind ?? 'bike'} size={16} />
+              </div>
+            )}
             {error && (
               <div className={styles.errorNote}>
                 {error}
@@ -235,6 +240,7 @@ function AssistantWidgetInner() {
               disabled={sending}
             />
             <button type="button" className={styles.sendBtn} onClick={handleSend} disabled={sending || !input.trim()}>
+              {sending && <VehicleSpinner kind={vehicleKind ?? 'bike'} size={14} />}
               Send
             </button>
           </div>

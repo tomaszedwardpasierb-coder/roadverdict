@@ -2,6 +2,7 @@
 'use client';
 
 import { useState } from 'react';
+import { VehicleSpinner } from '@/components/VehicleSpinner';
 import styles from './dashboard.module.css';
 import { ProGate } from './ProGate';
 
@@ -171,6 +172,7 @@ export function ExportShareSection({ isPro = false }: { isPro?: boolean }) {
           </p>
           {createError && <p className="error-text" role="alert">{createError}</p>}
           <button type="button" className={styles.scanReceiptBtn} onClick={handleGetLink} disabled={loading} style={{ marginTop: '0.7rem' }}>
+            {loading && <VehicleSpinner kind="bike" size={14} />}
             {loading ? 'Generating…' : 'Get shareable report link'}
           </button>
         </div>
@@ -210,6 +212,7 @@ export function ExportShareSection({ isPro = false }: { isPro?: boolean }) {
               required
             />
             <button type="submit" className={styles.iconBtn} disabled={sendingEmail}>
+              {sendingEmail && <VehicleSpinner kind="bike" size={14} />}
               {sendingEmail ? 'Sending…' : 'Send by email'}
             </button>
           </form>

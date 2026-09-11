@@ -3,10 +3,13 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useActiveSection } from "@/components/ActiveSectionContext";
+import { VehicleSpinner } from "@/components/VehicleSpinner";
 import styles from "./dashboard.module.css";
 
 export default function LogoutButton() {
   const router = useRouter();
+  const { vehicleKind } = useActiveSection();
   const [loading, setLoading] = useState(false);
 
   async function handleLogout() {
@@ -22,6 +25,7 @@ export default function LogoutButton() {
       disabled={loading}
       className={styles.logoutButton}
     >
+      {loading && <VehicleSpinner kind={vehicleKind ?? "bike"} size={14} />}
       {loading ? "Signing out..." : "Sign out"}
     </button>
   );

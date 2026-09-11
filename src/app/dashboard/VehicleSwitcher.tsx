@@ -13,6 +13,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { formatDistance, type DistanceUnit } from '@/lib/tracker/unitFormat';
+import { VehicleSpinner } from '@/components/VehicleSpinner';
 import styles from './dashboard.module.css';
 
 export type VehicleKind = 'bike' | 'car';
@@ -46,7 +47,11 @@ const SWITCH_BODY_KEY: Record<VehicleKind, string> = {
 export function VehicleSwitcher({ vehicles, activeVehicleId, distanceUnit }: Props) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
-  const [switching, setSwitching] = useState(false);
+  // Tracks WHICH row is mid-switch (not just a plain boolean) so the
+  // spinner can show that row's own kind - the vehicle being switched TO,
+  // not whatever kind was active before the click, which for a bike->car
+  // switch would otherwise show the wrong wheel while it's in flight.
+  const [switchingId, setSwitchingId] = useState<string | null>(null);
   const active = vehicles.find((v) => v.id === activeVehicleId) ?? vehicles[0];
 
   async function switchTo(vehicle: SwitcherVehicle) {
@@ -54,7 +59,7 @@ export function VehicleSwitcher({ vehicles, activeVehicleId, distanceUnit }: Pro
       setOpen(false);
       return;
     }
-    setSwitching(true);
+    setSwitchingId(vehicle.id);
     try {
       const res = await fetch(SWITCH_ENDPOINT[vehicle.kind], {
         method: 'POST',
@@ -66,7 +71,7 @@ export function VehicleSwitcher({ vehicles, activeVehicleId, distanceUnit }: Pro
         router.refresh();
       }
     } finally {
-      setSwitching(false);
+      setSwitchingId(null);
     }
   }
 
@@ -118,10 +123,11 @@ export function VehicleSwitcher({ vehicles, activeVehicleId, distanceUnit }: Pro
             <button
               key={v.id}
               type="button"
-              disabled={switching}
+              disabled={switchingId !== null}
               className={`${styles.bikeSwitcherRow} ${v.id === activeVehicleId ? styles.bikeSwitcherRowActive : ''}`}
               onClick={() => switchTo(v)}
             >
+              {switchingId === v.id && <VehicleSpinner kind={v.kind} size={13} />}
               {v.name}{' '}
               <span className={styles.bikeSwitcherRowMeta}>
                 ({v.kind === 'car' ? 'Car' : 'Bike'} · {v.year ?? 'Custom build'})

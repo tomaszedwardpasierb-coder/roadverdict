@@ -104,6 +104,20 @@ describe("AddCarForm", () => {
     expect(fetch).not.toHaveBeenCalled();
   });
 
+  it("look up: shows the car spinner on Look up while the lookup request is in flight", async () => {
+    let resolveFetch: (v: unknown) => void = () => {};
+    (fetch as ReturnType<typeof vi.fn>).mockReturnValue(new Promise((resolve) => { resolveFetch = resolve; }));
+    const user = userEvent.setup();
+    render(<AddCarForm />);
+    await user.type(screen.getByLabelText("Registration number"), "AB12CDE");
+    await user.click(screen.getByRole("button", { name: "Look up" }));
+
+    const button = screen.getByRole("button", { name: "Looking up…" });
+    expect(button.querySelector("svg")).toBeInTheDocument();
+    resolveFetch(jsonErr({ error: "No vehicle found." }));
+    await screen.findByRole("button", { name: "Look up" });
+  });
+
   it("look up: an empty registration is refused before any fetch call", async () => {
     const user = userEvent.setup();
     render(<AddCarForm />);
@@ -200,6 +214,27 @@ describe("AddCarForm", () => {
     );
   });
 
+  it("look up: shows the car spinner on 'Go to this car' while the switch request is in flight", async () => {
+    (fetch as ReturnType<typeof vi.fn>)
+      .mockResolvedValueOnce(jsonOk({ vrm: "AB12CDE", make: "Ford", model: "Focus", year: 2020, fuelType: "PETROL", engineCapacityCc: 1596, plateInRetention: false, vehicleType: "four-wheeled" }))
+      .mockResolvedValueOnce(jsonOk({ exists: true, belongsToCurrentUser: true, carId: "car-42" }));
+
+    const user = userEvent.setup();
+    render(<AddCarForm />);
+    await user.type(screen.getByLabelText("Registration number"), "AB12CDE");
+    await user.click(screen.getByRole("button", { name: "Look up" }));
+    await screen.findByText(/already added this car/i);
+
+    let resolveFetch: (v: unknown) => void = () => {};
+    (fetch as ReturnType<typeof vi.fn>).mockReturnValueOnce(new Promise((resolve) => { resolveFetch = resolve; }));
+    const button = screen.getByRole("button", { name: "Go to this car" });
+    await user.click(button);
+
+    expect(screen.getByRole("button", { name: "Switching…" }).querySelector("svg")).toBeInTheDocument();
+    resolveFetch(jsonOk({}));
+    await waitFor(() => expect(mockRouter.push).toHaveBeenCalledWith("/dashboard"));
+  });
+
   it("look up: a duplicate on someone else's account offers request-ownership, which reports the server's own error on failure", async () => {
     (fetch as ReturnType<typeof vi.fn>)
       .mockResolvedValueOnce(jsonOk({ vrm: "AB12CDE", make: "Ford", model: "Focus", year: 2020, fuelType: "PETROL", engineCapacityCc: 1596, plateInRetention: false, vehicleType: "four-wheeled" }))
@@ -219,6 +254,27 @@ describe("AddCarForm", () => {
       "/api/cars/car-transfer/request-ownership",
       expect.objectContaining({ method: "POST", body: JSON.stringify({ registration: "AB12CDE" }) })
     );
+  });
+
+  it("look up: shows the car spinner on 'Request ownership' while that request is in flight", async () => {
+    (fetch as ReturnType<typeof vi.fn>)
+      .mockResolvedValueOnce(jsonOk({ vrm: "AB12CDE", make: "Ford", model: "Focus", year: 2020, fuelType: "PETROL", engineCapacityCc: 1596, plateInRetention: false, vehicleType: "four-wheeled" }))
+      .mockResolvedValueOnce(jsonOk({ exists: true, belongsToCurrentUser: false }));
+
+    const user = userEvent.setup();
+    render(<AddCarForm />);
+    await user.type(screen.getByLabelText("Registration number"), "AB12CDE");
+    await user.click(screen.getByRole("button", { name: "Look up" }));
+    await screen.findByText(/already has a RoadVerdict history/i);
+
+    let resolveFetch: (v: unknown) => void = () => {};
+    (fetch as ReturnType<typeof vi.fn>).mockReturnValueOnce(new Promise((resolve) => { resolveFetch = resolve; }));
+    await user.click(screen.getByRole("button", { name: "Request ownership" }));
+
+    const button = screen.getByRole("button", { name: "Sending…" });
+    expect(button.querySelector("svg")).toBeInTheDocument();
+    resolveFetch(jsonOk({}));
+    await screen.findByText(/Request sent/);
   });
 
   it("look up: 'start fresh' on a duplicate applies the held lookup data without a second network round-trip, and flags the eventual submit as mayHavePriorHistory", async () => {
@@ -294,6 +350,21 @@ describe("AddCarForm", () => {
         expect.objectContaining({ method: "POST", body: JSON.stringify({ carId: "new-car-1" }) })
       )
     );
+  });
+
+  it("shows the car spinner on Add car while the submit request is in flight", async () => {
+    let resolveFetch: (v: unknown) => void = () => {};
+    (fetch as ReturnType<typeof vi.fn>).mockReturnValue(new Promise((resolve) => { resolveFetch = resolve; }));
+
+    const user = userEvent.setup();
+    render(<AddCarForm />);
+    await fillRequired(user);
+    await user.click(screen.getByRole("button", { name: "Add car" }));
+
+    const button = screen.getByRole("button", { name: "Adding…" });
+    expect(button.querySelector("svg")).toBeInTheDocument();
+    resolveFetch(jsonOk({ car: { id: "new-car-1" } }));
+    await screen.findByRole("button", { name: "Add car" });
   });
 
   it("shows the server's own error when the API rejects the submit, without attempting the MOT import", async () => {

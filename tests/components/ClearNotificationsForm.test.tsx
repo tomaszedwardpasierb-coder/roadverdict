@@ -178,4 +178,24 @@ describe("ClearNotificationsForm", () => {
 
     expect(await screen.findByText("Couldn't reach the server. Try again.")).toBeInTheDocument();
   });
+
+  it("shows the spinner alongside the button's own 'Clearing…' text while the request is in flight", async () => {
+    vi.stubGlobal("confirm", vi.fn(() => true));
+    let resolveFetch: (v: unknown) => void = () => {};
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() => new Promise((resolve) => { resolveFetch = resolve; }))
+    );
+
+    const user = userEvent.setup();
+    render(<ClearNotificationsForm broadcasts={broadcasts} allEmails={allEmails} />);
+    await user.click(screen.getByRole("button", { name: "Clear notifications" }));
+
+    const button = screen.getByRole("button", { name: "Clearing…" });
+    expect(button).toBeDisabled();
+    expect(button.querySelector("svg")).toBeInTheDocument();
+
+    resolveFetch({ ok: true, json: async () => ({ deletedCount: 2 }) });
+    expect(await screen.findByText("Cleared 2 notifications.")).toBeInTheDocument();
+  });
 });

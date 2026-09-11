@@ -48,6 +48,23 @@ describe("GrantPremiumForm", () => {
       expect(await screen.findByText("Grants can't exceed 3 years.")).toBeInTheDocument();
       expect(mockRouter.refresh).not.toHaveBeenCalled();
     });
+
+    it("shows the spinner on the Grant button while the request is in flight", async () => {
+      let resolveFetch: (v: unknown) => void = () => {};
+      vi.stubGlobal("fetch", vi.fn(() => new Promise((resolve) => { resolveFetch = resolve; })));
+
+      const user = userEvent.setup();
+      render(<GrantPremiumForm email="rider@example.com" plan={null} />);
+      await user.type(screen.getByLabelText("Premium expiry date for rider@example.com"), "2027-06-15");
+      const button = screen.getByRole("button", { name: "Grant" });
+      await user.click(button);
+
+      expect(button).toBeDisabled();
+      expect(button.querySelector("svg")).toBeInTheDocument();
+
+      resolveFetch({ ok: true, json: async () => ({ ok: true }) });
+      await waitFor(() => expect(mockRouter.refresh).toHaveBeenCalled());
+    });
   });
 
   describe("when the account already has an active plan", () => {
@@ -86,6 +103,24 @@ describe("GrantPremiumForm", () => {
       await user.click(screen.getByRole("button", { name: "Revoke" }));
 
       expect(fetch).not.toHaveBeenCalled();
+    });
+
+    it("shows the spinner on the Revoke button while the request is in flight", async () => {
+      vi.stubGlobal("confirm", vi.fn(() => true));
+      let resolveFetch: (v: unknown) => void = () => {};
+      vi.stubGlobal("fetch", vi.fn(() => new Promise((resolve) => { resolveFetch = resolve; })));
+
+      const user = userEvent.setup();
+      const expiresAt = new Date(Date.now() + 86_400_000).toISOString();
+      render(<GrantPremiumForm email="rider@example.com" plan={{ expiresAt }} />);
+      const button = screen.getByRole("button", { name: "Revoke" });
+      await user.click(button);
+
+      expect(button).toBeDisabled();
+      expect(button.querySelector("svg")).toBeInTheDocument();
+
+      resolveFetch({ ok: true, json: async () => ({ ok: true }) });
+      await waitFor(() => expect(mockRouter.refresh).toHaveBeenCalled());
     });
   });
 });

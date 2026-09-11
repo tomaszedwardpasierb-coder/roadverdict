@@ -3,7 +3,7 @@
 // Region picker. Only fetch and next/navigation's useRouter (via
 // useTrackerFormSubmit) are mocked.
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn() }) }));
@@ -48,5 +48,21 @@ describe("SetRegionForm", () => {
     await user.click(screen.getByRole("button", { name: "Save and continue" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent("Could not save region.");
+  });
+
+  // Bikes only - this form has no car equivalent, so the spinner is
+  // hardcoded to the bike wheel rather than read from context.
+  it("shows the bike spinner alongside 'Saving…' while the request is in flight", async () => {
+    let resolveFetch: (v: unknown) => void = () => {};
+    (fetch as ReturnType<typeof vi.fn>).mockReturnValue(new Promise((resolve) => { resolveFetch = resolve; }));
+    const user = userEvent.setup();
+    render(<SetRegionForm />);
+    await user.click(screen.getByRole("button", { name: "Save and continue" }));
+
+    const button = screen.getByRole("button", { name: "Saving…" });
+    expect(button.querySelector("svg")).toBeInTheDocument();
+
+    resolveFetch({ ok: true, json: async () => ({}) });
+    await waitFor(() => expect(button).not.toBeDisabled());
   });
 });

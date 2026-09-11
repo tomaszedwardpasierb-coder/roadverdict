@@ -102,6 +102,22 @@ describe("BikeSwitcher", () => {
     expect(screen.queryByText("Manage bikes →")).not.toBeInTheDocument();
   });
 
+  it("shows the bike spinner on the row being switched to, while the request is in flight", async () => {
+    let resolveFetch: (v: unknown) => void = () => {};
+    (fetch as ReturnType<typeof vi.fn>).mockReturnValue(new Promise((resolve) => { resolveFetch = resolve; }));
+    const user = userEvent.setup();
+    const { container } = render(<BikeSwitcher bikes={[bikeA, bikeB]} activeBikeId="a" distanceUnit="mi" />);
+    await user.click(screen.getByRole("button", { name: /My bike/ }));
+    const dropdown = openDropdown(container);
+    const targetRow = within(dropdown).getByText("MT-07", { exact: false }).closest("button") as HTMLElement;
+    await user.click(targetRow);
+
+    expect(targetRow.querySelector("svg")).toBeInTheDocument();
+
+    resolveFetch({ ok: true });
+    await waitFor(() => expect(mockRouter.refresh).toHaveBeenCalled());
+  });
+
   it("a failed switch does not refresh the page and leaves the dropdown open", async () => {
     (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({ ok: false });
     const user = userEvent.setup();

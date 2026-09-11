@@ -1,6 +1,7 @@
 // Place at: src/app/dashboard/BillSeriesSummary.tsx
 'use client';
 
+import { VehicleSpinner } from '@/components/VehicleSpinner';
 import type { BillSeriesDoc } from '@/lib/tracker/billSeries';
 import { seriesTotalCost, seriesEndDate } from '@/lib/tracker/billSeriesSchedule';
 import { BILL_LABELS, BILL_SERIES_FREQUENCY_LABELS } from '@/lib/tracker/billTypes';
@@ -44,6 +45,7 @@ function SeriesRow({ series, currency, rates }: { series: BillSeriesDoc; currenc
       {series.status === 'active' && (
         <div className={styles.cardActions}>
           <button type="button" className={styles.iconBtn} onClick={handleEnd} disabled={submitting}>
+            {submitting && <VehicleSpinner kind="bike" size={14} />}
             {submitting ? 'Ending…' : 'End this plan'}
           </button>
         </div>

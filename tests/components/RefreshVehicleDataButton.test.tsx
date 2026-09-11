@@ -154,4 +154,24 @@ describe("RefreshVehicleDataButton", () => {
 
     expect(screen.getByText("Refresh available again soon.")).toBeInTheDocument();
   });
+
+  // Pins the actual visual feedback this was built for - a button click
+  // that's accepted but takes a moment shouldn't read as "did nothing
+  // happen?" (see VehicleSpinner.tsx).
+  it("shows the bike spinner alongside the button's own 'Refreshing…' text while the request is in flight", async () => {
+    let resolveFetch: (value: unknown) => void;
+    (fetch as ReturnType<typeof vi.fn>).mockReturnValue(new Promise((resolve) => { resolveFetch = resolve; }));
+    const user = userEvent.setup();
+    render(<RefreshVehicleDataButton bikeId="bike-1" available nextAvailableAt={null} />);
+
+    const button = screen.getByRole("button", { name: "Refresh vehicle data" });
+    await user.click(button);
+
+    expect(await screen.findByText("Refreshing…")).toBeInTheDocument();
+    expect(button.querySelector("svg")).toBeInTheDocument();
+
+    resolveFetch!({ ok: true, json: async () => ({ dvlaRefreshed: false, motCreated: 0 }) });
+    expect(await screen.findByText("Checked - nothing new to add.")).toBeInTheDocument();
+    expect(button.querySelector("svg")).not.toBeInTheDocument();
+  });
 });

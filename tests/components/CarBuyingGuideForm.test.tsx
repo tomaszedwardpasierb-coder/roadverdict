@@ -61,6 +61,31 @@ describe("CarBuyingGuideForm", () => {
     expect(fetch).not.toHaveBeenCalled();
   });
 
+  it("shows the car spinner alongside the lookup button's own 'Looking up…' text while the request is in flight", async () => {
+    let resolveFetch: (v: unknown) => void = () => {};
+    (fetch as ReturnType<typeof vi.fn>).mockReturnValue(new Promise((resolve) => { resolveFetch = resolve; }));
+
+    const user = userEvent.setup();
+    render(<CarBuyingGuideForm signedIn />);
+    await user.type(screen.getByLabelText("Search by registration (optional)"), "AB12CDE");
+    await user.click(screen.getByRole("button", { name: "Look up" }));
+
+    const button = screen.getByRole("button", { name: "Looking up…" });
+    expect(button.querySelector("svg")).toBeInTheDocument();
+
+    resolveFetch({
+      ok: true,
+      json: async () => ({
+        vrm: "AB12CDE", make: "Ford", model: "Focus", fuelType: "Petrol", colour: "Blue",
+        plateInRetention: false, motDueDate: null, motTests: [], briefing: null,
+        vdiCheck: null, valuation: null, taxDetails: null,
+        requiresPayment: false, nextFreeLookupAt: null,
+      }),
+    });
+    await screen.findByRole("button", { name: "Look up" });
+    expect(screen.getByRole("button", { name: "Look up" }).querySelector("svg")).not.toBeInTheDocument();
+  });
+
   it("signed in: a matched plate renders MOT history and the AI briefing, and updates make (car size stays manual)", async () => {
     (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
       ok: true,
@@ -244,6 +269,7 @@ describe("CarBuyingGuideForm", () => {
 
   it("clicking Buy calls the checkout route with the current vrm and redirects to the returned url", async () => {
     const fetchMock = fetch as ReturnType<typeof vi.fn>;
+    let resolveCheckout: (v: unknown) => void = () => {};
     fetchMock.mockImplementation((url: string) => {
       if (url.startsWith("/api/cars/buying-guide-lookup")) {
         return Promise.resolve({
@@ -257,7 +283,9 @@ describe("CarBuyingGuideForm", () => {
           }),
         });
       }
-      return Promise.resolve({ ok: true, json: async () => ({ url: "https://checkout.stripe.com/test-session" }) });
+      // Deferred, unlike the lookup above, so the in-flight spinner
+      // assertion below has a moment to actually observe it.
+      return new Promise((resolve) => { resolveCheckout = resolve; });
     });
     const originalLocation = window.location;
     // @ts-expect-error - deliberately replacing location to observe the redirect without jsdom navigating for real
@@ -269,7 +297,13 @@ describe("CarBuyingGuideForm", () => {
     render(<CarBuyingGuideForm signedIn />);
     await user.type(screen.getByLabelText("Search by registration (optional)"), "AB12CDE");
     await user.click(screen.getByRole("button", { name: "Look up" }));
-    await user.click(await screen.findByRole("button", { name: /Buy the vehicle history report/ }));
+    const buyButton = await screen.findByRole("button", { name: /Buy the vehicle history report/ });
+    await user.click(buyButton);
+
+    expect(await screen.findByRole("button", { name: "Getting your report…" })).toBe(buyButton);
+    expect(buyButton.querySelector("svg")).toBeInTheDocument();
+
+    resolveCheckout({ ok: true, json: async () => ({ url: "https://checkout.stripe.com/test-session" }) });
 
     await waitFor(() => expect(window.location.href).toBe("https://checkout.stripe.com/test-session"));
     expect(fetchMock).toHaveBeenCalledWith(

@@ -247,6 +247,32 @@ describe("ShareLinksSection", () => {
     expect(JSON.parse(options.body)).toEqual({ entryIds: ["e2"], decision: "pending" });
   });
 
+  it("shows the bike spinner on Save decisions while the request is in flight", async () => {
+    let resolveFetch: (v: unknown) => void = () => {};
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((url: string) => {
+        if (url === "/api/tracker/notifications") return Promise.resolve({ ok: true, json: async () => ({ notifications: [], unreadCount: 0 }) });
+        return new Promise((resolve) => { resolveFetch = resolve; });
+      })
+    );
+    const req = request({ items: [item({ entryId: "e1", status: "pending" })] });
+    const user = userEvent.setup();
+    render(<ShareLinksSection {...baseSectionProps} requests={[req]} />);
+    await user.click(screen.getByRole("button", { name: /Request for receipt access/ }));
+    await user.click(screen.getByRole("radio", { name: "Don't share" }));
+    await user.click(screen.getByRole("button", { name: "Save decisions" }));
+
+    const button = screen.getByRole("button", { name: "Saving…" });
+    expect(button.querySelector("svg")).toBeInTheDocument();
+
+    resolveFetch({ ok: true, json: async () => ({}) });
+    // Tally reflects each item's ORIGINAL status (this session's decisions
+    // aren't merged back into it), matching the "1 of 2 decided" case
+    // covered separately below - here the single item started pending.
+    await screen.findByText("0 of 1 decided");
+  });
+
   it("collapses the card and shows a decided tally after a successful save", async () => {
     const req = request({
       items: [item({ entryId: "e1", status: "pending" }), item({ entryId: "e2", status: "approved" })],

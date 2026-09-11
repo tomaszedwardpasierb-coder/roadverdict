@@ -2,6 +2,7 @@
 'use client';
 
 import { useState } from 'react';
+import { VehicleSpinner } from '@/components/VehicleSpinner';
 import styles from './dashboard.module.css';
 
 // A real (if intentionally simple) shape check - "contains an @" alone
@@ -92,6 +93,7 @@ export function TransferOwnershipSection({ pendingRequest, bikeIsReadOnly }: Pro
               style={{ flex: '1 1 200px' }}
             />
             <button type="button" className="btn-primary" disabled={submitting} onClick={handleSubmit}>
+              {submitting && <VehicleSpinner kind="bike" size={14} />}
               {submitting ? 'Sending…' : 'Start handover'}
             </button>
           </div>

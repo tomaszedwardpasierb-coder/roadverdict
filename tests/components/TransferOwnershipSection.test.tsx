@@ -72,6 +72,21 @@ describe("TransferOwnershipSection", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent("Enter a valid email address.");
   });
 
+  it("shows the bike spinner on Start handover while the request is in flight", async () => {
+    let resolveFetch: (v: unknown) => void = () => {};
+    (fetch as ReturnType<typeof vi.fn>).mockReturnValue(new Promise((resolve) => { resolveFetch = resolve; }));
+    const user = userEvent.setup();
+    render(<TransferOwnershipSection bikeIsReadOnly={false} pendingRequest={null} />);
+    await user.type(screen.getByPlaceholderText("buyer@example.com"), "buyer@example.com");
+    await user.click(screen.getByRole("button", { name: "Start handover" }));
+
+    const button = screen.getByRole("button", { name: "Sending…" });
+    expect(button.querySelector("svg")).toBeInTheDocument();
+
+    resolveFetch({ ok: true, json: async () => ({}) });
+    await screen.findByText(/Waiting for/);
+  });
+
   it("submits recipientEmail and the includeRecords choice, then shows the optimistic waiting state with the correct excluded-records wording", async () => {
     (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({ ok: true, json: async () => ({}) });
     const user = userEvent.setup();

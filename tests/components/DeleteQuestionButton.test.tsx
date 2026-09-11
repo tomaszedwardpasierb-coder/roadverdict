@@ -61,6 +61,7 @@ describe("DeleteQuestionButton", () => {
 
     const button = await screen.findByRole("button", { name: "…" });
     expect(button).toBeDisabled();
+    expect(button.querySelector("svg")).toBeInTheDocument();
 
     resolveFetch({ ok: true });
     await waitFor(() => expect(mockRouter.refresh).toHaveBeenCalled());

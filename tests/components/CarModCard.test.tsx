@@ -34,6 +34,20 @@ describe("CarModCard", () => {
     expect(fetch).toHaveBeenCalledWith("/api/cars/car-mods/car-1::carMod::1", expect.objectContaining({ method: "PATCH" }));
   });
 
+  it("shows the car spinner on Save while the request is in flight", async () => {
+    let resolveFetch: (v: unknown) => void = () => {};
+    (fetch as ReturnType<typeof vi.fn>).mockReturnValue(new Promise((resolve) => { resolveFetch = resolve; }));
+    const user = userEvent.setup();
+    render(<CarModCard mod={mod} distanceUnit="mi" currency="GBP" rates={null} />);
+    await user.click(screen.getByRole("button", { name: "Edit" }));
+    await user.click(screen.getByRole("button", { name: "Save" }));
+
+    const button = screen.getByRole("button", { name: "Saving…" });
+    expect(button.querySelector("svg")).toBeInTheDocument();
+    resolveFetch({ ok: true, json: async () => ({}) });
+    await screen.findByRole("button", { name: "Edit" });
+  });
+
   it("Delete sends a real DELETE once confirmed", async () => {
     vi.spyOn(window, "confirm").mockReturnValue(true);
     (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({ ok: true, json: async () => ({}) });

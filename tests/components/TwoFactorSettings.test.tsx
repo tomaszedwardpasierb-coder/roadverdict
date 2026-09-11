@@ -7,6 +7,7 @@
 // advancing, and that a successful enroll/disable transitions the
 // displayed status. Only `fetch` and next/navigation's useRouter are
 // mocked.
+import { useEffect } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -15,6 +16,16 @@ const mockRouterRefresh = vi.hoisted(() => vi.fn());
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: mockRouterRefresh }) }));
 
 import { TwoFactorSettings } from "@/app/dashboard/TwoFactorSettings";
+import { ActiveSectionProvider, useActiveSection } from "@/components/ActiveSectionContext";
+
+// Mirrors AssistantWidget.test.tsx's own SetVehicleKind helper - a real
+// child calling the real setter, the same way DashboardShell does in
+// production, rather than a mock.
+function SetVehicleKind({ kind }: { kind: "bike" | "car" }) {
+  const { setVehicleKind } = useActiveSection();
+  useEffect(() => setVehicleKind(kind), [kind, setVehicleKind]);
+  return null;
+}
 
 describe("TwoFactorSettings", () => {
   beforeEach(() => {
@@ -114,5 +125,72 @@ describe("TwoFactorSettings", () => {
 
     expect(await screen.findByText(/Off/)).toBeInTheDocument();
     expect(mockRouterRefresh).toHaveBeenCalled();
+  });
+
+  // Rendered with no ActiveSectionProvider (as every other test in this
+  // file), useActiveSection's no-provider fallback (vehicleKind: null)
+  // applies, which defaults to the bike wheel.
+  it("shows the bike spinner on 'Set up two-factor authentication' while enrollment starts", async () => {
+    let resolveFetch: (v: unknown) => void = () => {};
+    vi.stubGlobal("fetch", vi.fn(() => new Promise((resolve) => { resolveFetch = resolve; })));
+    const user = userEvent.setup();
+    render(<TwoFactorSettings initiallyEnabled={false} />);
+    const button = screen.getByRole("button", { name: "Set up two-factor authentication" });
+    await user.click(button);
+
+    expect(screen.getByRole("button", { name: "Starting…" }).querySelector("svg")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Starting…" }).querySelectorAll("path").length).toBe(0);
+
+    resolveFetch({ ok: true, json: async () => ({ qrDataUrl: "data:x", manualEntryKey: "SECRET" }) });
+    await screen.findByLabelText("Enter the 6-digit code it shows");
+  });
+
+  it("shows the car spinner on 'Turn on' while confirming, when the dashboard's active vehicle is a car", async () => {
+    const user = userEvent.setup();
+    render(
+      <ActiveSectionProvider>
+        <SetVehicleKind kind="car" />
+        <TwoFactorSettings initiallyEnabled={false} />
+      </ActiveSectionProvider>
+    );
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValueOnce({ ok: true, json: async () => ({ qrDataUrl: "data:x", manualEntryKey: "SECRET" }) })
+    );
+    await user.click(screen.getByRole("button", { name: "Set up two-factor authentication" }));
+    await screen.findByLabelText("Enter the 6-digit code it shows");
+
+    let resolveFetch: (v: unknown) => void = () => {};
+    vi.stubGlobal("fetch", vi.fn(() => new Promise((resolve) => { resolveFetch = resolve; })));
+    await user.type(screen.getByLabelText("Enter the 6-digit code it shows"), "123456");
+    const turnOnButton = screen.getByRole("button", { name: "Turn on" });
+    await user.click(turnOnButton);
+
+    expect(screen.getByRole("button", { name: "Verifying…" }).querySelectorAll("path").length).toBeGreaterThan(0);
+
+    resolveFetch({ ok: true, json: async () => ({ backupCodes: ["aaaaaaaaaa"] }) });
+  });
+
+  it("shows the car spinner on 'Turn off' while disabling, when the dashboard's active vehicle is a car", async () => {
+    vi.stubGlobal("fetch", vi.fn());
+    const user = userEvent.setup();
+    render(
+      <ActiveSectionProvider>
+        <SetVehicleKind kind="car" />
+        <TwoFactorSettings initiallyEnabled={true} />
+      </ActiveSectionProvider>
+    );
+    await user.click(screen.getByRole("button", { name: "Turn off" }));
+    await user.type(screen.getByLabelText("Code"), "123456");
+
+    let resolveFetch: (v: unknown) => void = () => {};
+    vi.stubGlobal("fetch", vi.fn(() => new Promise((resolve) => { resolveFetch = resolve; })));
+    const turnOffButton = screen.getByRole("button", { name: "Turn off" });
+    await user.click(turnOffButton);
+
+    expect(screen.getByRole("button", { name: "Turning off…" }).querySelectorAll("path").length).toBeGreaterThan(0);
+
+    resolveFetch({ ok: true, json: async () => ({ ok: true }) });
   });
 });

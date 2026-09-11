@@ -74,4 +74,22 @@ describe("RegistrationBackfillBanner", () => {
 
     expect(await screen.findByRole("alert")).toHaveTextContent("Could not reach the server.");
   });
+
+  // Bikes only - this banner has no car equivalent (see setOriginalRegistration
+  // in bike.ts) - the spinner is hardcoded to the bike wheel rather than
+  // read from context.
+  it("shows the bike spinner alongside 'Saving…' while the request is in flight", async () => {
+    let resolveFetch: (v: unknown) => void = () => {};
+    (fetch as ReturnType<typeof vi.fn>).mockReturnValue(new Promise((resolve) => { resolveFetch = resolve; }));
+    const user = userEvent.setup();
+    render(<RegistrationBackfillBanner bikeName="Yamaha MT-07" />);
+    await user.type(screen.getByPlaceholderText("e.g. AB12 CDE"), "AB12CDE");
+    await user.click(screen.getByRole("button", { name: "Save registration" }));
+
+    const button = screen.getByRole("button", { name: "Saving…" });
+    expect(button.querySelector("svg")).toBeInTheDocument();
+
+    resolveFetch({ ok: true, json: async () => ({}) });
+    await waitFor(() => expect(refresh).toHaveBeenCalled());
+  });
 });

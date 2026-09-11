@@ -63,6 +63,7 @@ describe("RunCronButton", () => {
 
     const button = await screen.findByRole("button", { name: "Running…" });
     expect(button).toBeDisabled();
+    expect(button.querySelector("svg")).toBeInTheDocument();
 
     resolveFetch({ ok: true, json: async () => ({}) });
     await waitFor(() => expect(screen.getByRole("button", { name: "Run audit" })).not.toBeDisabled());

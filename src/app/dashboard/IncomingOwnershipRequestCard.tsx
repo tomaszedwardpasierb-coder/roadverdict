@@ -2,6 +2,7 @@
 'use client';
 
 import { useState } from 'react';
+import { VehicleSpinner } from '@/components/VehicleSpinner';
 import styles from './dashboard.module.css';
 
 interface Props {
@@ -81,9 +82,11 @@ export function IncomingOwnershipRequestCard({ requestId, requesterEmail, create
       </label>
       <div style={{ display: 'flex', gap: '0.6rem', marginTop: '0.8rem' }}>
         <button type="button" className="btn-primary" disabled={submitting} onClick={() => handleDecision('approve')}>
+          {submitting && <VehicleSpinner kind="bike" size={14} />}
           {submitting ? 'Please wait…' : 'Approve'}
         </button>
         <button type="button" className="btn-secondary" disabled={submitting} onClick={() => handleDecision('decline')}>
+          {submitting && <VehicleSpinner kind="bike" size={14} />}
           {submitting ? 'Please wait…' : 'Decline'}
         </button>
       </div>

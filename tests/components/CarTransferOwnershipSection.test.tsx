@@ -63,6 +63,20 @@ describe("CarTransferOwnershipSection", () => {
     expect(screen.queryByRole("button", { name: "Start handover" })).not.toBeInTheDocument();
   });
 
+  it("shows the car spinner on Start handover while the request is in flight", async () => {
+    let resolveFetch: (v: unknown) => void = () => {};
+    (fetch as ReturnType<typeof vi.fn>).mockReturnValue(new Promise((resolve) => { resolveFetch = resolve; }));
+    const user = userEvent.setup();
+    render(<CarTransferOwnershipSection carIsReadOnly={false} pendingRequest={null} />);
+    await user.type(screen.getByPlaceholderText("buyer@example.com"), "buyer@example.com");
+    await user.click(screen.getByRole("button", { name: "Start handover" }));
+
+    const button = screen.getByRole("button", { name: "Sending…" });
+    expect(button.querySelector("svg")).toBeInTheDocument();
+    resolveFetch({ ok: true, json: async () => ({}) });
+    await screen.findByText(/Waiting for/);
+  });
+
   it("an existing pending request from the server (includeRecords omitted) shows the 'records go with it too' wording, with no submission needed", () => {
     render(
       <CarTransferOwnershipSection

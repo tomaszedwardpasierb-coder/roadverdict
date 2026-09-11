@@ -2,6 +2,7 @@
 'use client';
 
 import { useState } from 'react';
+import { VehicleSpinner } from '@/components/VehicleSpinner';
 import { Icon } from './Icon';
 import { NotificationBell } from './NotificationBell';
 import { convertMilesToDisplay, type DistanceUnit } from '@/lib/tracker/unitFormat';
@@ -224,6 +225,7 @@ export function StorySoFarTab({ bikeNickname, registration, currentMileage, dist
           properly at all, regardless of how good its actual history is.
         </div>
         <button type="button" className={styles.scanReceiptBtn} disabled={loading} onClick={handleGenerate}>
+          {loading && <VehicleSpinner kind="bike" size={14} />}
           {loading ? 'Putting it together…' : 'Generate my story →'}
         </button>
         {error && <p className="error-text" role="alert" style={{ marginTop: '0.8rem' }}>{error}</p>}
@@ -274,6 +276,7 @@ export function StorySoFarTab({ bikeNickname, registration, currentMileage, dist
         onClick={handleGenerate}
         disabled={loading || !canRegenerate}
       >
+        {loading && <VehicleSpinner kind="bike" size={14} />}
         {loading ? 'Putting it together…' : 'Regenerate'}
       </button>
       {/* Shown upfront whenever it's locked, not discovered by clicking

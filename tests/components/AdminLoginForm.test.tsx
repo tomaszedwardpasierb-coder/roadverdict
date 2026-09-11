@@ -8,7 +8,7 @@
 // TOTP success navigates away. Only `fetch` and next/navigation's
 // useRouter are mocked.
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 const mockRouter = vi.hoisted(() => ({ push: vi.fn(), refresh: vi.fn() }));
@@ -49,6 +49,23 @@ describe("AdminLoginForm", () => {
     expect(screen.getByLabelText("Password")).toBeInTheDocument();
     expect(screen.queryByLabelText("Authenticator code")).not.toBeInTheDocument();
     expect(mockRouter.push).not.toHaveBeenCalled();
+  });
+
+  it("shows the spinner on the Continue button while the password request is in flight", async () => {
+    let resolveFetch: (v: unknown) => void = () => {};
+    vi.stubGlobal("fetch", vi.fn(() => new Promise((resolve) => { resolveFetch = resolve; })));
+
+    const user = userEvent.setup();
+    render(<AdminLoginForm />);
+    await user.type(screen.getByLabelText("Password"), "correct-password");
+    await user.click(screen.getByRole("button", { name: "Continue" }));
+
+    const button = screen.getByRole("button", { name: "Checking…" });
+    expect(button).toBeDisabled();
+    expect(button.querySelector("svg")).toBeInTheDocument();
+
+    resolveFetch({ ok: true, json: async () => ({}) });
+    await screen.findByLabelText("Authenticator code");
   });
 
   it("a correct password advances to the TOTP step without navigating away yet", async () => {
@@ -127,6 +144,24 @@ describe("AdminLoginForm", () => {
         body: JSON.stringify({ code: "123456" }),
       })
     );
+  });
+
+  it("shows the spinner on the Verify button while the TOTP request is in flight", async () => {
+    vi.stubGlobal("fetch", vi.fn());
+    const user = userEvent.setup();
+    await advanceToTotpStep(user);
+
+    let resolveFetch: (v: unknown) => void = () => {};
+    (fetch as ReturnType<typeof vi.fn>).mockReturnValueOnce(new Promise((resolve) => { resolveFetch = resolve; }));
+    await user.type(screen.getByLabelText("Authenticator code"), "123456");
+    await user.click(screen.getByRole("button", { name: "Verify" }));
+
+    const button = screen.getByRole("button", { name: "Verifying…" });
+    expect(button).toBeDisabled();
+    expect(button.querySelector("svg")).toBeInTheDocument();
+
+    resolveFetch({ ok: true, json: async () => ({}) });
+    await waitFor(() => expect(mockRouter.push).toHaveBeenCalledWith("/tomasz"));
   });
 
   it("a connection error on the TOTP step shows a generic message and stays on that step", async () => {

@@ -159,6 +159,25 @@ describe("SendNotificationForm", () => {
     expect(await screen.findByText("Couldn't reach the server. Try again.")).toBeInTheDocument();
   });
 
+  it("shows the spinner alongside the button's own 'Sending…' text while the request is in flight", async () => {
+    vi.stubGlobal("confirm", vi.fn(() => true));
+    let resolveFetch: (v: unknown) => void = () => {};
+    vi.stubGlobal("fetch", vi.fn(() => new Promise((resolve) => { resolveFetch = resolve; })));
+
+    const user = userEvent.setup();
+    render(<SendNotificationForm allEmails={["a@example.com", "b@example.com"]} />);
+    await user.type(screen.getByLabelText("Title"), "Heads up");
+    await user.type(screen.getByLabelText("Message"), "Something changed.");
+    await user.click(screen.getByRole("button", { name: "Send notification" }));
+
+    const button = await screen.findByRole("button", { name: "Sending…" });
+    expect(button).toBeDisabled();
+    expect(button.querySelector("svg")).toBeInTheDocument();
+
+    resolveFetch({ ok: true, json: async () => ({ sentCount: 2 }) });
+    await screen.findByText("Sent to 2 users.");
+  });
+
   it("shows a note that there are no registered users when the specific-recipients list is empty", async () => {
     const user = userEvent.setup();
     render(<SendNotificationForm allEmails={[]} />);

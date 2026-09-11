@@ -3,9 +3,12 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { useActiveSection } from '@/components/ActiveSectionContext';
+import { VehicleSpinner } from '@/components/VehicleSpinner';
 
 export function ResetDemoButton() {
   const router = useRouter();
+  const { vehicleKind } = useActiveSection();
   const [resetting, setResetting] = useState(false);
 
   async function handleReset() {
@@ -29,6 +32,7 @@ export function ResetDemoButton() {
 
   return (
     <button type="button" className="submit-button" onClick={handleReset} disabled={resetting} style={{ width: '100%' }}>
+      {resetting && <VehicleSpinner kind={vehicleKind ?? 'bike'} size={14} />}
       {resetting ? 'Resetting…' : '↺ Reset Demo'}
     </button>
   );

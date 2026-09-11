@@ -91,7 +91,9 @@ describe("PlateGate", () => {
     await user.type(screen.getByPlaceholderText("e.g. AB12 CDE"), "AB12CDE");
     await user.click(screen.getByRole("button", { name: "View report" }));
 
-    expect(screen.getByRole("button", { name: "Checking…" })).toBeDisabled();
+    const button = screen.getByRole("button", { name: "Checking…" });
+    expect(button).toBeDisabled();
+    expect(button.querySelector("svg")).toBeInTheDocument();
     resolveFetch({ ok: true, json: async () => ({}) });
     await screen.findByRole("button", { name: "View report" });
   });

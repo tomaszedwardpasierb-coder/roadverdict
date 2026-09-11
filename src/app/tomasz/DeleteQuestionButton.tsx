@@ -2,6 +2,7 @@
 'use client';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { VehicleSpinner } from '@/components/VehicleSpinner';
 import styles from './adminShell.module.css';
 export function DeleteQuestionButton({ id }: { id: string }) {
   const router = useRouter();
@@ -23,6 +24,7 @@ export function DeleteQuestionButton({ id }: { id: string }) {
       onClick={handleClick}
       disabled={deleting}
     >
+      {deleting && <VehicleSpinner size={14} />}
       {deleting ? '\u2026' : 'Delete'}
     </button>
   );

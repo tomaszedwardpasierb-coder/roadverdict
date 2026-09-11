@@ -3,10 +3,13 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { useActiveSection } from '@/components/ActiveSectionContext';
+import { VehicleSpinner } from '@/components/VehicleSpinner';
 import styles from './dashboard.module.css';
 
 export function DeleteAccountModal({ onClose }: { onClose: () => void }) {
   const router = useRouter();
+  const { vehicleKind } = useActiveSection();
   const [confirmText, setConfirmText] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -68,6 +71,7 @@ export function DeleteAccountModal({ onClose }: { onClose: () => void }) {
             disabled={!canConfirm || submitting}
             onClick={handleConfirm}
           >
+            {submitting && <VehicleSpinner kind={vehicleKind ?? 'bike'} size={14} />}
             {submitting ? 'Scheduling…' : 'Delete my account'}
           </button>
           <button type="button" className={styles.iconBtn} onClick={onClose} disabled={submitting}>

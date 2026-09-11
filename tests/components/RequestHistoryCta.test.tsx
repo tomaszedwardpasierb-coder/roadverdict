@@ -71,6 +71,25 @@ describe("RequestHistoryCta", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent(/couldn't reach the server/i);
   });
 
+  // Pins the actual visual feedback this was built for - a button click
+  // that's accepted but takes a moment shouldn't read as "did nothing
+  // happen?" (see VehicleSpinner.tsx).
+  it("shows the bike spinner alongside the button's own 'Sending…' text while the request is in flight", async () => {
+    let resolveFetch: (v: unknown) => void = () => {};
+    (fetch as ReturnType<typeof vi.fn>).mockReturnValue(new Promise((resolve) => { resolveFetch = resolve; }));
+
+    const user = userEvent.setup();
+    render(<RequestHistoryCta registration="AB12CDE" signedInEmail="buyer@example.com" currentPath="/report/tok123" />);
+    await user.click(screen.getByRole("button", { name: "Request this bike's history" }));
+
+    const button = screen.getByRole("button", { name: "Sending…" });
+    expect(button).toBeDisabled();
+    expect(button.querySelector("svg")).toBeInTheDocument();
+
+    resolveFetch({ ok: true, json: async () => ({}) });
+    expect(await screen.findByText("Request sent")).toBeInTheDocument();
+  });
+
   it("once sent, no longer shows the request button even if re-rendered with the same props", async () => {
     (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
       ok: true,

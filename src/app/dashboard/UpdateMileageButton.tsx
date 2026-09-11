@@ -4,6 +4,7 @@
 import { useState } from 'react';
 import { useTrackerFormSubmit } from './useTrackerFormSubmit';
 import { convertMilesToDisplay, convertDisplayToMiles, distanceUnitLabel, type DistanceUnit } from '@/lib/tracker/unitFormat';
+import { VehicleSpinner } from '@/components/VehicleSpinner';
 import styles from './dashboard.module.css';
 
 export function UpdateMileageButton({
@@ -46,6 +47,7 @@ export function UpdateMileageButton({
         />
         <span style={{ fontSize: '0.75rem', color: 'var(--ink-soft)' }}>{unitLabel}</span>
         <button className={styles.iconBtn} type="submit" disabled={submitting || isBlocked}>
+          {submitting && <VehicleSpinner kind={vehicleKind} size={14} />}
           {submitting ? 'Saving…' : 'Save'}
         </button>
         <button className={styles.iconBtn} type="button" onClick={() => setEditing(false)} disabled={submitting}>

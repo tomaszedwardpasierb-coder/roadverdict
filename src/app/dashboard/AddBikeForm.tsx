@@ -4,6 +4,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { VehicleSpinner } from '@/components/VehicleSpinner';
 import { ALL_BRANDS, MOTORCYCLE_MODELS, getBikeClassForCC } from '@/lib/motorcycleModels';
 import { REGION_LABELS, type Region } from '@/lib/priceData';
 import { useTrackerFormSubmit } from './useTrackerFormSubmit';
@@ -398,6 +399,7 @@ export function AddBikeForm() {
               style={{ flex: 1 }}
             />
             <button type="button" className={styles.iconBtn} disabled={lookingUp} onClick={handleLookup}>
+              {lookingUp && <VehicleSpinner kind="bike" size={14} />}
               {lookingUp ? 'Looking up…' : 'Look up'}
             </button>
           </div>
@@ -425,6 +427,7 @@ export function AddBikeForm() {
                 onClick={() => existingBike.bikeId && handleGoToExistingBike(existingBike.bikeId)}
                 style={{ marginTop: '0.5rem' }}
               >
+                {switchingBike && <VehicleSpinner kind="bike" size={14} />}
                 {switchingBike ? 'Switching…' : 'Go to this bike'}
               </button>
             </div>
@@ -450,6 +453,7 @@ export function AddBikeForm() {
                       disabled={requestingOwnership}
                       onClick={handleRequestOwnership}
                     >
+                      {requestingOwnership && <VehicleSpinner kind="bike" size={14} />}
                       {requestingOwnership ? 'Sending…' : 'Request ownership'}
                     </button>
                     <button type="button" className="btn-secondary" onClick={handleStartFresh}>
@@ -516,6 +520,7 @@ export function AddBikeForm() {
       <hr className="ticket__divider" />
       <div className="ticket__section">
         <button className="submit-button" type="submit" disabled={submitting}>
+          {submitting && <VehicleSpinner kind="bike" size={14} />}
           {submitting ? 'Adding…' : 'Add bike'}
         </button>
         {formError && <p className="error-text" role="alert">{formError}</p>}

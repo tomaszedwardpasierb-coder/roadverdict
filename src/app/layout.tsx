@@ -7,6 +7,7 @@ import { getAdminSession } from '@/lib/admin/session';
 import { ImpersonationBanner } from './ImpersonationBanner';
 import { AssistantWidget } from '@/components/AssistantWidget';
 import { ActiveSectionProvider } from '@/components/ActiveSectionContext';
+import { NavigationLoadingOverlay } from '@/components/NavigationLoadingOverlay';
 import { SocialLinks } from '@/components/SocialLinks';
 import { SiteHeaderNav } from './SiteHeaderNav';
 import './globals.css';
@@ -82,6 +83,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             <SocialLinks />
           </footer>
           <AssistantWidget />
+          <NavigationLoadingOverlay />
         </ActiveSectionProvider>
       </body>
     </html>

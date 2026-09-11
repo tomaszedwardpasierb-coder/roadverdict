@@ -104,6 +104,27 @@ describe("CarLabourCard", () => {
     expect(await screen.findByText("Mileage conflict")).toBeInTheDocument();
   });
 
+  it("shows the car spinner on Resolve while the conflict lookup is in flight", async () => {
+    let resolveLookup: (v: unknown) => void = () => {};
+    (fetch as ReturnType<typeof vi.fn>).mockImplementation((url: string) => {
+      if (url.includes("/api/tracker/mileage-conflict-lookup")) {
+        return new Promise((resolve) => { resolveLookup = resolve; });
+      }
+      return Promise.resolve({
+        ok: true,
+        json: async () => ({ id: "ref-1", category: "fuel", date: "2026-01-01", mileage: 43000, label: "Charge", cost: 20, attachment: null }),
+      });
+    });
+    const user = userEvent.setup();
+    renderCarLabourCard({ labour: { ...baseLabour, needsReview: true, mileageConflictWarning: "Mileage conflict detected." } });
+    await user.click(screen.getByRole("button", { name: "Resolve" }));
+
+    const button = screen.getByRole("button", { name: "Finding it..." });
+    expect(button.querySelector("svg")).toBeInTheDocument();
+    resolveLookup({ ok: true, json: async () => ({ referenceId: "ref-1", referenceCategory: "fuel" }) });
+    await screen.findByText("Mileage conflict");
+  });
+
   it("Edit opens a form pre-filled with the record's real values", async () => {
     const user = userEvent.setup();
     renderCarLabourCard({ labour: { ...baseLabour, notes: "Annual check" } });
@@ -164,5 +185,33 @@ describe("CarLabourCard", () => {
 
     await within(document.body).findByRole("button", { name: "Delete" });
     expect(fetch).toHaveBeenCalledWith("/api/cars/car-labour/car-labour-1", expect.objectContaining({ method: "DELETE" }));
+  });
+
+  it("shows the car spinner on Save while the request is in flight", async () => {
+    let resolveFetch: (v: unknown) => void = () => {};
+    (fetch as ReturnType<typeof vi.fn>).mockReturnValue(new Promise((resolve) => { resolveFetch = resolve; }));
+    const user = userEvent.setup();
+    renderCarLabourCard();
+    await user.click(screen.getByRole("button", { name: "Edit" }));
+    await user.click(screen.getByRole("button", { name: "Save" }));
+
+    const button = screen.getByRole("button", { name: "Saving…" });
+    expect(button.querySelector("svg")).toBeInTheDocument();
+    resolveFetch({ ok: true, json: async () => ({ id: "car-labour-1" }) });
+    await screen.findByRole("button", { name: "Edit" });
+  });
+
+  it("shows the car spinner on Delete while the request is in flight", async () => {
+    vi.stubGlobal("confirm", vi.fn(() => true));
+    let resolveFetch: (v: unknown) => void = () => {};
+    (fetch as ReturnType<typeof vi.fn>).mockReturnValue(new Promise((resolve) => { resolveFetch = resolve; }));
+    const user = userEvent.setup();
+    renderCarLabourCard();
+    await user.click(screen.getByRole("button", { name: "Delete" }));
+
+    const button = screen.getByRole("button", { name: "Deleting…" });
+    expect(button.querySelector("svg")).toBeInTheDocument();
+    resolveFetch({ ok: true, json: async () => ({}) });
+    await within(document.body).findByRole("button", { name: "Delete" });
   });
 });

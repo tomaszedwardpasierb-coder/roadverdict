@@ -8,6 +8,7 @@ import { BILL_LABELS } from '@/lib/tracker/billTypes';
 import { MOD_GROUPS, MOD_LABELS } from '@/lib/tracker/modTypes';
 import { LABOUR_GROUPS, LABOUR_LABELS } from '@/lib/tracker/labourTypes';
 import { CAR_LABOUR_GROUPS, CAR_LABOUR_LABELS } from '@/lib/tracker/carLabourTypes';
+import { VehicleSpinner } from './VehicleSpinner';
 import styles from './AssistantProposedEntryCard.module.css';
 
 export interface ProposedServiceEntry {
@@ -190,6 +191,11 @@ export function AssistantProposedEntryCard({ entry }: { entry: ProposedEntry }) 
   // mentions "miles", which nothing else these endpoints return does.
   const offerMileageOverride = entry.category !== 'bill' && !!error && /miles/i.test(error) && !mileageAcknowledged;
 
+  // Only the labour category actually varies by vehicle - every other
+  // category is bike-only (see getEndpoint above), so the spinner should
+  // match that same real distinction rather than always assuming bike.
+  const spinnerKind = entry.category === 'labour' ? entry.vehicleKind : 'bike';
+
   return (
     <div className={styles.card}>
       <span className={styles.cardLabel}>{CARD_TITLE[entry.category]}</span>
@@ -303,6 +309,7 @@ export function AssistantProposedEntryCard({ entry }: { entry: ProposedEntry }) 
 
       <div className={styles.actions}>
         <button type="button" className={styles.confirmBtn} onClick={() => handleConfirm(false)} disabled={submitting}>
+          {submitting && <VehicleSpinner kind={spinnerKind} size={14} />}
           {submitting ? 'Logging…' : 'Log it'}
         </button>
         {offerMileageOverride && (

@@ -2,6 +2,7 @@
 'use client';
 
 import { useState } from 'react';
+import { VehicleSpinner } from '@/components/VehicleSpinner';
 import styles from './report.module.css';
 
 export function PlateGate({ token }: { token: string }) {
@@ -51,6 +52,7 @@ export function PlateGate({ token }: { token: string }) {
             className={styles.gateInput}
           />
           <button type="submit" className="submit-button" disabled={submitting}>
+            {submitting && <VehicleSpinner kind="bike" size={14} />}
             {submitting ? 'Checking…' : 'View report'}
           </button>
         </form>

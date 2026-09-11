@@ -191,6 +191,36 @@ describe("DashboardShell", () => {
     expect(screen.getByText("Active section: fuel")).toBeInTheDocument();
   });
 
+  // Same reasoning as the test above, for the field NavigationLoadingOverlay
+  // reads to theme its spinner while inside the dashboard (see
+  // ActiveSectionContext.tsx's own comment).
+  it("publishes vehicleKind to the shared context too, and clears it once DashboardShell unmounts", () => {
+    function ShowVehicleKind() {
+      const { vehicleKind } = useActiveSection();
+      return <div>Vehicle kind: {vehicleKind ?? "none"}</div>;
+    }
+
+    const { rerender } = render(
+      <ActiveSectionProvider>
+        <DashboardShell {...baseProps({ vehicleKind: "car" })} />
+        <ShowVehicleKind />
+      </ActiveSectionProvider>
+    );
+
+    expect(screen.getByText("Vehicle kind: car")).toBeInTheDocument();
+
+    // Swaps DashboardShell out for nothing, without unmounting the whole
+    // provider tree - ShowVehicleKind (a sibling, same as the real
+    // globally-mounted NavigationLoadingOverlay) should see the cleared
+    // value, same as leaving the dashboard for another page would.
+    rerender(
+      <ActiveSectionProvider>
+        <ShowVehicleKind />
+      </ActiveSectionProvider>
+    );
+    expect(screen.getByText("Vehicle kind: none")).toBeInTheDocument();
+  });
+
   it("shows a Premium badge next to the user's email only when isPro is true", () => {
     const { rerender } = render(<DashboardShell {...baseProps({ isPro: false })} />);
     expect(screen.queryByText("Premium")).not.toBeInTheDocument();

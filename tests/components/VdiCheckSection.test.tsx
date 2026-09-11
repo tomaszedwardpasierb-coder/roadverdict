@@ -87,6 +87,35 @@ describe("VdiCheckSection", () => {
     expect(fetch).toHaveBeenCalledWith("/api/cars/vdi-checkout", expect.objectContaining({ method: "POST" }));
   });
 
+  it("shows the spinner alongside the unlock button's own 'Starting checkout…' text while checkout is being created", async () => {
+    let resolveFetch: (v: unknown) => void = () => {};
+    (fetch as ReturnType<typeof vi.fn>).mockReturnValue(new Promise((resolve) => { resolveFetch = resolve; }));
+    const user = userEvent.setup();
+    render(<VdiCheckSection vehicleKind="bike" token="tok_abc" registration="AB12CDE" make="Honda" model="CB125R" />);
+    await user.click(screen.getByText("Unlock for £9.99"));
+
+    const button = screen.getByRole("button", { name: "Starting checkout…" });
+    expect(button.querySelector("svg")).toBeInTheDocument();
+
+    resolveFetch({ ok: true, json: async () => ({ url: "https://checkout.stripe.com/session123" }) });
+    await vi.waitFor(() => expect(window.location.href).toBe("https://checkout.stripe.com/session123"));
+  });
+
+  it("themes the spinner from the real vehicleKind prop - a car section renders the car wheel (path elements), never the bike wheel's wire spokes", async () => {
+    let resolveFetch: (v: unknown) => void = () => {};
+    (fetch as ReturnType<typeof vi.fn>).mockReturnValue(new Promise((resolve) => { resolveFetch = resolve; }));
+    const user = userEvent.setup();
+    render(<VdiCheckSection vehicleKind="car" token="tok_xyz" registration="AB12CDE" make="Ford" model="Focus" />);
+    await user.click(screen.getByText("Unlock for £13.99"));
+
+    const button = screen.getByRole("button", { name: "Starting checkout…" });
+    expect(button.querySelectorAll("path").length).toBe(5);
+    expect(button.querySelectorAll("line").length).toBe(0);
+
+    resolveFetch({ ok: true, json: async () => ({ url: "https://checkout.stripe.com/session456" }) });
+    await vi.waitFor(() => expect(window.location.href).toBe("https://checkout.stripe.com/session456"));
+  });
+
   it("shows the server's own error message and never redirects when checkout creation fails", async () => {
     (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({ ok: false, json: async () => ({ error: "This report's Independent Vehicle Check has already been unlocked." }) });
     const user = userEvent.setup();

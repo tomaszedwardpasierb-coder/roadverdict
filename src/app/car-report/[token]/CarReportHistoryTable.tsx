@@ -6,6 +6,7 @@
 'use client';
 
 import { useState } from 'react';
+import { VehicleSpinner } from '@/components/VehicleSpinner';
 import { isBackdated, backdateNotice } from '@/lib/tracker/backdateCheck';
 import { isBeforeProduction } from '@/lib/tracker/productionYearCheck';
 import type { CarReportRow } from '@/lib/tracker/carSellerReportData';
@@ -221,6 +222,7 @@ export function CarReportHistoryTable({
                         disabled={(!status.canRemind && !remindedNow.has(r.id)) || remindedNow.has(r.id) || remindingId === r.id}
                         onClick={() => handleRemind(r.id)}
                       >
+                        {remindingId === r.id && <VehicleSpinner kind="car" size={14} />}
                         {remindedNow.has(r.id) ? 'Reminded' : remindingId === r.id ? 'Sending…' : 'Remind'}
                       </button>
                     </div>
@@ -271,6 +273,7 @@ export function CarReportHistoryTable({
               {error && <p className="error-text" role="alert">{error}</p>}
               <div style={{ display: 'flex', gap: '0.5rem' }}>
                 <button type="button" className="submit-button" onClick={handleSubmit} disabled={submitting}>
+                  {submitting && <VehicleSpinner kind="car" size={14} />}
                   {submitting ? 'Sending…' : 'Send request'}
                 </button>
                 <button type="button" className={styles.backLink} onClick={() => setShowForm(false)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}>

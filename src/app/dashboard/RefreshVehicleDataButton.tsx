@@ -3,6 +3,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { VehicleSpinner } from '@/components/VehicleSpinner';
 import styles from './dashboard.module.css';
 
 interface Props {
@@ -68,6 +69,7 @@ export function RefreshVehicleDataButton({ bikeId, available, nextAvailableAt }:
   return (
     <div>
       <button type="button" className={styles.iconBtn} onClick={handleClick} disabled={loading}>
+        {loading && <VehicleSpinner kind="bike" size={14} />}
         {loading ? 'Refreshing…' : 'Refresh vehicle data'}
       </button>
       {result && (

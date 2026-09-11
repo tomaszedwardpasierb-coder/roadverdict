@@ -178,6 +178,50 @@ describe("FuelLogCard", () => {
     expect(screen.getByLabelText("Mileage (km)")).toHaveValue(16093); // round(10000 * 1.60934)
   });
 
+  it("shows the bike spinner on Save while the request is in flight", async () => {
+    let resolveFetch: (v: unknown) => void = () => {};
+    vi.stubGlobal("fetch", vi.fn().mockReturnValue(new Promise((resolve) => { resolveFetch = resolve; })));
+    const user = userEvent.setup();
+    renderCard();
+    await user.click(screen.getByRole("button", { name: "Edit" }));
+    await user.click(screen.getByRole("button", { name: "Save" }));
+
+    const button = screen.getByRole("button", { name: "Saving…" });
+    expect(button.querySelector("svg")).toBeInTheDocument();
+
+    resolveFetch({ ok: true, json: async () => ({}) });
+    await screen.findByRole("button", { name: "Edit" });
+  });
+
+  it("shows the bike spinner on Delete while the request is in flight", async () => {
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    let resolveFetch: (v: unknown) => void = () => {};
+    vi.stubGlobal("fetch", vi.fn().mockReturnValue(new Promise((resolve) => { resolveFetch = resolve; })));
+    const user = userEvent.setup();
+    renderCard();
+    await user.click(screen.getByRole("button", { name: "Delete" }));
+
+    const button = screen.getByRole("button", { name: "Deleting…" });
+    expect(button.querySelector("svg")).toBeInTheDocument();
+
+    resolveFetch({ ok: true, json: async () => ({}) });
+    await screen.findByRole("button", { name: "Delete" });
+  });
+
+  it("shows the bike spinner on Resolve while the conflict lookup is in flight", async () => {
+    let resolveFetch: (v: unknown) => void = () => {};
+    vi.stubGlobal("fetch", vi.fn().mockReturnValue(new Promise((resolve) => { resolveFetch = resolve; })));
+    const user = userEvent.setup();
+    renderCard({ log: makeLog({ needsReview: true, mileageConflictWarning: "Conflict!" }) });
+    await user.click(screen.getByRole("button", { name: "Resolve" }));
+
+    const button = screen.getByRole("button", { name: "Finding it..." });
+    expect(button.querySelector("svg")).toBeInTheDocument();
+
+    resolveFetch({ ok: false, json: async () => ({ error: "Could not find the conflicting entry." }) });
+    await screen.findByRole("alert");
+  });
+
   it("Cancel discards edits and returns to the view without ever calling the server", async () => {
     const user = userEvent.setup();
     renderCard();

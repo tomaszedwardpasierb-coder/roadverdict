@@ -4,6 +4,7 @@
 // are reused directly - all three are genuinely vehicle-neutral.
 'use client';
 
+import { VehicleSpinner } from '@/components/VehicleSpinner';
 import type { CarBillSeriesDoc } from '@/lib/tracker/carBillSeries';
 import { seriesTotalCost, seriesEndDate } from '@/lib/tracker/billSeriesSchedule';
 import { CAR_BILL_LABELS } from '@/lib/tracker/carBillTypes';
@@ -48,6 +49,7 @@ function SeriesRow({ series, currency, rates }: { series: CarBillSeriesDoc; curr
       {series.status === 'active' && (
         <div className={styles.cardActions}>
           <button type="button" className={styles.iconBtn} onClick={handleEnd} disabled={submitting}>
+            {submitting && <VehicleSpinner kind="car" size={14} />}
             {submitting ? 'Ending…' : 'End this plan'}
           </button>
         </div>

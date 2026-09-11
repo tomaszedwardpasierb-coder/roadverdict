@@ -132,6 +132,29 @@ describe("CostCalculatorForm", () => {
     expect(body.taxStatus).toEqual({ taxStatus: "Taxed", taxIsCurrentlyValid: true, taxDueDate: "2027-06-01", taxDaysRemaining: 263, vedStandardTwelveMonths: 27 });
   });
 
+  it("shows the bike spinner alongside the lookup button's own 'Looking up…' text while the request is in flight", async () => {
+    let resolveFetch: (v: unknown) => void = () => {};
+    (fetch as ReturnType<typeof vi.fn>).mockReturnValue(new Promise((resolve) => { resolveFetch = resolve; }));
+
+    const user = userEvent.setup();
+    render(<CostCalculatorForm signedIn={true} />);
+    await user.type(screen.getByLabelText("Search by registration (optional)"), "AB12CDE");
+    await user.click(screen.getByRole("button", { name: "Look up" }));
+
+    const button = screen.getByRole("button", { name: "Looking up…" });
+    expect(button.querySelector("svg")).toBeInTheDocument();
+
+    resolveFetch({
+      ok: true,
+      json: async () => ({
+        vrm: "AB12CDE", make: "Honda", model: "CB125R", fuelType: "Petrol", colour: "Red",
+        plateInRetention: false, motDueDate: "2026-06-01", motTests: [], taxDetails: null,
+      }),
+    });
+    await screen.findByRole("button", { name: "Look up" });
+    expect(screen.getByRole("button", { name: "Look up" }).querySelector("svg")).not.toBeInTheDocument();
+  });
+
   it("rejects a mileage of exactly zero client-side - passes the input's own min=0 but fails the mileage<=0 guard", async () => {
     // min="0" alone treats 0 as a valid HTML number, so this is a real,
     // reachable path through the rendered form's own constraints, unlike

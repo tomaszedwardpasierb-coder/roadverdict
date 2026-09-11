@@ -13,6 +13,7 @@ import {
 import { getModelsForBrand, getBikeClassForCC, slugifyMake } from '@/lib/motorcycleModels';
 import type { Verdict } from '@/lib/verdict';
 import { VerdictResult } from './VerdictResult';
+import { VehicleSpinner } from './VehicleSpinner';
 
 interface ApiResponse {
   verdict: Verdict;
@@ -197,6 +198,7 @@ export function QuoteForm({ signedIn, initialBrand, initialBikeClass }: Props) {
                 style={{ flex: '1 1 160px' }}
               />
               <button type="button" className="btn-primary" onClick={handlePlateLookup} disabled={lookupLoading}>
+                {lookupLoading && <VehicleSpinner kind="bike" size={14} />}
                 {lookupLoading ? 'Looking up…' : 'Look up'}
               </button>
             </div>

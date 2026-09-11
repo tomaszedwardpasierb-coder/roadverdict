@@ -63,4 +63,21 @@ describe("RevokeSessionsButton", () => {
 
     expect(await screen.findByText("Could not reach the server.")).toBeInTheDocument();
   });
+
+  it("shows the spinner while the request is in flight", async () => {
+    vi.stubGlobal("confirm", vi.fn(() => true));
+    let resolveFetch: (v: unknown) => void = () => {};
+    vi.stubGlobal("fetch", vi.fn(() => new Promise((resolve) => { resolveFetch = resolve; })));
+
+    const user = userEvent.setup();
+    render(<RevokeSessionsButton email="rider@example.com" />);
+    const button = screen.getByRole("button", { name: "Force re-auth" });
+    await user.click(button);
+
+    expect(button).toBeDisabled();
+    expect(button.querySelector("svg")).toBeInTheDocument();
+
+    resolveFetch({ ok: true, json: async () => ({ ok: true, revokedCount: 2 }) });
+    await waitFor(() => expect(mockRouter.refresh).toHaveBeenCalled());
+  });
 });

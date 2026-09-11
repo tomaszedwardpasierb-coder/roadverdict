@@ -1,6 +1,7 @@
 // Place at: src/app/tomasz/ClearNotificationsForm.tsx
 'use client';
 import { useState } from 'react';
+import { VehicleSpinner } from '@/components/VehicleSpinner';
 import styles from './adminShell.module.css';
 import type { BroadcastSummary } from '@/lib/tracker/notification';
 
@@ -166,6 +167,7 @@ export function ClearNotificationsForm({ broadcasts, allEmails }: Props) {
         )}
 
         <button type="submit" disabled={clearing} className={`${styles.button} ${styles.buttonDanger}`}>
+          {clearing && <VehicleSpinner size={14} />}
           {clearing ? 'Clearing…' : 'Clear notifications'}
         </button>
       </form>

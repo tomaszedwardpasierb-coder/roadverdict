@@ -32,6 +32,14 @@ function SetActiveSection({ section }: { section: string }) {
   return null;
 }
 
+// Same pattern, for vehicleKind - see NavigationLoadingOverlay.tsx/
+// VehicleSpinner.tsx for why this widget needs to know it too.
+function SetVehicleKind({ kind }: { kind: "bike" | "car" }) {
+  const { setVehicleKind } = useActiveSection();
+  useEffect(() => setVehicleKind(kind), [kind, setVehicleKind]);
+  return null;
+}
+
 async function openWidgetAndSend(user: ReturnType<typeof userEvent.setup>, text: string) {
   await user.click(screen.getByRole("button", { name: "Open assistant" }));
   await user.type(screen.getByPlaceholderText("Ask about using RoadVerdict…"), text);
@@ -78,6 +86,53 @@ describe("AssistantWidget", () => {
       { role: "assistant", content: expect.stringContaining("What can I help with") },
       { role: "user", content: "How do I log a receipt?" },
     ] });
+  });
+
+  it("shows the spinner on the typing bubble and the Send button while a reply is in flight", async () => {
+    let resolveFetch: (v: unknown) => void = () => {};
+    (fetch as ReturnType<typeof vi.fn>).mockReturnValue(new Promise((resolve) => { resolveFetch = resolve; }));
+
+    const user = userEvent.setup();
+    render(<AssistantWidget />);
+    await user.click(screen.getByRole("button", { name: "Open assistant" }));
+    await user.type(screen.getByPlaceholderText("Ask about using RoadVerdict…"), "hello");
+    await user.click(screen.getByRole("button", { name: "Send" }));
+
+    const sendButton = screen.getByRole("button", { name: "Send" });
+    expect(sendButton).toBeDisabled();
+    expect(sendButton.querySelector("svg")).toBeInTheDocument();
+    // The typing-bubble spinner - a second, separate one from the Send
+    // button's own - confirms the "assistant is composing a reply" cue
+    // is a real animated wheel now, not just a static "…".
+    expect(document.querySelectorAll("svg").length).toBeGreaterThanOrEqual(2);
+
+    resolveFetch({ ok: true, status: 200, json: async () => ({ reply: "Done." }) });
+    expect(await screen.findByText("Done.")).toBeInTheDocument();
+    expect(sendButton.querySelector("svg")).not.toBeInTheDocument();
+  });
+
+  it("themes the sending spinner as a car wheel when ActiveSectionContext says the dashboard is car-active", async () => {
+    let resolveFetch: (v: unknown) => void = () => {};
+    (fetch as ReturnType<typeof vi.fn>).mockReturnValue(new Promise((resolve) => { resolveFetch = resolve; }));
+
+    const user = userEvent.setup();
+    render(
+      <ActiveSectionProvider>
+        <SetVehicleKind kind="car" />
+        <AssistantWidget />
+      </ActiveSectionProvider>
+    );
+    await user.click(screen.getByRole("button", { name: "Open assistant" }));
+    await user.type(screen.getByPlaceholderText("Ask about using RoadVerdict…"), "hello");
+    await user.click(screen.getByRole("button", { name: "Send" }));
+
+    // The car wheel's own distinguishing feature (its alloy wedge spokes,
+    // rendered as <path> elements) - the bike wheel's wire spokes are
+    // plain <line> elements instead, see VehicleSpinner.test.tsx.
+    expect(document.querySelectorAll("path").length).toBeGreaterThan(0);
+
+    resolveFetch({ ok: true, status: 200, json: async () => ({ reply: "Done." }) });
+    await screen.findByText("Done.");
   });
 
   it("on a /report/[token] page, includes that report's token in the request body", async () => {

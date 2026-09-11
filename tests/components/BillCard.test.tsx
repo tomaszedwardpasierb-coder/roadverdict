@@ -238,6 +238,40 @@ describe("BillCard", () => {
     expect(onSwitchTab).toHaveBeenCalledWith("service");
   });
 
+  it("shows the bike spinner on Save while the request is in flight", async () => {
+    let resolveFetch: (v: unknown) => void = () => {};
+    (fetch as ReturnType<typeof vi.fn>).mockReturnValue(new Promise((resolve) => { resolveFetch = resolve; }));
+    const bill = makeBill();
+    const user = userEvent.setup();
+    render(<BillCard bill={bill} currency="GBP" rates={null} pendingReviewIds={emptyPendingReviewIds} distanceUnit="mi" />);
+
+    await user.click(screen.getByRole("button", { name: "Edit" }));
+    await user.click(screen.getByRole("button", { name: "Save" }));
+
+    const button = screen.getByRole("button", { name: "Saving…" });
+    expect(button.querySelector("svg")).toBeInTheDocument();
+
+    resolveFetch({ ok: true, json: async () => ({}) });
+    await screen.findByRole("button", { name: "Edit" });
+  });
+
+  it("shows the bike spinner on Delete while the request is in flight", async () => {
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    let resolveFetch: (v: unknown) => void = () => {};
+    (fetch as ReturnType<typeof vi.fn>).mockReturnValue(new Promise((resolve) => { resolveFetch = resolve; }));
+    const bill = makeBill();
+    const user = userEvent.setup();
+    render(<BillCard bill={bill} currency="GBP" rates={null} pendingReviewIds={emptyPendingReviewIds} distanceUnit="mi" />);
+
+    await user.click(screen.getByRole("button", { name: "Delete" }));
+
+    const button = screen.getByRole("button", { name: "Deleting…" });
+    expect(button.querySelector("svg")).toBeInTheDocument();
+
+    resolveFetch({ ok: true, json: async () => ({}) });
+    await screen.findByRole("button", { name: "Delete" });
+  });
+
   it("saving a needs-review bill with more pending in its own category does NOT switch tabs", async () => {
     (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({ ok: true, json: async () => ({}) });
     const bill = makeBill({ needsReview: true });

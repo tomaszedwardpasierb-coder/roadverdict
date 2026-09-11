@@ -3,6 +3,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { VehicleSpinner } from '@/components/VehicleSpinner';
 
 export function ImpersonationBanner({ email }: { email: string }) {
   const router = useRouter();
@@ -50,6 +51,7 @@ export function ImpersonationBanner({ email }: { email: string }) {
           cursor: exiting ? 'default' : 'pointer',
         }}
       >
+        {exiting && <VehicleSpinner size={14} />}
         {exiting ? 'Exiting…' : 'Exit impersonation'}
       </button>
     </div>

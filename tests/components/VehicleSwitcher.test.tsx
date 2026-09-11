@@ -119,6 +119,48 @@ describe("VehicleSwitcher", () => {
     );
   });
 
+  // Deliberately reads the row's OWN kind (v.kind), not the dashboard's
+  // active-vehicle context - switching bike->car should show the car
+  // wheel for the row being switched TO while it's in flight, not the
+  // bike wheel from whatever was active before the click.
+  it("shows the car spinner only on the row being switched to, while the switch is in flight", async () => {
+    let resolveFetch: (v: unknown) => void = () => {};
+    (fetch as ReturnType<typeof vi.fn>).mockReturnValue(new Promise((resolve) => { resolveFetch = resolve; }));
+    const user = userEvent.setup();
+    const { container } = render(<VehicleSwitcher vehicles={[bikeA, carA]} activeVehicleId="a" distanceUnit="mi" />);
+    await user.click(screen.getByRole("button", { name: /My bike/ }));
+    const dropdown = openDropdown(container);
+    const carRow = within(dropdown).getByText("Focus", { exact: false }).closest("button") as HTMLButtonElement;
+    const bikeRow = within(dropdown).getByText("CB500", { exact: false }).closest("button") as HTMLButtonElement;
+    await user.click(carRow);
+
+    expect(carRow.querySelector("svg")).toBeInTheDocument();
+    expect(carRow.querySelectorAll("path").length).toBeGreaterThan(0); // car wheel
+    // The other row is disabled too (one switch at a time), but shows no
+    // spinner of its own - it isn't the one being switched to.
+    expect(bikeRow).toBeDisabled();
+    expect(bikeRow.querySelector("svg")).not.toBeInTheDocument();
+
+    resolveFetch({ ok: true });
+    await waitFor(() => expect(mockRouter.refresh).toHaveBeenCalled());
+  });
+
+  it("shows the bike spinner on the row being switched to when switching from a car to a bike", async () => {
+    let resolveFetch: (v: unknown) => void = () => {};
+    (fetch as ReturnType<typeof vi.fn>).mockReturnValue(new Promise((resolve) => { resolveFetch = resolve; }));
+    const user = userEvent.setup();
+    const { container } = render(<VehicleSwitcher vehicles={[bikeA, carA]} activeVehicleId="c" distanceUnit="mi" />);
+    await user.click(screen.getByRole("button", { name: /My car/ }));
+    const dropdown = openDropdown(container);
+    const bikeRow = within(dropdown).getByText("CB500", { exact: false }).closest("button") as HTMLButtonElement;
+    await user.click(bikeRow);
+
+    expect(bikeRow.querySelector("svg")).toBeInTheDocument();
+    expect(bikeRow.querySelectorAll("path").length).toBe(0); // bike wheel, not car
+
+    resolveFetch({ ok: true });
+  });
+
   it("a failed switch does not refresh the page and leaves the dropdown open", async () => {
     (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({ ok: false });
     const user = userEvent.setup();

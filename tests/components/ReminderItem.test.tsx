@@ -5,7 +5,7 @@
 // ReminderDoc fixture is used rather than a canned string. window.confirm
 // is stubbed since exact-date "Done" and both delete paths gate on it.
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReminderDoc } from "@/lib/tracker/reminder";
 
@@ -92,6 +92,29 @@ describe("ReminderItem", () => {
 
     expect(fetch).not.toHaveBeenCalled();
     expect(screen.getByText("Chain lube")).toBeInTheDocument();
+  });
+
+  it("shows the bike spinner on Done and on Delete while their own requests are in flight", async () => {
+    let resolveDone: (v: unknown) => void = () => {};
+    vi.stubGlobal("fetch", vi.fn().mockReturnValue(new Promise((resolve) => { resolveDone = resolve; })));
+    const user = userEvent.setup();
+    render(<ReminderItem reminder={makeReminder()} status="overdue" />);
+
+    const doneButton = screen.getByRole("button", { name: "✓ Done" });
+    await user.click(doneButton);
+    expect(doneButton.querySelector("svg")).toBeInTheDocument();
+    resolveDone({ ok: true, json: async () => ({}) });
+    await waitFor(() => expect(doneButton).not.toBeDisabled());
+    expect(doneButton.querySelector("svg")).not.toBeInTheDocument();
+
+    let resolveDelete: (v: unknown) => void = () => {};
+    vi.stubGlobal("fetch", vi.fn().mockReturnValue(new Promise((resolve) => { resolveDelete = resolve; })));
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    const deleteButton = screen.getByRole("button", { name: "✕" });
+    await user.click(deleteButton);
+    expect(deleteButton.querySelector("svg")).toBeInTheDocument();
+    resolveDelete({ ok: true, json: async () => ({}) });
+    await waitFor(() => expect(screen.queryByText("Chain lube")).not.toBeInTheDocument());
   });
 
   it("the ✕ delete button also confirms first, then deletes and hides the row", async () => {

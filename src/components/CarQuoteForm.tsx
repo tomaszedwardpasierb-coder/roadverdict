@@ -13,6 +13,7 @@ import {
 } from '@/lib/carPriceData';
 import type { Verdict } from '@/lib/verdict';
 import { CarVerdictResult } from './CarVerdictResult';
+import { VehicleSpinner } from './VehicleSpinner';
 
 interface ApiResponse {
   verdict: Verdict;
@@ -184,6 +185,7 @@ export function CarQuoteForm({ signedIn, initialBrand, initialCarClass }: Props)
                 style={{ flex: '1 1 160px' }}
               />
               <button type="button" className="btn-primary" onClick={handlePlateLookup} disabled={lookupLoading}>
+                {lookupLoading && <VehicleSpinner kind="car" size={14} />}
                 {lookupLoading ? 'Looking up…' : 'Look up'}
               </button>
             </div>

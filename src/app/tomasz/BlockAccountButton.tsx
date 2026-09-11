@@ -2,6 +2,7 @@
 'use client';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { VehicleSpinner } from '@/components/VehicleSpinner';
 import styles from './adminShell.module.css';
 
 export function BlockAccountButton({ email, blocked }: { email: string; blocked: boolean }) {
@@ -40,6 +41,7 @@ export function BlockAccountButton({ email, blocked }: { email: string; blocked:
   return (
     <span>
       <button type="button" className={`${styles.button} ${styles.buttonSmall}`} onClick={handleClick} disabled={loading}>
+        {loading && <VehicleSpinner size={14} />}
         {loading ? '…' : blocked ? 'Unblock' : 'Block'}
       </button>
       {error && <span style={{ color: 'var(--admin-danger)', fontSize: '0.72rem', marginLeft: '0.4rem' }}>{error}</span>}

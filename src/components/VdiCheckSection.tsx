@@ -30,6 +30,7 @@ import type { VdiUnlock, VdiCheckResult } from '@/lib/tracker/vdiUnlock';
 import { VDI_CHECK_PRICE_LABEL } from '@/lib/payments/pricing';
 import { VdiIcon } from './VdiIcon';
 import { VdiMileageChart } from './VdiMileageChart';
+import { VehicleSpinner } from './VehicleSpinner';
 import styles from '@/app/report/[token]/report.module.css';
 import { FileSearch } from 'lucide-react';
 
@@ -131,6 +132,7 @@ export function VdiCheckSection({ vehicleKind, token, registration, make, model,
           {vehicleKind === 'car' && ' Includes an independent valuation range too.'}
         </p>
         <button className="btn-primary" type="button" onClick={handleUnlock} disabled={loading}>
+          {loading && <VehicleSpinner kind={vehicleKind} size={14} />}
           {loading ? 'Starting checkout…' : `Unlock for ${VDI_CHECK_PRICE_LABEL[vehicleKind]}`}
         </button>
         {error && <p className="error-text" role="alert">{error}</p>}

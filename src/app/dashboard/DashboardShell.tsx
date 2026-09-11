@@ -246,7 +246,7 @@ export function DashboardShell({
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(
     () => new Set(NAV_GROUPS.filter((g) => g.defaultExpanded).map((g) => g.groupKey))
   );
-  const { setActiveSection } = useActiveSection();
+  const { setActiveSection, setVehicleKind } = useActiveSection();
 
   // A group also counts as expanded if the active tab lives inside it,
   // regardless of whether it was ever manually toggled open - e.g. a
@@ -333,6 +333,15 @@ export function DashboardShell({
     setActiveSection(active);
     return () => setActiveSection(null);
   }, [active, setActiveSection]);
+
+  // Same lifecycle as the effect above, kept separate since it depends
+  // on a different prop (vehicleKind never changes while this component
+  // is mounted, active does) - see ActiveSectionContext.tsx's own
+  // comment on why NavigationLoadingOverlay needs this.
+  useEffect(() => {
+    setVehicleKind(vehicleKind);
+    return () => setVehicleKind(null);
+  }, [vehicleKind, setVehicleKind]);
 
   const contentMap: Record<Section, ReactNode> = {
     dashboard: dashboardContent,

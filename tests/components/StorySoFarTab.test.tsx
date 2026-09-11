@@ -128,6 +128,34 @@ describe("StorySoFarTab", () => {
     expect(screen.getByText(/Generated 25 Aug 2026/)).toBeInTheDocument();
   });
 
+  it("shows the bike spinner on the Generate button while the request is in flight", async () => {
+    let resolveStory: (v: unknown) => void = () => {};
+    mockFetchRouter(() => new Promise((resolve) => { resolveStory = resolve; }));
+
+    const user = userEvent.setup();
+    render(
+      <StorySoFarTab currentMileage={12000} distanceUnit="mi" initialStory={null} sellerPrep={emptySellerPrep} />
+    );
+    await user.click(screen.getByRole("button", { name: /Generate my story/ }));
+
+    const button = screen.getByRole("button", { name: "Putting it together…" });
+    expect(button.querySelector("svg")).toBeInTheDocument();
+
+    resolveStory({
+      ok: true,
+      json: async () => ({
+        generatedWithAi: true,
+        sharedStory: ["Done."],
+        ownerNotes: [],
+        verdict: { tier: "strong", label: "Well documented" },
+        generatedAt: "2026-08-25T00:00:00.000Z",
+        cached: false,
+        nextAvailableAt: "2026-09-01T00:00:00.000Z",
+      }),
+    });
+    await screen.findByText("Done.");
+  });
+
   it("an already-cached, persisted story renders directly from initialStory with no fetch on mount", () => {
     mockFetchRouter(() => Promise.reject(new Error("should not be called")));
     const initialStory = {

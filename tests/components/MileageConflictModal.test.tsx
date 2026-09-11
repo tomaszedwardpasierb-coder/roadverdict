@@ -298,6 +298,49 @@ describe("MileageConflictModal", () => {
     expect(onResolved).toHaveBeenCalled();
   });
 
+  // vehicleKind is already threaded through as a prop here (see the
+  // car-routes test above), so the spinner just reads that same prop
+  // rather than the dashboard's shared context.
+  it("shows the bike spinner on 'Keep both as they are' while the save is in flight", async () => {
+    let resolvePatch: (v: unknown) => void = () => {};
+    (fetch as ReturnType<typeof vi.fn>)
+      .mockResolvedValueOnce(jsonOk(conflictingReference))
+      .mockReturnValueOnce(new Promise((resolve) => { resolvePatch = resolve; }));
+    const user = userEvent.setup();
+    renderModal({ referenceId: "ref-1", referenceCategory: "fuel" });
+    await screen.findByText("Mileage conflict");
+
+    const button = screen.getByRole("button", { name: /Keep both as they are/ });
+    await user.click(button);
+
+    expect(button.querySelector("svg")).toBeInTheDocument();
+    expect(button.querySelectorAll("path").length).toBe(0); // bike wheel, not car
+
+    resolvePatch(jsonOk({}));
+    await waitFor(() => expect(onResolved).toHaveBeenCalled());
+  });
+
+  it("shows the car spinner on 'Save both' when vehicleKind is 'car'", async () => {
+    let resolvePatch: (v: unknown) => void = () => {};
+    (fetch as ReturnType<typeof vi.fn>)
+      .mockResolvedValueOnce(jsonOk(conflictingReference))
+      .mockReturnValueOnce(new Promise((resolve) => { resolvePatch = resolve; }));
+    const user = userEvent.setup();
+    renderModal({ referenceId: "ref-1", referenceCategory: "fuel", vehicleKind: "car" });
+    await screen.findByText("Mileage conflict");
+
+    await user.click(screen.getByRole("button", { name: "Correct the mileage on one or both entries" }));
+    const refMileageInput = screen.getByLabelText("Fuel's mileage");
+    await user.clear(refMileageInput);
+    await user.type(refMileageInput, "6500");
+    const saveButton = screen.getByRole("button", { name: "Save both" });
+    await user.click(saveButton);
+
+    expect(saveButton.querySelectorAll("path").length).toBeGreaterThan(0); // car wheel
+
+    resolvePatch(jsonOk({}));
+  });
+
   it("Cancel closes the modal without touching the network at all", async () => {
     (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce(jsonOk(conflictingReference));
     const user = userEvent.setup();

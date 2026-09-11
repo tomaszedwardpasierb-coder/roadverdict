@@ -60,6 +60,22 @@ describe("IncomingCarOwnershipRequestCard", () => {
     expect(await screen.findByText(/Declined\. Nothing has changed/)).toBeInTheDocument();
   });
 
+  it("shows the car spinner on Approve while the request is in flight", async () => {
+    let resolveFetch: (v: unknown) => void = () => {};
+    (fetch as ReturnType<typeof vi.fn>).mockReturnValue(new Promise((resolve) => { resolveFetch = resolve; }));
+    const user = userEvent.setup();
+    render(<IncomingCarOwnershipRequestCard requestId="req-1" requesterEmail="buyer@example.com" createdAt="2026-03-05" />);
+    await user.click(screen.getByRole("button", { name: "Approve" }));
+
+    const buttons = screen.getAllByRole("button", { name: "Please wait…" });
+    expect(buttons).toHaveLength(2);
+    for (const button of buttons) {
+      expect(button.querySelector("svg")).toBeInTheDocument();
+    }
+    resolveFetch({ ok: true, json: async () => ({}) });
+    await screen.findByText(/logged service records, fuel logs, mods, bills/);
+  });
+
   it("shows the server's own error message on a non-ok response, and lets the person retry", async () => {
     (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({ ok: false, json: async () => ({ error: "Already decided." }) });
     const user = userEvent.setup();

@@ -67,4 +67,24 @@ describe("DeleteAccountButton", () => {
     expect(await screen.findByText("Something went wrong.")).toBeInTheDocument();
     expect(mockRouter.refresh).not.toHaveBeenCalled();
   });
+
+  it("shows the spinner while the delete request is in flight", async () => {
+    vi.stubGlobal("prompt", vi.fn(() => "rider@example.com"));
+    let resolveFetch: (v: unknown) => void = () => {};
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() => new Promise((resolve) => { resolveFetch = resolve; }))
+    );
+
+    const user = userEvent.setup();
+    render(<DeleteAccountButton email="rider@example.com" />);
+    await user.click(screen.getByRole("button", { name: "Delete" }));
+
+    const button = screen.getByRole("button", { name: "…" });
+    expect(button).toBeDisabled();
+    expect(button.querySelector("svg")).toBeInTheDocument();
+
+    resolveFetch({ ok: true, json: async () => ({ ok: true }) });
+    await waitFor(() => expect(mockRouter.refresh).toHaveBeenCalled());
+  });
 });

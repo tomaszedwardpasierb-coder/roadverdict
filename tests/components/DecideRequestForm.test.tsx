@@ -113,6 +113,21 @@ describe("DecideRequestForm", () => {
 
       expect(await screen.findByRole("alert")).toHaveTextContent("Could not reach the server. Please try again.");
     });
+
+    it("shows the spinner alongside the button's own 'Saving…' text while the confirm-all save is in flight", async () => {
+      let resolveFetch: (v: unknown) => void = () => {};
+      (fetch as ReturnType<typeof vi.fn>).mockReturnValue(new Promise((resolve) => { resolveFetch = resolve; }));
+      const user = userEvent.setup();
+      render(<DecideRequestForm token="tok1" items={[item({ entryId: "e1" })]} preselectAll="approve" />);
+      await user.click(screen.getByRole("button", { name: "Confirm - approve all" }));
+
+      const button = screen.getByRole("button", { name: "Saving…" });
+      expect(button).toBeDisabled();
+      expect(button.querySelector("svg")).toBeInTheDocument();
+
+      resolveFetch({ ok: true });
+      expect(await screen.findByText(/Done - your decision has been saved/)).toBeInTheDocument();
+    });
   });
 
   describe("individual review screen (preselectAll: null)", () => {
@@ -194,6 +209,22 @@ describe("DecideRequestForm", () => {
 
       expect(await screen.findByRole("alert")).toHaveTextContent("Could not reach the server. Please try again.");
       expect(screen.queryByText(/Done - your decision has been saved/)).not.toBeInTheDocument();
+    });
+
+    it("shows the spinner alongside the button's own 'Saving…' text while saving individual decisions is in flight", async () => {
+      let resolveFetch: (v: unknown) => void = () => {};
+      (fetch as ReturnType<typeof vi.fn>).mockReturnValue(new Promise((resolve) => { resolveFetch = resolve; }));
+      const user = userEvent.setup();
+      render(<DecideRequestForm token="tok1" items={[item({ entryId: "e1", status: "pending" })]} preselectAll={null} />);
+      await user.click(screen.getByRole("radio", { name: "Share" }));
+      await user.click(screen.getByRole("button", { name: "Save decisions" }));
+
+      const button = screen.getByRole("button", { name: "Saving…" });
+      expect(button).toBeDisabled();
+      expect(button.querySelector("svg")).toBeInTheDocument();
+
+      resolveFetch({ ok: true });
+      expect(await screen.findByText(/Done - your decision has been saved/)).toBeInTheDocument();
     });
   });
 

@@ -5,7 +5,7 @@
 // - the real ok/warning/over status thresholds and percentage math run
 // for real.
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn() }) }));
@@ -68,5 +68,38 @@ describe("BudgetWidget", () => {
     render(<BudgetWidget yearSpend={400} currentYear={2026} initialBudget={2000} currency="GBP" rates={null} />);
     await user.click(screen.getByRole("button", { name: "Change budget" }));
     expect(screen.getByLabelText("Annual budget (£)")).toBeInTheDocument();
+  });
+
+  // vehicleKind is already threaded through as a prop here (see the
+  // PATCHes-the-right-endpoint tests above), so the spinner just reads
+  // that same prop rather than the dashboard's shared context.
+  it("shows the bike spinner on 'Set budget' while the request is in flight", async () => {
+    let resolveFetch: (v: unknown) => void = () => {};
+    (fetch as ReturnType<typeof vi.fn>).mockReturnValue(new Promise((resolve) => { resolveFetch = resolve; }));
+    const user = userEvent.setup();
+    render(<BudgetWidget yearSpend={500} currentYear={2026} currency="GBP" rates={null} />);
+    await user.type(screen.getByLabelText("Annual budget (£)"), "2000");
+    await user.click(screen.getByRole("button", { name: "Set budget" }));
+
+    const button = screen.getByRole("button", { name: "Saving…" });
+    expect(button.querySelector("svg")).toBeInTheDocument();
+    expect(button.querySelectorAll("path").length).toBe(0); // bike wheel, not car
+
+    resolveFetch({ ok: true, json: async () => ({}) });
+    await waitFor(() => expect(screen.getByRole("button", { name: "Change budget" })).toBeInTheDocument());
+  });
+
+  it("shows the car spinner on 'Set budget' when vehicleKind is 'car'", async () => {
+    let resolveFetch: (v: unknown) => void = () => {};
+    (fetch as ReturnType<typeof vi.fn>).mockReturnValue(new Promise((resolve) => { resolveFetch = resolve; }));
+    const user = userEvent.setup();
+    render(<BudgetWidget yearSpend={500} currentYear={2026} currency="GBP" rates={null} vehicleKind="car" />);
+    await user.type(screen.getByLabelText("Annual budget (£)"), "2000");
+    await user.click(screen.getByRole("button", { name: "Set budget" }));
+
+    const button = screen.getByRole("button", { name: "Saving…" });
+    expect(button.querySelectorAll("path").length).toBeGreaterThan(0); // car wheel
+
+    resolveFetch({ ok: true, json: async () => ({}) });
   });
 });

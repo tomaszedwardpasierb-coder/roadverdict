@@ -111,6 +111,44 @@ describe("ExportShareSection", () => {
     expect(screen.queryByDisplayValue(/report/)).not.toBeInTheDocument();
   });
 
+  it("shows the bike spinner on 'Get shareable report link' while the request is in flight", async () => {
+    let resolveFetch: (v: unknown) => void = () => {};
+    (fetch as ReturnType<typeof vi.fn>).mockReturnValue(new Promise((resolve) => { resolveFetch = resolve; }));
+    const user = userEvent.setup();
+    render(<ExportShareSection isPro={false} />);
+    await user.type(screen.getByLabelText("Sharing with (email address)"), "buyer@example.com");
+    await user.click(screen.getByRole("button", { name: "Get shareable report link" }));
+
+    const button = screen.getByRole("button", { name: "Generating…" });
+    expect(button.querySelector("svg")).toBeInTheDocument();
+
+    resolveFetch({ ok: true, json: async () => ({ url: "https://roadverdict.app/report/tok123", expiresAt: null }) });
+    await screen.findByDisplayValue("https://roadverdict.app/report/tok123");
+  });
+
+  it("shows the bike spinner on 'Send by email' while the request is in flight", async () => {
+    const fetchMock = fetch as ReturnType<typeof vi.fn>;
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ url: "https://roadverdict.app/report/tok123", expiresAt: null }),
+    });
+    const user = userEvent.setup();
+    render(<ExportShareSection isPro={false} />);
+    await user.type(screen.getByLabelText("Sharing with (email address)"), "buyer@example.com");
+    await user.click(screen.getByRole("button", { name: "Get shareable report link" }));
+    await screen.findByDisplayValue("https://roadverdict.app/report/tok123");
+
+    let resolveSend: (v: unknown) => void = () => {};
+    fetchMock.mockReturnValueOnce(new Promise((resolve) => { resolveSend = resolve; }));
+    await user.click(screen.getByRole("button", { name: "Send by email" }));
+
+    const button = screen.getByRole("button", { name: "Sending…" });
+    expect(button.querySelector("svg")).toBeInTheDocument();
+
+    resolveSend({ ok: true, json: async () => ({}) });
+    await screen.findByText("Sent to buyer@example.com.");
+  });
+
   it("Copy writes the real share URL to the clipboard and reverts its label after a couple of seconds", async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({

@@ -2,6 +2,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import { VehicleSpinner } from '@/components/VehicleSpinner';
 import { LABOUR_GROUPS, LABOUR_LABELS, LABOUR_LABEL_TO_KEY } from '@/lib/tracker/labourTypes';
 import type { LabourDoc } from '@/lib/tracker/labour';
 import { useTrackerFormSubmit } from './useTrackerFormSubmit';
@@ -161,6 +162,7 @@ export function LabourCard({
         <hr className="ticket__divider" />
         <div className="ticket__section" style={{ display: 'flex', gap: '0.6rem', alignItems: 'center' }}>
           <button className="submit-button" type="submit" disabled={submitting || isBlocked}>
+            {submitting && <VehicleSpinner kind="bike" size={14} />}
             {submitting ? 'Saving…' : 'Save'}
           </button>
           <button type="button" className={styles.iconBtn} onClick={() => setIsEditing(false)} disabled={submitting}>
@@ -204,6 +206,7 @@ export function LabourCard({
                 }
               }}
             >
+              {findingConflict && <VehicleSpinner kind="bike" size={14} />}
               {findingConflict ? "Finding it..." : "Resolve"}
             </button>
             {conflictLookupError && <p className="error-text" role="alert">{conflictLookupError}</p>}
@@ -237,6 +240,7 @@ export function LabourCard({
       <div className={styles.cardActions}>
         <button type="button" className={styles.iconBtn} onClick={() => setIsEditing(true)}>Edit</button>
         <button type="button" className={styles.iconBtn} onClick={handleDelete} disabled={submitting}>
+          {submitting && <VehicleSpinner kind="bike" size={14} />}
           {submitting ? 'Deleting…' : 'Delete'}
         </button>
       </div>

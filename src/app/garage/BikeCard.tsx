@@ -3,6 +3,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { VehicleSpinner } from '@/components/VehicleSpinner';
 import styles from './garage.module.css';
 
 type RegistrationChangeReason = 'private-plate-assigned' | 'private-plate-removed' | 'correction' | 'other';
@@ -152,6 +153,7 @@ export function BikeCard({ bikeId, name, year, isCustomBuild, currentMileage, is
       )}
       <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
         <button type="button" className="submit-button" onClick={handleViewDashboard} disabled={loading || deleting}>
+          {loading && <VehicleSpinner kind="bike" size={14} />}
           {loading ? 'Switching…' : 'View dashboard'}
         </button>
         {/* Change registration and Delete both reject a read-only bike
@@ -165,6 +167,7 @@ export function BikeCard({ bikeId, name, year, isCustomBuild, currentMileage, is
         )}
         {!transferredToEmail && (
           <button type="button" className={styles.deleteBtn} onClick={handleDelete} disabled={loading || deleting}>
+            {deleting && <VehicleSpinner kind="bike" size={14} />}
             {deleting ? 'Deleting…' : 'Delete'}
           </button>
         )}
@@ -189,6 +192,7 @@ export function BikeCard({ bikeId, name, year, isCustomBuild, currentMileage, is
                 disabled={requestingHistory || !currentRegistration}
                 onClick={handleRequestHistory}
               >
+                {requestingHistory && <VehicleSpinner kind="bike" size={14} />}
                 {requestingHistory ? 'Sending…' : 'Request it'}
               </button>
               {historyRequestError && (
@@ -224,6 +228,7 @@ export function BikeCard({ bikeId, name, year, isCustomBuild, currentMileage, is
             </select>
           </div>
           <button type="submit" className="submit-button" disabled={changing} style={{ marginTop: '0.7rem', width: 'auto' }}>
+            {changing && <VehicleSpinner kind="bike" size={14} />}
             {changing ? 'Saving…' : 'Record change'}
           </button>
           {changeError && <p className="error-text" role="alert">{changeError}</p>}

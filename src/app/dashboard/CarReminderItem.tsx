@@ -1,6 +1,7 @@
 // Place at: src/app/dashboard/CarReminderItem.tsx
 'use client';
 
+import { VehicleSpinner } from '@/components/VehicleSpinner';
 import { useTrackerFormSubmit } from './useTrackerFormSubmit';
 import { carReminderDetailLabel } from '@/lib/tracker/carReminderStatus';
 import type { CarReminderDoc } from '@/lib/tracker/carReminder';
@@ -54,8 +55,14 @@ export function CarReminderItem({ reminder, status, isPro = false }: Props) {
       </div>
       {!isPermanent && (
         <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.6rem' }}>
-          <button type="button" className="btn-primary" onClick={handleDone} disabled={submitting}>Mark done</button>
-          <button type="button" className={styles.iconBtn} onClick={handleDelete} disabled={submitting}>Delete</button>
+          <button type="button" className="btn-primary" onClick={handleDone} disabled={submitting}>
+            {submitting && <VehicleSpinner kind="car" size={14} />}
+            Mark done
+          </button>
+          <button type="button" className={styles.iconBtn} onClick={handleDelete} disabled={submitting}>
+            {submitting && <VehicleSpinner kind="car" size={14} />}
+            Delete
+          </button>
         </div>
       )}
     </div>

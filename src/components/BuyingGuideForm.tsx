@@ -16,6 +16,7 @@ import type { BuyingGuideReportTier } from '@/lib/payments/pricing';
 import type { VdiCheckResult } from '@/lib/tracker/vdiUnlock';
 import { BuyingGuideResult } from './BuyingGuideResult';
 import { VdiCheckReport } from './VdiCheckReport';
+import { VehicleSpinner } from './VehicleSpinner';
 
 interface ApiResponse {
   checklist: Checklist;
@@ -336,6 +337,7 @@ export function BuyingGuideForm({ signedIn }: Props) {
                 style={{ flex: '1 1 160px' }}
               />
               <button type="button" className="btn-primary" onClick={handlePlateLookup} disabled={lookupLoading}>
+                {lookupLoading && <VehicleSpinner kind="bike" size={14} />}
                 {lookupLoading ? 'Looking up…' : 'Look up'}
               </button>
             </div>
@@ -353,6 +355,7 @@ export function BuyingGuideForm({ signedIn }: Props) {
                 . Buy the vehicle history report for this registration to check it now instead.
               </p>
               <button type="button" className="btn-primary" onClick={handleBuyVdiCheck} disabled={vdiPurchasing}>
+                {vdiPurchasing && <VehicleSpinner kind="bike" size={14} />}
                 {vdiPurchasing
                   ? 'Getting your report…'
                   : motResult.proFreeAvailable
@@ -376,6 +379,7 @@ export function BuyingGuideForm({ signedIn }: Props) {
                   "Your payment went through, but we couldn't fetch the report just now - look up this registration again and it'll retry, at no extra cost."}
               </p>
               <button type="button" className="btn-primary" onClick={handleBuyVdiCheck} disabled={vdiPurchasing}>
+                {vdiPurchasing && <VehicleSpinner kind="bike" size={14} />}
                 {vdiPurchasing
                   ? 'Getting your report…'
                   : motResult.proFreeAvailable

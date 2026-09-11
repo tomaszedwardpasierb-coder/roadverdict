@@ -4,6 +4,7 @@
 import { useState } from 'react';
 import { useTrackerFormSubmit } from './useTrackerFormSubmit';
 import { convertGbpToDisplay, convertDisplayToGbp, formatCurrency, CURRENCY_SYMBOLS, type Currency, type ExchangeRates } from '@/lib/tracker/currency';
+import { VehicleSpinner } from '@/components/VehicleSpinner';
 import styles from './dashboard.module.css';
 
 interface Props {
@@ -55,6 +56,7 @@ export function BudgetWidget({ yearSpend, currentYear, initialBudget, currency, 
             />
           </div>
           <button className={styles.scanReceiptBtn} type="submit" disabled={submitting}>
+            {submitting && <VehicleSpinner kind={vehicleKind} size={14} />}
             {submitting ? 'Saving…' : 'Set budget'}
           </button>
         </div>
