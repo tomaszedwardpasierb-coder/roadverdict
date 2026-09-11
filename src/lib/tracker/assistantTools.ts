@@ -61,6 +61,9 @@ import { CAR_BILL_LABELS } from "./carBillTypes";
 import { CAR_MOD_LABELS } from "./carModTypes";
 import { LABOUR_LABELS } from "./labourTypes";
 import { CAR_LABOUR_LABELS } from "./carLabourTypes";
+import { getLabour } from "./labour";
+import { getCarLabour } from "./carLabour";
+import { estimateMileage } from "./mileageEstimate";
 
 type CostItem = { date: string; cost: number };
 // Minimal structural shapes both a bike doc type and its car sister
@@ -784,16 +787,51 @@ export interface ProposeLogEntryArgs {
 }
 
 export type ProposedEntry =
-  | { category: "service"; jobType: string; jobLabel: string; description: string; cost: number; date: string; mileage: number }
+  | { category: "service"; jobType: string; jobLabel: string; description: string; cost: number; date: string; mileage: number; mileageNote?: string }
   | { category: "bill"; billType: string; billLabel: string; description: string; cost: number; date: string }
-  | { category: "mod"; modCategory: string; modLabel: string; description: string; cost: number; date: string; mileage: number }
-  | { category: "fuel"; litres: number; cost: number; date: string; mileage: number; filledToFull: boolean }
+  | { category: "mod"; modCategory: string; modLabel: string; description: string; cost: number; date: string; mileage: number; mileageNote?: string }
+  | { category: "fuel"; litres: number; cost: number; date: string; mileage: number; mileageNote?: string; filledToFull: boolean }
   // The only variant that can come from a car-active session (see the
   // top-of-file comment) - vehicleKind is carried on the entry itself,
   // not inferred later, so the draft card and its confirm handler know
   // which catalog and which /api/tracker vs /api/cars endpoint to use
   // without re-resolving the account's active vehicle a second time.
-  | { category: "labour"; labourCategory: string; labourLabel: string; description: string; cost: number; date: string; mileage: number; vehicleKind: "bike" | "car" };
+  | { category: "labour"; labourCategory: string; labourLabel: string; description: string; cost: number; date: string; mileage: number; mileageNote?: string; vehicleKind: "bike" | "car" };
+
+// Same date-based estimate the manual dashboard forms show via
+// useEstimatedMileage.ts (same estimateMileage() maths, just run
+// server-side here since there's no client hook to hang it off in a
+// chat draft flow) - a chat-drafted entry should be no less informed
+// about "what was the mileage that day" than one typed in by hand.
+// Today (or later) needs no estimate: the current mileage IS the
+// answer, not a guess - same shortcut useEstimatedMileage takes and for
+// the same reason (the alternative rounds a same-day entry a mile or
+// two under the real current figure via the exact-instant-vs-midnight
+// gap, which then trips the mileage-consistency check unnecessarily).
+function estimateDraftMileage(
+  date: string,
+  points: MileagePoint[],
+  vehicle: { currentMileage: number; startingMileage: number; dateAdded: string }
+): { mileage: number; mileageNote?: string } {
+  const todayStr = new Date().toISOString().slice(0, 10);
+  if (date >= todayStr) return { mileage: vehicle.currentMileage };
+
+  const result = estimateMileage(date, points, vehicle);
+  if (result.requiresManualEntry) {
+    return {
+      mileage: result.mileage,
+      mileageNote:
+        result.warning ??
+        "Not enough logged history near this date to estimate mileage confidently - please check and enter it yourself.",
+    };
+  }
+  const confidenceNote =
+    result.confidence === "interpolated" ? "interpolated between logged records" : "estimated from this vehicle's logged pace";
+  return {
+    mileage: result.mileage,
+    mileageNote: `Mileage ${confidenceNote} for this date${result.warning ? ` - ${result.warning}` : ""} - please check and adjust if needed.`,
+  };
+}
 
 function resolveModCategory(input: string | undefined): string {
   const fallback = "other-accessory";
@@ -832,6 +870,23 @@ function resolveLabourCategory(input: string | undefined, labels: Record<string,
   return substring ? substring[0] : fallback;
 }
 
+// Required in every case, same as the manual dashboard forms' own date
+// field - the model must either have an explicit date from the user or
+// have asked "today?" and had it confirmed, never silently assume it.
+// Kept as a shared helper since both the bike and car branches below
+// need the exact same check.
+function resolveRequiredDraftDate(args: ProposeLogEntryArgs): { date: string } | { error: string } {
+  const rawDate = typeof args.date === "string" ? args.date.trim() : "";
+  const parsed = rawDate ? new Date(rawDate) : null;
+  if (!rawDate || !parsed || Number.isNaN(parsed.getTime())) {
+    return { error: "What date did this happen (or get paid)? A specific date, or \"today\" if that's right - needed before I can draft this." };
+  }
+  if (parsed.getTime() > Date.now() + 86_400_000) {
+    return { error: "That date is in the future - this can only log something that's already happened." };
+  }
+  return { date: rawDate };
+}
+
 export async function toolProposeLogEntry(email: string, args: ProposeLogEntryArgs) {
   const vehicle = await resolveActiveVehicle(email);
   if (!vehicle) return { error: "No vehicle found on this account." };
@@ -848,23 +903,31 @@ export async function toolProposeLogEntry(email: string, args: ProposeLogEntryAr
     if (typeof args.cost !== "number" || !Number.isFinite(args.cost) || args.cost <= 0) {
       return { error: "Needs a valid, positive cost." };
     }
-    const parsedCarDate = typeof args.date === "string" ? new Date(args.date) : null;
-    const carDate = parsedCarDate && !Number.isNaN(parsedCarDate.getTime()) ? args.date! : new Date().toISOString().slice(0, 10);
-    if (new Date(carDate).getTime() > Date.now() + 86_400_000) {
-      return { error: "That date is in the future - this can only log something that's already happened." };
-    }
+    const resolvedCarDate = resolveRequiredDraftDate(args);
+    if ("error" in resolvedCarDate) return resolvedCarDate;
+    const { date } = resolvedCarDate;
     if (typeof args.description !== "string" || !args.description.trim()) {
       return { error: "Needs a short description of what this is." };
     }
     const carLabourCategory = resolveLabourCategory(args.labourCategory, CAR_LABOUR_LABELS);
+    const [records, mods, fuelLogs, bills, labour] = await Promise.all([
+      getCarServiceRecords(email, car.id),
+      getCarMods(email, car.id),
+      getCarFuelLogs(email, car.id),
+      getCarBills(email, car.id),
+      getCarLabour(email, car.id),
+    ]);
+    const points = gatherCarMileagePoints(records, mods, fuelLogs, bills, labour);
+    const { mileage, mileageNote } = estimateDraftMileage(date, points, car);
     const entry: ProposedEntry = {
       category: "labour",
       labourCategory: carLabourCategory,
       labourLabel: CAR_LABOUR_LABELS[carLabourCategory],
       description: args.description.trim(),
       cost: args.cost,
-      date: carDate,
-      mileage: car.currentMileage,
+      date,
+      mileage,
+      mileageNote,
       vehicleKind: "car",
     };
     return entry;
@@ -878,17 +941,24 @@ export async function toolProposeLogEntry(email: string, args: ProposeLogEntryAr
     return { error: "Needs a valid, positive cost." };
   }
 
-  const parsedDate = typeof args.date === "string" ? new Date(args.date) : null;
-  const date = parsedDate && !Number.isNaN(parsedDate.getTime()) ? args.date! : new Date().toISOString().slice(0, 10);
-  if (new Date(date).getTime() > Date.now() + 86_400_000) {
-    return { error: "That date is in the future - this can only log something that's already happened." };
-  }
+  const resolvedDate = resolveRequiredDraftDate(args);
+  if ("error" in resolvedDate) return resolvedDate;
+  const { date } = resolvedDate;
 
   if (args.category === "fuel") {
     if (typeof args.litres !== "number" || !Number.isFinite(args.litres) || args.litres <= 0) {
       return { error: "Needs a valid, positive number of litres." };
     }
-    const entry: ProposedEntry = { category: "fuel", litres: args.litres, cost: args.cost, date, mileage: bike.currentMileage, filledToFull: args.filledToFull === true };
+    const [records, mods, fuelLogs, bills, labour] = await Promise.all([
+      getServiceRecords(email, bike.id),
+      getMods(email, bike.id),
+      getFuelLogs(email, bike.id),
+      getBills(email, bike.id),
+      getLabour(email, bike.id),
+    ]);
+    const points = gatherMileagePoints(records, mods, fuelLogs, bills, labour);
+    const { mileage, mileageNote } = estimateDraftMileage(date, points, bike);
+    const entry: ProposedEntry = { category: "fuel", litres: args.litres, cost: args.cost, date, mileage, mileageNote, filledToFull: args.filledToFull === true };
     return entry;
   }
 
@@ -897,21 +967,29 @@ export async function toolProposeLogEntry(email: string, args: ProposeLogEntryAr
   }
   const description = args.description.trim();
 
-  if (args.category === "service") {
-    const jobType = typeof args.jobType === "string" && args.jobType in JOB_LABELS ? args.jobType : "other";
-    const entry: ProposedEntry = { category: "service", jobType, jobLabel: JOB_LABELS[jobType], description, cost: args.cost, date, mileage: bike.currentMileage };
-    return entry;
-  }
+  if (args.category === "service" || args.category === "mod" || args.category === "labour") {
+    const [records, mods, fuelLogs, bills, labour] = await Promise.all([
+      getServiceRecords(email, bike.id),
+      getMods(email, bike.id),
+      getFuelLogs(email, bike.id),
+      getBills(email, bike.id),
+      getLabour(email, bike.id),
+    ]);
+    const points = gatherMileagePoints(records, mods, fuelLogs, bills, labour);
+    const { mileage, mileageNote } = estimateDraftMileage(date, points, bike);
 
-  if (args.category === "mod") {
-    const modCategory = resolveModCategory(args.modCategory);
-    const entry: ProposedEntry = { category: "mod", modCategory, modLabel: MOD_LABELS[modCategory], description, cost: args.cost, date, mileage: bike.currentMileage };
-    return entry;
-  }
-
-  if (args.category === "labour") {
+    if (args.category === "service") {
+      const jobType = typeof args.jobType === "string" && args.jobType in JOB_LABELS ? args.jobType : "other";
+      const entry: ProposedEntry = { category: "service", jobType, jobLabel: JOB_LABELS[jobType], description, cost: args.cost, date, mileage, mileageNote };
+      return entry;
+    }
+    if (args.category === "mod") {
+      const modCategory = resolveModCategory(args.modCategory);
+      const entry: ProposedEntry = { category: "mod", modCategory, modLabel: MOD_LABELS[modCategory], description, cost: args.cost, date, mileage, mileageNote };
+      return entry;
+    }
     const labourCategory = resolveLabourCategory(args.labourCategory, LABOUR_LABELS);
-    const entry: ProposedEntry = { category: "labour", labourCategory, labourLabel: LABOUR_LABELS[labourCategory], description, cost: args.cost, date, mileage: bike.currentMileage, vehicleKind: "bike" };
+    const entry: ProposedEntry = { category: "labour", labourCategory, labourLabel: LABOUR_LABELS[labourCategory], description, cost: args.cost, date, mileage, mileageNote, vehicleKind: "bike" };
     return entry;
   }
 
@@ -935,7 +1013,7 @@ export function buildLogEntryToolDeclarations(vehicleKind: "bike" | "car") {
       {
         name: "proposeLogEntry",
         description:
-          "Draft a new Labour entry (workshop time, diagnostic hours) for the signed-in user's car, from their description of what they want to log. This only prepares a draft for the user to review, edit, and confirm themselves on screen - it NEVER saves anything by itself. Doesn't need an exact category match - your best guess is fine, the user can correct it on the draft card. Only Labour is available for a car-active account right now - every other category still needs to be logged directly from the dashboard.",
+          "Draft a new Labour entry (workshop time, diagnostic hours) for the signed-in user's car, from their description of what they want to log. This only prepares a draft for the user to review, edit, and confirm themselves on screen - it NEVER saves anything by itself. Doesn't need an exact category match - your best guess is fine, the user can correct it on the draft card. Only Labour is available for a car-active account right now - every other category still needs to be logged directly from the dashboard. IMPORTANT: always ask the user what date this happened before calling this tool, unless they've already said (including just 'today') - never assume today's date yourself. Once you have the date, this tool works out a suggested mileage for that day automatically; you don't need to ask the user for it.",
         parameters: {
           type: "OBJECT",
           properties: {
@@ -946,13 +1024,17 @@ export function buildLogEntryToolDeclarations(vehicleKind: "bike" | "car") {
             },
             description: { type: "STRING", description: "A short, plain label for what this is, e.g. 'Cambelt replacement' or '2 hours diagnostic time'." },
             cost: { type: "NUMBER", description: "The amount paid, in GBP, as a plain number." },
-            date: { type: "STRING", description: "ISO date (YYYY-MM-DD) this was paid/done. Use today's date if the user didn't say otherwise." },
+            date: {
+              type: "STRING",
+              description:
+                "ISO date (YYYY-MM-DD) this was paid/done. Required - ask the user first if they haven't said, and convert a reply like 'today' or 'last Tuesday' to the actual date yourself.",
+            },
             labourCategory: {
               type: "STRING",
               description: "Your best guess at what kind of labour job this is, in plain words (e.g. 'brake bleed', 'timing belt', 'EV battery health check'). Doesn't need to be exact - it's matched to the closest real category, or filed as 'Other' if nothing fits.",
             },
           },
-          required: ["category", "cost"],
+          required: ["category", "cost", "date"],
         },
       },
     ] as const;
@@ -962,7 +1044,7 @@ export function buildLogEntryToolDeclarations(vehicleKind: "bike" | "car") {
     {
       name: "proposeLogEntry",
       description:
-        "Draft a new service record, insurance/road-tax/MOT/finance bill, modification/accessory, fuel fill-up, or labour/workshop-time entry for the signed-in user's bike, from their description of what they want to log. This only prepares a draft for the user to review, edit, and confirm themselves on screen - it NEVER saves anything by itself, and never changes or deletes an existing entry. Doesn't need an exact category match - your best guess is fine, the user can correct it on the draft card.",
+        "Draft a new service record, insurance/road-tax/MOT/finance bill, modification/accessory, fuel fill-up, or labour/workshop-time entry for the signed-in user's bike, from their description of what they want to log. This only prepares a draft for the user to review, edit, and confirm themselves on screen - it NEVER saves anything by itself, and never changes or deletes an existing entry. Doesn't need an exact category match - your best guess is fine, the user can correct it on the draft card. IMPORTANT: always ask the user what date this happened before calling this tool, unless they've already said (including just 'today') - never assume today's date yourself. Once you have the date, this tool works out a suggested mileage for that day automatically (for every category except 'bill'); you don't need to ask the user for it.",
       parameters: {
         type: "OBJECT",
         properties: {
@@ -973,7 +1055,11 @@ export function buildLogEntryToolDeclarations(vehicleKind: "bike" | "car") {
           },
           description: { type: "STRING", description: "Not used for 'fuel'. A short, plain label for what this is, e.g. 'Valve cleaner' or 'Annual insurance renewal'." },
           cost: { type: "NUMBER", description: "The amount paid, in GBP, as a plain number." },
-          date: { type: "STRING", description: "ISO date (YYYY-MM-DD) this was paid/done. Use today's date if the user didn't say otherwise." },
+          date: {
+            type: "STRING",
+            description:
+              "ISO date (YYYY-MM-DD) this was paid/done. Required - ask the user first if they haven't said, and convert a reply like 'today' or 'last Tuesday' to the actual date yourself.",
+          },
           jobType: {
             type: "STRING",
             enum: Object.keys(JOB_LABELS),
@@ -995,7 +1081,7 @@ export function buildLogEntryToolDeclarations(vehicleKind: "bike" | "car") {
             description: "Only for category 'labour' - your best guess at what kind of labour job this is, in plain words (e.g. 'brake bleed', 'valve clearance', 'wheel bearing'). Doesn't need to be exact - it's matched to the closest real category, or filed as 'Other' if nothing fits.",
           },
         },
-        required: ["category", "cost"],
+        required: ["category", "cost", "date"],
       },
     },
   ] as const;

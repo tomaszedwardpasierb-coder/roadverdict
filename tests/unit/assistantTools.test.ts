@@ -24,6 +24,8 @@ const mocks = vi.hoisted(() => ({
   computeCarReminderStatus: vi.fn(),
   carReminderDetailLabel: vi.fn(),
   gatherCarMileagePoints: vi.fn(),
+  getLabour: vi.fn(),
+  getCarLabour: vi.fn(),
 }));
 
 // resolveActiveVehicle (activeVehicle.ts) is the one boundary every tool
@@ -60,6 +62,11 @@ vi.mock("@/lib/tracker/carReminderStatus", () => ({
   carReminderDetailLabel: mocks.carReminderDetailLabel,
 }));
 vi.mock("@/lib/tracker/carSummary", () => ({ gatherCarMileagePoints: mocks.gatherCarMileagePoints }));
+vi.mock("@/lib/tracker/labour", () => ({ getLabour: mocks.getLabour }));
+vi.mock("@/lib/tracker/carLabour", () => ({ getCarLabour: mocks.getCarLabour }));
+// mileageEstimate.ts (estimateMileage) is deliberately NOT mocked - same
+// "pure, no I/O, exercise the real logic" reasoning this file already
+// applies to bikeComparisonVerdict.ts.
 // jobTypes.ts/carJobTypes.ts (JOB_LABELS/CAR_JOB_LABELS) etc. are
 // deliberately NOT mocked - pure static data. bikeComparisonVerdict.ts
 // (buildCostPerMileVerdict) is deliberately NOT mocked either - it's
@@ -83,8 +90,23 @@ import {
   ASSISTANT_TOOL_DECLARATIONS,
 } from "@/lib/tracker/assistantTools";
 
-const bike = { id: "bike-1", currentMileage: 15000, currency: "GBP", annualBudget: null as number | null };
-const car = { id: "car-1", currentMileage: 20000, currency: "GBP", annualBudget: null as number | null, fuelType: "petrol" as "petrol" | "diesel" | "hybrid" | "phev" | "electric" };
+const bike = {
+  id: "bike-1",
+  currentMileage: 15000,
+  currency: "GBP",
+  annualBudget: null as number | null,
+  startingMileage: 8000,
+  dateAdded: "2020-01-01",
+};
+const car = {
+  id: "car-1",
+  currentMileage: 20000,
+  currency: "GBP",
+  annualBudget: null as number | null,
+  fuelType: "petrol" as "petrol" | "diesel" | "hybrid" | "phev" | "electric",
+  startingMileage: 10000,
+  dateAdded: "2020-01-01",
+};
 
 function bikeActive(overrides: Partial<typeof bike> = {}) {
   return { kind: "bike" as const, bike: { ...bike, ...overrides }, hasAnyCar: false };
@@ -108,6 +130,15 @@ beforeEach(() => {
   mocks.getCarBills.mockResolvedValue([]);
   mocks.getCarFuelLogs.mockResolvedValue([]);
   mocks.getCarReminders.mockResolvedValue([]);
+  mocks.getLabour.mockResolvedValue([]);
+  mocks.getCarLabour.mockResolvedValue([]);
+  // Safe default for every toolProposeLogEntry test that isn't itself
+  // testing mileage estimation - individual tests below override this
+  // with real points when they need to exercise estimateMileage's own
+  // interpolation/extrapolation logic (that function is deliberately not
+  // mocked - see the vi.mock comment above).
+  mocks.gatherMileagePoints.mockReturnValue([]);
+  mocks.gatherCarMileagePoints.mockReturnValue([]);
 });
 
 describe("runAssistantTool - the core security dispatch layer", () => {
@@ -693,13 +724,22 @@ describe("toolGetViewedReport", () => {
 });
 
 describe("toolProposeLogEntry", () => {
+  // Kept a plain 'today' for every test below that isn't itself testing
+  // mileage estimation - it takes estimateDraftMileage's same-day
+  // shortcut (see mileageEstimate.test.ts/useEstimatedMileage.ts's own
+  // reasoning for that shortcut), so these tests can keep asserting an
+  // exact current-mileage figure without getting entangled in the real
+  // interpolation/extrapolation maths, which has its own dedicated tests
+  // further down.
+  const today = new Date().toISOString().slice(0, 10);
+
   it("returns an error when the account has no vehicle at all", async () => {
     mocks.resolveActiveVehicle.mockResolvedValue(null);
     const result = await toolProposeLogEntry("owner@example.com", { category: "service", description: "Oil", cost: 20 });
     expect(result).toEqual({ error: "No vehicle found on this account." });
   });
 
-  it("is not available for a car-active session's non-labour categories, and never reaches any cost/description validation", async () => {
+  it("is not available for a car-active session's non-labour categories, and never reaches any cost/description/date validation", async () => {
     mocks.resolveActiveVehicle.mockResolvedValue(carActive());
     const result: any = await toolProposeLogEntry("owner@example.com", { category: "service", description: "Oil", cost: 20 });
     expect(result.error).toMatch(/only available for Labour/i);
@@ -711,12 +751,12 @@ describe("toolProposeLogEntry", () => {
   });
 
   it("rejects a missing description", async () => {
-    const result: any = await toolProposeLogEntry("owner@example.com", { category: "service", cost: 20 });
+    const result: any = await toolProposeLogEntry("owner@example.com", { category: "service", cost: 20, date: today });
     expect(result.error).toMatch(/description/i);
   });
 
   it("rejects a blank/whitespace-only description", async () => {
-    const result: any = await toolProposeLogEntry("owner@example.com", { category: "service", description: "   ", cost: 20 });
+    const result: any = await toolProposeLogEntry("owner@example.com", { category: "service", description: "   ", cost: 20, date: today });
     expect(result.error).toMatch(/description/i);
   });
 
@@ -733,85 +773,96 @@ describe("toolProposeLogEntry", () => {
     expect(result.error).toMatch(/future/);
   });
 
-  it("defaults to today's date when none is given or the given one is unparseable", async () => {
-    const today = new Date().toISOString().slice(0, 10);
+  // The actual fix this whole block exercises: a chat-drafted entry must
+  // ask for a date, exactly like the manual dashboard forms' own
+  // required date field - never silently assume today, since AI chat
+  // was previously the one place in the app doing that.
+  it("asks for the date, rather than silently defaulting to today, when none is given or the given one is unparseable", async () => {
     const result: any = await toolProposeLogEntry("owner@example.com", { category: "service", description: "Oil", cost: 20 });
-    expect(result.date).toBe(today);
+    expect(result.error).toMatch(/what date/i);
+    expect(result.date).toBeUndefined();
 
     const result2: any = await toolProposeLogEntry("owner@example.com", { category: "service", description: "Oil", cost: 20, date: "not-a-date" });
-    expect(result2.date).toBe(today);
+    expect(result2.error).toMatch(/what date/i);
+  });
+
+  it("asks for the date on a car-active session too, once past the labour-only/cost gate", async () => {
+    mocks.resolveActiveVehicle.mockResolvedValue(carActive());
+    const result: any = await toolProposeLogEntry("owner@example.com", { category: "labour", description: "Cambelt", cost: 60 });
+    expect(result.error).toMatch(/what date/i);
   });
 
   it("drafts a service entry with the recognized jobType and the account's current mileage", async () => {
     const result: any = await toolProposeLogEntry("owner@example.com", {
-      category: "service", description: "Valve cleaner", cost: 4, date: "2026-01-01", jobType: "oil-filter",
+      category: "service", description: "Valve cleaner", cost: 4, date: today, jobType: "oil-filter",
     });
     expect(result).toEqual({
       category: "service", jobType: "oil-filter", jobLabel: expect.any(String),
-      description: "Valve cleaner", cost: 4, date: "2026-01-01", mileage: 15000,
+      description: "Valve cleaner", cost: 4, date: today, mileage: 15000,
     });
+    expect(result.mileageNote).toBeUndefined(); // today needs no estimate - it's just the current mileage
   });
 
   it("defaults an unrecognized or missing jobType to 'other' rather than rejecting the draft", async () => {
-    const result: any = await toolProposeLogEntry("owner@example.com", { category: "service", description: "Valve cleaner", cost: 4, jobType: "not-a-real-job" });
+    const result: any = await toolProposeLogEntry("owner@example.com", { category: "service", description: "Valve cleaner", cost: 4, date: today, jobType: "not-a-real-job" });
     expect(result.jobType).toBe("other");
 
-    const result2: any = await toolProposeLogEntry("owner@example.com", { category: "service", description: "Valve cleaner", cost: 4 });
+    const result2: any = await toolProposeLogEntry("owner@example.com", { category: "service", description: "Valve cleaner", cost: 4, date: today });
     expect(result2.jobType).toBe("other");
   });
 
   it("drafts a bill entry with a valid billType", async () => {
     const result: any = await toolProposeLogEntry("owner@example.com", {
-      category: "bill", description: "Annual renewal", cost: 300, date: "2026-01-01", billType: "insurance",
+      category: "bill", description: "Annual renewal", cost: 300, date: today, billType: "insurance",
     });
-    expect(result).toEqual({ category: "bill", billType: "insurance", billLabel: expect.any(String), description: "Annual renewal", cost: 300, date: "2026-01-01" });
+    expect(result).toEqual({ category: "bill", billType: "insurance", billLabel: expect.any(String), description: "Annual renewal", cost: 300, date: today });
   });
 
   it("asks a clarifying question rather than guessing when billType is missing or invalid, since bills have no safe 'other' fallback", async () => {
-    const result: any = await toolProposeLogEntry("owner@example.com", { category: "bill", description: "Annual renewal", cost: 300 });
+    const result: any = await toolProposeLogEntry("owner@example.com", { category: "bill", description: "Annual renewal", cost: 300, date: today });
     expect(result.error).toMatch(/insurance, road tax, MOT test, or finance/);
 
-    const result2: any = await toolProposeLogEntry("owner@example.com", { category: "bill", description: "Annual renewal", cost: 300, billType: "not-real" });
+    const result2: any = await toolProposeLogEntry("owner@example.com", { category: "bill", description: "Annual renewal", cost: 300, date: today, billType: "not-real" });
     expect(result2.error).toMatch(/insurance, road tax, MOT test, or finance/);
   });
 
   it("drafts a mod/accessory entry, resolving an exact category key or label", async () => {
-    const byKey: any = await toolProposeLogEntry("owner@example.com", { category: "mod", description: "Öhlins rear shock", cost: 400, date: "2026-01-01", modCategory: "suspension-upgrade" });
-    expect(byKey).toEqual({ category: "mod", modCategory: "suspension-upgrade", modLabel: expect.any(String), description: "Öhlins rear shock", cost: 400, date: "2026-01-01", mileage: 15000 });
+    const byKey: any = await toolProposeLogEntry("owner@example.com", { category: "mod", description: "Öhlins rear shock", cost: 400, date: today, modCategory: "suspension-upgrade" });
+    expect(byKey).toEqual({ category: "mod", modCategory: "suspension-upgrade", modLabel: expect.any(String), description: "Öhlins rear shock", cost: 400, date: today, mileage: 15000 });
 
-    const byLabel: any = await toolProposeLogEntry("owner@example.com", { category: "mod", description: "Tank pads", cost: 20, modCategory: "Tank pads / protectors" });
+    const byLabel: any = await toolProposeLogEntry("owner@example.com", { category: "mod", description: "Tank pads", cost: 20, date: today, modCategory: "Tank pads / protectors" });
     expect(byLabel.modCategory).toBe("tank-pads");
   });
 
   it("fuzzy-matches a plain-language mod category by substring, case-insensitively", async () => {
-    const result: any = await toolProposeLogEntry("owner@example.com", { category: "mod", description: "Phone mount", cost: 15, modCategory: "PHONE mount" });
+    const result: any = await toolProposeLogEntry("owner@example.com", { category: "mod", description: "Phone mount", cost: 15, date: today, modCategory: "PHONE mount" });
     expect(result.modCategory).toBe("phone-mount");
   });
 
   it("falls back to 'other-accessory' for a mod category with no match, rather than blocking the draft, e.g. a wax or detailing product", async () => {
-    const result: any = await toolProposeLogEntry("owner@example.com", { category: "mod", description: "Szuwax detailing spray", cost: 12, modCategory: "szuwax" });
+    const result: any = await toolProposeLogEntry("owner@example.com", { category: "mod", description: "Szuwax detailing spray", cost: 12, date: today, modCategory: "szuwax" });
     expect(result.modCategory).toBe("other-accessory");
   });
 
   it("falls back to 'other-accessory' when modCategory is missing entirely", async () => {
-    const result: any = await toolProposeLogEntry("owner@example.com", { category: "mod", description: "Mystery part", cost: 12 });
+    const result: any = await toolProposeLogEntry("owner@example.com", { category: "mod", description: "Mystery part", cost: 12, date: today });
     expect(result.modCategory).toBe("other-accessory");
   });
 
   it("drafts a fuel entry with litres, cost, and the account's current mileage - no description needed", async () => {
-    const result: any = await toolProposeLogEntry("owner@example.com", { category: "fuel", cost: 15, date: "2026-01-01", litres: 10 });
-    expect(result).toEqual({ category: "fuel", litres: 10, cost: 15, date: "2026-01-01", mileage: 15000, filledToFull: false });
+    const result: any = await toolProposeLogEntry("owner@example.com", { category: "fuel", cost: 15, date: today, litres: 10 });
+    expect(result).toEqual({ category: "fuel", litres: 10, cost: 15, date: today, mileage: 15000, filledToFull: false });
   });
 
   it("only marks a fuel entry filledToFull when explicitly told true", async () => {
-    const result: any = await toolProposeLogEntry("owner@example.com", { category: "fuel", cost: 15, litres: 10, filledToFull: true });
+    const result: any = await toolProposeLogEntry("owner@example.com", { category: "fuel", cost: 15, date: today, litres: 10, filledToFull: true });
     expect(result.filledToFull).toBe(true);
   });
 
   it("rejects a missing, non-numeric, or non-positive litres for a fuel entry", async () => {
-    expect((await toolProposeLogEntry("owner@example.com", { category: "fuel", cost: 15 }) as any).error).toMatch(/litres/i);
-    expect((await toolProposeLogEntry("owner@example.com", { category: "fuel", cost: 15, litres: 0 }) as any).error).toMatch(/litres/i);
-    expect((await toolProposeLogEntry("owner@example.com", { category: "fuel", cost: 15, litres: -3 }) as any).error).toMatch(/litres/i);
+    expect((await toolProposeLogEntry("owner@example.com", { category: "fuel", cost: 15, date: today }) as any).error).toMatch(/litres/i);
+    expect((await toolProposeLogEntry("owner@example.com", { category: "fuel", cost: 15, date: today, litres: 0 }) as any).error).toMatch(/litres/i);
+    expect((await toolProposeLogEntry("owner@example.com", { category: "fuel", cost: 15, date: today, litres: -3 }) as any).error).toMatch(/litres/i);
   });
 
   // Labour is the one category available on both vehicle kinds - see
@@ -819,32 +870,32 @@ describe("toolProposeLogEntry", () => {
   describe("labour (bike-active)", () => {
     it("drafts a labour entry, resolving an exact category key or label, tagged vehicleKind: 'bike'", async () => {
       const byKey: any = await toolProposeLogEntry("owner@example.com", {
-        category: "labour", description: "Front brake bleed", cost: 45, date: "2026-01-01", labourCategory: "brake-bleeding",
+        category: "labour", description: "Front brake bleed", cost: 45, date: today, labourCategory: "brake-bleeding",
       });
       expect(byKey).toEqual({
         category: "labour", labourCategory: "brake-bleeding", labourLabel: expect.any(String),
-        description: "Front brake bleed", cost: 45, date: "2026-01-01", mileage: 15000, vehicleKind: "bike",
+        description: "Front brake bleed", cost: 45, date: today, mileage: 15000, vehicleKind: "bike",
       });
     });
 
     it("fuzzy-matches a plain-language labour category by substring, case-insensitively", async () => {
-      const result: any = await toolProposeLogEntry("owner@example.com", { category: "labour", description: "Bleeding the brakes", cost: 45, labourCategory: "BRAKE bleeding" });
+      const result: any = await toolProposeLogEntry("owner@example.com", { category: "labour", description: "Bleeding the brakes", cost: 45, date: today, labourCategory: "BRAKE bleeding" });
       expect(result.labourCategory).toBe("brake-bleeding");
     });
 
     it("falls back to 'other' for a labour category with no match, rather than blocking the draft", async () => {
-      const result: any = await toolProposeLogEntry("owner@example.com", { category: "labour", description: "Something unusual", cost: 45, labourCategory: "not-a-real-labour-job" });
+      const result: any = await toolProposeLogEntry("owner@example.com", { category: "labour", description: "Something unusual", cost: 45, date: today, labourCategory: "not-a-real-labour-job" });
       expect(result.labourCategory).toBe("other");
     });
 
     it("falls back to 'other' when labourCategory is missing entirely", async () => {
-      const result: any = await toolProposeLogEntry("owner@example.com", { category: "labour", description: "Workshop time", cost: 45 });
+      const result: any = await toolProposeLogEntry("owner@example.com", { category: "labour", description: "Workshop time", cost: 45, date: today });
       expect(result.labourCategory).toBe("other");
     });
 
     it("still requires a description and a valid cost for labour, same as every other bike category", async () => {
-      expect((await toolProposeLogEntry("owner@example.com", { category: "labour", cost: 45 }) as any).error).toMatch(/description/i);
-      expect((await toolProposeLogEntry("owner@example.com", { category: "labour", description: "Workshop time", cost: 0 }) as any).error).toMatch(/cost/i);
+      expect((await toolProposeLogEntry("owner@example.com", { category: "labour", cost: 45, date: today }) as any).error).toMatch(/description/i);
+      expect((await toolProposeLogEntry("owner@example.com", { category: "labour", description: "Workshop time", cost: 0, date: today }) as any).error).toMatch(/cost/i);
     });
   });
 
@@ -852,25 +903,69 @@ describe("toolProposeLogEntry", () => {
     it("drafts a labour entry against the car's own catalog and mileage, tagged vehicleKind: 'car'", async () => {
       mocks.resolveActiveVehicle.mockResolvedValue(carActive());
       const result: any = await toolProposeLogEntry("owner@example.com", {
-        category: "labour", description: "EV battery health check", cost: 60, date: "2026-01-01", labourCategory: "hv-battery-health-check",
+        category: "labour", description: "EV battery health check", cost: 60, date: today, labourCategory: "hv-battery-health-check",
       });
       expect(result).toEqual({
         category: "labour", labourCategory: "hv-battery-health-check", labourLabel: expect.any(String),
-        description: "EV battery health check", cost: 60, date: "2026-01-01", mileage: 20000, vehicleKind: "car",
+        description: "EV battery health check", cost: 60, date: today, mileage: 20000, vehicleKind: "car",
       });
     });
 
     it("falls back to 'other' for an unmatched car labour category", async () => {
       mocks.resolveActiveVehicle.mockResolvedValue(carActive());
-      const result: any = await toolProposeLogEntry("owner@example.com", { category: "labour", description: "Something unusual", cost: 60, labourCategory: "not-a-real-car-labour-job" });
+      const result: any = await toolProposeLogEntry("owner@example.com", { category: "labour", description: "Something unusual", cost: 60, date: today, labourCategory: "not-a-real-car-labour-job" });
       expect(result.labourCategory).toBe("other");
     });
 
     it("still requires a description and a valid, non-future date for car labour", async () => {
       mocks.resolveActiveVehicle.mockResolvedValue(carActive());
-      expect((await toolProposeLogEntry("owner@example.com", { category: "labour", cost: 60 }) as any).error).toMatch(/description/i);
+      expect((await toolProposeLogEntry("owner@example.com", { category: "labour", cost: 60, date: today }) as any).error).toMatch(/description/i);
       const tomorrow = new Date(Date.now() + 2 * 86_400_000).toISOString().slice(0, 10);
       expect((await toolProposeLogEntry("owner@example.com", { category: "labour", description: "Workshop time", cost: 60, date: tomorrow }) as any).error).toMatch(/future/);
+    });
+  });
+
+  // The other half of the fix: a past-dated draft should get a proper
+  // date-based mileage estimate (same maths as the manual dashboard
+  // forms' own useEstimatedMileage.ts), not just a hardcoded "current
+  // mileage right now" regardless of how long ago the date actually was.
+  describe("mileage estimation for a past date", () => {
+    it("interpolates between two logged points that bracket the date, and notes that it's an estimate", async () => {
+      mocks.gatherMileagePoints.mockReturnValue([
+        { date: "2022-01-01", mileage: 12000 },
+        { date: "2023-01-01", mileage: 13000 },
+      ]);
+      const result: any = await toolProposeLogEntry("owner@example.com", {
+        category: "service", description: "Oil change", cost: 40, date: "2022-07-02", jobType: "oil-filter",
+      });
+      expect(result.mileage).toBeGreaterThan(12000);
+      expect(result.mileage).toBeLessThan(13000);
+      expect(result.mileageNote).toMatch(/interpolated between logged records/);
+    });
+
+    it("does the same for a car-active session's labour draft, via gatherCarMileagePoints", async () => {
+      mocks.resolveActiveVehicle.mockResolvedValue(carActive());
+      mocks.gatherCarMileagePoints.mockReturnValue([
+        { date: "2022-01-01", mileage: 17000 },
+        { date: "2023-01-01", mileage: 19000 },
+      ]);
+      const result: any = await toolProposeLogEntry("owner@example.com", {
+        category: "labour", description: "Cambelt", cost: 200, date: "2022-07-02",
+      });
+      expect(result.mileage).toBeGreaterThan(17000);
+      expect(result.mileage).toBeLessThan(19000);
+      expect(result.mileageNote).toMatch(/interpolated between logged records/);
+    });
+
+    it("still supplies a provisional mileage, with a please-check note, rather than blocking the draft, when there's not enough history to estimate confidently", async () => {
+      // Well before the bike was even added (dateAdded: 2020-01-01), with
+      // no logged points at all to establish this bike's own pace from -
+      // exactly the case estimateMileage refuses to guess confidently at.
+      const result: any = await toolProposeLogEntry("owner@example.com", {
+        category: "service", description: "Oil change", cost: 40, date: "2010-01-01",
+      });
+      expect(result.mileage).toBe(8000); // bike.startingMileage - a provisional anchor, not a fabricated guess
+      expect(result.mileageNote).toMatch(/before this bike was added/);
     });
   });
 });

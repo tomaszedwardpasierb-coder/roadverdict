@@ -61,6 +61,11 @@
   color: var(--error, #b3261e);
 }
 
+.mileageNote {
+  font-size: 0.75rem;
+  color: var(--ink-soft);
+}
+
 .actions {
   display: flex;
   gap: 0.5rem;

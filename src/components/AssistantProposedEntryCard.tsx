@@ -18,6 +18,7 @@ export interface ProposedServiceEntry {
   cost: number;
   date: string;
   mileage: number;
+  mileageNote?: string;
 }
 
 export interface ProposedBillEntry {
@@ -37,6 +38,7 @@ export interface ProposedModEntry {
   cost: number;
   date: string;
   mileage: number;
+  mileageNote?: string;
 }
 
 export interface ProposedFuelEntry {
@@ -45,6 +47,7 @@ export interface ProposedFuelEntry {
   cost: number;
   date: string;
   mileage: number;
+  mileageNote?: string;
   filledToFull: boolean;
 }
 
@@ -56,6 +59,7 @@ export interface ProposedLabourEntry {
   cost: number;
   date: string;
   mileage: number;
+  mileageNote?: string;
   // The only variant that can come from either vehicle kind - carried on
   // the entry itself (see assistantTools.ts's ProposedEntry type) so this
   // card knows which catalog to render and which endpoint to post to
@@ -106,6 +110,11 @@ export function AssistantProposedEntryCard({ entry }: { entry: ProposedEntry }) 
   const [cost, setCost] = useState(String(entry.cost));
   const [date, setDate] = useState(entry.date);
   const [mileage, setMileage] = useState(entry.category !== 'bill' ? String(entry.mileage) : '');
+  // Cleared the moment the person edits the field themselves - same
+  // "their own figure always wins" rule useEstimatedMileage.ts follows
+  // for the manual dashboard forms, so a stale estimate note never sits
+  // under a number the person has since overridden.
+  const [mileageNote, setMileageNote] = useState(entry.category !== 'bill' ? entry.mileageNote ?? null : null);
   const [litres, setLitres] = useState(entry.category === 'fuel' ? String(entry.litres) : '');
   const [filledToFull, setFilledToFull] = useState(entry.category === 'fuel' ? entry.filledToFull : false);
   const [mileageAcknowledged, setMileageAcknowledged] = useState(false);
@@ -275,7 +284,18 @@ export function AssistantProposedEntryCard({ entry }: { entry: ProposedEntry }) 
       {entry.category !== 'bill' && (
         <div className={styles.field}>
           <label htmlFor="ai-mileage">Mileage</label>
-          <input id="ai-mileage" type="number" min="0" value={mileage} onChange={(e) => setMileage(e.target.value)} disabled={submitting} />
+          <input
+            id="ai-mileage"
+            type="number"
+            min="0"
+            value={mileage}
+            onChange={(e) => {
+              setMileage(e.target.value);
+              setMileageNote(null);
+            }}
+            disabled={submitting}
+          />
+          {mileageNote && <p className={styles.mileageNote}>{mileageNote}</p>}
         </div>
       )}
 
