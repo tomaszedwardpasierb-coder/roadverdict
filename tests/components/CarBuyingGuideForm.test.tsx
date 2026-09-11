@@ -296,14 +296,107 @@ describe("CarBuyingGuideForm", () => {
     expect(await screen.findByText(/1 write-off record\(s\) on file/)).toBeInTheDocument();
     expect(screen.getByText(/Vehicle history report - included with your £14\.99 purchase/)).toBeInTheDocument();
     expect(screen.getByText(/Bought 01\/01\/2026 - free to look up again until 15\/01\/2026/)).toBeInTheDocument();
-    expect(screen.getByText(/1 colour change\(s\) on record \(currently grey\)/)).toBeInTheDocument();
+    expect(screen.getByText(/Colour: grey \(1 change\(s\) on record\)/)).toBeInTheDocument();
     expect(screen.getByText(/Average annual mileage: 9,800 mi\/year/)).toBeInTheDocument();
     expect(screen.getByText(/⚠️ anomaly flagged/)).toBeInTheDocument();
-    expect(screen.getByText(/Manufacturer warranty: 36 months \/ 60,000 miles from new/)).toBeInTheDocument();
+    expect(screen.getByText("Manufacturer warranty")).toBeInTheDocument();
+    expect(screen.getByText(/36 months \/ 60,000 miles from new/)).toBeInTheDocument();
     expect(screen.getByText("Keeper change history")).toBeInTheDocument();
     expect(screen.getByText("Private average: £23,994")).toBeInTheDocument();
     expect(screen.getByText("Dealer forecourt: £27,161")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Buy the vehicle history report/ })).not.toBeInTheDocument();
+  });
+
+  // The fuller identity/technical-spec/PNC block added for the car
+  // Buying Guide's report (see vdiCheckFetch.ts's BMW 640i sample).
+  it("renders the identity, status, running-cost, technical-spec, performance, fuel-economy and PNC fact groups when present", async () => {
+    (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        vrm: "PA63ERB", make: "BMW", model: "640i", fuelType: "Petrol", colour: "Black",
+        plateInRetention: false, motDueDate: null, motTests: [], briefing: null, taxDetails: null,
+        vdiCheck: {
+          isStolen: false, hasWriteOffRecord: false, writeOffRecordCount: 0, hasOutstandingFinance: false,
+          financeRecords: [],
+          keeperChanges: [{ keeperStartDate: "2020-01-01T00:00:00Z", previousKeeperDisposalDate: null, numberOfPreviousKeepers: 2 }],
+          keeperChangeCount: 1,
+          plateChanges: [{ currentVrm: "PA63ERB", previousVrm: "OLD123", dateOfTransaction: "2015-05-01T00:00:00Z" }],
+          plateChangeCount: 1, colourChangeCount: 0, currentColour: "Black", originalColour: "Black", previousColour: null,
+          v5cReissueCount: 1, calculatedAverageAnnualMileage: null, averageMileageForAge: null,
+          mileageAnomalyDetected: false, manufacturerWarrantyMiles: null, manufacturerWarrantyMonths: null,
+          series: "F13", platformName: "L6", countryOfOrigin: "Germany", dvlaFuelType: "PETROL",
+          bodyStyle: "Coupe", dvlaBodyType: "COUPE", dvlaWheelPlan: "2 AXLE RIGID BODY",
+          dateFirstRegisteredInUk: "2013-09-10T00:00:00Z", dateOfManufacture: "2013-09-10T00:00:00Z",
+          isImported: true, isImportedFromOutsideEu: false, isScrapped: false, certificateOfDestructionIssued: false,
+          vedStandardSixMonths: 68.75, vedStandardTwelveMonths: 200, dvlaCo2: 181, dvlaCo2Band: "I", euroStatus: "5b",
+          kerbWeightKg: 1685, grossCombinedWeightKg: 2180, fuelTankCapacityLitres: 70,
+          cylinderArrangement: "Inline", numberOfCylinders: 6, aspiration: "Turbocharged",
+          transmissionType: "Automatic", numberOfGears: 8, drivingAxle: "Rear",
+          bhp: 315, ps: 319.5, torqueNm: 450, torqueRpm: 1300,
+          zeroToSixtyMph: 5.3, zeroToOneHundredKph: null, maxSpeedMph: 155, maxSpeedKph: 250,
+          soundLevels: { stationaryDb: 90, driveByDb: 79, engineSpeedRpm: 4200 },
+          fuelEconomy: {
+            urbanColdMpg: 26.4, extraUrbanMpg: 47.1, combinedMpg: 36.2,
+            urbanColdL100Km: 10.7, extraUrbanL100Km: 6.0, combinedL100Km: 7.8,
+          },
+          pncDetail: {
+            policeForceName: "Metropolitan Police", currentStatusOnRecord: "Recovered",
+            dateReportedStolen: "2021-05-01T00:00:00Z", dateRecordAddedToPnc: "2021-05-02T00:00:00Z",
+          },
+        },
+        valuation: null,
+        vdiCheckPurchasedAt: "2026-01-01T00:00:00.000Z",
+        vdiCheckExpiresAt: "2026-01-15T00:00:00.000Z",
+        vdiCheckPricePaidPence: 1499,
+      }),
+    });
+    const user = userEvent.setup();
+    render(<CarBuyingGuideForm signedIn />);
+    await user.type(screen.getByLabelText("Search by registration (optional)"), "PA63ERB");
+    await user.click(screen.getByRole("button", { name: "Look up" }));
+
+    expect(await screen.findByText(/Series: F13/)).toBeInTheDocument();
+    expect(screen.getByText(/Platform: L6/)).toBeInTheDocument();
+    expect(screen.getByText(/Country of origin: Germany/)).toBeInTheDocument();
+    expect(screen.getByText(/DVLA fuel type: PETROL/)).toBeInTheDocument();
+    expect(screen.getByText(/Body style: Coupe/)).toBeInTheDocument();
+    expect(screen.getByText(/DVLA body type: COUPE/)).toBeInTheDocument();
+    expect(screen.getByText(/Wheel plan: 2 AXLE RIGID BODY/)).toBeInTheDocument();
+    expect(screen.getByText(/First registered in the UK: 10\/09\/2013/)).toBeInTheDocument();
+    expect(screen.getByText(/Date of manufacture: 10\/09\/2013/)).toBeInTheDocument();
+
+    expect(screen.getByText(/Current keeper since 01\/01\/2020 \(2 previous keeper\(s\)\)/)).toBeInTheDocument();
+
+    expect(screen.getByText(/Imported/)).toBeInTheDocument();
+
+    expect(screen.getByText(/Road tax \(6 months\): £68\.75/)).toBeInTheDocument();
+    expect(screen.getByText(/Road tax \(12 months\): £200\.00/)).toBeInTheDocument();
+    expect(screen.getByText(/DVLA CO2: 181 g\/km \(band I\)/)).toBeInTheDocument();
+    expect(screen.getByText(/Euro status: 5b/)).toBeInTheDocument();
+
+    expect(screen.getByText(/Engine: Inline, 6 cylinders, Turbocharged/)).toBeInTheDocument();
+    expect(screen.getByText(/Transmission: Automatic, 8-speed, Rear drive/)).toBeInTheDocument();
+    expect(screen.getByText(/Kerb weight: 1,685 kg/)).toBeInTheDocument();
+    expect(screen.getByText(/Gross combined weight: 2,180 kg/)).toBeInTheDocument();
+    expect(screen.getByText(/Fuel tank: 70 litres/)).toBeInTheDocument();
+
+    expect(screen.getByText(/Power: 315 bhp \/ 319\.5 PS/)).toBeInTheDocument();
+    expect(screen.getByText(/Torque: 450 Nm at 1,300 rpm/)).toBeInTheDocument();
+    expect(screen.getByText(/0-60mph: 5\.3s/)).toBeInTheDocument();
+    expect(screen.getByText(/Max speed: 155mph \/ 250kph/)).toBeInTheDocument();
+    expect(screen.getByText(/Sound level: 90dB stationary, 79dB drive-by at 4,200 rpm/)).toBeInTheDocument();
+
+    expect(screen.getByText(/Urban \(cold\): 26\.4mpg \(10\.7L\/100km\)/)).toBeInTheDocument();
+    expect(screen.getByText(/Extra urban: 47\.1mpg \(6L\/100km\)/)).toBeInTheDocument();
+    expect(screen.getByText(/Combined: 36\.2mpg \(7\.8L\/100km\)/)).toBeInTheDocument();
+
+    expect(screen.getByText(/Police force: Metropolitan Police/)).toBeInTheDocument();
+    expect(screen.getByText(/Current status: Recovered/)).toBeInTheDocument();
+    expect(screen.getByText(/Reported stolen: 01\/05\/2021/)).toBeInTheDocument();
+    expect(screen.getByText(/Added to PNC: 02\/05\/2021/)).toBeInTheDocument();
+
+    expect(screen.getByText("Plate change history")).toBeInTheDocument();
+    expect(screen.getByText(/OLD123 → PA63ERB \(01\/05\/2015\)/)).toBeInTheDocument();
   });
 
   it("shows the valuation cooldown message when the free/Pro allowance is used up, independent of the VDI purchase state", async () => {

@@ -51,17 +51,71 @@ interface CarBuyingGuideLookupResponse {
     writeOffRecordCount: number;
     hasOutstandingFinance: boolean;
     financeRecords: { agreementDate: string | null; agreementType: string | null; financeCompany: string | null }[];
-    keeperChanges: { keeperStartDate: string; previousKeeperDisposalDate: string | null }[];
+    keeperChanges: { keeperStartDate: string; previousKeeperDisposalDate: string | null; numberOfPreviousKeepers?: number | null }[];
     keeperChangeCount: number;
+    plateChanges?: { currentVrm: string | null; previousVrm: string | null; dateOfTransaction: string | null }[];
     plateChangeCount: number;
     colourChangeCount: number;
     currentColour: string | null;
+    originalColour?: string | null;
+    previousColour?: string | null;
     v5cReissueCount: number;
     calculatedAverageAnnualMileage: number | null;
     averageMileageForAge: number | null;
     mileageAnomalyDetected: boolean;
     manufacturerWarrantyMiles: number | null;
     manufacturerWarrantyMonths: number | null;
+    dateFirstRegisteredInUk?: string | null;
+    dateOfManufacture?: string | null;
+    vedStandardSixMonths?: number | null;
+    vedStandardTwelveMonths?: number | null;
+    taxationClass?: string | null;
+    bhp?: number | null;
+    soundLevels?: { stationaryDb: number | null; driveByDb: number | null; engineSpeedRpm: number | null } | null;
+    series?: string | null;
+    platformName?: string | null;
+    countryOfOrigin?: string | null;
+    dvlaFuelType?: string | null;
+    bodyStyle?: string | null;
+    dvlaBodyType?: string | null;
+    dvlaWheelPlan?: string | null;
+    isImported?: boolean;
+    isImportedFromOutsideEu?: boolean;
+    isScrapped?: boolean;
+    certificateOfDestructionIssued?: boolean;
+    euroStatus?: string | null;
+    dvlaCo2?: number | null;
+    dvlaCo2Band?: string | null;
+    kerbWeightKg?: number | null;
+    grossCombinedWeightKg?: number | null;
+    cylinderArrangement?: string | null;
+    numberOfCylinders?: number | null;
+    aspiration?: string | null;
+    transmissionType?: string | null;
+    numberOfGears?: number | null;
+    drivingAxle?: string | null;
+    fuelTankCapacityLitres?: number | null;
+    ps?: number | null;
+    torqueNm?: number | null;
+    torqueRpm?: number | null;
+    zeroToSixtyMph?: number | null;
+    zeroToOneHundredKph?: number | null;
+    maxSpeedMph?: number | null;
+    maxSpeedKph?: number | null;
+    fuelEconomy?: {
+      urbanColdMpg: number | null;
+      extraUrbanMpg: number | null;
+      combinedMpg: number | null;
+      urbanColdL100Km: number | null;
+      extraUrbanL100Km: number | null;
+      combinedL100Km: number | null;
+    } | null;
+    pncDetail?: {
+      policeForceName: string | null;
+      currentStatusOnRecord: string | null;
+      dateReportedStolen: string | null;
+      dateRecordAddedToPnc: string | null;
+    } | null;
   } | null;
   vdiCheckBlockedReason?: 'already_used' | 'payment_not_confirmed' | 'invalid' | 'fetch_failed';
   // Set alongside vdiCheck - when it was paid for, and how long it stays
@@ -113,6 +167,25 @@ const ICON = {
   keeperChanges: '👤',
   plateChanges: '🔢',
   mileage: '🛣️',
+  pnc: '🚓',
+  identity: '🚗',
+  registration: '📅',
+  bodyType: '🚙',
+  origin: '🌍',
+  imported: '📦',
+  scrapped: '♻️',
+  tax: '🏛️',
+  co2: '🌫️',
+  weight: '⚖️',
+  engine: '🔧',
+  transmission: '⚙️',
+  fuelTank: '⛽',
+  performance: '🏁',
+  torque: '💪',
+  topSpeed: '🚀',
+  soundLevel: '🔊',
+  fuelEconomy: '📊',
+  warranty: '🧾',
 } as const;
 
 const CAR_CLASSES = Object.keys(CAR_CLASS_LABELS_FOR_BUYING_GUIDE) as CarSizeClass[];
@@ -382,6 +455,7 @@ export function CarBuyingGuideForm({ signedIn }: Props) {
                   </p>
                 )}
               </div>
+              <p className="field-note" style={{ fontWeight: 600, margin: '0 0 0.3rem' }}>Safety &amp; history</p>
               <ul style={{ margin: 0, paddingLeft: '1.1rem' }}>
                 <li className="field-note">{ICON.stolen} {motResult.vdiCheck.isStolen ? '⚠️ Recorded as stolen' : 'No stolen marker found'}</li>
                 <li className="field-note">
@@ -396,12 +470,189 @@ export function CarBuyingGuideForm({ signedIn }: Props) {
                     ? `⚠️ ${motResult.vdiCheck.financeRecords.length} outstanding finance agreement(s) on file`
                     : 'No outstanding finance found'}
                 </li>
-                <li className="field-note">{ICON.keeperChanges} {motResult.vdiCheck.keeperChangeCount} keeper change(s) on record</li>
-                <li className="field-note">{ICON.plateChanges} {motResult.vdiCheck.plateChangeCount} plate change(s) on record</li>
+              </ul>
+
+              {(motResult.vdiCheck.series || motResult.vdiCheck.platformName || motResult.vdiCheck.countryOfOrigin ||
+                motResult.vdiCheck.dvlaFuelType || motResult.vdiCheck.bodyStyle || motResult.vdiCheck.dvlaBodyType ||
+                motResult.vdiCheck.dvlaWheelPlan || motResult.vdiCheck.dateFirstRegisteredInUk || motResult.vdiCheck.dateOfManufacture) && (
+                <>
+                  <p className="field-note" style={{ fontWeight: 600, margin: '0.6rem 0 0.3rem' }}>Identity</p>
+                  <ul style={{ margin: 0, paddingLeft: '1.1rem' }}>
+                    {motResult.vdiCheck.series && <li className="field-note">{ICON.identity} Series: {motResult.vdiCheck.series}</li>}
+                    {motResult.vdiCheck.platformName && <li className="field-note">{ICON.identity} Platform: {motResult.vdiCheck.platformName}</li>}
+                    {motResult.vdiCheck.countryOfOrigin && <li className="field-note">{ICON.origin} Country of origin: {motResult.vdiCheck.countryOfOrigin}</li>}
+                    {motResult.vdiCheck.dvlaFuelType && <li className="field-note">{ICON.fuelTank} DVLA fuel type: {motResult.vdiCheck.dvlaFuelType}</li>}
+                    {motResult.vdiCheck.bodyStyle && <li className="field-note">{ICON.bodyType} Body style: {motResult.vdiCheck.bodyStyle}</li>}
+                    {motResult.vdiCheck.dvlaBodyType && <li className="field-note">{ICON.bodyType} DVLA body type: {motResult.vdiCheck.dvlaBodyType}</li>}
+                    {motResult.vdiCheck.dvlaWheelPlan && <li className="field-note">{ICON.bodyType} Wheel plan: {motResult.vdiCheck.dvlaWheelPlan}</li>}
+                    {motResult.vdiCheck.dateFirstRegisteredInUk && (
+                      <li className="field-note">{ICON.registration} First registered in the UK: {new Date(motResult.vdiCheck.dateFirstRegisteredInUk).toLocaleDateString('en-GB')}</li>
+                    )}
+                    {motResult.vdiCheck.dateOfManufacture && (
+                      <li className="field-note">{ICON.registration} Date of manufacture: {new Date(motResult.vdiCheck.dateOfManufacture).toLocaleDateString('en-GB')}</li>
+                    )}
+                  </ul>
+                </>
+              )}
+
+              <p className="field-note" style={{ fontWeight: 600, margin: '0.6rem 0 0.3rem' }}>Colour</p>
+              <ul style={{ margin: 0, paddingLeft: '1.1rem' }}>
                 <li className="field-note">
-                  {ICON.colour} {motResult.vdiCheck.colourChangeCount} colour change(s) on record
-                  {motResult.vdiCheck.currentColour ? ` (currently ${motResult.vdiCheck.currentColour.toLowerCase()})` : ''}
+                  {ICON.colour}{' '}
+                  {motResult.vdiCheck.originalColour && motResult.vdiCheck.currentColour && motResult.vdiCheck.originalColour !== motResult.vdiCheck.currentColour
+                    ? `${motResult.vdiCheck.originalColour.toLowerCase()} → ${motResult.vdiCheck.currentColour.toLowerCase()}`
+                    : motResult.vdiCheck.currentColour
+                      ? `Colour: ${motResult.vdiCheck.currentColour.toLowerCase()}`
+                      : 'Colour not recorded'}
+                  {' '}({motResult.vdiCheck.colourChangeCount} change(s) on record)
+                  {motResult.vdiCheck.previousColour ? `, previously ${motResult.vdiCheck.previousColour.toLowerCase()}` : ''}
                 </li>
+              </ul>
+
+              <p className="field-note" style={{ fontWeight: 600, margin: '0.6rem 0 0.3rem' }}>Ownership history</p>
+              <ul style={{ margin: 0, paddingLeft: '1.1rem' }}>
+                <li className="field-note">{ICON.keeperChanges} {motResult.vdiCheck.keeperChangeCount} keeper change(s) on record</li>
+                {motResult.vdiCheck.keeperChanges.length > 0 && (() => {
+                  const latest = motResult.vdiCheck.keeperChanges[motResult.vdiCheck.keeperChanges.length - 1];
+                  return (
+                    <li className="field-note">
+                      {ICON.keeperChanges} Current keeper since {new Date(latest.keeperStartDate).toLocaleDateString('en-GB')}
+                      {latest.numberOfPreviousKeepers != null ? ` (${latest.numberOfPreviousKeepers} previous keeper(s))` : ''}
+                    </li>
+                  );
+                })()}
+                <li className="field-note">{ICON.plateChanges} {motResult.vdiCheck.plateChangeCount} plate change(s) on record</li>
+              </ul>
+
+              {(motResult.vdiCheck.isImported || motResult.vdiCheck.isImportedFromOutsideEu || motResult.vdiCheck.isScrapped || motResult.vdiCheck.certificateOfDestructionIssued) && (
+                <>
+                  <p className="field-note" style={{ fontWeight: 600, margin: '0.6rem 0 0.3rem' }}>Status flags</p>
+                  <ul style={{ margin: 0, paddingLeft: '1.1rem' }}>
+                    {motResult.vdiCheck.isImported && (
+                      <li className="field-note">{ICON.imported} Imported{motResult.vdiCheck.isImportedFromOutsideEu ? ' (from outside the EU)' : ''}</li>
+                    )}
+                    {motResult.vdiCheck.isScrapped && <li className="field-note">{ICON.scrapped} ⚠️ Recorded as scrapped</li>}
+                    {motResult.vdiCheck.certificateOfDestructionIssued && (
+                      <li className="field-note">{ICON.scrapped} ⚠️ Certificate of destruction issued</li>
+                    )}
+                  </ul>
+                </>
+              )}
+
+              {(motResult.vdiCheck.vedStandardSixMonths != null || motResult.vdiCheck.vedStandardTwelveMonths != null ||
+                motResult.vdiCheck.dvlaCo2 != null || motResult.vdiCheck.dvlaCo2Band || motResult.vdiCheck.euroStatus) && (
+                <>
+                  <p className="field-note" style={{ fontWeight: 600, margin: '0.6rem 0 0.3rem' }}>Running costs</p>
+                  <ul style={{ margin: 0, paddingLeft: '1.1rem' }}>
+                    {motResult.vdiCheck.vedStandardSixMonths != null && (
+                      <li className="field-note">{ICON.tax} Road tax (6 months): £{motResult.vdiCheck.vedStandardSixMonths.toFixed(2)}</li>
+                    )}
+                    {motResult.vdiCheck.vedStandardTwelveMonths != null && (
+                      <li className="field-note">{ICON.tax} Road tax (12 months): £{motResult.vdiCheck.vedStandardTwelveMonths.toFixed(2)}</li>
+                    )}
+                    {motResult.vdiCheck.dvlaCo2 != null && (
+                      <li className="field-note">{ICON.co2} DVLA CO2: {motResult.vdiCheck.dvlaCo2} g/km{motResult.vdiCheck.dvlaCo2Band ? ` (band ${motResult.vdiCheck.dvlaCo2Band})` : ''}</li>
+                    )}
+                    {motResult.vdiCheck.euroStatus && <li className="field-note">{ICON.co2} Euro status: {motResult.vdiCheck.euroStatus}</li>}
+                  </ul>
+                </>
+              )}
+
+              {(motResult.vdiCheck.cylinderArrangement || motResult.vdiCheck.numberOfCylinders != null || motResult.vdiCheck.aspiration ||
+                motResult.vdiCheck.transmissionType || motResult.vdiCheck.numberOfGears != null || motResult.vdiCheck.drivingAxle ||
+                motResult.vdiCheck.kerbWeightKg != null || motResult.vdiCheck.grossCombinedWeightKg != null || motResult.vdiCheck.fuelTankCapacityLitres != null) && (
+                <>
+                  <p className="field-note" style={{ fontWeight: 600, margin: '0.6rem 0 0.3rem' }}>Technical spec</p>
+                  <ul style={{ margin: 0, paddingLeft: '1.1rem' }}>
+                    {(motResult.vdiCheck.numberOfCylinders != null || motResult.vdiCheck.cylinderArrangement) && (
+                      <li className="field-note">
+                        {ICON.engine} Engine: {[motResult.vdiCheck.cylinderArrangement, motResult.vdiCheck.numberOfCylinders != null ? `${motResult.vdiCheck.numberOfCylinders} cylinders` : null, motResult.vdiCheck.aspiration].filter(Boolean).join(', ')}
+                      </li>
+                    )}
+                    {motResult.vdiCheck.transmissionType && (
+                      <li className="field-note">
+                        {ICON.transmission} Transmission: {[motResult.vdiCheck.transmissionType, motResult.vdiCheck.numberOfGears != null ? `${motResult.vdiCheck.numberOfGears}-speed` : null, motResult.vdiCheck.drivingAxle ? `${motResult.vdiCheck.drivingAxle} drive` : null].filter(Boolean).join(', ')}
+                      </li>
+                    )}
+                    {motResult.vdiCheck.kerbWeightKg != null && <li className="field-note">{ICON.weight} Kerb weight: {motResult.vdiCheck.kerbWeightKg.toLocaleString()} kg</li>}
+                    {motResult.vdiCheck.grossCombinedWeightKg != null && <li className="field-note">{ICON.weight} Gross combined weight: {motResult.vdiCheck.grossCombinedWeightKg.toLocaleString()} kg</li>}
+                    {motResult.vdiCheck.fuelTankCapacityLitres != null && <li className="field-note">{ICON.fuelTank} Fuel tank: {motResult.vdiCheck.fuelTankCapacityLitres} litres</li>}
+                  </ul>
+                </>
+              )}
+
+              {(motResult.vdiCheck.bhp != null || motResult.vdiCheck.ps != null || motResult.vdiCheck.torqueNm != null ||
+                motResult.vdiCheck.zeroToSixtyMph != null || motResult.vdiCheck.maxSpeedMph != null || motResult.vdiCheck.soundLevels) && (
+                <>
+                  <p className="field-note" style={{ fontWeight: 600, margin: '0.6rem 0 0.3rem' }}>Performance</p>
+                  <ul style={{ margin: 0, paddingLeft: '1.1rem' }}>
+                    {(motResult.vdiCheck.bhp != null || motResult.vdiCheck.ps != null) && (
+                      <li className="field-note">
+                        {ICON.performance} Power: {[motResult.vdiCheck.bhp != null ? `${motResult.vdiCheck.bhp} bhp` : null, motResult.vdiCheck.ps != null ? `${motResult.vdiCheck.ps} PS` : null].filter(Boolean).join(' / ')}
+                      </li>
+                    )}
+                    {motResult.vdiCheck.torqueNm != null && (
+                      <li className="field-note">
+                        {ICON.torque} Torque: {motResult.vdiCheck.torqueNm} Nm{motResult.vdiCheck.torqueRpm != null ? ` at ${motResult.vdiCheck.torqueRpm.toLocaleString()} rpm` : ''}
+                      </li>
+                    )}
+                    {motResult.vdiCheck.zeroToSixtyMph != null && <li className="field-note">{ICON.topSpeed} 0-60mph: {motResult.vdiCheck.zeroToSixtyMph}s</li>}
+                    {motResult.vdiCheck.zeroToOneHundredKph != null && <li className="field-note">{ICON.topSpeed} 0-100kph: {motResult.vdiCheck.zeroToOneHundredKph}s</li>}
+                    {(motResult.vdiCheck.maxSpeedMph != null || motResult.vdiCheck.maxSpeedKph != null) && (
+                      <li className="field-note">
+                        {ICON.topSpeed} Max speed: {[motResult.vdiCheck.maxSpeedMph != null ? `${motResult.vdiCheck.maxSpeedMph}mph` : null, motResult.vdiCheck.maxSpeedKph != null ? `${motResult.vdiCheck.maxSpeedKph}kph` : null].filter(Boolean).join(' / ')}
+                      </li>
+                    )}
+                    {motResult.vdiCheck.soundLevels && (motResult.vdiCheck.soundLevels.stationaryDb != null || motResult.vdiCheck.soundLevels.driveByDb != null) && (
+                      <li className="field-note">
+                        {ICON.soundLevel} Sound level:{' '}
+                        {[
+                          motResult.vdiCheck.soundLevels.stationaryDb != null ? `${motResult.vdiCheck.soundLevels.stationaryDb}dB stationary` : null,
+                          motResult.vdiCheck.soundLevels.driveByDb != null
+                            ? `${motResult.vdiCheck.soundLevels.driveByDb}dB drive-by${motResult.vdiCheck.soundLevels.engineSpeedRpm != null ? ` at ${motResult.vdiCheck.soundLevels.engineSpeedRpm.toLocaleString()} rpm` : ''}`
+                            : null,
+                        ].filter(Boolean).join(', ')}
+                      </li>
+                    )}
+                  </ul>
+                </>
+              )}
+
+              {motResult.vdiCheck.fuelEconomy && (
+                <>
+                  <p className="field-note" style={{ fontWeight: 600, margin: '0.6rem 0 0.3rem' }}>Fuel economy</p>
+                  <ul style={{ margin: 0, paddingLeft: '1.1rem' }}>
+                    {motResult.vdiCheck.fuelEconomy.urbanColdMpg != null && (
+                      <li className="field-note">{ICON.fuelEconomy} Urban (cold): {motResult.vdiCheck.fuelEconomy.urbanColdMpg}mpg ({motResult.vdiCheck.fuelEconomy.urbanColdL100Km}L/100km)</li>
+                    )}
+                    {motResult.vdiCheck.fuelEconomy.extraUrbanMpg != null && (
+                      <li className="field-note">{ICON.fuelEconomy} Extra urban: {motResult.vdiCheck.fuelEconomy.extraUrbanMpg}mpg ({motResult.vdiCheck.fuelEconomy.extraUrbanL100Km}L/100km)</li>
+                    )}
+                    {motResult.vdiCheck.fuelEconomy.combinedMpg != null && (
+                      <li className="field-note">{ICON.fuelEconomy} Combined: {motResult.vdiCheck.fuelEconomy.combinedMpg}mpg ({motResult.vdiCheck.fuelEconomy.combinedL100Km}L/100km)</li>
+                    )}
+                  </ul>
+                </>
+              )}
+
+              {motResult.vdiCheck.pncDetail && (
+                <>
+                  <p className="field-note" style={{ fontWeight: 600, margin: '0.6rem 0 0.3rem' }}>Police National Computer record</p>
+                  <ul style={{ margin: 0, paddingLeft: '1.1rem' }}>
+                    {motResult.vdiCheck.pncDetail.policeForceName && <li className="field-note">{ICON.pnc} Police force: {motResult.vdiCheck.pncDetail.policeForceName}</li>}
+                    {motResult.vdiCheck.pncDetail.currentStatusOnRecord && <li className="field-note">{ICON.pnc} Current status: {motResult.vdiCheck.pncDetail.currentStatusOnRecord}</li>}
+                    {motResult.vdiCheck.pncDetail.dateReportedStolen && (
+                      <li className="field-note">{ICON.pnc} Reported stolen: {new Date(motResult.vdiCheck.pncDetail.dateReportedStolen).toLocaleDateString('en-GB')}</li>
+                    )}
+                    {motResult.vdiCheck.pncDetail.dateRecordAddedToPnc && (
+                      <li className="field-note">{ICON.pnc} Added to PNC: {new Date(motResult.vdiCheck.pncDetail.dateRecordAddedToPnc).toLocaleDateString('en-GB')}</li>
+                    )}
+                  </ul>
+                </>
+              )}
+
+              <p className="field-note" style={{ fontWeight: 600, margin: '0.6rem 0 0.3rem' }}>Mileage integrity</p>
+              <ul style={{ margin: 0, paddingLeft: '1.1rem' }}>
                 {motResult.vdiCheck.calculatedAverageAnnualMileage != null && motResult.vdiCheck.averageMileageForAge != null && (
                   <li className="field-note">
                     {ICON.mileage} Average annual mileage: {motResult.vdiCheck.calculatedAverageAnnualMileage.toLocaleString()} mi/year
@@ -409,19 +660,26 @@ export function CarBuyingGuideForm({ signedIn }: Props) {
                     {motResult.vdiCheck.mileageAnomalyDetected ? ' - ⚠️ anomaly flagged' : ''}
                   </li>
                 )}
-                {(motResult.vdiCheck.manufacturerWarrantyMonths != null || motResult.vdiCheck.manufacturerWarrantyMiles != null) && (
-                  <li className="field-note">
-                    Manufacturer warranty:{' '}
-                    {[
-                      motResult.vdiCheck.manufacturerWarrantyMonths ? `${motResult.vdiCheck.manufacturerWarrantyMonths} months` : null,
-                      motResult.vdiCheck.manufacturerWarrantyMiles ? `${motResult.vdiCheck.manufacturerWarrantyMiles.toLocaleString()} miles` : null,
-                    ]
-                      .filter(Boolean)
-                      .join(' / ')}{' '}
-                    from new
-                  </li>
-                )}
               </ul>
+
+              {(motResult.vdiCheck.manufacturerWarrantyMonths != null || motResult.vdiCheck.manufacturerWarrantyMiles != null) && (
+                <>
+                  <p className="field-note" style={{ fontWeight: 600, margin: '0.6rem 0 0.3rem' }}>Manufacturer warranty</p>
+                  <ul style={{ margin: 0, paddingLeft: '1.1rem' }}>
+                    <li className="field-note">
+                      {ICON.warranty}{' '}
+                      {[
+                        motResult.vdiCheck.manufacturerWarrantyMonths ? `${motResult.vdiCheck.manufacturerWarrantyMonths} months` : null,
+                        motResult.vdiCheck.manufacturerWarrantyMiles ? `${motResult.vdiCheck.manufacturerWarrantyMiles.toLocaleString()} miles` : null,
+                      ]
+                        .filter(Boolean)
+                        .join(' / ')}{' '}
+                      from new
+                    </li>
+                  </ul>
+                </>
+              )}
+
               {motResult.vdiCheck.keeperChanges.length > 0 && (
                 <>
                   <p className="field-note" style={{ fontWeight: 600, margin: '0.6rem 0 0.3rem' }}>Keeper change history</p>
@@ -432,6 +690,20 @@ export function CarBuyingGuideForm({ signedIn }: Props) {
                         {k.previousKeeperDisposalDate
                           ? ` (previous keeper disposed ${new Date(k.previousKeeperDisposalDate).toLocaleDateString('en-GB')})`
                           : ''}
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              )}
+
+              {motResult.vdiCheck.plateChanges && motResult.vdiCheck.plateChanges.length > 0 && (
+                <>
+                  <p className="field-note" style={{ fontWeight: 600, margin: '0.6rem 0 0.3rem' }}>Plate change history</p>
+                  <ul style={{ margin: 0, paddingLeft: '1.1rem' }}>
+                    {[...motResult.vdiCheck.plateChanges].reverse().map((p, i) => (
+                      <li key={i} className="field-note">
+                        {p.previousVrm ?? '?'} → {p.currentVrm ?? '?'}
+                        {p.dateOfTransaction ? ` (${new Date(p.dateOfTransaction).toLocaleDateString('en-GB')})` : ''}
                       </li>
                     ))}
                   </ul>

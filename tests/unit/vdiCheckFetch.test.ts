@@ -85,7 +85,7 @@ describe("fetchVdiCheckFromVdg", () => {
       writeOffRecordCount: 0,
       hasOutstandingFinance: true,
       financeRecords: [{ agreementDate: "2024-09-02T00:00:00", agreementType: "HIRE PURCHASE", financeCompany: "LEXUS FINANCIAL SERVICES" }],
-      keeperChanges: [{ keeperStartDate: "2025-11-12T00:00:00Z", previousKeeperDisposalDate: null }],
+      keeperChanges: [{ keeperStartDate: "2025-11-12T00:00:00Z", previousKeeperDisposalDate: null, numberOfPreviousKeepers: null }],
       keeperChangeCount: 1,
       plateChangeCount: 1,
       colourChangeCount: 0,
@@ -108,7 +108,162 @@ describe("fetchVdiCheckFromVdg", () => {
       taxationClass: "L3",
       bhp: 71,
       soundLevels: { stationaryDb: 90, driveByDb: 79, engineSpeedRpm: 4200 },
+      series: null,
+      platformName: null,
+      countryOfOrigin: null,
+      dvlaFuelType: null,
+      bodyStyle: null,
+      dvlaBodyType: null,
+      dvlaWheelPlan: null,
+      isImported: false,
+      isImportedFromOutsideEu: false,
+      isScrapped: false,
+      certificateOfDestructionIssued: false,
+      euroStatus: null,
+      dvlaCo2: null,
+      dvlaCo2Band: null,
+      kerbWeightKg: null,
+      grossCombinedWeightKg: null,
+      cylinderArrangement: null,
+      numberOfCylinders: null,
+      aspiration: null,
+      transmissionType: null,
+      numberOfGears: null,
+      drivingAxle: null,
+      fuelTankCapacityLitres: null,
+      ps: null,
+      torqueNm: null,
+      torqueRpm: null,
+      zeroToSixtyMph: null,
+      zeroToOneHundredKph: null,
+      maxSpeedMph: null,
+      maxSpeedKph: null,
+      fuelEconomy: null,
+      previousColour: null,
+      pncDetail: null,
     });
+  });
+
+  // Identity/technical-spec block, confirmed against a real BMW 640i
+  // VDICheck sample (see vdiUnlock.ts's comment on this field group).
+  it("parses the car-oriented identity/technical-spec/PNC fields from a real sample shape", async () => {
+    mocks.fetch.mockResolvedValue(
+      vdgSuccess({
+        VehicleDetails: {
+          VehicleIdentification: {
+            DateFirstRegisteredInUk: "2013-09-10T00:00:00Z",
+            DateOfManufacture: "2013-09-10T00:00:00Z",
+            DvlaWheelPlan: "2 AXLE RIGID BODY",
+            DvlaBodyType: "COUPE",
+            DvlaFuelType: "PETROL",
+          },
+          VehicleStatus: {
+            IsImported: false,
+            IsImportedFromOutsideEu: false,
+            IsScrapped: false,
+            CertificateOfDestructionIssued: false,
+            VehicleExciseDutyDetails: {
+              DvlaCo2: 181,
+              DvlaCo2Band: "I",
+              VedRate: { FirstYear: { TwelveMonths: 405 }, Standard: { SixMonths: 68.75, TwelveMonths: 200 } },
+            },
+          },
+          VehicleHistory: {
+            ColourDetails: { CurrentColour: "BLACK", OriginalColour: "BLACK", PreviousColour: null, NumberOfColourChanges: 0 },
+            KeeperChangeList: [{ KeeperStartDate: "2020-01-01T00:00:00Z", PreviousKeeperDisposalDate: null, NumberOfPreviousKeepers: 2 }],
+            PlateChangeList: [],
+            V5cCertificateList: [],
+          },
+          DvlaTechnicalDetails: { MassInServiceKg: 1900 },
+        },
+        ModelDetails: {
+          ModelIdentification: { Series: "F13", CountryOfOrigin: "Germany" },
+          ModelClassification: { TaxationClass: "PRIVATE/LIGHT GOODS" },
+          BodyDetails: { PlatformName: "L6", BodyStyle: "Coupe", FuelTankCapacityLitres: 70 },
+          Weights: { KerbWeightKg: 1685, GrossCombinedWeightKg: 2180 },
+          AdditionalInformation: { VehicleWarrantyInformation: { ManufacturerWarrantyMiles: null, ManufacturerWarrantyMonths: null } },
+          Emissions: { EuroStatus: "5b", SoundLevels: { StationaryDb: null, DriveByDb: null, EngineSpeedRpm: null } },
+          Powertrain: {
+            IceDetails: { Aspiration: "Turbocharged", CylinderArrangement: "Inline", NumberOfCylinders: 6 },
+            Transmission: { TransmissionType: "Automatic", NumberOfGears: 8, DrivingAxle: "Rear" },
+          },
+          Performance: {
+            Power: { Bhp: 315, Ps: 319.5 },
+            Torque: { Nm: 450.0, Rpm: 1300 },
+            Statistics: { ZeroToSixtyMph: 5.3, ZeroToOneHundredKph: null, MaxSpeedMph: 155, MaxSpeedKph: 250 },
+            FuelEconomy: {
+              UrbanColdMpg: 26.4,
+              ExtraUrbanMpg: 47.1,
+              CombinedMpg: 36.2,
+              UrbanColdL100Km: 10.7,
+              ExtraUrbanL100Km: 6.0,
+              CombinedL100Km: 7.8,
+            },
+          },
+        },
+        PncDetails: {
+          IsStolen: false,
+          PoliceForceName: "Metropolitan Police",
+          CurrentStatusOnRecord: "Recovered",
+          DateReportedStolen: "2021-05-01T00:00:00Z",
+          DateRecordAddedToPnc: "2021-05-02T00:00:00Z",
+        },
+      })
+    );
+    const result = await fetchVdiCheckFromVdg("PA63ERB", "test-key");
+
+    expect(result?.series).toBe("F13");
+    expect(result?.platformName).toBe("L6");
+    expect(result?.countryOfOrigin).toBe("Germany");
+    expect(result?.dvlaFuelType).toBe("PETROL");
+    expect(result?.bodyStyle).toBe("Coupe");
+    expect(result?.dvlaBodyType).toBe("COUPE");
+    expect(result?.dvlaWheelPlan).toBe("2 AXLE RIGID BODY");
+    expect(result?.isImported).toBe(false);
+    expect(result?.isImportedFromOutsideEu).toBe(false);
+    expect(result?.isScrapped).toBe(false);
+    expect(result?.certificateOfDestructionIssued).toBe(false);
+    expect(result?.euroStatus).toBe("5b");
+    expect(result?.dvlaCo2).toBe(181);
+    expect(result?.dvlaCo2Band).toBe("I");
+    expect(result?.kerbWeightKg).toBe(1685);
+    expect(result?.grossCombinedWeightKg).toBe(2180);
+    expect(result?.cylinderArrangement).toBe("Inline");
+    expect(result?.numberOfCylinders).toBe(6);
+    expect(result?.aspiration).toBe("Turbocharged");
+    expect(result?.transmissionType).toBe("Automatic");
+    expect(result?.numberOfGears).toBe(8);
+    expect(result?.drivingAxle).toBe("Rear");
+    expect(result?.fuelTankCapacityLitres).toBe(70);
+    expect(result?.ps).toBe(319.5);
+    expect(result?.torqueNm).toBe(450.0);
+    expect(result?.torqueRpm).toBe(1300);
+    expect(result?.zeroToSixtyMph).toBe(5.3);
+    expect(result?.zeroToOneHundredKph).toBeNull();
+    expect(result?.maxSpeedMph).toBe(155);
+    expect(result?.maxSpeedKph).toBe(250);
+    expect(result?.fuelEconomy).toEqual({
+      urbanColdMpg: 26.4,
+      extraUrbanMpg: 47.1,
+      combinedMpg: 36.2,
+      urbanColdL100Km: 10.7,
+      extraUrbanL100Km: 6.0,
+      combinedL100Km: 7.8,
+    });
+    expect(result?.previousColour).toBeNull();
+    expect(result?.keeperChanges[0].numberOfPreviousKeepers).toBe(2);
+    expect(result?.pncDetail).toEqual({
+      policeForceName: "Metropolitan Police",
+      currentStatusOnRecord: "Recovered",
+      dateReportedStolen: "2021-05-01T00:00:00Z",
+      dateRecordAddedToPnc: "2021-05-02T00:00:00Z",
+    });
+  });
+
+  it("leaves pncDetail null when PNC fields are all absent (a clean record)", async () => {
+    mocks.fetch.mockResolvedValue(vdgSuccess({ PncDetails: { IsStolen: false } }));
+    const result = await fetchVdiCheckFromVdg("AS3527", "test-key");
+    expect(result?.pncDetail).toBeNull();
   });
 
   it("flags a stolen marker and a write-off record when present", async () => {
@@ -191,6 +346,39 @@ describe("fetchVdiCheckFromVdg", () => {
       taxationClass: null,
       bhp: null,
       soundLevels: null,
+      series: null,
+      platformName: null,
+      countryOfOrigin: null,
+      dvlaFuelType: null,
+      bodyStyle: null,
+      dvlaBodyType: null,
+      dvlaWheelPlan: null,
+      isImported: false,
+      isImportedFromOutsideEu: false,
+      isScrapped: false,
+      certificateOfDestructionIssued: false,
+      euroStatus: null,
+      dvlaCo2: null,
+      dvlaCo2Band: null,
+      kerbWeightKg: null,
+      grossCombinedWeightKg: null,
+      cylinderArrangement: null,
+      numberOfCylinders: null,
+      aspiration: null,
+      transmissionType: null,
+      numberOfGears: null,
+      drivingAxle: null,
+      fuelTankCapacityLitres: null,
+      ps: null,
+      torqueNm: null,
+      torqueRpm: null,
+      zeroToSixtyMph: null,
+      zeroToOneHundredKph: null,
+      maxSpeedMph: null,
+      maxSpeedKph: null,
+      fuelEconomy: null,
+      previousColour: null,
+      pncDetail: null,
     });
   });
 

@@ -18,6 +18,10 @@ export interface VdiFinanceRecord {
 export interface VdiKeeperChange {
   keeperStartDate: string;
   previousKeeperDisposalDate: string | null;
+  // DVLA's own running count at the time of this change, not something
+  // derived from the length of this array - the two can differ (e.g. a
+  // keeper change from before this vehicle's VDG history began).
+  numberOfPreviousKeepers?: number | null;
 }
 
 export interface VdiWriteOffRecord {
@@ -43,6 +47,29 @@ export interface VdiSoundLevels {
   // stationary test's own (different) rev point - VDG gives one shared
   // EngineSpeedRpm value for the pair.
   engineSpeedRpm: number | null;
+}
+
+// Whether this vehicle has ever been recorded on the Police National
+// Computer - distinct from (and additional to) the plain isStolen flag
+// below, which only ever answers "currently marked stolen right now".
+// All null when nothing's on record, same as a clean MIAFTR/finance check.
+export interface VdiPncDetail {
+  policeForceName: string | null;
+  currentStatusOnRecord: string | null;
+  dateReportedStolen: string | null;
+  dateRecordAddedToPnc: string | null;
+}
+
+// A full-quality figure alongside the more commonly quoted MPG one -
+// litres/100km reads naturally for anyone used to metric fuel figures,
+// rather than forcing a conversion in the reader's head.
+export interface VdiFuelEconomy {
+  urbanColdMpg: number | null;
+  extraUrbanMpg: number | null;
+  combinedMpg: number | null;
+  urbanColdL100Km: number | null;
+  extraUrbanL100Km: number | null;
+  combinedL100Km: number | null;
 }
 
 export interface VdiCheckResult {
@@ -93,6 +120,66 @@ export interface VdiCheckResult {
   taxationClass?: string | null;
   bhp?: number | null;
   soundLevels?: VdiSoundLevels | null;
+
+  // Optional, additive - added for the car Buying Guide's fuller
+  // technical-spec report (confirmed against a real BMW 640i VDICheck
+  // sample, same discipline as every other field on this type). Left on
+  // the one shared type rather than split into a car-only variant, same
+  // reasoning as vedFirstYearTwelveMonths above - harmless when a bike
+  // check doesn't populate one of these.
+
+  // Identity / model detail
+  series?: string | null;
+  platformName?: string | null;
+  countryOfOrigin?: string | null;
+  // DVLA's own fuel-type string - the canonical source when it and
+  // ModelDetails' own Powertrain.FuelType would otherwise show as two
+  // near-duplicate rows for the same fact.
+  dvlaFuelType?: string | null;
+  bodyStyle?: string | null;
+  dvlaBodyType?: string | null;
+  dvlaWheelPlan?: string | null;
+
+  // Status flags
+  isImported?: boolean;
+  isImportedFromOutsideEu?: boolean;
+  isScrapped?: boolean;
+  certificateOfDestructionIssued?: boolean;
+
+  // Emissions / tax
+  euroStatus?: string | null;
+  dvlaCo2?: number | null;
+  dvlaCo2Band?: string | null;
+
+  // Weights
+  kerbWeightKg?: number | null;
+  grossCombinedWeightKg?: number | null;
+
+  // Engine / transmission
+  cylinderArrangement?: string | null;
+  numberOfCylinders?: number | null;
+  aspiration?: string | null;
+  transmissionType?: string | null;
+  numberOfGears?: number | null;
+  drivingAxle?: string | null;
+  fuelTankCapacityLitres?: number | null;
+
+  // Performance - alongside the existing bhp field above
+  ps?: number | null;
+  torqueNm?: number | null;
+  torqueRpm?: number | null;
+  zeroToSixtyMph?: number | null;
+  zeroToOneHundredKph?: number | null;
+  maxSpeedMph?: number | null;
+  maxSpeedKph?: number | null;
+  fuelEconomy?: VdiFuelEconomy | null;
+
+  // Colour - alongside the existing originalColour/currentColour above.
+  // Only meaningful (and only ever shown) when colourChangeCount > 0.
+  previousColour?: string | null;
+
+  // Police National Computer detail
+  pncDetail?: VdiPncDetail | null;
 }
 
 export interface ValuationResult {
