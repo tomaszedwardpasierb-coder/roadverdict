@@ -29,6 +29,15 @@ export interface ReminderDoc extends TrackerDocBase {
   exactDate?: string;
   sourceKey?: string;
   notifiedAt?: string | null;
+  // Independent from notifiedAt above (which gates the Pro-only
+  // automated EMAIL - see check-reminders/route.ts) - these instead gate
+  // the in-app BELL notification, available to every account regardless
+  // of Pro status. Reset to null alongside notifiedAt whenever the
+  // reminder is updated/rolled forward (see updateReminder below), so a
+  // renewed reminder can notify again the next time it crosses into
+  // "due soon"/"overdue".
+  dueSoonBellNotifiedAt?: string | null;
+  overdueBellNotifiedAt?: string | null;
   // Optional, additive - existing reminders simply have none. When
   // present, the reminder fires the moment ANY ONE of the primary
   // trigger (above) or these extra ones is reached - "whichever comes
@@ -50,7 +59,12 @@ export async function createReminder(
     additionalTriggers?: ReminderTrigger[];
   }
 ): Promise<ReminderDoc> {
-  return createTrackerDoc<ReminderDoc>(email, "reminder", "reminder", { ...data, notifiedAt: null });
+  return createTrackerDoc<ReminderDoc>(email, "reminder", "reminder", {
+    ...data,
+    notifiedAt: null,
+    dueSoonBellNotifiedAt: null,
+    overdueBellNotifiedAt: null,
+  });
 }
 
 export async function getReminders(email: string, bikeId: string): Promise<ReminderDoc[]> {
@@ -67,14 +81,20 @@ export async function getReminderById(email: string, id: string): Promise<Remind
   return resource ?? null;
 }
 
-// Resetting also clears notifiedAt, so if it crosses back into "overdue"
-// in the future, the cron is free to email about it again.
+// Resetting also clears notifiedAt and the two bell-notification flags,
+// so if it crosses back into "due soon"/"overdue" in the future, both
+// the cron's email and its bell notification are free to fire again.
 export async function updateReminder(
   email: string,
   id: string,
   data: Partial<Omit<ReminderDoc, "id" | "pk" | "type" | "createdAt">>
 ): Promise<ReminderDoc | null> {
-  return updateTrackerDoc<ReminderDoc>(email, id, { ...data, notifiedAt: null });
+  return updateTrackerDoc<ReminderDoc>(email, id, {
+    ...data,
+    notifiedAt: null,
+    dueSoonBellNotifiedAt: null,
+    overdueBellNotifiedAt: null,
+  });
 }
 
 export async function deleteReminder(email: string, id: string): Promise<void> {
@@ -110,6 +130,22 @@ export async function markReminderNotified(email: string, id: string): Promise<v
   const { resource } = await container.item(id, email).read<ReminderDoc>();
   if (!resource) return;
   resource.notifiedAt = new Date().toISOString();
+  await container.items.upsert(resource);
+}
+
+export async function markReminderDueSoonBellNotified(email: string, id: string): Promise<void> {
+  const container = getContainer();
+  const { resource } = await container.item(id, email).read<ReminderDoc>();
+  if (!resource) return;
+  resource.dueSoonBellNotifiedAt = new Date().toISOString();
+  await container.items.upsert(resource);
+}
+
+export async function markReminderOverdueBellNotified(email: string, id: string): Promise<void> {
+  const container = getContainer();
+  const { resource } = await container.item(id, email).read<ReminderDoc>();
+  if (!resource) return;
+  resource.overdueBellNotifiedAt = new Date().toISOString();
   await container.items.upsert(resource);
 }
 

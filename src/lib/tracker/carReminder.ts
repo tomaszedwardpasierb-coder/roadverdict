@@ -34,6 +34,11 @@ export interface CarReminderDoc extends TrackerDocBase {
   exactDate?: string;
   sourceKey?: string;
   notifiedAt?: string | null;
+  // Mirrors reminder.ts's own fields of the same name exactly - see its
+  // comment. Independent from notifiedAt (Pro-only email gate); these
+  // gate the in-app bell notification instead, available to every account.
+  dueSoonBellNotifiedAt?: string | null;
+  overdueBellNotifiedAt?: string | null;
   additionalTriggers?: CarReminderTrigger[];
 }
 
@@ -51,7 +56,12 @@ export async function createCarReminder(
     additionalTriggers?: CarReminderTrigger[];
   }
 ): Promise<CarReminderDoc> {
-  return createTrackerDoc<CarReminderDoc>(email, "carReminder", "carReminder", { ...data, notifiedAt: null });
+  return createTrackerDoc<CarReminderDoc>(email, "carReminder", "carReminder", {
+    ...data,
+    notifiedAt: null,
+    dueSoonBellNotifiedAt: null,
+    overdueBellNotifiedAt: null,
+  });
 }
 
 export async function getCarReminders(email: string, carId: string): Promise<CarReminderDoc[]> {
@@ -70,7 +80,12 @@ export async function updateCarReminder(
   id: string,
   data: Partial<Omit<CarReminderDoc, "id" | "pk" | "type" | "createdAt">>
 ): Promise<CarReminderDoc | null> {
-  return updateTrackerDoc<CarReminderDoc>(email, id, { ...data, notifiedAt: null });
+  return updateTrackerDoc<CarReminderDoc>(email, id, {
+    ...data,
+    notifiedAt: null,
+    dueSoonBellNotifiedAt: null,
+    overdueBellNotifiedAt: null,
+  });
 }
 
 export async function deleteCarReminder(email: string, id: string): Promise<void> {
@@ -101,6 +116,22 @@ export async function markCarReminderNotified(email: string, id: string): Promis
   const { resource } = await container.item(id, email).read<CarReminderDoc>();
   if (!resource) return;
   resource.notifiedAt = new Date().toISOString();
+  await container.items.upsert(resource);
+}
+
+export async function markCarReminderDueSoonBellNotified(email: string, id: string): Promise<void> {
+  const container = getContainer();
+  const { resource } = await container.item(id, email).read<CarReminderDoc>();
+  if (!resource) return;
+  resource.dueSoonBellNotifiedAt = new Date().toISOString();
+  await container.items.upsert(resource);
+}
+
+export async function markCarReminderOverdueBellNotified(email: string, id: string): Promise<void> {
+  const container = getContainer();
+  const { resource } = await container.item(id, email).read<CarReminderDoc>();
+  if (!resource) return;
+  resource.overdueBellNotifiedAt = new Date().toISOString();
   await container.items.upsert(resource);
 }
 

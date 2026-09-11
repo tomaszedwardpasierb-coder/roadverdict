@@ -20,6 +20,7 @@ vi.mock("@/lib/cosmos", () => ({
 
 import {
   createBroadcastNotifications,
+  createReminderNotification,
   getAllUserEmails,
   getNotificationsForUser,
   getUnreadNotificationCount,
@@ -92,6 +93,34 @@ describe("createBroadcastNotifications", () => {
     await createBroadcastNotifications(["a@example.com"], { title: "T", body: "B" });
     const doc = mocks.create.mock.calls[0][0];
     expect(doc.readAt).toBeUndefined();
+  });
+});
+
+describe("createReminderNotification", () => {
+  it("creates exactly one document, partitioned by the given email, with kind 'reminder'", async () => {
+    await createReminderNotification("rider@example.com", { title: "MOT", body: "Due soon for Honda CB500F - due 5 Jun 2027" });
+    expect(mocks.create).toHaveBeenCalledTimes(1);
+    const doc = mocks.create.mock.calls[0][0];
+    expect(doc).toMatchObject({
+      type: "notification",
+      kind: "reminder",
+      pk: "rider@example.com",
+      title: "MOT",
+      body: "Due soon for Honda CB500F - due 5 Jun 2027",
+    });
+  });
+
+  it("stores linkTo when provided, and omits it otherwise", async () => {
+    await createReminderNotification("rider@example.com", { title: "MOT", body: "B", linkTo: "/dashboard" });
+    expect(mocks.create.mock.calls[0][0].linkTo).toBe("/dashboard");
+
+    await createReminderNotification("rider@example.com", { title: "MOT", body: "B" });
+    expect(mocks.create.mock.calls[1][0].linkTo).toBeUndefined();
+  });
+
+  it("does not include readAt on a freshly created document", async () => {
+    await createReminderNotification("rider@example.com", { title: "MOT", body: "B" });
+    expect(mocks.create.mock.calls[0][0].readAt).toBeUndefined();
   });
 });
 

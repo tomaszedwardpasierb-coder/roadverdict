@@ -21,7 +21,14 @@ export interface NotificationDoc {
   id: string;
   pk: string; // recipient email
   type: "notification";
-  kind: "broadcast";
+  // "reminder" is created by the daily check-reminders cron whenever a
+  // reminder first crosses into "due soon" or "overdue" - available to
+  // every account regardless of Pro status, unlike the separate
+  // automated reminder EMAIL (which stays a Premium perk - see that
+  // cron's own comment). Deduped per reminder/per transition via
+  // ReminderDoc's dueSoonBellNotifiedAt/overdueBellNotifiedAt, not
+  // anything on this doc itself.
+  kind: "broadcast" | "reminder";
   title: string;
   body: string;
   // Optional in-app path to navigate to when the notification is
@@ -65,6 +72,26 @@ export async function createBroadcastNotifications(
   if (failures.length > 0) {
     console.error(`createBroadcastNotifications: ${failures.length} of ${recipientEmails.length} recipient(s) failed to receive the notification:`, failures);
   }
+}
+
+// Single-recipient counterpart to createBroadcastNotifications above -
+// one reminder crossing into "due soon"/"overdue" only ever concerns the
+// one account that owns it, never a fan-out list.
+export async function createReminderNotification(
+  email: string,
+  data: { title: string; body: string; linkTo?: string }
+): Promise<void> {
+  const container = getContainer();
+  await container.items.create({
+    id: crypto.randomUUID(),
+    pk: email,
+    type: "notification",
+    kind: "reminder",
+    title: data.title,
+    body: data.body,
+    linkTo: data.linkTo,
+    createdAt: new Date().toISOString(),
+  } satisfies NotificationDoc);
 }
 
 // Every "user" document ever created - see createSessionForEmail in

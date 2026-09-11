@@ -32,6 +32,8 @@ import {
   deleteCarRemindersBySourceKey,
   getAllCarReminders,
   markCarReminderNotified,
+  markCarReminderDueSoonBellNotified,
+  markCarReminderOverdueBellNotified,
   syncCarSornReminder,
   CAR_SORN_REMINDER_SOURCE_KEY,
   CAR_SORN_REMINDER_NAME,
@@ -81,10 +83,12 @@ describe("createCarReminder", () => {
     );
   });
 
-  it("always sets notifiedAt to null on creation", async () => {
+  it("always sets notifiedAt and the two bell-notification flags to null on creation", async () => {
     await createCarReminder(email, { carId, name: "Cambelt replacement", intervalType: "mileage", date: "2025-01-01" });
     const payload = mocks.createTrackerDoc.mock.calls[0][3];
     expect(payload.notifiedAt).toBeNull();
+    expect(payload.dueSoonBellNotifiedAt).toBeNull();
+    expect(payload.overdueBellNotifiedAt).toBeNull();
   });
 
   it("returns the created reminder document", async () => {
@@ -139,10 +143,12 @@ describe("updateCarReminder", () => {
     );
   });
 
-  it("always resets notifiedAt to null on update", async () => {
+  it("always resets notifiedAt and the two bell-notification flags to null on update", async () => {
     await updateCarReminder(email, baseReminder.id, { intervalValue: 65000 });
     const payload = mocks.updateTrackerDoc.mock.calls[0][2];
     expect(payload.notifiedAt).toBeNull();
+    expect(payload.dueSoonBellNotifiedAt).toBeNull();
+    expect(payload.overdueBellNotifiedAt).toBeNull();
   });
 });
 
@@ -208,6 +214,44 @@ describe("markCarReminderNotified", () => {
     const after = Date.now();
     const upsertedDoc = mocks.upsert.mock.calls[0][0];
     const ts = new Date(upsertedDoc.notifiedAt).getTime();
+    expect(ts).toBeGreaterThanOrEqual(before);
+    expect(ts).toBeLessThanOrEqual(after);
+  });
+});
+
+describe("markCarReminderDueSoonBellNotified", () => {
+  it("does nothing when the reminder does not exist", async () => {
+    mocks.read.mockResolvedValue({ resource: null });
+    await markCarReminderDueSoonBellNotified(email, "nonexistent-id");
+    expect(mocks.upsert).not.toHaveBeenCalled();
+  });
+
+  it("sets dueSoonBellNotifiedAt to a current ISO timestamp and upserts", async () => {
+    mocks.read.mockResolvedValue({ resource: { ...baseReminder } });
+    const before = Date.now();
+    await markCarReminderDueSoonBellNotified(email, baseReminder.id);
+    const after = Date.now();
+    const upsertedDoc = mocks.upsert.mock.calls[0][0];
+    const ts = new Date(upsertedDoc.dueSoonBellNotifiedAt).getTime();
+    expect(ts).toBeGreaterThanOrEqual(before);
+    expect(ts).toBeLessThanOrEqual(after);
+  });
+});
+
+describe("markCarReminderOverdueBellNotified", () => {
+  it("does nothing when the reminder does not exist", async () => {
+    mocks.read.mockResolvedValue({ resource: null });
+    await markCarReminderOverdueBellNotified(email, "nonexistent-id");
+    expect(mocks.upsert).not.toHaveBeenCalled();
+  });
+
+  it("sets overdueBellNotifiedAt to a current ISO timestamp and upserts", async () => {
+    mocks.read.mockResolvedValue({ resource: { ...baseReminder } });
+    const before = Date.now();
+    await markCarReminderOverdueBellNotified(email, baseReminder.id);
+    const after = Date.now();
+    const upsertedDoc = mocks.upsert.mock.calls[0][0];
+    const ts = new Date(upsertedDoc.overdueBellNotifiedAt).getTime();
     expect(ts).toBeGreaterThanOrEqual(before);
     expect(ts).toBeLessThanOrEqual(after);
   });
