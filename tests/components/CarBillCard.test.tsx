@@ -18,7 +18,7 @@ describe("CarBillCard", () => {
   it("shows the real bill type label, cost, and notes", () => {
     render(<CarBillCard bill={bill} currency="GBP" rates={null} />);
     expect(screen.getByText("Insurance")).toBeInTheDocument();
-    expect(screen.getByText("£420")).toBeInTheDocument();
+    expect(screen.getByText("£420.00")).toBeInTheDocument();
     expect(screen.getByText("Annual renewal")).toBeInTheDocument();
   });
 

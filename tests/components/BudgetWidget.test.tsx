@@ -50,7 +50,7 @@ describe("BudgetWidget", () => {
   it("shows the 'on track' status when spend is comfortably under budget", () => {
     render(<BudgetWidget yearSpend={400} currentYear={2026} initialBudget={2000} currency="GBP" rates={null} />);
     expect(screen.getByText("On track for 2026")).toBeInTheDocument();
-    expect(screen.getByText("£400 of £2000")).toBeInTheDocument();
+    expect(screen.getByText("£400.00 of £2000.00")).toBeInTheDocument();
   });
 
   it("shows the 'approaching' warning once spend reaches 80% of budget", () => {

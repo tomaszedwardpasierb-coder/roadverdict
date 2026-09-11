@@ -37,7 +37,7 @@ describe("DashboardStatCards", () => {
       />
     );
     expect(screen.getByText("Total spend")).toBeInTheDocument();
-    expect(screen.getByText("£180")).toBeInTheDocument();
+    expect(screen.getByText("£180.00")).toBeInTheDocument();
     expect(screen.getByText("Actual economy")).toBeInTheDocument();
     expect(screen.getByText("-")).toBeInTheDocument();
     expect(screen.getByText("Per mile")).toBeInTheDocument();
@@ -66,7 +66,7 @@ describe("DashboardStatCards", () => {
     );
     // 100 miles on 1 UK gallon (4.546L) between the two full fill-ups = 100.0 mpg
     expect(screen.getByText("100.0 mpg")).toBeInTheDocument();
-    expect(screen.getByText("£10")).toBeInTheDocument();
+    expect(screen.getByText("£10.00")).toBeInTheDocument();
   });
 
   it("converts total spend into the given currency and cost-per-distance into the given distance unit", () => {
@@ -86,7 +86,7 @@ describe("DashboardStatCards", () => {
         isPro
       />
     );
-    expect(screen.getByText("€100")).toBeInTheDocument(); // £50 * rate 2
+    expect(screen.getByText("€100.00")).toBeInTheDocument(); // £50 * rate 2
     expect(screen.getByText("Per km")).toBeInTheDocument();
     // Per-distance now converts through the same EUR rate as "Total
     // spend" above, rather than staying in raw GBP pence: €100 over 100
@@ -111,7 +111,7 @@ describe("DashboardStatCards", () => {
         isPro
       />
     );
-    expect(screen.getByText("£20")).toBeInTheDocument();
+    expect(screen.getByText("£20.00")).toBeInTheDocument();
     const dashes = screen.getAllByText("-");
     expect(dashes).toHaveLength(2); // both economy and per-mile fall back
   });
@@ -139,8 +139,8 @@ describe("DashboardStatCards", () => {
         />
       </ChartFilterProvider>
     );
-    expect(screen.getByText("£50")).toBeInTheDocument();
-    expect(screen.queryByText("£550")).not.toBeInTheDocument();
+    expect(screen.getByText("£50.00")).toBeInTheDocument();
+    expect(screen.queryByText("£550.00")).not.toBeInTheDocument();
   });
 
   it("locks Actual economy and Per mile behind Premium when isPro is false, while Total spend stays real", () => {
@@ -160,7 +160,7 @@ describe("DashboardStatCards", () => {
       />
     );
     expect(screen.getByText("Total spend")).toBeInTheDocument();
-    expect(screen.getByText("£100")).toBeInTheDocument();
+    expect(screen.getByText("£100.00")).toBeInTheDocument();
     expect(screen.getByText("Actual economy")).toBeInTheDocument();
     expect(screen.getByText("Per mile")).toBeInTheDocument();
     expect(screen.getAllByText("Premium")).toHaveLength(2);

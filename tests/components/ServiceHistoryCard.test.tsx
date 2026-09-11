@@ -72,7 +72,7 @@ describe("ServiceHistoryCard", () => {
   it("renders the job label, cost, and a real benchmark-derived 'Fair' verdict tag for an in-range cost", () => {
     render(<ServiceHistoryCard {...defaultProps} record={baseRecord} />);
     expect(screen.getByText("Full service")).toBeInTheDocument();
-    expect(screen.getByText("£120")).toBeInTheDocument();
+    expect(screen.getByText("£120.00")).toBeInTheDocument();
 
     const bench = getAdjustedBenchmark("full-service", "medium", "honda", "rest-england-wales");
     expect(

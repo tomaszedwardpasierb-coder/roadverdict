@@ -64,7 +64,7 @@ describe("BillCard", () => {
     render(<BillCard bill={bill} currency="GBP" rates={null} pendingReviewIds={emptyPendingReviewIds} distanceUnit="mi" />);
 
     expect(screen.getByText("Insurance")).toBeInTheDocument();
-    expect(screen.getByText("£300")).toBeInTheDocument();
+    expect(screen.getByText("£300.00")).toBeInTheDocument();
     expect(screen.getByText(fmtDate("2024-01-15"))).toBeInTheDocument();
     expect(screen.getByText("Annual renewal")).toBeInTheDocument();
   });

@@ -19,7 +19,7 @@ describe("CarServiceHistoryCard", () => {
   it("shows the real label, cost, date, mileage, and notes", () => {
     render(<CarServiceHistoryCard record={record} distanceUnit="mi" currency="GBP" rates={null} />);
     expect(screen.getByText("Cambelt / timing belt replacement")).toBeInTheDocument();
-    expect(screen.getByText("£350")).toBeInTheDocument();
+    expect(screen.getByText("£350.00")).toBeInTheDocument();
     expect(screen.getByText(/1 Jun 2025/)).toBeInTheDocument();
     expect(screen.getByText(/42,000 miles/)).toBeInTheDocument();
     expect(screen.getByText("Cambelt and water pump")).toBeInTheDocument();

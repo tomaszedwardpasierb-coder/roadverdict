@@ -74,7 +74,7 @@ describe("LabourCard", () => {
   it("renders the real category label, formatted cost, date and mileage", () => {
     renderLabourCard();
     expect(screen.getByText("Brake bleeding")).toBeInTheDocument();
-    expect(screen.getByText("£45")).toBeInTheDocument();
+    expect(screen.getByText("£45.00")).toBeInTheDocument();
     expect(screen.getByText(/15 Jan 2026 · 12,000 miles/)).toBeInTheDocument();
   });
 

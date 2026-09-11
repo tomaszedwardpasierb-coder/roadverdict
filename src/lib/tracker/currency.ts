@@ -58,5 +58,5 @@ export function convertDisplayToGbp(amount: number, currency: Currency, rates: E
 
 export function formatCurrency(amountGbp: number, currency: Currency, rates: ExchangeRates | null): string {
   const value = convertGbpToDisplay(amountGbp, currency, rates);
-  return `${CURRENCY_SYMBOLS[currency]}${value.toFixed(0)}`;
+  return `${CURRENCY_SYMBOLS[currency]}${value.toFixed(2)}`;
 }

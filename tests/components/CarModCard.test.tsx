@@ -20,7 +20,7 @@ describe("CarModCard", () => {
     render(<CarModCard mod={mod} distanceUnit="mi" currency="GBP" rates={null} />);
     expect(screen.getByText("Nextbase 622GW")).toBeInTheDocument();
     expect(screen.getByText(/Dash cam/)).toBeInTheDocument();
-    expect(screen.getByText("£150")).toBeInTheDocument();
+    expect(screen.getByText("£150.00")).toBeInTheDocument();
     expect(screen.getByText("Front and rear")).toBeInTheDocument();
   });
 

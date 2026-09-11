@@ -154,7 +154,7 @@ describe("MpgChart", () => {
         excludedFuelEntries={[{ date: "2024-01-01", cost: 42 }]}
       />
     );
-    expect(screen.getByText(/£42 of fuel spend excluded from this calculation/)).toBeInTheDocument();
+    expect(screen.getByText(/£42.00 of fuel spend excluded from this calculation/)).toBeInTheDocument();
   });
 
   it("sorts points chronologically for the time-based view regardless of the input array's order", () => {

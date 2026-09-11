@@ -39,7 +39,7 @@ describe("CustomFilterPanel", () => {
   it("defaults to Service, totalling every real record with the right entry count", () => {
     render(<CustomFilterPanel {...baseProps()} />);
     expect(screen.getByLabelText("Category")).toHaveValue("service");
-    expect(screen.getByText("£130", { selector: "div" })).toBeInTheDocument();
+    expect(screen.getByText("£130.00", { selector: "div" })).toBeInTheDocument();
     expect(screen.getByText("2 entries")).toBeInTheDocument();
     expect(screen.getByText("Basic service", { selector: "span" })).toBeInTheDocument();
     expect(screen.getByText("Full service", { selector: "span" })).toBeInTheDocument();
@@ -50,7 +50,7 @@ describe("CustomFilterPanel", () => {
     render(<CustomFilterPanel {...baseProps()} />);
     await user.selectOptions(screen.getByLabelText("Item"), "full-service");
 
-    expect(screen.getByText("£80", { selector: "div" })).toBeInTheDocument();
+    expect(screen.getByText("£80.00", { selector: "div" })).toBeInTheDocument();
     expect(screen.getByText("1 entry")).toBeInTheDocument();
     expect(screen.queryByText("Basic service", { selector: "span" })).not.toBeInTheDocument();
   });
@@ -60,7 +60,7 @@ describe("CustomFilterPanel", () => {
     render(<CustomFilterPanel {...baseProps()} />);
     await user.selectOptions(screen.getByLabelText("Category"), "mods");
 
-    expect(screen.getByText("£65", { selector: "div" })).toBeInTheDocument();
+    expect(screen.getByText("£65.00", { selector: "div" })).toBeInTheDocument();
     expect(screen.getByText("Tank bag: Kappa tank bag")).toBeInTheDocument();
     expect(screen.getByText("Disc lock: Oxford lock")).toBeInTheDocument();
   });
@@ -71,7 +71,7 @@ describe("CustomFilterPanel", () => {
     await user.selectOptions(screen.getByLabelText("Category"), "mods");
     await user.selectOptions(screen.getByLabelText("Group"), "Electronics & security");
 
-    expect(screen.getByText("£25", { selector: "div" })).toBeInTheDocument();
+    expect(screen.getByText("£25.00", { selector: "div" })).toBeInTheDocument();
     expect(screen.getByText("Disc lock: Oxford lock")).toBeInTheDocument();
     expect(screen.queryByText("Tank bag: Kappa tank bag")).not.toBeInTheDocument();
   });
@@ -85,7 +85,7 @@ describe("CustomFilterPanel", () => {
 
     expect(screen.getByLabelText("Group")).toHaveValue("Comfort & practicality");
     expect(screen.getByLabelText("Item")).toHaveValue("tank-bag");
-    expect(screen.getByText("£40", { selector: "div" })).toBeInTheDocument();
+    expect(screen.getByText("£40.00", { selector: "div" })).toBeInTheDocument();
     expect(screen.queryByText("Disc lock: Oxford lock")).not.toBeInTheDocument();
   });
 
@@ -95,7 +95,7 @@ describe("CustomFilterPanel", () => {
     await user.selectOptions(screen.getByLabelText("Category"), "bills");
     await user.selectOptions(screen.getByLabelText("Item"), "insurance");
 
-    expect(screen.getByText("£200", { selector: "div" })).toBeInTheDocument();
+    expect(screen.getByText("£200.00", { selector: "div" })).toBeInTheDocument();
     expect(screen.getByText("Insurance", { selector: "span" })).toBeInTheDocument();
     expect(screen.queryByText("Road tax (VED)", { selector: "span" })).not.toBeInTheDocument();
   });
@@ -109,7 +109,7 @@ describe("CustomFilterPanel", () => {
     await user.selectOptions(screen.getByLabelText("Category"), "mods");
 
     expect(screen.getByLabelText("Group")).toHaveValue("__all__");
-    expect(screen.getByText("£65", { selector: "div" })).toBeInTheDocument();
+    expect(screen.getByText("£65.00", { selector: "div" })).toBeInTheDocument();
   });
 
   it("real entries render sorted newest first regardless of input order", () => {
@@ -124,7 +124,7 @@ describe("CustomFilterPanel", () => {
     await user.type(screen.getByLabelText("From"), "2026-02-01");
     await user.type(screen.getByLabelText("To"), "2026-02-28");
 
-    expect(screen.getByText("£80", { selector: "div" })).toBeInTheDocument();
+    expect(screen.getByText("£80.00", { selector: "div" })).toBeInTheDocument();
     expect(screen.getByText("1 entry")).toBeInTheDocument();
     expect(screen.queryByText("Basic service", { selector: "span" })).not.toBeInTheDocument();
   });
@@ -145,7 +145,7 @@ describe("CustomFilterPanel", () => {
     await user.selectOptions(screen.getByLabelText("Date range"), "lastN");
 
     expect(screen.getByLabelText("Last how many days?")).toHaveValue(30); // real default, not reset by switching mode
-    expect(screen.getByText("£50", { selector: "div" })).toBeInTheDocument();
+    expect(screen.getByText("£50.00", { selector: "div" })).toBeInTheDocument();
     expect(screen.getByText("1 entry")).toBeInTheDocument();
   });
 
@@ -162,7 +162,7 @@ describe("CustomFilterPanel", () => {
     );
     await user.selectOptions(screen.getByLabelText("Category"), "fuel");
 
-    expect(screen.getByText("£42", { selector: "div" })).toBeInTheDocument(); // both fill-ups' real cost, 20 + 22
+    expect(screen.getByText("£42.00", { selector: "div" })).toBeInTheDocument(); // both fill-ups' real cost, 20 + 22
     expect(screen.getByText("2 entries")).toBeInTheDocument();
     expect(screen.getAllByText("Fuel fill-up")).toHaveLength(2);
     expect(screen.getByText("124.0 mpg average for this range")).toBeInTheDocument();
@@ -177,7 +177,7 @@ describe("CustomFilterPanel", () => {
         rates={{ base: "GBP", rates: { EUR: 1.15 }, fetchedAt: "2026-01-01T00:00:00.000Z" }}
       />
     );
-    // 130 GBP * 1.15 = 149.5 -> rounds to 150 in formatCurrency's toFixed(0)
-    expect(screen.getByText("€150")).toBeInTheDocument();
+    // 130 GBP * 1.15 = 149.5, shown with real cent precision by formatCurrency's toFixed(2)
+    expect(screen.getByText("€149.50")).toBeInTheDocument();
   });
 });

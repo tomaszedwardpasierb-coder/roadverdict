@@ -47,7 +47,7 @@ describe("RecentActivity", () => {
     renderWithProvider([item]);
     expect(screen.getByText("10 Feb 2026")).toBeInTheDocument();
     expect(screen.getByText("Shell garage")).toBeInTheDocument();
-    expect(screen.getByText("£45")).toBeInTheDocument();
+    expect(screen.getByText("£45.00")).toBeInTheDocument();
     expect(screen.getByText("12,000")).toBeInTheDocument();
   });
 

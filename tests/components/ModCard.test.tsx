@@ -77,7 +77,7 @@ describe("ModCard", () => {
   it("renders the real name, formatted cost, category label, date and mileage", () => {
     renderModCard();
     expect(screen.getByText("Oxford disc lock")).toBeInTheDocument();
-    expect(screen.getByText("£25")).toBeInTheDocument();
+    expect(screen.getByText("£25.00")).toBeInTheDocument();
     expect(screen.getByText(/Disc lock · 15 Jan 2026 · 12,000 miles/)).toBeInTheDocument();
   });
 

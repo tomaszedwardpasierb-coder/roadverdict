@@ -19,7 +19,7 @@ describe("CarFuelLogCard", () => {
   it("shows litres and 'full tank' for a petrol log", () => {
     render(<CarFuelLogCard log={petrolLog} distanceUnit="mi" currency="GBP" rates={null} />);
     expect(screen.getByText("45.0L (full tank)")).toBeInTheDocument();
-    expect(screen.getByText("£60")).toBeInTheDocument();
+    expect(screen.getByText("£60.00")).toBeInTheDocument();
   });
 
   it("shows kWh, never litres, for an electric log", () => {

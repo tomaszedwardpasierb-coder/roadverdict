@@ -65,7 +65,7 @@ describe("FuelLogCard", () => {
   it("shows litres, the full-tank tag, cost, date, distance and price-per-litre in view mode", () => {
     renderCard({ log: makeLog({ litres: 10, cost: 15, mileage: 5000, filledToFull: true, date: "2024-02-10" }) });
     expect(screen.getByText("10.0 L (full tank)")).toBeInTheDocument();
-    expect(screen.getByText("£15")).toBeInTheDocument();
+    expect(screen.getByText("£15.00")).toBeInTheDocument();
     expect(screen.getByText(/10 Feb 2024/)).toBeInTheDocument();
     expect(screen.getByText(/5,000 miles/)).toBeInTheDocument();
     expect(screen.getByText(/£1\.50\/litre/)).toBeInTheDocument();

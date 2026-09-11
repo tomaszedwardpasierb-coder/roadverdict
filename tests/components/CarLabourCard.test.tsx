@@ -75,7 +75,7 @@ describe("CarLabourCard", () => {
   it("renders the real category label, formatted cost, date and mileage", () => {
     renderCarLabourCard();
     expect(screen.getByText("HV battery health check")).toBeInTheDocument();
-    expect(screen.getByText("£60")).toBeInTheDocument();
+    expect(screen.getByText("£60.00")).toBeInTheDocument();
     expect(screen.getByText(/15 Jan 2026 · 42,000 miles/)).toBeInTheDocument();
   });
 
