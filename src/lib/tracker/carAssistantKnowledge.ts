@@ -466,6 +466,10 @@ AI-written briefing alongside it, so you're not checking the guide and a separat
 two different steps. From there, you can optionally pay to unlock a full vehicle-history report
 - see 6.17a.
 **Status:** Live.
+**The free lookup itself is capped, not unlimited:** one new registration free every 30 days per
+account, Free and Pro alike - re-checking a plate that's already been looked up (by anyone) stays
+free and instant any time, but a second, different plate within that same 30-day window needs the
+paid vehicle-history report instead (6.17a), not just another free lookup.
 **Limits:** [VERIFY: the exact checklist content and structure beyond the registration/MOT
 lookup described above - that part is confirmed, the specific checklist wording hasn't been
 reviewed here.]
@@ -513,6 +517,23 @@ write-off/finance/valuation check on top of a link someone's already been sent a
 car they're already looking at buying (£13.99, see 6.14); this one is the Buying Guide's own
 pre-purchase report, run from a plate the buyer typed in themselves, before they've necessarily
 been sent anything.
+
+### 6.17b Independent valuation (car Buying Guide only)
+**What:** An estimated private-sale and dealer-forecourt value for the exact car just looked up
+in the Buying Guide (6.17), shown alongside the free checklist/MOT history - no separate lookup
+or purchase needed.
+**Why:** Knowing roughly what a car is actually worth is exactly what a buyer needs before
+agreeing a price with a seller, and it's free precisely because it's cheap enough to give away -
+unlike the Independent Vehicle Check (6.17a), which costs real money per lookup and is priced
+accordingly.
+**How:** Runs automatically as part of the free Buying Guide lookup (6.17) for a car - no separate
+button or purchase. Shows a private average value and a dealer forecourt value when available.
+**Status:** Live. Car only - there is no motorcycle equivalent of this specific feature.
+**Limits:** Free, but rate-limited to once every 7 days per account - the same limit for Free and
+Pro accounts alike, not a Pro perk. Once that's used up for the week, the Buying Guide lookup
+itself still works (checklist, MOT history, AI briefing all still run) - only the valuation figures
+are withheld until the cooldown passes, and the account is told plainly when they'll be available
+again rather than the figures just silently vanishing.
 
 ### 6.18 Units and currency
 **What:** Switch between miles/km, mpg/L per 100km, and currency display.
