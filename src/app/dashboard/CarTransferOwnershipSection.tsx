@@ -91,7 +91,7 @@ export function CarTransferOwnershipSection({ pendingRequest, carIsReadOnly }: P
               style={{ flex: '1 1 200px' }}
             />
             <button type="button" className="btn-primary" disabled={submitting} onClick={handleSubmit}>
-              {submitting && <VehicleSpinner kind="car" size={14} />}
+              {submitting && <VehicleSpinner kind="car" size={20} />}
               {submitting ? 'Sending…' : 'Start handover'}
             </button>
           </div>

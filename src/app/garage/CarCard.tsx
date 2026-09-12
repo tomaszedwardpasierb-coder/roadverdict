@@ -158,7 +158,7 @@ export function CarCard({ carId, name, year, isCustomBuild, currentMileage, isAc
       )}
       <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
         <button type="button" className="submit-button" onClick={handleViewDashboard} disabled={loading || deleting}>
-          {loading && <VehicleSpinner kind="car" size={14} />}
+          {loading && <VehicleSpinner kind="car" size={20} />}
           {loading ? 'Switching…' : 'View dashboard'}
         </button>
         {/* Change registration and Delete both reject a read-only car
@@ -172,7 +172,7 @@ export function CarCard({ carId, name, year, isCustomBuild, currentMileage, isAc
         )}
         {!transferredToEmail && (
           <button type="button" className={styles.deleteBtn} onClick={handleDelete} disabled={loading || deleting}>
-            {deleting && <VehicleSpinner kind="car" size={14} />}
+            {deleting && <VehicleSpinner kind="car" size={20} />}
             {deleting ? 'Deleting…' : 'Delete'}
           </button>
         )}
@@ -197,7 +197,7 @@ export function CarCard({ carId, name, year, isCustomBuild, currentMileage, isAc
                 disabled={requestingHistory || !currentRegistration}
                 onClick={handleRequestHistory}
               >
-                {requestingHistory && <VehicleSpinner kind="car" size={14} />}
+                {requestingHistory && <VehicleSpinner kind="car" size={20} />}
                 {requestingHistory ? 'Sending…' : 'Request it'}
               </button>
               {historyRequestError && (
@@ -233,7 +233,7 @@ export function CarCard({ carId, name, year, isCustomBuild, currentMileage, isAc
             </select>
           </div>
           <button type="submit" className="submit-button" disabled={changing} style={{ marginTop: '0.7rem', width: 'auto' }}>
-            {changing && <VehicleSpinner kind="car" size={14} />}
+            {changing && <VehicleSpinner kind="car" size={20} />}
             {changing ? 'Saving…' : 'Record change'}
           </button>
           {changeError && <p className="error-text" role="alert">{changeError}</p>}

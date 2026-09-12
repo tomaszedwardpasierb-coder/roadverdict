@@ -166,7 +166,7 @@ export function CarLabourCard({
         <hr className="ticket__divider" />
         <div className="ticket__section" style={{ display: 'flex', gap: '0.6rem', alignItems: 'center' }}>
           <button className="submit-button" type="submit" disabled={submitting || isBlocked}>
-            {submitting && <VehicleSpinner kind="car" size={14} />}
+            {submitting && <VehicleSpinner kind="car" size={20} />}
             {submitting ? 'Saving…' : 'Save'}
           </button>
           <button type="button" className={styles.iconBtn} onClick={() => setIsEditing(false)} disabled={submitting}>
@@ -210,7 +210,7 @@ export function CarLabourCard({
                 }
               }}
             >
-              {findingConflict && <VehicleSpinner kind="car" size={14} />}
+              {findingConflict && <VehicleSpinner kind="car" size={20} />}
               {findingConflict ? "Finding it..." : "Resolve"}
             </button>
             {conflictLookupError && <p className="error-text" role="alert">{conflictLookupError}</p>}
@@ -244,7 +244,7 @@ export function CarLabourCard({
       <div className={styles.cardActions}>
         <button type="button" className={styles.iconBtn} onClick={() => setIsEditing(true)}>Edit</button>
         <button type="button" className={styles.iconBtn} onClick={handleDelete} disabled={submitting}>
-          {submitting && <VehicleSpinner kind="car" size={14} />}
+          {submitting && <VehicleSpinner kind="car" size={20} />}
           {submitting ? 'Deleting…' : 'Delete'}
         </button>
       </div>

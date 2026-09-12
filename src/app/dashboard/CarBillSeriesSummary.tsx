@@ -49,7 +49,7 @@ function SeriesRow({ series, currency, rates }: { series: CarBillSeriesDoc; curr
       {series.status === 'active' && (
         <div className={styles.cardActions}>
           <button type="button" className={styles.iconBtn} onClick={handleEnd} disabled={submitting}>
-            {submitting && <VehicleSpinner kind="car" size={14} />}
+            {submitting && <VehicleSpinner kind="car" size={20} />}
             {submitting ? 'Ending…' : 'End this plan'}
           </button>
         </div>

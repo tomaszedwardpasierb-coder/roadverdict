@@ -56,11 +56,11 @@ export function CarReminderItem({ reminder, status, isPro = false }: Props) {
       {!isPermanent && (
         <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.6rem' }}>
           <button type="button" className="btn-primary" onClick={handleDone} disabled={submitting}>
-            {submitting && <VehicleSpinner kind="car" size={14} />}
+            {submitting && <VehicleSpinner kind="car" size={20} />}
             Mark done
           </button>
           <button type="button" className={styles.iconBtn} onClick={handleDelete} disabled={submitting}>
-            {submitting && <VehicleSpinner kind="car" size={14} />}
+            {submitting && <VehicleSpinner kind="car" size={20} />}
             Delete
           </button>
         </div>

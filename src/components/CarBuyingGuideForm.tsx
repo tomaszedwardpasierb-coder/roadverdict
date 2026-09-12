@@ -321,7 +321,7 @@ export function CarBuyingGuideForm({ signedIn }: Props) {
                 style={{ flex: '1 1 160px' }}
               />
               <button type="button" className="btn-primary" onClick={handlePlateLookup} disabled={lookupLoading}>
-                {lookupLoading && <VehicleSpinner kind="car" size={14} />}
+                {lookupLoading && <VehicleSpinner kind="car" size={20} />}
                 {lookupLoading ? 'Looking up…' : 'Look up'}
               </button>
             </div>
@@ -339,7 +339,7 @@ export function CarBuyingGuideForm({ signedIn }: Props) {
                 . Buy the vehicle history report for this registration to check it now instead.
               </p>
               <button type="button" className="btn-primary" onClick={handleBuyVdiCheck} disabled={vdiPurchasing}>
-                {vdiPurchasing && <VehicleSpinner kind="car" size={14} />}
+                {vdiPurchasing && <VehicleSpinner kind="car" size={20} />}
                 {vdiPurchasing
                   ? 'Getting your report…'
                   : motResult.proFreeAvailable
@@ -363,7 +363,7 @@ export function CarBuyingGuideForm({ signedIn }: Props) {
                   "Your payment went through, but we couldn't fetch the report just now - look up this registration again and it'll retry, at no extra cost."}
               </p>
               <button type="button" className="btn-primary" onClick={handleBuyVdiCheck} disabled={vdiPurchasing}>
-                {vdiPurchasing && <VehicleSpinner kind="car" size={14} />}
+                {vdiPurchasing && <VehicleSpinner kind="car" size={20} />}
                 {vdiPurchasing
                   ? 'Getting your report…'
                   : motResult.proFreeAvailable

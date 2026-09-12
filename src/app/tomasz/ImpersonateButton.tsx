@@ -107,7 +107,7 @@ export function ImpersonateButton({ email }: { email: string }) {
 
             <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1rem' }}>
               <button type="button" className={styles.button} disabled={!canConfirm || loading} onClick={handleConfirm}>
-                {loading && <VehicleSpinner size={14} />}
+                {loading && <VehicleSpinner size={20} />}
                 {loading ? '…' : 'Confirm'}
               </button>
               <button type="button" className={`${styles.button} ${styles.buttonSecondary}`} onClick={closeModal} disabled={loading}>

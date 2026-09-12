@@ -29,7 +29,7 @@ export function RunCronButton({ name, label }: { name: string; label: string }) 
   return (
     <div>
       <button type="button" className={styles.button} onClick={handleClick} disabled={running}>
-        {running && <VehicleSpinner size={14} />}
+        {running && <VehicleSpinner size={20} />}
         {running ? 'Running\u2026' : label}
       </button>
       {result && <div className={styles.jsonBlock}>{result}</div>}

@@ -64,7 +64,7 @@ export function CarAcceptDeclineForm({ token, status, recipientEmail, signedInEm
 
   const declineButton = (
     <button type="button" className="btn-secondary" disabled={submitting} onClick={() => handleDecision('decline')}>
-      {submitting && <VehicleSpinner kind="car" size={14} />}
+      {submitting && <VehicleSpinner kind="car" size={20} />}
       {submitting ? 'Please wait…' : 'Decline'}
     </button>
   );
@@ -99,7 +99,7 @@ export function CarAcceptDeclineForm({ token, status, recipientEmail, signedInEm
     <div className={styles.wrapper} style={{ padding: 0 }}>
       <div style={{ display: 'flex', gap: '0.6rem' }}>
         <button type="button" className="btn-primary" disabled={submitting} onClick={() => handleDecision('accept')}>
-          {submitting && <VehicleSpinner kind="car" size={14} />}
+          {submitting && <VehicleSpinner kind="car" size={20} />}
           {submitting ? 'Please wait…' : 'Accept'}
         </button>
         {declineButton}

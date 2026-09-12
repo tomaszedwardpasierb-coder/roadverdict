@@ -69,7 +69,7 @@ export function RefreshCarDataButton({ carId, available, nextAvailableAt }: Prop
   return (
     <div>
       <button type="button" className={styles.iconBtn} onClick={handleClick} disabled={loading}>
-        {loading && <VehicleSpinner kind="car" size={14} />}
+        {loading && <VehicleSpinner kind="car" size={20} />}
         {loading ? 'Refreshing…' : 'Refresh vehicle data'}
       </button>
       {result && (

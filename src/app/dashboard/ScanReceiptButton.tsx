@@ -151,7 +151,7 @@ export function ScanReceiptButton({ isPro = false, vehicleKind = 'bike' }: { isP
             Resume
           </button>
           <button type="button" className={styles.scanDiscardBtn} disabled={discarding} onClick={handleDiscardPending}>
-            {discarding && <VehicleSpinner kind={vehicleKind} size={13} />}
+            {discarding && <VehicleSpinner kind={vehicleKind} size={18} />}
             {discarding ? 'Discarding…' : 'Discard'}
           </button>
         </div>

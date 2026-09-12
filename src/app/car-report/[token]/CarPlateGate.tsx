@@ -53,7 +53,7 @@ export function CarPlateGate({ token }: { token: string }) {
             className={styles.gateInput}
           />
           <button type="submit" className="submit-button" disabled={submitting}>
-            {submitting && <VehicleSpinner kind="car" size={14} />}
+            {submitting && <VehicleSpinner kind="car" size={20} />}
             {submitting ? 'Checking…' : 'View report'}
           </button>
         </form>

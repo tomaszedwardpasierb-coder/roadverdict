@@ -305,7 +305,7 @@ export function MileageConflictModal({
                 {stillConflicting === false ? (
                   <>
                     <button type="button" className="submit-button" disabled={submitting} onClick={handleClearStaleWarning}>
-                      {submitting && <VehicleSpinner kind={vehicleKind} size={14} />}
+                      {submitting && <VehicleSpinner kind={vehicleKind} size={20} />}
                       {submitting ? 'Clearing…' : 'Clear this warning'}
                     </button>
                     <button type="button" className={styles.iconBtn} disabled={submitting} onClick={onClose}>
@@ -315,22 +315,22 @@ export function MileageConflictModal({
                 ) : (
                   <>
                     <button type="button" className="submit-button" disabled={submitting} onClick={handleIgnore}>
-                      {submitting && <VehicleSpinner kind={vehicleKind} size={14} />}
+                      {submitting && <VehicleSpinner kind={vehicleKind} size={20} />}
                       Keep both as they are - mark as a known anomaly (shown as a separate dot on the mileage chart, excluded from the trend line)
                     </button>
                     <button type="button" className={styles.iconBtn} disabled={submitting} onClick={() => setMode('correctBoth')}>
                       Correct the mileage on one or both entries
                     </button>
                     <button type="button" className={styles.iconBtn} disabled={submitting} onClick={() => handleDelete('entry')}>
-                      {submitting && <VehicleSpinner kind={vehicleKind} size={14} />}
+                      {submitting && <VehicleSpinner kind={vehicleKind} size={20} />}
                       Delete this entry ({entryLabel})
                     </button>
                     <button type="button" className={styles.iconBtn} disabled={submitting} onClick={() => handleDelete('reference')}>
-                      {submitting && <VehicleSpinner kind={vehicleKind} size={14} />}
+                      {submitting && <VehicleSpinner kind={vehicleKind} size={20} />}
                       Delete the other entry ({reference.label})
                     </button>
                     <button type="button" className={styles.iconBtn} disabled={submitting} onClick={() => handleDelete('both')}>
-                      {submitting && <VehicleSpinner kind={vehicleKind} size={14} />}
+                      {submitting && <VehicleSpinner kind={vehicleKind} size={20} />}
                       Delete both entries
                     </button>
                     <button type="button" className={styles.iconBtn} disabled={submitting} onClick={onClose}>
@@ -360,7 +360,7 @@ export function MileageConflictModal({
                     Back
                   </button>
                   <button type="button" className="submit-button" disabled={submitting} onClick={handleCorrectBoth}>
-                    {submitting && <VehicleSpinner kind={vehicleKind} size={14} />}
+                    {submitting && <VehicleSpinner kind={vehicleKind} size={20} />}
                     {submitting ? 'Saving…' : 'Save both'}
                   </button>
                 </div>

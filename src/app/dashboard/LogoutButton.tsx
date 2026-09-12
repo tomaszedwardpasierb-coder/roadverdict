@@ -25,7 +25,7 @@ export default function LogoutButton() {
       disabled={loading}
       className={styles.logoutButton}
     >
-      {loading && <VehicleSpinner kind={vehicleKind ?? "bike"} size={14} />}
+      {loading && <VehicleSpinner kind={vehicleKind ?? "bike"} size={20} />}
       {loading ? "Signing out..." : "Sign out"}
     </button>
   );

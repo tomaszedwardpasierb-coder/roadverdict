@@ -61,7 +61,7 @@ export function CarRequestHistoryCta({ registration, signedInEmail, currentPath 
       </p>
       {signedInEmail ? (
         <button type="button" className="btn-primary" disabled={submitting} onClick={handleRequest} style={{ marginTop: '0.6rem' }}>
-          {submitting && <VehicleSpinner kind="car" size={14} />}
+          {submitting && <VehicleSpinner kind="car" size={20} />}
           {submitting ? 'Sending…' : "Request this car's history"}
         </button>
       ) : (

@@ -160,7 +160,7 @@ export function TwoFactorSettings({ initiallyEnabled }: { initiallyEnabled: bool
         <hr className="ticket__divider" />
         <div className="ticket__section">
           <button className="submit-button" type="submit" disabled={submitting || !code.trim()}>
-            {submitting && <VehicleSpinner kind={vehicleKind ?? 'bike'} size={14} />}
+            {submitting && <VehicleSpinner kind={vehicleKind ?? 'bike'} size={20} />}
             {submitting ? 'Verifying…' : 'Turn on'}
           </button>
           <button type="button" className={styles.iconBtn} onClick={cancel} disabled={submitting} style={{ marginLeft: '0.5rem' }}>
@@ -194,7 +194,7 @@ export function TwoFactorSettings({ initiallyEnabled }: { initiallyEnabled: bool
         <hr className="ticket__divider" />
         <div className="ticket__section">
           <button className="submit-button" type="submit" disabled={submitting || !code.trim()}>
-            {submitting && <VehicleSpinner kind={vehicleKind ?? 'bike'} size={14} />}
+            {submitting && <VehicleSpinner kind={vehicleKind ?? 'bike'} size={20} />}
             {submitting ? 'Turning off…' : 'Turn off'}
           </button>
           <button type="button" className={styles.iconBtn} onClick={cancel} disabled={submitting} style={{ marginLeft: '0.5rem' }}>
@@ -222,7 +222,7 @@ export function TwoFactorSettings({ initiallyEnabled }: { initiallyEnabled: bool
           </button>
         ) : (
           <button type="button" className="submit-button" onClick={handleStart} disabled={submitting}>
-            {submitting && <VehicleSpinner kind={vehicleKind ?? 'bike'} size={14} />}
+            {submitting && <VehicleSpinner kind={vehicleKind ?? 'bike'} size={20} />}
             {submitting ? 'Starting…' : 'Set up two-factor authentication'}
           </button>
         )}

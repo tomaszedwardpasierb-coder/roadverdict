@@ -71,10 +71,10 @@ export function ReminderItem({
         {!isPermanent && (
           <>
             <button type="button" className={styles.iconBtn} onClick={handleDone} disabled={submitting}>
-              {submitting && <VehicleSpinner kind="bike" size={14} />}✓ Done
+              {submitting && <VehicleSpinner kind="bike" size={20} />}✓ Done
             </button>
             <button type="button" className={styles.iconBtn} onClick={handleDelete} disabled={submitting}>
-              {submitting && <VehicleSpinner kind="bike" size={14} />}✕
+              {submitting && <VehicleSpinner kind="bike" size={20} />}✕
             </button>
           </>
         )}

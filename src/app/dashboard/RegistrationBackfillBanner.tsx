@@ -59,7 +59,7 @@ export function RegistrationBackfillBanner({ bikeName }: { bikeName: string }) {
           required
         />
         <button type="submit" className="submit-button" disabled={submitting} style={{ width: 'auto' }}>
-          {submitting && <VehicleSpinner kind="bike" size={14} />}
+          {submitting && <VehicleSpinner kind="bike" size={20} />}
           {submitting ? 'Saving…' : 'Save registration'}
         </button>
       </form>

@@ -41,7 +41,7 @@ export function BlockAccountButton({ email, blocked }: { email: string; blocked:
   return (
     <span>
       <button type="button" className={`${styles.button} ${styles.buttonSmall}`} onClick={handleClick} disabled={loading}>
-        {loading && <VehicleSpinner size={14} />}
+        {loading && <VehicleSpinner size={20} />}
         {loading ? '…' : blocked ? 'Unblock' : 'Block'}
       </button>
       {error && <span style={{ color: 'var(--admin-danger)', fontSize: '0.72rem', marginLeft: '0.4rem' }}>{error}</span>}

@@ -185,7 +185,7 @@ export function CarQuoteForm({ signedIn, initialBrand, initialCarClass }: Props)
                 style={{ flex: '1 1 160px' }}
               />
               <button type="button" className="btn-primary" onClick={handlePlateLookup} disabled={lookupLoading}>
-                {lookupLoading && <VehicleSpinner kind="car" size={14} />}
+                {lookupLoading && <VehicleSpinner kind="car" size={20} />}
                 {lookupLoading ? 'Looking up…' : 'Look up'}
               </button>
             </div>

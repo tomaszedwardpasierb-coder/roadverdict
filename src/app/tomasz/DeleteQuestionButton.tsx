@@ -24,7 +24,7 @@ export function DeleteQuestionButton({ id }: { id: string }) {
       onClick={handleClick}
       disabled={deleting}
     >
-      {deleting && <VehicleSpinner size={14} />}
+      {deleting && <VehicleSpinner size={20} />}
       {deleting ? '\u2026' : 'Delete'}
     </button>
   );

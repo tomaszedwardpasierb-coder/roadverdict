@@ -82,7 +82,7 @@ export function AdminLoginForm() {
         <hr className="ticket__divider" />
         <div className="ticket__section">
           <button className="submit-button" type="submit" disabled={submitting}>
-            {submitting && <VehicleSpinner size={14} />}
+            {submitting && <VehicleSpinner size={20} />}
             {submitting ? 'Verifying…' : 'Verify'}
           </button>
           {error && <p className="error-text" role="alert">{error}</p>}
@@ -110,7 +110,7 @@ export function AdminLoginForm() {
       <hr className="ticket__divider" />
       <div className="ticket__section">
         <button className="submit-button" type="submit" disabled={submitting}>
-          {submitting && <VehicleSpinner size={14} />}
+          {submitting && <VehicleSpinner size={20} />}
           {submitting ? 'Checking…' : 'Continue'}
         </button>
         {error && <p className="error-text" role="alert">{error}</p>}

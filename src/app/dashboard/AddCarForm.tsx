@@ -426,7 +426,7 @@ export function AddCarForm() {
               style={{ flex: 1 }}
             />
             <button type="button" className={styles.iconBtn} disabled={lookingUp} onClick={handleLookup}>
-              {lookingUp && <VehicleSpinner kind="car" size={14} />}
+              {lookingUp && <VehicleSpinner kind="car" size={20} />}
               {lookingUp ? 'Looking up…' : 'Look up'}
             </button>
           </div>
@@ -449,7 +449,7 @@ export function AddCarForm() {
                 onClick={() => existingCar.carId && handleGoToExistingCar(existingCar.carId)}
                 style={{ marginTop: '0.5rem' }}
               >
-                {switchingCar && <VehicleSpinner kind="car" size={14} />}
+                {switchingCar && <VehicleSpinner kind="car" size={20} />}
                 {switchingCar ? 'Switching…' : 'Go to this car'}
               </button>
             </div>
@@ -475,7 +475,7 @@ export function AddCarForm() {
                       disabled={requestingOwnership}
                       onClick={handleRequestOwnership}
                     >
-                      {requestingOwnership && <VehicleSpinner kind="car" size={14} />}
+                      {requestingOwnership && <VehicleSpinner kind="car" size={20} />}
                       {requestingOwnership ? 'Sending…' : 'Request ownership'}
                     </button>
                     <button type="button" className="btn-secondary" onClick={handleStartFresh}>
@@ -540,7 +540,7 @@ export function AddCarForm() {
       <hr className="ticket__divider" />
       <div className="ticket__section">
         <button className="submit-button" type="submit" disabled={submitting}>
-          {submitting && <VehicleSpinner kind="car" size={14} />}
+          {submitting && <VehicleSpinner kind="car" size={20} />}
           {submitting ? 'Adding…' : 'Add car'}
         </button>
         {formError && <p className="error-text" role="alert">{formError}</p>}

@@ -168,7 +168,7 @@ export function CarExportShareSection({ isPro = false }: { isPro?: boolean }) {
           </p>
           {createError && <p className="error-text" role="alert">{createError}</p>}
           <button type="button" className={styles.scanReceiptBtn} onClick={handleGetLink} disabled={loading} style={{ marginTop: '0.7rem' }}>
-            {loading && <VehicleSpinner kind="car" size={14} />}
+            {loading && <VehicleSpinner kind="car" size={20} />}
             {loading ? 'Generating…' : 'Get shareable report link'}
           </button>
         </div>
@@ -208,7 +208,7 @@ export function CarExportShareSection({ isPro = false }: { isPro?: boolean }) {
               required
             />
             <button type="submit" className={styles.iconBtn} disabled={sendingEmail}>
-              {sendingEmail && <VehicleSpinner kind="car" size={14} />}
+              {sendingEmail && <VehicleSpinner kind="car" size={20} />}
               {sendingEmail ? 'Sending…' : 'Send by email'}
             </button>
           </form>

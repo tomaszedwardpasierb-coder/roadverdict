@@ -55,7 +55,7 @@ export function DeleteAccountButton({ email }: { email: string }) {
         onClick={handleClick}
         disabled={deleting}
       >
-        {deleting && <VehicleSpinner size={14} />}
+        {deleting && <VehicleSpinner size={20} />}
         {deleting ? '…' : 'Delete'}
       </button>
       {error && <span style={{ color: 'var(--admin-danger)', fontSize: '0.72rem', marginLeft: '0.4rem' }}>{error}</span>}

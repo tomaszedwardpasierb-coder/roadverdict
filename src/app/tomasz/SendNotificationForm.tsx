@@ -154,7 +154,7 @@ export function SendNotificationForm({ allEmails }: Props) {
         )}
 
         <button type="submit" disabled={sending} className={styles.button}>
-          {sending && <VehicleSpinner size={14} />}
+          {sending && <VehicleSpinner size={20} />}
           {sending ? 'Sending\u2026' : 'Send notification'}
         </button>
       </form>

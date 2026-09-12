@@ -32,10 +32,10 @@ describe("VehicleSpinner", () => {
     expect(svg).toHaveAttribute("height", "32");
   });
 
-  it("defaults to size 18 when none is given", () => {
+  it("defaults to size 20 when none is given", () => {
     const { container } = render(<VehicleSpinner />);
     const svg = container.querySelector("svg")!;
-    expect(svg).toHaveAttribute("width", "18");
+    expect(svg).toHaveAttribute("width", "20");
   });
 
   it("renders 8 wire spokes for the bike wheel", () => {

@@ -32,7 +32,7 @@ export function ResetDemoButton() {
 
   return (
     <button type="button" className="submit-button" onClick={handleReset} disabled={resetting} style={{ width: '100%' }}>
-      {resetting && <VehicleSpinner kind={vehicleKind ?? 'bike'} size={14} />}
+      {resetting && <VehicleSpinner kind={vehicleKind ?? 'bike'} size={20} />}
       {resetting ? 'Resetting…' : '↺ Reset Demo'}
     </button>
   );

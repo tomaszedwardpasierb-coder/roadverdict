@@ -65,7 +65,7 @@ export function UnitSettings({ distanceUnit, fuelEconomyUnit, currency, vehicleK
         </select>
       </div>
       <button className="submit-button" type="submit" disabled={submitting}>
-        {submitting && <VehicleSpinner kind={vehicleKind} size={14} />}
+        {submitting && <VehicleSpinner kind={vehicleKind} size={20} />}
         {submitting ? 'Saving…' : 'Save'}
       </button>
       <button

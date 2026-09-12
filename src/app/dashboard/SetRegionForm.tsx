@@ -37,7 +37,7 @@ export function SetRegionForm() {
       <hr className="ticket__divider" />
       <div className="ticket__section">
         <button className="submit-button" type="submit" disabled={submitting}>
-          {submitting && <VehicleSpinner kind="bike" size={14} />}
+          {submitting && <VehicleSpinner kind="bike" size={20} />}
           {submitting ? 'Saving…' : 'Save and continue'}
         </button>
         {error && <p className="error-text" role="alert">{error}</p>}

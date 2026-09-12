@@ -51,7 +51,7 @@ export function ImpersonationBanner({ email }: { email: string }) {
           cursor: exiting ? 'default' : 'pointer',
         }}
       >
-        {exiting && <VehicleSpinner size={14} />}
+        {exiting && <VehicleSpinner size={20} />}
         {exiting ? 'Exiting…' : 'Exit impersonation'}
       </button>
     </div>

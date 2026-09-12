@@ -127,7 +127,7 @@ export function VehicleSwitcher({ vehicles, activeVehicleId, distanceUnit }: Pro
               className={`${styles.bikeSwitcherRow} ${v.id === activeVehicleId ? styles.bikeSwitcherRowActive : ''}`}
               onClick={() => switchTo(v)}
             >
-              {switchingId === v.id && <VehicleSpinner kind={v.kind} size={13} />}
+              {switchingId === v.id && <VehicleSpinner kind={v.kind} size={18} />}
               {v.name}{' '}
               <span className={styles.bikeSwitcherRowMeta}>
                 ({v.kind === 'car' ? 'Car' : 'Bike'} · {v.year ?? 'Custom build'})

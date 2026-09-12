@@ -56,7 +56,7 @@ export function BudgetWidget({ yearSpend, currentYear, initialBudget, currency, 
             />
           </div>
           <button className={styles.scanReceiptBtn} type="submit" disabled={submitting}>
-            {submitting && <VehicleSpinner kind={vehicleKind} size={14} />}
+            {submitting && <VehicleSpinner kind={vehicleKind} size={20} />}
             {submitting ? 'Saving…' : 'Set budget'}
           </button>
         </div>

@@ -82,11 +82,11 @@ export function IncomingOwnershipRequestCard({ requestId, requesterEmail, create
       </label>
       <div style={{ display: 'flex', gap: '0.6rem', marginTop: '0.8rem' }}>
         <button type="button" className="btn-primary" disabled={submitting} onClick={() => handleDecision('approve')}>
-          {submitting && <VehicleSpinner kind="bike" size={14} />}
+          {submitting && <VehicleSpinner kind="bike" size={20} />}
           {submitting ? 'Please wait…' : 'Approve'}
         </button>
         <button type="button" className="btn-secondary" disabled={submitting} onClick={() => handleDecision('decline')}>
-          {submitting && <VehicleSpinner kind="bike" size={14} />}
+          {submitting && <VehicleSpinner kind="bike" size={20} />}
           {submitting ? 'Please wait…' : 'Decline'}
         </button>
       </div>

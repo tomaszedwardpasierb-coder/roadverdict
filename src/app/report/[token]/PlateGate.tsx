@@ -52,7 +52,7 @@ export function PlateGate({ token }: { token: string }) {
             className={styles.gateInput}
           />
           <button type="submit" className="submit-button" disabled={submitting}>
-            {submitting && <VehicleSpinner kind="bike" size={14} />}
+            {submitting && <VehicleSpinner kind="bike" size={20} />}
             {submitting ? 'Checking…' : 'View report'}
           </button>
         </form>

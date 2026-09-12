@@ -167,7 +167,7 @@ export function ClearNotificationsForm({ broadcasts, allEmails }: Props) {
         )}
 
         <button type="submit" disabled={clearing} className={`${styles.button} ${styles.buttonDanger}`}>
-          {clearing && <VehicleSpinner size={14} />}
+          {clearing && <VehicleSpinner size={20} />}
           {clearing ? 'Clearing…' : 'Clear notifications'}
         </button>
       </form>

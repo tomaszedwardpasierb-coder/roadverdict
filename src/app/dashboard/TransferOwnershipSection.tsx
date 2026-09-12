@@ -93,7 +93,7 @@ export function TransferOwnershipSection({ pendingRequest, bikeIsReadOnly }: Pro
               style={{ flex: '1 1 200px' }}
             />
             <button type="button" className="btn-primary" disabled={submitting} onClick={handleSubmit}>
-              {submitting && <VehicleSpinner kind="bike" size={14} />}
+              {submitting && <VehicleSpinner kind="bike" size={20} />}
               {submitting ? 'Sending…' : 'Start handover'}
             </button>
           </div>

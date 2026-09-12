@@ -103,7 +103,7 @@ export function DecideRequestForm({
           disabled={submitting}
           onClick={() => submitAll(preselectAll === 'approve' ? 'approved' : 'declined', 'all')}
         >
-          {submitting && <VehicleSpinner size={14} />}
+          {submitting && <VehicleSpinner size={20} />}
           {submitting ? 'Saving…' : `Confirm - ${verb} all`}
         </button>
         <p className={styles.previewNote ?? styles.subtext} style={{ marginTop: '0.6rem' }}>
@@ -180,7 +180,7 @@ export function DecideRequestForm({
       ))}
       {error && <p className="error-text" role="alert">{error}</p>}
       <button type="button" className="submit-button" disabled={submitting} onClick={handleIndividualSubmit}>
-        {submitting && <VehicleSpinner size={14} />}
+        {submitting && <VehicleSpinner size={20} />}
         {submitting ? 'Saving…' : 'Save decisions'}
       </button>
     </div>

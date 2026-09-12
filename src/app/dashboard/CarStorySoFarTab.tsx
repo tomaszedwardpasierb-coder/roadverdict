@@ -203,7 +203,7 @@ export function CarStorySoFarTab({ carNickname, registration, currentMileage, di
           properly at all, regardless of how good its actual history is.
         </div>
         <button type="button" className={styles.scanReceiptBtn} disabled={loading} onClick={handleGenerate}>
-          {loading && <VehicleSpinner kind="car" size={14} />}
+          {loading && <VehicleSpinner kind="car" size={20} />}
           {loading ? 'Putting it together…' : 'Generate my story →'}
         </button>
         {error && <p className="error-text" role="alert" style={{ marginTop: '0.8rem' }}>{error}</p>}
@@ -251,7 +251,7 @@ export function CarStorySoFarTab({ carNickname, registration, currentMileage, di
         onClick={handleGenerate}
         disabled={loading || !canRegenerate}
       >
-        {loading && <VehicleSpinner kind="car" size={14} />}
+        {loading && <VehicleSpinner kind="car" size={20} />}
         {loading ? 'Putting it together…' : 'Regenerate'}
       </button>
       {!canRegenerate && (

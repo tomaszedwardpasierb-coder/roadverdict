@@ -309,7 +309,7 @@ export function AssistantProposedEntryCard({ entry }: { entry: ProposedEntry }) 
 
       <div className={styles.actions}>
         <button type="button" className={styles.confirmBtn} onClick={() => handleConfirm(false)} disabled={submitting}>
-          {submitting && <VehicleSpinner kind={spinnerKind} size={14} />}
+          {submitting && <VehicleSpinner kind={spinnerKind} size={20} />}
           {submitting ? 'Logging…' : 'Log it'}
         </button>
         {offerMileageOverride && (

@@ -47,7 +47,7 @@ export function UpdateMileageButton({
         />
         <span style={{ fontSize: '0.75rem', color: 'var(--ink-soft)' }}>{unitLabel}</span>
         <button className={styles.iconBtn} type="submit" disabled={submitting || isBlocked}>
-          {submitting && <VehicleSpinner kind={vehicleKind} size={14} />}
+          {submitting && <VehicleSpinner kind={vehicleKind} size={20} />}
           {submitting ? 'Saving…' : 'Save'}
         </button>
         <button className={styles.iconBtn} type="button" onClick={() => setEditing(false)} disabled={submitting}>

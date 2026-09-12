@@ -79,7 +79,7 @@ export function VaultAuthModal({ vehicleKind, onUnlocked }: Props) {
           )}
           <div style={{ marginTop: '1.2rem' }}>
             <button type="submit" className="submit-button" disabled={submitting || !code.trim()}>
-              {submitting && <VehicleSpinner kind={vehicleKind} size={14} />}
+              {submitting && <VehicleSpinner kind={vehicleKind} size={20} />}
               {submitting ? 'Confirming…' : 'Unlock'}
             </button>
           </div>

@@ -191,7 +191,7 @@ export function VaultTab({ vehicleKind, vehicleId }: Props) {
   if (unlocked === null) {
     return (
       <div className={styles.subtext}>
-        <VehicleSpinner kind={vehicleKind} size={16} /> Loading…
+        <VehicleSpinner kind={vehicleKind} size={18} /> Loading…
       </div>
     );
   }
@@ -229,7 +229,7 @@ export function VaultTab({ vehicleKind, vehicleId }: Props) {
                 Download
               </a>
               <button type="button" className={styles.iconBtn} disabled={deletingId === doc.id} onClick={() => handleDelete(doc.id)}>
-                {deletingId === doc.id && <VehicleSpinner kind={vehicleKind} size={14} />}
+                {deletingId === doc.id && <VehicleSpinner kind={vehicleKind} size={20} />}
                 Delete
               </button>
             </li>
@@ -272,7 +272,7 @@ export function VaultTab({ vehicleKind, vehicleId }: Props) {
           </p>
         )}
         <button type="submit" className="submit-button" disabled={uploading || !file || !category}>
-          {uploading && <VehicleSpinner kind={vehicleKind} size={14} />}
+          {uploading && <VehicleSpinner kind={vehicleKind} size={20} />}
           {uploading ? 'Uploading…' : 'Add document'}
         </button>
       </form>

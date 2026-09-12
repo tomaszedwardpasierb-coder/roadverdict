@@ -71,7 +71,7 @@ export function DeleteAccountModal({ onClose }: { onClose: () => void }) {
             disabled={!canConfirm || submitting}
             onClick={handleConfirm}
           >
-            {submitting && <VehicleSpinner kind={vehicleKind ?? 'bike'} size={14} />}
+            {submitting && <VehicleSpinner kind={vehicleKind ?? 'bike'} size={20} />}
             {submitting ? 'Scheduling…' : 'Delete my account'}
           </button>
           <button type="button" className={styles.iconBtn} onClick={onClose} disabled={submitting}>

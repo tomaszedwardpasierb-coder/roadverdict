@@ -399,7 +399,7 @@ export function AddBikeForm() {
               style={{ flex: 1 }}
             />
             <button type="button" className={styles.iconBtn} disabled={lookingUp} onClick={handleLookup}>
-              {lookingUp && <VehicleSpinner kind="bike" size={14} />}
+              {lookingUp && <VehicleSpinner kind="bike" size={20} />}
               {lookingUp ? 'Looking up…' : 'Look up'}
             </button>
           </div>
@@ -427,7 +427,7 @@ export function AddBikeForm() {
                 onClick={() => existingBike.bikeId && handleGoToExistingBike(existingBike.bikeId)}
                 style={{ marginTop: '0.5rem' }}
               >
-                {switchingBike && <VehicleSpinner kind="bike" size={14} />}
+                {switchingBike && <VehicleSpinner kind="bike" size={20} />}
                 {switchingBike ? 'Switching…' : 'Go to this bike'}
               </button>
             </div>
@@ -453,7 +453,7 @@ export function AddBikeForm() {
                       disabled={requestingOwnership}
                       onClick={handleRequestOwnership}
                     >
-                      {requestingOwnership && <VehicleSpinner kind="bike" size={14} />}
+                      {requestingOwnership && <VehicleSpinner kind="bike" size={20} />}
                       {requestingOwnership ? 'Sending…' : 'Request ownership'}
                     </button>
                     <button type="button" className="btn-secondary" onClick={handleStartFresh}>
@@ -520,7 +520,7 @@ export function AddBikeForm() {
       <hr className="ticket__divider" />
       <div className="ticket__section">
         <button className="submit-button" type="submit" disabled={submitting}>
-          {submitting && <VehicleSpinner kind="bike" size={14} />}
+          {submitting && <VehicleSpinner kind="bike" size={20} />}
           {submitting ? 'Adding…' : 'Add bike'}
         </button>
         {formError && <p className="error-text" role="alert">{formError}</p>}

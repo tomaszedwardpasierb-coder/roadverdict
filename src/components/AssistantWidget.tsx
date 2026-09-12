@@ -214,7 +214,7 @@ function AssistantWidgetInner() {
             ))}
             {sending && (
               <div className={styles.bubbleAssistant}>
-                <VehicleSpinner kind={vehicleKind ?? 'bike'} size={16} />
+                <VehicleSpinner kind={vehicleKind ?? 'bike'} size={18} />
               </div>
             )}
             {error && (
@@ -240,7 +240,7 @@ function AssistantWidgetInner() {
               disabled={sending}
             />
             <button type="button" className={styles.sendBtn} onClick={handleSend} disabled={sending || !input.trim()}>
-              {sending && <VehicleSpinner kind={vehicleKind ?? 'bike'} size={14} />}
+              {sending && <VehicleSpinner kind={vehicleKind ?? 'bike'} size={20} />}
               Send
             </button>
           </div>

@@ -96,7 +96,7 @@ export function BikeSwitcher({ bikes, activeBikeId, distanceUnit }: Props) {
               className={`${styles.bikeSwitcherRow} ${b.id === activeBikeId ? styles.bikeSwitcherRowActive : ''}`}
               onClick={() => switchTo(b.id)}
             >
-              {switching && <VehicleSpinner kind="bike" size={14} />}
+              {switching && <VehicleSpinner kind="bike" size={20} />}
               {b.name} <span className={styles.bikeSwitcherRowMeta}>({b.year ?? 'Custom build'})</span>
             </button>
           ))}

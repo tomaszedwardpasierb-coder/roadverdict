@@ -86,7 +86,7 @@ export function GrantPremiumForm({ email, plan }: Props) {
           disabled={loading}
           style={{ marginLeft: '0.5rem' }}
         >
-          {loading && <VehicleSpinner size={14} />}
+          {loading && <VehicleSpinner size={20} />}
           {loading ? '…' : 'Revoke'}
         </button>
         {error && <span style={{ color: 'var(--admin-danger)', fontSize: '0.72rem', marginLeft: '0.4rem' }}>{error}</span>}
@@ -107,7 +107,7 @@ export function GrantPremiumForm({ email, plan }: Props) {
         style={{ padding: '0.2rem', fontSize: '0.75rem', width: '9rem' }}
       />
       <button type="button" className={`${styles.button} ${styles.buttonSmall}`} onClick={handleGrant} disabled={loading || !expiresAt}>
-        {loading && <VehicleSpinner size={14} />}
+        {loading && <VehicleSpinner size={20} />}
         {loading ? '…' : 'Grant'}
       </button>
       {error && <span style={{ color: 'var(--admin-danger)', fontSize: '0.72rem' }}>{error}</span>}

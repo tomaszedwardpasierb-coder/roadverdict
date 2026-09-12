@@ -61,7 +61,7 @@ export function CarBillCard({ bill, currency, rates, includeInsuranceInReport = 
         </div>
         <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.6rem' }}>
           <button type="submit" className="btn-primary" disabled={submitting}>
-            {submitting && <VehicleSpinner kind="car" size={14} />}
+            {submitting && <VehicleSpinner kind="car" size={20} />}
             {submitting ? 'Saving…' : 'Save'}
           </button>
           <button type="button" className={styles.iconBtn} onClick={() => setIsEditing(false)} disabled={submitting}>Cancel</button>
@@ -92,7 +92,7 @@ export function CarBillCard({ bill, currency, rates, includeInsuranceInReport = 
       <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.6rem' }}>
         <button type="button" className={styles.iconBtn} onClick={() => setIsEditing(true)}>Edit</button>
         <button type="button" className={styles.iconBtn} onClick={handleDelete} disabled={submitting}>
-          {submitting && <VehicleSpinner kind="car" size={14} />}
+          {submitting && <VehicleSpinner kind="car" size={20} />}
           Delete
         </button>
       </div>
