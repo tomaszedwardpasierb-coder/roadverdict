@@ -63,6 +63,7 @@ export const PRO_FEATURES = [
   "Quote Checker, Cost Calculator & Buying Guide, pre-filled with your bike's own details",
   "One free Buying Guide vehicle-history report every 4 weeks (£9.99 for another sooner)",
   "AI-generated \"Story So Far\" summary",
+  "The Vault - encrypted, 2FA-protected document storage for your V5C, insurance, MOT, and everything else you'd hate to lose",
   "Detailed buyer/seller verdict report",
   "Export your full history as CSV",
   "Batch receipt scanning (multiple files at once)",

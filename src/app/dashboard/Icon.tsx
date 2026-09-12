@@ -1,6 +1,6 @@
 // Place at: src/app/dashboard/Icon.tsx
 'use client';
-import { Gauge, Wrench, Droplet, Package, Shield, Bell, BellRing, BarChart3, BookOpen, Share2, Receipt, Tag, Calendar, Camera, Calculator, ClipboardCheck, Lock, Scale, ArrowRightLeft, Upload, KeyRound, HardHat, ClipboardList, Sparkles, Handshake, ShoppingCart, ChevronDown, ChevronRight } from 'lucide-react';
+import { Gauge, Wrench, Droplet, Package, Shield, Bell, BellRing, BarChart3, BookOpen, Share2, Receipt, Tag, Calendar, Camera, Calculator, ClipboardCheck, Lock, Scale, ArrowRightLeft, Upload, KeyRound, HardHat, ClipboardList, Sparkles, Handshake, ShoppingCart, ChevronDown, ChevronRight, Vault } from 'lucide-react';
 import type { LucideProps } from 'lucide-react';
 // Maps this app's semantic icon names to their lucide-react component -
 // keeps every call site referring to "what this icon means" (fuel,
@@ -16,6 +16,10 @@ const ICONS = {
   reminders: Bell,
   reports: BarChart3,
   story: BookOpen,
+  // A distinct icon from Lock (already meaning "privacy"/"security"/the
+  // Premium stat badge above) - the Vault deserves its own visual
+  // identity in the nav, not a third reuse of the same padlock glyph.
+  vault: Vault,
   shareLinks: Share2,
   // Stat-card icons - reuse the same underlying lucide component where
   // conceptually the same thing (Droplet for fuel economy, Gauge for

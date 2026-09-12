@@ -89,6 +89,8 @@ import { Icon } from "./Icon";
 import { LockedStatCard } from "./LockedStatCard";
 import { getProStatus } from "@/lib/subscriptions";
 import { ProGate } from "./ProGate";
+import { TwoFactorGate } from "./TwoFactorGate";
+import { VaultTab } from "./VaultTab";
 import { PlanComparisonCards } from "@/components/PlanComparisonCards";
 import { isTwoFactorEnabled } from "@/lib/auth/twoFactor";
 import { SettingsTab } from "./SettingsTab";
@@ -153,13 +155,17 @@ export default async function DashboardPage(props: { searchParams: Promise<{ add
   if (!session) redirect("/login");
 
   // Reopens a specific tab on load instead of the default dashboard
-  // overview - currently only ever "buyingGuide", set by the Stripe
-  // checkout return URL for a buyer who started the Buying Guide's paid
-  // report purchase from inside the dashboard rather than the public
-  // page (see buyingGuideVdiCheckout.ts's BuyingGuideReturnContext).
-  // Deliberately a narrow allow-list of one value, not a general
-  // "deep link to any tab" mechanism - nothing else needs that yet.
-  const initialSection = searchParams.tab === "buyingGuide" ? ("buyingGuide" as const) : undefined;
+  // overview. "buyingGuide" is set by the Stripe checkout return URL for
+  // a buyer who started the Buying Guide's paid report purchase from
+  // inside the dashboard rather than the public page (see
+  // buyingGuideVdiCheckout.ts's BuyingGuideReturnContext). "security" is
+  // set by the Vault's "enable 2FA to continue" prompt (TwoFactorGate),
+  // which needs a real navigation back to Settings rather than in-SPA
+  // tab-switch plumbing threaded into a server-rendered child tree.
+  // Deliberately a narrow allow-list, not a general "deep link to any
+  // tab" mechanism - nothing else needs that yet.
+  const initialSection =
+    searchParams.tab === "buyingGuide" ? ("buyingGuide" as const) : searchParams.tab === "security" ? ("security" as const) : undefined;
 
   // Account-level, not bike/car-specific - fetched once here so it's
   // available before the car/bike branch decision below, and passed
@@ -945,6 +951,7 @@ export default async function DashboardPage(props: { searchParams: Promise<{ add
       remindersContent={remindersContent}
       reportsContent={reportsContent}
       storyContent={<ProGate featureName="The Story So Far" description="An AI-generated narrative of your ownership - your bike's history told as a story, with insights on what's been done, what's coming, and how your costs compare." isPro={userIsPro}><StorySoFarTab bikeNickname={bike.nickname} registration={currentRegistration} currentMileage={bike.currentMileage} distanceUnit={distanceUnit} initialStory={initialStory} sellerPrep={sellerPrep} /></ProGate>}
+      vaultContent={<ProGate featureName="The Vault" description="Encrypted storage for your V5C, insurance, MOT, and every document that matters. 2FA-protected. Private. Never shared." isPro={userIsPro}><TwoFactorGate twoFactorEnabled={twoFactorEnabled}><VaultTab vehicleKind="bike" vehicleId={bike.id} /></TwoFactorGate></ProGate>}
       shareLinksContent={shareLinksContent}
       quoteCheckerContent={quoteCheckerContent}
       costCalculatorContent={costCalculatorContent}
@@ -975,7 +982,7 @@ async function renderCarDashboard(
   hasAnyBike: boolean,
   userAccount: Awaited<ReturnType<typeof getUserDoc>>,
   pendingDeletion: ReturnType<typeof getPendingDeletionInfo>,
-  initialSection?: "buyingGuide"
+  initialSection?: "buyingGuide" | "security"
 ) {
   const [bikes, proStatus, twoFactorEnabled] = await Promise.all([
     hasAnyBike ? getBikesForUser(email) : Promise.resolve([]),
@@ -1495,6 +1502,14 @@ async function renderCarDashboard(
     </ProGate>
   );
 
+  const carVaultContent = (
+    <ProGate featureName="The Vault" description="Encrypted storage for your V5C, insurance, MOT, and every document that matters. 2FA-protected. Private. Never shared." isPro={userIsPro}>
+      <TwoFactorGate twoFactorEnabled={twoFactorEnabled}>
+        <VaultTab vehicleKind="car" vehicleId={car.id} />
+      </TwoFactorGate>
+    </ProGate>
+  );
+
   const pendingCarTransferRequests = await getPendingCarTransferRequestsForOwner(email);
   const carRequestsForThisCar = pendingCarTransferRequests.filter((r) => r.carId === car.id);
   const carOutgoingOffer = carRequestsForThisCar.find((r) => r.initiatedBy === "owner");
@@ -1577,6 +1592,7 @@ async function renderCarDashboard(
       costCalculatorContent={carCostCalculatorContent}
       buyingGuideContent={carBuyingGuideContent}
       storyContent={carStoryContent}
+      vaultContent={carVaultContent}
       transferOwnershipContent={carTransferOwnershipContent}
       privacyContent={privacyContent}
       securityContent={securityContent}

@@ -80,6 +80,12 @@ export interface UserDoc {
   // assistantSignedInUsage.ts. date is a UTC calendar date
   // ("YYYY-MM-DD"); count resets the moment it rolls over.
   assistantMessageUsage?: { date: string; count: number };
+  // The Vault's own access trail (see vaultSession.ts/vaultAudit.ts) -
+  // written once per successful re-auth, newest first, capped at 5
+  // entries. Lets the Vault show "last opened: <date> - <browser>,
+  // <country>" as a spot-unauthorised-access signal, without exposing a
+  // full audit trail.
+  vaultAccessLog?: { at: string; browser: string; country: string | null }[];
 }
 
 export async function getUserDoc(email: string): Promise<UserDoc | null> {

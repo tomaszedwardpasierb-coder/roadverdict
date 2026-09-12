@@ -50,6 +50,7 @@ function baseProps(overrides: Partial<Parameters<typeof DashboardShell>[0]> = {}
     remindersContent: <div>Reminders content</div>,
     reportsContent: <div>Reports content</div>,
     storyContent: <div>Story content</div>,
+    vaultContent: <div>Vault content</div>,
     shareLinksContent: <div>ShareLinks content</div>,
     quoteCheckerContent: <div>QuoteChecker content</div>,
     costCalculatorContent: <div>CostCalculator content</div>,
@@ -444,6 +445,19 @@ describe("DashboardShell", () => {
       expect(screen.getByRole("button", { name: "The Story So Far" })).toBeInTheDocument();
       await user.click(screen.getByRole("button", { name: "The Story So Far" }));
       expect(screen.getByText("Story content")).toBeInTheDocument();
+    });
+
+    // The Vault ships for both vehicle kinds from day one - same Insights
+    // group, same expectation, never added to CAR_UNAVAILABLE_SECTIONS.
+    it("shows The Vault as a real, clickable nav item for a car-active session", async () => {
+      const user = userEvent.setup();
+      render(<DashboardShell {...carProps()} />);
+      const insightsHeader = screen.getAllByRole("button", { name: /Insights/ })[0];
+      await user.click(insightsHeader);
+
+      expect(screen.getByRole("button", { name: "The Vault" })).toBeInTheDocument();
+      await user.click(screen.getByRole("button", { name: "The Vault" }));
+      expect(screen.getByText("Vault content")).toBeInTheDocument();
     });
 
     // Shareable Links has a real car equivalent now - it must actually

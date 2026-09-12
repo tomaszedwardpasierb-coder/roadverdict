@@ -17,7 +17,7 @@ import { DEMO_EMAIL } from '@/lib/tracker/demoSeed';
 import { Icon, type IconName } from './Icon';
 import styles from './dashboard.module.css';
 
-type Section = 'dashboard' | 'service' | 'fuel' | 'mods' | 'bills' | 'labour' | 'reminders' | 'reports' | 'shareLinks' | 'story' | 'quoteChecker' | 'costCalculator' | 'buyingGuide' | 'privacy' | 'transferOwnership' | 'security';
+type Section = 'dashboard' | 'service' | 'fuel' | 'mods' | 'bills' | 'labour' | 'reminders' | 'reports' | 'shareLinks' | 'story' | 'vault' | 'quoteChecker' | 'costCalculator' | 'buyingGuide' | 'privacy' | 'transferOwnership' | 'security';
 
 const REVIEW_CATEGORIES: ReviewCategory[] = ['service', 'fuel', 'mods', 'bills', 'labour'];
 function asReviewCategory(key: string): ReviewCategory | null {
@@ -83,6 +83,7 @@ const NAV_GROUPS: NavGroupDef[] = [
     items: [
       { key: 'reports', label: 'Reports', icon: 'reports' },
       { key: 'story', label: 'The Story So Far', icon: 'story' },
+      { key: 'vault', label: 'The Vault', icon: 'vault' },
     ],
   },
   {
@@ -164,6 +165,7 @@ interface Props {
   // one of these is actually supplied for both vehicle kinds today.
   reportsContent?: ReactNode;
   storyContent?: ReactNode;
+  vaultContent?: ReactNode;
   shareLinksContent?: ReactNode;
   transferOwnershipContent?: ReactNode;
   quoteCheckerContent?: ReactNode;
@@ -224,6 +226,7 @@ export function DashboardShell({
   remindersContent,
   reportsContent,
   storyContent,
+  vaultContent,
   shareLinksContent,
   quoteCheckerContent,
   costCalculatorContent,
@@ -353,6 +356,7 @@ export function DashboardShell({
     reminders: remindersContent,
     reports: reportsContent,
     story: storyContent,
+    vault: vaultContent,
     shareLinks: shareLinksContent,
     quoteChecker: quoteCheckerContent,
     costCalculator: costCalculatorContent,

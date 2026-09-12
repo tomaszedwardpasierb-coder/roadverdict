@@ -182,11 +182,11 @@ export async function verifyLoginCode(email: string, code: string): Promise<bool
 const ATTEMPT_WINDOW_SECONDS = 15 * 60;
 const MAX_ATTEMPTS_PER_WINDOW = 10;
 
-function attemptIdPrefix(kind: "login" | "enroll" | "disable"): string {
+function attemptIdPrefix(kind: "login" | "enroll" | "disable" | "vault"): string {
   return `totp-attempt:${kind}:`;
 }
 
-export async function checkTotpRateLimit(email: string, kind: "login" | "enroll" | "disable"): Promise<boolean> {
+export async function checkTotpRateLimit(email: string, kind: "login" | "enroll" | "disable" | "vault"): Promise<boolean> {
   const container = getContainer();
   const { resources } = await container.items
     .query<{ id: string }>(
@@ -200,7 +200,7 @@ export async function checkTotpRateLimit(email: string, kind: "login" | "enroll"
   return resources.length < MAX_ATTEMPTS_PER_WINDOW;
 }
 
-export async function recordTotpAttempt(email: string, kind: "login" | "enroll" | "disable"): Promise<void> {
+export async function recordTotpAttempt(email: string, kind: "login" | "enroll" | "disable" | "vault"): Promise<void> {
   const container = getContainer();
   const suffix = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   await container.items.create({
