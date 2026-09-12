@@ -241,6 +241,18 @@ export function DashboardShell({
   const router = useRouter();
   const [active, setActive] = useState<Section>(initialSection ?? 'dashboard');
   const [cancellingDeletion, setCancellingDeletion] = useState(false);
+  // useState's initializer above only ever runs on this component's very
+  // first mount - it does nothing on a later render that arrives with a
+  // different initialSection prop. That matters here because a same-page
+  // navigation (e.g. TwoFactorGate's "Go to Settings" link, or the Stripe
+  // Buying Guide return, both ?tab=... query changes on /dashboard) is
+  // handled by Next.js as a soft, client-side transition: this same
+  // DashboardShell instance stays mounted throughout, it's only re-rendered
+  // with new props - so without this effect, initialSection changing from
+  // undefined to e.g. "security" would silently do nothing at all.
+  useEffect(() => {
+    if (initialSection) setActive(initialSection);
+  }, [initialSection]);
   // Mobile only: which bottom-bar "shelf" is currently open - either a
   // bottom-bar group's own key (its shelf shows just that group's items)
   // or 'more' (the catch-all sheet: Buying Tools, Reminders, Security,

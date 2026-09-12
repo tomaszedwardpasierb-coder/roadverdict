@@ -1,9 +1,18 @@
 // Place at: tests/components/TwoFactorGate.test.tsx
-import { describe, expect, it } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+
+const push = vi.fn();
+vi.mock("next/navigation", () => ({ useRouter: () => ({ push }) }));
+
 import { TwoFactorGate } from "@/app/dashboard/TwoFactorGate";
 
 describe("TwoFactorGate", () => {
+  beforeEach(() => {
+    push.mockClear();
+  });
+
   it("renders the real content when 2FA is enabled", () => {
     render(
       <TwoFactorGate twoFactorEnabled={true}>
@@ -23,13 +32,16 @@ describe("TwoFactorGate", () => {
     expect(screen.getByText("The Vault requires two-factor authentication")).toBeInTheDocument();
   });
 
-  it("links to the dashboard's security tab", () => {
+  it("navigates to the dashboard's security tab when clicked", async () => {
+    const user = userEvent.setup();
     render(
       <TwoFactorGate twoFactorEnabled={false}>
         <div>Real Vault content</div>
       </TwoFactorGate>
     );
-    const link = screen.getByRole("link", { name: "Go to Settings" });
-    expect(link).toHaveAttribute("href", "/dashboard?tab=security");
+
+    await user.click(screen.getByRole("button", { name: "Go to Settings" }));
+
+    await waitFor(() => expect(push).toHaveBeenCalledWith("/dashboard?tab=security"));
   });
 });

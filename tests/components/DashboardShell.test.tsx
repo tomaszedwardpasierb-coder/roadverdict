@@ -91,6 +91,24 @@ describe("DashboardShell", () => {
     expect(screen.queryByText("Dashboard content")).not.toBeInTheDocument();
   });
 
+  // The real-world case this covers: a same-page navigation (e.g.
+  // TwoFactorGate's "Go to Settings" link, both ?tab=... on /dashboard)
+  // is a soft client-side transition - this exact DashboardShell instance
+  // stays mounted and is simply re-rendered with a new initialSection
+  // prop, never remounted. useState's initializer alone (what this used
+  // to rely on) only runs on first mount, so without an effect re-syncing
+  // to a changed prop, a later initialSection value would silently do
+  // nothing - this is the regression test for that bug.
+  it("switches to the tab named by initialSection when that prop changes on an already-mounted instance, not just at first mount", () => {
+    const { rerender } = render(<DashboardShell {...baseProps()} />);
+    expect(screen.getByText("Dashboard content")).toBeInTheDocument();
+
+    rerender(<DashboardShell {...baseProps({ initialSection: "security" })} />);
+
+    expect(screen.getByText("Security content")).toBeInTheDocument();
+    expect(screen.queryByText("Dashboard content")).not.toBeInTheDocument();
+  });
+
   it("clicking a sidebar nav item switches the visible content to that tab's own real content", async () => {
     const user = userEvent.setup();
     render(<DashboardShell {...baseProps()} />);
