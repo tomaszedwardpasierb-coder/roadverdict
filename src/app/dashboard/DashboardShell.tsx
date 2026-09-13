@@ -17,7 +17,7 @@ import { DEMO_EMAIL } from '@/lib/tracker/demoSeed';
 import { Icon, type IconName } from './Icon';
 import styles from './dashboard.module.css';
 
-type Section = 'dashboard' | 'service' | 'fuel' | 'mods' | 'bills' | 'labour' | 'reminders' | 'reports' | 'shareLinks' | 'story' | 'vault' | 'quoteChecker' | 'costCalculator' | 'buyingGuide' | 'privacy' | 'transferOwnership' | 'security';
+type Section = 'dashboard' | 'service' | 'fuel' | 'mods' | 'bills' | 'labour' | 'fines' | 'tolls' | 'reminders' | 'reports' | 'shareLinks' | 'story' | 'vault' | 'quoteChecker' | 'costCalculator' | 'buyingGuide' | 'privacy' | 'transferOwnership' | 'security';
 
 const REVIEW_CATEGORIES: ReviewCategory[] = ['service', 'fuel', 'mods', 'bills', 'labour'];
 function asReviewCategory(key: string): ReviewCategory | null {
@@ -76,6 +76,8 @@ const NAV_GROUPS: NavGroupDef[] = [
       { key: 'mods', label: 'Parts & Accessories', icon: 'mods' },
       { key: 'bills', label: 'Insurance, Tax, MOT & Finance', icon: 'bills' },
       { key: 'labour', label: 'Labour', icon: 'labour' },
+      { key: 'fines', label: 'Fines', icon: 'fines' },
+      { key: 'tolls', label: 'Tolls', icon: 'tolls' },
     ],
   },
   {
@@ -159,6 +161,8 @@ interface Props {
   modsContent: ReactNode;
   labourContent: ReactNode;
   billsContent: ReactNode;
+  finesContent: ReactNode;
+  tollsContent: ReactNode;
   remindersContent: ReactNode;
   // Optional because CAR_UNAVAILABLE_SECTIONS could hide any of these
   // for a car-active session in principle - currently empty, so every
@@ -223,6 +227,8 @@ export function DashboardShell({
   modsContent,
   labourContent,
   billsContent,
+  finesContent,
+  tollsContent,
   remindersContent,
   reportsContent,
   storyContent,
@@ -365,6 +371,8 @@ export function DashboardShell({
     mods: modsContent,
     labour: labourContent,
     bills: billsContent,
+    fines: finesContent,
+    tolls: tollsContent,
     reminders: remindersContent,
     reports: reportsContent,
     story: storyContent,

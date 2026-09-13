@@ -19,6 +19,8 @@ const mocks = vi.hoisted(() => ({
   getCarServiceRecords: vi.fn(),
   getCarMods: vi.fn(),
   getCarBills: vi.fn(),
+  getCarFines: vi.fn(),
+  getCarTolls: vi.fn(),
   getCarFuelLogs: vi.fn(),
   getCarReminders: vi.fn(),
   getBillSeriesForCar: vi.fn(),
@@ -50,6 +52,8 @@ vi.mock("@/lib/tracker/carReportAccess", () => ({ allKnownCarPlates: mocks.allKn
 vi.mock("@/lib/tracker/carServiceRecord", () => ({ getCarServiceRecords: mocks.getCarServiceRecords }));
 vi.mock("@/lib/tracker/carMod", () => ({ getCarMods: mocks.getCarMods }));
 vi.mock("@/lib/tracker/carBill", () => ({ getCarBills: mocks.getCarBills }));
+vi.mock("@/lib/tracker/carFine", () => ({ getCarFines: mocks.getCarFines }));
+vi.mock("@/lib/tracker/carToll", () => ({ getCarTolls: mocks.getCarTolls }));
 vi.mock("@/lib/tracker/carFuelLog", () => ({ getCarFuelLogs: mocks.getCarFuelLogs }));
 vi.mock("@/lib/tracker/carReminder", () => ({ getCarReminders: mocks.getCarReminders }));
 vi.mock("@/lib/tracker/carBillSeries", () => ({
@@ -104,6 +108,8 @@ beforeEach(() => {
   mocks.getCarServiceRecords.mockResolvedValue([]);
   mocks.getCarMods.mockResolvedValue([]);
   mocks.getCarBills.mockResolvedValue([]);
+  mocks.getCarFines.mockResolvedValue([]);
+  mocks.getCarTolls.mockResolvedValue([]);
   mocks.getCarFuelLogs.mockResolvedValue([]);
   mocks.getCarReminders.mockResolvedValue([]);
   mocks.getBillSeriesForCar.mockResolvedValue([]);
@@ -349,14 +355,16 @@ describe("transferCar", () => {
     mocks.getCarServiceRecords.mockResolvedValue([{ id: "sr-1" }]);
     mocks.getCarMods.mockResolvedValue([{ id: "m-1" }]);
     mocks.getCarBills.mockResolvedValue([{ id: "bl-1" }]);
+    mocks.getCarFines.mockResolvedValue([{ id: "f-1" }]);
+    mocks.getCarTolls.mockResolvedValue([{ id: "t-1" }]);
     mocks.getCarFuelLogs.mockResolvedValue([{ id: "fl-1" }]);
     mocks.getCarReminders.mockResolvedValue([{ id: "rm-1" }]);
 
     await transferCar(fromEmail, carId, toEmail, true);
 
-    expect(mocks.copyCarTrackerDoc).toHaveBeenCalledTimes(5);
+    expect(mocks.copyCarTrackerDoc).toHaveBeenCalledTimes(7);
     const types = mocks.copyCarTrackerDoc.mock.calls.map((c: any[]) => c[1]);
-    expect(types).toEqual(expect.arrayContaining(["carService", "carMod", "carBill", "carFuel", "carReminder"]));
+    expect(types).toEqual(expect.arrayContaining(["carService", "carMod", "carBill", "carFine", "carToll", "carFuel", "carReminder"]));
   });
 
   it("resets notifiedAt to null when copying reminders", async () => {

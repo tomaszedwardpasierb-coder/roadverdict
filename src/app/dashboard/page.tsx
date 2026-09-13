@@ -8,6 +8,8 @@ import { getServiceRecords } from "@/lib/tracker/serviceRecord";
 import { getFuelLogs, computeActualMPG, computeMPGSeries } from "@/lib/tracker/fuelLog";
 import { getMods } from "@/lib/tracker/mod";
 import { getBills } from "@/lib/tracker/bill";
+import { getFines } from "@/lib/tracker/fine";
+import { getTolls } from "@/lib/tracker/toll";
 import { getLabour } from "@/lib/tracker/labour";
 import { LABOUR_LABELS } from "@/lib/tracker/labourTypes";
 import { getBillSeriesForBike, materializeAllDueForBike } from "@/lib/tracker/billSeries";
@@ -41,10 +43,14 @@ import { LogFuelForm } from "./LogFuelForm";
 import { LogModForm } from "./LogModForm";
 import { LogBillForm } from "./LogBillForm";
 import { LogLabourForm } from "./LogLabourForm";
+import { LogFineForm } from "./LogFineForm";
+import { LogTollForm } from "./LogTollForm";
 import { ServiceHistoryCard } from "./ServiceHistoryCard";
 import { FuelLogCard } from "./FuelLogCard";
 import { ModCard } from "./ModCard";
 import { BillCard } from "./BillCard";
+import { FineCard } from "./FineCard";
+import { TollCard } from "./TollCard";
 import { LabourCard } from "./LabourCard";
 import { BillSeriesSummary } from "./BillSeriesSummary";
 import { CarBillSeriesSummary } from "./CarBillSeriesSummary";
@@ -104,6 +110,8 @@ import { getCarServiceRecords } from "@/lib/tracker/carServiceRecord";
 import { getCarFuelLogs } from "@/lib/tracker/carFuelLog";
 import { getCarMods } from "@/lib/tracker/carMod";
 import { getCarBills } from "@/lib/tracker/carBill";
+import { getCarFines } from "@/lib/tracker/carFine";
+import { getCarTolls } from "@/lib/tracker/carToll";
 import { getCarLabour } from "@/lib/tracker/carLabour";
 import { CAR_LABOUR_LABELS } from "@/lib/tracker/carLabourTypes";
 import { getCarReminders } from "@/lib/tracker/carReminder";
@@ -124,10 +132,14 @@ import { LogCarFuelForm } from "./LogCarFuelForm";
 import { LogCarModForm } from "./LogCarModForm";
 import { LogCarBillForm } from "./LogCarBillForm";
 import { LogCarLabourForm } from "./LogCarLabourForm";
+import { LogCarFineForm } from "./LogCarFineForm";
+import { LogCarTollForm } from "./LogCarTollForm";
 import { CarServiceHistoryCard } from "./CarServiceHistoryCard";
 import { CarFuelLogCard } from "./CarFuelLogCard";
 import { CarModCard } from "./CarModCard";
 import { CarBillCard } from "./CarBillCard";
+import { CarFineCard } from "./CarFineCard";
+import { CarTollCard } from "./CarTollCard";
 import { CarExcludeFromReportToggle } from "./CarExcludeFromReportToggle";
 import { CarLabourCard } from "./CarLabourCard";
 import { CarReminderItem } from "./CarReminderItem";
@@ -295,7 +307,7 @@ export default async function DashboardPage(props: { searchParams: Promise<{ add
     await materializeAllDueForBike(session.email, bike.id);
   }
 
-  const [records, fuelLogs, mods, bills, labour, billSeries, reminders, rates] = await Promise.all([
+  const [records, fuelLogs, mods, bills, labour, billSeries, reminders, rates, fines, tolls] = await Promise.all([
     getServiceRecords(session.email, bike.id),
     getFuelLogs(session.email, bike.id),
     getMods(session.email, bike.id),
@@ -304,6 +316,8 @@ export default async function DashboardPage(props: { searchParams: Promise<{ add
     getBillSeriesForBike(session.email, bike.id),
     getReminders(session.email, bike.id),
     getExchangeRates(),
+    getFines(session.email, bike.id),
+    getTolls(session.email, bike.id),
   ]);
   const brandValue = slugifyMake(bike.make);
   const pendingReviewIds = {
@@ -625,6 +639,58 @@ export default async function DashboardPage(props: { searchParams: Promise<{ add
             includeInsuranceInReport={Boolean(bike.includeInsuranceInReport)}
             includeFinanceInReport={Boolean(bike.includeFinanceInReport)}
           />
+        ))
+      )}
+    </>
+  );
+
+  const finesContent = (
+    <>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "0.75rem" }}>
+        <h1 className={styles.heading}>Fines{bikeTag}</h1>
+        {mileagePill}
+      </div>
+      <p className={styles.subtext}>Speeding tickets, parking charges, and other penalties - tracked in one place.</p>
+      <LogFineForm currency={currency} rates={rates} vehicleYear={bike.year} isCustomBuild={bike.isCustomBuild} />
+      <ExcludeFromReportToggle
+        fieldName="includeFinesInReport"
+        included={Boolean(bike.includeFinesInReport)}
+        checkboxLabel="Show fines in my buyer report"
+        confirmMessage="A fine reflects your own driving, not the bike - showing it could make your history look worse than it needs to for a future buyer. Show anyway?"
+        noteText="Off by default - a fine is about the previous owner's driving, not this bike, so it isn't predictive of what a future owner will experience."
+      />
+      <h2 className={styles.sectionHeading}>History</h2>
+      {fines.length === 0 ? (
+        <div className={styles.card}><p className={styles.cardBody}>No fines logged yet.</p></div>
+      ) : (
+        fines.map((f) => (
+          <FineCard key={f.id} fine={f} currency={currency} rates={rates} includeFinesInReport={Boolean(bike.includeFinesInReport)} />
+        ))
+      )}
+    </>
+  );
+
+  const tollsContent = (
+    <>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "0.75rem" }}>
+        <h1 className={styles.heading}>Tolls{bikeTag}</h1>
+        {mileagePill}
+      </div>
+      <p className={styles.subtext}>Toll roads, river crossings, and congestion-style charges - tracked in one place.</p>
+      <LogTollForm currency={currency} rates={rates} vehicleYear={bike.year} isCustomBuild={bike.isCustomBuild} />
+      <ExcludeFromReportToggle
+        fieldName="includeTollsInReport"
+        included={Boolean(bike.includeTollsInReport)}
+        checkboxLabel="Show tolls in my buyer report"
+        confirmMessage="A toll reflects the roads you chose to travel, not the bike - showing it could make your history look pricier than it needs to for a future buyer. Show anyway?"
+        noteText="Off by default - which roads or zones the previous owner drove through isn't predictive of what a future owner will experience."
+      />
+      <h2 className={styles.sectionHeading}>History</h2>
+      {tolls.length === 0 ? (
+        <div className={styles.card}><p className={styles.cardBody}>No tolls logged yet.</p></div>
+      ) : (
+        tolls.map((t) => (
+          <TollCard key={t.id} toll={t} currency={currency} rates={rates} includeTollsInReport={Boolean(bike.includeTollsInReport)} />
         ))
       )}
     </>
@@ -955,10 +1021,12 @@ export default async function DashboardPage(props: { searchParams: Promise<{ add
       modsContent={modsContent}
       labourContent={labourContent}
       billsContent={billsContent}
+      finesContent={finesContent}
+      tollsContent={tollsContent}
       remindersContent={remindersContent}
       reportsContent={reportsContent}
       storyContent={<ProGate featureName="The Story So Far" description="An AI-generated narrative of your ownership - your bike's history told as a story, with insights on what's been done, what's coming, and how your costs compare." isPro={userIsPro}><StorySoFarTab bikeNickname={bike.nickname} registration={currentRegistration} currentMileage={bike.currentMileage} distanceUnit={distanceUnit} initialStory={initialStory} sellerPrep={sellerPrep} /></ProGate>}
-      vaultContent={<ProGate featureName="The Vault" description="Encrypted storage for your V5C, insurance, MOT, and every document that matters. 2FA-protected. Private. Never shared." isPro={userIsPro}><TwoFactorGate twoFactorEnabled={twoFactorEnabled}><VaultTab vehicleKind="bike" vehicleId={bike.id} /></TwoFactorGate></ProGate>}
+      vaultContent={<ProGate featureName="The Vault" description="Encrypted storage for your V5C, insurance, MOT, and every document that matters. 2FA-protected. Private. Never shared." isPro={userIsPro}><TwoFactorGate twoFactorEnabled={twoFactorEnabled}><VaultTab vehicleKind="bike" vehicleId={bike.id} currentMileage={bike.currentMileage} distanceUnit={distanceUnit} /></TwoFactorGate></ProGate>}
       shareLinksContent={shareLinksContent}
       quoteCheckerContent={quoteCheckerContent}
       costCalculatorContent={costCalculatorContent}
@@ -1010,7 +1078,7 @@ async function renderCarDashboard(
     await materializeAllDueForCar(email, car.id);
   }
 
-  const [records, fuelLogs, mods, bills, labour, carBillSeries, reminders, rates, carShareLinks, pendingCarReceiptRequests] = await Promise.all([
+  const [records, fuelLogs, mods, bills, labour, carBillSeries, reminders, rates, carShareLinks, pendingCarReceiptRequests, fines, tolls] = await Promise.all([
     getCarServiceRecords(email, car.id),
     getCarFuelLogs(email, car.id),
     getCarMods(email, car.id),
@@ -1021,6 +1089,8 @@ async function renderCarDashboard(
     getExchangeRates(),
     getCarShareLinksForUser(email),
     getPendingCarReceiptRequestsForOwner(email),
+    getCarFines(email, car.id),
+    getCarTolls(email, car.id),
   ]);
   const carNames: Record<string, string> = {};
   for (const c of allCars) {
@@ -1418,6 +1488,58 @@ async function renderCarDashboard(
     </>
   );
 
+  const finesContent = (
+    <>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "0.75rem" }}>
+        <h1 className={styles.heading}>Fines{carTag}</h1>
+        {mileagePill}
+      </div>
+      <p className={styles.subtext}>Speeding tickets, parking charges, and other penalties - tracked in one place.</p>
+      <LogCarFineForm currency={currency} rates={rates} carYear={car.year} isCustomBuild={car.isCustomBuild} />
+      <CarExcludeFromReportToggle
+        fieldName="includeFinesInReport"
+        included={Boolean(car.includeFinesInReport)}
+        checkboxLabel="Show fines in my buyer report"
+        confirmMessage="A fine reflects your own driving, not the car - showing it could make your history look worse than it needs to for a future buyer. Show anyway?"
+        noteText="Off by default - a fine is about the previous owner's driving, not this car, so it isn't predictive of what a future owner will experience."
+      />
+      <h2 className={styles.sectionHeading}>History</h2>
+      {fines.length === 0 ? (
+        <div className={styles.card}><p className={styles.cardBody}>No fines logged yet.</p></div>
+      ) : (
+        fines.map((f) => (
+          <CarFineCard key={f.id} fine={f} currency={currency} rates={rates} includeFinesInReport={Boolean(car.includeFinesInReport)} />
+        ))
+      )}
+    </>
+  );
+
+  const tollsContent = (
+    <>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "0.75rem" }}>
+        <h1 className={styles.heading}>Tolls{carTag}</h1>
+        {mileagePill}
+      </div>
+      <p className={styles.subtext}>Toll roads, river crossings, and congestion-style charges - tracked in one place.</p>
+      <LogCarTollForm currency={currency} rates={rates} carYear={car.year} isCustomBuild={car.isCustomBuild} />
+      <CarExcludeFromReportToggle
+        fieldName="includeTollsInReport"
+        included={Boolean(car.includeTollsInReport)}
+        checkboxLabel="Show tolls in my buyer report"
+        confirmMessage="A toll reflects the roads you chose to travel, not the car - showing it could make your history look pricier than it needs to for a future buyer. Show anyway?"
+        noteText="Off by default - which roads or zones the previous owner drove through isn't predictive of what a future owner will experience."
+      />
+      <h2 className={styles.sectionHeading}>History</h2>
+      {tolls.length === 0 ? (
+        <div className={styles.card}><p className={styles.cardBody}>No tolls logged yet.</p></div>
+      ) : (
+        tolls.map((t) => (
+          <CarTollCard key={t.id} toll={t} currency={currency} rates={rates} includeTollsInReport={Boolean(car.includeTollsInReport)} />
+        ))
+      )}
+    </>
+  );
+
   const labourContent = (
     <>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "0.75rem" }}>
@@ -1512,7 +1634,7 @@ async function renderCarDashboard(
   const carVaultContent = (
     <ProGate featureName="The Vault" description="Encrypted storage for your V5C, insurance, MOT, and every document that matters. 2FA-protected. Private. Never shared." isPro={userIsPro}>
       <TwoFactorGate twoFactorEnabled={twoFactorEnabled}>
-        <VaultTab vehicleKind="car" vehicleId={car.id} />
+        <VaultTab vehicleKind="car" vehicleId={car.id} currentMileage={car.currentMileage} distanceUnit={distanceUnit} />
       </TwoFactorGate>
     </ProGate>
   );
@@ -1592,6 +1714,8 @@ async function renderCarDashboard(
       modsContent={modsContent}
       labourContent={labourContent}
       billsContent={billsContent}
+      finesContent={finesContent}
+      tollsContent={tollsContent}
       remindersContent={remindersContent}
       reportsContent={carReportsContent}
       shareLinksContent={carShareLinksContent}

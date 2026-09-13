@@ -5,6 +5,14 @@
 // blob storage, only ever the original. No SAS URL, same "always proxy
 // through our own authenticated route" posture as
 // api/tracker/attachment/[blobName]/route.ts.
+//
+// Watermarking is on by default and can be explicitly opted out of via
+// ?watermark=0, per the user-facing "disable watermark before
+// downloading" toggle - deliberately opt-OUT rather than opt-in, so a
+// plain, unmodified download link (no query string at all) stays
+// watermarked. This is separate from the un-watermarked
+// [id]/preview route, which is for the in-app embedded preview only
+// and is never a real download (inline disposition, no filename save).
 import { NextRequest, NextResponse } from "next/server";
 import { checkVaultGate } from "@/lib/tracker/vaultAccess";
 import { extendVaultSession } from "@/lib/tracker/vaultSession";
@@ -31,18 +39,22 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   const doc = await getVaultDocument(gate.email, id);
   if (!doc) return NextResponse.json({ error: "Document not found." }, { status: 404 });
 
+  const watermarkDisabled = request.nextUrl.searchParams.get("watermark") === "0";
+
   try {
     const container = await getVaultContainer();
     const downloadResponse = await container.getBlockBlobClient(doc.blobName).download();
     const original = await streamToBuffer(downloadResponse.readableStreamBody);
 
-    const stamp = `${gate.email} — Downloaded ${new Date().toLocaleString("en-GB")}`;
-    const watermarked =
-      doc.fileType === "application/pdf" ? await watermarkPdf(original, stamp) : await watermarkImage(original, stamp, doc.fileType);
+    let output = original;
+    if (!watermarkDisabled) {
+      const stamp = `${gate.email} — Downloaded ${new Date().toLocaleString("en-GB")}`;
+      output = doc.fileType === "application/pdf" ? await watermarkPdf(original, stamp) : await watermarkImage(original, stamp, doc.fileType);
+    }
 
     await extendVaultSession(gate.email, gate.raw);
 
-    return new NextResponse(new Uint8Array(watermarked), {
+    return new NextResponse(new Uint8Array(output), {
       headers: {
         "Content-Type": doc.fileType,
         "Content-Disposition": `attachment; filename="${encodeURIComponent(doc.fileName)}"`,

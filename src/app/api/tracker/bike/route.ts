@@ -13,6 +13,8 @@ import {
   updateBikeCurrency,
   updateBikeIncludeInsuranceInReport,
   updateBikeIncludeFinanceInReport,
+  updateBikeIncludeFinesInReport,
+  updateBikeIncludeTollsInReport,
   updateBikeChartType,
   updateBikeDvlaData,
   isBikeReadOnly,
@@ -179,7 +181,7 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
   }
 
-  const { currentMileage, region, annualBudget, distanceUnit, fuelEconomyUnit, currency, chartType, includeInsuranceInReport, includeFinanceInReport } = body as {
+  const { currentMileage, region, annualBudget, distanceUnit, fuelEconomyUnit, currency, chartType, includeInsuranceInReport, includeFinanceInReport, includeFinesInReport, includeTollsInReport } = body as {
     currentMileage?: number;
     region?: Region;
     annualBudget?: number;
@@ -189,6 +191,8 @@ export async function PATCH(request: NextRequest) {
     chartType?: { chartId: string; kind: ChartKind };
     includeInsuranceInReport?: boolean;
     includeFinanceInReport?: boolean;
+    includeFinesInReport?: boolean;
+    includeTollsInReport?: boolean;
   };
 
   if (
@@ -200,7 +204,9 @@ export async function PATCH(request: NextRequest) {
     !currency &&
     !chartType &&
     includeInsuranceInReport === undefined &&
-    includeFinanceInReport === undefined
+    includeFinanceInReport === undefined &&
+    includeFinesInReport === undefined &&
+    includeTollsInReport === undefined
   ) {
     return NextResponse.json({ error: "Nothing to update." }, { status: 400 });
   }
@@ -255,6 +261,14 @@ export async function PATCH(request: NextRequest) {
   }
   if (includeFinanceInReport !== undefined) {
     bike = await updateBikeIncludeFinanceInReport(session.email, bikeId, includeFinanceInReport);
+    void logImpersonationActivityForCurrentRequest("bike", bikeId, "update");
+  }
+  if (includeFinesInReport !== undefined) {
+    bike = await updateBikeIncludeFinesInReport(session.email, bikeId, includeFinesInReport);
+    void logImpersonationActivityForCurrentRequest("bike", bikeId, "update");
+  }
+  if (includeTollsInReport !== undefined) {
+    bike = await updateBikeIncludeTollsInReport(session.email, bikeId, includeTollsInReport);
     void logImpersonationActivityForCurrentRequest("bike", bikeId, "update");
   }
 

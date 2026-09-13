@@ -126,6 +126,15 @@ export interface BikeDoc {
   // insurance one deliberately - someone may want to show one but not
   // the other.
   includeFinanceInReport?: boolean;
+  // Same off-by-default pattern again, for logged fines - a fine
+  // reflects the previous owner's own driving/parking choices, not
+  // anything predictive about the bike itself, so a buyer shouldn't see
+  // it unless the seller chooses to show it.
+  includeFinesInReport?: boolean;
+  // Same reasoning as includeFinesInReport, for tolls/congestion-style
+  // charges - which roads or zones a previous owner drove through says
+  // nothing about the bike either.
+  includeTollsInReport?: boolean;
   // Set once, at creation (or backfilled once for bikes added before this
   // existed) - never editable after that through any normal flow, not
   // even "edit bike". Optional on the type only because bikes created
@@ -551,6 +560,24 @@ export async function updateBikeIncludeFinanceInReport(email: string, bikeId: st
   const { resource } = await container.item(bikeId, email).read<BikeDoc>();
   if (!resource) return null;
   resource.includeFinanceInReport = includeFinanceInReport;
+  await container.items.upsert(resource);
+  return resource;
+}
+
+export async function updateBikeIncludeFinesInReport(email: string, bikeId: string, includeFinesInReport: boolean): Promise<BikeDoc | null> {
+  const container = getContainer();
+  const { resource } = await container.item(bikeId, email).read<BikeDoc>();
+  if (!resource) return null;
+  resource.includeFinesInReport = includeFinesInReport;
+  await container.items.upsert(resource);
+  return resource;
+}
+
+export async function updateBikeIncludeTollsInReport(email: string, bikeId: string, includeTollsInReport: boolean): Promise<BikeDoc | null> {
+  const container = getContainer();
+  const { resource } = await container.item(bikeId, email).read<BikeDoc>();
+  if (!resource) return null;
+  resource.includeTollsInReport = includeTollsInReport;
   await container.items.upsert(resource);
   return resource;
 }

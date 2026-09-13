@@ -17,6 +17,8 @@ const mocks = vi.hoisted(() => ({
   updateCarDvlaData: vi.fn(),
   updateCarIncludeInsuranceInReport: vi.fn(),
   updateCarIncludeFinanceInReport: vi.fn(),
+  updateCarIncludeFinesInReport: vi.fn(),
+  updateCarIncludeTollsInReport: vi.fn(),
   isCarReadOnly: vi.fn(),
   fetchDvlaDataFromVdg: vi.fn(),
   fetchVehicleTaxDetailsFromVdg: vi.fn(),
@@ -45,6 +47,8 @@ vi.mock("@/lib/tracker/car", async () => {
     updateCarDvlaData: mocks.updateCarDvlaData,
     updateCarIncludeInsuranceInReport: mocks.updateCarIncludeInsuranceInReport,
     updateCarIncludeFinanceInReport: mocks.updateCarIncludeFinanceInReport,
+    updateCarIncludeFinesInReport: mocks.updateCarIncludeFinesInReport,
+    updateCarIncludeTollsInReport: mocks.updateCarIncludeTollsInReport,
     isCarReadOnly: mocks.isCarReadOnly,
     CAR_READ_ONLY_MESSAGE: "This car has been transferred and is now read-only.",
   };
@@ -480,6 +484,22 @@ describe("PATCH /api/cars/car", () => {
     const response = await PATCH(request("PATCH", JSON.stringify({ includeFinanceInReport: false })));
     expect(response.status).toBe(200);
     expect(mocks.updateCarIncludeFinanceInReport).toHaveBeenCalledWith("owner@example.com", "car-1", false);
+  });
+
+  it("updates includeFinesInReport", async () => {
+    mocks.getSession.mockResolvedValue({ email: "owner@example.com" });
+    mocks.updateCarIncludeFinesInReport.mockResolvedValue({ id: "car-1", includeFinesInReport: true });
+    const response = await PATCH(request("PATCH", JSON.stringify({ includeFinesInReport: true })));
+    expect(response.status).toBe(200);
+    expect(mocks.updateCarIncludeFinesInReport).toHaveBeenCalledWith("owner@example.com", "car-1", true);
+  });
+
+  it("updates includeTollsInReport", async () => {
+    mocks.getSession.mockResolvedValue({ email: "owner@example.com" });
+    mocks.updateCarIncludeTollsInReport.mockResolvedValue({ id: "car-1", includeTollsInReport: true });
+    const response = await PATCH(request("PATCH", JSON.stringify({ includeTollsInReport: true })));
+    expect(response.status).toBe(200);
+    expect(mocks.updateCarIncludeTollsInReport).toHaveBeenCalledWith("owner@example.com", "car-1", true);
   });
 
   // Real, slightly surprising behaviour worth pinning as-is, same as the

@@ -5,6 +5,8 @@ import { getBike, getCurrentRegistration, isBikeReadOnly } from "@/lib/tracker/b
 import { getServiceRecords } from "@/lib/tracker/serviceRecord";
 import { getMods } from "@/lib/tracker/mod";
 import { getBills } from "@/lib/tracker/bill";
+import { getFines } from "@/lib/tracker/fine";
+import { getTolls } from "@/lib/tracker/toll";
 import { materializeAllDueForBike } from "@/lib/tracker/billSeries";
 import { getFuelLogs } from "@/lib/tracker/fuelLog";
 import { getReminders, type ReminderDoc } from "@/lib/tracker/reminder";
@@ -29,12 +31,16 @@ import {
 import { JOB_LABELS } from "@/lib/tracker/jobTypes";
 import { MOD_LABELS } from "@/lib/tracker/modTypes";
 import { BILL_LABELS } from "@/lib/tracker/billTypes";
+import { FINE_LABELS } from "@/lib/tracker/fineTypes";
+import { TOLL_LABELS } from "@/lib/tracker/tollTypes";
 import { isBackdated, backdateNotice, detectBulkBackdating, type BackdateCheckItem, type BulkBackdateCluster } from "@/lib/tracker/backdateCheck";
 import type { Attachment } from "@/lib/tracker/cosmosHelpers";
 import type { BikeDoc } from "@/lib/tracker/bike";
 import type { ServiceRecordDoc } from "@/lib/tracker/serviceRecord";
 import type { ModDoc } from "@/lib/tracker/mod";
 import type { BillDoc } from "@/lib/tracker/bill";
+import type { FineDoc } from "@/lib/tracker/fine";
+import type { TollDoc } from "@/lib/tracker/toll";
 import type { FuelLogDoc } from "@/lib/tracker/fuelLog";
 
 export interface ReportRow {
@@ -150,7 +156,9 @@ export function computeSellerReportRowsAndMetrics(
   mods: ModDoc[],
   bills: BillDoc[],
   fuelLogs: FuelLogDoc[],
-  reminders: ReminderDoc[]
+  reminders: ReminderDoc[],
+  fines: FineDoc[] = [],
+  tolls: TollDoc[] = []
 ) {
   // Insurance and finance are owner-specific, not bike-specific - a
   // future buyer's own insurance premium or finance deal depends on
@@ -165,6 +173,12 @@ export function computeSellerReportRowsAndMetrics(
   const isHiddenFromBuyer = (billType: string): boolean =>
     (billType === "insurance" && !bike.includeInsuranceInReport) ||
     (billType === "finance" && !bike.includeFinanceInReport);
+
+  // Same off-by-default reasoning as insurance/finance above, but for
+  // fines and tolls - every fine/toll is owner-specific (a previous
+  // owner's own driving/route choices), so there's no per-category
+  // branching needed the way bill types have: ALL fines are gated by
+  // includeFinesInReport, ALL tolls by includeTollsInReport.
 
   const allRows: (ReportRow & { hiddenFromBuyer: boolean })[] = [
     ...records.map((r) => ({ id: r.id, date: r.date, createdAt: r.createdAt, category: "Service", description: JOB_LABELS[r.jobType] ?? r.jobType, cost: r.cost, attachment: r.attachments?.[0] ?? null, hiddenFromBuyer: false })),
@@ -184,6 +198,26 @@ export function computeSellerReportRowsAndMetrics(
       cost: b.cost,
       attachment: b.attachments?.[0] ?? null,
       hiddenFromBuyer: isHiddenFromBuyer(b.billType),
+    })),
+    ...fines.map((f) => ({
+      id: f.id,
+      date: f.date,
+      createdAt: f.createdAt,
+      category: "Fine",
+      description: FINE_LABELS[f.fineType] ?? f.fineType,
+      cost: f.cost,
+      attachment: f.attachments?.[0] ?? null,
+      hiddenFromBuyer: !bike.includeFinesInReport,
+    })),
+    ...tolls.map((t) => ({
+      id: t.id,
+      date: t.date,
+      createdAt: t.createdAt,
+      category: "Toll",
+      description: TOLL_LABELS[t.tollType] ?? t.tollType,
+      cost: t.cost,
+      attachment: t.attachments?.[0] ?? null,
+      hiddenFromBuyer: !bike.includeTollsInReport,
     })),
   ].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
@@ -269,12 +303,14 @@ export async function getSellerReportCore(email: string, bikeId: string): Promis
     await materializeAllDueForBike(email, bikeId);
   }
 
-  const [records, mods, bills, fuelLogs, reminders] = await Promise.all([
+  const [records, mods, bills, fuelLogs, reminders, fines, tolls] = await Promise.all([
     getServiceRecords(email, bikeId),
     getMods(email, bikeId),
     getBills(email, bikeId),
     getFuelLogs(email, bikeId),
     getReminders(email, bikeId),
+    getFines(email, bikeId),
+    getTolls(email, bikeId),
   ]);
 
   const {
@@ -289,7 +325,7 @@ export async function getSellerReportCore(email: string, bikeId: string): Promis
     mostRecentChange,
     daysSinceLastChange,
     verdictMetrics,
-  } = computeSellerReportRowsAndMetrics(bike, records, mods, bills, fuelLogs, reminders);
+  } = computeSellerReportRowsAndMetrics(bike, records, mods, bills, fuelLogs, reminders, fines, tolls);
 
   const verdict = computeSellerVerdict(verdictMetrics);
   const buyerQuestions = generateBuyerQuestions(verdictMetrics);

@@ -30,6 +30,8 @@ import { allKnownCarPlates } from "@/lib/tracker/carReportAccess";
 import { getCarServiceRecords } from "@/lib/tracker/carServiceRecord";
 import { getCarMods } from "@/lib/tracker/carMod";
 import { getCarBills } from "@/lib/tracker/carBill";
+import { getCarFines } from "@/lib/tracker/carFine";
+import { getCarTolls } from "@/lib/tracker/carToll";
 import { getCarFuelLogs } from "@/lib/tracker/carFuelLog";
 import { getCarReminders } from "@/lib/tracker/carReminder";
 import { getBillSeriesForCar, endCarBillSeries } from "@/lib/tracker/carBillSeries";
@@ -101,16 +103,18 @@ export async function transferCar(
     }
   }
 
-  const [records, mods, bills, fuelLogs, reminders, billSeries] = await Promise.all([
+  const [records, mods, bills, fuelLogs, reminders, billSeries, fines, tolls] = await Promise.all([
     getCarServiceRecords(fromEmail, carId),
     getCarMods(fromEmail, carId),
     getCarBills(fromEmail, carId),
     getCarFuelLogs(fromEmail, carId),
     getCarReminders(fromEmail, carId),
     getBillSeriesForCar(fromEmail, carId),
+    getCarFines(fromEmail, carId),
+    getCarTolls(fromEmail, carId),
   ]);
   const activeBillSeries = billSeries.filter((s) => s.status === "active");
-  const { rows, total, verdictMetrics } = computeCarSellerReportRowsAndMetrics(oldCar, records, mods, bills, fuelLogs, reminders);
+  const { rows, total, verdictMetrics } = computeCarSellerReportRowsAndMetrics(oldCar, records, mods, bills, fuelLogs, reminders, fines, tolls);
   const verdict = computeSellerVerdict(verdictMetrics);
 
   const transferredAt = new Date().toISOString();
@@ -181,6 +185,8 @@ export async function transferCar(
       ...records.map((r) => copyCarTrackerDoc(r, "carService", toEmail, newCarId)),
       ...mods.map((m) => copyCarTrackerDoc(m, "carMod", toEmail, newCarId)),
       ...bills.map((b) => copyCarTrackerDoc(b, "carBill", toEmail, newCarId)),
+      ...fines.map((f) => copyCarTrackerDoc(f, "carFine", toEmail, newCarId)),
+      ...tolls.map((t) => copyCarTrackerDoc(t, "carToll", toEmail, newCarId)),
       ...fuelLogs.map((f) => copyCarTrackerDoc(f, "carFuel", toEmail, newCarId)),
       ...reminders.map((rm) => copyCarTrackerDoc(rm, "carReminder", toEmail, newCarId, { notifiedAt: null })),
       ...activeBillSeries.map((s) => copyCarTrackerDoc(s, "carBillSeries", toEmail, newCarId)),

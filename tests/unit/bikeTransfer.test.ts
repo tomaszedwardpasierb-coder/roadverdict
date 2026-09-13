@@ -12,6 +12,8 @@ const mocks = vi.hoisted(() => ({
   getServiceRecords: vi.fn(),
   getMods: vi.fn(),
   getBills: vi.fn(),
+  getFines: vi.fn(),
+  getTolls: vi.fn(),
   getFuelLogs: vi.fn(),
   getReminders: vi.fn(),
   getBillSeriesForBike: vi.fn(),
@@ -41,6 +43,8 @@ vi.mock("@/lib/tracker/vehicleLimit", () => ({ MAX_FREE_VEHICLES: 1, MAX_PRO_VEH
 vi.mock("@/lib/tracker/serviceRecord", () => ({ getServiceRecords: mocks.getServiceRecords }));
 vi.mock("@/lib/tracker/mod", () => ({ getMods: mocks.getMods }));
 vi.mock("@/lib/tracker/bill", () => ({ getBills: mocks.getBills }));
+vi.mock("@/lib/tracker/fine", () => ({ getFines: mocks.getFines }));
+vi.mock("@/lib/tracker/toll", () => ({ getTolls: mocks.getTolls }));
 vi.mock("@/lib/tracker/fuelLog", () => ({ getFuelLogs: mocks.getFuelLogs }));
 vi.mock("@/lib/tracker/reminder", () => ({ getReminders: mocks.getReminders }));
 vi.mock("@/lib/tracker/billSeries", () => ({
@@ -94,6 +98,8 @@ beforeEach(() => {
   mocks.getServiceRecords.mockResolvedValue([]);
   mocks.getMods.mockResolvedValue([]);
   mocks.getBills.mockResolvedValue([]);
+  mocks.getFines.mockResolvedValue([]);
+  mocks.getTolls.mockResolvedValue([]);
   mocks.getFuelLogs.mockResolvedValue([]);
   mocks.getReminders.mockResolvedValue([]);
   mocks.getBillSeriesForBike.mockResolvedValue([]);
@@ -362,14 +368,16 @@ describe("transferBike", () => {
     mocks.getServiceRecords.mockResolvedValue([{ id: "sr-1" }]);
     mocks.getMods.mockResolvedValue([{ id: "m-1" }]);
     mocks.getBills.mockResolvedValue([{ id: "bl-1" }]);
+    mocks.getFines.mockResolvedValue([{ id: "f-1" }]);
+    mocks.getTolls.mockResolvedValue([{ id: "t-1" }]);
     mocks.getFuelLogs.mockResolvedValue([{ id: "fl-1" }]);
     mocks.getReminders.mockResolvedValue([{ id: "rm-1" }]);
 
     await transferBike(fromEmail, bikeId, toEmail, true);
 
-    expect(mocks.copyTrackerDoc).toHaveBeenCalledTimes(5);
+    expect(mocks.copyTrackerDoc).toHaveBeenCalledTimes(7);
     const types = mocks.copyTrackerDoc.mock.calls.map((c: any[]) => c[1]);
-    expect(types).toEqual(expect.arrayContaining(["service", "mod", "bill", "fuel", "reminder"]));
+    expect(types).toEqual(expect.arrayContaining(["service", "mod", "bill", "fine", "toll", "fuel", "reminder"]));
   });
 
   it("resets notifiedAt to null when copying reminders", async () => {

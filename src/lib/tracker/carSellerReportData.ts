@@ -10,6 +10,8 @@ import type { EntryRequestStatus } from "@/lib/tracker/sellerReportData";
 import { getCarServiceRecords } from "@/lib/tracker/carServiceRecord";
 import { getCarMods } from "@/lib/tracker/carMod";
 import { getCarBills } from "@/lib/tracker/carBill";
+import { getCarFines } from "@/lib/tracker/carFine";
+import { getCarTolls } from "@/lib/tracker/carToll";
 import { getCarFuelLogs } from "@/lib/tracker/carFuelLog";
 import { getCarReminders } from "@/lib/tracker/carReminder";
 import { computeCarReminderStatus } from "@/lib/tracker/carReminderStatus";
@@ -31,11 +33,15 @@ import { generateStoryParagraphs, type JobTypeGroup } from "@/lib/tracker/report
 import { CAR_JOB_LABELS } from "@/lib/tracker/carJobTypes";
 import { CAR_MOD_LABELS } from "@/lib/tracker/carModTypes";
 import { CAR_BILL_LABELS } from "@/lib/tracker/carBillTypes";
+import { FINE_LABELS } from "@/lib/tracker/fineTypes";
+import { TOLL_LABELS } from "@/lib/tracker/tollTypes";
 import { isBackdated, detectBulkBackdating, type BackdateCheckItem, type BulkBackdateCluster } from "@/lib/tracker/backdateCheck";
 import type { Attachment } from "@/lib/tracker/cosmosHelpers";
 import type { CarServiceRecordDoc } from "@/lib/tracker/carServiceRecord";
 import type { CarModDoc } from "@/lib/tracker/carMod";
 import type { CarBillDoc } from "@/lib/tracker/carBill";
+import type { CarFineDoc } from "@/lib/tracker/carFine";
+import type { CarTollDoc } from "@/lib/tracker/carToll";
 import type { CarFuelLogDoc } from "@/lib/tracker/carFuelLog";
 import type { CarBenchmarkClass } from "@/lib/carPriceData";
 
@@ -110,7 +116,9 @@ export function computeCarSellerReportRowsAndMetrics(
   mods: CarModDoc[],
   bills: CarBillDoc[],
   fuelLogs: CarFuelLogDoc[],
-  reminders: CarReminderDoc[]
+  reminders: CarReminderDoc[],
+  fines: CarFineDoc[] = [],
+  tolls: CarTollDoc[] = []
 ) {
   // Same reasoning as sellerReportData.ts's own isHiddenFromBuyer: a
   // future owner's own insurance/finance is specific to THEM, never
@@ -131,6 +139,26 @@ export function computeCarSellerReportRowsAndMetrics(
       cost: b.cost,
       attachment: b.attachments?.[0] ?? null,
       hiddenFromBuyer: isHiddenFromBuyer(b.billType),
+    })),
+    ...fines.map((f) => ({
+      id: f.id,
+      date: f.date,
+      createdAt: f.createdAt,
+      category: "Fine",
+      description: FINE_LABELS[f.fineType] ?? f.fineType,
+      cost: f.cost,
+      attachment: f.attachments?.[0] ?? null,
+      hiddenFromBuyer: !car.includeFinesInReport,
+    })),
+    ...tolls.map((t) => ({
+      id: t.id,
+      date: t.date,
+      createdAt: t.createdAt,
+      category: "Toll",
+      description: TOLL_LABELS[t.tollType] ?? t.tollType,
+      cost: t.cost,
+      attachment: t.attachments?.[0] ?? null,
+      hiddenFromBuyer: !car.includeTollsInReport,
     })),
   ].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
@@ -213,12 +241,14 @@ export async function getCarSellerReportCore(email: string, carId: string): Prom
     await materializeAllDueForCar(email, carId);
   }
 
-  const [records, mods, bills, fuelLogs, reminders] = await Promise.all([
+  const [records, mods, bills, fuelLogs, reminders, fines, tolls] = await Promise.all([
     getCarServiceRecords(email, carId),
     getCarMods(email, carId),
     getCarBills(email, carId),
     getCarFuelLogs(email, carId),
     getCarReminders(email, carId),
+    getCarFines(email, carId),
+    getCarTolls(email, carId),
   ]);
 
   const {
@@ -233,7 +263,7 @@ export async function getCarSellerReportCore(email: string, carId: string): Prom
     mostRecentChange,
     daysSinceLastChange,
     verdictMetrics,
-  } = computeCarSellerReportRowsAndMetrics(car, records, mods, bills, fuelLogs, reminders);
+  } = computeCarSellerReportRowsAndMetrics(car, records, mods, bills, fuelLogs, reminders, fines, tolls);
 
   const verdict = computeSellerVerdict(verdictMetrics);
   const buyerQuestions = generateCarBuyerQuestions(verdictMetrics);

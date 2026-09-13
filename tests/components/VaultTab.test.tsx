@@ -32,14 +32,14 @@ describe("VaultTab", () => {
 
   it("shows the re-auth modal when the Vault starts locked", async () => {
     mockFetchRouter({ status: () => jsonResponse({ unlocked: false }) });
-    render(<VaultTab vehicleKind="bike" vehicleId="bike-1" />);
+    render(<VaultTab vehicleKind="bike" vehicleId="bike-1" currentMileage={1000} distanceUnit="mi" />);
 
-    expect(await screen.findByRole("dialog", { name: /confirm it's you/i })).toBeInTheDocument();
+    expect(await screen.findByRole("region", { name: /confirm it's you/i })).toBeInTheDocument();
   });
 
   it("loads and shows the empty-state copy and document list once already unlocked", async () => {
     mockFetchRouter({ status: () => jsonResponse({ unlocked: true }), list: jsonResponse({ documents: [] }) });
-    render(<VaultTab vehicleKind="bike" vehicleId="bike-1" />);
+    render(<VaultTab vehicleKind="bike" vehicleId="bike-1" currentMileage={1000} distanceUnit="mi" />);
 
     expect(await screen.findByText(/documents, in one secure place/)).toBeInTheDocument();
     expect(screen.getByText(/This is the first time the Vault has been opened/)).toBeInTheDocument();
@@ -52,12 +52,54 @@ describe("VaultTab", () => {
         documents: [{ id: "d1", fileName: "V5C.pdf", fileType: "application/pdf", fileSize: 2048, category: "dvlaLegal", uploadedAt: "2026-01-01T00:00:00.000Z" }],
       }),
     });
-    render(<VaultTab vehicleKind="bike" vehicleId="bike-1" />);
+    render(<VaultTab vehicleKind="bike" vehicleId="bike-1" currentMileage={1000} distanceUnit="mi" />);
 
     expect(await screen.findByText("V5C.pdf")).toBeInTheDocument();
     expect(screen.getAllByText(/DVLA \/ Legal/).length).toBeGreaterThan(0);
     expect(screen.getByRole("link", { name: "Download" })).toHaveAttribute("href", "/api/vault/documents/d1/download");
     expect(screen.getByRole("button", { name: "Delete" })).toBeInTheDocument();
+  });
+
+  it("opens an enlarged preview (pointing at the un-watermarked preview route) when the thumbnail is clicked", async () => {
+    mockFetchRouter({
+      status: () => jsonResponse({ unlocked: true }),
+      list: jsonResponse({
+        documents: [{ id: "d1", fileName: "V5C.pdf", fileType: "application/pdf", fileSize: 2048, category: "dvlaLegal", uploadedAt: "2026-01-01T00:00:00.000Z" }],
+      }),
+    });
+    const user = userEvent.setup();
+    render(<VaultTab vehicleKind="bike" vehicleId="bike-1" currentMileage={1000} distanceUnit="mi" />);
+    await screen.findByText("V5C.pdf");
+
+    await user.click(screen.getByTitle("Preview V5C.pdf"));
+
+    const dialog = await screen.findByRole("dialog", { name: "V5C.pdf" });
+    expect(dialog.querySelector("iframe")).toHaveAttribute("src", "/api/vault/documents/d1/preview");
+
+    await user.click(screen.getByRole("button", { name: "Close" }));
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
+  it("checking 'Download without watermark' appends ?watermark=0 to that document's download link only", async () => {
+    mockFetchRouter({
+      status: () => jsonResponse({ unlocked: true }),
+      list: jsonResponse({
+        documents: [
+          { id: "d1", fileName: "V5C.pdf", fileType: "application/pdf", fileSize: 2048, category: "dvlaLegal", uploadedAt: "2026-01-01T00:00:00.000Z" },
+          { id: "d2", fileName: "insurance.jpg", fileType: "image/jpeg", fileSize: 1024, category: "insurance", uploadedAt: "2026-01-01T00:00:00.000Z" },
+        ],
+      }),
+    });
+    const user = userEvent.setup();
+    render(<VaultTab vehicleKind="bike" vehicleId="bike-1" currentMileage={1000} distanceUnit="mi" />);
+    await screen.findByText("V5C.pdf");
+
+    const checkboxes = screen.getAllByLabelText("Download without watermark");
+    await user.click(checkboxes[0]);
+
+    const links = screen.getAllByRole("link", { name: "Download" });
+    expect(links[0]).toHaveAttribute("href", "/api/vault/documents/d1/download?watermark=0");
+    expect(links[1]).toHaveAttribute("href", "/api/vault/documents/d2/download");
   });
 
   it("unlocking via the auth modal reveals the tab content", async () => {
@@ -73,9 +115,9 @@ describe("VaultTab", () => {
     });
 
     const user = userEvent.setup();
-    render(<VaultTab vehicleKind="bike" vehicleId="bike-1" />);
+    render(<VaultTab vehicleKind="bike" vehicleId="bike-1" currentMileage={1000} distanceUnit="mi" />);
 
-    await screen.findByRole("dialog");
+    await screen.findByRole("region");
     await user.type(screen.getByLabelText(/6-digit code/), "123456");
     await user.click(screen.getByRole("button", { name: "Unlock" }));
 
@@ -99,7 +141,7 @@ describe("VaultTab", () => {
     vi.stubGlobal("fetch", fetch);
 
     const user = userEvent.setup();
-    render(<VaultTab vehicleKind="bike" vehicleId="bike-1" />);
+    render(<VaultTab vehicleKind="bike" vehicleId="bike-1" currentMileage={1000} distanceUnit="mi" />);
     await screen.findByText(/documents, in one secure place/);
 
     await user.selectOptions(screen.getByLabelText("Category"), "dvlaLegal");
@@ -137,7 +179,7 @@ describe("VaultTab", () => {
     );
 
     const user = userEvent.setup();
-    render(<VaultTab vehicleKind="bike" vehicleId="bike-1" />);
+    render(<VaultTab vehicleKind="bike" vehicleId="bike-1" currentMileage={1000} distanceUnit="mi" />);
     await screen.findByText("v5c.pdf");
 
     await user.click(screen.getByRole("button", { name: "Delete" }));
@@ -155,9 +197,9 @@ describe("VaultTab", () => {
       })
     );
 
-    render(<VaultTab vehicleKind="bike" vehicleId="bike-1" />);
+    render(<VaultTab vehicleKind="bike" vehicleId="bike-1" currentMileage={1000} distanceUnit="mi" />);
 
-    expect(await screen.findByRole("dialog", { name: /confirm it's you/i })).toBeInTheDocument();
+    expect(await screen.findByRole("region", { name: /confirm it's you/i })).toBeInTheDocument();
   });
 
   it("shows the bike or car spinner while checking status, per the vehicleKind prop", async () => {
@@ -167,7 +209,7 @@ describe("VaultTab", () => {
       vi.fn(() => new Promise((resolve) => { resolveStatus = resolve; }))
     );
 
-    render(<VaultTab vehicleKind="car" vehicleId="car-1" />);
+    render(<VaultTab vehicleKind="car" vehicleId="car-1" currentMileage={1000} distanceUnit="mi" />);
     expect(screen.getByText("Loading…")).toBeInTheDocument();
 
     resolveStatus({ ok: true, json: async () => ({ unlocked: false }) });
@@ -185,11 +227,11 @@ describe("VaultTab", () => {
     );
 
     const user = userEvent.setup();
-    render(<VaultTab vehicleKind="bike" vehicleId="bike-1" />);
+    render(<VaultTab vehicleKind="bike" vehicleId="bike-1" currentMileage={1000} distanceUnit="mi" />);
     await screen.findByText(/documents, in one secure place/);
 
     await user.click(screen.getByRole("button", { name: "Lock the Vault now" }));
 
-    expect(await screen.findByRole("dialog", { name: /confirm it's you/i })).toBeInTheDocument();
+    expect(await screen.findByRole("region", { name: /confirm it's you/i })).toBeInTheDocument();
   });
 });

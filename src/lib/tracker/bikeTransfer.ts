@@ -32,6 +32,8 @@ import { normalizePlate, allKnownPlates } from "@/lib/tracker/reportAccess";
 import { getServiceRecords } from "@/lib/tracker/serviceRecord";
 import { getMods } from "@/lib/tracker/mod";
 import { getBills } from "@/lib/tracker/bill";
+import { getFines } from "@/lib/tracker/fine";
+import { getTolls } from "@/lib/tracker/toll";
 import { getFuelLogs } from "@/lib/tracker/fuelLog";
 import { getReminders } from "@/lib/tracker/reminder";
 import { getBillSeriesForBike, endBillSeries } from "@/lib/tracker/billSeries";
@@ -140,16 +142,18 @@ export async function transferBike(
   // judged by, reused here so the frozen summary means the same thing
   // everywhere it appears rather than being computed a third, slightly
   // different way.
-  const [records, mods, bills, fuelLogs, reminders, billSeries] = await Promise.all([
+  const [records, mods, bills, fuelLogs, reminders, billSeries, fines, tolls] = await Promise.all([
     getServiceRecords(fromEmail, bikeId),
     getMods(fromEmail, bikeId),
     getBills(fromEmail, bikeId),
     getFuelLogs(fromEmail, bikeId),
     getReminders(fromEmail, bikeId),
     getBillSeriesForBike(fromEmail, bikeId),
+    getFines(fromEmail, bikeId),
+    getTolls(fromEmail, bikeId),
   ]);
   const activeBillSeries = billSeries.filter((s) => s.status === "active");
-  const { rows, total, verdictMetrics } = computeSellerReportRowsAndMetrics(oldBike, records, mods, bills, fuelLogs, reminders);
+  const { rows, total, verdictMetrics } = computeSellerReportRowsAndMetrics(oldBike, records, mods, bills, fuelLogs, reminders, fines, tolls);
   const verdict = computeSellerVerdict(verdictMetrics);
 
   const transferredAt = new Date().toISOString();
@@ -225,6 +229,8 @@ export async function transferBike(
       ...records.map((r) => copyTrackerDoc(r, "service", toEmail, newBikeId)),
       ...mods.map((m) => copyTrackerDoc(m, "mod", toEmail, newBikeId)),
       ...bills.map((b) => copyTrackerDoc(b, "bill", toEmail, newBikeId)),
+      ...fines.map((f) => copyTrackerDoc(f, "fine", toEmail, newBikeId)),
+      ...tolls.map((t) => copyTrackerDoc(t, "toll", toEmail, newBikeId)),
       ...fuelLogs.map((f) => copyTrackerDoc(f, "fuel", toEmail, newBikeId)),
       // notifiedAt reset to null - the new owner hasn't been notified
       // about anything yet, regardless of whether the previous owner

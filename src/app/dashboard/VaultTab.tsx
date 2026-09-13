@@ -14,7 +14,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { VehicleSpinner } from '@/components/VehicleSpinner';
 import { VaultAuthModal, type VaultPreviousAccess } from './VaultAuthModal';
+import { VaultDocumentPreviewModal } from './VaultDocumentPreviewModal';
 import { VAULT_CATEGORIES, type VaultDocumentCategory } from '@/lib/tracker/vaultDocument';
+import { Icon } from './Icon';
+import { NotificationBell } from './NotificationBell';
+import { convertMilesToDisplay, type DistanceUnit } from '@/lib/tracker/unitFormat';
 import styles from './dashboard.module.css';
 
 interface VaultDocumentSummary {
@@ -30,6 +34,8 @@ interface VaultDocumentSummary {
 interface Props {
   vehicleKind: 'bike' | 'car';
   vehicleId: string;
+  currentMileage: number;
+  distanceUnit: DistanceUnit;
 }
 
 // The spec's own auto-lock window - kept in sync with
@@ -51,7 +57,7 @@ function isLockedResponse(status: number, data: unknown): boolean {
   return status === 401 && (data as { error?: string } | null)?.error === 'vault_locked';
 }
 
-export function VaultTab({ vehicleKind, vehicleId }: Props) {
+export function VaultTab({ vehicleKind, vehicleId, currentMileage, distanceUnit }: Props) {
   const [unlocked, setUnlocked] = useState<boolean | null>(null);
   const [documents, setDocuments] = useState<VaultDocumentSummary[] | null>(null);
   const [previousAccess, setPreviousAccess] = useState<VaultPreviousAccess | null>(null);
@@ -63,6 +69,17 @@ export function VaultTab({ vehicleKind, vehicleId }: Props) {
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [previewDoc, setPreviewDoc] = useState<VaultDocumentSummary | null>(null);
+  const [noWatermarkIds, setNoWatermarkIds] = useState<Set<string>>(new Set());
+
+  function toggleWatermark(id: string, disabled: boolean) {
+    setNoWatermarkIds((prev) => {
+      const next = new Set(prev);
+      if (disabled) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  }
 
   const lastInteraction = useRef(Date.now());
   const markActive = useCallback(() => {
@@ -188,21 +205,42 @@ export function VaultTab({ vehicleKind, vehicleId }: Props) {
     }
   }
 
+  const mileagePill = (
+    <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+      <NotificationBell />
+      <div className={styles.headerMileagePill}>
+        <Icon name="currentMiles" size={15} />
+        {Math.round(convertMilesToDisplay(currentMileage, distanceUnit)).toLocaleString()} {distanceUnit === 'km' ? 'km' : 'mi'}
+      </div>
+    </div>
+  );
+
   if (unlocked === null) {
     return (
-      <div className={styles.subtext}>
-        <VehicleSpinner kind={vehicleKind} size={18} /> Loading…
+      <div>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '0.75rem' }}>{mileagePill}</div>
+        <div className={styles.subtext}>
+          <VehicleSpinner kind={vehicleKind} size={18} /> Loading…
+        </div>
       </div>
     );
   }
 
   if (!unlocked) {
-    return <VaultAuthModal vehicleKind={vehicleKind} onUnlocked={handleUnlocked} />;
+    return (
+      <div>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '0.75rem' }}>{mileagePill}</div>
+        <VaultAuthModal vehicleKind={vehicleKind} onUnlocked={handleUnlocked} />
+      </div>
+    );
   }
 
   return (
     <div onClick={markActive} onScroll={markActive}>
-      <h2 style={{ marginTop: 0 }}>The Vault</h2>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '0.75rem' }}>
+        <h2 style={{ marginTop: 0 }}>The Vault</h2>
+        {mileagePill}
+      </div>
       <p className={styles.subtext}>
         {documents && documents.length === 0
           ? `Your ${vehicleKind === 'bike' ? "bike's" : "car's"} documents, in one secure place. Only you can access this - protected by two-factor authentication and encrypted at rest. Add your V5C, insurance certificate, MOT, or anything else you'd hate to lose.`
@@ -217,23 +255,53 @@ export function VaultTab({ vehicleKind, vehicleId }: Props) {
 
       {documents && documents.length > 0 && (
         <ul style={{ listStyle: 'none', padding: 0, margin: '1rem 0' }}>
-          {documents.map((doc) => (
-            <li key={doc.id} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.6rem 0', borderBottom: '1px solid var(--border)' }}>
-              <div style={{ flex: 1 }}>
-                <div>{doc.label || doc.fileName}</div>
-                <div className={styles.subtext}>
-                  {categoryLabel(doc.category)} - {formatBytes(doc.fileSize)}
+          {documents.map((doc) => {
+            const isImage = doc.fileType === 'image/jpeg' || doc.fileType === 'image/png';
+            const watermarkOff = noWatermarkIds.has(doc.id);
+            return (
+              <li key={doc.id} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.6rem 0', borderBottom: '1px solid var(--border)' }}>
+                <button
+                  type="button"
+                  className={styles.attachmentThumb}
+                  style={{ padding: 0, cursor: 'pointer', flexShrink: 0 }}
+                  title={`Preview ${doc.fileName}`}
+                  onClick={() => {
+                    markActive();
+                    setPreviewDoc(doc);
+                  }}
+                >
+                  {isImage ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={`/api/vault/documents/${doc.id}/preview`} alt={doc.fileName} className={styles.attachmentThumbImg} />
+                  ) : (
+                    <span className={styles.attachmentThumbPdf}>PDF</span>
+                  )}
+                </button>
+                <div style={{ flex: 1 }}>
+                  <div>{doc.label || doc.fileName}</div>
+                  <div className={styles.subtext}>
+                    {categoryLabel(doc.category)} - {formatBytes(doc.fileSize)}
+                  </div>
+                  <label className={styles.subtext} style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', marginTop: '0.3rem' }}>
+                    <input type="checkbox" checked={watermarkOff} onChange={(e) => toggleWatermark(doc.id, e.target.checked)} />
+                    Download without watermark
+                  </label>
                 </div>
-              </div>
-              <a href={`/api/vault/documents/${doc.id}/download`} className="submit-button" onClick={markActive} style={{ textDecoration: 'none' }}>
-                Download
-              </a>
-              <button type="button" className={styles.iconBtn} disabled={deletingId === doc.id} onClick={() => handleDelete(doc.id)}>
-                {deletingId === doc.id && <VehicleSpinner kind={vehicleKind} size={20} />}
-                Delete
-              </button>
-            </li>
-          ))}
+                <a
+                  href={`/api/vault/documents/${doc.id}/download${watermarkOff ? '?watermark=0' : ''}`}
+                  className="submit-button"
+                  onClick={markActive}
+                  style={{ textDecoration: 'none' }}
+                >
+                  Download
+                </a>
+                <button type="button" className={styles.iconBtn} disabled={deletingId === doc.id} onClick={() => handleDelete(doc.id)}>
+                  {deletingId === doc.id && <VehicleSpinner kind={vehicleKind} size={20} />}
+                  Delete
+                </button>
+              </li>
+            );
+          })}
         </ul>
       )}
 
@@ -285,6 +353,15 @@ export function VaultTab({ vehicleKind, vehicleId }: Props) {
       <button type="button" className={styles.iconBtn} onClick={handleLockNow}>
         Lock the Vault now
       </button>
+
+      {previewDoc && (
+        <VaultDocumentPreviewModal
+          documentId={previewDoc.id}
+          fileName={previewDoc.label || previewDoc.fileName}
+          fileType={previewDoc.fileType}
+          onClose={() => setPreviewDoc(null)}
+        />
+      )}
     </div>
   );
 }

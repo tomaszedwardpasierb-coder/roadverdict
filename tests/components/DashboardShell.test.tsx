@@ -47,6 +47,8 @@ function baseProps(overrides: Partial<Parameters<typeof DashboardShell>[0]> = {}
     modsContent: <div>Mods content</div>,
     labourContent: <div>Labour content</div>,
     billsContent: <div>Bills content</div>,
+    finesContent: <div>Fines content</div>,
+    tollsContent: <div>Tolls content</div>,
     remindersContent: <div>Reminders content</div>,
     reportsContent: <div>Reports content</div>,
     storyContent: <div>Story content</div>,

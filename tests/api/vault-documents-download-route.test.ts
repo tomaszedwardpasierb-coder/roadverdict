@@ -23,8 +23,8 @@ import { GET } from "@/app/api/vault/documents/[id]/download/route";
 
 const EMAIL = "rider@example.com";
 
-function req(): NextRequest {
-  return new NextRequest("http://localhost/api/vault/documents/d1/download");
+function req(query = ""): NextRequest {
+  return new NextRequest(`http://localhost/api/vault/documents/d1/download${query}`);
 }
 
 function params(id: string) {
@@ -94,6 +94,17 @@ describe("GET /api/vault/documents/[id]/download", () => {
     // once (for the read), confirming no separate write-back call happens.
     expect(getBlockBlobClient).toHaveBeenCalledTimes(1);
     expect(mocks.download).toHaveBeenCalledTimes(1);
+  });
+
+  it("skips watermarking entirely when ?watermark=0 is passed, streaming the original bytes", async () => {
+    const response = await GET(req("?watermark=0"), params("d1"));
+    expect(response.status).toBe(200);
+    expect(mocks.watermarkPdf).not.toHaveBeenCalled();
+    expect(mocks.watermarkImage).not.toHaveBeenCalled();
+
+    const body = Buffer.from(await response.arrayBuffer());
+    expect(body.toString()).toBe("original-pdf-bytes");
+    expect(response.headers.get("Content-Disposition")).toContain("V5C.pdf");
   });
 
   it("responds 500 when the blob download itself fails", async () => {

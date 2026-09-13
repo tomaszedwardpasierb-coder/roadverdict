@@ -15,6 +15,8 @@ const mocks = vi.hoisted(() => ({
   updateBikeCurrency: vi.fn(),
   updateBikeIncludeInsuranceInReport: vi.fn(),
   updateBikeIncludeFinanceInReport: vi.fn(),
+  updateBikeIncludeFinesInReport: vi.fn(),
+  updateBikeIncludeTollsInReport: vi.fn(),
   updateBikeChartType: vi.fn(),
   updateBikeDvlaData: vi.fn(),
   isBikeReadOnly: vi.fn(),
@@ -43,6 +45,8 @@ vi.mock("@/lib/tracker/bike", async () => {
     updateBikeCurrency: mocks.updateBikeCurrency,
     updateBikeIncludeInsuranceInReport: mocks.updateBikeIncludeInsuranceInReport,
     updateBikeIncludeFinanceInReport: mocks.updateBikeIncludeFinanceInReport,
+    updateBikeIncludeFinesInReport: mocks.updateBikeIncludeFinesInReport,
+    updateBikeIncludeTollsInReport: mocks.updateBikeIncludeTollsInReport,
     updateBikeChartType: mocks.updateBikeChartType,
     updateBikeDvlaData: mocks.updateBikeDvlaData,
     isBikeReadOnly: mocks.isBikeReadOnly,
@@ -462,6 +466,24 @@ describe("PATCH /api/tracker/bike", () => {
     expect(response.status).toBe(200);
     expect(mocks.updateBikeIncludeFinanceInReport).toHaveBeenCalledWith("owner@example.com", "bike-1", true);
     expect(mocks.updateBikeIncludeInsuranceInReport).not.toHaveBeenCalled();
+  });
+
+  it("updates includeFinesInReport independently of the other report toggles", async () => {
+    mocks.getSession.mockResolvedValue({ email: "owner@example.com" });
+    mocks.updateBikeIncludeFinesInReport.mockResolvedValue({ id: "bike-1", includeFinesInReport: true });
+    const response = await PATCH(request("PATCH", JSON.stringify({ includeFinesInReport: true })));
+    expect(response.status).toBe(200);
+    expect(mocks.updateBikeIncludeFinesInReport).toHaveBeenCalledWith("owner@example.com", "bike-1", true);
+    expect(mocks.updateBikeIncludeTollsInReport).not.toHaveBeenCalled();
+  });
+
+  it("updates includeTollsInReport independently of the other report toggles", async () => {
+    mocks.getSession.mockResolvedValue({ email: "owner@example.com" });
+    mocks.updateBikeIncludeTollsInReport.mockResolvedValue({ id: "bike-1", includeTollsInReport: true });
+    const response = await PATCH(request("PATCH", JSON.stringify({ includeTollsInReport: true })));
+    expect(response.status).toBe(200);
+    expect(mocks.updateBikeIncludeTollsInReport).toHaveBeenCalledWith("owner@example.com", "bike-1", true);
+    expect(mocks.updateBikeIncludeFinesInReport).not.toHaveBeenCalled();
   });
 
   it("updates a chart's type only when both chartId and kind are supplied", async () => {

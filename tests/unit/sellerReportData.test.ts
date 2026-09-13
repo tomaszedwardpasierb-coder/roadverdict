@@ -8,6 +8,8 @@ const mocks = vi.hoisted(() => ({
   getServiceRecords: vi.fn(),
   getMods: vi.fn(),
   getBills: vi.fn(),
+  getFines: vi.fn(),
+  getTolls: vi.fn(),
   getFuelLogs: vi.fn(),
   getReminders: vi.fn(),
   resolveShareToken: vi.fn(),
@@ -28,6 +30,8 @@ vi.mock("@/lib/tracker/bike", async (importOriginal) => {
 vi.mock("@/lib/tracker/serviceRecord", () => ({ getServiceRecords: mocks.getServiceRecords }));
 vi.mock("@/lib/tracker/mod", () => ({ getMods: mocks.getMods }));
 vi.mock("@/lib/tracker/bill", () => ({ getBills: mocks.getBills }));
+vi.mock("@/lib/tracker/fine", () => ({ getFines: mocks.getFines }));
+vi.mock("@/lib/tracker/toll", () => ({ getTolls: mocks.getTolls }));
 vi.mock("@/lib/tracker/fuelLog", () => ({ getFuelLogs: mocks.getFuelLogs }));
 vi.mock("@/lib/tracker/reminder", () => ({ getReminders: mocks.getReminders }));
 vi.mock("@/lib/tracker/shareLink", () => ({ resolveShareToken: mocks.resolveShareToken }));
@@ -58,6 +62,8 @@ import type { ModDoc } from "@/lib/tracker/mod";
 import type { BillDoc } from "@/lib/tracker/bill";
 import type { FuelLogDoc } from "@/lib/tracker/fuelLog";
 import type { ReminderDoc } from "@/lib/tracker/reminder";
+import type { FineDoc } from "@/lib/tracker/fine";
+import type { TollDoc } from "@/lib/tracker/toll";
 
 function resetAllMocks() {
   Object.values(mocks).forEach((m) => m.mockReset());
@@ -250,6 +256,41 @@ describe("computeSellerReportRowsAndMetrics", () => {
       expect(result.realTimeCount).toBe(0);
     });
   });
+
+  describe("hiding fines and tolls from the buyer-facing rows and total", () => {
+    const fine = { id: "f-1", pk: "x", type: "fine" as const, fineType: "speeding", cost: 100, notes: "", date: "2025-03-01", createdAt: "2025-03-02T00:00:00.000Z" } as FineDoc;
+    const toll = { id: "t-1", pk: "x", type: "toll" as const, tollType: "dartford-crossing", cost: 2.5, notes: "", date: "2025-04-01", createdAt: "2025-04-02T00:00:00.000Z" } as TollDoc;
+
+    it("excludes fines and tolls from rows and total by default", () => {
+      const result = computeSellerReportRowsAndMetrics(makeBike(), [], [], [], [], [], [fine], [toll]);
+      expect(result.rows).toEqual([]);
+      expect(result.total).toBe(0);
+    });
+
+    it("shows fines once includeFinesInReport is true, independently of tolls", () => {
+      const result = computeSellerReportRowsAndMetrics(makeBike({ includeFinesInReport: true }), [], [], [], [], [], [fine], [toll]);
+      expect(result.rows.map((r) => r.id)).toEqual(["f-1"]);
+      expect(result.total).toBe(100);
+    });
+
+    it("shows tolls once includeTollsInReport is true, independently of fines", () => {
+      const result = computeSellerReportRowsAndMetrics(makeBike({ includeTollsInReport: true }), [], [], [], [], [], [fine], [toll]);
+      expect(result.rows.map((r) => r.id)).toEqual(["t-1"]);
+      expect(result.total).toBe(2.5);
+    });
+
+    it("labels fine/toll rows using their own catalogs and categories", () => {
+      const result = computeSellerReportRowsAndMetrics(makeBike({ includeFinesInReport: true, includeTollsInReport: true }), [], [], [], [], [], [fine], [toll]);
+      expect(result.rows.find((r) => r.id === "f-1")).toMatchObject({ category: "Fine", description: "Speeding (fixed penalty / NIP)" });
+      expect(result.rows.find((r) => r.id === "t-1")).toMatchObject({ category: "Toll", description: "Dartford Crossing (Dart Charge)" });
+    });
+
+    it("still counts a hidden fine toward totalEntries, even though it's excluded from rows/total", () => {
+      const result = computeSellerReportRowsAndMetrics(makeBike(), [], [], [], [], [], [fine], []);
+      expect(result.rows).toEqual([]);
+      expect(result.verdictMetrics.totalEntries).toBe(1);
+    });
+  });
 });
 
 describe("getSellerReportCore", () => {
@@ -258,6 +299,8 @@ describe("getSellerReportCore", () => {
     mocks.getServiceRecords.mockResolvedValue([]);
     mocks.getMods.mockResolvedValue([]);
     mocks.getBills.mockResolvedValue([]);
+    mocks.getFines.mockResolvedValue([]);
+    mocks.getTolls.mockResolvedValue([]);
     mocks.getFuelLogs.mockResolvedValue([]);
     mocks.getReminders.mockResolvedValue([]);
   });
@@ -293,6 +336,8 @@ describe("getSellerReportData", () => {
     mocks.getServiceRecords.mockResolvedValue([]);
     mocks.getMods.mockResolvedValue([]);
     mocks.getBills.mockResolvedValue([]);
+    mocks.getFines.mockResolvedValue([]);
+    mocks.getTolls.mockResolvedValue([]);
     mocks.getFuelLogs.mockResolvedValue([]);
     mocks.getReminders.mockResolvedValue([]);
     mocks.getReceiptRequestsForShareToken.mockResolvedValue([]);

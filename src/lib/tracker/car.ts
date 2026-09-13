@@ -86,6 +86,10 @@ export interface CarDoc {
   // owner's own dashboard/spend charts/cost-per-mile).
   includeInsuranceInReport?: boolean;
   includeFinanceInReport?: boolean;
+  // Same pattern again for logged fines/tolls - see bike.ts's own
+  // comment on includeFinesInReport/includeTollsInReport.
+  includeFinesInReport?: boolean;
+  includeTollsInReport?: boolean;
   // Cached AI-generated buyer opinion for the detailed car report -
   // mirrors bike.ts's own field exactly. That report page has no login
   // and can be viewed by anyone with the link, any number of times, so
@@ -310,6 +314,24 @@ export async function updateCarIncludeFinanceInReport(email: string, carId: stri
   const { resource } = await container.item(carId, email).read<CarDoc>();
   if (!resource) return null;
   resource.includeFinanceInReport = includeFinanceInReport;
+  await container.items.upsert(resource);
+  return resource;
+}
+
+export async function updateCarIncludeFinesInReport(email: string, carId: string, includeFinesInReport: boolean): Promise<CarDoc | null> {
+  const container = getContainer();
+  const { resource } = await container.item(carId, email).read<CarDoc>();
+  if (!resource) return null;
+  resource.includeFinesInReport = includeFinesInReport;
+  await container.items.upsert(resource);
+  return resource;
+}
+
+export async function updateCarIncludeTollsInReport(email: string, carId: string, includeTollsInReport: boolean): Promise<CarDoc | null> {
+  const container = getContainer();
+  const { resource } = await container.item(carId, email).read<CarDoc>();
+  if (!resource) return null;
+  resource.includeTollsInReport = includeTollsInReport;
   await container.items.upsert(resource);
   return resource;
 }

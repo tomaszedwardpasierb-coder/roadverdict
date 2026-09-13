@@ -8,6 +8,8 @@ const mocks = vi.hoisted(() => ({
   getCarServiceRecords: vi.fn(),
   getCarMods: vi.fn(),
   getCarBills: vi.fn(),
+  getCarFines: vi.fn(),
+  getCarTolls: vi.fn(),
   getCarFuelLogs: vi.fn(),
   getCarReminders: vi.fn(),
   resolveCarShareToken: vi.fn(),
@@ -36,6 +38,8 @@ vi.mock("@/lib/tracker/car", async (importOriginal) => {
 vi.mock("@/lib/tracker/carServiceRecord", () => ({ getCarServiceRecords: mocks.getCarServiceRecords }));
 vi.mock("@/lib/tracker/carMod", () => ({ getCarMods: mocks.getCarMods }));
 vi.mock("@/lib/tracker/carBill", () => ({ getCarBills: mocks.getCarBills }));
+vi.mock("@/lib/tracker/carFine", () => ({ getCarFines: mocks.getCarFines }));
+vi.mock("@/lib/tracker/carToll", () => ({ getCarTolls: mocks.getCarTolls }));
 vi.mock("@/lib/tracker/carFuelLog", () => ({ getCarFuelLogs: mocks.getCarFuelLogs }));
 vi.mock("@/lib/tracker/carReminder", () => ({ getCarReminders: mocks.getCarReminders }));
 vi.mock("@/lib/tracker/carBillSeries", () => ({ materializeAllDueForCar: mocks.materializeAllDueForCar }));
@@ -58,6 +62,8 @@ import type { CarModDoc } from "@/lib/tracker/carMod";
 import type { CarBillDoc } from "@/lib/tracker/carBill";
 import type { CarFuelLogDoc } from "@/lib/tracker/carFuelLog";
 import type { CarReminderDoc } from "@/lib/tracker/carReminder";
+import type { CarFineDoc } from "@/lib/tracker/carFine";
+import type { CarTollDoc } from "@/lib/tracker/carToll";
 
 function resetAllMocks() {
   Object.values(mocks).forEach((m) => m.mockReset());
@@ -180,6 +186,35 @@ describe("computeCarSellerReportRowsAndMetrics", () => {
       expect(result.verdictMetrics.receiptCount).toBe(1);
     });
   });
+
+  describe("hiding fines and tolls from the buyer-facing rows and total", () => {
+    const fine = { id: "f-1", pk: "x", type: "carFine" as const, carId: "car-1", fineType: "speeding", cost: 100, notes: "", date: "2025-03-01", createdAt: "2025-03-02T00:00:00.000Z" } as CarFineDoc;
+    const toll = { id: "t-1", pk: "x", type: "carToll" as const, carId: "car-1", tollType: "dartford-crossing", cost: 2.5, notes: "", date: "2025-04-01", createdAt: "2025-04-02T00:00:00.000Z" } as CarTollDoc;
+
+    it("excludes fines and tolls from rows and total by default", () => {
+      const result = computeCarSellerReportRowsAndMetrics(makeCar(), [], [], [], [], [], [fine], [toll]);
+      expect(result.rows).toEqual([]);
+      expect(result.total).toBe(0);
+    });
+
+    it("shows fines once includeFinesInReport is true, independently of tolls", () => {
+      const result = computeCarSellerReportRowsAndMetrics(makeCar({ includeFinesInReport: true }), [], [], [], [], [], [fine], [toll]);
+      expect(result.rows.map((r) => r.id)).toEqual(["f-1"]);
+      expect(result.total).toBe(100);
+    });
+
+    it("shows tolls once includeTollsInReport is true, independently of fines", () => {
+      const result = computeCarSellerReportRowsAndMetrics(makeCar({ includeTollsInReport: true }), [], [], [], [], [], [fine], [toll]);
+      expect(result.rows.map((r) => r.id)).toEqual(["t-1"]);
+      expect(result.total).toBe(2.5);
+    });
+
+    it("labels fine/toll rows using their own catalogs and categories", () => {
+      const result = computeCarSellerReportRowsAndMetrics(makeCar({ includeFinesInReport: true, includeTollsInReport: true }), [], [], [], [], [], [fine], [toll]);
+      expect(result.rows.find((r) => r.id === "f-1")).toMatchObject({ category: "Fine", description: "Speeding (fixed penalty / NIP)" });
+      expect(result.rows.find((r) => r.id === "t-1")).toMatchObject({ category: "Toll", description: "Dartford Crossing (Dart Charge)" });
+    });
+  });
 });
 
 describe("getCarSellerReportCore", () => {
@@ -188,6 +223,8 @@ describe("getCarSellerReportCore", () => {
     mocks.getCarServiceRecords.mockResolvedValue([]);
     mocks.getCarMods.mockResolvedValue([]);
     mocks.getCarBills.mockResolvedValue([]);
+    mocks.getCarFines.mockResolvedValue([]);
+    mocks.getCarTolls.mockResolvedValue([]);
     mocks.getCarFuelLogs.mockResolvedValue([]);
     mocks.getCarReminders.mockResolvedValue([]);
     mocks.materializeAllDueForCar.mockResolvedValue(undefined);
@@ -241,6 +278,8 @@ describe("getCarSellerReportData", () => {
     mocks.getCarServiceRecords.mockResolvedValue([]);
     mocks.getCarMods.mockResolvedValue([]);
     mocks.getCarBills.mockResolvedValue([]);
+    mocks.getCarFines.mockResolvedValue([]);
+    mocks.getCarTolls.mockResolvedValue([]);
     mocks.getCarFuelLogs.mockResolvedValue([]);
     mocks.getCarReminders.mockResolvedValue([]);
     mocks.getCarReceiptRequestsForShareToken.mockResolvedValue([]);
