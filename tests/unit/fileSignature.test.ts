@@ -35,4 +35,20 @@ describe("matchesDeclaredFileType", () => {
   it("rejects an empty buffer", () => {
     expect(matchesDeclaredFileType(Buffer.alloc(0), "application/pdf")).toBe(false);
   });
+
+  it("accepts real WEBP bytes as image/webp", () => {
+    // "RIFF" + 4-byte length (arbitrary here) + "WEBP"
+    const bytes = Buffer.from([0x52, 0x49, 0x46, 0x46, 0, 0, 0, 0, 0x57, 0x45, 0x42, 0x50]);
+    expect(matchesDeclaredFileType(bytes, "image/webp")).toBe(true);
+  });
+
+  it("rejects a RIFF file that isn't WEBP (e.g. a WAV file)", () => {
+    const bytes = Buffer.from([0x52, 0x49, 0x46, 0x46, 0, 0, 0, 0, 0x57, 0x41, 0x56, 0x45]); // "RIFF"...."WAVE"
+    expect(matchesDeclaredFileType(bytes, "image/webp")).toBe(false);
+  });
+
+  it("rejects a file too short to contain the WEBP signature", () => {
+    const bytes = Buffer.from([0x52, 0x49, 0x46, 0x46]);
+    expect(matchesDeclaredFileType(bytes, "image/webp")).toBe(false);
+  });
 });

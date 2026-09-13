@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { randomBytes } from "crypto";
 import { getSession } from "@/lib/auth/session";
 import { getAttachmentContainer } from "@/lib/blobStorage";
+import { matchesDeclaredFileType, type SniffableFileType } from "@/lib/tracker/fileSignature";
 import type { Attachment } from "@/lib/tracker/cosmosHelpers";
 
 export const dynamic = "force-dynamic";
@@ -42,6 +43,17 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "File is too large - 10MB maximum." }, { status: 400 });
   }
 
+  const bytes = Buffer.from(await file.arrayBuffer());
+
+  // The declared MIME type above is just a client-supplied claim - a
+  // renamed/relabelled file of any kind would otherwise sail through the
+  // ALLOWED_TYPES check unchanged. Confirming the actual bytes match
+  // closes that gap, same check the Vault's own upload route already
+  // applies to its documents.
+  if (!matchesDeclaredFileType(bytes, file.type as SniffableFileType)) {
+    return NextResponse.json({ error: "This file's contents don't match its type - it may be corrupted or mislabelled." }, { status: 400 });
+  }
+
   // Unguessable, unrelated to the original filename or the user's email -
   // the blob name itself carries no information, same principle as the
   // share-link tokens elsewhere in this app.
@@ -50,8 +62,7 @@ export async function POST(request: NextRequest) {
   try {
     const container = await getAttachmentContainer();
     const blockBlobClient = container.getBlockBlobClient(blobName);
-    const arrayBuffer = await file.arrayBuffer();
-    await blockBlobClient.uploadData(Buffer.from(arrayBuffer), {
+    await blockBlobClient.uploadData(bytes, {
       blobHTTPHeaders: { blobContentType: file.type },
     });
 
@@ -64,9 +75,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ attachment });
   } catch (err) {
-    return NextResponse.json(
-      { error: "Upload failed. Please try again.", detail: err instanceof Error ? err.message : String(err) },
-      { status: 500 }
-    );
+    console.error("upload-attachment: upload failed:", err);
+    return NextResponse.json({ error: "Upload failed. Please try again." }, { status: 500 });
   }
 }

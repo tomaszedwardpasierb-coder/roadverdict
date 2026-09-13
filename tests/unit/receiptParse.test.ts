@@ -30,12 +30,22 @@ import { parseReceiptFile, vehicleKindOf } from "@/lib/tracker/receiptParse";
 function geminiResponse(bodyText: string) {
   return { ok: true, json: async () => ({ candidates: [{ content: { parts: [{ text: bodyText }] } }] }) };
 }
+// Real magic bytes for each declared type - parseReceiptFile now sniffs
+// the actual file contents, not just the declared Content-Type, so an
+// arbitrary 8-byte buffer (the old fixture) would be rejected before ever
+// reaching the code path most of these tests mean to exercise.
+const SIGNATURE_BYTES: Record<string, number[]> = {
+  "image/jpeg": [0xff, 0xd8, 0xff, 0xe0, 0, 0, 0, 0],
+  "application/pdf": [0x25, 0x50, 0x44, 0x46, 0x2d, 0x31, 0x2e, 0x34],
+};
 function fakeFile(overrides: Partial<{ name: string; type: string; size: number }> = {}) {
+  const type = overrides.type ?? "image/jpeg";
+  const bytes = SIGNATURE_BYTES[type] ?? [1, 2, 3];
   return {
     name: overrides.name ?? "receipt.jpg",
-    type: overrides.type ?? "image/jpeg",
+    type,
     size: overrides.size ?? 1024,
-    arrayBuffer: async () => new ArrayBuffer(8),
+    arrayBuffer: async () => new Uint8Array(bytes).buffer,
   } as unknown as File;
 }
 const bike = { id: "bike-1", type: "bike", year: 2018 } as any; // production year 2018, used by isBeforeProduction; type: "bike" drives vehicleKindOf

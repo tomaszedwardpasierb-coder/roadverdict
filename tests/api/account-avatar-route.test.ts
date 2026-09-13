@@ -34,6 +34,14 @@ function requestWithFile(file: File): NextRequest {
   return new NextRequest("http://localhost/api/account/avatar", { method: "POST", body: fd });
 }
 
+// Real magic bytes - the route now sniffs the actual file contents, not
+// just the declared Content-Type, so a fake single-byte body (the old
+// fixture) would be rejected before ever reaching the code path most of
+// these tests mean to exercise.
+function validJpegFile(name = "a.jpg"): File {
+  return new File([new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 0, 0, 0, 0])], name, { type: "image/jpeg" });
+}
+
 describe("/api/account/avatar", () => {
   beforeEach(() => {
     Object.values(mocks).forEach((m) => m.mockReset());
@@ -54,7 +62,7 @@ describe("/api/account/avatar", () => {
   describe("POST", () => {
     it("rejects unauthenticated requests", async () => {
       mocks.getSession.mockResolvedValue(null);
-      const response = await POST(requestWithFile(new File([new Uint8Array([1])], "a.jpg", { type: "image/jpeg" })));
+      const response = await POST(requestWithFile(validJpegFile()));
       expect(response.status).toBe(401);
     });
 
@@ -71,7 +79,7 @@ describe("/api/account/avatar", () => {
     });
 
     it("resizes the uploaded image before storing it, and saves the new blobName on the user's own profile", async () => {
-      const response = await POST(requestWithFile(new File([new Uint8Array([1])], "a.jpg", { type: "image/jpeg" })));
+      const response = await POST(requestWithFile(validJpegFile()));
       expect(response.status).toBe(200);
       expect(mocks.sharpToBuffer).toHaveBeenCalled();
       expect(mocks.uploadData).toHaveBeenCalledWith(Buffer.from([1, 2, 3]), { blobHTTPHeaders: { blobContentType: "image/jpeg" } });
@@ -80,14 +88,21 @@ describe("/api/account/avatar", () => {
 
     it("deletes the previous avatar blob after a new one replaces it", async () => {
       mocks.getUserDoc.mockResolvedValue({ avatarBlobName: "avatar-old.jpg" });
-      await POST(requestWithFile(new File([new Uint8Array([1])], "a.jpg", { type: "image/jpeg" })));
+      await POST(requestWithFile(validJpegFile()));
       expect(mocks.deleteIfExists).toHaveBeenCalled();
     });
 
     it("doesn't attempt to delete anything when there was no previous avatar", async () => {
       mocks.getUserDoc.mockResolvedValue({});
-      await POST(requestWithFile(new File([new Uint8Array([1])], "a.jpg", { type: "image/jpeg" })));
+      await POST(requestWithFile(validJpegFile()));
       expect(mocks.deleteIfExists).not.toHaveBeenCalled();
+    });
+
+    it("rejects a file whose bytes don't match its declared type", async () => {
+      const mislabelled = new File([new Uint8Array([1, 2, 3, 4])], "fake.jpg", { type: "image/jpeg" });
+      const response = await POST(requestWithFile(mislabelled));
+      expect(response.status).toBe(400);
+      expect(mocks.sharpToBuffer).not.toHaveBeenCalled();
     });
   });
 

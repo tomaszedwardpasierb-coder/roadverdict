@@ -16,6 +16,7 @@ import { getAttachmentContainer } from "@/lib/blobStorage";
 import { getExchangeRates } from "@/lib/tracker/currencyRates";
 import { convertDisplayToGbp, ALL_CURRENCIES, type Currency } from "@/lib/tracker/currency";
 import { isBeforeProduction } from "@/lib/tracker/productionYearCheck";
+import { matchesDeclaredFileType, type SniffableFileType } from "@/lib/tracker/fileSignature";
 import { logGeminiUsage } from "@/lib/tracker/geminiUsageLog";
 import type { Attachment, CurrencyConversionInfo } from "@/lib/tracker/cosmosHelpers";
 import type { BikeDoc } from "@/lib/tracker/bike";
@@ -226,6 +227,14 @@ export async function parseReceiptFile(file: File, apiKey: string, vehicle: Scan
 
   const isPdf = file.type === "application/pdf";
 
+  const originalBytes = Buffer.from(await file.arrayBuffer());
+  // The declared MIME type above is just a client-supplied claim - confirm
+  // the actual bytes match before this goes anywhere near Gemini or sharp,
+  // same check the Vault's own upload route already applies.
+  if (!matchesDeclaredFileType(originalBytes, file.type as SniffableFileType)) {
+    return { ok: false, fileName, error: "This file's contents don't match its type - it may be corrupted or mislabelled.", status: 400 };
+  }
+
   try {
     let base64: string;
     let mimeTypeForGemini: string;
@@ -237,15 +246,14 @@ export async function parseReceiptFile(file: File, apiKey: string, vehicle: Scan
       // Send PDF bytes directly to Gemini as a document - no rasterisation
       // needed since Gemini reads PDF natively. The original PDF is stored
       // as the attachment so the buyer can open the real invoice later.
-      uploadBuffer = Buffer.from(await file.arrayBuffer());
+      uploadBuffer = originalBytes;
       base64 = uploadBuffer.toString("base64");
       mimeTypeForGemini = "application/pdf";
       uploadContentType = "application/pdf";
       uploadExtension = "pdf";
     } else {
       // Images: compress/resize before sending to keep API payload small.
-      const originalBuffer = Buffer.from(await file.arrayBuffer());
-      uploadBuffer = await sharp(originalBuffer)
+      uploadBuffer = await sharp(originalBytes)
         .rotate()
         .resize({ width: 1600, height: 1600, fit: "inside", withoutEnlargement: true })
         .jpeg({ quality: 80 })

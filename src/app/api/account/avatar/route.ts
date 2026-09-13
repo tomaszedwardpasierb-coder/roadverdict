@@ -13,6 +13,7 @@ import { getSession } from "@/lib/auth/session";
 import { getUserDoc } from "@/lib/tracker/userDoc";
 import { updateProfile } from "@/lib/tracker/userAccount";
 import { getAttachmentContainer } from "@/lib/blobStorage";
+import { matchesDeclaredFileType, type SniffableFileType } from "@/lib/tracker/fileSignature";
 
 export const dynamic = "force-dynamic";
 
@@ -53,13 +54,21 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Image is too large - 2MB maximum." }, { status: 400 });
   }
 
+  const originalBuffer = Buffer.from(await file.arrayBuffer());
+
+  // The declared MIME type above is just a client-supplied claim - confirm
+  // the actual bytes match before ever handing them to sharp, same check
+  // the Vault's own upload route already applies to its documents.
+  if (!matchesDeclaredFileType(originalBuffer, file.type as SniffableFileType)) {
+    return NextResponse.json({ error: "This file's contents don't match its type - it may be corrupted or mislabelled." }, { status: 400 });
+  }
+
   try {
     // Whatever's uploaded, however large, only a small square JPEG
     // thumbnail is ever actually stored - "cover" crops to fill the
     // square rather than letterboxing, the right choice for a face/logo
     // thumbnail (unlike receiptParse.ts's "inside" fit, which needs the
     // whole receipt visible, not a crop).
-    const originalBuffer = Buffer.from(await file.arrayBuffer());
     const resized = await sharp(originalBuffer)
       .rotate()
       .resize({ width: AVATAR_SIZE_PX, height: AVATAR_SIZE_PX, fit: "cover" })
@@ -78,10 +87,8 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ ok: true });
   } catch (err) {
-    return NextResponse.json(
-      { error: "Upload failed. Please try again.", detail: err instanceof Error ? err.message : String(err) },
-      { status: 500 }
-    );
+    console.error("avatar: upload failed:", err);
+    return NextResponse.json({ error: "Upload failed. Please try again." }, { status: 500 });
   }
 }
 
