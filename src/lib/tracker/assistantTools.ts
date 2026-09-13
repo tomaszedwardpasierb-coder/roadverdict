@@ -25,9 +25,11 @@
 // draft card, AssistantProposedEntryCard.tsx, is deeply bike-shaped for
 // those four - grouped job/mod catalogs, a hardcoded /api/tracker/*
 // endpoint, no litres-vs-kWh branching), but IS available for a
-// car-active session's Labour category specifically, since Labour's own
-// catalog and draft card were built vehicle-kind-aware from the start -
-// see the labourCategory/vehicleKind handling below.
+// car-active session's Labour, Fine, and Toll categories specifically,
+// since those three were all built vehicle-kind-aware from the start -
+// see the labourCategory/fineType/tollType/vehicleKind handling below.
+// Fines and Tolls carry no mileage at all, unlike every other category -
+// the simplest shape here, closer to Bill than to Labour.
 
 import { getServiceRecords } from "./serviceRecord";
 import { getMods } from "./mod";
@@ -65,6 +67,10 @@ import { LABOUR_LABELS } from "./labourTypes";
 import { CAR_LABOUR_LABELS } from "./carLabourTypes";
 import { getLabour } from "./labour";
 import { getCarLabour } from "./carLabour";
+import { FINE_LABELS } from "./fineTypes";
+import { CAR_FINE_LABELS } from "./carFineTypes";
+import { TOLL_LABELS } from "./tollTypes";
+import { CAR_TOLL_LABELS } from "./carTollTypes";
 import { estimateMileage } from "./mileageEstimate";
 
 type CostItem = { date: string; cost: number };
@@ -842,6 +848,8 @@ export interface ProposeLogEntryArgs {
   litres?: number;
   filledToFull?: boolean;
   labourCategory?: string;
+  fineType?: string;
+  tollType?: string;
 }
 
 export type ProposedEntry =
@@ -849,12 +857,15 @@ export type ProposedEntry =
   | { category: "bill"; billType: string; billLabel: string; description: string; cost: number; date: string }
   | { category: "mod"; modCategory: string; modLabel: string; description: string; cost: number; date: string; mileage: number; mileageNote?: string }
   | { category: "fuel"; litres: number; cost: number; date: string; mileage: number; mileageNote?: string; filledToFull: boolean }
-  // The only variant that can come from a car-active session (see the
-  // top-of-file comment) - vehicleKind is carried on the entry itself,
-  // not inferred later, so the draft card and its confirm handler know
-  // which catalog and which /api/tracker vs /api/cars endpoint to use
-  // without re-resolving the account's active vehicle a second time.
-  | { category: "labour"; labourCategory: string; labourLabel: string; description: string; cost: number; date: string; mileage: number; mileageNote?: string; vehicleKind: "bike" | "car" };
+  // These three are the categories that can come from a car-active
+  // session (see the top-of-file comment) - vehicleKind is carried on
+  // the entry itself, not inferred later, so the draft card and its
+  // confirm handler know which catalog and which /api/tracker vs
+  // /api/cars endpoint to use without re-resolving the account's active
+  // vehicle a second time.
+  | { category: "labour"; labourCategory: string; labourLabel: string; description: string; cost: number; date: string; mileage: number; mileageNote?: string; vehicleKind: "bike" | "car" }
+  | { category: "fine"; fineType: string; fineLabel: string; description: string; cost: number; date: string; vehicleKind: "bike" | "car" }
+  | { category: "toll"; tollType: string; tollLabel: string; description: string; cost: number; date: string; vehicleKind: "bike" | "car" };
 
 // Same date-based estimate the manual dashboard forms show via
 // useEstimatedMileage.ts (same estimateMileage() maths, just run
@@ -909,10 +920,12 @@ function resolveModCategory(input: string | undefined): string {
 
 // Same case-insensitive "exact match, then substring, then a safe
 // fallback" approach as resolveModCategory above, generalised over
-// whichever labour catalog (bike or car) applies to this session - both
-// LABOUR_LABELS and CAR_LABOUR_LABELS carry their own "other" key as the
-// fallback, so this never needs a hardcoded default of its own.
-function resolveLabourCategory(input: string | undefined, labels: Record<string, string>): string {
+// whichever flat catalog applies - labour, fine, or toll, bike or car.
+// Genuinely generic (unlike resolveModCategory, which is mod-specific):
+// every one of LABOUR_LABELS/CAR_LABOUR_LABELS/FINE_LABELS/
+// CAR_FINE_LABELS/TOLL_LABELS/CAR_TOLL_LABELS carries its own "other" key
+// as the fallback, so this never needs a hardcoded default of its own.
+function resolveCatalogKey(input: string | undefined, labels: Record<string, string>): string {
   const fallback = "other";
   if (typeof input !== "string" || !input.trim()) return fallback;
   const q = input.trim().toLowerCase();
@@ -950,12 +963,12 @@ export async function toolProposeLogEntry(email: string, args: ProposeLogEntryAr
   if (!vehicle) return { error: "No vehicle found on this account." };
 
   if (vehicle.kind === "car") {
-    // Labour is the one category the car-active draft card actually
-    // supports (see the top-of-file comment) - everything else still
-    // gets the honest "not available" reply, now naming the category it
-    // was asked for rather than a blanket refusal.
-    if (args.category !== "labour") {
-      return { error: "Drafting a new entry from chat is only available for Labour on a car-active account right now - log other categories directly from the dashboard instead." };
+    // Labour, Fine, and Toll are the categories the car-active draft
+    // card actually supports (see the top-of-file comment) - everything
+    // else still gets the honest "not available" reply, now naming the
+    // category it was asked for rather than a blanket refusal.
+    if (args.category !== "labour" && args.category !== "fine" && args.category !== "toll") {
+      return { error: "Drafting a new entry from chat is only available for Labour, Fines, and Tolls on a car-active account right now - log other categories directly from the dashboard instead." };
     }
     const car = vehicle.car;
     if (typeof args.cost !== "number" || !Number.isFinite(args.cost) || args.cost <= 0) {
@@ -967,7 +980,22 @@ export async function toolProposeLogEntry(email: string, args: ProposeLogEntryAr
     if (typeof args.description !== "string" || !args.description.trim()) {
       return { error: "Needs a short description of what this is." };
     }
-    const carLabourCategory = resolveLabourCategory(args.labourCategory, CAR_LABOUR_LABELS);
+    const description = args.description.trim();
+
+    // Fines and Tolls carry no mileage at all (unlike Labour) - a plain
+    // draft with no mileage-history fetch needed.
+    if (args.category === "fine") {
+      const fineType = resolveCatalogKey(args.fineType, CAR_FINE_LABELS);
+      const entry: ProposedEntry = { category: "fine", fineType, fineLabel: CAR_FINE_LABELS[fineType], description, cost: args.cost, date, vehicleKind: "car" };
+      return entry;
+    }
+    if (args.category === "toll") {
+      const tollType = resolveCatalogKey(args.tollType, CAR_TOLL_LABELS);
+      const entry: ProposedEntry = { category: "toll", tollType, tollLabel: CAR_TOLL_LABELS[tollType], description, cost: args.cost, date, vehicleKind: "car" };
+      return entry;
+    }
+
+    const carLabourCategory = resolveCatalogKey(args.labourCategory, CAR_LABOUR_LABELS);
     const [records, mods, fuelLogs, bills, labour] = await Promise.all([
       getCarServiceRecords(email, car.id),
       getCarMods(email, car.id),
@@ -981,7 +1009,7 @@ export async function toolProposeLogEntry(email: string, args: ProposeLogEntryAr
       category: "labour",
       labourCategory: carLabourCategory,
       labourLabel: CAR_LABOUR_LABELS[carLabourCategory],
-      description: args.description.trim(),
+      description,
       cost: args.cost,
       date,
       mileage,
@@ -992,8 +1020,16 @@ export async function toolProposeLogEntry(email: string, args: ProposeLogEntryAr
   }
   const bike = vehicle.bike;
 
-  if (args.category !== "service" && args.category !== "bill" && args.category !== "mod" && args.category !== "fuel" && args.category !== "labour") {
-    return { error: "Not sure what category that is - a service item, a bill (insurance/road tax/MOT/finance), a modification/accessory, a fuel fill-up, or labour/workshop time?" };
+  if (
+    args.category !== "service" &&
+    args.category !== "bill" &&
+    args.category !== "mod" &&
+    args.category !== "fuel" &&
+    args.category !== "labour" &&
+    args.category !== "fine" &&
+    args.category !== "toll"
+  ) {
+    return { error: "Not sure what category that is - a service item, a bill (insurance/road tax/MOT/finance), a modification/accessory, a fuel fill-up, labour/workshop time, a fine, or a toll/parking charge?" };
   }
   if (typeof args.cost !== "number" || !Number.isFinite(args.cost) || args.cost <= 0) {
     return { error: "Needs a valid, positive cost." };
@@ -1025,6 +1061,20 @@ export async function toolProposeLogEntry(email: string, args: ProposeLogEntryAr
   }
   const description = args.description.trim();
 
+  // Fines and Tolls carry no mileage at all (unlike service/mod/labour
+  // below, or fuel above) - the simplest drafts here, closer to Bill's
+  // own shape further down than to anything mileage-tracked.
+  if (args.category === "fine") {
+    const fineType = resolveCatalogKey(args.fineType, FINE_LABELS);
+    const entry: ProposedEntry = { category: "fine", fineType, fineLabel: FINE_LABELS[fineType], description, cost: args.cost, date, vehicleKind: "bike" };
+    return entry;
+  }
+  if (args.category === "toll") {
+    const tollType = resolveCatalogKey(args.tollType, TOLL_LABELS);
+    const entry: ProposedEntry = { category: "toll", tollType, tollLabel: TOLL_LABELS[tollType], description, cost: args.cost, date, vehicleKind: "bike" };
+    return entry;
+  }
+
   if (args.category === "service" || args.category === "mod" || args.category === "labour") {
     const [records, mods, fuelLogs, bills, labour] = await Promise.all([
       getServiceRecords(email, bike.id),
@@ -1046,7 +1096,7 @@ export async function toolProposeLogEntry(email: string, args: ProposeLogEntryAr
       const entry: ProposedEntry = { category: "mod", modCategory, modLabel: MOD_LABELS[modCategory], description, cost: args.cost, date, mileage, mileageNote };
       return entry;
     }
-    const labourCategory = resolveLabourCategory(args.labourCategory, LABOUR_LABELS);
+    const labourCategory = resolveCatalogKey(args.labourCategory, LABOUR_LABELS);
     const entry: ProposedEntry = { category: "labour", labourCategory, labourLabel: LABOUR_LABELS[labourCategory], description, cost: args.cost, date, mileage, mileageNote, vehicleKind: "bike" };
     return entry;
   }
@@ -1060,27 +1110,28 @@ export async function toolProposeLogEntry(email: string, args: ProposeLogEntryAr
 }
 
 // Vehicle-kind-dependent, unlike every other declaration array in this
-// file: a car-active session's draft card only ever supports Labour (see
-// toolProposeLogEntry above), so its schema offers just that one category
-// and the car's own labour catalog - never the bike-only categories or
-// LABOUR_LABELS' keys, which would let the model draft something the
-// car-active card can't actually post anywhere correct.
+// file: a car-active session's draft card only supports Labour, Fine,
+// and Toll (see toolProposeLogEntry above), so its schema offers just
+// those three categories and the car's own labour/fine/toll catalogs -
+// never the bike-only categories or LABOUR_LABELS' own keys, which would
+// let the model draft something the car-active card can't actually post
+// anywhere correct.
 export function buildLogEntryToolDeclarations(vehicleKind: "bike" | "car") {
   if (vehicleKind === "car") {
     return [
       {
         name: "proposeLogEntry",
         description:
-          "Draft a new Labour entry (workshop time, diagnostic hours) for the signed-in user's car, from their description of what they want to log. This only prepares a draft for the user to review, edit, and confirm themselves on screen - it NEVER saves anything by itself. Doesn't need an exact category match - your best guess is fine, the user can correct it on the draft card. Only Labour is available for a car-active account right now - every other category still needs to be logged directly from the dashboard. IMPORTANT: always ask the user what date this happened before calling this tool, unless they've already said (including just 'today') - never assume today's date yourself. Once you have the date, this tool works out a suggested mileage for that day automatically; you don't need to ask the user for it.",
+          "Draft a new Labour entry (workshop time, diagnostic hours), Fine, or Toll/parking charge for the signed-in user's car, from their description of what they want to log. This only prepares a draft for the user to review, edit, and confirm themselves on screen - it NEVER saves anything by itself. Doesn't need an exact category match - your best guess is fine, the user can correct it on the draft card. Only Labour, Fines, and Tolls are available for a car-active account right now - every other category still needs to be logged directly from the dashboard. IMPORTANT: always ask the user what date this happened before calling this tool, unless they've already said (including just 'today') - never assume today's date yourself. For Labour, this tool works out a suggested mileage for that day automatically; Fines and Tolls need no mileage at all.",
         parameters: {
           type: "OBJECT",
           properties: {
             category: {
               type: "STRING",
-              enum: ["labour"],
-              description: "Always 'labour' - the only category available for a car-active account.",
+              enum: ["labour", "fine", "toll"],
+              description: "'labour' for workshop time/diagnostic hours, 'fine' for a driving offence or penalty charge, 'toll' for a road/bridge/tunnel charge or parking.",
             },
-            description: { type: "STRING", description: "A short, plain label for what this is, e.g. 'Cambelt replacement' or '2 hours diagnostic time'." },
+            description: { type: "STRING", description: "A short, plain label for what this is, e.g. 'Cambelt replacement', 'Speeding fine on the M25', or 'Parking near the hospital'." },
             cost: { type: "NUMBER", description: "The amount paid, in GBP, as a plain number." },
             date: {
               type: "STRING",
@@ -1089,7 +1140,15 @@ export function buildLogEntryToolDeclarations(vehicleKind: "bike" | "car") {
             },
             labourCategory: {
               type: "STRING",
-              description: "Your best guess at what kind of labour job this is, in plain words (e.g. 'brake bleed', 'timing belt', 'EV battery health check'). Doesn't need to be exact - it's matched to the closest real category, or filed as 'Other' if nothing fits.",
+              description: "Only for category 'labour' - your best guess at what kind of labour job this is, in plain words (e.g. 'brake bleed', 'timing belt', 'EV battery health check'). Doesn't need to be exact - it's matched to the closest real category, or filed as 'Other' if nothing fits.",
+            },
+            fineType: {
+              type: "STRING",
+              description: "Only for category 'fine' - your best guess at what kind of fine this is, in plain words (e.g. 'speeding', 'parking charge notice', 'bus lane'). Doesn't need to be exact - it's matched to the closest real category, or filed as 'Other' if nothing fits.",
+            },
+            tollType: {
+              type: "STRING",
+              description: "Only for category 'toll' - your best guess at which toll/charge/parking this is, in plain words (e.g. 'M6 toll', 'parking', 'Dartford crossing'). Doesn't need to be exact - it's matched to the closest real category, or filed as 'Other' if nothing fits.",
             },
           },
           required: ["category", "cost", "date"],
@@ -1102,16 +1161,16 @@ export function buildLogEntryToolDeclarations(vehicleKind: "bike" | "car") {
     {
       name: "proposeLogEntry",
       description:
-        "Draft a new service record, insurance/road-tax/MOT/finance bill, modification/accessory, fuel fill-up, or labour/workshop-time entry for the signed-in user's bike, from their description of what they want to log. This only prepares a draft for the user to review, edit, and confirm themselves on screen - it NEVER saves anything by itself, and never changes or deletes an existing entry. Doesn't need an exact category match - your best guess is fine, the user can correct it on the draft card. IMPORTANT: always ask the user what date this happened before calling this tool, unless they've already said (including just 'today') - never assume today's date yourself. Once you have the date, this tool works out a suggested mileage for that day automatically (for every category except 'bill'); you don't need to ask the user for it.",
+        "Draft a new service record, insurance/road-tax/MOT/finance bill, modification/accessory, fuel fill-up, labour/workshop-time entry, fine, or toll/parking charge for the signed-in user's bike, from their description of what they want to log. This only prepares a draft for the user to review, edit, and confirm themselves on screen - it NEVER saves anything by itself, and never changes or deletes an existing entry. Doesn't need an exact category match - your best guess is fine, the user can correct it on the draft card. IMPORTANT: always ask the user what date this happened before calling this tool, unless they've already said (including just 'today') - never assume today's date yourself. Once you have the date, this tool works out a suggested mileage for that day automatically (for every category except 'bill', 'fine', and 'toll', which need no mileage at all); you don't need to ask the user for it.",
       parameters: {
         type: "OBJECT",
         properties: {
           category: {
             type: "STRING",
-            enum: ["service", "bill", "mod", "fuel", "labour"],
-            description: "'service' for maintenance/consumables/small parts, 'bill' for insurance/road-tax/MOT/finance, 'mod' for a modification or accessory (including general detailing products like wax/polish), 'fuel' for a fuel fill-up, 'labour' for workshop time/labour charges billed separately from parts.",
+            enum: ["service", "bill", "mod", "fuel", "labour", "fine", "toll"],
+            description: "'service' for maintenance/consumables/small parts, 'bill' for insurance/road-tax/MOT/finance, 'mod' for a modification or accessory (including general detailing products like wax/polish), 'fuel' for a fuel fill-up, 'labour' for workshop time/labour charges billed separately from parts, 'fine' for a driving offence or penalty charge, 'toll' for a road/bridge/tunnel charge or parking.",
           },
-          description: { type: "STRING", description: "Not used for 'fuel'. A short, plain label for what this is, e.g. 'Valve cleaner' or 'Annual insurance renewal'." },
+          description: { type: "STRING", description: "Not used for 'fuel'. A short, plain label for what this is, e.g. 'Valve cleaner', 'Annual insurance renewal', 'Speeding fine on the A1', or 'Parking near the station'." },
           cost: { type: "NUMBER", description: "The amount paid, in GBP, as a plain number." },
           date: {
             type: "STRING",
@@ -1137,6 +1196,14 @@ export function buildLogEntryToolDeclarations(vehicleKind: "bike" | "car") {
           labourCategory: {
             type: "STRING",
             description: "Only for category 'labour' - your best guess at what kind of labour job this is, in plain words (e.g. 'brake bleed', 'valve clearance', 'wheel bearing'). Doesn't need to be exact - it's matched to the closest real category, or filed as 'Other' if nothing fits.",
+          },
+          fineType: {
+            type: "STRING",
+            description: "Only for category 'fine' - your best guess at what kind of fine this is, in plain words (e.g. 'speeding', 'no helmet', 'parking charge notice'). Doesn't need to be exact - it's matched to the closest real category, or filed as 'Other' if nothing fits.",
+          },
+          tollType: {
+            type: "STRING",
+            description: "Only for category 'toll' - your best guess at which toll/charge/parking this is, in plain words (e.g. 'M6 toll', 'parking', 'Mersey Gateway'). Doesn't need to be exact - it's matched to the closest real category, or filed as 'Other' if nothing fits.",
           },
         },
         required: ["category", "cost", "date"],

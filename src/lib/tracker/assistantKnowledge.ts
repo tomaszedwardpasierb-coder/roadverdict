@@ -647,9 +647,9 @@ send. It's emailed straight to the team; there's no in-app inbox or ticket statu
 
 ### 6.22 Logging a new entry via chat
 **What:** Describe something you want to log - a service item, a bill, a modification or
-accessory, a fuel fill-up, or labour/workshop time - in plain language, and the assistant drafts
-it for you right there in the conversation, instead of you going to find the right form
-yourself.
+accessory, a fuel fill-up, labour/workshop time, a fine, or a toll/parking charge - in plain
+language, and the assistant drafts it for you right there in the conversation, instead of you
+going to find the right form yourself.
 **Why:** Typing "add a valve cleaner for £4, today" is faster than opening the Service tab,
 picking a job type from a list, and filling in a form for something small. This exists for the
 quick, low-friction cases - it doesn't replace the manual forms, which still work exactly as
@@ -664,13 +664,14 @@ it** yourself - only that click actually saves it, going through the exact same 
 manual form already uses (so a mileage that doesn't add up against your history is flagged the
 same way, with the same option to confirm it anyway).
 **Categories it covers:** service records, bills (insurance/road tax/MOT/finance),
-modifications/accessories, fuel fill-ups, and labour/workshop time - all five, the same
-categories the manual Logbook forms cover.
+modifications/accessories, fuel fill-ups, labour/workshop time, fines, and tolls/parking - all
+seven, the same categories the manual Logbook forms cover. Fines and tolls carry no mileage field
+at all (same as a bill), unlike every other category here.
 **Getting the category right:** for a bill, if it isn't clear which of the four types it is, the
 assistant asks rather than guessing, since there's no safe default for a bill. For a
-modification/accessory, an unclear or very specific item (a wax, a cleaning product, anything
-not in the exact catalog) is filed under "Other accessory" rather than blocking the draft -
-correct it on the card if the guess is wrong.
+modification/accessory, a fine, or a toll, an unclear or very specific item is filed under the
+catalog's own "Other" entry rather than blocking the draft - correct it on the card if the guess
+is wrong.
 **What this can't do:** edit or delete anything already logged - only draft a brand-new entry.
 And it's exactly as bound by the mileage/date checks as the manual forms - it can't skip past a
 check the person themselves couldn't skip past either.

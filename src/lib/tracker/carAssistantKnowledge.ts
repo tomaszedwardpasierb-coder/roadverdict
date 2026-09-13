@@ -182,10 +182,10 @@ declarations before treating every item above as individually confirmed live.
 - Read or describe the contents of a receipt image or attachment itself - only the data that
   was extracted from it and saved (amount, date, category), never the document.
 - Directly change anything on your account by itself, beyond the one narrow exception in 6.22 -
-  and even there, only for Labour entries, and only ever as a draft you review and confirm
-  yourself. Everything else - editing or deleting anything already logged, changing account
-  settings like 2FA, drafting any category other than Labour - is still lookup/explain only,
-  never something it does for you.
+  and even there, only for Labour, Fine, and Toll entries, and only ever as a draft you review
+  and confirm yourself. Everything else - editing or deleting anything already logged, changing
+  account settings like 2FA, drafting any other category - is still lookup/explain only, never
+  something it does for you.
 - Never answer as if a lookup returning nothing or failing settles the question. It should
   say plainly that it doesn't see anything logged for that, rather than estimate a figure to
   avoid an empty answer.
@@ -669,23 +669,27 @@ send. It's emailed straight to the team; there's no in-app inbox or ticket statu
 the conversation, instead of you going to find the right form yourself.
 **Why:** Typing "add 2 hours labour for £90, today" is faster than opening the Labour tab and
 filling in a form for something small.
-**Status:** Live, but **only for labour/workshop-time entries right now, and Premium only.**
+**Status:** Live, but **only for Labour, Fine, and Toll entries right now, and Premium only.**
 This is a real, current gap on the car side, not a design choice: service records, bills
 (insurance/road tax/MOT/finance), modifications/accessories, and fuel fill-ups can't be drafted
-via chat for a car yet - only Labour can. If asked to draft anything else, say plainly that it
-isn't available for cars via chat yet and point to the matching Logbook tab instead, rather than
-attempting it or pretending the category doesn't exist. (The motorcycle side of RoadVerdict
-supports all five categories via chat - this gap is specific to cars.) Asked to draft anything at
-all on a free account, the assistant says so plainly and points to the dashboard forms instead.
+via chat for a car yet - only Labour, Fine, and Toll can. If asked to draft anything else, say
+plainly that it isn't available for cars via chat yet and point to the matching Logbook tab
+instead, rather than attempting it or pretending the category doesn't exist. (The motorcycle side
+of RoadVerdict supports all seven categories via chat - this gap is specific to cars.) Asked to
+draft anything at all on a free account, the assistant says so plainly and points to the
+dashboard forms instead.
 **How, for Labour:** describe what happened - what it was, the cost, and (if not today) the date
 - and the assistant replies with an editable draft card: description, cost, date, and mileage.
 Nothing is saved yet. Review it, change anything that's wrong, then click **Log it** yourself -
 only that click actually saves it, going through the exact same check the manual form already
 uses (so a mileage that doesn't add up against your history is flagged the same way, with the
 same option to confirm it anyway).
-**What this can't do:** edit or delete anything already logged - only draft a brand-new Labour
-entry. And it's exactly as bound by the mileage/date checks as the manual form - it can't skip
-past a check the person themselves couldn't skip past either.
+**How, for Fine and Toll:** the same drafting flow as Labour, except the draft card has no
+mileage field at all - just a category (fine/toll type), description, cost, and date, since
+neither of these is tracked against mileage.
+**What this can't do:** edit or delete anything already logged - only draft a brand-new Labour,
+Fine, or Toll entry. And it's exactly as bound by the date checks as the manual forms - it can't
+skip past a check the person themselves couldn't skip past either.
 
 ---
 

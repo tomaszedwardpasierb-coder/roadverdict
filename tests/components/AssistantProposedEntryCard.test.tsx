@@ -48,6 +48,26 @@ const carLabourEntry: ProposedEntry = {
   vehicleKind: "car",
 };
 
+const bikeFineEntry: ProposedEntry = {
+  category: "fine",
+  fineType: "speeding",
+  fineLabel: "Speeding (fixed penalty / NIP)",
+  description: "Caught on a speed camera",
+  cost: 100,
+  date: "2026-01-01",
+  vehicleKind: "bike",
+};
+
+const carTollEntry: ProposedEntry = {
+  category: "toll",
+  tollType: "parking",
+  tollLabel: "Parking",
+  description: "Outside the office",
+  cost: 4,
+  date: "2026-01-01",
+  vehicleKind: "car",
+};
+
 describe("AssistantProposedEntryCard", () => {
   beforeEach(() => {
     vi.stubGlobal("fetch", vi.fn());
@@ -108,5 +128,32 @@ describe("AssistantProposedEntryCard", () => {
 
     expect(await screen.findByText(/Logged/)).toBeInTheDocument();
     expect(fetch).toHaveBeenCalledWith("/api/tracker/labour", expect.objectContaining({ method: "POST" }));
+  });
+
+  // Fine and Toll are the other two categories that vary by vehicle kind
+  // (see getEndpoint) - no mileage field on either, unlike every category
+  // above except a plain bill.
+  it("a bike fine entry posts to the bike fines endpoint, with no mileage field rendered", async () => {
+    (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({ ok: true, json: async () => ({}) });
+    const user = userEvent.setup();
+    render(<AssistantProposedEntryCard entry={bikeFineEntry} />);
+
+    expect(screen.queryByLabelText("Mileage")).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Log it" }));
+
+    expect(await screen.findByText(/Logged - Speeding/)).toBeInTheDocument();
+    expect(fetch).toHaveBeenCalledWith("/api/tracker/fines", expect.objectContaining({ method: "POST" }));
+  });
+
+  it("a car toll entry posts to the car tolls endpoint, with no mileage field rendered", async () => {
+    (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({ ok: true, json: async () => ({}) });
+    const user = userEvent.setup();
+    render(<AssistantProposedEntryCard entry={carTollEntry} />);
+
+    expect(screen.queryByLabelText("Mileage")).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Log it" }));
+
+    expect(await screen.findByText(/Logged - Parking/)).toBeInTheDocument();
+    expect(fetch).toHaveBeenCalledWith("/api/cars/car-tolls", expect.objectContaining({ method: "POST" }));
   });
 });

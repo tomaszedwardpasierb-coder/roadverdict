@@ -8,6 +8,10 @@ import { BILL_LABELS } from '@/lib/tracker/billTypes';
 import { MOD_GROUPS, MOD_LABELS } from '@/lib/tracker/modTypes';
 import { LABOUR_GROUPS, LABOUR_LABELS } from '@/lib/tracker/labourTypes';
 import { CAR_LABOUR_GROUPS, CAR_LABOUR_LABELS } from '@/lib/tracker/carLabourTypes';
+import { FINE_LABELS } from '@/lib/tracker/fineTypes';
+import { CAR_FINE_LABELS } from '@/lib/tracker/carFineTypes';
+import { TOLL_LABELS } from '@/lib/tracker/tollTypes';
+import { CAR_TOLL_LABELS } from '@/lib/tracker/carTollTypes';
 import { VehicleSpinner } from './VehicleSpinner';
 import styles from './AssistantProposedEntryCard.module.css';
 
@@ -68,21 +72,56 @@ export interface ProposedLabourEntry {
   vehicleKind: 'bike' | 'car';
 }
 
-export type ProposedEntry = ProposedServiceEntry | ProposedBillEntry | ProposedModEntry | ProposedFuelEntry | ProposedLabourEntry;
+export interface ProposedFineEntry {
+  category: 'fine';
+  fineType: string;
+  fineLabel: string;
+  description: string;
+  cost: number;
+  date: string;
+  // Same reasoning as ProposedLabourEntry's own vehicleKind above - a
+  // Fine can be drafted from either vehicle kind.
+  vehicleKind: 'bike' | 'car';
+}
 
-const ENDPOINT: Record<Exclude<ProposedEntry['category'], 'labour'>, string> = {
+export interface ProposedTollEntry {
+  category: 'toll';
+  tollType: string;
+  tollLabel: string;
+  description: string;
+  cost: number;
+  date: string;
+  vehicleKind: 'bike' | 'car';
+}
+
+export type ProposedEntry =
+  | ProposedServiceEntry
+  | ProposedBillEntry
+  | ProposedModEntry
+  | ProposedFuelEntry
+  | ProposedLabourEntry
+  | ProposedFineEntry
+  | ProposedTollEntry;
+
+const ENDPOINT: Record<Exclude<ProposedEntry['category'], 'labour' | 'fine' | 'toll'>, string> = {
   service: '/api/tracker/services',
   bill: '/api/tracker/bills',
   mod: '/api/tracker/mods',
   fuel: '/api/tracker/fuel',
 };
 
-// Labour is the one category needing a vehicle-kind-dependent endpoint -
-// every other category is bike-only, so a plain lookup table is enough
-// for those.
+// Labour, Fine, and Toll are the categories needing a vehicle-kind-
+// dependent endpoint - every other category is bike-only, so a plain
+// lookup table is enough for those.
 function getEndpoint(entry: ProposedEntry): string {
   if (entry.category === 'labour') {
     return entry.vehicleKind === 'car' ? '/api/cars/car-labour' : '/api/tracker/labour';
+  }
+  if (entry.category === 'fine') {
+    return entry.vehicleKind === 'car' ? '/api/cars/car-fines' : '/api/tracker/fines';
+  }
+  if (entry.category === 'toll') {
+    return entry.vehicleKind === 'car' ? '/api/cars/car-tolls' : '/api/tracker/tolls';
   }
   return ENDPOINT[entry.category];
 }
@@ -93,6 +132,8 @@ const CARD_TITLE: Record<ProposedEntry['category'], string> = {
   mod: 'New modification/accessory',
   fuel: 'New fuel log',
   labour: 'New labour entry',
+  fine: 'New fine',
+  toll: 'New toll/parking charge',
 };
 
 // Renders the AI assistant's draft for a new service record, bill,
@@ -107,15 +148,25 @@ export function AssistantProposedEntryCard({ entry }: { entry: ProposedEntry }) 
   const [billType, setBillType] = useState(entry.category === 'bill' ? entry.billType : '');
   const [modCategory, setModCategory] = useState(entry.category === 'mod' ? entry.modCategory : '');
   const [labourCategory, setLabourCategory] = useState(entry.category === 'labour' ? entry.labourCategory : '');
+  const [fineType, setFineType] = useState(entry.category === 'fine' ? entry.fineType : '');
+  const [tollType, setTollType] = useState(entry.category === 'toll' ? entry.tollType : '');
   const [description, setDescription] = useState(entry.category !== 'fuel' ? entry.description : '');
   const [cost, setCost] = useState(String(entry.cost));
   const [date, setDate] = useState(entry.date);
-  const [mileage, setMileage] = useState(entry.category !== 'bill' ? String(entry.mileage) : '');
+  // Fine and Toll carry no mileage at all, same as Bill - all three are
+  // excluded here and everywhere else this same check appears. Written
+  // as the same inline discriminant check every time (not a shared
+  // boolean) so TypeScript can actually narrow `entry` at each site.
+  const [mileage, setMileage] = useState(
+    entry.category !== 'bill' && entry.category !== 'fine' && entry.category !== 'toll' ? String(entry.mileage) : ''
+  );
   // Cleared the moment the person edits the field themselves - same
   // "their own figure always wins" rule useEstimatedMileage.ts follows
   // for the manual dashboard forms, so a stale estimate note never sits
   // under a number the person has since overridden.
-  const [mileageNote, setMileageNote] = useState(entry.category !== 'bill' ? entry.mileageNote ?? null : null);
+  const [mileageNote, setMileageNote] = useState(
+    entry.category !== 'bill' && entry.category !== 'fine' && entry.category !== 'toll' ? entry.mileageNote ?? null : null
+  );
   const [litres, setLitres] = useState(entry.category === 'fuel' ? String(entry.litres) : '');
   const [filledToFull, setFilledToFull] = useState(entry.category === 'fuel' ? entry.filledToFull : false);
   const [mileageAcknowledged, setMileageAcknowledged] = useState(false);
@@ -149,6 +200,10 @@ export function AssistantProposedEntryCard({ entry }: { entry: ProposedEntry }) 
         ? { category: modCategory, name: description, cost: costValue, mileage: Number(mileage), date, mileageAcknowledged: mileageAck }
         : entry.category === 'labour'
         ? { category: labourCategory, cost: costValue, mileage: Number(mileage), date, notes: description, mileageAcknowledged: mileageAck }
+        : entry.category === 'fine'
+        ? { fineType, cost: costValue, date, notes: description }
+        : entry.category === 'toll'
+        ? { tollType, cost: costValue, date, notes: description }
         : { litres: Number(litres), cost: costValue, mileage: Number(mileage), date, filledToFull, mileageAcknowledged: mileageAck };
 
     try {
@@ -178,6 +233,8 @@ export function AssistantProposedEntryCard({ entry }: { entry: ProposedEntry }) 
       : entry.category === 'bill' ? (BILL_LABELS[billType] ?? billType)
       : entry.category === 'mod' ? (MOD_LABELS[modCategory] ?? modCategory)
       : entry.category === 'labour' ? ((entry.vehicleKind === 'car' ? CAR_LABOUR_LABELS : LABOUR_LABELS)[labourCategory] ?? labourCategory)
+      : entry.category === 'fine' ? ((entry.vehicleKind === 'car' ? CAR_FINE_LABELS : FINE_LABELS)[fineType] ?? fineType)
+      : entry.category === 'toll' ? ((entry.vehicleKind === 'car' ? CAR_TOLL_LABELS : TOLL_LABELS)[tollType] ?? tollType)
       : 'Fuel fill-up';
     return (
       <div className={styles.card}>
@@ -189,12 +246,17 @@ export function AssistantProposedEntryCard({ entry }: { entry: ProposedEntry }) 
   // A heuristic, not a status code check (fetch here doesn't carry one
   // through) - every mileage-consistency message from describeMileageCheck
   // mentions "miles", which nothing else these endpoints return does.
-  const offerMileageOverride = entry.category !== 'bill' && !!error && /miles/i.test(error) && !mileageAcknowledged;
+  // Fine and Toll never carry mileage, so they can never trigger this in
+  // the first place - excluded the same way Bill already was.
+  const offerMileageOverride =
+    entry.category !== 'bill' && entry.category !== 'fine' && entry.category !== 'toll' && !!error && /miles/i.test(error) && !mileageAcknowledged;
 
-  // Only the labour category actually varies by vehicle - every other
-  // category is bike-only (see getEndpoint above), so the spinner should
-  // match that same real distinction rather than always assuming bike.
-  const spinnerKind = entry.category === 'labour' ? entry.vehicleKind : 'bike';
+  // Labour, Fine, and Toll are the categories that actually vary by
+  // vehicle - every other category is bike-only (see getEndpoint above),
+  // so the spinner should match that same real distinction rather than
+  // always assuming bike.
+  const spinnerKind =
+    entry.category === 'labour' || entry.category === 'fine' || entry.category === 'toll' ? entry.vehicleKind : 'bike';
 
   return (
     <div className={styles.card}>
@@ -256,6 +318,28 @@ export function AssistantProposedEntryCard({ entry }: { entry: ProposedEntry }) 
         </div>
       )}
 
+      {entry.category === 'fine' && (
+        <div className={styles.field}>
+          <label htmlFor="ai-fine-type">Type of fine</label>
+          <select id="ai-fine-type" value={fineType} onChange={(e) => setFineType(e.target.value)} disabled={submitting}>
+            {Object.entries(entry.vehicleKind === 'car' ? CAR_FINE_LABELS : FINE_LABELS).map(([key, label]) => (
+              <option key={key} value={key}>{label}</option>
+            ))}
+          </select>
+        </div>
+      )}
+
+      {entry.category === 'toll' && (
+        <div className={styles.field}>
+          <label htmlFor="ai-toll-type">Toll or charge</label>
+          <select id="ai-toll-type" value={tollType} onChange={(e) => setTollType(e.target.value)} disabled={submitting}>
+            {Object.entries(entry.vehicleKind === 'car' ? CAR_TOLL_LABELS : TOLL_LABELS).map(([key, label]) => (
+              <option key={key} value={key}>{label}</option>
+            ))}
+          </select>
+        </div>
+      )}
+
       {entry.category !== 'fuel' && (
         <div className={styles.field}>
           <label htmlFor="ai-description">Description</label>
@@ -287,7 +371,7 @@ export function AssistantProposedEntryCard({ entry }: { entry: ProposedEntry }) 
         </div>
       </div>
 
-      {entry.category !== 'bill' && (
+      {entry.category !== 'bill' && entry.category !== 'fine' && entry.category !== 'toll' && (
         <div className={styles.field}>
           <label htmlFor="ai-mileage">Mileage</label>
           <input

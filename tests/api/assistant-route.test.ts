@@ -34,7 +34,9 @@ vi.mock("@/lib/tracker/assistantTools", () => ({
   REPORT_TOOL_DECLARATIONS: [{ name: "getViewedReport" }],
   COMPARISON_TOOL_DECLARATIONS: [{ name: "getViewedComparison" }],
   buildLogEntryToolDeclarations: (vehicleKind: "bike" | "car") =>
-    vehicleKind === "car" ? [{ name: "proposeLogEntry", parameters: { properties: { category: { enum: ["labour"] } } } }] : [{ name: "proposeLogEntry", parameters: { properties: { category: { enum: ["service", "bill", "mod", "fuel", "labour"] } } } }],
+    vehicleKind === "car"
+      ? [{ name: "proposeLogEntry", parameters: { properties: { category: { enum: ["labour", "fine", "toll"] } } } }]
+      : [{ name: "proposeLogEntry", parameters: { properties: { category: { enum: ["service", "bill", "mod", "fuel", "labour", "fine", "toll"] } } } }],
   runAssistantTool: mocks.runAssistantTool,
 }));
 vi.mock("@/lib/tracker/assistantQuestionLog", () => ({ logAssistantQuestion: mocks.logAssistantQuestion }));
@@ -735,11 +737,11 @@ describe("POST /api/assistant - car-active knowledge base and log-entry gating",
     expect(callBody.systemInstruction.parts[0].text).toContain("KB content.");
   });
 
-  // Labour is the one category a car-active session's draft card
-  // actually supports - the tool is now offered (Pro-gated exactly like
-  // a bike session), just with a labour-only category enum, not the
-  // full 5-category schema a bike session gets.
-  it("offers the log-entry tool (labour-only) for a car-active Pro session", async () => {
+  // Labour, Fine, and Toll are the categories a car-active session's
+  // draft card actually supports - the tool is now offered (Pro-gated
+  // exactly like a bike session), just with that three-category enum,
+  // not the full 7-category schema a bike session gets.
+  it("offers the log-entry tool (labour/fine/toll only) for a car-active Pro session", async () => {
     mocks.getSession.mockResolvedValue({ email: "driver@example.com" });
     mocks.resolveActiveVehicle.mockResolvedValue({ kind: "car", car: { id: "car-1" }, hasAnyBike: false });
     mocks.isPro.mockResolvedValue(true);
@@ -750,8 +752,8 @@ describe("POST /api/assistant - car-active knowledge base and log-entry gating",
     const declarations = callBody.tools[0].functionDeclarations;
     const proposeLogEntry = declarations.find((d: { name: string }) => d.name === "proposeLogEntry");
     expect(proposeLogEntry).toBeDefined();
-    expect(proposeLogEntry.parameters.properties.category.enum).toEqual(["labour"]);
-    expect(callBody.systemInstruction.parts[0].text).toContain("LOGGING VIA CHAT (Pro feature, active now - Labour only)");
+    expect(proposeLogEntry.parameters.properties.category.enum).toEqual(["labour", "fine", "toll"]);
+    expect(callBody.systemInstruction.parts[0].text).toContain("LOGGING VIA CHAT (Pro feature, active now - Labour, Fines, and Tolls only)");
     expect(mocks.isPro).toHaveBeenCalled();
   });
 

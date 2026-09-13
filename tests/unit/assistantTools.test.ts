@@ -972,6 +972,124 @@ describe("toolProposeLogEntry", () => {
     });
   });
 
+  // Fine and Toll carry no mileage at all (unlike every category above
+  // except Bill) - the simplest drafts here, available on both vehicle
+  // kinds from the start, same as Labour.
+  describe("fine (bike-active)", () => {
+    it("drafts a fine entry, resolving an exact category key, tagged vehicleKind: 'bike', with no mileage field", async () => {
+      const result: any = await toolProposeLogEntry("owner@example.com", {
+        category: "fine", description: "Caught on a speed camera", cost: 100, date: today, fineType: "speeding",
+      });
+      expect(result).toEqual({
+        category: "fine", fineType: "speeding", fineLabel: expect.any(String),
+        description: "Caught on a speed camera", cost: 100, date: today, vehicleKind: "bike",
+      });
+      expect(result.mileage).toBeUndefined();
+    });
+
+    it("fuzzy-matches a plain-language fine type by substring, case-insensitively", async () => {
+      const result: any = await toolProposeLogEntry("owner@example.com", { category: "fine", description: "No lid on", cost: 50, date: today, fineType: "HELMET" });
+      expect(result.fineType).toBe("no-helmet");
+    });
+
+    it("falls back to 'other' for a fine type with no match, rather than blocking the draft", async () => {
+      const result: any = await toolProposeLogEntry("owner@example.com", { category: "fine", description: "Something unusual", cost: 50, date: today, fineType: "not-a-real-fine" });
+      expect(result.fineType).toBe("other");
+    });
+
+    it("falls back to 'other' when fineType is missing entirely", async () => {
+      const result: any = await toolProposeLogEntry("owner@example.com", { category: "fine", description: "Unspecified fine", cost: 50, date: today });
+      expect(result.fineType).toBe("other");
+    });
+
+    it("still requires a description and a valid cost for a fine, same as every other bike category", async () => {
+      expect((await toolProposeLogEntry("owner@example.com", { category: "fine", cost: 50, date: today }) as any).error).toMatch(/description/i);
+      expect((await toolProposeLogEntry("owner@example.com", { category: "fine", description: "Speeding", cost: 0, date: today }) as any).error).toMatch(/cost/i);
+    });
+  });
+
+  describe("toll (bike-active)", () => {
+    it("drafts a toll entry, resolving an exact category key, tagged vehicleKind: 'bike', with no mileage field", async () => {
+      const result: any = await toolProposeLogEntry("owner@example.com", {
+        category: "toll", description: "Outside the hospital", cost: 3.5, date: today, tollType: "parking",
+      });
+      expect(result).toEqual({
+        category: "toll", tollType: "parking", tollLabel: expect.any(String),
+        description: "Outside the hospital", cost: 3.5, date: today, vehicleKind: "bike",
+      });
+      expect(result.mileage).toBeUndefined();
+    });
+
+    it("falls back to 'other' for a toll type with no match, rather than blocking the draft", async () => {
+      const result: any = await toolProposeLogEntry("owner@example.com", { category: "toll", description: "Something unusual", cost: 5, date: today, tollType: "not-a-real-toll" });
+      expect(result.tollType).toBe("other");
+    });
+
+    it("falls back to 'other' when tollType is missing entirely", async () => {
+      const result: any = await toolProposeLogEntry("owner@example.com", { category: "toll", description: "Unspecified charge", cost: 5, date: today });
+      expect(result.tollType).toBe("other");
+    });
+
+    it("still requires a description and a valid cost for a toll, same as every other bike category", async () => {
+      expect((await toolProposeLogEntry("owner@example.com", { category: "toll", cost: 5, date: today }) as any).error).toMatch(/description/i);
+      expect((await toolProposeLogEntry("owner@example.com", { category: "toll", description: "Parking", cost: 0, date: today }) as any).error).toMatch(/cost/i);
+    });
+  });
+
+  describe("fine (car-active)", () => {
+    it("drafts a fine entry against the car's own catalog, tagged vehicleKind: 'car', with no mileage field", async () => {
+      mocks.resolveActiveVehicle.mockResolvedValue(carActive());
+      const result: any = await toolProposeLogEntry("owner@example.com", {
+        category: "fine", description: "Belt not on", cost: 100, date: today, fineType: "no-seatbelt",
+      });
+      expect(result).toEqual({
+        category: "fine", fineType: "no-seatbelt", fineLabel: expect.any(String),
+        description: "Belt not on", cost: 100, date: today, vehicleKind: "car",
+      });
+      expect(result.mileage).toBeUndefined();
+    });
+
+    it("falls back to 'other' for an unmatched car fine type", async () => {
+      mocks.resolveActiveVehicle.mockResolvedValue(carActive());
+      const result: any = await toolProposeLogEntry("owner@example.com", { category: "fine", description: "Something unusual", cost: 100, date: today, fineType: "not-a-real-car-fine" });
+      expect(result.fineType).toBe("other");
+    });
+
+    it("still requires a description and a valid, non-future date for a car fine", async () => {
+      mocks.resolveActiveVehicle.mockResolvedValue(carActive());
+      expect((await toolProposeLogEntry("owner@example.com", { category: "fine", cost: 100, date: today }) as any).error).toMatch(/description/i);
+      const tomorrow = new Date(Date.now() + 2 * 86_400_000).toISOString().slice(0, 10);
+      expect((await toolProposeLogEntry("owner@example.com", { category: "fine", description: "Speeding", cost: 100, date: tomorrow }) as any).error).toMatch(/future/);
+    });
+  });
+
+  describe("toll (car-active)", () => {
+    it("drafts a toll entry against the car's own catalog, tagged vehicleKind: 'car', with no mileage field", async () => {
+      mocks.resolveActiveVehicle.mockResolvedValue(carActive());
+      const result: any = await toolProposeLogEntry("owner@example.com", {
+        category: "toll", description: "Crossing the Thames", cost: 2.5, date: today, tollType: "dartford-crossing",
+      });
+      expect(result).toEqual({
+        category: "toll", tollType: "dartford-crossing", tollLabel: expect.any(String),
+        description: "Crossing the Thames", cost: 2.5, date: today, vehicleKind: "car",
+      });
+      expect(result.mileage).toBeUndefined();
+    });
+
+    it("falls back to 'other' for an unmatched car toll type", async () => {
+      mocks.resolveActiveVehicle.mockResolvedValue(carActive());
+      const result: any = await toolProposeLogEntry("owner@example.com", { category: "toll", description: "Something unusual", cost: 5, date: today, tollType: "not-a-real-car-toll" });
+      expect(result.tollType).toBe("other");
+    });
+
+    it("still requires a description and a valid, non-future date for a car toll", async () => {
+      mocks.resolveActiveVehicle.mockResolvedValue(carActive());
+      expect((await toolProposeLogEntry("owner@example.com", { category: "toll", cost: 5, date: today }) as any).error).toMatch(/description/i);
+      const tomorrow = new Date(Date.now() + 2 * 86_400_000).toISOString().slice(0, 10);
+      expect((await toolProposeLogEntry("owner@example.com", { category: "toll", description: "Parking", cost: 5, date: tomorrow }) as any).error).toMatch(/future/);
+    });
+  });
+
   // The other half of the fix: a past-dated draft should get a proper
   // date-based mileage estimate (same maths as the manual dashboard
   // forms' own useEstimatedMileage.ts), not just a hardcoded "current
