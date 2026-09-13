@@ -6,6 +6,7 @@ import { getPrimaryBike, updateBikeMileage, isBikeReadOnly, BIKE_READ_ONLY_MESSA
 import { getServiceRecords } from "@/lib/tracker/serviceRecord";
 import { getFuelLogs } from "@/lib/tracker/fuelLog";
 import { checkMileageConsistency, describeMileageCheck } from "@/lib/tracker/mileageCheck";
+import { checkAndRecordWrite } from "@/lib/tracker/writeRateLimit";
 import type { Attachment } from "@/lib/tracker/cosmosHelpers";
 
 export const dynamic = "force-dynamic";
@@ -14,6 +15,9 @@ export async function POST(request: NextRequest) {
   const session = await getSession();
   if (!session) {
     return NextResponse.json({ error: "Not signed in." }, { status: 401 });
+  }
+  if (!(await checkAndRecordWrite(session.email))) {
+    return NextResponse.json({ error: "Too many requests. Please wait a moment and try again." }, { status: 429 });
   }
 
   let body: unknown;

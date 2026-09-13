@@ -3,12 +3,14 @@ import { NextRequest } from "next/server";
 
 const mocks = vi.hoisted(() => ({
   getSession: vi.fn(),
+  checkAndRecordWrite: vi.fn(),
   getPrimaryCar: vi.fn(),
   isCarReadOnly: vi.fn(),
   createCarToll: vi.fn(),
 }));
 
 vi.mock("@/lib/auth/session", () => ({ getSession: mocks.getSession }));
+vi.mock("@/lib/tracker/writeRateLimit", () => ({ checkAndRecordWrite: mocks.checkAndRecordWrite }));
 vi.mock("@/lib/tracker/car", () => ({
   getPrimaryCar: mocks.getPrimaryCar,
   isCarReadOnly: mocks.isCarReadOnly,
@@ -31,9 +33,18 @@ const validPayload = { tollType: "dartford-crossing", cost: 2.5, date: "2025-06-
 describe("POST /api/cars/car-tolls", () => {
   beforeEach(() => {
     Object.values(mocks).forEach((mock) => mock.mockReset());
+    mocks.checkAndRecordWrite.mockResolvedValue(true);
     mocks.getPrimaryCar.mockResolvedValue({ id: "car-1", year: 2018, currentMileage: 5000 });
     mocks.isCarReadOnly.mockReturnValue(false);
     mocks.createCarToll.mockResolvedValue({ id: "toll-1" });
+  });
+
+  it("returns 429 when the account is over its write-rate budget, before ever reading the body", async () => {
+    mocks.getSession.mockResolvedValue({ email: "owner@example.com" });
+    mocks.checkAndRecordWrite.mockResolvedValue(false);
+    const response = await POST(request("{}"));
+    expect(response.status).toBe(429);
+    expect(mocks.createCarToll).not.toHaveBeenCalled();
   });
 
   it("rejects unauthenticated requests before reading the body", async () => {

@@ -3,6 +3,7 @@ import { NextRequest } from "next/server";
 
 const mocks = vi.hoisted(() => ({
   getSession: vi.fn(),
+  checkAndRecordWrite: vi.fn(),
   getPrimaryBike: vi.fn(),
   isBikeReadOnly: vi.fn(),
   createReminder: vi.fn(),
@@ -11,6 +12,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("@/lib/auth/session", () => ({ getSession: mocks.getSession }));
+vi.mock("@/lib/tracker/writeRateLimit", () => ({ checkAndRecordWrite: mocks.checkAndRecordWrite }));
 vi.mock("@/lib/tracker/bike", () => ({
   getPrimaryBike: mocks.getPrimaryBike,
   isBikeReadOnly: mocks.isBikeReadOnly,
@@ -37,9 +39,18 @@ function request(body: string): NextRequest {
 describe("POST /api/tracker/reminders", () => {
   beforeEach(() => {
     Object.values(mocks).forEach((mock) => mock.mockReset());
+    mocks.checkAndRecordWrite.mockResolvedValue(true);
     mocks.getPrimaryBike.mockResolvedValue({ id: "bike-1", currentMileage: 5000 });
     mocks.isBikeReadOnly.mockReturnValue(false);
     mocks.createReminder.mockResolvedValue({ id: "reminder-1" });
+  });
+
+  it("returns 429 when the account is over its write-rate budget, before ever reading the body", async () => {
+    mocks.getSession.mockResolvedValue({ email: "owner@example.com" });
+    mocks.checkAndRecordWrite.mockResolvedValue(false);
+    const response = await POST(request("{}"));
+    expect(response.status).toBe(429);
+    expect(mocks.createReminder).not.toHaveBeenCalled();
   });
 
   it("rejects unauthenticated requests before reading the body", async () => {

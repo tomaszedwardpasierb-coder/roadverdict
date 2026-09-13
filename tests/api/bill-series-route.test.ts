@@ -3,6 +3,7 @@ import { NextRequest } from "next/server";
 
 const mocks = vi.hoisted(() => ({
   getSession: vi.fn(),
+  checkAndRecordWrite: vi.fn(),
   getPrimaryBike: vi.fn(),
   isBikeReadOnly: vi.fn(),
   createBillSeries: vi.fn(),
@@ -14,6 +15,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("@/lib/auth/session", () => ({ getSession: mocks.getSession }));
+vi.mock("@/lib/tracker/writeRateLimit", () => ({ checkAndRecordWrite: mocks.checkAndRecordWrite }));
 vi.mock("@/lib/tracker/bike", () => ({
   getPrimaryBike: mocks.getPrimaryBike,
   isBikeReadOnly: mocks.isBikeReadOnly,
@@ -55,6 +57,7 @@ const validInsurancePlan = {
 describe("POST /api/tracker/bill-series", () => {
   beforeEach(() => {
     Object.values(mocks).forEach((mock) => mock.mockReset());
+    mocks.checkAndRecordWrite.mockResolvedValue(true);
     mocks.getPrimaryBike.mockResolvedValue({ id: "bike-1", year: 2018, currentMileage: 5000 });
     mocks.isBikeReadOnly.mockReturnValue(false);
     mocks.createBillSeries.mockResolvedValue({ id: "series-1", bikeId: "bike-1" });
@@ -67,6 +70,14 @@ describe("POST /api/tracker/bill-series", () => {
     mocks.getSession.mockResolvedValue(null);
     const response = await POST(request(JSON.stringify(validInsurancePlan)));
     expect(response.status).toBe(401);
+  });
+
+  it("returns 429 when the account is over its write-rate budget, before ever reading the body", async () => {
+    mocks.getSession.mockResolvedValue({ email: "owner@example.com" });
+    mocks.checkAndRecordWrite.mockResolvedValue(false);
+    const response = await POST(request("{}"));
+    expect(response.status).toBe(429);
+    expect(mocks.createBillSeries).not.toHaveBeenCalled();
   });
 
   it("rejects malformed JSON", async () => {

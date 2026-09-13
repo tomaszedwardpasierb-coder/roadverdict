@@ -4,6 +4,7 @@ import { NextRequest } from "next/server";
 
 const mocks = vi.hoisted(() => ({
   getSession: vi.fn(),
+  checkAndRecordWrite: vi.fn(),
   getPrimaryCar: vi.fn(),
   isCarReadOnly: vi.fn(),
   createCarBillSeries: vi.fn(),
@@ -15,6 +16,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("@/lib/auth/session", () => ({ getSession: mocks.getSession }));
+vi.mock("@/lib/tracker/writeRateLimit", () => ({ checkAndRecordWrite: mocks.checkAndRecordWrite }));
 vi.mock("@/lib/tracker/car", () => ({
   getPrimaryCar: mocks.getPrimaryCar,
   isCarReadOnly: mocks.isCarReadOnly,
@@ -59,12 +61,21 @@ const validInsurancePlan = {
 describe("POST /api/cars/car-bill-series", () => {
   beforeEach(() => {
     Object.values(mocks).forEach((mock) => mock.mockReset());
+    mocks.checkAndRecordWrite.mockResolvedValue(true);
     mocks.getPrimaryCar.mockResolvedValue({ id: "car-1", year: 2018, currentMileage: 5000 });
     mocks.isCarReadOnly.mockReturnValue(false);
     mocks.createCarBillSeries.mockResolvedValue({ id: "series-1", carId: "car-1" });
     mocks.materializeDueInstalments.mockResolvedValue([]);
     mocks.materializeExactCount.mockResolvedValue([]);
     mocks.seriesEndDate.mockReturnValue("2026-06-01");
+  });
+
+  it("returns 429 when the account is over its write-rate budget, before ever reading the body", async () => {
+    mocks.getSession.mockResolvedValue({ email: "owner@example.com" });
+    mocks.checkAndRecordWrite.mockResolvedValue(false);
+    const response = await POST(request("{}"));
+    expect(response.status).toBe(429);
+    expect(mocks.createCarBillSeries).not.toHaveBeenCalled();
   });
 
   it("rejects unauthenticated requests", async () => {

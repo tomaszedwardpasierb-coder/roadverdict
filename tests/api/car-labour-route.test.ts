@@ -3,6 +3,7 @@ import { NextRequest } from "next/server";
 
 const mocks = vi.hoisted(() => ({
   getSession: vi.fn(),
+  checkAndRecordWrite: vi.fn(),
   getPrimaryCar: vi.fn(),
   updateCarMileage: vi.fn(),
   isCarReadOnly: vi.fn(),
@@ -15,6 +16,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("@/lib/auth/session", () => ({ getSession: mocks.getSession }));
+vi.mock("@/lib/tracker/writeRateLimit", () => ({ checkAndRecordWrite: mocks.checkAndRecordWrite }));
 vi.mock("@/lib/tracker/car", () => ({
   getPrimaryCar: mocks.getPrimaryCar,
   updateCarMileage: mocks.updateCarMileage,
@@ -43,11 +45,20 @@ function request(body: string): NextRequest {
 describe("POST /api/cars/car-labour", () => {
   beforeEach(() => {
     Object.values(mocks).forEach((mock) => mock.mockReset());
+    mocks.checkAndRecordWrite.mockResolvedValue(true);
     mocks.checkMileageConsistency.mockReturnValue({ status: "ok" });
     mocks.getCarServiceRecords.mockResolvedValue([]);
     mocks.getCarFuelLogs.mockResolvedValue([]);
     mocks.getCarMods.mockResolvedValue([]);
     mocks.getCarLabour.mockResolvedValue([]);
+  });
+
+  it("returns 429 when the account is over its write-rate budget, before ever reading the body", async () => {
+    mocks.getSession.mockResolvedValue({ email: "owner@example.com" });
+    mocks.checkAndRecordWrite.mockResolvedValue(false);
+    const response = await POST(request("{}"));
+    expect(response.status).toBe(429);
+    expect(mocks.createCarLabour).not.toHaveBeenCalled();
   });
 
   it("rejects unauthenticated requests before reading the body", async () => {
