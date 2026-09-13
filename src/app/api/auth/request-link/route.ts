@@ -32,6 +32,53 @@ async function isRateLimited(container: ReturnType<typeof getContainer>, email: 
   return resources.length > 0;
 }
 
+// The per-email cooldown above only ever throttles requests for the
+// SAME target email - it does nothing to stop a script from requesting
+// a link for a large number of DISTINCT emails (using this app's own
+// transactional mailer as a spam/email-bombing relay), since each one
+// individually stays under that limit. A per-IP ceiling closes that gap,
+// same one-document-per-attempt, Cosmos-ttl-expired pattern
+// twoFactor.ts's checkTotpRateLimit/recordTotpAttempt already use for an
+// analogous "many attempts, one identity" budget. Generous on purpose -
+// a shared office/cafe IP legitimately requesting several real accounts'
+// links shouldn't be blocked, but a scripted burst against thousands of
+// addresses will hit this fast.
+const IP_RATE_LIMIT_WINDOW_SECONDS = 15 * 60;
+const IP_RATE_LIMIT_MAX_ATTEMPTS = 20;
+
+function ipAttemptPrefix(ip: string): string {
+  return `magic-link-ip-attempt:${ip}:`;
+}
+
+async function isIpRateLimited(container: ReturnType<typeof getContainer>, ip: string): Promise<boolean> {
+  // Can't rate-limit an identity we can't actually distinguish - fails
+  // open here rather than accidentally throttling every "unknown-ip"
+  // request as if it were the same one caller.
+  if (ip === "unknown") return false;
+  const { resources } = await container.items
+    .query<{ id: string }>(
+      {
+        query: "SELECT c.id FROM c WHERE c.type = 'magicLinkIpAttempt' AND STARTSWITH(c.id, @prefix)",
+        parameters: [{ name: "@prefix", value: ipAttemptPrefix(ip) }],
+      },
+      { partitionKey: `ip:${ip}` }
+    )
+    .fetchAll();
+  return resources.length >= IP_RATE_LIMIT_MAX_ATTEMPTS;
+}
+
+async function recordIpAttempt(container: ReturnType<typeof getContainer>, ip: string): Promise<void> {
+  if (ip === "unknown") return;
+  const suffix = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  await container.items.create({
+    id: `${ipAttemptPrefix(ip)}${suffix}`,
+    pk: `ip:${ip}`,
+    type: "magicLinkIpAttempt",
+    createdAt: new Date().toISOString(),
+    ttl: IP_RATE_LIMIT_WINDOW_SECONDS,
+  });
+}
+
 // Exact, hardcoded, case-normalised match only - deliberately not a
 // pattern, a prefix check, or anything derived from user input. This is
 // the one email address in the entire app that skips real verification,
@@ -58,6 +105,12 @@ export async function POST(req: NextRequest) {
   // just because it passed this first check.
   const safeRedirect = getSafeRedirectPath(redirect);
 
+  const ip = getClientIp(req);
+  if (await isIpRateLimited(container, ip)) {
+    return NextResponse.json({ error: "Too many attempts. Please wait and try again." }, { status: 429 });
+  }
+  await recordIpAttempt(container, ip);
+
   // Checked before either branch below - a blocked account can't get
   // back in at all, not even the demo bypass. getSession() also checks
   // this independently (so an already-active session dies immediately
@@ -79,7 +132,7 @@ export async function POST(req: NextRequest) {
         // refusing to sign in at all.
       }
     }
-    const { cookieValue, maxAge } = await createSessionForEmail(DEMO_EMAIL, getClientIp(req), req.headers.get("user-agent") ?? "unknown");
+    const { cookieValue, maxAge } = await createSessionForEmail(DEMO_EMAIL, ip, req.headers.get("user-agent") ?? "unknown");
     // No emailed link in this branch - the client redirects immediately
     // on its own, so the safe destination is handed back directly
     // rather than baked into a URL.

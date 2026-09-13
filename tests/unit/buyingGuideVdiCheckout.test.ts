@@ -8,7 +8,7 @@ const mocks = vi.hoisted(() => ({
   getVdiPurchase: vi.fn(),
   markVdiPurchasePaid: vi.fn(),
   computeBuyingGuideReportTier: vi.fn(),
-  getUserDoc: vi.fn(),
+  getDocWithEtag: vi.fn(),
   canRunFreeVehicleHistoryReport: vi.fn(),
   recordVehicleHistoryReportRun: vi.fn(),
 }));
@@ -23,7 +23,7 @@ vi.mock("@/lib/tracker/vdiPurchase", () => ({
   markVdiPurchasePaid: mocks.markVdiPurchasePaid,
 }));
 vi.mock("@/lib/payments/buyingGuideReportTier", () => ({ computeBuyingGuideReportTier: mocks.computeBuyingGuideReportTier }));
-vi.mock("@/lib/tracker/userDoc", () => ({ getUserDoc: mocks.getUserDoc }));
+vi.mock("@/lib/tracker/atomicUpdate", () => ({ getDocWithEtag: mocks.getDocWithEtag }));
 vi.mock("@/lib/tracker/vehicleHistoryReportUsage", () => ({
   canRunFreeVehicleHistoryReport: mocks.canRunFreeVehicleHistoryReport,
   recordVehicleHistoryReportRun: mocks.recordVehicleHistoryReportRun,
@@ -122,13 +122,15 @@ describe("createBuyingGuideVdiCheckoutSession", () => {
       proFreeAvailable: true,
       nextFreeAt: null,
     });
-    mocks.getUserDoc.mockResolvedValue({ id: "pro@example.com", pk: "pro@example.com", type: "user", email: "pro@example.com", createdAt: "x" });
+    const baseUser = { id: "pro@example.com", pk: "pro@example.com", type: "user", email: "pro@example.com", createdAt: "x" };
+    mocks.getDocWithEtag.mockResolvedValue({ doc: baseUser, etag: "etag-1" });
     mocks.canRunFreeVehicleHistoryReport.mockReturnValue(true);
+    mocks.recordVehicleHistoryReportRun.mockResolvedValue({ recorded: true });
     mocks.createFreeProVdiPurchase.mockResolvedValue(purchase({ id: "free-purchase-1", status: "paid", pricePence: 0 }));
 
     const result = await createBuyingGuideVdiCheckoutSession("pro@example.com", "AB12CDE", "bike", "https://roadverdict.co.uk");
 
-    expect(mocks.recordVehicleHistoryReportRun).toHaveBeenCalledWith("pro@example.com");
+    expect(mocks.recordVehicleHistoryReportRun).toHaveBeenCalledWith("pro@example.com", "etag-1", baseUser);
     expect(mocks.createFreeProVdiPurchase).toHaveBeenCalledWith("pro@example.com", "AB12CDE", "bike", "pro");
     expect(result).toEqual({ ok: true, freeReportReady: true, purchaseId: "free-purchase-1" });
     expect(mocks.create).not.toHaveBeenCalled();
@@ -142,7 +144,10 @@ describe("createBuyingGuideVdiCheckoutSession", () => {
       proFreeAvailable: true,
       nextFreeAt: null,
     });
-    mocks.getUserDoc.mockResolvedValue({ id: "pro@example.com", pk: "pro@example.com", type: "user", email: "pro@example.com", createdAt: "x" });
+    mocks.getDocWithEtag.mockResolvedValue({
+      doc: { id: "pro@example.com", pk: "pro@example.com", type: "user", email: "pro@example.com", createdAt: "x" },
+      etag: "etag-1",
+    });
     // Someone else's request already claimed the allowance between the
     // read in computeBuyingGuideReportTier and this re-check.
     mocks.canRunFreeVehicleHistoryReport.mockReturnValue(false);
@@ -153,6 +158,34 @@ describe("createBuyingGuideVdiCheckoutSession", () => {
 
     expect(mocks.createFreeProVdiPurchase).not.toHaveBeenCalled();
     expect(mocks.recordVehicleHistoryReportRun).not.toHaveBeenCalled();
+    expect(mocks.createVdiPurchase).toHaveBeenCalledWith("pro@example.com", "AB12CDE", "bike", "pro", 999);
+    expect(result).toEqual({ ok: true, url: "https://checkout.stripe.com/session123" });
+  });
+
+  // A different, later race than the one above: the predicate passed at
+  // read time, but the atomic write itself lost to a concurrent request
+  // (recordVehicleHistoryReportRun's own etag-conditioned replace
+  // reports alreadyUsed) - this must fall through to the paid price too,
+  // not grant a purchase that was never actually recorded as used.
+  it("falls through to the paid pro price when the atomic record write itself loses the race", async () => {
+    mocks.computeBuyingGuideReportTier.mockResolvedValue({
+      tier: "pro",
+      pricePence: 0,
+      proFreeAvailable: true,
+      nextFreeAt: null,
+    });
+    mocks.getDocWithEtag.mockResolvedValue({
+      doc: { id: "pro@example.com", pk: "pro@example.com", type: "user", email: "pro@example.com", createdAt: "x" },
+      etag: "etag-1",
+    });
+    mocks.canRunFreeVehicleHistoryReport.mockReturnValue(true);
+    mocks.recordVehicleHistoryReportRun.mockResolvedValue({ recorded: false, alreadyUsed: true });
+    mocks.createVdiPurchase.mockResolvedValue(purchase({ pricePence: 999 }));
+    mocks.create.mockResolvedValue({ url: "https://checkout.stripe.com/session123" });
+
+    const result = await createBuyingGuideVdiCheckoutSession("pro@example.com", "AB12CDE", "bike", "https://roadverdict.co.uk");
+
+    expect(mocks.createFreeProVdiPurchase).not.toHaveBeenCalled();
     expect(mocks.createVdiPurchase).toHaveBeenCalledWith("pro@example.com", "AB12CDE", "bike", "pro", 999);
     expect(result).toEqual({ ok: true, url: "https://checkout.stripe.com/session123" });
   });

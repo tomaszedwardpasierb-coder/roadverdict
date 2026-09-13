@@ -235,12 +235,19 @@ export default async function DashboardPage(props: { searchParams: Promise<{ add
     }
   }
 
-  const bikes = await getBikesForUser(session.email);
+  // shareLinks/proStatus/pendingReceiptRequests don't depend on bikes or
+  // each other - batched the same way the car dashboard path already
+  // does for its own equivalent calls, rather than four sequential
+  // round trips on the app's main hot path. pickActiveBike itself still
+  // has to wait for bikes specifically, so it can't join this batch.
+  const [bikes, shareLinks, proStatus, pendingReceiptRequests] = await Promise.all([
+    getBikesForUser(session.email),
+    getShareLinksForUser(session.email),
+    getProStatus(session.email),
+    getPendingReceiptRequestsForOwner(session.email),
+  ]);
   const bike = await pickActiveBike(bikes);
-  const shareLinks = await getShareLinksForUser(session.email);
-  const proStatus = await getProStatus(session.email);
   const userIsPro = proStatus.isPro;
-  const pendingReceiptRequests = await getPendingReceiptRequestsForOwner(session.email);
   const bikeNames: Record<string, string> = {};
   for (const b of bikes) {
     bikeNames[b.id] = b.nickname ? `${b.nickname} (${b.make} ${b.model})` : `${b.make} ${b.model}`;

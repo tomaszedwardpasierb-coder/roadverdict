@@ -20,6 +20,13 @@ function getClientIp(req: NextRequest): string {
   return "unknown";
 }
 
+function isPreconditionFailed(err: unknown): boolean {
+  if (typeof err !== "object" || err === null) return false;
+  const code = (err as { code?: unknown }).code;
+  const statusCode = (err as { statusCode?: unknown }).statusCode;
+  return code === 412 || statusCode === 412;
+}
+
 export async function GET(req: NextRequest) {
   const container = getContainer();
   const url = new URL(req.url);
@@ -55,9 +62,25 @@ export async function GET(req: NextRequest) {
     return NextResponse.redirect(`${APP_URL}/login?error=expired_link`);
   }
 
-  await container.item(tokenHash, email).patch([
-    { op: "replace", path: "/used", value: true },
-  ]);
+  // Conditioned on `used` still being false at the moment Cosmos applies
+  // this patch - a plain unconditional patch here let two near-
+  // simultaneous requests for the exact same link (two tabs, or an
+  // email security scanner prefetching the link right as the real user
+  // clicks it) both pass the check above before either patch landed,
+  // each independently creating a session. Cosmos evaluates `condition`
+  // atomically against the current document server-side, so only one of
+  // two racing requests can ever win this.
+  try {
+    await container.item(tokenHash, email).patch({
+      operations: [{ op: "replace", path: "/used", value: true }],
+      condition: "from c where c.used = false",
+    });
+  } catch (err) {
+    if (isPreconditionFailed(err)) {
+      return NextResponse.redirect(`${APP_URL}/login?error=expired_link`);
+    }
+    throw err;
+  }
 
   // A real magic-link click is now independently confirmed - if this
   // account has 2FA on, that's only step one. Hand off to a short-lived

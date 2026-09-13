@@ -32,7 +32,8 @@ import { fetchVehicleTaxDetailsFromVdg, type VehicleTaxDetails } from "@/lib/tra
 import type { VdiCheckResult } from "@/lib/tracker/vdiUnlock";
 import { computeBuyingGuideReportTier } from "@/lib/payments/buyingGuideReportTier";
 import { BUYING_GUIDE_REPORT_PRICE_LABEL, type BuyingGuideReportTier } from "@/lib/payments/pricing";
-import { getUserDoc } from "@/lib/tracker/userDoc";
+import type { UserDoc } from "@/lib/tracker/userDoc";
+import { getDocWithEtag, type DocWithEtag } from "@/lib/tracker/atomicUpdate";
 import { canRunFreeBuyingGuideLookup, nextFreeBuyingGuideLookupAt, recordBuyingGuideLookupRun } from "@/lib/tracker/buyingGuideLookupUsage";
 import { getCachedBuyingGuideLookup, setCachedBuyingGuideLookup } from "@/lib/tracker/buyingGuideLookupCache";
 
@@ -195,8 +196,14 @@ export async function GET(request: NextRequest) {
 
   const cached = await getCachedBuyingGuideLookup("bike", vrm);
 
+  // Captured here (with its etag) rather than re-read from scratch at
+  // the recordBuyingGuideLookupRun() call far below - closes the race
+  // where two concurrent lookups could both pass this check before
+  // either one's write landed.
+  let gatingUserWithEtag: DocWithEtag<UserDoc> | null = null;
   if (!cached && !hasPaidAccess) {
-    const gatingUser = await getUserDoc(session.email);
+    gatingUserWithEtag = await getDocWithEtag<UserDoc>(session.email, session.email);
+    const gatingUser = gatingUserWithEtag?.doc ?? null;
     if (!canRunFreeBuyingGuideLookup(gatingUser)) {
       const reportTierResult = await computeBuyingGuideReportTier(session.email);
       const blockedResult: BuyingGuideLookupResult = {
@@ -271,8 +278,8 @@ export async function GET(request: NextRequest) {
     motTestsOldestFirst = parsed.tests;
     motTests = [...parsed.tests].reverse();
 
-    if (!hasPaidAccess) {
-      await recordBuyingGuideLookupRun(session.email);
+    if (!hasPaidAccess && gatingUserWithEtag) {
+      await recordBuyingGuideLookupRun(session.email, gatingUserWithEtag.etag, gatingUserWithEtag.doc);
     }
   }
 

@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const mocks = vi.hoisted(() => ({ read: vi.fn(), upsert: vi.fn() }));
+const mocks = vi.hoisted(() => ({ read: vi.fn(), upsert: vi.fn(), replace: vi.fn() }));
 const mockContainer = {
-  item: vi.fn(() => ({ read: mocks.read })),
+  item: vi.fn(() => ({ read: mocks.read, replace: mocks.replace })),
   items: { upsert: mocks.upsert },
 };
 vi.mock("@/lib/cosmos", () => ({ getContainer: () => mockContainer }));
@@ -22,6 +22,7 @@ function makeUser(overrides: Partial<UserDoc> = {}): UserDoc {
 beforeEach(() => {
   mocks.read.mockReset();
   mocks.upsert.mockReset();
+  mocks.replace.mockReset();
 });
 
 describe("canRunFreeBuyingGuideLookup", () => {
@@ -64,17 +65,22 @@ describe("nextFreeBuyingGuideLookupAt", () => {
 });
 
 describe("recordBuyingGuideLookupRun", () => {
-  it("does nothing when the user doc doesn't exist", async () => {
-    mocks.read.mockResolvedValue({ resource: undefined });
-    await recordBuyingGuideLookupRun("missing@example.com");
-    expect(mocks.upsert).not.toHaveBeenCalled();
+  it("stamps lastRunAt with the current time and writes conditioned on the given etag", async () => {
+    mocks.replace.mockResolvedValue({ resource: {} });
+    const before = Date.now();
+    const result = await recordBuyingGuideLookupRun("a@example.com", "etag-1", makeUser());
+    expect(result).toEqual({ recorded: true });
+    const [saved, options] = mocks.replace.mock.calls[0];
+    expect(new Date((saved as UserDoc).buyingGuideLookupUsage!.lastRunAt).getTime()).toBeGreaterThanOrEqual(before);
+    expect(options).toEqual({ accessCondition: { type: "IfMatch", condition: "etag-1" } });
   });
 
-  it("stamps lastRunAt with the current time and upserts", async () => {
-    mocks.read.mockResolvedValue({ resource: makeUser() });
-    const before = Date.now();
-    await recordBuyingGuideLookupRun("a@example.com");
-    const saved = mocks.upsert.mock.calls[0][0] as UserDoc;
-    expect(new Date(saved.buyingGuideLookupUsage!.lastRunAt).getTime()).toBeGreaterThanOrEqual(before);
+  it("reports alreadyUsed when a concurrent writer already consumed this window's free lookup", async () => {
+    mocks.replace.mockRejectedValueOnce(Object.assign(new Error("conflict"), { code: 412 }));
+    mocks.read.mockResolvedValue({
+      resource: { ...makeUser(), buyingGuideLookupUsage: { lastRunAt: new Date().toISOString() }, _etag: "etag-2" },
+    });
+    const result = await recordBuyingGuideLookupRun("a@example.com", "etag-1", makeUser());
+    expect(result).toEqual({ recorded: false, alreadyUsed: true });
   });
 });

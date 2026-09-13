@@ -120,7 +120,7 @@ describe("GET /api/auth/verify", () => {
     const response = await GET(req(verifyUrl()));
 
     expect(mocks.item).toHaveBeenCalledWith(hashToken(RAW_TOKEN), EMAIL);
-    expect(mocks.patch).toHaveBeenCalledWith([{ op: "replace", path: "/used", value: true }]);
+    expect(mocks.patch).toHaveBeenCalledWith({ operations: [{ op: "replace", path: "/used", value: true }], condition: "from c where c.used = false" });
     expect(mocks.createSessionForEmail).toHaveBeenCalledWith(EMAIL, "unknown", "unknown");
 
     expect(response.headers.get("location")).toBe(`${APP_URL}/dashboard`);
@@ -128,6 +128,23 @@ describe("GET /api/auth/verify", () => {
     expect(cookie?.value).toBe("session-cookie-value");
     expect(cookie?.httpOnly).toBe(true);
     expect(cookie?.secure).toBe(true);
+  });
+
+  // The actual race this closes: two near-simultaneous requests for the
+  // same link (two tabs, or a security scanner prefetching the link
+  // right as the real user clicks it) both pass the up-front `used`
+  // check before either patch lands. Cosmos's own conditional patch
+  // rejects the loser with a 412, which must redirect to the same
+  // expired-link error a already-used link gets - never create a session.
+  it("redirects to the expired-link error, without creating a session, when a concurrent request already consumed this link", async () => {
+    mocks.read.mockResolvedValue({ resource: validDoc() });
+    mocks.patch.mockRejectedValue(Object.assign(new Error("precondition failed"), { code: 412 }));
+
+    const response = await GET(req(verifyUrl()));
+
+    expect(response.headers.get("location")).toBe(`${APP_URL}/login?error=expired_link`);
+    expect(mocks.createSessionForEmail).not.toHaveBeenCalled();
+    expect(mocks.createPendingLogin).not.toHaveBeenCalled();
   });
 
   it("redirects to a safe, relative destination when one was requested", async () => {
@@ -177,7 +194,7 @@ describe("GET /api/auth/verify", () => {
 
     it("still marks the magic link used, same as the non-2FA path", async () => {
       await GET(req(verifyUrl()));
-      expect(mocks.patch).toHaveBeenCalledWith([{ op: "replace", path: "/used", value: true }]);
+      expect(mocks.patch).toHaveBeenCalledWith({ operations: [{ op: "replace", path: "/used", value: true }], condition: "from c where c.used = false" });
     });
 
     it("carries a requested safe redirect destination through to the code-entry page's own query string", async () => {

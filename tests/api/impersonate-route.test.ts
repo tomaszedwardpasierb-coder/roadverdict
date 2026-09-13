@@ -146,6 +146,18 @@ describe("POST /api/tomasz/impersonate", () => {
       expect(mocks.verifyAdminPassword).toHaveBeenCalledWith("correct-password");
       expect(mocks.verifyTotpCode).toHaveBeenCalledWith("123456");
     });
+
+    // Regression: recordAdminLoginAttempt used to run unconditionally,
+    // before the correctness check - meaning a legitimate admin
+    // re-authenticating correctly many times in a row (e.g. across
+    // several support tickets) would burn through the same 10-per-15-
+    // minute budget as a real attacker and lock themselves out of
+    // impersonation. It must only be recorded on an actual wrong
+    // password/code, same as login-password/login-totp.
+    it("does not record a rate-limit attempt at all on a fully correct re-auth", async () => {
+      await POST(postRequest(validBody));
+      expect(mocks.recordAdminLoginAttempt).not.toHaveBeenCalled();
+    });
   });
 
   it("returns 404 for an email with no real account, without creating a session", async () => {

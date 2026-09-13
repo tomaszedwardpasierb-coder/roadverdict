@@ -26,23 +26,35 @@ export async function createVdiCheckoutSession(token: string, vehicleKind: Vehic
 
   const path = detailedPath(token, vehicleKind);
   try {
-    const session = await getStripe().checkout.sessions.create({
-      mode: "payment",
-      client_reference_id: token,
-      metadata: { token, vehicleKind },
-      line_items: [
-        {
-          quantity: 1,
-          price_data: {
-            currency: "gbp",
-            unit_amount: VDI_CHECK_PRICE_PENCE[vehicleKind],
-            product_data: { name: VDI_CHECK_PRODUCT_NAME[vehicleKind] },
+    const session = await getStripe().checkout.sessions.create(
+      {
+        mode: "payment",
+        client_reference_id: token,
+        metadata: { token, vehicleKind },
+        line_items: [
+          {
+            quantity: 1,
+            price_data: {
+              currency: "gbp",
+              unit_amount: VDI_CHECK_PRICE_PENCE[vehicleKind],
+              product_data: { name: VDI_CHECK_PRODUCT_NAME[vehicleKind] },
+            },
           },
-        },
-      ],
-      success_url: `${appUrl}${path}?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${appUrl}${path}`,
-    });
+        ],
+        success_url: `${appUrl}${path}?session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${appUrl}${path}`,
+      },
+      // Stripe's own idempotency guarantee, not a Cosmos-side lock - a
+      // double-click or a page-refresh racing the original request
+      // reuses the exact same Checkout Session instead of creating a
+      // second, separately payable one for the same share-link token.
+      // Stable per-token, so it converges to one session across retries
+      // for as long as Stripe retains the key (~24h, the same window a
+      // Checkout Session itself is valid for) - once resolved.vdiUnlock
+      // is set, this function returns already_unlocked above long before
+      // ever reaching Stripe, so this never blocks a genuinely new purchase.
+      { idempotencyKey: `vdi-checkout:${token}` }
+    );
     if (!session.url) return { ok: false, reason: "creation_failed" };
     return { ok: true, url: session.url };
   } catch (err) {

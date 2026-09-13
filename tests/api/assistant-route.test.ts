@@ -17,7 +17,7 @@ const mocks = vi.hoisted(() => ({
   isPro: vi.fn(),
   resolveActiveVehicle: vi.fn(),
   getCarAssistantConfig: vi.fn(),
-  getUserDoc: vi.fn(),
+  getDocWithEtag: vi.fn(),
   canSendAnonAssistantMessage: vi.fn(),
   generateAnonId: vi.fn(),
   canSendAssistantMessage: vi.fn(),
@@ -28,7 +28,7 @@ vi.mock("@/lib/auth/session", () => ({ getSession: mocks.getSession }));
 vi.mock("@/lib/tracker/assistantKnowledge", () => ({ getLivePrivacyPolicyText: mocks.getLivePrivacyPolicyText }));
 vi.mock("@/lib/tracker/assistantConfig", () => ({ getAssistantConfig: mocks.getAssistantConfig, getCarAssistantConfig: mocks.getCarAssistantConfig }));
 vi.mock("@/lib/tracker/activeVehicle", () => ({ resolveActiveVehicle: mocks.resolveActiveVehicle }));
-vi.mock("@/lib/tracker/userDoc", () => ({ getUserDoc: mocks.getUserDoc }));
+vi.mock("@/lib/tracker/atomicUpdate", () => ({ getDocWithEtag: mocks.getDocWithEtag }));
 vi.mock("@/lib/tracker/assistantTools", () => ({
   ASSISTANT_TOOL_DECLARATIONS: [{ name: "getSpendTotal" }],
   REPORT_TOOL_DECLARATIONS: [{ name: "getViewedReport" }],
@@ -126,7 +126,11 @@ beforeEach(() => {
   mocks.canSendAnonAssistantMessage.mockResolvedValue(true);
   mocks.generateAnonId.mockReturnValue("new-anon-id");
   mocks.canSendAssistantMessage.mockReturnValue(true);
-  mocks.recordAssistantMessage.mockResolvedValue(undefined);
+  mocks.recordAssistantMessage.mockResolvedValue({ recorded: true });
+  mocks.getDocWithEtag.mockResolvedValue({
+    doc: { id: "rider@example.com", pk: "rider@example.com", type: "user", email: "rider@example.com", createdAt: "x" },
+    etag: "etag-1",
+  });
 });
 
 const bikeA = { id: "bike-1", make: "Honda", model: "Africa Twin", nickname: "" };
@@ -304,7 +308,11 @@ describe("POST /api/assistant", () => {
 
     await POST(request({ messages: [{ role: "user", content: "hi" }] }));
 
-    expect(mocks.recordAssistantMessage).toHaveBeenCalledWith("rider@example.com");
+    expect(mocks.recordAssistantMessage).toHaveBeenCalledWith(
+      "rider@example.com",
+      "etag-1",
+      expect.objectContaining({ email: "rider@example.com" })
+    );
   });
 
   it("never checks or records the signed-in message cap for an anonymous visitor", async () => {
@@ -318,7 +326,7 @@ describe("POST /api/assistant", () => {
 
   it("addresses the signed-in user by their Settings-tab display name, when one is set", async () => {
     mocks.getSession.mockResolvedValue({ email: "rider@example.com" });
-    mocks.getUserDoc.mockResolvedValue({ displayName: "Alex" });
+    mocks.getDocWithEtag.mockResolvedValue({ doc: { displayName: "Alex" }, etag: "etag-1" });
 
     await POST(request({ messages: [{ role: "user", content: "hi" }] }));
 
@@ -328,7 +336,7 @@ describe("POST /api/assistant", () => {
 
   it("adds no name block when no display name has been set", async () => {
     mocks.getSession.mockResolvedValue({ email: "rider@example.com" });
-    mocks.getUserDoc.mockResolvedValue({});
+    mocks.getDocWithEtag.mockResolvedValue({ doc: {}, etag: "etag-1" });
 
     await POST(request({ messages: [{ role: "user", content: "hi" }] }));
 
@@ -336,15 +344,15 @@ describe("POST /api/assistant", () => {
     expect(callBody.systemInstruction.parts[0].text).not.toContain("USER'S NAME");
   });
 
-  it("never addresses an anonymous visitor by name, even if getUserDoc somehow returned one", async () => {
+  it("never addresses an anonymous visitor by name, even if the user-doc lookup somehow returned one", async () => {
     mocks.getSession.mockResolvedValue(null);
-    mocks.getUserDoc.mockResolvedValue({ displayName: "Alex" });
+    mocks.getDocWithEtag.mockResolvedValue({ doc: { displayName: "Alex" }, etag: "etag-1" });
 
     await POST(request({ messages: [{ role: "user", content: "hi" }] }));
 
     const callBody = JSON.parse(mocks.fetch.mock.calls[0][1].body);
     expect(callBody.systemInstruction.parts[0].text).not.toContain("USER'S NAME");
-    expect(mocks.getUserDoc).not.toHaveBeenCalled();
+    expect(mocks.getDocWithEtag).not.toHaveBeenCalled();
   });
 
   it("ignores an unrecognised dashboardTab key rather than passing arbitrary client text into the prompt", async () => {

@@ -52,9 +52,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       },
     });
   } catch (err) {
-    return NextResponse.json(
-      { error: "Could not prepare this document for download.", detail: err instanceof Error ? err.message : String(err) },
-      { status: 500 }
-    );
+    console.error("Vault document download failed:", err);
+    return NextResponse.json({ error: "Could not prepare this document for download." }, { status: 500 });
   }
 }

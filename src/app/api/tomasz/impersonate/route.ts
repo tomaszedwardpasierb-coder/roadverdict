@@ -47,12 +47,18 @@ export async function POST(request: NextRequest) {
   // this is one already-authenticated admin re-proving themselves, not
   // a fresh login. Password checked before TOTP, same order as login,
   // so a wrong password never gets a "your code was fine" signal either.
+  // Only recorded against the rate limit on a WRONG password/code, same
+  // as login-password/login-totp - recording unconditionally (the
+  // previous behavior here) meant a legitimate admin re-authenticating
+  // correctly 10+ times in 15 minutes while working through several
+  // support tickets could lock themselves out of impersonation purely
+  // from successful logins.
   const passwordLimit = await checkAdminLoginRateLimit("reauth-password");
   if (!passwordLimit.allowed) {
     return NextResponse.json({ error: "Too many attempts. Please wait and try again." }, { status: 429 });
   }
-  await recordAdminLoginAttempt("reauth-password");
   if (!password || !verifyAdminPassword(password)) {
+    await recordAdminLoginAttempt("reauth-password");
     return NextResponse.json({ error: "Incorrect password." }, { status: 401 });
   }
 
@@ -60,8 +66,8 @@ export async function POST(request: NextRequest) {
   if (!totpLimit.allowed) {
     return NextResponse.json({ error: "Too many attempts. Please wait and try again." }, { status: 429 });
   }
-  await recordAdminLoginAttempt("reauth-totp");
   if (!totpCode || !verifyTotpCode(totpCode)) {
+    await recordAdminLoginAttempt("reauth-totp");
     return NextResponse.json({ error: "Incorrect authenticator code." }, { status: 401 });
   }
 

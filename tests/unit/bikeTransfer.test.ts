@@ -104,7 +104,27 @@ beforeEach(() => {
   mocks.computeSellerVerdict.mockReturnValue({ label: "Good" });
   mocks.copyTrackerDoc.mockResolvedValue(undefined);
   mocks.upsert.mockResolvedValue(undefined);
-  mocks.getContainer.mockReturnValue({ items: { upsert: mocks.upsert } });
+  // getDocWithEtag/replaceIfUnchanged (atomicUpdate.ts, not mocked - it's
+  // exercised for real here) call container.item(id, pk).read()/.replace()
+  // directly. Routing the mocked read() through the existing getBike()
+  // mock (with a synthetic _etag attached) and the mocked replace()
+  // through the same `upsert` spy new/old-car ordering assertions
+  // already rely on means every existing test below keeps working
+  // unchanged - only the write mechanism for the old bike moved from a
+  // blind items.upsert() to an etag-conditioned item().replace().
+  mocks.getContainer.mockReturnValue({
+    item: (id: string, pk: string) => ({
+      read: async () => {
+        const doc = await mocks.getBike(pk, id);
+        return { resource: doc ? { ...doc, _etag: "etag-1" } : undefined };
+      },
+      replace: async (doc: unknown) => {
+        mocks.upsert(doc);
+        return { resource: doc };
+      },
+    }),
+    items: { upsert: mocks.upsert },
+  });
 });
 
 describe("transferBike", () => {
@@ -129,6 +149,37 @@ describe("transferBike", () => {
     });
     const result = await transferBike(fromEmail, bikeId, toEmail, false);
     expect(result).toEqual({ ok: false, reason: "already_transferred" });
+  });
+
+  // The actual race this closes: two concurrent accepts both pass the
+  // up-front transferredTo check before either write lands. The etag-
+  // conditioned write here loses (412), re-reads the now-transferred
+  // bike, and correctly reports the loss - critically, WITHOUT ever
+  // creating a duplicate new bike doc (no upsert call at all).
+  it("returns already_transferred, without creating a duplicate new bike, when a concurrent transfer wins the race at write time", async () => {
+    mocks.getBike
+      .mockResolvedValueOnce({ ...oldBike })
+      .mockResolvedValueOnce({
+        ...oldBike,
+        transferredTo: { newBikeId: "winning-racers-new-bike", newOwnerEmail: "other@example.com", transferredAt: "2025-01-01" },
+      });
+    mocks.getContainer.mockReturnValue({
+      item: (id: string, pk: string) => ({
+        read: async () => {
+          const doc = await mocks.getBike(pk, id);
+          return { resource: doc ? { ...doc, _etag: "etag-1" } : undefined };
+        },
+        replace: async () => {
+          throw Object.assign(new Error("conflict"), { code: 412 });
+        },
+      }),
+      items: { upsert: mocks.upsert },
+    });
+
+    const result = await transferBike(fromEmail, bikeId, toEmail, false);
+
+    expect(result).toEqual({ ok: false, reason: "already_transferred" });
+    expect(mocks.upsert).not.toHaveBeenCalled();
   });
 
   it("returns recipient_limit_reached when recipient is already at the free combined vehicle cap", async () => {

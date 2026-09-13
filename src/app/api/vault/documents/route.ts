@@ -17,6 +17,8 @@ import { extendVaultSession } from "@/lib/tracker/vaultSession";
 import { getBike } from "@/lib/tracker/bike";
 import { getCarById } from "@/lib/tracker/car";
 import { getVaultContainer } from "@/lib/blobStorage";
+import { acquireVaultUploadLock, releaseVaultUploadLock } from "@/lib/tracker/vaultUploadLock";
+import { matchesDeclaredFileType, type SniffableFileType } from "@/lib/tracker/fileSignature";
 import {
   createVaultDocument,
   getVaultDocumentsForVehicle,
@@ -95,40 +97,61 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Vehicle not found." }, { status: 404 });
   }
 
-  const { count, totalBytes } = await countAndSizeVaultDocuments(gate.email, vehicleId);
-  if (count >= VAULT_MAX_DOCUMENTS_PER_VEHICLE) {
-    return NextResponse.json({ error: "This vehicle already has 20 documents - delete one before adding another." }, { status: 400 });
-  }
-  if (totalBytes + file.size > VAULT_MAX_TOTAL_BYTES_PER_VEHICLE) {
-    return NextResponse.json({ error: "This vehicle's Vault is at its 100MB limit - delete something before adding another file." }, { status: 400 });
+  const arrayBuffer = await file.arrayBuffer();
+  const bytes = Buffer.from(arrayBuffer);
+  if (!matchesDeclaredFileType(bytes, file.type as SniffableFileType)) {
+    return NextResponse.json({ error: "This file's contents don't match its type - it may be corrupted or mislabelled." }, { status: 400 });
   }
 
-  const blobName = `${randomBytes(24).toString("base64url")}.${extension}`;
+  // Per-vehicle advisory lock, held for the rest of this request - closes
+  // the race where two concurrent uploads for the same vehicle could
+  // both read the count/size caps below before either write landed,
+  // together exceeding the 20-document/100MB limits.
+  const gotLock = await acquireVaultUploadLock(gate.email, vehicleId);
+  if (!gotLock) {
+    return NextResponse.json({ error: "Another upload for this vehicle is already in progress - try again in a moment." }, { status: 409 });
+  }
+
   try {
+    const { count, totalBytes } = await countAndSizeVaultDocuments(gate.email, vehicleId);
+    if (count >= VAULT_MAX_DOCUMENTS_PER_VEHICLE) {
+      return NextResponse.json({ error: "This vehicle already has 20 documents - delete one before adding another." }, { status: 400 });
+    }
+    if (totalBytes + file.size > VAULT_MAX_TOTAL_BYTES_PER_VEHICLE) {
+      return NextResponse.json({ error: "This vehicle's Vault is at its 100MB limit - delete something before adding another file." }, { status: 400 });
+    }
+
+    const blobName = `${randomBytes(24).toString("base64url")}.${extension}`;
     const container = await getVaultContainer();
     const blockBlobClient = container.getBlockBlobClient(blobName);
-    const arrayBuffer = await file.arrayBuffer();
-    await blockBlobClient.uploadData(Buffer.from(arrayBuffer), {
-      blobHTTPHeaders: { blobContentType: file.type },
-    });
+    try {
+      await blockBlobClient.uploadData(bytes, {
+        blobHTTPHeaders: { blobContentType: file.type },
+      });
 
-    const doc = await createVaultDocument(gate.email, {
-      vehicleKind: vehicleKind as "bike" | "car",
-      vehicleId,
-      blobName,
-      fileName: file.name || `document.${extension}`,
-      fileType: file.type as "application/pdf" | "image/jpeg" | "image/png",
-      fileSize: file.size,
-      category: category as VaultDocumentCategory,
-      ...(typeof label === "string" && label.trim() ? { label: label.trim() } : {}),
-    });
+      const doc = await createVaultDocument(gate.email, {
+        vehicleKind: vehicleKind as "bike" | "car",
+        vehicleId,
+        blobName,
+        fileName: file.name || `document.${extension}`,
+        fileType: file.type as "application/pdf" | "image/jpeg" | "image/png",
+        fileSize: file.size,
+        category: category as VaultDocumentCategory,
+        ...(typeof label === "string" && label.trim() ? { label: label.trim() } : {}),
+      });
 
-    await extendVaultSession(gate.email, gate.raw);
-    return NextResponse.json({ document: doc });
-  } catch (err) {
-    return NextResponse.json(
-      { error: "Upload failed. Please try again.", detail: err instanceof Error ? err.message : String(err) },
-      { status: 500 }
-    );
+      await extendVaultSession(gate.email, gate.raw);
+      return NextResponse.json({ document: doc });
+    } catch (err) {
+      // The blob may have uploaded successfully even if the metadata
+      // write after it failed - clean it up rather than leaving a real,
+      // sensitive file sitting in storage with nothing pointing at it
+      // (unlistable, undeletable through the app, kept forever).
+      await blockBlobClient.deleteIfExists().catch(() => {});
+      console.error("Vault upload failed:", err);
+      return NextResponse.json({ error: "Upload failed. Please try again." }, { status: 500 });
+    }
+  } finally {
+    await releaseVaultUploadLock(gate.email, vehicleId);
   }
 }

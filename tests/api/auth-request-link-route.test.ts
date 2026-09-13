@@ -28,10 +28,10 @@ vi.mock("@/lib/tracker/userDoc", () => ({ isAccountBlocked: mocks.isAccountBlock
 
 import { POST } from "@/app/api/auth/request-link/route";
 
-function req(body: string): NextRequest {
+function req(body: string, headers?: Record<string, string>): NextRequest {
   return new NextRequest("http://localhost/api/auth/request-link", {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    headers: { "content-type": "application/json", ...headers },
     body,
   });
 }
@@ -202,5 +202,67 @@ describe("POST /api/auth/request-link", () => {
   // unhandled rejection out of POST instead of a clean 400 response.
   it("propagates malformed JSON as a thrown error rather than a 400 response", async () => {
     await expect(POST(req("not-json"))).rejects.toThrow();
+  });
+
+  // The gap this closes: the per-email cooldown above does nothing to
+  // stop a script requesting links for many DISTINCT addresses, using
+  // this app's own transactional mailer as a spam relay - each one
+  // individually stays under that per-email limit. A per-IP ceiling,
+  // scoped separately from the per-email one, catches that pattern.
+  describe("per-IP throttle", () => {
+    function ipHeaders(ip: string) {
+      return { "x-forwarded-for": ip };
+    }
+
+    it("blocks further requests from the same IP once it's made 20 requests, even for 20 different email addresses", async () => {
+      mocks.itemsQuery.mockImplementation((queryObj: { query: string }) => {
+        if (queryObj.query.includes("magicLinkIpAttempt")) {
+          return { fetchAll: () => Promise.resolve({ resources: Array.from({ length: 20 }, (_, i) => ({ id: `attempt-${i}` })) }) };
+        }
+        return { fetchAll: () => Promise.resolve({ resources: [] }) };
+      });
+
+      const response = await POST(req(JSON.stringify({ email: "victim-21@example.com" }), ipHeaders("203.0.113.5")));
+
+      expect(response.status).toBe(429);
+      await expect(response.json()).resolves.toEqual({ error: "Too many attempts. Please wait and try again." });
+      expect(mocks.sendMagicLinkEmail).not.toHaveBeenCalled();
+    });
+
+    it("allows a request from the same IP when it's under the cap, and records the attempt", async () => {
+      mocks.itemsQuery.mockImplementation((queryObj: { query: string }) => {
+        if (queryObj.query.includes("magicLinkIpAttempt")) {
+          return { fetchAll: () => Promise.resolve({ resources: Array.from({ length: 5 }, (_, i) => ({ id: `attempt-${i}` })) }) };
+        }
+        return { fetchAll: () => Promise.resolve({ resources: [] }) };
+      });
+
+      const response = await POST(req(JSON.stringify({ email: "someone@example.com" }), ipHeaders("203.0.113.5")));
+
+      expect(response.status).toBe(200);
+      expect(mocks.itemsCreate).toHaveBeenCalledWith(
+        expect.objectContaining({ type: "magicLinkIpAttempt", pk: "ip:203.0.113.5" })
+      );
+    });
+
+    it("scopes the IP check to its own partition, taking only the first hop of x-forwarded-for", async () => {
+      await POST(req(JSON.stringify({ email: "someone@example.com" }), { "x-forwarded-for": "198.51.100.7, 10.0.0.1" }));
+      const ipQueryCall = mocks.itemsQuery.mock.calls.find((c: any[]) => c[0].query.includes("magicLinkIpAttempt"));
+      expect(ipQueryCall![1]).toEqual({ partitionKey: "ip:198.51.100.7" });
+    });
+
+    it("does not rate-limit or record anything when the IP can't be determined at all", async () => {
+      const response = await POST(req(JSON.stringify({ email: "someone@example.com" })));
+      expect(response.status).toBe(200);
+      expect(mocks.itemsCreate).not.toHaveBeenCalledWith(expect.objectContaining({ type: "magicLinkIpAttempt" }));
+    });
+
+    it("tracks the IP budget separately from the per-email cooldown - hitting the per-email limit doesn't touch the IP counter's own query", async () => {
+      await POST(req(JSON.stringify({ email: "someone@example.com" }), ipHeaders("203.0.113.9")));
+      const ipQueryCalls = mocks.itemsQuery.mock.calls.filter((c: any[]) => c[0].query.includes("magicLinkIpAttempt"));
+      const emailQueryCalls = mocks.itemsQuery.mock.calls.filter((c: any[]) => c[0].query.includes("c.type = 'magicLink'") && !c[0].query.includes("magicLinkIpAttempt"));
+      expect(ipQueryCalls.length).toBe(1);
+      expect(emailQueryCalls.length).toBe(1);
+    });
   });
 });

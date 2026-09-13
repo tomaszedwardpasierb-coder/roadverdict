@@ -16,6 +16,14 @@
 // elsewhere, starting with admin-sent messages.
 import { getContainer } from "@/lib/cosmos";
 import { stripCosmosMetadata } from "@/lib/tracker/cosmosHelpers";
+import { runInBatches } from "@/lib/concurrency";
+
+// A "send to everyone" broadcast, or a "clear for everyone" action, must
+// not fan out one concurrent Cosmos write per registered user - that
+// scales with the user base with no bound at all. Chunked instead: still
+// concurrent within a chunk, never more than this many requests in
+// flight for one of these actions at once.
+const BROADCAST_BATCH_SIZE = 25;
 
 export interface NotificationDoc {
   id: string;
@@ -54,19 +62,17 @@ export async function createBroadcastNotifications(
   // entire broadcast failed to send when the vast majority went out
   // fine. Logged, not silently dropped, so a real, systemic failure is
   // still visible.
-  const results = await Promise.allSettled(
-    recipientEmails.map((email) =>
-      container.items.create({
-        id: crypto.randomUUID(),
-        pk: email,
-        type: "notification",
-        kind: "broadcast",
-        title: data.title,
-        body: data.body,
-        linkTo: data.linkTo,
-        createdAt: now,
-      } satisfies NotificationDoc)
-    )
+  const results = await runInBatches(recipientEmails, BROADCAST_BATCH_SIZE, (email) =>
+    container.items.create({
+      id: crypto.randomUUID(),
+      pk: email,
+      type: "notification",
+      kind: "broadcast",
+      title: data.title,
+      body: data.body,
+      linkTo: data.linkTo,
+      createdAt: now,
+    } satisfies NotificationDoc)
   );
   const failures = results.filter((r) => r.status === "rejected");
   if (failures.length > 0) {
@@ -264,18 +270,21 @@ export async function clearNotifications(filter: ClearNotificationsFilter): Prom
   const container = getContainer();
   const recipientEmails = filter.recipients === "all" ? await getAllUserEmails() : filter.recipients;
 
-  const perRecipientCounts = await Promise.all(
-    recipientEmails.map(async (email) => {
-      const docs = await getAllNotificationsForUser(email);
-      const toDelete = docs.filter((d) => matchesBroadcastFilter(d, filter.broadcasts));
-      if (toDelete.length === 0) return 0;
-      const results = await Promise.allSettled(toDelete.map((d) => container.item(d.id, email).delete()));
-      const failures = results.filter((r) => r.status === "rejected");
-      if (failures.length > 0) {
-        console.error(`clearNotifications: ${failures.length} of ${toDelete.length} failed to delete for ${email}:`, failures);
-      }
-      return results.filter((r) => r.status === "fulfilled").length;
-    })
-  );
-  return perRecipientCounts.reduce((sum, n) => sum + n, 0);
+  const perRecipientResults = await runInBatches(recipientEmails, BROADCAST_BATCH_SIZE, async (email) => {
+    const docs = await getAllNotificationsForUser(email);
+    const toDelete = docs.filter((d) => matchesBroadcastFilter(d, filter.broadcasts));
+    if (toDelete.length === 0) return 0;
+    const results = await Promise.allSettled(toDelete.map((d) => container.item(d.id, email).delete()));
+    const failures = results.filter((r) => r.status === "rejected");
+    if (failures.length > 0) {
+      console.error(`clearNotifications: ${failures.length} of ${toDelete.length} failed to delete for ${email}:`, failures);
+    }
+    return results.filter((r) => r.status === "fulfilled").length;
+  });
+
+  const failedRecipients = perRecipientResults.filter((r) => r.status === "rejected");
+  if (failedRecipients.length > 0) {
+    console.error(`clearNotifications: ${failedRecipients.length} of ${recipientEmails.length} recipient(s) failed entirely:`, failedRecipients);
+  }
+  return perRecipientResults.reduce((sum, r) => sum + (r.status === "fulfilled" ? r.value : 0), 0);
 }

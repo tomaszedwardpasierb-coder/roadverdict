@@ -108,4 +108,42 @@ describe("GET /api/video/promo", () => {
     expect(response.status).toBe(404);
     expect(await response.text()).toBe("Video not found");
   });
+
+  // Regression: a malformed Range header used to parse to NaN and be
+  // passed straight into blob.download(NaN, NaN), which threw and was
+  // reported as a generic 404 "Video not found" - masking a request-
+  // parsing bug as a missing-resource error. It must now be recognised
+  // and rejected with 416 before ever reaching blob storage.
+  it("serves a suffix range (last N bytes) correctly", async () => {
+    const response = await GET(request({ range: "bytes=-500" }));
+    expect(response.status).toBe(206);
+    expect(response.headers.get("Content-Range")).toBe("bytes 500-999/1000");
+    expect(mocks.download).toHaveBeenCalledWith(500, 500);
+  });
+
+  it.each([
+    ["bytes=abc-def", "non-numeric bounds"],
+    ["bytes=-", "no numbers at all"],
+    ["not-a-range-header", "not even the right shape"],
+    ["bytes=500-100", "start greater than end"],
+    ["bytes=-1--5", "double-negative garbage"],
+  ])("returns 416 without calling blob.download for a malformed Range header (%s: %s)", async (range) => {
+    const response = await GET(request({ range }));
+    expect(response.status).toBe(416);
+    expect(response.headers.get("Content-Range")).toBe("bytes */1000");
+    expect(mocks.download).not.toHaveBeenCalled();
+  });
+
+  it("returns 416 when the range starts at or past the real content length", async () => {
+    const response = await GET(request({ range: "bytes=1000-1099" }));
+    expect(response.status).toBe(416);
+    expect(mocks.download).not.toHaveBeenCalled();
+  });
+
+  it("clamps an end value beyond the real content length rather than rejecting it outright", async () => {
+    const response = await GET(request({ range: "bytes=900-9999" }));
+    expect(response.status).toBe(206);
+    expect(response.headers.get("Content-Range")).toBe("bytes 900-999/1000");
+    expect(mocks.download).toHaveBeenCalledWith(900, 100);
+  });
 });

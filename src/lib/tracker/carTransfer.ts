@@ -23,7 +23,8 @@ import { getContainer } from "@/lib/cosmos";
 import { isPro } from "@/lib/subscriptions";
 import { MAX_FREE_VEHICLES, MAX_PRO_VEHICLES } from "@/lib/tracker/vehicleLimit";
 import { getBikesForUser, countActiveBikes } from "@/lib/tracker/bike";
-import { getCarById, getCarsForUser, generateCarId, countActiveCars, getCurrentRegistration, copyCarTrackerDoc, type CarDoc } from "@/lib/tracker/car";
+import { getCarsForUser, generateCarId, countActiveCars, getCurrentRegistration, copyCarTrackerDoc, type CarDoc } from "@/lib/tracker/car";
+import { getDocWithEtag, replaceIfUnchanged } from "@/lib/tracker/atomicUpdate";
 import { normalizePlate } from "@/lib/tracker/reportAccess";
 import { allKnownCarPlates } from "@/lib/tracker/carReportAccess";
 import { getCarServiceRecords } from "@/lib/tracker/carServiceRecord";
@@ -53,10 +54,22 @@ export async function transferCar(
     return { ok: false, reason: "same_owner" };
   }
 
-  const oldCar = await getCarById(fromEmail, carId);
-  if (!oldCar) {
+  // Etag captured here is what makes the final "mark oldCar transferred"
+  // write further down conditional rather than a blind upsert - see
+  // bikeTransfer.ts's own comment for the exact race this closes (two
+  // concurrent accepts both passing this check before either write
+  // landed, each creating a separate new car doc and duplicating the
+  // vehicle).
+  let current: { doc: CarDoc; etag: string } | null;
+  try {
+    current = await getDocWithEtag<CarDoc>(carId, fromEmail);
+  } catch {
+    current = null;
+  }
+  if (!current) {
     return { ok: false, reason: "car_not_found" };
   }
+  const oldCar = current.doc;
   if (oldCar.transferredTo) {
     return { ok: false, reason: "already_transferred" };
   }
@@ -139,15 +152,23 @@ export async function transferCar(
     },
   };
 
-  oldCar.transferredTo = {
-    newCarId,
-    newOwnerEmail: toEmail,
-    transferredAt,
-  };
+  // Conditioned on the etag captured at the top of this function - see
+  // bikeTransfer.ts's own comment on this exact write for why. Done
+  // before creating/upserting newCar or copying a single record, so the
+  // loser of a double-accept race never creates a duplicate vehicle.
+  const writeResult = await replaceIfUnchanged<CarDoc>(
+    carId,
+    fromEmail,
+    current.etag,
+    oldCar,
+    (doc) => ({ ...doc, transferredTo: { newCarId, newOwnerEmail: toEmail, transferredAt } }),
+    (doc) => !doc.transferredTo
+  );
+  if (!writeResult.ok) {
+    return { ok: false, reason: "already_transferred" };
+  }
 
   const container = getContainer();
-  // Old car written first deliberately - same reasoning as bikeTransfer.ts.
-  await container.items.upsert(oldCar);
   await container.items.upsert(newCar);
 
   if (includeRecords) {

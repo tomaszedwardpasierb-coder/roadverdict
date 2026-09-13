@@ -25,7 +25,7 @@ import { getAssistantConfig, getCarAssistantConfig } from '@/lib/tracker/assista
 import { getAllUserAccounts } from '@/lib/tracker/userAccount';
 import { getGeminiUsageByTask, type GeminiUsageByTask } from '@/lib/tracker/geminiUsageLog';
 import type { UserDoc } from '@/lib/tracker/userDoc';
-import { getAllImpersonationSessions, countImpersonationActivity, type ImpersonationSession } from '@/lib/admin/impersonation';
+import { getAllImpersonationSessions, getAllImpersonationActivityCounts, type ImpersonationSession } from '@/lib/admin/impersonation';
 import { AdminShell } from './AdminShell';
 import { KnowledgeBaseEditor } from './KnowledgeBaseEditor';
 import styles from './adminShell.module.css';
@@ -104,12 +104,12 @@ async function getImpersonationSessionsSafe(): Promise<ImpersonationSession[]> {
   }
 }
 
-async function countImpersonationActivitySafe(sessionId: string): Promise<number> {
+async function getAllImpersonationActivityCountsSafe(): Promise<Record<string, number>> {
   try {
-    return await countImpersonationActivity(sessionId);
+    return await getAllImpersonationActivityCounts();
   } catch (err) {
-    console.error(`Failed to count impersonation activity for session ${sessionId}:`, err);
-    return 0;
+    console.error('Failed to load impersonation activity counts for /tomasz:', err);
+    return {};
   }
 }
 
@@ -216,6 +216,7 @@ export default async function AdminDashboardPage(
     geminiUsageByTask,
     broadcastSummaries,
     impersonationSessions,
+    impersonationActivityCounts,
   ] = await Promise.all([
     getDbStats(),
     getActiveSessionCount(),
@@ -239,15 +240,18 @@ export default async function AdminDashboardPage(
     getGeminiUsageByTaskSafe(),
     getBroadcastSummariesSafe(),
     getImpersonationSessionsSafe(),
+    getAllImpersonationActivityCountsSafe(),
   ]);
   const health = getServerHealth();
   const commonQuestions = groupSimilarQuestions(assistantQuestions);
-  // A second pass, not folded into the Promise.all above - each count
-  // depends on knowing the session ids first, which only exist once
-  // impersonationSessions itself has already resolved.
-  const impersonationSessionsWithCounts = await Promise.all(
-    impersonationSessions.map(async (s) => ({ ...s, changesCount: await countImpersonationActivitySafe(s.sessionId) }))
-  );
+  // One query for every session's count (see
+  // getAllImpersonationActivityCounts's own comment), already fetched
+  // above alongside everything else - just a lookup per session here,
+  // not a second wave of Cosmos round trips.
+  const impersonationSessionsWithCounts = impersonationSessions.map((s) => ({
+    ...s,
+    changesCount: impersonationActivityCounts[s.sessionId] ?? 0,
+  }));
 
   const trendRequests = siteStats?.trend.map((t) => t.requests) ?? [];
   const trendFailures = siteStats?.trend.map((t) => t.failures) ?? [];

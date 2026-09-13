@@ -28,6 +28,7 @@ import {
   logImpersonationActivity,
   logImpersonationActivityForCurrentRequest,
   countImpersonationActivity,
+  getAllImpersonationActivityCounts,
   purgeOldImpersonationLogs,
 } from "@/lib/admin/impersonation";
 
@@ -257,6 +258,27 @@ describe("logImpersonationActivity / countImpersonationActivity", () => {
     expect(query.query).toContain("c.sessionId = @sessionId");
     expect(query.parameters).toEqual([{ name: "@sessionId", value: "s1" }]);
     expect(options).toEqual({ partitionKey: "admin" });
+  });
+});
+
+describe("getAllImpersonationActivityCounts", () => {
+  it("groups activity entries by sessionId in one query, rather than one query per session", async () => {
+    mocks.fetchAll.mockResolvedValue({
+      resources: [{ sessionId: "s1" }, { sessionId: "s2" }, { sessionId: "s1" }, { sessionId: "s1" }],
+    });
+
+    const counts = await getAllImpersonationActivityCounts();
+
+    expect(counts).toEqual({ s1: 3, s2: 1 });
+    expect(mockContainer.items.query).toHaveBeenCalledTimes(1);
+    const [query, options] = mockContainer.items.query.mock.calls[0] as any[];
+    expect(query.query).toBe("SELECT c.sessionId FROM c WHERE c.type = 'impersonationActivity'");
+    expect(options).toEqual({ partitionKey: "admin" });
+  });
+
+  it("returns an empty object when there's no activity logged at all", async () => {
+    mocks.fetchAll.mockResolvedValue({ resources: [] });
+    await expect(getAllImpersonationActivityCounts()).resolves.toEqual({});
   });
 });
 

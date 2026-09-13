@@ -10,7 +10,8 @@
 import { getStripe } from "@/lib/payments/stripe";
 import { BUYING_GUIDE_REPORT_PRICE_PENCE, BUYING_GUIDE_REPORT_PRODUCT_NAME } from "@/lib/payments/pricing";
 import { computeBuyingGuideReportTier } from "@/lib/payments/buyingGuideReportTier";
-import { getUserDoc } from "@/lib/tracker/userDoc";
+import { getDocWithEtag } from "@/lib/tracker/atomicUpdate";
+import type { UserDoc } from "@/lib/tracker/userDoc";
 import { canRunFreeVehicleHistoryReport, recordVehicleHistoryReportRun } from "@/lib/tracker/vehicleHistoryReportUsage";
 import {
   createVdiPurchase,
@@ -61,16 +62,20 @@ export async function createBuyingGuideVdiCheckoutSession(
 
   if (tierResult.proFreeAvailable) {
     // Re-check right before granting, not just trusting the read inside
-    // computeBuyingGuideReportTier above - closes the (rare) race where
-    // two requests both read "available" before either records a run.
-    // Losing this race isn't an error: it just falls through to the
-    // normal paid "pro" price below, same as a Pro account that's
-    // already used this month's free report.
-    const user = await getUserDoc(email);
-    if (canRunFreeVehicleHistoryReport(user)) {
-      await recordVehicleHistoryReportRun(email);
-      const purchase = await createFreeProVdiPurchase(email, vrm, vehicleKind, tierResult.tier);
-      return { ok: true, freeReportReady: true, purchaseId: purchase.id };
+    // computeBuyingGuideReportTier above, AND record the run atomically
+    // against the exact etag this check read - closes the race where two
+    // concurrent requests both read "available" before either recorded a
+    // run (a plain read-then-upsert previously let both through). Losing
+    // this race isn't an error: it just falls through to the normal paid
+    // "pro" price below, same as a Pro account that's already used this
+    // month's free report.
+    const current = await getDocWithEtag<UserDoc>(email, email);
+    if (current && canRunFreeVehicleHistoryReport(current.doc)) {
+      const { recorded } = await recordVehicleHistoryReportRun(email, current.etag, current.doc);
+      if (recorded) {
+        const purchase = await createFreeProVdiPurchase(email, vrm, vehicleKind, tierResult.tier);
+        return { ok: true, freeReportReady: true, purchaseId: purchase.id };
+      }
     }
   }
 

@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const mocks = vi.hoisted(() => ({ read: vi.fn(), upsert: vi.fn() }));
+const mocks = vi.hoisted(() => ({ read: vi.fn(), upsert: vi.fn(), replace: vi.fn() }));
 const mockContainer = {
-  item: vi.fn(() => ({ read: mocks.read })),
+  item: vi.fn(() => ({ read: mocks.read, replace: mocks.replace })),
   items: { upsert: mocks.upsert },
 };
 vi.mock("@/lib/cosmos", () => ({ getContainer: () => mockContainer }));
@@ -17,6 +17,8 @@ function makeUser(overrides: Partial<UserDoc> = {}): UserDoc {
 beforeEach(() => {
   mocks.read.mockReset();
   mocks.upsert.mockReset();
+  mocks.replace.mockReset();
+  mocks.replace.mockResolvedValue({ resource: {} });
 });
 
 describe("canSendAssistantMessage", () => {
@@ -47,32 +49,37 @@ describe("canSendAssistantMessage", () => {
 });
 
 describe("recordAssistantMessage", () => {
-  it("does nothing when the user doc doesn't exist", async () => {
-    mocks.read.mockResolvedValue({ resource: undefined });
-    await recordAssistantMessage("missing@example.com");
-    expect(mocks.upsert).not.toHaveBeenCalled();
-  });
-
   it("starts a fresh count-of-1 for a user with no prior usage today", async () => {
-    mocks.read.mockResolvedValue({ resource: makeUser() });
-    await recordAssistantMessage("a@example.com");
-    const saved = mocks.upsert.mock.calls[0][0] as UserDoc;
-    expect(saved.assistantMessageUsage!.count).toBe(1);
-    expect(saved.assistantMessageUsage!.date).toBe(new Date().toISOString().slice(0, 10));
+    const result = await recordAssistantMessage("a@example.com", "etag-1", makeUser());
+    expect(result).toEqual({ recorded: true });
+    const [saved, options] = mocks.replace.mock.calls[0];
+    expect((saved as UserDoc).assistantMessageUsage!.count).toBe(1);
+    expect((saved as UserDoc).assistantMessageUsage!.date).toBe(new Date().toISOString().slice(0, 10));
+    expect(options).toEqual({ accessCondition: { type: "IfMatch", condition: "etag-1" } });
   });
 
   it("increments an existing same-day count", async () => {
     const today = new Date().toISOString().slice(0, 10);
-    mocks.read.mockResolvedValue({ resource: makeUser({ assistantMessageUsage: { date: today, count: 5 } }) });
-    await recordAssistantMessage("a@example.com");
-    const saved = mocks.upsert.mock.calls[0][0] as UserDoc;
+    const baseUser = makeUser({ assistantMessageUsage: { date: today, count: 5 } });
+    await recordAssistantMessage("a@example.com", "etag-1", baseUser);
+    const saved = mocks.replace.mock.calls[0][0] as UserDoc;
     expect(saved.assistantMessageUsage!.count).toBe(6);
   });
 
   it("resets the count when the stored date is a previous day", async () => {
-    mocks.read.mockResolvedValue({ resource: makeUser({ assistantMessageUsage: { date: "2020-01-01", count: 9999 } }) });
-    await recordAssistantMessage("a@example.com");
-    const saved = mocks.upsert.mock.calls[0][0] as UserDoc;
+    const baseUser = makeUser({ assistantMessageUsage: { date: "2020-01-01", count: 9999 } });
+    await recordAssistantMessage("a@example.com", "etag-1", baseUser);
+    const saved = mocks.replace.mock.calls[0][0] as UserDoc;
     expect(saved.assistantMessageUsage!.count).toBe(1);
+  });
+
+  it("reports alreadyUsed when a concurrent writer already pushed today's count to the limit", async () => {
+    const today = new Date().toISOString().slice(0, 10);
+    mocks.replace.mockRejectedValueOnce(Object.assign(new Error("conflict"), { code: 412 }));
+    mocks.read.mockResolvedValue({
+      resource: { ...makeUser(), assistantMessageUsage: { date: today, count: ASSISTANT_SIGNED_IN_MESSAGE_LIMIT }, _etag: "etag-2" },
+    });
+    const result = await recordAssistantMessage("a@example.com", "etag-1", makeUser());
+    expect(result).toEqual({ recorded: false, alreadyUsed: true });
   });
 });

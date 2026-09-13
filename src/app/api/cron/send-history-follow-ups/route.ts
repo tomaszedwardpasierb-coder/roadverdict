@@ -28,88 +28,101 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const appUrl = process.env.APP_URL ?? "https://roadverdict.co.uk";
-  let checked = 0;
-  let sent = 0;
-  let skipped = 0;
+  try {
+    const appUrl = process.env.APP_URL ?? "https://roadverdict.co.uk";
+    let checked = 0;
+    let sent = 0;
+    let skipped = 0;
+    let failed = 0;
 
-  const bikeCandidates = await getShareLinksNeedingFollowUp();
-  for (const link of bikeCandidates) {
-    checked++;
-    if (!link.recipientEmail) {
-      // Shouldn't happen given the query's own IS_DEFINED filter, but
-      // there's nowhere to send this without an address regardless.
-      skipped++;
-      continue;
+    const bikeCandidates = await getShareLinksNeedingFollowUp();
+    for (const link of bikeCandidates) {
+      checked++;
+
+      // Isolated per link, same as check-reminders/audit-mileage - one
+      // transient Cosmos read/write failure for a single link shouldn't
+      // abort every other link's own chance to be checked in this run.
+      try {
+        if (!link.recipientEmail) {
+          // Shouldn't happen given the query's own IS_DEFINED filter, but
+          // there's nowhere to send this without an address regardless.
+          skipped++;
+          continue;
+        }
+
+        const bike = await getBike(link.email, link.bikeId);
+        if (!bike) {
+          // Bike deleted since the link was created - nothing left to
+          // offer a history for. Mark processed so this link stops
+          // showing up in every future run.
+          await markShareLinkFollowUpSent(link.id);
+          skipped++;
+          continue;
+        }
+
+        if (isBikeReadOnly(bike) || (await hasActiveTransferRequestForBike(link.email, link.bikeId))) {
+          // Already handed off, or already requested by someone - either
+          // way the follow-up would be redundant or actively unwelcome.
+          await markShareLinkFollowUpSent(link.id);
+          skipped++;
+          continue;
+        }
+
+        await sendHistoryFollowUpEmail({
+          recipientEmail: link.recipientEmail,
+          bikeSummary: { make: bike.make, model: bike.model, year: bike.year, isCustomBuild: !!bike.isCustomBuild },
+          reportUrl: `${appUrl}/report/${link.id}/detailed`,
+        });
+        await markShareLinkFollowUpSent(link.id);
+        sent++;
+      } catch (err) {
+        // Not marked as sent on failure - left eligible so tomorrow's
+        // run retries it, same as a transient failure anywhere else in
+        // this app degrading to "try again next time" rather than lost.
+        console.error(`History follow-up failed for share link ${link.id}:`, err);
+        failed++;
+      }
     }
 
-    const bike = await getBike(link.email, link.bikeId);
-    if (!bike) {
-      // Bike deleted since the link was created - nothing left to
-      // offer a history for. Mark processed so this link stops
-      // showing up in every future run.
-      await markShareLinkFollowUpSent(link.id);
-      skipped++;
-      continue;
+    const carCandidates = await getCarShareLinksNeedingFollowUp();
+    for (const link of carCandidates) {
+      checked++;
+
+      try {
+        if (!link.recipientEmail) {
+          skipped++;
+          continue;
+        }
+
+        const car = await getCarById(link.email, link.carId);
+        if (!car) {
+          await markCarShareLinkFollowUpSent(link.id);
+          skipped++;
+          continue;
+        }
+
+        if (isCarReadOnly(car) || (await hasActiveCarTransferRequestForCar(link.email, link.carId))) {
+          await markCarShareLinkFollowUpSent(link.id);
+          skipped++;
+          continue;
+        }
+
+        await sendCarHistoryFollowUpEmail({
+          recipientEmail: link.recipientEmail,
+          carSummary: { make: car.make, model: car.model, year: car.year, isCustomBuild: !!car.isCustomBuild },
+          reportUrl: `${appUrl}/car-report/${link.id}/detailed`,
+        });
+        await markCarShareLinkFollowUpSent(link.id);
+        sent++;
+      } catch (err) {
+        console.error(`Car history follow-up failed for share link ${link.id}:`, err);
+        failed++;
+      }
     }
 
-    if (isBikeReadOnly(bike) || (await hasActiveTransferRequestForBike(link.email, link.bikeId))) {
-      // Already handed off, or already requested by someone - either
-      // way the follow-up would be redundant or actively unwelcome.
-      await markShareLinkFollowUpSent(link.id);
-      skipped++;
-      continue;
-    }
-
-    try {
-      await sendHistoryFollowUpEmail({
-        recipientEmail: link.recipientEmail,
-        bikeSummary: { make: bike.make, model: bike.model, year: bike.year, isCustomBuild: !!bike.isCustomBuild },
-        reportUrl: `${appUrl}/report/${link.id}/detailed`,
-      });
-      await markShareLinkFollowUpSent(link.id);
-      sent++;
-    } catch (err) {
-      // Not marked as sent on failure - left eligible so tomorrow's
-      // run retries it, same as a transient failure anywhere else in
-      // this app degrading to "try again next time" rather than lost.
-      console.error("History follow-up email failed to send:", err);
-    }
+    return NextResponse.json({ ok: true, checked, sent, skipped, ...(failed ? { failed } : {}) });
+  } catch (err) {
+    console.error("send-history-follow-ups: unexpected top-level failure:", err);
+    return NextResponse.json({ error: "Unexpected error sending history follow-ups" }, { status: 500 });
   }
-
-  const carCandidates = await getCarShareLinksNeedingFollowUp();
-  for (const link of carCandidates) {
-    checked++;
-    if (!link.recipientEmail) {
-      skipped++;
-      continue;
-    }
-
-    const car = await getCarById(link.email, link.carId);
-    if (!car) {
-      await markCarShareLinkFollowUpSent(link.id);
-      skipped++;
-      continue;
-    }
-
-    if (isCarReadOnly(car) || (await hasActiveCarTransferRequestForCar(link.email, link.carId))) {
-      await markCarShareLinkFollowUpSent(link.id);
-      skipped++;
-      continue;
-    }
-
-    try {
-      await sendCarHistoryFollowUpEmail({
-        recipientEmail: link.recipientEmail,
-        carSummary: { make: car.make, model: car.model, year: car.year, isCustomBuild: !!car.isCustomBuild },
-        reportUrl: `${appUrl}/car-report/${link.id}/detailed`,
-      });
-      await markCarShareLinkFollowUpSent(link.id);
-      sent++;
-    } catch (err) {
-      console.error("Car history follow-up email failed to send:", err);
-    }
-  }
-
-  return NextResponse.json({ checked, sent, skipped });
 }

@@ -12,7 +12,7 @@ const mocks = vi.hoisted(() => ({
   fetchVdiCheckFromVdg: vi.fn(),
   fetchVehicleTaxDetailsFromVdg: vi.fn(),
   computeBuyingGuideReportTier: vi.fn(),
-  getUserDoc: vi.fn(),
+  getDocWithEtag: vi.fn(),
   getCachedBuyingGuideLookup: vi.fn(),
   setCachedBuyingGuideLookup: vi.fn(),
   canRunFreeBuyingGuideLookup: vi.fn(),
@@ -38,7 +38,7 @@ vi.mock("@/lib/payments/buyingGuideVdiCheckout", () => ({
 vi.mock("@/lib/tracker/vdiCheckFetch", () => ({ fetchVdiCheckFromVdg: mocks.fetchVdiCheckFromVdg }));
 vi.mock("@/lib/tracker/vehicleTaxFetch", () => ({ fetchVehicleTaxDetailsFromVdg: mocks.fetchVehicleTaxDetailsFromVdg }));
 vi.mock("@/lib/payments/buyingGuideReportTier", () => ({ computeBuyingGuideReportTier: mocks.computeBuyingGuideReportTier }));
-vi.mock("@/lib/tracker/userDoc", () => ({ getUserDoc: mocks.getUserDoc }));
+vi.mock("@/lib/tracker/atomicUpdate", () => ({ getDocWithEtag: mocks.getDocWithEtag }));
 vi.mock("@/lib/tracker/buyingGuideLookupCache", () => ({
   getCachedBuyingGuideLookup: mocks.getCachedBuyingGuideLookup,
   setCachedBuyingGuideLookup: mocks.setCachedBuyingGuideLookup,
@@ -128,12 +128,15 @@ beforeEach(() => {
     proFreeAvailable: false,
     nextFreeAt: null,
   });
-  mocks.getUserDoc.mockResolvedValue(null);
+  mocks.getDocWithEtag.mockResolvedValue({
+    doc: { id: "rider@example.com", pk: "rider@example.com", type: "user", email: "rider@example.com", createdAt: "x" },
+    etag: "etag-1",
+  });
   mocks.getCachedBuyingGuideLookup.mockResolvedValue(null);
   mocks.canRunFreeBuyingGuideLookup.mockReturnValue(true);
   mocks.nextFreeBuyingGuideLookupAt.mockReturnValue(null);
   mocks.setCachedBuyingGuideLookup.mockResolvedValue(undefined);
-  mocks.recordBuyingGuideLookupRun.mockResolvedValue(undefined);
+  mocks.recordBuyingGuideLookupRun.mockResolvedValue({ recorded: true });
   process.env.VDG_API_KEY = "test-key";
   delete process.env.GEMINI_API_KEY;
   mocks.fetch.mockResolvedValue(vdgMotSuccess());
@@ -564,7 +567,11 @@ describe("GET /api/tracker/buying-guide-lookup", () => {
       },
       briefing: null,
     });
-    expect(mocks.recordBuyingGuideLookupRun).toHaveBeenCalledWith("rider@example.com");
+    expect(mocks.recordBuyingGuideLookupRun).toHaveBeenCalledWith(
+      "rider@example.com",
+      "etag-1",
+      expect.objectContaining({ email: "rider@example.com" })
+    );
   });
 
   it("caches a fresh lookup unlocked by paid access too, but does not spend the free quota for it", async () => {

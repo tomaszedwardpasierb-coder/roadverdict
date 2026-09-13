@@ -17,7 +17,8 @@ import { getSession } from "@/lib/auth/session";
 import { parseMotHistory, type RawMotTest, type ParsedMotTest } from "@/lib/tracker/motHistory";
 import { generateCarBuyingGuideBriefing, type CarBuyingGuideBriefingResult } from "@/lib/tracker/carBuyingGuideBriefing";
 import { isPro } from "@/lib/subscriptions";
-import { getUserDoc } from "@/lib/tracker/userDoc";
+import type { UserDoc } from "@/lib/tracker/userDoc";
+import { getDocWithEtag, type DocWithEtag } from "@/lib/tracker/atomicUpdate";
 import { canRunValuationCheck, recordValuationCheckRun, nextValuationCheckAt } from "@/lib/tracker/valuationCheckUsage";
 import { getVdiPurchase, markVdiPurchaseConsumed, findRecentConsumedPurchase, VDI_PURCHASE_RETRIEVAL_WINDOW_MS } from "@/lib/tracker/vdiPurchase";
 import { selfHealBuyingGuideVdiPurchase } from "@/lib/payments/buyingGuideVdiCheckout";
@@ -201,8 +202,16 @@ export async function GET(request: NextRequest) {
 
   const cached = await getCachedBuyingGuideLookup("car", vrm);
 
+  // Captured here (with its etag) rather than re-read from scratch at
+  // the recordBuyingGuideLookupRun() call far below - that etag is what
+  // lets the write later be conditioned on nothing else having changed
+  // this cooldown since this exact check, closing the race where two
+  // concurrent lookups could both pass this same check before either
+  // one's write landed.
+  let gatingUserWithEtag: DocWithEtag<UserDoc> | null = null;
   if (!cached && !hasPaidAccess) {
-    const gatingUser = await getUserDoc(session.email);
+    gatingUserWithEtag = await getDocWithEtag<UserDoc>(session.email, session.email);
+    const gatingUser = gatingUserWithEtag?.doc ?? null;
     if (!canRunFreeBuyingGuideLookup(gatingUser)) {
       const reportTierResult = await computeBuyingGuideReportTier(session.email);
       const blockedResult: CarBuyingGuideLookupResult = {
@@ -278,23 +287,28 @@ export async function GET(request: NextRequest) {
     motTestsOldestFirst = parsed.tests;
     motTests = [...parsed.tests].reverse();
 
-    if (!hasPaidAccess) {
+    if (!hasPaidAccess && gatingUserWithEtag) {
       // Only the free path spends this account's monthly credit - a
       // paid-access lookup (a real, valid VDI purchase for this plate)
       // never touches the free quota, so buying the report doesn't cost
-      // an account its next month's free lookup too.
-      await recordBuyingGuideLookupRun(session.email);
+      // an account its next month's free lookup too. Conditioned on the
+      // etag captured at the gating check above rather than a fresh
+      // unconditional read-then-write.
+      await recordBuyingGuideLookupRun(session.email, gatingUserWithEtag.etag, gatingUserWithEtag.doc);
     }
   }
 
   const userIsPro = await isPro(session.email);
-  const user = await getUserDoc(session.email);
+  const valuationUserWithEtag = await getDocWithEtag<UserDoc>(session.email, session.email);
+  const user = valuationUserWithEtag?.doc ?? null;
   let valuation: ValuationResult | null = null;
   let valuationBlockedReason: "cooldown" | undefined;
   let valuationAvailableAt: string | null = null;
   if (canRunValuationCheck(user, userIsPro)) {
     valuation = await fetchValuationFromVdg(vrm, apiKey);
-    await recordValuationCheckRun(session.email);
+    if (valuationUserWithEtag) {
+      await recordValuationCheckRun(session.email, valuationUserWithEtag.etag, valuationUserWithEtag.doc, userIsPro);
+    }
   } else {
     valuationBlockedReason = "cooldown";
     valuationAvailableAt = nextValuationCheckAt(user, userIsPro);

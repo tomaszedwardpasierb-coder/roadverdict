@@ -18,7 +18,8 @@ import {
 import { getLivePrivacyPolicyText } from "@/lib/tracker/assistantKnowledge";
 import { getAssistantConfig, getCarAssistantConfig, type AssistantConfigDoc } from "@/lib/tracker/assistantConfig";
 import { resolveActiveVehicle } from "@/lib/tracker/activeVehicle";
-import { getUserDoc } from "@/lib/tracker/userDoc";
+import { getDocWithEtag } from "@/lib/tracker/atomicUpdate";
+import type { UserDoc } from "@/lib/tracker/userDoc";
 import { canSendAssistantMessage, recordAssistantMessage } from "@/lib/tracker/assistantSignedInUsage";
 import {
   ASSISTANT_TOOL_DECLARATIONS,
@@ -321,17 +322,24 @@ export async function POST(req: NextRequest) {
   let displayName: string | null = null;
   if (signedIn && session) {
     try {
-      const user = await getUserDoc(session.email);
-      displayName = user?.displayName ?? null;
-      if (!canSendAssistantMessage(user)) {
+      const current = await getDocWithEtag<UserDoc>(session.email, session.email);
+      displayName = current?.doc.displayName ?? null;
+      if (current && !canSendAssistantMessage(current.doc)) {
         return NextResponse.json(
           { error: "You've reached today's message limit for the assistant - try again tomorrow." },
           { status: 429 }
         );
       }
-      await recordAssistantMessage(session.email);
+      // Recorded atomically against the exact doc/etag just read above -
+      // see assistantSignedInUsage.ts's own comment for why a plain
+      // read-then-upsert here let concurrent messages near the daily cap
+      // all get through. Losing this race (alreadyUsed: true) isn't
+      // treated as an error - the cap check above already ran, so this
+      // message is allowed through either way; it's only relevant to a
+      // very rare, harmless double-count.
+      if (current) await recordAssistantMessage(session.email, current.etag, current.doc);
     } catch (err) {
-      console.error("Assistant: getUserDoc()/message-cap check failed, continuing without a display name:", err);
+      console.error("Assistant: message-cap check failed, continuing without a display name:", err);
     }
   }
 
@@ -391,11 +399,19 @@ export async function POST(req: NextRequest) {
   // kinds in one picker - see vehicleComparison.ts), preserving the
   // original requested order so the merged comparison the tool returns
   // lines up with what's actually on screen.
+  // Computed once and reused by both this block and the logEntryAccess
+  // block below - isPro() can't change mid-request, so there's no reason
+  // to spend a second Cosmos read on the identical value. Caught to null
+  // (not folded into false) so each block below can still tell "genuinely
+  // not Pro" apart from "the lookup itself failed" and keep its own
+  // existing fail-soft behavior.
+  const userIsProResult: Promise<boolean | null> = signedIn && session ? isPro(session.email).catch(() => null) : Promise.resolve(null);
+
   let compareContext: CompareContext | null = null;
   let compareVehicleNames: string[] | null = null;
   if (signedIn && session && Array.isArray(body.compareVehicleIds) && body.compareVehicleIds.length > 0) {
     try {
-      const userIsPro = await isPro(session.email);
+      const userIsPro = await userIsProResult;
       if (userIsPro) {
         const [bikes, cars] = await Promise.all([getBikesForUser(session.email), getCarsForUser(session.email)]);
         const ownActiveBikes = bikes.filter((b) => !isBikeReadOnly(b));
@@ -429,11 +445,8 @@ export async function POST(req: NextRequest) {
   // buildLogEntryToolDeclarations below), not whether it's offered at all.
   let logEntryAccess: "available" | "upsell" | "none" = "none";
   if (signedIn && session) {
-    try {
-      logEntryAccess = (await isPro(session.email)) ? "available" : "upsell";
-    } catch (err) {
-      console.error("Assistant: isPro() failed for log-entry gating, continuing without it:", err);
-    }
+    const userIsPro = await userIsProResult;
+    logEntryAccess = userIsPro === null ? "none" : userIsPro ? "available" : "upsell";
   }
 
   // The client always appends the new message before sending, so this

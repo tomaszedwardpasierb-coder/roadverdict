@@ -142,7 +142,7 @@ describe("POST /api/cron/update-fuel-price", () => {
       .mockResolvedValueOnce(okResponse(pageHtml(CSV_URL)))
       .mockResolvedValueOnce(okResponse(csvText(ukDate(1))));
     await POST(request({ authorization: "Bearer top-secret" }));
-    expect(mocks.fetch).toHaveBeenNthCalledWith(2, CSV_URL);
+    expect(mocks.fetch).toHaveBeenNthCalledWith(2, CSV_URL, expect.objectContaining({ signal: expect.any(AbortSignal) }));
   });
 
   it("returns a 500 when saving the parsed price throws", async () => {

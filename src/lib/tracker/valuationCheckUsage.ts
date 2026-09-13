@@ -15,8 +15,8 @@
 // subscription price on this one feature alone. Matched to Free's 7-day
 // cooldown instead (~£0.86/month) - there's no product reason Pro needs
 // this specific check 7x more often than Free.
-import { getContainer } from "@/lib/cosmos";
 import type { UserDoc } from "@/lib/tracker/userDoc";
+import { replaceIfUnchanged } from "@/lib/tracker/atomicUpdate";
 
 export const VALUATION_CHECK_COOLDOWN_MS_FREE = 7 * 24 * 60 * 60 * 1000;
 export const VALUATION_CHECK_COOLDOWN_MS_PRO = 7 * 24 * 60 * 60 * 1000;
@@ -38,10 +38,27 @@ export function nextValuationCheckAt(user: UserDoc | null, isPro: boolean): stri
   return nextMs > Date.now() ? new Date(nextMs).toISOString() : null;
 }
 
-export async function recordValuationCheckRun(email: string): Promise<void> {
-  const container = getContainer();
-  const { resource } = await container.item(email, email).read<UserDoc>();
-  if (!resource) return;
-  resource.valuationCheckUsage = { lastRunAt: new Date().toISOString() };
-  await container.items.upsert(resource);
+// Takes the exact UserDoc + etag the caller already read to run
+// canRunValuationCheck in the first place (see getDocWithEtag in
+// atomicUpdate.ts), and writes the new lastRunAt conditioned on nothing
+// else having changed that document since - closes the race where two
+// concurrent requests could both pass the cooldown check before either
+// one's write landed.
+export async function recordValuationCheckRun(
+  email: string,
+  etag: string,
+  baseUser: UserDoc,
+  isPro: boolean
+): Promise<{ recorded: boolean; alreadyUsed?: boolean }> {
+  const result = await replaceIfUnchanged<UserDoc>(
+    email,
+    email,
+    etag,
+    baseUser,
+    (doc) => ({ ...doc, valuationCheckUsage: { lastRunAt: new Date().toISOString() } }),
+    (doc) => canRunValuationCheck(doc, isPro)
+  );
+  if (result.ok) return { recorded: true };
+  if (result.reason === "not_found") return { recorded: false };
+  return { recorded: false, alreadyUsed: true };
 }

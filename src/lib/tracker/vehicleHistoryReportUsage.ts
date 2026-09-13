@@ -7,9 +7,9 @@
 // just at different lengths). Same field+predicate+recorder shape as
 // valuationCheckUsage.ts/receiptRequest.ts's canSendReminder/
 // recordReminderSent.
-import { getContainer } from "@/lib/cosmos";
 import type { UserDoc } from "@/lib/tracker/userDoc";
 import { PRO_FREE_REPORT_COOLDOWN_MS } from "@/lib/payments/pricing";
+import { replaceIfUnchanged } from "@/lib/tracker/atomicUpdate";
 
 export function canRunFreeVehicleHistoryReport(user: UserDoc | null): boolean {
   if (!user?.vehicleHistoryReportUsage) return true;
@@ -24,10 +24,26 @@ export function nextFreeVehicleHistoryReportAt(user: UserDoc | null): string | n
   return nextMs > Date.now() ? new Date(nextMs).toISOString() : null;
 }
 
-export async function recordVehicleHistoryReportRun(email: string): Promise<void> {
-  const container = getContainer();
-  const { resource } = await container.item(email, email).read<UserDoc>();
-  if (!resource) return;
-  resource.vehicleHistoryReportUsage = { lastRunAt: new Date().toISOString() };
-  await container.items.upsert(resource);
+// Takes the exact UserDoc + etag the caller already read to run
+// canRunFreeVehicleHistoryReport in the first place (see getDocWithEtag),
+// and writes the new lastRunAt conditioned on nothing else having
+// changed that document since - see atomicUpdate.ts's own comment for
+// why a plain read-then-upsert here let two concurrent requests both
+// grant themselves the same month's free report.
+export async function recordVehicleHistoryReportRun(
+  email: string,
+  etag: string,
+  baseUser: UserDoc
+): Promise<{ recorded: boolean; alreadyUsed?: boolean }> {
+  const result = await replaceIfUnchanged<UserDoc>(
+    email,
+    email,
+    etag,
+    baseUser,
+    (doc) => ({ ...doc, vehicleHistoryReportUsage: { lastRunAt: new Date().toISOString() } }),
+    canRunFreeVehicleHistoryReport
+  );
+  if (result.ok) return { recorded: true };
+  if (result.reason === "not_found") return { recorded: false };
+  return { recorded: false, alreadyUsed: true };
 }

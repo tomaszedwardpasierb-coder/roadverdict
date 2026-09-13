@@ -24,7 +24,8 @@
 // read-only from this point on either way.
 import { getContainer } from "@/lib/cosmos";
 import { isPro } from "@/lib/subscriptions";
-import { getBike, getBikesForUser, generateBikeId, countActiveBikes, getCurrentRegistration, type BikeDoc } from "@/lib/tracker/bike";
+import { getBikesForUser, generateBikeId, countActiveBikes, getCurrentRegistration, type BikeDoc } from "@/lib/tracker/bike";
+import { getDocWithEtag, replaceIfUnchanged } from "@/lib/tracker/atomicUpdate";
 import { getCarsForUser, countActiveCars } from "@/lib/tracker/car";
 import { MAX_FREE_VEHICLES, MAX_PRO_VEHICLES } from "@/lib/tracker/vehicleLimit";
 import { normalizePlate, allKnownPlates } from "@/lib/tracker/reportAccess";
@@ -56,10 +57,22 @@ export async function transferBike(
     return { ok: false, reason: "same_owner" };
   }
 
-  const oldBike = await getBike(fromEmail, bikeId);
-  if (!oldBike) {
+  // Etag captured here is what makes the final "mark oldBike
+  // transferred" write further down conditional rather than a blind
+  // upsert - see that write's own comment for why: two concurrent
+  // accepts of the same offer used to both pass this exact check before
+  // either write landed, each creating its own new bike doc under a
+  // different recipient/session, duplicating the vehicle.
+  let current: { doc: BikeDoc; etag: string } | null;
+  try {
+    current = await getDocWithEtag<BikeDoc>(bikeId, fromEmail);
+  } catch {
+    current = null;
+  }
+  if (!current) {
     return { ok: false, reason: "bike_not_found" };
   }
+  const oldBike = current.doc;
   if (oldBike.transferredTo) {
     return { ok: false, reason: "already_transferred" };
   }
@@ -180,20 +193,26 @@ export async function transferBike(
     },
   };
 
-  oldBike.transferredTo = {
-    newBikeId,
-    newOwnerEmail: toEmail,
-    transferredAt,
-  };
+  // Conditioned on the etag captured at the top of this function - if a
+  // concurrent call already transferred this exact bike since then (the
+  // double-accept race), this write loses and reports a conflict rather
+  // than silently overwriting the other transfer's result. Done BEFORE
+  // creating/upserting newBike or copying a single record, so the loser
+  // of the race never creates a duplicate vehicle - only the winner's
+  // side effects happen at all.
+  const writeResult = await replaceIfUnchanged<BikeDoc>(
+    bikeId,
+    fromEmail,
+    current.etag,
+    oldBike,
+    (doc) => ({ ...doc, transferredTo: { newBikeId, newOwnerEmail: toEmail, transferredAt } }),
+    (doc) => !doc.transferredTo
+  );
+  if (!writeResult.ok) {
+    return { ok: false, reason: "already_transferred" };
+  }
 
   const container = getContainer();
-  // Old bike written first deliberately - if this succeeds but the new
-  // bike write fails, the old bike is locked with nothing to show for
-  // it (bad, but recoverable by an admin retry, and not user-visible
-  // since there's no UI to this yet). The other order would risk a
-  // brand new bike existing while the old one still looks transferable,
-  // which is the worse of the two failure shapes to leave behind.
-  await container.items.upsert(oldBike);
   await container.items.upsert(newBike);
 
   if (includeRecords) {

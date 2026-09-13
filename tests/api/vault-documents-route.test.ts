@@ -9,9 +9,12 @@ const mocks = vi.hoisted(() => ({
   getCarById: vi.fn(),
   getVaultContainer: vi.fn(),
   uploadData: vi.fn(),
+  deleteIfExists: vi.fn(),
   createVaultDocument: vi.fn(),
   getVaultDocumentsForVehicle: vi.fn(),
   countAndSizeVaultDocuments: vi.fn(),
+  acquireVaultUploadLock: vi.fn(),
+  releaseVaultUploadLock: vi.fn(),
 }));
 
 vi.mock("@/lib/tracker/vaultAccess", () => ({ checkVaultGate: mocks.checkVaultGate }));
@@ -19,6 +22,10 @@ vi.mock("@/lib/tracker/vaultSession", () => ({ extendVaultSession: mocks.extendV
 vi.mock("@/lib/tracker/bike", () => ({ getBike: mocks.getBike }));
 vi.mock("@/lib/tracker/car", () => ({ getCarById: mocks.getCarById }));
 vi.mock("@/lib/blobStorage", () => ({ getVaultContainer: mocks.getVaultContainer }));
+vi.mock("@/lib/tracker/vaultUploadLock", () => ({
+  acquireVaultUploadLock: mocks.acquireVaultUploadLock,
+  releaseVaultUploadLock: mocks.releaseVaultUploadLock,
+}));
 vi.mock("@/lib/tracker/vaultDocument", async () => {
   const actual = await vi.importActual<typeof import("@/lib/tracker/vaultDocument")>("@/lib/tracker/vaultDocument");
   return {
@@ -89,12 +96,25 @@ describe("POST /api/vault/documents", () => {
     mocks.getBike.mockResolvedValue({ id: "bike-1" });
     mocks.getCarById.mockResolvedValue({ id: "car-1" });
     mocks.countAndSizeVaultDocuments.mockResolvedValue({ count: 0, totalBytes: 0 });
-    mocks.getVaultContainer.mockResolvedValue({ getBlockBlobClient: () => ({ uploadData: mocks.uploadData }) });
+    mocks.getVaultContainer.mockResolvedValue({ getBlockBlobClient: () => ({ uploadData: mocks.uploadData, deleteIfExists: mocks.deleteIfExists }) });
     mocks.createVaultDocument.mockImplementation(async (email, data) => ({ id: "new-doc", pk: email, type: "vaultDocument", uploadedAt: "now", ...data }));
+    mocks.acquireVaultUploadLock.mockResolvedValue(true);
+    mocks.releaseVaultUploadLock.mockResolvedValue(undefined);
+    mocks.deleteIfExists.mockResolvedValue(undefined);
   });
 
+  // Real magic bytes for each declared type - the route now sniffs the
+  // actual file contents, not just the declared Content-Type, so a fake
+  // [1,2,3] body (the old fixture) would be rejected before ever
+  // reaching the code path most of these tests mean to exercise.
   function validFile(type = "application/pdf") {
-    return new File([new Uint8Array([1, 2, 3])], "v5c.pdf", { type });
+    const bytesByType: Record<string, number[]> = {
+      "application/pdf": [0x25, 0x50, 0x44, 0x46, 0x2d, 0x31, 0x2e, 0x34],
+      "image/jpeg": [0xff, 0xd8, 0xff, 0xe0, 0, 0, 0, 0],
+      "image/png": [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a],
+    };
+    const bytes = bytesByType[type] ?? [1, 2, 3];
+    return new File([new Uint8Array(bytes)], "v5c.pdf", { type });
   }
 
   it("rejects when the gate fails", async () => {
@@ -165,5 +185,46 @@ describe("POST /api/vault/documents", () => {
     mocks.uploadData.mockRejectedValue(new Error("storage down"));
     const response = await POST(postReq({ file: validFile(), vehicleKind: "bike", vehicleId: "bike-1", category: "dvlaLegal" }));
     expect(response.status).toBe(500);
+  });
+
+  it("rejects a file whose real bytes don't match its declared type", async () => {
+    const mislabelled = new File([new Uint8Array([1, 2, 3, 4])], "fake.pdf", { type: "application/pdf" });
+    const response = await POST(postReq({ file: mislabelled, vehicleKind: "bike", vehicleId: "bike-1", category: "dvlaLegal" }));
+    expect(response.status).toBe(400);
+    expect(mocks.createVaultDocument).not.toHaveBeenCalled();
+  });
+
+  it("responds 409 without uploading anything when a concurrent upload already holds the per-vehicle lock", async () => {
+    mocks.acquireVaultUploadLock.mockResolvedValue(false);
+    const response = await POST(postReq({ file: validFile(), vehicleKind: "bike", vehicleId: "bike-1", category: "dvlaLegal" }));
+    expect(response.status).toBe(409);
+    expect(mocks.uploadData).not.toHaveBeenCalled();
+    expect(mocks.releaseVaultUploadLock).not.toHaveBeenCalled();
+  });
+
+  it("always releases the per-vehicle upload lock, even when the upload fails", async () => {
+    mocks.uploadData.mockRejectedValue(new Error("storage down"));
+    await POST(postReq({ file: validFile(), vehicleKind: "bike", vehicleId: "bike-1", category: "dvlaLegal" }));
+    expect(mocks.releaseVaultUploadLock).toHaveBeenCalledWith(EMAIL, "bike-1");
+  });
+
+  it("releases the lock after a successful upload too", async () => {
+    await POST(postReq({ file: validFile(), vehicleKind: "bike", vehicleId: "bike-1", category: "dvlaLegal" }));
+    expect(mocks.releaseVaultUploadLock).toHaveBeenCalledWith(EMAIL, "bike-1");
+  });
+
+  it("cleans up the orphaned blob when the metadata write fails after a successful upload", async () => {
+    mocks.createVaultDocument.mockRejectedValue(new Error("cosmos throttled"));
+    const response = await POST(postReq({ file: validFile(), vehicleKind: "bike", vehicleId: "bike-1", category: "dvlaLegal" }));
+    expect(response.status).toBe(500);
+    expect(mocks.uploadData).toHaveBeenCalledTimes(1);
+    expect(mocks.deleteIfExists).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not leak internal error detail to the client on a 500", async () => {
+    mocks.uploadData.mockRejectedValue(new Error("connection string abc123 leaked"));
+    const response = await POST(postReq({ file: validFile(), vehicleKind: "bike", vehicleId: "bike-1", category: "dvlaLegal" }));
+    const body = await response.json();
+    expect(body).toEqual({ error: "Upload failed. Please try again." });
   });
 });

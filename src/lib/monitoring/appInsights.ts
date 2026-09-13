@@ -1,4 +1,5 @@
 import { ClientSecretCredential } from "@azure/identity";
+import { fetchWithTimeout } from "@/lib/fetchWithTimeout";
 
 const APP_INSIGHTS_RESOURCE_ID =
   "/subscriptions/bb9e306b-3a3f-485e-9c3e-a952ce5aaecf/resourceGroups/roadverdict-rg/providers/microsoft.insights/components/roadverdict-insights";
@@ -27,7 +28,7 @@ async function runQuery(kql: string, timespanIso: string): Promise<LogsTable[]> 
     throw new Error("Failed to acquire Log Analytics access token.");
   }
 
-  const res = await fetch(`https://api.loganalytics.io/v1${APP_INSIGHTS_RESOURCE_ID}/query`, {
+  const res = await fetchWithTimeout(`https://api.loganalytics.io/v1${APP_INSIGHTS_RESOURCE_ID}/query`, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${token.token}`,

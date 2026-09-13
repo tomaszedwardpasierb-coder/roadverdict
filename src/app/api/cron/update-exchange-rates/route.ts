@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getContainer } from "@/lib/cosmos";
 import { ALL_CURRENCIES } from "@/lib/tracker/currency";
+import { fetchWithTimeout } from "@/lib/fetchWithTimeout";
 
 export const dynamic = "force-dynamic";
 
@@ -19,7 +20,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const targets = ALL_CURRENCIES.filter((c) => c !== "GBP").join(",");
-    const res = await fetch(`https://api.frankfurter.dev/v2/rates?base=GBP&quotes=${targets}`);
+    const res = await fetchWithTimeout(`https://api.frankfurter.dev/v2/rates?base=GBP&quotes=${targets}`);
     if (!res.ok) {
       throw new Error(`Frankfurter returned ${res.status}`);
     }

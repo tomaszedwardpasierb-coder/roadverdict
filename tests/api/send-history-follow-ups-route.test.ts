@@ -115,13 +115,13 @@ describe("POST /api/cron/send-history-follow-ups", () => {
   it("no-ops cleanly when there are no candidate links", async () => {
     const response = await POST(request({ authorization: "Bearer top-secret" }));
     expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toEqual({ checked: 0, sent: 0, skipped: 0 });
+    await expect(response.json()).resolves.toEqual({ ok: true, checked: 0, sent: 0, skipped: 0 });
   });
 
   it("skips (without marking) a bike candidate that has no recipient email", async () => {
     mocks.getShareLinksNeedingFollowUp.mockResolvedValue([link({ recipientEmail: undefined })]);
     const response = await POST(request({ authorization: "Bearer top-secret" }));
-    await expect(response.json()).resolves.toEqual({ checked: 1, sent: 0, skipped: 1 });
+    await expect(response.json()).resolves.toEqual({ ok: true, checked: 1, sent: 0, skipped: 1 });
     expect(mocks.markShareLinkFollowUpSent).not.toHaveBeenCalled();
     expect(mocks.sendHistoryFollowUpEmail).not.toHaveBeenCalled();
   });
@@ -130,7 +130,7 @@ describe("POST /api/cron/send-history-follow-ups", () => {
     mocks.getShareLinksNeedingFollowUp.mockResolvedValue([link()]);
     mocks.getBike.mockResolvedValue(null);
     const response = await POST(request({ authorization: "Bearer top-secret" }));
-    await expect(response.json()).resolves.toEqual({ checked: 1, sent: 0, skipped: 1 });
+    await expect(response.json()).resolves.toEqual({ ok: true, checked: 1, sent: 0, skipped: 1 });
     expect(mocks.markShareLinkFollowUpSent).toHaveBeenCalledWith("token-1");
     expect(mocks.sendHistoryFollowUpEmail).not.toHaveBeenCalled();
   });
@@ -139,7 +139,7 @@ describe("POST /api/cron/send-history-follow-ups", () => {
     mocks.getShareLinksNeedingFollowUp.mockResolvedValue([link()]);
     mocks.isBikeReadOnly.mockReturnValue(true);
     const response = await POST(request({ authorization: "Bearer top-secret" }));
-    await expect(response.json()).resolves.toEqual({ checked: 1, sent: 0, skipped: 1 });
+    await expect(response.json()).resolves.toEqual({ ok: true, checked: 1, sent: 0, skipped: 1 });
     expect(mocks.markShareLinkFollowUpSent).toHaveBeenCalledWith("token-1");
     expect(mocks.sendHistoryFollowUpEmail).not.toHaveBeenCalled();
   });
@@ -148,14 +148,14 @@ describe("POST /api/cron/send-history-follow-ups", () => {
     mocks.getShareLinksNeedingFollowUp.mockResolvedValue([link()]);
     mocks.hasActiveTransferRequestForBike.mockResolvedValue(true);
     const response = await POST(request({ authorization: "Bearer top-secret" }));
-    await expect(response.json()).resolves.toEqual({ checked: 1, sent: 0, skipped: 1 });
+    await expect(response.json()).resolves.toEqual({ ok: true, checked: 1, sent: 0, skipped: 1 });
     expect(mocks.sendHistoryFollowUpEmail).not.toHaveBeenCalled();
   });
 
   it("sends the follow-up email and marks it sent for an eligible bike link", async () => {
     mocks.getShareLinksNeedingFollowUp.mockResolvedValue([link()]);
     const response = await POST(request({ authorization: "Bearer top-secret" }));
-    await expect(response.json()).resolves.toEqual({ checked: 1, sent: 1, skipped: 0 });
+    await expect(response.json()).resolves.toEqual({ ok: true, checked: 1, sent: 1, skipped: 0 });
     expect(mocks.sendHistoryFollowUpEmail).toHaveBeenCalledWith({
       recipientEmail: "buyer@example.com",
       bikeSummary: { make: "Yamaha", model: "MT-07", year: 2020, isCustomBuild: false },
@@ -190,8 +190,34 @@ describe("POST /api/cron/send-history-follow-ups", () => {
     const body = await response.json();
 
     expect(response.status).toBe(200);
-    expect(body).toEqual({ checked: 2, sent: 1, skipped: 0 });
+    expect(body).toEqual({ ok: true, checked: 2, sent: 1, failed: 1, skipped: 0 });
     expect(mocks.markShareLinkFollowUpSent).not.toHaveBeenCalledWith("token-fail");
+    expect(mocks.markShareLinkFollowUpSent).toHaveBeenCalledWith("token-ok");
+  });
+
+  // Regression: a transient failure in getBike/isBikeReadOnly/
+  // hasActiveTransferRequestForBike - i.e. anywhere in the per-link body
+  // OTHER than the email send itself - used to be completely unwrapped,
+  // so it threw all the way out of the whole handler and silently
+  // abandoned every other pending link in the same run. It must now be
+  // isolated exactly like a failed send: counted, logged, left eligible
+  // for tomorrow's retry, and the rest of the batch still processed.
+  it("isolates a failure in the per-link lookup itself (not just the email send), so one bad link doesn't abort the whole run", async () => {
+    mocks.getShareLinksNeedingFollowUp.mockResolvedValue([
+      link({ id: "token-broken", recipientEmail: "broken@example.com" }),
+      link({ id: "token-ok", recipientEmail: "ok@example.com" }),
+    ]);
+    mocks.getBike.mockImplementationOnce(async () => {
+      throw new Error("Cosmos read failed");
+    });
+    mocks.getBike.mockResolvedValue({ make: "Yamaha", model: "MT-07", year: 2020, isCustomBuild: false });
+
+    const response = await POST(request({ authorization: "Bearer top-secret" }));
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body).toEqual({ ok: true, checked: 2, sent: 1, failed: 1, skipped: 0 });
+    expect(mocks.markShareLinkFollowUpSent).not.toHaveBeenCalledWith("token-broken");
     expect(mocks.markShareLinkFollowUpSent).toHaveBeenCalledWith("token-ok");
   });
 
@@ -212,10 +238,10 @@ describe("POST /api/cron/send-history-follow-ups", () => {
     });
 
     const first = await POST(request({ authorization: "Bearer top-secret" }));
-    await expect(first.json()).resolves.toEqual({ checked: 1, sent: 1, skipped: 0 });
+    await expect(first.json()).resolves.toEqual({ ok: true, checked: 1, sent: 1, skipped: 0 });
 
     const second = await POST(request({ authorization: "Bearer top-secret" }));
-    await expect(second.json()).resolves.toEqual({ checked: 0, sent: 0, skipped: 0 });
+    await expect(second.json()).resolves.toEqual({ ok: true, checked: 0, sent: 0, skipped: 0 });
 
     expect(mocks.sendHistoryFollowUpEmail).toHaveBeenCalledTimes(1);
   });
@@ -226,7 +252,7 @@ describe("POST /api/cron/send-history-follow-ups", () => {
     it("skips (without marking) a car candidate that has no recipient email", async () => {
       mocks.getCarShareLinksNeedingFollowUp.mockResolvedValue([carLink({ recipientEmail: undefined })]);
       const response = await POST(request({ authorization: "Bearer top-secret" }));
-      await expect(response.json()).resolves.toEqual({ checked: 1, sent: 0, skipped: 1 });
+      await expect(response.json()).resolves.toEqual({ ok: true, checked: 1, sent: 0, skipped: 1 });
       expect(mocks.markCarShareLinkFollowUpSent).not.toHaveBeenCalled();
       expect(mocks.sendCarHistoryFollowUpEmail).not.toHaveBeenCalled();
     });
@@ -235,7 +261,7 @@ describe("POST /api/cron/send-history-follow-ups", () => {
       mocks.getCarShareLinksNeedingFollowUp.mockResolvedValue([carLink()]);
       mocks.getCarById.mockResolvedValue(null);
       const response = await POST(request({ authorization: "Bearer top-secret" }));
-      await expect(response.json()).resolves.toEqual({ checked: 1, sent: 0, skipped: 1 });
+      await expect(response.json()).resolves.toEqual({ ok: true, checked: 1, sent: 0, skipped: 1 });
       expect(mocks.markCarShareLinkFollowUpSent).toHaveBeenCalledWith("car-token-1");
       expect(mocks.sendCarHistoryFollowUpEmail).not.toHaveBeenCalled();
     });
@@ -244,7 +270,7 @@ describe("POST /api/cron/send-history-follow-ups", () => {
       mocks.getCarShareLinksNeedingFollowUp.mockResolvedValue([carLink()]);
       mocks.isCarReadOnly.mockReturnValue(true);
       const response = await POST(request({ authorization: "Bearer top-secret" }));
-      await expect(response.json()).resolves.toEqual({ checked: 1, sent: 0, skipped: 1 });
+      await expect(response.json()).resolves.toEqual({ ok: true, checked: 1, sent: 0, skipped: 1 });
       expect(mocks.sendCarHistoryFollowUpEmail).not.toHaveBeenCalled();
     });
 
@@ -252,14 +278,14 @@ describe("POST /api/cron/send-history-follow-ups", () => {
       mocks.getCarShareLinksNeedingFollowUp.mockResolvedValue([carLink()]);
       mocks.hasActiveCarTransferRequestForCar.mockResolvedValue(true);
       const response = await POST(request({ authorization: "Bearer top-secret" }));
-      await expect(response.json()).resolves.toEqual({ checked: 1, sent: 0, skipped: 1 });
+      await expect(response.json()).resolves.toEqual({ ok: true, checked: 1, sent: 0, skipped: 1 });
       expect(mocks.sendCarHistoryFollowUpEmail).not.toHaveBeenCalled();
     });
 
     it("sends the follow-up email and marks it sent for an eligible car link", async () => {
       mocks.getCarShareLinksNeedingFollowUp.mockResolvedValue([carLink()]);
       const response = await POST(request({ authorization: "Bearer top-secret" }));
-      await expect(response.json()).resolves.toEqual({ checked: 1, sent: 1, skipped: 0 });
+      await expect(response.json()).resolves.toEqual({ ok: true, checked: 1, sent: 1, skipped: 0 });
       expect(mocks.sendCarHistoryFollowUpEmail).toHaveBeenCalledWith({
         recipientEmail: "buyer@example.com",
         carSummary: { make: "Ford", model: "Focus", year: 2020, isCustomBuild: false },
@@ -272,7 +298,7 @@ describe("POST /api/cron/send-history-follow-ups", () => {
       mocks.getShareLinksNeedingFollowUp.mockResolvedValue([link()]);
       mocks.getCarShareLinksNeedingFollowUp.mockResolvedValue([carLink()]);
       const response = await POST(request({ authorization: "Bearer top-secret" }));
-      await expect(response.json()).resolves.toEqual({ checked: 2, sent: 2, skipped: 0 });
+      await expect(response.json()).resolves.toEqual({ ok: true, checked: 2, sent: 2, skipped: 0 });
       expect(mocks.sendHistoryFollowUpEmail).toHaveBeenCalledTimes(1);
       expect(mocks.sendCarHistoryFollowUpEmail).toHaveBeenCalledTimes(1);
     });
@@ -283,7 +309,7 @@ describe("POST /api/cron/send-history-follow-ups", () => {
       mocks.sendCarHistoryFollowUpEmail.mockRejectedValue(new Error("Resend rejected"));
 
       const response = await POST(request({ authorization: "Bearer top-secret" }));
-      await expect(response.json()).resolves.toEqual({ checked: 2, sent: 1, skipped: 0 });
+      await expect(response.json()).resolves.toEqual({ ok: true, checked: 2, sent: 1, failed: 1, skipped: 0 });
       expect(mocks.markShareLinkFollowUpSent).toHaveBeenCalledWith("token-1");
       expect(mocks.markCarShareLinkFollowUpSent).not.toHaveBeenCalled();
     });

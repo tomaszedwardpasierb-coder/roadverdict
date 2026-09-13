@@ -197,6 +197,28 @@ export async function countImpersonationActivity(sessionId: string): Promise<num
   return resources[0] ?? 0;
 }
 
+// Same fix as getAllImpersonationSessions above already applies to its
+// own query: one query over every impersonationActivity doc, grouped by
+// sessionId in memory, instead of the admin page issuing its own
+// separate countImpersonationActivity query per session (an N+1 that
+// scaled with the number of logged sessions - 200 sessions meant 200
+// Cosmos round trips to render the page instead of one).
+export async function getAllImpersonationActivityCounts(): Promise<Record<string, number>> {
+  const container = getContainer();
+  const { resources } = await container.items
+    .query<{ sessionId: string }>(
+      { query: "SELECT c.sessionId FROM c WHERE c.type = 'impersonationActivity'" },
+      { partitionKey: ADMIN_PK }
+    )
+    .fetchAll();
+
+  const counts: Record<string, number> = {};
+  for (const { sessionId } of resources) {
+    counts[sessionId] = (counts[sessionId] ?? 0) + 1;
+  }
+  return counts;
+}
+
 const IMPERSONATION_LOG_RETENTION_DAYS = 365;
 
 // No Cosmos ttl here on purpose - unlike the app's other short-lived

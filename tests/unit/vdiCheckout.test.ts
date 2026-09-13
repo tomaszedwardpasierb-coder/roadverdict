@@ -59,6 +59,20 @@ describe("createVdiCheckoutSession", () => {
     expect(args.cancel_url).toBe("https://roadverdict.co.uk/report/tok_abc/detailed");
   });
 
+  // Stripe's own idempotency guarantee - a double-click or a page-refresh
+  // racing the original request must reuse the exact same Checkout
+  // Session rather than create a second, separately payable one for the
+  // same share-link token (the underlying bug behind a real double charge).
+  it("passes a stable, per-token idempotency key so a repeat call reuses the same Checkout Session", async () => {
+    mocks.resolveShareToken.mockResolvedValue({ email: "a@example.com", bikeId: "b1" });
+    mocks.create.mockResolvedValue({ url: "https://checkout.stripe.com/session123" });
+
+    await createVdiCheckoutSession("tok_abc", "bike", "https://roadverdict.co.uk");
+
+    const options = mocks.create.mock.calls[0][1];
+    expect(options).toEqual({ idempotencyKey: "vdi-checkout:tok_abc" });
+  });
+
   it("creates a car checkout session at £13.99 pointing at the car report path", async () => {
     mocks.resolveCarShareToken.mockResolvedValue({ email: "a@example.com", carId: "c1" });
     mocks.create.mockResolvedValue({ url: "https://checkout.stripe.com/session456" });

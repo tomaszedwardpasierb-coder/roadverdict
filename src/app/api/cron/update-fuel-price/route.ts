@@ -1,6 +1,7 @@
 ﻿// Place at: src/app/api/cron/update-fuel-price/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { saveCurrentPetrolPrice, saveCurrentDieselPrice } from "@/lib/fuelPrice";
+import { fetchWithTimeout } from "@/lib/fetchWithTimeout";
 
 export const dynamic = "force-dynamic";
 
@@ -86,7 +87,7 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const pageResponse = await fetch(STATS_PAGE_URL);
+    const pageResponse = await fetchWithTimeout(STATS_PAGE_URL);
     if (!pageResponse.ok) {
       return NextResponse.json({ error: "Could not load statistics page" }, { status: 502 });
     }
@@ -97,7 +98,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Could not find CSV link on page" }, { status: 502 });
     }
 
-    const csvResponse = await fetch(csvUrl);
+    const csvResponse = await fetchWithTimeout(csvUrl);
     if (!csvResponse.ok) {
       return NextResponse.json({ error: "Could not download CSV" }, { status: 502 });
     }

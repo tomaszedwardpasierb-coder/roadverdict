@@ -11,7 +11,7 @@ const mocks = vi.hoisted(() => ({
   parseMotHistory: vi.fn(),
   generateCarBuyingGuideBriefing: vi.fn(),
   isPro: vi.fn(),
-  getUserDoc: vi.fn(),
+  getDocWithEtag: vi.fn(),
   canRunValuationCheck: vi.fn(),
   recordValuationCheckRun: vi.fn(),
   nextValuationCheckAt: vi.fn(),
@@ -37,7 +37,7 @@ vi.mock("@/lib/tracker/carBuyingGuideBriefing", () => ({
   generateCarBuyingGuideBriefing: mocks.generateCarBuyingGuideBriefing,
 }));
 vi.mock("@/lib/subscriptions", () => ({ isPro: mocks.isPro }));
-vi.mock("@/lib/tracker/userDoc", () => ({ getUserDoc: mocks.getUserDoc }));
+vi.mock("@/lib/tracker/atomicUpdate", () => ({ getDocWithEtag: mocks.getDocWithEtag }));
 vi.mock("@/lib/tracker/valuationCheckUsage", () => ({
   canRunValuationCheck: mocks.canRunValuationCheck,
   recordValuationCheckRun: mocks.recordValuationCheckRun,
@@ -129,7 +129,10 @@ beforeEach(() => {
   mocks.parseMotHistory.mockReturnValue(parsedMotResult);
   mocks.generateCarBuyingGuideBriefing.mockResolvedValue(null);
   mocks.isPro.mockResolvedValue(false);
-  mocks.getUserDoc.mockResolvedValue(null);
+  mocks.getDocWithEtag.mockResolvedValue({
+    doc: { id: "buyer@example.com", pk: "buyer@example.com", type: "user", email: "buyer@example.com", createdAt: "x" },
+    etag: "etag-1",
+  });
   mocks.canRunValuationCheck.mockReturnValue(true);
   mocks.nextValuationCheckAt.mockReturnValue(null);
   mocks.findRecentConsumedPurchase.mockResolvedValue(null);
@@ -158,7 +161,8 @@ beforeEach(() => {
   mocks.canRunFreeBuyingGuideLookup.mockReturnValue(true);
   mocks.nextFreeBuyingGuideLookupAt.mockReturnValue(null);
   mocks.setCachedBuyingGuideLookup.mockResolvedValue(undefined);
-  mocks.recordBuyingGuideLookupRun.mockResolvedValue(undefined);
+  mocks.recordBuyingGuideLookupRun.mockResolvedValue({ recorded: true });
+  mocks.recordValuationCheckRun.mockResolvedValue({ recorded: true });
   process.env.VDG_API_KEY = "test-key";
   delete process.env.GEMINI_API_KEY;
   mocks.fetch.mockResolvedValue(vdgMotSuccess());
@@ -371,14 +375,36 @@ describe("GET /api/cars/buying-guide-lookup", () => {
     const response = await GET(request("AB20FOC"));
     const body = await response.json();
     expect(mocks.fetchValuationFromVdg).toHaveBeenCalledWith("AB20FOC", "test-key");
-    expect(mocks.recordValuationCheckRun).toHaveBeenCalledWith("buyer@example.com");
+    expect(mocks.recordValuationCheckRun).toHaveBeenCalledWith(
+      "buyer@example.com",
+      "etag-1",
+      expect.objectContaining({ email: "buyer@example.com" }),
+      false
+    );
     expect(body.valuation).toMatchObject({ privateAverage: 23994 });
   });
 
   it("passes isPro through to canRunValuationCheck/nextValuationCheckAt", async () => {
     mocks.isPro.mockResolvedValue(true);
     await GET(request("AB20FOC"));
-    expect(mocks.canRunValuationCheck).toHaveBeenCalledWith(null, true);
+    expect(mocks.canRunValuationCheck).toHaveBeenCalledWith(
+      expect.objectContaining({ email: "buyer@example.com" }),
+      true
+    );
+  });
+
+  // The genuinely-null-UserDoc edge case (a signed-in session with no
+  // real UserDoc at all - not realistic in production, since
+  // createSessionForEmail always creates one, but worth covering): the
+  // valuation check still runs (canRunValuationCheck(null, ...) is
+  // permissive), it just has nothing to record the run against.
+  it("still runs the valuation but skips recording when there's no user doc to record against", async () => {
+    mocks.getDocWithEtag.mockResolvedValue(null);
+    const response = await GET(request("AB20FOC"));
+    const body = await response.json();
+    expect(mocks.canRunValuationCheck).toHaveBeenCalledWith(null, false);
+    expect(body.valuation).toMatchObject({ privateAverage: 23994 });
+    expect(mocks.recordValuationCheckRun).not.toHaveBeenCalled();
   });
 
   it("blocks the valuation on cooldown, returning the reason and next-available date instead", async () => {
@@ -590,7 +616,11 @@ describe("GET /api/cars/buying-guide-lookup", () => {
       },
       briefing: null,
     });
-    expect(mocks.recordBuyingGuideLookupRun).toHaveBeenCalledWith("buyer@example.com");
+    expect(mocks.recordBuyingGuideLookupRun).toHaveBeenCalledWith(
+      "buyer@example.com",
+      "etag-1",
+      expect.objectContaining({ email: "buyer@example.com" })
+    );
   });
 
   it("caches a fresh lookup unlocked by paid access too, but does not spend the free quota for it", async () => {

@@ -7,9 +7,9 @@
 // report), this applies to every account alike - there is no unlimited
 // tier for the base free lookup. Same field+predicate+recorder shape as
 // vehicleHistoryReportUsage.ts/valuationCheckUsage.ts.
-import { getContainer } from "@/lib/cosmos";
 import type { UserDoc } from "@/lib/tracker/userDoc";
 import { BUYING_GUIDE_LOOKUP_COOLDOWN_MS } from "@/lib/payments/pricing";
+import { replaceIfUnchanged } from "@/lib/tracker/atomicUpdate";
 
 export function canRunFreeBuyingGuideLookup(user: UserDoc | null): boolean {
   if (!user?.buyingGuideLookupUsage) return true;
@@ -24,10 +24,25 @@ export function nextFreeBuyingGuideLookupAt(user: UserDoc | null): string | null
   return nextMs > Date.now() ? new Date(nextMs).toISOString() : null;
 }
 
-export async function recordBuyingGuideLookupRun(email: string): Promise<void> {
-  const container = getContainer();
-  const { resource } = await container.item(email, email).read<UserDoc>();
-  if (!resource) return;
-  resource.buyingGuideLookupUsage = { lastRunAt: new Date().toISOString() };
-  await container.items.upsert(resource);
+// Takes the exact UserDoc + etag the caller already read to run
+// canRunFreeBuyingGuideLookup in the first place, and writes the new
+// lastRunAt conditioned on nothing else having changed that document
+// since - closes the race where two concurrent lookups could both pass
+// the cooldown check before either write landed.
+export async function recordBuyingGuideLookupRun(
+  email: string,
+  etag: string,
+  baseUser: UserDoc
+): Promise<{ recorded: boolean; alreadyUsed?: boolean }> {
+  const result = await replaceIfUnchanged<UserDoc>(
+    email,
+    email,
+    etag,
+    baseUser,
+    (doc) => ({ ...doc, buyingGuideLookupUsage: { lastRunAt: new Date().toISOString() } }),
+    canRunFreeBuyingGuideLookup
+  );
+  if (result.ok) return { recorded: true };
+  if (result.reason === "not_found") return { recorded: false };
+  return { recorded: false, alreadyUsed: true };
 }

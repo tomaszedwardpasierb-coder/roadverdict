@@ -20,8 +20,8 @@
 // email) rather than a separate hashed-key doc, since a signed-in
 // request already has a real account to key off - no need for the
 // anon tracker's cookie+IP double-keying here.
-import { getContainer } from "@/lib/cosmos";
 import type { UserDoc } from "@/lib/tracker/userDoc";
+import { replaceIfUnchanged } from "@/lib/tracker/atomicUpdate";
 
 export const ASSISTANT_SIGNED_IN_MESSAGE_LIMIT = 150;
 
@@ -35,12 +35,29 @@ export function canSendAssistantMessage(user: UserDoc | null): boolean {
   return user.assistantMessageUsage.count < ASSISTANT_SIGNED_IN_MESSAGE_LIMIT;
 }
 
-export async function recordAssistantMessage(email: string): Promise<void> {
-  const container = getContainer();
-  const { resource } = await container.item(email, email).read<UserDoc>();
-  if (!resource) return;
-  const today = todayUtc();
-  const currentCount = resource.assistantMessageUsage?.date === today ? resource.assistantMessageUsage.count : 0;
-  resource.assistantMessageUsage = { date: today, count: currentCount + 1 };
-  await container.items.upsert(resource);
+// Takes the exact UserDoc + etag the caller already read to run
+// canSendAssistantMessage in the first place, and writes the incremented
+// count conditioned on nothing else having changed that document since -
+// closes the race where N concurrent messages near the daily cap could
+// all read the same pre-increment count and all get through.
+export async function recordAssistantMessage(
+  email: string,
+  etag: string,
+  baseUser: UserDoc
+): Promise<{ recorded: boolean; alreadyUsed?: boolean }> {
+  const result = await replaceIfUnchanged<UserDoc>(
+    email,
+    email,
+    etag,
+    baseUser,
+    (doc) => {
+      const today = todayUtc();
+      const currentCount = doc.assistantMessageUsage?.date === today ? doc.assistantMessageUsage.count : 0;
+      return { ...doc, assistantMessageUsage: { date: today, count: currentCount + 1 } };
+    },
+    canSendAssistantMessage
+  );
+  if (result.ok) return { recorded: true };
+  if (result.reason === "not_found") return { recorded: false };
+  return { recorded: false, alreadyUsed: true };
 }
