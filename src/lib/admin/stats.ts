@@ -271,6 +271,81 @@ export interface DetailedCounts {
   unusedMagicLinks: number;
 }
 
+// Every function above this line that scans the whole container (no
+// partition key - GROUP BY or a bare COUNT/SELECT across every doc of a
+// type) is cheap today, but its cost scales with total document count,
+// not with how often an admin actually looks at this page. getAdminStatsBundle
+// below is the one thing /tomasz should actually call for these seven -
+// it wraps them in a short-lived Cosmos-backed cache (same pattern as
+// buyingGuideLookupCache.ts) so a page reload, a tab switch, or two
+// admins looking at once within the same minute triggers one real scan
+// of each, not one per page view. The individual functions stay exported
+// and untouched (including their own direct unit tests) - this only
+// changes how often /tomasz's Promise.all actually calls them.
+export interface AdminStatsBundle {
+  dbStats: DbTypeCount[];
+  activeSessionCount: number;
+  totalUserCount: number;
+  magicLinkRequests: MagicLinkRequestSummary[];
+  recentSessions: RecentSession[];
+  browserBreakdown: BrowserBreakdownEntry[];
+  detailedCounts: DetailedCounts;
+}
+
+interface AdminStatsCacheDoc {
+  id: string;
+  pk: "system";
+  type: "adminStatsCache";
+  cachedAt: string;
+  data: AdminStatsBundle;
+}
+
+const ADMIN_STATS_CACHE_ID = "adminStatsCache";
+const ADMIN_STATS_CACHE_PK = "system";
+// An internal dashboard, not a customer-facing number - a bit of
+// staleness costs nothing here, and the actions that DO need to feel
+// instant on this page (blocking an account, granting Pro, etc.) all
+// come from separate, uncached reads elsewhere in tomasz/page.tsx, not
+// from anything in this bundle.
+const ADMIN_STATS_CACHE_TTL_MS = 60 * 1000;
+
+export async function getAdminStatsBundle(): Promise<AdminStatsBundle> {
+  const container = getContainer();
+
+  try {
+    const { resource } = await container.item(ADMIN_STATS_CACHE_ID, ADMIN_STATS_CACHE_PK).read<AdminStatsCacheDoc>();
+    if (resource && Date.now() - new Date(resource.cachedAt).getTime() < ADMIN_STATS_CACHE_TTL_MS) {
+      return resource.data;
+    }
+  } catch {
+    // No cache doc yet, or a transient read failure - fall through to a
+    // real (if slower) read below rather than failing the whole page.
+  }
+
+  const [dbStats, activeSessionCount, totalUserCount, magicLinkRequests, recentSessions, browserBreakdown, detailedCounts] = await Promise.all([
+    getDbStats(),
+    getActiveSessionCount(),
+    getTotalUserCount(),
+    getMagicLinkRequests(),
+    getRecentSessions(50),
+    getBrowserBreakdown(),
+    getDetailedCounts(),
+  ]);
+  const data: AdminStatsBundle = { dbStats, activeSessionCount, totalUserCount, magicLinkRequests, recentSessions, browserBreakdown, detailedCounts };
+
+  try {
+    const doc: AdminStatsCacheDoc = { id: ADMIN_STATS_CACHE_ID, pk: ADMIN_STATS_CACHE_PK, type: "adminStatsCache", cachedAt: new Date().toISOString(), data };
+    await container.items.upsert(doc);
+  } catch (err) {
+    // The fresh data is still good - a failure to cache it just means
+    // the next request within the window does a real scan again too,
+    // not that this request should fail.
+    console.error("getAdminStatsBundle: failed to write the cache doc (serving the fresh read anyway):", err);
+  }
+
+  return data;
+}
+
 export async function getDetailedCounts(): Promise<DetailedCounts> {
   const container = getContainer();
   const now = new Date().toISOString();

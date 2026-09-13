@@ -2,20 +2,14 @@
 import { redirect } from 'next/navigation';
 import { getAdminSession } from '@/lib/admin/session';
 import {
-  getDbStats,
-  getActiveSessionCount,
+  getAdminStatsBundle,
   getFuelPriceStatus,
   getReminderCronStatus,
-  getTotalUserCount,
-  getMagicLinkRequests,
-  getRecentSessions,
   getServerHealth,
   getCosmosContainerInfo,
-  getDetailedCounts,
   getBikeIdBackfillStatus,
   getUserBackfillStatus,
   getSeedAssistantConfigStatus,
-  getBrowserBreakdown,
   browserFamily,
 } from '@/lib/admin/stats';
 import { getSiteStats, type SiteStats } from '@/lib/monitoring/appInsights';
@@ -194,19 +188,13 @@ export default async function AdminDashboardPage(
   const windowHours = HOUR_OPTIONS.some((o) => o.hours === requestedHours) ? requestedHours : 24;
 
   const [
-    dbStats,
-    activeSessions,
+    statsBundle,
     fuelStatus,
     reminderStatus,
-    totalUsers,
-    magicLinkRequests,
-    recentSessions,
     cosmosInfo,
-    detailedCounts,
     bikeIdBackfillStatus,
     userBackfillStatus,
     seedAssistantConfigStatus,
-    browserBreakdown,
     siteStats,
     assistantQuestions,
     allUserEmails,
@@ -218,19 +206,13 @@ export default async function AdminDashboardPage(
     impersonationSessions,
     impersonationActivityCounts,
   ] = await Promise.all([
-    getDbStats(),
-    getActiveSessionCount(),
+    getAdminStatsBundle(),
     getFuelPriceStatus(),
     getReminderCronStatus(),
-    getTotalUserCount(),
-    getMagicLinkRequests(),
-    getRecentSessions(50),
     getCosmosContainerInfo(),
-    getDetailedCounts(),
     getBikeIdBackfillStatus(),
     getUserBackfillStatus(),
     getSeedAssistantConfigStatus(),
-    getBrowserBreakdown(),
     getSiteStatsSafe(windowHours),
     getAssistantQuestionsSafe(),
     getAllUserEmailsSafe(),
@@ -242,6 +224,7 @@ export default async function AdminDashboardPage(
     getImpersonationSessionsSafe(),
     getAllImpersonationActivityCountsSafe(),
   ]);
+  const { dbStats, activeSessionCount: activeSessions, totalUserCount: totalUsers, magicLinkRequests, recentSessions, browserBreakdown, detailedCounts } = statsBundle;
   const health = getServerHealth();
   const commonQuestions = groupSimilarQuestions(assistantQuestions);
   // One query for every session's count (see

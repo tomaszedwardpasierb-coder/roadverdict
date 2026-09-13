@@ -4,11 +4,13 @@ const mocks = vi.hoisted(() => ({
   fetchAll: vi.fn(),
   itemRead: vi.fn(),
   containerRead: vi.fn(),
+  itemUpsert: vi.fn(),
 }));
 
 const mockContainer = {
   items: {
     query: vi.fn(() => ({ fetchAll: mocks.fetchAll })),
+    upsert: mocks.itemUpsert,
   },
   item: vi.fn(() => ({ read: mocks.itemRead })),
   read: mocks.containerRead,
@@ -32,6 +34,7 @@ import {
   getServerHealth,
   getCosmosContainerInfo,
   getDetailedCounts,
+  getAdminStatsBundle,
 } from "@/lib/admin/stats";
 
 function resetMocks() {
@@ -384,5 +387,80 @@ describe("getDetailedCounts", () => {
       usedMagicLinks: 0,
       unusedMagicLinks: 0,
     });
+  });
+});
+
+describe("getAdminStatsBundle", () => {
+  beforeEach(resetMocks);
+
+  const freshBundle = {
+    dbStats: [{ type: "user", count: 1 }],
+    activeSessionCount: 1,
+    totalUserCount: 1,
+    magicLinkRequests: [],
+    recentSessions: [],
+    browserBreakdown: [],
+    detailedCounts: { expiredSessions: 0, usedMagicLinks: 0, unusedMagicLinks: 0 },
+  };
+
+  it("returns the cached bundle as-is, without running any of the underlying scans, when the cache is still fresh", async () => {
+    mocks.itemRead.mockResolvedValue({ resource: { cachedAt: new Date().toISOString(), data: freshBundle } });
+
+    const result = await getAdminStatsBundle();
+
+    expect(result).toEqual(freshBundle);
+    expect(mocks.fetchAll).not.toHaveBeenCalled();
+    expect(mocks.itemUpsert).not.toHaveBeenCalled();
+  });
+
+  it("treats a cache doc older than 60s as a miss and recomputes", async () => {
+    mocks.itemRead.mockResolvedValue({
+      resource: { cachedAt: new Date(Date.now() - 61_000).toISOString(), data: freshBundle },
+    });
+    mocks.fetchAll.mockResolvedValue({ resources: [] });
+    mocks.itemUpsert.mockResolvedValue(undefined);
+
+    await getAdminStatsBundle();
+
+    expect(mocks.fetchAll).toHaveBeenCalled();
+    expect(mocks.itemUpsert).toHaveBeenCalledTimes(1);
+  });
+
+  it("recomputes from the seven underlying scans when there's no cache doc yet, and writes the result back", async () => {
+    mocks.itemRead.mockResolvedValue({ resource: undefined });
+    // One resolved value per fetchAll() call, in the exact order each
+    // underlying function's own query fires - see the comment on
+    // getAdminStatsBundle for why this order is deterministic: dbStats,
+    // activeSessionCount, totalUserCount, magicLinkRequests,
+    // recentSessions, browserBreakdown, then getDetailedCounts' own three
+    // internal queries (expired/used/unused).
+    mocks.fetchAll
+      .mockResolvedValueOnce({ resources: [{ type: "user", count: 1 }] })
+      .mockResolvedValueOnce({ resources: [1] })
+      .mockResolvedValueOnce({ resources: [1] })
+      .mockResolvedValueOnce({ resources: [] })
+      .mockResolvedValueOnce({ resources: [] })
+      .mockResolvedValueOnce({ resources: [] })
+      .mockResolvedValueOnce({ resources: [0] })
+      .mockResolvedValueOnce({ resources: [0] })
+      .mockResolvedValueOnce({ resources: [0] });
+    mocks.itemUpsert.mockResolvedValue(undefined);
+
+    const result = await getAdminStatsBundle();
+
+    expect(result).toEqual(freshBundle);
+    expect(mocks.itemUpsert).toHaveBeenCalledTimes(1);
+    const [cachedDoc] = mocks.itemUpsert.mock.calls[0];
+    expect(cachedDoc).toMatchObject({ id: "adminStatsCache", pk: "system", type: "adminStatsCache", data: freshBundle });
+  });
+
+  it("still returns the freshly computed bundle even if writing the cache doc fails", async () => {
+    mocks.itemRead.mockResolvedValue({ resource: undefined });
+    mocks.fetchAll.mockResolvedValue({ resources: [] });
+    mocks.itemUpsert.mockRejectedValue(new Error("cosmos unavailable"));
+
+    const result = await getAdminStatsBundle();
+
+    expect(result.detailedCounts).toEqual({ expiredSessions: 0, usedMagicLinks: 0, unusedMagicLinks: 0 });
   });
 });
