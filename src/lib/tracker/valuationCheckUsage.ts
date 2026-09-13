@@ -13,13 +13,21 @@
 // Pro's cooldown used to be 24h (vs Free's 7 days) - at £0.20/call that
 // alone worked out to roughly £6/month, more than Pro's entire £5.99
 // subscription price on this one feature alone. Matched to Free's 7-day
-// cooldown instead (~£0.86/month) - there's no product reason Pro needs
-// this specific check 7x more often than Free.
+// cooldown for a while after that (~£0.86/month) - there was no product
+// reason Pro needed this specific check 7x more often than Free.
+//
+// Tightened again to 28 days, matching the free monthly vehicle-history
+// report's own cadence (PRO_FREE_REPORT_COOLDOWN_MS in pricing.ts) - at
+// the same confirmed £0.20/call, the 7-day version still cost up to
+// ~£0.86/month per Pro subscriber with no product reason for it to run
+// more often than the report it sits alongside. Monthly brings that down
+// to ~£0.20/month, closing the gap between the two cooldowns rather than
+// leaving this one as the odd one out.
 import type { UserDoc } from "@/lib/tracker/userDoc";
 import { replaceIfUnchanged } from "@/lib/tracker/atomicUpdate";
 
 export const VALUATION_CHECK_COOLDOWN_MS_FREE = 7 * 24 * 60 * 60 * 1000;
-export const VALUATION_CHECK_COOLDOWN_MS_PRO = 7 * 24 * 60 * 60 * 1000;
+export const VALUATION_CHECK_COOLDOWN_MS_PRO = 28 * 24 * 60 * 60 * 1000;
 
 function cooldownMs(isPro: boolean): number {
   return isPro ? VALUATION_CHECK_COOLDOWN_MS_PRO : VALUATION_CHECK_COOLDOWN_MS_FREE;

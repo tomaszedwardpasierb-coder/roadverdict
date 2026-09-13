@@ -45,22 +45,35 @@ describe("canRunValuationCheck", () => {
     expect(canRunValuationCheck(user, false)).toBe(true);
   });
 
-  it("blocks a Pro account within the same cooldown as Free", () => {
+  it("blocks a Pro account within its own cooldown", () => {
     const user = makeUser({ valuationCheckUsage: { lastRunAt: new Date(Date.now() - 1000).toISOString() } });
     expect(canRunValuationCheck(user, true)).toBe(false);
   });
 
-  // Pro's cooldown used to be a separate, much shorter 24h window - at
-  // £0.20/call that alone worked out to more than Pro's entire monthly
-  // subscription price. Matched to Free's 7-day cooldown instead (see
-  // VALUATION_CHECK_COOLDOWN_MS_PRO's own comment) - this pins that both
-  // plans now share the exact same window, not a Pro-specific shortcut.
-  it("gives Pro the exact same cooldown as Free, not a shorter one", () => {
-    expect(VALUATION_CHECK_COOLDOWN_MS_PRO).toBe(VALUATION_CHECK_COOLDOWN_MS_FREE);
+  // Pro's cooldown has moved twice: a separate, much shorter 24h window
+  // originally (at £0.20/call, that alone cost more than Pro's entire
+  // monthly subscription price), then matched to Free's 7-day cooldown,
+  // now tightened to 28 days to match the free monthly vehicle-history
+  // report's own cadence (see VALUATION_CHECK_COOLDOWN_MS_PRO's own
+  // comment) - this pins that Pro is deliberately LONGER than Free, not
+  // the other way round, since Pro already gets a separate free report
+  // on this same monthly rhythm.
+  it("gives Pro a longer cooldown than Free, matching the free report's monthly cadence", () => {
+    expect(VALUATION_CHECK_COOLDOWN_MS_PRO).toBeGreaterThan(VALUATION_CHECK_COOLDOWN_MS_FREE);
+    expect(VALUATION_CHECK_COOLDOWN_MS_PRO).toBe(28 * 24 * 60 * 60 * 1000);
+
+    // Just past the Free cooldown, but still well within Pro's - Pro must
+    // still be blocked here, not incorrectly allowed just because Free
+    // would already allow a re-run at this point.
     const lastRunAt = new Date(Date.now() - VALUATION_CHECK_COOLDOWN_MS_FREE - 1000).toISOString();
     const user = makeUser({ valuationCheckUsage: { lastRunAt } });
-    expect(canRunValuationCheck(user, true)).toBe(true);
     expect(canRunValuationCheck(user, false)).toBe(true);
+    expect(canRunValuationCheck(user, true)).toBe(false);
+  });
+
+  it("allows a Pro account again once its own longer cooldown has passed", () => {
+    const user = makeUser({ valuationCheckUsage: { lastRunAt: new Date(Date.now() - VALUATION_CHECK_COOLDOWN_MS_PRO - 1000).toISOString() } });
+    expect(canRunValuationCheck(user, true)).toBe(true);
   });
 });
 

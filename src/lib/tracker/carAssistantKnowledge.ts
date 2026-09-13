@@ -529,11 +529,13 @@ accordingly.
 **How:** Runs automatically as part of the free Buying Guide lookup (6.17) for a car - no separate
 button or purchase. Shows a private average value and a dealer forecourt value when available.
 **Status:** Live. Car only - there is no motorcycle equivalent of this specific feature.
-**Limits:** Free, but rate-limited to once every 7 days per account - the same limit for Free and
-Pro accounts alike, not a Pro perk. Once that's used up for the week, the Buying Guide lookup
-itself still works (checklist, MOT history, AI briefing all still run) - only the valuation figures
-are withheld until the cooldown passes, and the account is told plainly when they'll be available
-again rather than the figures just silently vanishing.
+**Limits:** Free, but rate-limited per account - once every 7 days on a Free account, once every 28
+days on a Pro account (matching the free vehicle-history report's own monthly cadence in 6.17a,
+rather than letting Pro re-run this specific check noticeably more often for no product reason).
+Once that's used up, the Buying Guide lookup itself still works (checklist, MOT history, AI
+briefing all still run) - only the valuation figures are withheld until the cooldown passes, and
+the account is told plainly when they'll be available again rather than the figures just silently
+vanishing.
 
 ### 6.18 Units and currency
 **What:** Switch between miles/km, mpg/L per 100km, and currency display.
