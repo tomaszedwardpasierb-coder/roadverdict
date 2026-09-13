@@ -4,7 +4,7 @@
 'use client';
 
 import { useState } from 'react';
-import { TOLL_LABELS } from '@/lib/tracker/tollTypes';
+import { CAR_TOLL_LABELS as TOLL_LABELS } from '@/lib/tracker/carTollTypes';
 import { convertDisplayToGbp, CURRENCY_SYMBOLS, type Currency, type ExchangeRates } from '@/lib/tracker/currency';
 import { useTrackerFormSubmit } from './useTrackerFormSubmit';
 import { AttachmentUploader } from './AttachmentUploader';

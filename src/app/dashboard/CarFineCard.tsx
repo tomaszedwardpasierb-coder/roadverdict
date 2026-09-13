@@ -5,7 +5,7 @@
 
 import { useState } from 'react';
 import { VehicleSpinner } from '@/components/VehicleSpinner';
-import { FINE_LABELS } from '@/lib/tracker/fineTypes';
+import { CAR_FINE_LABELS as FINE_LABELS } from '@/lib/tracker/carFineTypes';
 import type { CarFineDoc } from '@/lib/tracker/carFine';
 import { useTrackerFormSubmit } from './useTrackerFormSubmit';
 import { AttachmentUploader } from './AttachmentUploader';

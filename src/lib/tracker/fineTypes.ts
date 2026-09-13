@@ -4,10 +4,21 @@
 // grouping needed at this size (~20 entries). Covers the fixed-penalty
 // and prosecutable offences a private motorist actually logs against a
 // specific vehicle, not the full Road Traffic Act.
+//
+// Motorcycle-specific: no seatbelt fine (motorcycles don't have
+// seatbelts to begin with) or a penalty for an unpaid charge that
+// doesn't apply to bikes in the first place (congestion/ULEZ/CAZ/Dart
+// Charge - see tollTypes.ts's own comment for why those five are
+// car-only). "no-helmet" replaces "no-seatbelt" as the genuine
+// motorcycle equivalent - a real, common offence with no car analogue.
+// carFineTypes.ts carries the full car set (including no-seatbelt and
+// the four unpaid-charge penalties above), not a superset of this file -
+// the two lists diverge in both directions, not just car-adds-on-top,
+// so they're kept as independent literals rather than a spread merge.
 export const FINE_LABELS: Record<string, string> = {
   speeding: "Speeding (fixed penalty / NIP)",
   "mobile-phone": "Using a mobile phone while driving",
-  "no-seatbelt": "Not wearing a seatbelt",
+  "no-helmet": "Riding without a helmet (rider or passenger)",
   "red-light": "Failing to stop at a red light",
   "bus-lane": "Bus lane violation",
   "yellow-box": "Yellow box junction violation",
@@ -17,10 +28,6 @@ export const FINE_LABELS: Record<string, string> = {
   "no-mot": "Driving without a valid MOT",
   "no-vehicle-tax": "Driving without vehicle tax (SORN/VED)",
   "parking-pcn": "Parking Charge Notice (PCN)",
-  "congestion-charge-penalty": "Congestion Charge penalty (unpaid)",
-  "ulez-penalty": "ULEZ penalty charge (unpaid)",
-  "caz-penalty": "Clean Air Zone penalty charge (unpaid)",
-  "dart-charge-penalty": "Dart Charge penalty (unpaid)",
   "dangerous-condition": "Using a vehicle in a dangerous condition",
   overloading: "Overloading a vehicle",
   "drink-drug-driving": "Drink or drug driving",

@@ -33,8 +33,8 @@ import { generateStoryParagraphs, type JobTypeGroup } from "@/lib/tracker/report
 import { CAR_JOB_LABELS } from "@/lib/tracker/carJobTypes";
 import { CAR_MOD_LABELS } from "@/lib/tracker/carModTypes";
 import { CAR_BILL_LABELS } from "@/lib/tracker/carBillTypes";
-import { FINE_LABELS } from "@/lib/tracker/fineTypes";
-import { TOLL_LABELS } from "@/lib/tracker/tollTypes";
+import { CAR_FINE_LABELS as FINE_LABELS } from "@/lib/tracker/carFineTypes";
+import { CAR_TOLL_LABELS as TOLL_LABELS } from "@/lib/tracker/carTollTypes";
 import { isBackdated, detectBulkBackdating, type BackdateCheckItem, type BulkBackdateCluster } from "@/lib/tracker/backdateCheck";
 import type { Attachment } from "@/lib/tracker/cosmosHelpers";
 import type { CarServiceRecordDoc } from "@/lib/tracker/carServiceRecord";

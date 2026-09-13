@@ -5,7 +5,7 @@
 
 import { useState } from 'react';
 import { VehicleSpinner } from '@/components/VehicleSpinner';
-import { TOLL_LABELS } from '@/lib/tracker/tollTypes';
+import { CAR_TOLL_LABELS as TOLL_LABELS } from '@/lib/tracker/carTollTypes';
 import type { CarTollDoc } from '@/lib/tracker/carToll';
 import { useTrackerFormSubmit } from './useTrackerFormSubmit';
 import { AttachmentUploader } from './AttachmentUploader';

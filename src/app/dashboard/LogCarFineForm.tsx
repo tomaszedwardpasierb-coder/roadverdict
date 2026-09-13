@@ -4,7 +4,7 @@
 'use client';
 
 import { useState } from 'react';
-import { FINE_LABELS } from '@/lib/tracker/fineTypes';
+import { CAR_FINE_LABELS as FINE_LABELS } from '@/lib/tracker/carFineTypes';
 import { convertDisplayToGbp, CURRENCY_SYMBOLS, type Currency, type ExchangeRates } from '@/lib/tracker/currency';
 import { useTrackerFormSubmit } from './useTrackerFormSubmit';
 import { AttachmentUploader } from './AttachmentUploader';

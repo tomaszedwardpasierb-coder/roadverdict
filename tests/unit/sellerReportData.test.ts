@@ -259,7 +259,7 @@ describe("computeSellerReportRowsAndMetrics", () => {
 
   describe("hiding fines and tolls from the buyer-facing rows and total", () => {
     const fine = { id: "f-1", pk: "x", type: "fine" as const, fineType: "speeding", cost: 100, notes: "", date: "2025-03-01", createdAt: "2025-03-02T00:00:00.000Z" } as FineDoc;
-    const toll = { id: "t-1", pk: "x", type: "toll" as const, tollType: "dartford-crossing", cost: 2.5, notes: "", date: "2025-04-01", createdAt: "2025-04-02T00:00:00.000Z" } as TollDoc;
+    const toll = { id: "t-1", pk: "x", type: "toll" as const, tollType: "m6-toll", cost: 2.5, notes: "", date: "2025-04-01", createdAt: "2025-04-02T00:00:00.000Z" } as TollDoc;
 
     it("excludes fines and tolls from rows and total by default", () => {
       const result = computeSellerReportRowsAndMetrics(makeBike(), [], [], [], [], [], [fine], [toll]);
@@ -282,7 +282,7 @@ describe("computeSellerReportRowsAndMetrics", () => {
     it("labels fine/toll rows using their own catalogs and categories", () => {
       const result = computeSellerReportRowsAndMetrics(makeBike({ includeFinesInReport: true, includeTollsInReport: true }), [], [], [], [], [], [fine], [toll]);
       expect(result.rows.find((r) => r.id === "f-1")).toMatchObject({ category: "Fine", description: "Speeding (fixed penalty / NIP)" });
-      expect(result.rows.find((r) => r.id === "t-1")).toMatchObject({ category: "Toll", description: "Dartford Crossing (Dart Charge)" });
+      expect(result.rows.find((r) => r.id === "t-1")).toMatchObject({ category: "Toll", description: "M6 Toll" });
     });
 
     it("still counts a hidden fine toward totalEntries, even though it's excluded from rows/total", () => {
