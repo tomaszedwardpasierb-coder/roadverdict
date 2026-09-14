@@ -1,46 +1,73 @@
-# RoadVerdict — prototype
+# RoadVerdict
 
-The quote-checker flow: bike → job → quoted price → fair/high/second-opinion verdict,
-benchmarked against price data, logged anonymously.
+A UK vehicle-ownership platform for motorcycles and cars, live at
+[roadverdict.co.uk](https://roadverdict.co.uk). Free quote-checking and
+buying-guide tools sit alongside **the Tracker** — the core product — where
+owners log service history, fuel, mods, bills, fines/tolls and MOT data
+against their vehicle, then generate a shareable, buyer-facing report when
+selling.
 
-## Important: I haven't run this myself
+## What's in here
 
-My sandbox's network access is locked to Adobe domains only, so I can't reach the npm
-registry to run `npm install` or `npm run build` here. Everything below is hand-written
-and I'm confident in the patterns, but you're the first one actually running it — if
-`npm install` or `npm run dev` throws something, paste me the error and I'll fix it.
+- **Free tools**: quote checker (job → fair/high/second-opinion verdict),
+  cost calculator, buying guide — bike and car variants of each.
+- **The Tracker**: full ownership history (service, fuel/mileage, mods,
+  bills, reminders, fines & tolls, MOT import), ownership transfer, and
+  shareable report links for buyers.
+- **Pro tier**: vehicle history check (VDI) via Stripe, an AI assistant
+  (Gemini-backed, can draft log entries from a chat description), and
+  **the Vault** — 2FA-gated encrypted document storage for V5C/insurance/
+  licences.
+- **Admin** (`/tomasz`): account management, impersonation with an audit
+  trail, cron triggers, site stats.
+- **Auth**: magic-link sign-in, optional TOTP 2FA — no passwords for
+  regular users.
+
+## Stack
+
+Next.js 15 (App Router) · Azure Cosmos DB (single container, partitioned
+by `/pk`) · Azure Blob Storage · Stripe · Resend · Google Gemini · deployed
+to Azure App Service.
 
 ## Setup
 
 ```bash
 npm install
+cp .env.example .env.local   # fill in real values — see below
 npm run dev
 ```
 
-Open http://localhost:3000 — you should see the quote-checker form.
+Open http://localhost:3000.
 
-## What's real vs placeholder right now
+`.env.example` lists every environment variable the app actually reads
+(Cosmos, Blob Storage, Stripe, Resend, Gemini, admin/2FA secrets, cron
+auth, Application Insights). None of it is optional for a full local
+run — some features fail soft without a given key, but most tracker/auth
+flows need Cosmos and Resend at minimum.
 
-- **Real**: the form, the API route, input validation, the verdict logic, the anonymised
-  SQLite logging, the security headers, the CSP, the SEO metadata/schema.
-- **Sourced, but thin — check `src/lib/priceData.ts` comments before trusting any number**:
-  the base job × bike-size price ranges. Chain-and-sprockets and the service-cost bands are
-  anchored to named UK specialists' published prices; brake pads and tyres are thinner —
-  one real source each, extrapolated for the sizes that source didn't cover.
-- **Still pure placeholder, not sourced at all**: the brand-tier and region multipliers.
-  That research hasn't happened yet.
+## Testing
 
-## What's deliberately not built yet
+```bash
+npm run typecheck
+npm run lint
+npm test                # unit
+npm run test:components
+npm run test:integration  # needs a real (or test-account) Cosmos connection
+npm run test:e2e          # Playwright, see TESTING.md for local setup
+```
 
-- No deployment pipeline to the Azure Web App yet (comes next)
-- No real database beyond local SQLite (fine until there's real traffic)
-- No analytics, no cookie banner (not needed until analytics/tracking is added)
-- No accounts/API keys needed for any of this — told you I'd flag it when that changes
+CI (`.github/workflows/main_roadverdict.yml`) runs all of the above,
+including authenticated Playwright E2E against a real dedicated test
+Cosmos account, before every deploy. See [TESTING.md](TESTING.md) for
+details on running the E2E suite locally.
 
-## Where the money-relevant logic lives, if you want to check my work
+## Where things live
 
-- `src/lib/priceData.ts` — the benchmark ranges (placeholder)
-- `src/lib/verdict.ts` — fair/high/second-opinion thresholds
-- `src/app/api/verdict/route.ts` — validation, rate limiting, the anonymised log write
-- `src/lib/db.ts` — the SQLite table; check the columns yourself, there's genuinely
-  nothing identifying in there
+- `src/lib/tracker/` — the Tracker's domain logic (one file per record
+  type, plus shared concerns like `atomicUpdate.ts` for etag-conditioned
+  writes).
+- `src/lib/payments/` — Stripe checkout/pricing.
+- `src/app/api/` — route handlers, mirroring the domain layer above.
+- `src/app/tomasz/` — the admin panel.
+- `CARS_PHASE_PLAN.md` — the bike → car expansion plan and its current
+  status.
