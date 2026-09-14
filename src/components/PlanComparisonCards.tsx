@@ -34,6 +34,7 @@ export function PlanComparisonCards({ userIsPro, showFreeCta = true }: Props) {
           <li>Total spend &amp; current mileage at a glance</li>
           <li>Basic history timeline</li>
           <li>Shareable buyer report link</li>
+          <li>Export your full history as CSV</li>
         </ul>
         {showFreeCta && (
           <Link href="/dashboard" className={styles.planCta + ' ' + styles.planCtaSecondary}>
