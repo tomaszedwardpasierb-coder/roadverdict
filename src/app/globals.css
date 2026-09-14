@@ -806,7 +806,17 @@ body:has(main [data-admin-shell]) [data-assistant-widget] {
 /* ── Hero ─────────────────────────────────────────────────────────── */
 .rv-hero {
   position: relative;
-  min-height: 560px;
+  /* Scales with the hero's own width (forced to 100vw below, full-bleed)
+     rather than a fixed min-height - previously the three comic panels
+     stayed almost exactly the same height while their width changed with
+     every browser resize, so object-fit: cover had to crop a different
+     amount of each image on every window width, not just at real
+     breakpoints. Tying height to vw keeps each panel's effective aspect
+     ratio - and therefore its crop - stable across ordinary window
+     widths; clamp() still bounds it so an ultrawide monitor doesn't get
+     an absurdly tall hero, and a narrow one never drops below a usable
+     minimum before the mobile breakpoint's own override takes over. */
+  height: clamp(480px, 30vw, 680px);
   display: flex;
   align-items: center;
   overflow: hidden;
@@ -1197,7 +1207,7 @@ a.rv-sol-card {
 
 /* ── Responsive tweaks ────────────────────────────────────────────── */
 @media (max-width: 640px) {
-  .rv-hero { padding: 3rem 1.2rem; min-height: 480px; }
+  .rv-hero { padding: 3rem 1.2rem; height: clamp(420px, 90vw, 520px); }
   .rv-hero-panels { grid-template-columns: 1fr; }
   .rv-panel-right-col { display: none; }
   .rv-panel-left .rv-panel-overlay {
