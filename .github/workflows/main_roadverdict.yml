@@ -4,6 +4,23 @@ on:
     branches:
       - main
   workflow_dispatch:
+# Without this, two pushes close together each get their own full,
+# unrelated pipeline run - and both authenticated-e2e jobs share the
+# exact same demo@roadverdict.co.uk account on the one real test Cosmos
+# account, with no locking of its own around the delete-then-rebuild
+# reseed (runDemoSeed in demoSeedRunner.ts - a plain read-then-write,
+# not etag-guarded the way every other concurrent-write risk in this app
+# already is). Two overlapping runs racing on that same account is a
+# real, confirmed mechanism for the kind of 75-90s login timeout seen
+# today - each individual Cosmos write still looks fast and unthrottled
+# (confirmed via the account's own metrics), but the conflict-and-retry
+# cost of two processes fighting over the same documents doesn't show up
+# there at all. cancel-in-progress: true rather than queuing - a stale
+# in-flight run for an older commit on main is never worth finishing
+# once a newer one exists; the newer push is what should actually ship.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
   test:
     runs-on: ubuntu-latest
