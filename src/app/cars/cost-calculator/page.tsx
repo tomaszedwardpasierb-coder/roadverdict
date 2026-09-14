@@ -6,6 +6,7 @@ import { getSession } from '@/lib/auth/session';
 import { getPrimaryCar } from '@/lib/tracker/car';
 import { CAR_BRAND_OPTIONS, slugifyCarMake, type CarBenchmarkClass } from '@/lib/carPriceData';
 import { CarRelatedTools } from '@/components/CarRelatedTools';
+import { buildBreadcrumbJsonLd } from '@/lib/seo/breadcrumbs';
 
 export const dynamic = 'force-dynamic';
 
@@ -26,6 +27,8 @@ const jsonLd = {
   description:
     'Estimate the true annual cost of owning a car in the UK, covering servicing, tyres, MOT, road tax, and fuel.',
 };
+
+const breadcrumbJsonLd = buildBreadcrumbJsonLd('Cost Calculator', '/cars/cost-calculator');
 
 function classFromEngineLitres(engineLitres: number): CarBenchmarkClass {
   if (engineLitres <= 1.2) return 'small';
@@ -61,6 +64,12 @@ export default async function CarCostCalculatorPage() {
         nonce={nonce}
         // eslint-disable-next-line react/no-danger
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
+      <script
+        type="application/ld+json"
+        nonce={nonce}
+        // eslint-disable-next-line react/no-danger
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }}
       />
       <div className="hero">
         <h1>What does this car actually cost you a year?</h1>

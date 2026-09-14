@@ -1,39 +1,37 @@
-// Place at: src/app/cars/page.tsx
+// Place at: src/app/motorcycles/page.tsx
 //
-// Public, signed-out marketing landing page for car support - the /cars
-// namespace from RoadVerdict_Car_Plan_v3.md's Phase 4. Reuses the
-// homepage's rv-* design system (same dark hero, same amber accent) but
-// deliberately without the homepage's comic-panel photography, since
-// there's no car-specific hero imagery to show - a text-led hero is
-// honest about that rather than reusing motorcycle photos on a car page.
-//
-// Links to /cars/quote-checker, /cars/cost-calculator, and
-// /cars/buying-guide - the car equivalents of the motorcycle tools,
-// built once Phase 7's real UK car price research landed (see
-// carPriceData.ts). Never links to the motorcycle-only /quote-checker,
-// /cost-calculator, or /buying-guide - those are benchmarked against
-// motorcycle price data only and would overclaim if presented as
-// available for cars.
+// Public, signed-out marketing landing page for motorcycle support -
+// the missing mirror of /cars/page.tsx. Before this, /cars had a
+// dedicated hub consolidating internal links and targeting head terms
+// like "car cost tracker," while motorcycle tools sat at bare root paths
+// (/quote-checker, /cost-calculator, /buying-guide) with no single page
+// doing the same job for "motorcycle" - flagged as a real architecture
+// gap in SEO_STRATEGY.md's Pillar 4 (motorcycles as a first-class vehicle
+// type, not a footnote) since it's the one structural advantage most
+// competitors can't easily copy. Deliberately mirrors /cars/page.tsx's
+// structure and design system (same rv-* classes) rather than reusing the
+// homepage's own comic-panel hero, which is already motorcycle-branded in
+// a way this page shouldn't duplicate.
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { headers } from 'next/headers';
 import { getSession } from '@/lib/auth/session';
-import { getCarsForUser } from '@/lib/tracker/car';
+import { getBikesForUser } from '@/lib/tracker/bike';
 import { buildBreadcrumbJsonLd } from '@/lib/seo/breadcrumbs';
 
 export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = {
-  title: 'Know what your car really costs',
+  title: 'Know what your motorcycle really costs',
   description:
-    'Log every service, fuel fill, and bill for your car - petrol, diesel, hybrid, or electric. Scan receipts with AI and get reminders before your MOT or insurance lapses. Free to start.',
-  alternates: { canonical: '/cars' },
+    'Log every service, fuel fill, and bill for your motorcycle. Scan receipts with AI and get reminders before your MOT or insurance lapses. Free to start.',
+  alternates: { canonical: '/motorcycles' },
 };
 
 const jsonLd = {
   '@context': 'https://schema.org',
   '@type': 'WebApplication',
-  name: 'RoadVerdict for cars',
+  name: 'RoadVerdict for motorcycles',
   applicationCategory: 'UtilitiesApplication',
   operatingSystem: 'Any',
   offers: {
@@ -42,29 +40,35 @@ const jsonLd = {
     priceCurrency: 'GBP',
   },
   description:
-    'Car ownership tracker for UK drivers - service history, fuel logs, bills, and MOT/insurance reminders, with AI receipt scanning.',
+    'Motorcycle ownership tracker for UK riders - service history, fuel logs, bills, and MOT/insurance reminders, with AI receipt scanning.',
 };
 
-const breadcrumbJsonLd = buildBreadcrumbJsonLd('Cars', '/cars');
+const breadcrumbJsonLd = buildBreadcrumbJsonLd('Motorcycles', '/motorcycles');
 
+// Bills copy deliberately says "fines and tolls" rather than the car
+// page's "ULEZ and congestion charges" - motorcycles are exempt from
+// London's congestion charge and the ULEZ/CAZ charges that specific
+// wording refers to (see carTollTypes.ts/tollTypes.ts's own split), so
+// repeating the car page's claim here would overstate what actually
+// applies to a bike.
 const FEATURES = [
   {
     title: 'Service history',
-    body: "Log every service and repair - oil changes, brakes, tyres, and more. Free-text make and model, so there's no curated list to fight with.",
+    body: "Log every service and repair - oil changes, chain & sprockets, tyres, and more. Free-text make and model, so there's no curated list to fight with.",
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
     ),
   },
   {
     title: 'Fuel log',
-    body: 'Petrol, diesel, hybrid, plug-in hybrid, or fully electric. Litres or kWh - whichever your car actually uses.',
+    body: 'Petrol or fully electric - litres or kWh, whichever your bike actually uses, plus your real-world MPG once you\'ve logged a few fill-ups.',
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M3 22V4a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v18M3 22h10M14 9h3l3 3v6a1 1 0 0 1-1 1h-1"/><path d="M14 13h4"/><circle cx="7" cy="6" r="1"/></svg>
     ),
   },
   {
-    title: 'Bills & MOT',
-    body: 'Track mods, insurance, tax, finance, and MOT - including ULEZ and congestion charges, which most trackers ignore entirely.',
+    title: 'Bills, fines & tolls',
+    body: 'Track mods, insurance, tax, finance, and MOT - plus fines and tolls, which most trackers ignore entirely.',
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M20.59 13.41 11 3.83A2 2 0 0 0 9.59 3.2L4 3a1 1 0 0 0-1 1l.2 5.59a2 2 0 0 0 .61 1.41l9.58 9.59a2 2 0 0 0 2.83 0l4.37-4.37a2 2 0 0 0 0-2.83Z"/><circle cx="7.5" cy="7.5" r="1.2"/></svg>
     ),
@@ -85,34 +89,27 @@ const FEATURES = [
   },
 ] as const;
 
-export default async function CarsPage() {
+export default async function MotorcyclesPage() {
   const nonce = (await headers()).get('x-nonce') ?? undefined;
 
-  // Same defensive wrapping as the existing public tool pages: a Cosmos
-  // problem should degrade this to "treat as anonymous," not take down a
-  // public, no-account-needed marketing page for every visitor.
+  // Same defensive wrapping as every other public marketing/tool page: a
+  // Cosmos problem should degrade this to "treat as anonymous," not take
+  // down a public, no-account-needed page for every visitor.
   let session: Awaited<ReturnType<typeof getSession>> = null;
   try {
     session = await getSession();
   } catch (err) {
-    console.error('Cars page: getSession() failed, continuing as anonymous:', err);
+    console.error('Motorcycles page: getSession() failed, continuing as anonymous:', err);
   }
-  const hasCar = session ? (await getCarsForUser(session.email).catch(() => [])).length > 0 : false;
+  const hasBike = session ? (await getBikesForUser(session.email).catch(() => [])).length > 0 : false;
 
-  // addVehicle=car is kept even for a returning car owner (hasCar true) -
-  // dashboard/page.tsx forces the car view with it, so someone with both
-  // a bike and a car lands on their car, not whichever kind their
-  // activeVehicleKind cookie happened to remember from a previous visit.
-  const ctaHref = !session ? `/login?redirect=${encodeURIComponent('/dashboard?addVehicle=car')}` : '/dashboard?addVehicle=car';
-  const ctaLabel = !session ? 'Start tracking your car free' : hasCar ? 'Go to your dashboard' : 'Add your car';
-  // Same reasoning as ctaHref above, mirrored for the opposite kind - a
-  // signed-in visitor here (e.g. one who also has a bike) needs this to
-  // force the bike view, not just land on plain "/" and bounce straight
-  // back to /dashboard showing whatever kind their cookie remembers.
-  // Signed-out points at /motorcycles specifically, not plain "/" - now
-  // that a real motorcycle hub exists, it's a much more relevant landing
-  // spot than the homepage for someone who followed this exact link.
-  const secondaryHref = !session ? '/motorcycles' : '/dashboard?addVehicle=bike';
+  const ctaHref = !session ? `/login?redirect=${encodeURIComponent('/dashboard?addVehicle=bike')}` : '/dashboard?addVehicle=bike';
+  const ctaLabel = !session ? 'Start tracking your bike free' : hasBike ? 'Go to your dashboard' : 'Add your bike';
+  // Mirrors /cars/page.tsx's own secondaryHref reasoning - a signed-in
+  // visitor here who also has a car needs this to force the car view,
+  // not land on plain "/" and bounce back to whichever kind their
+  // activeVehicleKind cookie happened to remember.
+  const secondaryHref = !session ? '/cars' : '/dashboard?addVehicle=car';
 
   return (
     <>
@@ -134,11 +131,11 @@ export default async function CarsPage() {
         <div className="rv-hero-content">
           <div className="rv-hero-eyebrow">
             <span className="rv-eyebrow-dot" aria-hidden="true" />
-            Cars · UK
+            Motorcycles · UK
           </div>
           <h1 className="rv-hero-headline">
             Know what<br />
-            your car<br />
+            your bike<br />
             <span className="rv-hl-amber">really costs.</span>
           </h1>
           <p className="rv-hero-sub">
@@ -151,7 +148,7 @@ export default async function CarsPage() {
               {ctaLabel}
               <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M2 7h10M8 3l4 4-4 4"/></svg>
             </Link>
-            <Link href={secondaryHref} className="rv-cta-secondary">Ride a motorcycle instead?</Link>
+            <Link href={secondaryHref} className="rv-cta-secondary">Drive a car instead?</Link>
           </div>
           <ul className="rv-hero-proof" aria-label="Key facts">
             <li className="rv-proof-item">
@@ -177,10 +174,10 @@ export default async function CarsPage() {
       <section className="rv-problems" aria-labelledby="features-heading">
         <p className="rv-section-eyebrow">What you can do today</p>
         <h2 className="rv-section-heading" id="features-heading">
-          Every car has a story. Start logging yours.
+          Every bike has a story. Start logging yours.
         </h2>
         <p className="rv-section-sub">
-          The same engine that&apos;s tracked thousands of motorcycles, now built for cars too.
+          The same engine that&apos;s tracked thousands of cars, built for motorcycles first.
         </p>
         <div className="rv-problem-grid">
           {FEATURES.map((f, i) => (
@@ -197,22 +194,22 @@ export default async function CarsPage() {
       <section className="rv-problems" aria-labelledby="tools-heading">
         <p className="rv-section-eyebrow">Also free</p>
         <h2 className="rv-section-heading" id="tools-heading">
-          Benchmarked against real UK car prices
+          Benchmarked against real UK motorcycle prices
         </h2>
         <p className="rv-section-sub">
-          Not just for cars you&apos;re logging - for any car you&apos;re quoted on, running, or
+          Not just for bikes you&apos;re logging - for any bike you&apos;re quoted on, running, or
           about to buy.
         </p>
         <div className="rv-related-tools__row">
-          <Link href="/cars/quote-checker" className="rv-related-tools__link">
+          <Link href="/quote-checker" className="rv-related-tools__link">
             <strong>Quote Checker</strong>
             <span>Is your service quote fair?</span>
           </Link>
-          <Link href="/cars/cost-calculator" className="rv-related-tools__link">
+          <Link href="/cost-calculator" className="rv-related-tools__link">
             <strong>Cost Calculator</strong>
             <span>What does it actually cost you a year?</span>
           </Link>
-          <Link href="/cars/buying-guide" className="rv-related-tools__link">
+          <Link href="/buying-guide" className="rv-related-tools__link">
             <strong>Buying Guide</strong>
             <span>What to check before you buy</span>
           </Link>

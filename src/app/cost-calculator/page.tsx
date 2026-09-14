@@ -6,6 +6,7 @@ import { getPrimaryBike } from '@/lib/tracker/bike';
 import { BRAND_OPTIONS } from '@/lib/priceData';
 import { getModelsForBrand, getBikeClassForCC, slugifyMake } from '@/lib/motorcycleModels';
 import { RelatedTools } from '@/components/RelatedTools';
+import { buildBreadcrumbJsonLd } from '@/lib/seo/breadcrumbs';
 
 export const dynamic = 'force-dynamic';
 
@@ -26,6 +27,8 @@ const jsonLd = {
   description:
     'Estimate the true annual cost of owning a motorcycle in the UK, covering servicing, tyres, MOT, road tax, and fuel.',
 };
+
+const breadcrumbJsonLd = buildBreadcrumbJsonLd('Cost Calculator', '/cost-calculator');
 
 export default async function CostCalculatorPage() {
   const nonce = (await headers()).get('x-nonce') ?? undefined;
@@ -71,6 +74,12 @@ export default async function CostCalculatorPage() {
         nonce={nonce}
         // eslint-disable-next-line react/no-danger
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
+      <script
+        type="application/ld+json"
+        nonce={nonce}
+        // eslint-disable-next-line react/no-danger
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }}
       />
       <div className="hero">
         <h1>What does this bike actually cost you a year?</h1>

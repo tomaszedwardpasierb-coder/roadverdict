@@ -7,6 +7,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     { url: `${base}/quote-checker`, lastModified: new Date(), priority: 0.9 },
     { url: `${base}/cost-calculator`, lastModified: new Date(), priority: 0.9 },
     { url: `${base}/buying-guide`, lastModified: new Date(), priority: 0.9 },
+    { url: `${base}/motorcycles`, lastModified: new Date(), priority: 0.7 },
     { url: `${base}/cars`, lastModified: new Date(), priority: 0.7 },
     { url: `${base}/cars/quote-checker`, lastModified: new Date(), priority: 0.9 },
     { url: `${base}/cars/cost-calculator`, lastModified: new Date(), priority: 0.9 },

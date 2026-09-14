@@ -1,6 +1,7 @@
 // Place at: src/app/layout.tsx
 import type { Metadata, Viewport } from 'next';
 import { Big_Shoulders, Inter, IBM_Plex_Mono } from 'next/font/google';
+import Image from 'next/image';
 import Link from 'next/link';
 import { cookies } from 'next/headers';
 import { getAdminSession } from '@/lib/admin/session';
@@ -34,14 +35,42 @@ const plexMono = IBM_Plex_Mono({
   variable: '--font-mono',
   display: 'swap',
 });
+// Vehicle-neutral on purpose - this is the fallback every page without its
+// own metadata falls back to, and cars are a fully shipped, equally-weighted
+// product now, not an afterthought. Matches the homepage's own framing
+// (page.tsx's title/description) rather than describing only one half of
+// what the site actually does.
+const SITE_TITLE = 'Know What Your Vehicle Really Costs | RoadVerdict';
+const SITE_DESCRIPTION =
+  'Log every service, fill-up, and repair. Check if a quote is fair before you pay. Know exactly what you\'re looking at before you buy. Free for motorcycles and cars.';
+
 export const metadata: Metadata = {
   metadataBase: new URL('https://roadverdict.co.uk'),
   title: {
-    default: 'RoadVerdict - is your motorcycle quote fair?',
+    default: SITE_TITLE,
     template: '%s | RoadVerdict',
   },
-  description:
-    'Enter your bike, the job, and what you were quoted. Get an instant verdict benchmarked against typical UK motorcycle service and repair prices.',
+  description: SITE_DESCRIPTION,
+  // Every page share (WhatsApp, iMessage, Slack, LinkedIn, X) rendered with
+  // no image and often no description before this - zero openGraph/twitter
+  // metadata existed anywhere in the app. Image intentionally NOT set here -
+  // this segment's own opengraph-image.tsx (Next's file-convention OG image)
+  // supplies it automatically; a page/segment with its own opengraph-image.tsx
+  // (quote-checker, cost-calculator, buying-guide) overrides it for free,
+  // without needing to repeat a manual image URL at every level.
+  openGraph: {
+    title: SITE_TITLE,
+    description: SITE_DESCRIPTION,
+    url: 'https://roadverdict.co.uk',
+    siteName: 'RoadVerdict',
+    locale: 'en_GB',
+    type: 'website',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: SITE_TITLE,
+    description: SITE_DESCRIPTION,
+  },
 };
 
 // No viewport configuration existed anywhere before this - not this
@@ -69,7 +98,14 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           {showImpersonationBanner && <ImpersonationBanner email={impersonatingEmail!} />}
           <header className="site-header">
             <Link href="/" className="site-header__logo">
-              <img src="/logo-dark.png" alt="RoadVerdict" className="site-header__logo-img" />
+              <Image
+                src="/logo-dark.png"
+                alt="RoadVerdict"
+                width={232}
+                height={145}
+                priority
+                className="site-header__logo-img"
+              />
             </Link>
             <SiteHeaderNav />
           </header>

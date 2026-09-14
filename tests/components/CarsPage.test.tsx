@@ -94,12 +94,12 @@ describe("CarsPage", () => {
     expect(screen.getByRole("link", { name: /buying guide/i })).toHaveAttribute("href", "/cars/buying-guide");
   });
 
-  it("links back to the motorcycle homepage for a signed-out visitor", async () => {
+  it("links to the dedicated motorcycle hub for a signed-out visitor", async () => {
     mockGetSession.mockResolvedValue(null);
     const jsx = await CarsPage();
     render(jsx);
 
-    expect(screen.getByRole("link", { name: /ride a motorcycle instead/i })).toHaveAttribute("href", "/");
+    expect(screen.getByRole("link", { name: /ride a motorcycle instead/i })).toHaveAttribute("href", "/motorcycles");
   });
 
   // Plain "/" would bounce a signed-in visitor straight back to
