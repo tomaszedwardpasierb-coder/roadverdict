@@ -106,10 +106,6 @@ export async function POST(req: NextRequest) {
   const safeRedirect = getSafeRedirectPath(redirect);
 
   const ip = getClientIp(req);
-  if (await isIpRateLimited(container, ip)) {
-    return NextResponse.json({ error: "Too many attempts. Please wait and try again." }, { status: 429 });
-  }
-  await recordIpAttempt(container, ip);
 
   // Checked before either branch below - a blocked account can't get
   // back in at all, not even the demo bypass. getSession() also checks
@@ -121,6 +117,19 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "This account is no longer able to sign in." }, { status: 403 });
   }
 
+  // Handled before the IP ceiling below on purpose - the demo bypass
+  // sends no real email and always grants the same one deliberately
+  // public sandbox account, so it isn't exposed to the spam-relay threat
+  // that ceiling exists for (see its own comment). Checking IP first
+  // meant every authenticated-e2e CI run's own demo logins - three per
+  // pipeline attempt, repeated across a busy day of pushes - counted
+  // against the exact same 20-per-15-minutes budget real traffic shares,
+  // and could lock CI's own test account out of its own demo sign-in.
+  // That's confirmed to be exactly what happened: a local repro hit this
+  // same "Too many attempts" response instead of ever reaching
+  // /dashboard, which is indistinguishable from a slow login to
+  // Playwright's waitForURL - it just times out with nothing to show for
+  // why.
   if (normalizedEmail === DEMO_EMAIL) {
     const alreadySeeded = await demoBikeExists();
     if (!alreadySeeded) {
@@ -146,6 +155,11 @@ export async function POST(req: NextRequest) {
     });
     return response;
   }
+
+  if (await isIpRateLimited(container, ip)) {
+    return NextResponse.json({ error: "Too many attempts. Please wait and try again." }, { status: 429 });
+  }
+  await recordIpAttempt(container, ip);
 
   if (await isRateLimited(container, normalizedEmail)) {
     return NextResponse.json(

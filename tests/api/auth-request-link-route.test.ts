@@ -257,6 +257,21 @@ describe("POST /api/auth/request-link", () => {
       expect(mocks.itemsCreate).not.toHaveBeenCalledWith(expect.objectContaining({ type: "magicLinkIpAttempt" }));
     });
 
+    it("never applies the IP throttle to the demo account, which sends no email and isn't the spam-relay threat it guards against", async () => {
+      mocks.itemsQuery.mockImplementation((queryObj: { query: string }) => {
+        if (queryObj.query.includes("magicLinkIpAttempt")) {
+          return { fetchAll: () => Promise.resolve({ resources: Array.from({ length: 20 }, (_, i) => ({ id: `attempt-${i}` })) }) };
+        }
+        return { fetchAll: () => Promise.resolve({ resources: [] }) };
+      });
+
+      const response = await POST(req(JSON.stringify({ email: "demo@roadverdict.co.uk" }), ipHeaders("203.0.113.5")));
+
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toMatchObject({ demo: true });
+      expect(mocks.itemsCreate).not.toHaveBeenCalledWith(expect.objectContaining({ type: "magicLinkIpAttempt" }));
+    });
+
     it("tracks the IP budget separately from the per-email cooldown - hitting the per-email limit doesn't touch the IP counter's own query", async () => {
       await POST(req(JSON.stringify({ email: "someone@example.com" }), ipHeaders("203.0.113.9")));
       const ipQueryCalls = mocks.itemsQuery.mock.calls.filter((c: any[]) => c[0].query.includes("magicLinkIpAttempt"));
