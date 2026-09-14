@@ -25,11 +25,16 @@
 import { test, expect } from "@playwright/test";
 import { loginAsDemo, resetDemoAccount, DEMO_REGISTRATION, DEMO_NICKNAME } from "./helpers/demoAuth";
 
-// Generous relative to the happy-path duration (a login plus one reset)
-// - the reset itself is now allowed to wait up to 60s on its own (see
-// resetDemoAccount's comment), so the overall test needs enough extra
-// room on top of that for the login and final assertion around it.
-test.describe.configure({ mode: "serial", timeout: 90_000 });
+// Generous relative to the happy-path duration, same reasoning as
+// resetDemoAccount's own 60s allowance and loginAsDemo's own 75s
+// allowance (see demoAuth.ts) - the first test in this file pays for a
+// full ~360-write demo reseed inline during its own login alone, on top
+// of whatever that specific test itself still needs to do. 90s proved
+// too tight for that combination under real Cosmos jitter on the shared
+// CI test account (two independent timeouts here, on two different
+// "first" tests, before this was raised) - 150s leaves real room rather
+// than living right on the edge of loginAsDemo's own 75s allowance.
+test.describe.configure({ mode: "serial", timeout: 150_000 });
 
 test.describe("Authenticated demo journeys", () => {
   test("logs a new fuel fill-up through the real form and sees it reflected in fuel history", async ({ page }) => {
