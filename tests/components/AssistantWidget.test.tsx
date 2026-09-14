@@ -23,6 +23,30 @@ vi.mock("next/navigation", () => ({
 import { AssistantWidget } from "@/components/AssistantWidget";
 import { ActiveSectionProvider, useActiveSection } from "@/components/ActiveSectionContext";
 
+// jsdom implements no version of the Web Speech API at all - this stands
+// in for a real browser's SpeechRecognition, giving tests a handle on the
+// exact instance the component creates (via `instances`) so they can
+// simulate onresult/onerror/onend the way a real browser would drive
+// them, and assert start()/stop() were actually called rather than just
+// trusting the click handler ran.
+class MockSpeechRecognition extends EventTarget {
+  lang = "";
+  continuous = false;
+  interimResults = false;
+  onresult: ((event: unknown) => void) | null = null;
+  onerror: ((event: unknown) => void) | null = null;
+  onend: (() => void) | null = null;
+  start = vi.fn();
+  stop = vi.fn(() => {
+    this.onend?.();
+  });
+  constructor() {
+    super();
+    MockSpeechRecognition.instances.push(this);
+  }
+  static instances: MockSpeechRecognition[] = [];
+}
+
 // Mirrors how DashboardShell actually publishes the open tab in
 // production (a useEffect syncing local state into the shared context)
 // - a real child calling the real setter, not a mock.
@@ -52,6 +76,12 @@ describe("AssistantWidget", () => {
     mockSearchParams.current = new URLSearchParams();
     mockRouterRefresh.mockReset();
     vi.stubGlobal("fetch", vi.fn());
+    MockSpeechRecognition.instances = [];
+    // Deliberately NOT stubbed here, unlike fetch - support has to be
+    // opted into per test (see the voice-input describe block below) so
+    // the "hidden when unsupported" test reflects a real browser (like
+    // Firefox) that has no SpeechRecognition global at all, the same way
+    // the component's own getSpeechRecognitionConstructor() would see it.
   });
 
   afterEach(() => {
@@ -444,5 +474,115 @@ describe("AssistantWidget", () => {
     expect(fetchMock).toHaveBeenLastCalledWith("/api/tracker/fuel", expect.objectContaining({ method: "POST" }));
     const body = JSON.parse(fetchMock.mock.calls[1][1].body);
     expect(body).toEqual({ litres: 10, cost: 15, mileage: 15000, date: "2026-01-01", filledToFull: false, mileageAcknowledged: false });
+  });
+
+  describe("voice input", () => {
+    it("hides the mic button entirely when the browser has no SpeechRecognition support", async () => {
+      const user = userEvent.setup();
+      render(<AssistantWidget />);
+      await user.click(screen.getByRole("button", { name: "Open assistant" }));
+
+      expect(screen.queryByRole("button", { name: "Start voice input" })).not.toBeInTheDocument();
+    });
+
+    it("shows the mic button when supported, and starts recognition on click", async () => {
+      vi.stubGlobal("SpeechRecognition", MockSpeechRecognition);
+      const user = userEvent.setup();
+      render(<AssistantWidget />);
+      await user.click(screen.getByRole("button", { name: "Open assistant" }));
+
+      const micButton = await screen.findByRole("button", { name: "Start voice input" });
+      await user.click(micButton);
+
+      expect(MockSpeechRecognition.instances).toHaveLength(1);
+      expect(MockSpeechRecognition.instances[0].start).toHaveBeenCalledTimes(1);
+      expect(MockSpeechRecognition.instances[0].lang).toBe("en-GB");
+      expect(MockSpeechRecognition.instances[0].interimResults).toBe(true);
+      expect(await screen.findByRole("button", { name: "Stop voice input" })).toHaveAttribute("aria-pressed", "true");
+    });
+
+    it("clicking the mic again while listening stops recognition", async () => {
+      vi.stubGlobal("SpeechRecognition", MockSpeechRecognition);
+      const user = userEvent.setup();
+      render(<AssistantWidget />);
+      await user.click(screen.getByRole("button", { name: "Open assistant" }));
+      await user.click(await screen.findByRole("button", { name: "Start voice input" }));
+
+      await user.click(screen.getByRole("button", { name: "Stop voice input" }));
+
+      expect(MockSpeechRecognition.instances[0].stop).toHaveBeenCalledTimes(1);
+      // stop() drives onend in this mock, exactly as a real browser would -
+      // the button should fall back to its idle label and state.
+      expect(await screen.findByRole("button", { name: "Start voice input" })).toHaveAttribute("aria-pressed", "false");
+    });
+
+    it("writes live speech results into the same input the textarea already shows, exactly like typing", async () => {
+      vi.stubGlobal("SpeechRecognition", MockSpeechRecognition);
+      const user = userEvent.setup();
+      render(<AssistantWidget />);
+      await user.click(screen.getByRole("button", { name: "Open assistant" }));
+      await user.click(await screen.findByRole("button", { name: "Start voice input" }));
+
+      const recognition = MockSpeechRecognition.instances[0];
+      act(() => {
+        recognition.onresult?.({
+          results: [[{ transcript: "check my fuel economy" }]],
+        });
+      });
+
+      const textarea = screen.getByPlaceholderText("Listening…") as HTMLTextAreaElement;
+      expect(textarea.value).toBe("check my fuel economy");
+      // The real Send button reads from the exact same `input` state -
+      // proof this isn't a separate, parallel field.
+      expect(screen.getByRole("button", { name: "Send" })).toBeEnabled();
+    });
+
+    it("a real recognition error (e.g. microphone permission denied) shows an inline note", async () => {
+      vi.stubGlobal("SpeechRecognition", MockSpeechRecognition);
+      const user = userEvent.setup();
+      render(<AssistantWidget />);
+      await user.click(screen.getByRole("button", { name: "Open assistant" }));
+      await user.click(await screen.findByRole("button", { name: "Start voice input" }));
+
+      const recognition = MockSpeechRecognition.instances[0];
+      act(() => {
+        recognition.onerror?.({ error: "not-allowed" });
+      });
+
+      expect(await screen.findByText(/check your microphone permission/i)).toBeInTheDocument();
+    });
+
+    it.each(["no-speech", "aborted"])(
+      "a '%s' recognition event is a normal outcome, not an error shown to the user",
+      async (errorCode) => {
+        vi.stubGlobal("SpeechRecognition", MockSpeechRecognition);
+        const user = userEvent.setup();
+        render(<AssistantWidget />);
+        await user.click(screen.getByRole("button", { name: "Open assistant" }));
+        await user.click(await screen.findByRole("button", { name: "Start voice input" }));
+
+        const recognition = MockSpeechRecognition.instances[0];
+        act(() => {
+          recognition.onerror?.({ error: errorCode });
+        });
+
+        expect(screen.queryByText(/check your microphone permission/i)).not.toBeInTheDocument();
+      }
+    );
+
+    it("disables the mic button while a message is sending, same as the textarea and Send button", async () => {
+      vi.stubGlobal("SpeechRecognition", MockSpeechRecognition);
+      let resolveFetch: (v: unknown) => void = () => {};
+      (fetch as ReturnType<typeof vi.fn>).mockReturnValue(new Promise((resolve) => { resolveFetch = resolve; }));
+
+      const user = userEvent.setup();
+      render(<AssistantWidget />);
+      await openWidgetAndSend(user, "hello");
+
+      expect(await screen.findByRole("button", { name: "Start voice input" })).toBeDisabled();
+
+      resolveFetch({ ok: true, status: 200, json: async () => ({ reply: "Done." }) });
+      await screen.findByText("Done.");
+    });
   });
 });

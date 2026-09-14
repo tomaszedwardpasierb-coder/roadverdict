@@ -3,10 +3,52 @@
 
 import { Suspense, useEffect, useRef, useState } from 'react';
 import { usePathname, useSearchParams } from 'next/navigation';
+import { Mic } from 'lucide-react';
 import { useActiveSection } from './ActiveSectionContext';
 import { AssistantProposedEntryCard, type ProposedEntry } from './AssistantProposedEntryCard';
 import { VehicleSpinner } from './VehicleSpinner';
 import styles from './AssistantWidget.module.css';
+
+// The Web Speech API's SpeechRecognition isn't in TypeScript's default DOM
+// lib - it's still non-standard and vendor-prefixed on most browsers
+// (webkitSpeechRecognition), not something @types/node or lib.dom.d.ts
+// ships. Minimal shape for exactly what's used below, rather than reaching
+// for `any` - real browsers implementing this expose a much larger API,
+// this only types the slice this component touches.
+interface SpeechRecognitionResultLike {
+  [index: number]: { transcript: string };
+  isFinal: boolean;
+}
+interface SpeechRecognitionEventLike extends Event {
+  resultIndex: number;
+  results: ArrayLike<SpeechRecognitionResultLike>;
+}
+interface SpeechRecognitionLike extends EventTarget {
+  lang: string;
+  continuous: boolean;
+  interimResults: boolean;
+  start(): void;
+  stop(): void;
+  onresult: ((event: SpeechRecognitionEventLike) => void) | null;
+  onerror: ((event: Event) => void) | null;
+  onend: (() => void) | null;
+}
+type SpeechRecognitionConstructor = new () => SpeechRecognitionLike;
+
+// Voice input is a pure convenience layered on the existing text box - it
+// only ever writes into the same `input` state typing already uses, so
+// send/retry/validation below needs no changes at all to support it. Not
+// supported at all in Firefox, and inconsistently on iOS Safari - the mic
+// button simply doesn't render there (see the isSupported check below)
+// rather than showing something that wouldn't work.
+function getSpeechRecognitionConstructor(): SpeechRecognitionConstructor | null {
+  if (typeof window === 'undefined') return null;
+  const w = window as unknown as {
+    SpeechRecognition?: SpeechRecognitionConstructor;
+    webkitSpeechRecognition?: SpeechRecognitionConstructor;
+  };
+  return w.SpeechRecognition ?? w.webkitSpeechRecognition ?? null;
+}
 
 interface Message {
   role: 'user' | 'assistant';
@@ -141,11 +183,81 @@ function AssistantWidgetInner() {
   // same thing there would just fail identically - the only real fix
   // in that case is a different message, typed fresh.
   const [lastFailedMessages, setLastFailedMessages] = useState<Message[] | null>(null);
+  const [listening, setListening] = useState(false);
+  // Starts false and is only ever flipped true from an effect, never
+  // computed directly during render - checking `window` synchronously at
+  // render time would make the client's first render disagree with the
+  // server's (which has no window at all), and React would flag that as a
+  // hydration mismatch. Deferring to an effect means both the server and
+  // the client's first paint agree ("no mic button yet"), and it only
+  // appears once the browser has actually confirmed support.
+  const [micSupported, setMicSupported] = useState(false);
+  const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    setMicSupported(getSpeechRecognitionConstructor() !== null);
+  }, []);
 
   useEffect(() => {
     listRef.current?.scrollTo({ top: listRef.current.scrollHeight, behavior: 'smooth' });
   }, [messages, sending]);
+
+  // Stop any in-progress recognition on unmount (e.g. closing the panel
+  // mid-sentence) - onend below already clears `listening` in the normal
+  // case, but the browser wouldn't otherwise know to stop listening just
+  // because the component watching it went away.
+  useEffect(() => {
+    return () => {
+      recognitionRef.current?.stop();
+    };
+  }, []);
+
+  function handleMicClick() {
+    if (listening) {
+      recognitionRef.current?.stop();
+      return;
+    }
+    const SpeechRecognitionCtor = getSpeechRecognitionConstructor();
+    if (!SpeechRecognitionCtor) return;
+
+    const recognition = new SpeechRecognitionCtor();
+    recognition.lang = 'en-GB';
+    recognition.continuous = false;
+    recognition.interimResults = true;
+    // Writes straight into the same `input` state the textarea already
+    // renders and Send already reads from - interim results update it
+    // live as you speak, exactly like typing, so nothing downstream
+    // (send, retry, validation) needs to know voice was involved at all.
+    recognition.onresult = (event) => {
+      let transcript = '';
+      for (let i = 0; i < event.results.length; i++) {
+        transcript += event.results[i][0].transcript;
+      }
+      setInput(transcript);
+    };
+    // "no-speech" (nobody said anything before it timed out) and
+    // "aborted" (the person clicked the mic again to stop it themselves)
+    // are both normal, silent outcomes, not failures worth surfacing -
+    // onend below already resets the listening state either way. Anything
+    // else (mic permission denied, no microphone, a real browser error)
+    // gets a brief inline note the same way a failed send does.
+    recognition.onerror = (event) => {
+      const errorEvent = event as Event & { error?: string };
+      if (errorEvent.error !== 'no-speech' && errorEvent.error !== 'aborted') {
+        setError("Couldn't hear that - check your microphone permission and try again.");
+      }
+    };
+    recognition.onend = () => {
+      setListening(false);
+      recognitionRef.current = null;
+    };
+
+    recognitionRef.current = recognition;
+    setListening(true);
+    setError(null);
+    recognition.start();
+  }
 
   async function sendWithRetry(payload: Message[], reportToken: string | null, dashboardTab: string | null, compareContext: CompareContext | null) {
     setSending(true);
@@ -235,10 +347,22 @@ function AssistantWidgetInner() {
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="Ask about using RoadVerdict…"
+              placeholder={listening ? 'Listening…' : 'Ask about using RoadVerdict…'}
               rows={1}
               disabled={sending}
             />
+            {micSupported && (
+              <button
+                type="button"
+                className={listening ? styles.micBtnActive : styles.micBtn}
+                onClick={handleMicClick}
+                disabled={sending}
+                aria-label={listening ? 'Stop voice input' : 'Start voice input'}
+                aria-pressed={listening}
+              >
+                <Mic size={18} />
+              </button>
+            )}
             <button type="button" className={styles.sendBtn} onClick={handleSend} disabled={sending || !input.trim()}>
               {sending && <VehicleSpinner kind={vehicleKind ?? 'bike'} size={20} />}
               Send
