@@ -1,10 +1,11 @@
 // Place at: tests/components/ExportShareSection.test.tsx
 //
 // ExportShareSection is two things bolted together: a CSV download link
-// gated behind Pro (via the real ProGate component, not a stub), and a
-// share-link creation flow with its own client-side validation, copy
-// button and optional send-by-email step. Only `fetch` and
-// navigator.clipboard are mocked.
+// (free on every plan - export/csv/route.ts has no Pro gate, and it's a
+// free-tier perk on /pro; this section previously and mistakenly wrapped
+// it in a ProGate anyway) and a share-link creation flow with its own
+// client-side validation, copy button and optional send-by-email step.
+// Only `fetch` and navigator.clipboard are mocked.
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -27,24 +28,17 @@ describe("ExportShareSection", () => {
     vi.useRealTimers();
   });
 
-  it("free plan: the real CSV link is replaced by the Pro upsell, not shown alongside it", () => {
-    render(<ExportShareSection isPro={false} />);
-    expect(screen.queryByRole("link", { name: "Download CSV" })).not.toBeInTheDocument();
-    expect(screen.getByText("Export as CSV")).toBeInTheDocument();
-    expect(screen.getByText(/unlocks every locked feature/)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Coming soon" })).toBeInTheDocument();
-  });
-
-  it("pro plan: the real CSV link is shown, pointing at the export route, with no upsell", () => {
-    render(<ExportShareSection isPro={true} />);
+  it("always shows the real CSV link, with no Pro upsell - it's free on every plan", () => {
+    render(<ExportShareSection />);
     const link = screen.getByRole("link", { name: "Download CSV" });
     expect(link).toHaveAttribute("href", "/api/tracker/export/csv");
-    expect(screen.queryByText("Export as CSV")).not.toBeInTheDocument();
+    expect(screen.queryByText(/unlocks every locked feature/)).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Coming soon" })).not.toBeInTheDocument();
   });
 
   it("blocks creating a link with no recipient email, without calling the server", async () => {
     const user = userEvent.setup();
-    render(<ExportShareSection isPro={false} />);
+    render(<ExportShareSection />);
     await user.click(screen.getByRole("button", { name: "Get shareable report link" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent(/enter the email address/i);
@@ -53,7 +47,7 @@ describe("ExportShareSection", () => {
 
   it("blocks an email address with no @ as clearly invalid", async () => {
     const user = userEvent.setup();
-    render(<ExportShareSection isPro={false} />);
+    render(<ExportShareSection />);
     await user.type(screen.getByLabelText("Sharing with (email address)"), "not-an-email");
     await user.click(screen.getByRole("button", { name: "Get shareable report link" }));
 
@@ -63,7 +57,7 @@ describe("ExportShareSection", () => {
 
   it("blocks a non-numeric or non-positive asking price, but leaves it optional", async () => {
     const user = userEvent.setup();
-    render(<ExportShareSection isPro={false} />);
+    render(<ExportShareSection />);
     await user.type(screen.getByLabelText("Sharing with (email address)"), "buyer@example.com");
     await user.type(screen.getByLabelText("Asking price (optional)"), "-5");
     await user.click(screen.getByRole("button", { name: "Get shareable report link" }));
@@ -78,7 +72,7 @@ describe("ExportShareSection", () => {
       json: async () => ({ url: "https://roadverdict.app/report/tok123", expiresAt: "2024-06-01T00:00:00.000Z" }),
     });
     const user = userEvent.setup();
-    render(<ExportShareSection isPro={false} />);
+    render(<ExportShareSection />);
     await user.type(screen.getByLabelText("Sharing with (email address)"), "buyer@example.com");
     await user.selectOptions(screen.getByLabelText("Link stays valid for"), "6months");
     await user.type(screen.getByLabelText("Asking price (optional)"), "3200");
@@ -103,7 +97,7 @@ describe("ExportShareSection", () => {
       json: async () => ({ error: "You already have 5 active links." }),
     });
     const user = userEvent.setup();
-    render(<ExportShareSection isPro={false} />);
+    render(<ExportShareSection />);
     await user.type(screen.getByLabelText("Sharing with (email address)"), "buyer@example.com");
     await user.click(screen.getByRole("button", { name: "Get shareable report link" }));
 
@@ -115,7 +109,7 @@ describe("ExportShareSection", () => {
     let resolveFetch: (v: unknown) => void = () => {};
     (fetch as ReturnType<typeof vi.fn>).mockReturnValue(new Promise((resolve) => { resolveFetch = resolve; }));
     const user = userEvent.setup();
-    render(<ExportShareSection isPro={false} />);
+    render(<ExportShareSection />);
     await user.type(screen.getByLabelText("Sharing with (email address)"), "buyer@example.com");
     await user.click(screen.getByRole("button", { name: "Get shareable report link" }));
 
@@ -133,7 +127,7 @@ describe("ExportShareSection", () => {
       json: async () => ({ url: "https://roadverdict.app/report/tok123", expiresAt: null }),
     });
     const user = userEvent.setup();
-    render(<ExportShareSection isPro={false} />);
+    render(<ExportShareSection />);
     await user.type(screen.getByLabelText("Sharing with (email address)"), "buyer@example.com");
     await user.click(screen.getByRole("button", { name: "Get shareable report link" }));
     await screen.findByDisplayValue("https://roadverdict.app/report/tok123");
@@ -156,7 +150,7 @@ describe("ExportShareSection", () => {
       json: async () => ({ url: "https://roadverdict.app/report/tok123", expiresAt: null }),
     });
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
-    render(<ExportShareSection isPro={false} />);
+    render(<ExportShareSection />);
     await user.type(screen.getByLabelText("Sharing with (email address)"), "buyer@example.com");
     await user.click(screen.getByRole("button", { name: "Get shareable report link" }));
     await screen.findByDisplayValue("https://roadverdict.app/report/tok123");
@@ -178,7 +172,7 @@ describe("ExportShareSection", () => {
       json: async () => ({ url: "https://roadverdict.app/report/tok123", expiresAt: null }),
     });
     const user = userEvent.setup();
-    render(<ExportShareSection isPro={false} />);
+    render(<ExportShareSection />);
     await user.type(screen.getByLabelText("Sharing with (email address)"), "buyer@example.com");
     await user.click(screen.getByRole("button", { name: "Get shareable report link" }));
     await screen.findByDisplayValue("https://roadverdict.app/report/tok123");
@@ -201,7 +195,7 @@ describe("ExportShareSection", () => {
       json: async () => ({ url: "https://roadverdict.app/report/tok123", expiresAt: null }),
     });
     const user = userEvent.setup();
-    render(<ExportShareSection isPro={false} />);
+    render(<ExportShareSection />);
     await user.type(screen.getByLabelText("Sharing with (email address)"), "buyer@example.com");
     await user.click(screen.getByRole("button", { name: "Get shareable report link" }));
     await screen.findByDisplayValue("https://roadverdict.app/report/tok123");

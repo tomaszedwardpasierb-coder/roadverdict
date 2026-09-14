@@ -230,7 +230,6 @@ function RequestCard({ request }: { request: CarReceiptRequestDocView }) {
 }
 
 interface Props {
-  isPro?: boolean;
   links: CarShareLinkDoc[];
   carNames: Record<string, string>;
   appUrl: string;
@@ -241,7 +240,7 @@ interface Props {
   distanceUnit: DistanceUnit;
 }
 
-export function CarShareLinksSection({ links, carNames, appUrl, requests, carNickname, registration, currentMileage, distanceUnit, isPro = false }: Props) {
+export function CarShareLinksSection({ links, carNames, appUrl, requests, carNickname, registration, currentMileage, distanceUnit }: Props) {
   const [tab, setTab] = useState<SubTab>('links');
   const pendingCount = requests.length;
 
@@ -298,7 +297,7 @@ export function CarShareLinksSection({ links, carNames, appUrl, requests, carNic
 
       {activeTab === 'links' ? (
         <>
-          <CarExportShareSection isPro={isPro} />
+          <CarExportShareSection />
           <CarShareLinksList links={links} carNames={carNames} appUrl={appUrl} />
         </>
       ) : (

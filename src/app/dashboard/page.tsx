@@ -528,7 +528,7 @@ export default async function DashboardPage(props: { searchParams: Promise<{ add
         </div>
       </div>
 
-      <ExportShareSection isPro={userIsPro} />
+      <ExportShareSection />
     </ChartFilterProvider>
   );
 
@@ -832,7 +832,7 @@ export default async function DashboardPage(props: { searchParams: Promise<{ add
   const incomingRequest = requestsForThisBike.find((r) => r.initiatedBy === "recipient");
 
   const shareLinksContent = (
-    <ShareLinksSection isPro={userIsPro}
+    <ShareLinksSection
       links={shareLinks}
       bikeNames={bikeNames}
       appUrl={process.env.APP_URL ?? "https://roadverdict.co.uk"}
@@ -1261,7 +1261,7 @@ async function renderCarDashboard(
         </div>
       </div>
 
-      <CarExportShareSection isPro={userIsPro} />
+      <CarExportShareSection />
     </ChartFilterProvider>
   );
 
@@ -1581,7 +1581,7 @@ async function renderCarDashboard(
   );
 
   const carShareLinksContent = (
-    <CarShareLinksSection isPro={userIsPro}
+    <CarShareLinksSection
       links={carShareLinks}
       carNames={carNames}
       appUrl={process.env.APP_URL ?? "https://roadverdict.co.uk"}

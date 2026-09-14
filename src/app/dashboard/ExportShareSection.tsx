@@ -4,7 +4,6 @@
 import { useState } from 'react';
 import { VehicleSpinner } from '@/components/VehicleSpinner';
 import styles from './dashboard.module.css';
-import { ProGate } from './ProGate';
 
 type ShareLinkDuration = '1week' | '1month' | '6months';
 
@@ -19,7 +18,7 @@ const DURATION_OPTIONS: { value: ShareLinkDuration; label: string }[] = [
 // already there) and the Shareable Links tab (where creating and
 // managing links belong together). A copy or logic fix here only ever
 // needs making once.
-export function ExportShareSection({ isPro = false }: { isPro?: boolean }) {
+export function ExportShareSection() {
   const [duration, setDuration] = useState<ShareLinkDuration>('1month');
   const [recipientEmail, setRecipientEmail] = useState('');
   const [askingPrice, setAskingPrice] = useState('');
@@ -111,16 +110,15 @@ export function ExportShareSection({ isPro = false }: { isPro?: boolean }) {
         been looked after, dates, costs, a real history, not just your word for it. Your personal details stay
         yours, receipts and invoices only appear if you specifically approve sharing them when someone asks.
       </p>
+      {/* CSV export has no Pro gate on the backend (export/csv/route.ts) and
+          is listed as a Free perk on /pro - it was mistakenly wrapped in a
+          ProGate here, which meant this genuinely free Shareable Links
+          section always showed a full Free/Pro pricing banner underneath a
+          feature that costs nothing. Plain, unconditional link instead. */}
       <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap', alignItems: 'center' }}>
-        {isPro ? (
-          <a href="/api/tracker/export/csv" className={styles.scanReceiptBtn} style={{ textDecoration: 'none' }}>
-            Download CSV
-          </a>
-        ) : (
-          <ProGate featureName="Export as CSV" description="Download your full service, fuel, mods and bills history as a spreadsheet." isPro={false}>
-            <a href="/api/tracker/export/csv" className={styles.scanReceiptBtn} style={{ textDecoration: 'none' }}>Download CSV</a>
-          </ProGate>
-        )}
+        <a href="/api/tracker/export/csv" className={styles.scanReceiptBtn} style={{ textDecoration: 'none' }}>
+          Download CSV
+        </a>
       </div>
 
       {!shareUrl ? (

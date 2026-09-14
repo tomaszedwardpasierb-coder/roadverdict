@@ -232,7 +232,6 @@ function RequestCard({ request }: { request: ReceiptRequestDocView }) {
 }
 
 interface Props {
-  isPro?: boolean;
   links: ShareLinkDoc[];
   bikeNames: Record<string, string>;
   appUrl: string;
@@ -243,7 +242,7 @@ interface Props {
   distanceUnit: DistanceUnit;
 }
 
-export function ShareLinksSection({ links, bikeNames, appUrl, requests, bikeNickname, registration, currentMileage, distanceUnit, isPro = false }: Props) {
+export function ShareLinksSection({ links, bikeNames, appUrl, requests, bikeNickname, registration, currentMileage, distanceUnit }: Props) {
   const [tab, setTab] = useState<SubTab>('links');
   const pendingCount = requests.length;
 
@@ -307,7 +306,7 @@ export function ShareLinksSection({ links, bikeNames, appUrl, requests, bikeNick
 
       {activeTab === 'links' ? (
         <>
-          <ExportShareSection isPro={isPro} />
+          <ExportShareSection />
           <ShareLinksList links={links} bikeNames={bikeNames} appUrl={appUrl} />
         </>
       ) : (

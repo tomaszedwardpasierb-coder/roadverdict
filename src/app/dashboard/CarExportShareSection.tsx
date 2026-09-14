@@ -1,14 +1,12 @@
 // Place at: src/app/dashboard/CarExportShareSection.tsx
-// Car mirror of ExportShareSection.tsx. ProGate is reused directly -
-// genuinely vehicle-neutral. CSV export already resolves whichever
-// vehicle kind is active (see /api/tracker/export/csv), so no
+// Car mirror of ExportShareSection.tsx. CSV export already resolves
+// whichever vehicle kind is active (see /api/tracker/export/csv), so no
 // car-specific export endpoint is needed either.
 'use client';
 
 import { useState } from 'react';
 import { VehicleSpinner } from '@/components/VehicleSpinner';
 import styles from './dashboard.module.css';
-import { ProGate } from './ProGate';
 
 type ShareLinkDuration = '1week' | '1month' | '6months';
 
@@ -18,7 +16,7 @@ const DURATION_OPTIONS: { value: ShareLinkDuration; label: string }[] = [
   { value: '6months', label: '6 months' },
 ];
 
-export function CarExportShareSection({ isPro = false }: { isPro?: boolean }) {
+export function CarExportShareSection() {
   const [duration, setDuration] = useState<ShareLinkDuration>('1month');
   const [recipientEmail, setRecipientEmail] = useState('');
   const [askingPrice, setAskingPrice] = useState('');
@@ -107,16 +105,15 @@ export function CarExportShareSection({ isPro = false }: { isPro?: boolean }) {
         been looked after, dates, costs, a real history, not just your word for it. Your personal details stay
         yours, receipts and invoices only appear if you specifically approve sharing them when someone asks.
       </p>
+      {/* CSV export has no Pro gate on the backend (export/csv/route.ts) and
+          is listed as a Free perk on /pro - it was mistakenly wrapped in a
+          ProGate here, which meant this genuinely free Shareable Links
+          section always showed a full Free/Pro pricing banner underneath a
+          feature that costs nothing. Plain, unconditional link instead. */}
       <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap', alignItems: 'center' }}>
-        {isPro ? (
-          <a href="/api/tracker/export/csv" className={styles.scanReceiptBtn} style={{ textDecoration: 'none' }}>
-            Download CSV
-          </a>
-        ) : (
-          <ProGate featureName="Export as CSV" description="Download your full service, fuel, mods and bills history as a spreadsheet." isPro={false}>
-            <a href="/api/tracker/export/csv" className={styles.scanReceiptBtn} style={{ textDecoration: 'none' }}>Download CSV</a>
-          </ProGate>
-        )}
+        <a href="/api/tracker/export/csv" className={styles.scanReceiptBtn} style={{ textDecoration: 'none' }}>
+          Download CSV
+        </a>
       </div>
 
       {!shareUrl ? (
