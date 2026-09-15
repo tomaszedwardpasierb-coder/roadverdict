@@ -207,9 +207,24 @@ Start with 20–50 genuinely good pages backed by real observations, not thousan
 template pages — Google's own guidance treats large volumes of low-added-value pages as scaled
 content abuse.
 
-**Track 2 — a small, genuinely written guides hub.** "What to check before buying a used
-motorcycle" needs real, specific, well-sourced writing. Four to six cornerstone guides, each
-mapped to one pillar, are enough to start.
+**Track 2 — a small, genuinely written guides hub. SHIPPED (2 of 4 pillars) 15 September 2026.**
+Live at `/guides`: separate, genuinely-written motorcycle and car versions of "what to check
+before buying a used [vehicle]" and "the real cost of owning a [vehicle] in the UK" - four real
+pages, not one template with the vehicle word swapped, each with its own FAQPage and
+BreadcrumbList schema, cross-linked both from the guides hub and from the relevant existing tool
+page (Buying Guide ↔ its guide, Cost Calculator ↔ its guide). The other two pillars (fair-price
+and proof-when-selling) don't have a cornerstone guide yet - worth revisiting once these four
+show real traffic.
+
+**A note on Track 1's original scope, discovered while starting this work:** the "Honda CB500F
+service cost" style per-model pages described in Cluster F below assumed per-model pricing data
+exists. It doesn't - `priceData.ts`/`carPriceData.ts` are genuinely priced by size class (small/
+medium/large), not by make/model, with honestly-tracked confidence levels per cell. Building
+per-model pages from size-class data would mean presenting coarser data as if it were
+model-specific - exactly the kind of thin, inauthentic content Google's scaled-content policy
+targets. Track 1 needs either a smaller, honest scope (real pages built around what the data
+actually supports) or genuine per-model research before it's revisited - not a page-building
+task as originally scoped.
 
 ---
 

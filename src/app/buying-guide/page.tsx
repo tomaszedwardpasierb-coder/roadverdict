@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import Link from 'next/link';
 import { headers } from 'next/headers';
 import { BuyingGuideForm } from '@/components/BuyingGuideForm';
 import { RelatedTools } from '@/components/RelatedTools';
@@ -99,6 +100,10 @@ export default async function BuyingGuidePage() {
         especially on anything safety-critical like brakes or frame condition.
       </p>
       <RelatedTools current="/buying-guide" />
+      <p style={{ maxWidth: 'none', marginTop: '1rem' }}>
+        Want the full checklist, not just this tool? Read{' '}
+        <Link href="/guides/buying-a-used-motorcycle">What to Check Before Buying a Used Motorcycle</Link>.
+      </p>
       <section aria-labelledby="buying-guide-faq-heading">
         <h2 id="buying-guide-faq-heading">Questions about the Buying Guide</h2>
         <h3>What does the Buying Guide check?</h3>

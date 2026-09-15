@@ -1,5 +1,6 @@
 // Place at: src/app/cars/cost-calculator/page.tsx
 import type { Metadata } from 'next';
+import Link from 'next/link';
 import { headers } from 'next/headers';
 import { CarCostCalculatorForm } from '@/components/CarCostCalculatorForm';
 import { getSession } from '@/lib/auth/session';
@@ -86,6 +87,10 @@ export default async function CarCostCalculatorPage() {
         Fully electric cars aren&apos;t supported yet - not enough sourced UK price data.
       </p>
       <CarRelatedTools current="/cars/cost-calculator" />
+      <p style={{ maxWidth: 'none', marginTop: '1rem' }}>
+        Want to understand every cost category, not just this estimate? Read{' '}
+        <Link href="/guides/cost-of-owning-a-car">The Real Cost of Owning a Car in the UK</Link>.
+      </p>
     </>
   );
 }

@@ -1,5 +1,6 @@
 // Place at: src/app/cars/buying-guide/page.tsx
 import type { Metadata } from 'next';
+import Link from 'next/link';
 import { headers } from 'next/headers';
 import { CarBuyingGuideForm } from '@/components/CarBuyingGuideForm';
 import { CarRelatedTools } from '@/components/CarRelatedTools';
@@ -100,6 +101,10 @@ export default async function CarBuyingGuidePage() {
         especially on anything safety-critical like brakes or structural condition.
       </p>
       <CarRelatedTools current="/cars/buying-guide" />
+      <p style={{ maxWidth: 'none', marginTop: '1rem' }}>
+        Want the full checklist, not just this tool? Read{' '}
+        <Link href="/guides/buying-a-used-car">What to Check Before Buying a Used Car</Link>.
+      </p>
       <section aria-labelledby="buying-guide-faq-heading">
         <h2 id="buying-guide-faq-heading">Questions about the Buying Guide</h2>
         <h3>What does the Buying Guide check?</h3>

@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import Link from 'next/link';
 import { headers } from 'next/headers';
 import { CostCalculatorForm } from '@/components/CostCalculatorForm';
 import { getSession } from '@/lib/auth/session';
@@ -96,6 +97,10 @@ export default async function CostCalculatorPage() {
         region - not a quote, and not a substitute for checking your own riding costs.
       </p>
       <RelatedTools current="/cost-calculator" />
+      <p style={{ maxWidth: 'none', marginTop: '1rem' }}>
+        Want to understand every cost category, not just this estimate? Read{' '}
+        <Link href="/guides/cost-of-owning-a-motorcycle">The Real Cost of Owning a Motorcycle in the UK</Link>.
+      </p>
     </>
   );
 }

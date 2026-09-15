@@ -10,6 +10,7 @@ const NAV_ITEMS = [
   { href: '/quote-checker', label: 'Quote Checker' },
   { href: '/cost-calculator', label: 'Cost Calculator' },
   { href: '/buying-guide', label: 'Buying Guide' },
+  { href: '/guides', label: 'Guides' },
   { href: '/pro', label: 'Pro' },
 ];
 
