@@ -3,6 +3,7 @@
 
 import { useState } from 'react';
 import type { Attachment } from '@/lib/tracker/cosmosHelpers';
+import { fetchWithTimeout, FetchTimeoutError, UPLOAD_TIMEOUT_MS } from '@/lib/fetchWithTimeout';
 import { AttachmentThumb } from './AttachmentThumb';
 import styles from './dashboard.module.css';
 
@@ -39,7 +40,11 @@ export function AttachmentUploader({ value, onChange, idSuffix = '', compareValu
     try {
       const formData = new FormData();
       formData.append('file', file);
-      const res = await fetch('/api/tracker/upload-attachment', { method: 'POST', body: formData });
+      const res = await fetchWithTimeout(
+        '/api/tracker/upload-attachment',
+        { method: 'POST', body: formData },
+        UPLOAD_TIMEOUT_MS
+      );
       const data = await res.json();
       if (!res.ok) {
         setError(data.error ?? 'Upload failed. Try again.');
@@ -50,7 +55,7 @@ export function AttachmentUploader({ value, onChange, idSuffix = '', compareValu
       if (compareValues) {
         setVerifying(true);
         try {
-          const verifyRes = await fetch('/api/tracker/verify-receipt', {
+          const verifyRes = await fetchWithTimeout('/api/tracker/verify-receipt', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -64,13 +69,13 @@ export function AttachmentUploader({ value, onChange, idSuffix = '', compareValu
             setDiscrepancies(verifyData.discrepancies);
           }
         } catch {
-          // Silent - this is a best-effort nudge, not a required step.
+          // Silent (including a timeout) - this is a best-effort nudge, not a required step.
         } finally {
           setVerifying(false);
         }
       }
-    } catch {
-      setError('Could not reach the server.');
+    } catch (err) {
+      setError(err instanceof FetchTimeoutError ? 'Upload timed out - try again.' : 'Could not reach the server.');
     } finally {
       setUploading(false);
       e.target.value = '';

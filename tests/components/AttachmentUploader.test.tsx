@@ -93,6 +93,27 @@ describe("AttachmentUploader", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent("Could not reach the server.");
   });
 
+  it("shows a distinct timed-out message, and re-enables the input, when the upload stalls instead of rejecting", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    (fetch as ReturnType<typeof vi.fn>).mockImplementation((_url: string, init: RequestInit) => {
+      return new Promise((_resolve, reject) => {
+        init.signal?.addEventListener("abort", () => {
+          reject(new DOMException("The operation was aborted.", "AbortError"));
+        });
+      });
+    });
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    render(<AttachmentUploader value={null} onChange={vi.fn()} />);
+    await user.upload(screen.getByLabelText("Receipt or invoice (optional)"), makeFile());
+
+    expect(screen.getByText("Uploading…")).toBeInTheDocument();
+    await vi.advanceTimersByTimeAsync(45_000);
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("Upload timed out - try again.");
+    expect(screen.getByLabelText("Receipt or invoice (optional)")).not.toBeDisabled();
+    vi.useRealTimers();
+  });
+
   it("when compareValues is supplied, a successful upload also calls verify-receipt and surfaces its discrepancies", async () => {
     (fetch as ReturnType<typeof vi.fn>)
       .mockResolvedValueOnce({

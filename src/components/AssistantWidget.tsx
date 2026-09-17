@@ -11,6 +11,7 @@ import { AssistantProposedShareLinkCard, type ProposedShareLink } from './Assist
 import { AssistantProposedVaultDocumentCard, type ProposedVaultDocument } from './AssistantProposedVaultDocumentCard';
 import { AttachmentThumb } from '@/app/dashboard/AttachmentThumb';
 import type { Attachment } from '@/lib/tracker/cosmosHelpers';
+import { fetchWithTimeout, FetchTimeoutError, UPLOAD_TIMEOUT_MS } from '@/lib/fetchWithTimeout';
 import { VehicleSpinner } from './VehicleSpinner';
 import styles from './AssistantWidget.module.css';
 
@@ -313,15 +314,19 @@ function AssistantWidgetInner() {
     try {
       const formData = new FormData();
       formData.append('file', file);
-      const res = await fetch('/api/tracker/upload-attachment', { method: 'POST', body: formData });
+      const res = await fetchWithTimeout(
+        '/api/tracker/upload-attachment',
+        { method: 'POST', body: formData },
+        UPLOAD_TIMEOUT_MS
+      );
       const data = await res.json();
       if (!res.ok) {
         setAttachmentError(data.error ?? 'Upload failed. Try again.');
         return;
       }
       setPendingAttachment(data.attachment);
-    } catch {
-      setAttachmentError('Could not reach the server.');
+    } catch (err) {
+      setAttachmentError(err instanceof FetchTimeoutError ? 'Upload timed out - try again.' : 'Could not reach the server.');
     } finally {
       setUploadingAttachment(false);
     }

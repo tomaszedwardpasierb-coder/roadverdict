@@ -20,6 +20,18 @@ const CONTAINER_NAME = "attachments";
 // sharing a container whose name and history predate it.
 const VAULT_CONTAINER_NAME = "vault-documents";
 
+// Neither the Azure Blob SDK client above nor any individual uploadData()
+// call in this app passes a timeout of its own - left unbounded, a stalled
+// upload (not a rejected one) just runs forever, holding whatever
+// server-side resource the request handler holds for as long as it does
+// (the Vault upload route's own per-vehicle advisory lock, notably).
+// Deliberately longer than the client's own UPLOAD_TIMEOUT_MS
+// (fetchWithTimeout.ts) - the client's own timeout should be what a
+// person actually sees in the ordinary case; this is a backstop for
+// when it isn't (the client's own abort not reaching the server, or a
+// direct call to the route outside the browser).
+export const BLOB_UPLOAD_TIMEOUT_MS = 60_000;
+
 // Lazily creates the client on first real use, same reasoning as
 // getContainer() in cosmos.ts: Next.js inspects route modules during
 // `next build` even when a route is never called, and doing this at

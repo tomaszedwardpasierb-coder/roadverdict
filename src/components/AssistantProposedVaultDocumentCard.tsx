@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { VaultAuthModal, type VaultPreviousAccess } from '@/app/dashboard/VaultAuthModal';
 import { VAULT_CATEGORIES, type VaultDocumentCategory } from '@/lib/tracker/vaultDocument';
+import { fetchWithTimeout, FetchTimeoutError, UPLOAD_TIMEOUT_MS } from '@/lib/fetchWithTimeout';
 import { VehicleSpinner } from './VehicleSpinner';
 import styles from './AssistantProposedEntryCard.module.css';
 
@@ -73,7 +74,7 @@ export function AssistantProposedVaultDocumentCard({ document: doc }: { document
       fd.set('vehicleId', doc.vehicleId);
       fd.set('category', category);
       if (label.trim()) fd.set('label', label.trim());
-      const res = await fetch('/api/vault/documents', { method: 'POST', body: fd });
+      const res = await fetchWithTimeout('/api/vault/documents', { method: 'POST', body: fd }, UPLOAD_TIMEOUT_MS);
       const data = await res.json();
       if (!res.ok) {
         if (isLockedResponse(res.status, data)) {
@@ -85,8 +86,12 @@ export function AssistantProposedVaultDocumentCard({ document: doc }: { document
       }
       setAdded(true);
       router.refresh();
-    } catch {
-      setError('Could not reach RoadVerdict. Check your connection and try again.');
+    } catch (err) {
+      setError(
+        err instanceof FetchTimeoutError
+          ? 'Upload timed out - try again.'
+          : 'Could not reach RoadVerdict. Check your connection and try again.'
+      );
     } finally {
       setUploading(false);
     }

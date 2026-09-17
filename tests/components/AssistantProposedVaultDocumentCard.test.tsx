@@ -147,4 +147,28 @@ describe("AssistantProposedVaultDocumentCard", () => {
     expect(await screen.findByText("File too large.")).toBeInTheDocument();
     expect(screen.queryByText(/Added to Vault/)).not.toBeInTheDocument();
   });
+
+  it("shows a distinct timed-out message when the upload stalls instead of rejecting", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    (fetch as ReturnType<typeof vi.fn>)
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ unlocked: true }) })
+      .mockImplementationOnce((_url: string, init: RequestInit) => {
+        return new Promise((_resolve, reject) => {
+          init.signal?.addEventListener("abort", () => {
+            reject(new DOMException("The operation was aborted.", "AbortError"));
+          });
+        });
+      });
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    render(<AssistantProposedVaultDocumentCard document={bikeDoc} />);
+
+    await user.upload(await screen.findByLabelText(/File \(PDF, JPG, or PNG/), makeFile());
+    await user.click(screen.getByRole("button", { name: "Add document" }));
+
+    await vi.advanceTimersByTimeAsync(45_000);
+
+    expect(await screen.findByText("Upload timed out - try again.")).toBeInTheDocument();
+    expect(screen.queryByText(/Added to Vault/)).not.toBeInTheDocument();
+    vi.useRealTimers();
+  });
 });

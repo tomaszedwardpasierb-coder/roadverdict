@@ -161,6 +161,39 @@ describe("VaultTab", () => {
     expect(formData.get("vehicleId")).toBe("bike-1");
   });
 
+  it("shows a distinct timed-out message when the upload stalls instead of rejecting", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((url: string, init?: RequestInit) => {
+        if (url === "/api/vault/status") return jsonResponse({ unlocked: true });
+        if (url.startsWith("/api/vault/documents?")) return jsonResponse({ documents: [] });
+        if (url === "/api/vault/documents" && init?.method === "POST") {
+          return new Promise((_resolve, reject) => {
+            init.signal?.addEventListener("abort", () => {
+              reject(new DOMException("The operation was aborted.", "AbortError"));
+            });
+          });
+        }
+        return Promise.reject(new Error(`Unexpected fetch: ${url}`));
+      })
+    );
+
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    render(<VaultTab vehicleKind="bike" vehicleId="bike-1" currentMileage={1000} distanceUnit="mi" />);
+    await screen.findByText(/documents, in one secure place/);
+
+    await user.selectOptions(screen.getByLabelText("Category"), "dvlaLegal");
+    const file = new File([new Uint8Array([1, 2, 3])], "v5c.pdf", { type: "application/pdf" });
+    await user.upload(screen.getByLabelText(/File \(PDF/), file);
+    await user.click(screen.getByRole("button", { name: "Add document" }));
+
+    await vi.advanceTimersByTimeAsync(45_000);
+
+    expect(await screen.findByText("Upload timed out - try again.")).toBeInTheDocument();
+    vi.useRealTimers();
+  });
+
   it("deletes a document and removes it from the list", async () => {
     let listCallCount = 0;
     vi.stubGlobal(

@@ -16,7 +16,7 @@ import { checkVaultGate } from "@/lib/tracker/vaultAccess";
 import { extendVaultSession } from "@/lib/tracker/vaultSession";
 import { getBike } from "@/lib/tracker/bike";
 import { getCarById } from "@/lib/tracker/car";
-import { getVaultContainer } from "@/lib/blobStorage";
+import { getVaultContainer, BLOB_UPLOAD_TIMEOUT_MS } from "@/lib/blobStorage";
 import { acquireVaultUploadLock, releaseVaultUploadLock } from "@/lib/tracker/vaultUploadLock";
 import { matchesDeclaredFileType, type SniffableFileType } from "@/lib/tracker/fileSignature";
 import {
@@ -127,6 +127,7 @@ export async function POST(request: NextRequest) {
     try {
       await blockBlobClient.uploadData(bytes, {
         blobHTTPHeaders: { blobContentType: file.type },
+        abortSignal: AbortSignal.timeout(BLOB_UPLOAD_TIMEOUT_MS),
       });
 
       const doc = await createVaultDocument(gate.email, {

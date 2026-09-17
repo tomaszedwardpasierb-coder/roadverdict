@@ -2,7 +2,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { randomBytes } from "crypto";
 import { getSession } from "@/lib/auth/session";
-import { getAttachmentContainer } from "@/lib/blobStorage";
+import { getAttachmentContainer, BLOB_UPLOAD_TIMEOUT_MS } from "@/lib/blobStorage";
 import { matchesDeclaredFileType, type SniffableFileType } from "@/lib/tracker/fileSignature";
 import type { Attachment } from "@/lib/tracker/cosmosHelpers";
 
@@ -64,6 +64,7 @@ export async function POST(request: NextRequest) {
     const blockBlobClient = container.getBlockBlobClient(blobName);
     await blockBlobClient.uploadData(bytes, {
       blobHTTPHeaders: { blobContentType: file.type },
+      abortSignal: AbortSignal.timeout(BLOB_UPLOAD_TIMEOUT_MS),
     });
 
     const attachment: Attachment = {

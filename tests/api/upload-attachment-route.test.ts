@@ -8,7 +8,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("@/lib/auth/session", () => ({ getSession: mocks.getSession }));
-vi.mock("@/lib/blobStorage", () => ({ getAttachmentContainer: mocks.getAttachmentContainer }));
+vi.mock("@/lib/blobStorage", () => ({ getAttachmentContainer: mocks.getAttachmentContainer, BLOB_UPLOAD_TIMEOUT_MS: 60_000 }));
 
 import { POST } from "@/app/api/tracker/upload-attachment/route";
 
@@ -126,7 +126,10 @@ describe("POST /api/tracker/upload-attachment", () => {
     expect(mocks.uploadData).toHaveBeenCalledTimes(1);
     const [uploadedBuffer, options] = mocks.uploadData.mock.calls[0];
     expect(Buffer.from(uploadedBuffer)).toEqual(Buffer.from(expectedBytes));
-    expect(options).toEqual({ blobHTTPHeaders: { blobContentType: "image/jpeg" } });
+    expect(options).toEqual({
+      blobHTTPHeaders: { blobContentType: "image/jpeg" },
+      abortSignal: expect.any(AbortSignal),
+    });
   });
 
   it("returns an attachment with a generated blobName, the original fileName, fileType, and an uploadedAt timestamp", async () => {

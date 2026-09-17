@@ -21,7 +21,7 @@ vi.mock("@/lib/tracker/vaultAccess", () => ({ checkVaultGate: mocks.checkVaultGa
 vi.mock("@/lib/tracker/vaultSession", () => ({ extendVaultSession: mocks.extendVaultSession }));
 vi.mock("@/lib/tracker/bike", () => ({ getBike: mocks.getBike }));
 vi.mock("@/lib/tracker/car", () => ({ getCarById: mocks.getCarById }));
-vi.mock("@/lib/blobStorage", () => ({ getVaultContainer: mocks.getVaultContainer }));
+vi.mock("@/lib/blobStorage", () => ({ getVaultContainer: mocks.getVaultContainer, BLOB_UPLOAD_TIMEOUT_MS: 60_000 }));
 vi.mock("@/lib/tracker/vaultUploadLock", () => ({
   acquireVaultUploadLock: mocks.acquireVaultUploadLock,
   releaseVaultUploadLock: mocks.releaseVaultUploadLock,
