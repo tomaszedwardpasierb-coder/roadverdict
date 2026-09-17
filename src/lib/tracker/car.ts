@@ -18,6 +18,8 @@ import type { DistanceUnit, FuelEconomyUnit } from "@/lib/tracker/unitFormat";
 import type { Currency } from "@/lib/tracker/currency";
 import type { ChartKind, DvlaVehicleData, RegistrationChangeEntry, RegistrationChangeReason } from "@/lib/tracker/bike";
 import { REFRESH_DATA_COOLDOWN_MS } from "@/lib/tracker/refreshDataCooldown";
+import { deleteAttachmentBlobsBestEffort } from "@/lib/blobStorage";
+import { deleteVaultDocumentsForVehicle } from "@/lib/tracker/vaultDocument";
 
 export type CarFuelType = "petrol" | "diesel" | "hybrid" | "phev" | "electric";
 export type CarSizeClass = "small" | "medium" | "large" | "electric";
@@ -433,18 +435,24 @@ export async function updateCarChartType(email: string, carId: string, chartId: 
 }
 
 // Permanently deletes a car and every record that belongs to it -
-// mirrors deleteBike exactly, own record-type list (carServiceRecord/
-// carFuelLog/carMod/carBill/carLabour/carReminder), no shareToken to
-// clean up since cars don't have one yet.
+// mirrors deleteBike, including its own record-type list (now
+// carBillSeries/carFine/carToll added alongside the original
+// carServiceRecord/carFuelLog/carMod/carBill/carLabour/carReminder,
+// which this had been missing), the same cross-partition query for
+// every carShareLink this car ever had (CarShareLinkDoc has no
+// CarDoc-side pointer field to follow, unlike bike's now-removed one -
+// carId is the only way to find them), and the same Vault document/blob
+// and attachment-blob cleanup deleteBike now does.
 export async function deleteCar(email: string, carId: string): Promise<void> {
   const container = getContainer();
-  const recordTypes = ["carServiceRecord", "carFuelLog", "carMod", "carBill", "carLabour", "carReminder"];
+  const recordTypes = ["carServiceRecord", "carFuelLog", "carMod", "carBill", "carBillSeries", "carLabour", "carReminder", "carFine", "carToll"];
+  const blobNames: string[] = [];
   await Promise.all(
     recordTypes.map(async (type) => {
       const { resources } = await container.items
-        .query<{ id: string }>(
+        .query<{ id: string; attachments?: { blobName: string }[] }>(
           {
-            query: "SELECT c.id FROM c WHERE c.type = @type AND c.carId = @carId",
+            query: "SELECT c.id, c.attachments FROM c WHERE c.type = @type AND c.carId = @carId",
             parameters: [
               { name: "@type", value: type },
               { name: "@carId", value: carId },
@@ -453,9 +461,29 @@ export async function deleteCar(email: string, carId: string): Promise<void> {
           { partitionKey: email }
         )
         .fetchAll();
+      for (const r of resources) {
+        if (r.attachments) blobNames.push(...r.attachments.map((a) => a.blobName));
+      }
       await Promise.all(resources.map((r) => container.item(r.id, email).delete()));
     })
   );
+
+  const { resources: shareLinks } = await container.items
+    .query<{ id: string; pk: string }>({
+      query: "SELECT c.id, c.pk FROM c WHERE c.type = 'carShareLink' AND c.carId = @carId",
+      parameters: [{ name: "@carId", value: carId }],
+    })
+    .fetchAll();
+  await Promise.all(
+    shareLinks.map((r) =>
+      container.item(r.id, r.pk).delete().catch(() => {
+        // Already gone or never existed - not a reason to fail the whole deletion.
+      })
+    )
+  );
+
+  await Promise.all([deleteAttachmentBlobsBestEffort(blobNames), deleteVaultDocumentsForVehicle(email, carId)]);
+
   await container.item(carId, email).delete();
 }
 

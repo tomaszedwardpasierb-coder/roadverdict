@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
   deleteBike: vi.fn(),
   getCarsForUser: vi.fn(),
   deleteCar: vi.fn(),
+  deleteAvatarBlob: vi.fn(),
 }));
 
 vi.mock("@/lib/cosmos", () => ({
@@ -19,6 +20,11 @@ vi.mock("@/lib/cosmos", () => ({
       upsert: mocks.upsert,
       query: (queryObj: unknown) => ({ fetchAll: () => mocks.query(queryObj) }),
     },
+  }),
+}));
+vi.mock("@/lib/blobStorage", () => ({
+  getAttachmentContainer: async () => ({
+    getBlockBlobClient: (blobName: string) => ({ deleteIfExists: () => mocks.deleteAvatarBlob(blobName) }),
   }),
 }));
 vi.mock("@/lib/tracker/userDoc", () => ({ getUserDoc: mocks.getUserDoc }));
@@ -61,6 +67,7 @@ beforeEach(() => {
   mocks.deleteBike.mockResolvedValue(undefined);
   mocks.getCarsForUser.mockResolvedValue([]);
   mocks.deleteCar.mockResolvedValue(undefined);
+  mocks.deleteAvatarBlob.mockResolvedValue(undefined);
 });
 
 describe("getAllUserAccounts", () => {
@@ -180,7 +187,7 @@ describe("deleteAccount", () => {
   it("point-deletes every other email-partitioned doc type", async () => {
     mocks.query.mockImplementation((q: { query: string; parameters?: { name: string; value: string }[] }) => {
       if (q.query.includes("c.type = @type")) {
-        return Promise.resolve({ resources: [{ id: "doc-1" }] });
+        return Promise.resolve({ resources: [{ id: "doc-1", pk: email }] });
       }
       return Promise.resolve({ resources: [] });
     });
@@ -188,8 +195,32 @@ describe("deleteAccount", () => {
     await deleteAccount(email);
 
     // user, session, magicLink, notification, pendingScanBatch,
-    // bikeTransferRequest, receiptRequest - one query + one delete each.
-    expect(mocks.itemDelete).toHaveBeenCalledTimes(7);
+    // bikeTransferRequest, receiptRequest, carTransferRequest,
+    // carReceiptRequest, totpEnrollmentPending, totpPendingLogin,
+    // totpAttempt, trackerWriteAttempt, vaultSession, vaultUploadLock
+    // (15, one query + one delete each) - plus assistantQuestion and
+    // vdiPurchase, the two cross-partition-by-email-field types, whose
+    // query also happens to match the same "c.type = @type" mock
+    // condition above (17 total).
+    expect(mocks.itemDelete).toHaveBeenCalledTimes(17);
+  });
+
+  // Regression test: carTransferRequest/carReceiptRequest are
+  // pk=ownerEmail exactly like their bike-side equivalents
+  // (bikeTransferRequest/receiptRequest) already in this list, but were
+  // missing entirely - a real asymmetry, not an intentional difference.
+  it("includes carTransferRequest and carReceiptRequest alongside their bike equivalents", async () => {
+    const queriedTypes: string[] = [];
+    mocks.query.mockImplementation((q: { query: string; parameters?: { name: string; value: string }[] }) => {
+      const type = q.parameters?.find((p) => p.name === "@type")?.value;
+      if (type) queriedTypes.push(type);
+      return Promise.resolve({ resources: [] });
+    });
+
+    await deleteAccount(email);
+
+    expect(queriedTypes).toContain("carTransferRequest");
+    expect(queriedTypes).toContain("carReceiptRequest");
   });
 
   it("best-effort cleans up assistantQuestion entries via the cross-partition email query, without failing the whole deletion if that lookup throws", async () => {
@@ -197,6 +228,38 @@ describe("deleteAccount", () => {
       if (q.query.includes("assistantQuestion")) return Promise.reject(new Error("boom"));
       return Promise.resolve({ resources: [] });
     });
+
+    await expect(deleteAccount(email)).resolves.toBeUndefined();
+  });
+
+  it("best-effort cleans up vdiPurchase entries via the cross-partition email query, without failing the whole deletion if that lookup throws", async () => {
+    mocks.query.mockImplementation((q: { query: string }) => {
+      if (q.query.includes("vdiPurchase")) return Promise.reject(new Error("boom"));
+      return Promise.resolve({ resources: [] });
+    });
+
+    await expect(deleteAccount(email)).resolves.toBeUndefined();
+  });
+
+  it("deletes the account's own avatar blob when it has one", async () => {
+    mocks.getUserDoc.mockResolvedValue({ email, avatarBlobName: "avatar-123.jpg" });
+
+    await deleteAccount(email);
+
+    expect(mocks.deleteAvatarBlob).toHaveBeenCalledWith("avatar-123.jpg");
+  });
+
+  it("skips the avatar blob delete entirely when the account never had one", async () => {
+    mocks.getUserDoc.mockResolvedValue({ email });
+
+    await deleteAccount(email);
+
+    expect(mocks.deleteAvatarBlob).not.toHaveBeenCalled();
+  });
+
+  it("does not fail the whole deletion if the avatar blob delete itself fails", async () => {
+    mocks.getUserDoc.mockResolvedValue({ email, avatarBlobName: "avatar-123.jpg" });
+    mocks.deleteAvatarBlob.mockRejectedValue(new Error("blob service unavailable"));
 
     await expect(deleteAccount(email)).resolves.toBeUndefined();
   });

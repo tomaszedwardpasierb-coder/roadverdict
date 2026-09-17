@@ -7,6 +7,8 @@ const mocks = vi.hoisted(() => ({
   fetchAll: vi.fn(),
   cookieGet: vi.fn(),
   isPro: vi.fn(),
+  deleteAttachmentBlobsBestEffort: vi.fn(),
+  deleteVaultDocumentsForVehicle: vi.fn(),
 }));
 
 const mockContainer = {
@@ -24,6 +26,8 @@ const mockContainer = {
 vi.mock("@/lib/cosmos", () => ({ getContainer: () => mockContainer }));
 vi.mock("next/headers", () => ({ cookies: vi.fn(async () => ({ get: mocks.cookieGet })) }));
 vi.mock("@/lib/subscriptions", () => ({ isPro: mocks.isPro }));
+vi.mock("@/lib/blobStorage", () => ({ deleteAttachmentBlobsBestEffort: mocks.deleteAttachmentBlobsBestEffort }));
+vi.mock("@/lib/tracker/vaultDocument", () => ({ deleteVaultDocumentsForVehicle: mocks.deleteVaultDocumentsForVehicle }));
 
 import {
   MAX_FREE_BIKES,
@@ -804,17 +808,23 @@ describe("deleteBike", () => {
   beforeEach(() => {
     resetAllMocks();
     mocks.deleteFn.mockResolvedValue(undefined);
+    mocks.deleteAttachmentBlobsBestEffort.mockResolvedValue(undefined);
+    mocks.deleteVaultDocumentsForVehicle.mockResolvedValue(undefined);
   });
 
-  function mockRecordsByType(fixtures: Record<string, Array<{ id: string }>>) {
+  // Record-type queries are told apart from the shareLink cross-partition
+  // query by whether they carry an @type parameter at all - shareLink's
+  // own query hardcodes the type directly in the query string instead
+  // (see deleteBike's own source), so it has none.
+  function mockRecordsByType(fixtures: Record<string, Array<{ id: string; attachments?: { blobName: string }[] }>>, shareLinks: Array<{ id: string; pk: string }> = []) {
     mocks.fetchAll.mockImplementation(async (queryObj: any) => {
-      const type = queryObj.parameters.find((p: any) => p.name === "@type")?.value;
+      const type = queryObj.parameters?.find((p: any) => p.name === "@type")?.value;
+      if (type === undefined) return { resources: shareLinks };
       return { resources: fixtures[type] ?? [] };
     });
   }
 
-  it("queries and deletes every matching record across all seven record types", async () => {
-    mocks.read.mockResolvedValue({ resource: makeBike({ shareToken: undefined }) });
+  it("queries and deletes every matching record across all nine record types", async () => {
     mockRecordsByType({
       serviceRecord: [{ id: "sr-1" }],
       fuelLog: [{ id: "fl-1" }, { id: "fl-2" }],
@@ -823,28 +833,62 @@ describe("deleteBike", () => {
       billSeries: [],
       reminder: [],
       labour: [{ id: "lb-1" }],
+      fine: [{ id: "fn-1" }],
+      toll: [{ id: "tl-1" }],
     });
 
     await deleteBike("owner@example.com", "bike-1");
 
-    const queriedTypes = mockContainer.items.query.mock.calls.map((call: any) => call[0].parameters.find((p: any) => p.name === "@type").value);
-    expect(queriedTypes.sort()).toEqual(["bill", "billSeries", "fuelLog", "labour", "mod", "reminder", "serviceRecord"].sort());
-    // 5 real records deleted, plus the bike document itself = 6 deletes.
-    expect(mocks.deleteFn).toHaveBeenCalledTimes(6);
+    const queriedTypes = mockContainer.items.query.mock.calls
+      .map((call: any) => call[0].parameters?.find((p: any) => p.name === "@type")?.value)
+      .filter((t: unknown) => t !== undefined);
+    expect(queriedTypes.sort()).toEqual(
+      ["bill", "billSeries", "fine", "fuelLog", "labour", "mod", "reminder", "serviceRecord", "toll"].sort()
+    );
+    // 7 real records deleted, plus the bike document itself = 8 deletes.
+    expect(mocks.deleteFn).toHaveBeenCalledTimes(8);
   });
 
-  it("also deletes the share-link document, keyed by its own token as both id and partition key", async () => {
-    mocks.read.mockResolvedValue({ resource: makeBike({ shareToken: "tok_abc123" }) });
+  it("collects every attachment blobName across every record type and passes it to deleteAttachmentBlobsBestEffort", async () => {
+    mockRecordsByType({
+      serviceRecord: [{ id: "sr-1", attachments: [{ blobName: "blob-1" }] }],
+      fuelLog: [],
+      mod: [{ id: "mod-1", attachments: [{ blobName: "blob-2" }, { blobName: "blob-3" }] }],
+      bill: [],
+      billSeries: [],
+      reminder: [],
+      labour: [{ id: "lb-1" }], // never carries attachments - must not appear in the collected list
+      fine: [],
+      toll: [],
+    });
+
+    await deleteBike("owner@example.com", "bike-1");
+
+    expect(mocks.deleteAttachmentBlobsBestEffort).toHaveBeenCalledWith(["blob-1", "blob-2", "blob-3"]);
+  });
+
+  it("calls deleteVaultDocumentsForVehicle for this bike", async () => {
     mockRecordsByType({});
 
     await deleteBike("owner@example.com", "bike-1");
 
-    expect(mockContainer.item).toHaveBeenCalledWith("tok_abc123", "tok_abc123");
+    expect(mocks.deleteVaultDocumentsForVehicle).toHaveBeenCalledWith("owner@example.com", "bike-1");
   });
 
-  it("skips the share-link deletion entirely when the bike has no shareToken", async () => {
-    mocks.read.mockResolvedValue({ resource: makeBike({ shareToken: undefined }) });
-    mockRecordsByType({});
+  it("deletes every share-link document this bike ever had, keyed by its own token as both id and partition key", async () => {
+    mockRecordsByType({}, [
+      { id: "tok_abc123", pk: "tok_abc123" },
+      { id: "tok_def456", pk: "tok_def456" },
+    ]);
+
+    await deleteBike("owner@example.com", "bike-1");
+
+    expect(mockContainer.item).toHaveBeenCalledWith("tok_abc123", "tok_abc123");
+    expect(mockContainer.item).toHaveBeenCalledWith("tok_def456", "tok_def456");
+  });
+
+  it("skips the share-link deletion entirely when this bike never had one", async () => {
+    mockRecordsByType({}, []);
 
     await deleteBike("owner@example.com", "bike-1");
 
@@ -854,9 +898,8 @@ describe("deleteBike", () => {
 
   // Explicit try/catch in the source: an already-gone or never-existed
   // share-link doc must not fail the whole deletion.
-  it("swallows an error deleting the share-link doc and still deletes the bike itself", async () => {
-    mocks.read.mockResolvedValue({ resource: makeBike({ shareToken: "tok_abc123" }) });
-    mockRecordsByType({});
+  it("swallows an error deleting a share-link doc and still deletes the bike itself", async () => {
+    mockRecordsByType({}, [{ id: "tok_abc123", pk: "tok_abc123" }]);
     // Only the share-token delete fails - the bike's own delete call
     // (a separate container.item(...) call, keyed by bikeId not the
     // token) must still go through afterward.
@@ -870,21 +913,11 @@ describe("deleteBike", () => {
   });
 
   it("deletes the bike document itself last", async () => {
-    mocks.read.mockResolvedValue({ resource: makeBike({ shareToken: undefined, id: "bike-1" }) });
-    mockRecordsByType({});
+    mockRecordsByType({}, []);
 
     await deleteBike("owner@example.com", "bike-1");
 
     expect(mockContainer.item).toHaveBeenCalledWith("bike-1", "owner@example.com");
-  });
-
-  it("does not throw when the bike document itself was already gone (no resource on read)", async () => {
-    mocks.read.mockResolvedValue({ resource: undefined });
-    mockRecordsByType({});
-
-    await expect(deleteBike("owner@example.com", "bike-1")).resolves.toBeUndefined();
-    // No shareToken to look up on an undefined bike - guarded by `bike?.shareToken`.
-    expect(mocks.deleteFn).toHaveBeenCalledTimes(1);
   });
 });
 

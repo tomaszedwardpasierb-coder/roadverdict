@@ -1,6 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const mocks = vi.hoisted(() => ({ read: vi.fn(), upsert: vi.fn(), fetchAll: vi.fn(), deleteFn: vi.fn() }));
+const mocks = vi.hoisted(() => ({
+  read: vi.fn(),
+  upsert: vi.fn(),
+  fetchAll: vi.fn(),
+  deleteFn: vi.fn(),
+  blobDeleteIfExists: vi.fn(),
+}));
 vi.mock("@/lib/cosmos", () => ({
   getContainer: () => ({
     item: () => ({ read: mocks.read, delete: mocks.deleteFn }),
@@ -10,6 +16,11 @@ vi.mock("@/lib/cosmos", () => ({
     },
   }),
 }));
+vi.mock("@/lib/blobStorage", () => ({
+  getVaultContainer: async () => ({
+    getBlockBlobClient: (blobName: string) => ({ deleteIfExists: () => mocks.blobDeleteIfExists(blobName) }),
+  }),
+}));
 
 import {
   createVaultDocument,
@@ -17,6 +28,7 @@ import {
   getVaultDocumentsForVehicle,
   countAndSizeVaultDocuments,
   deleteVaultDocument,
+  deleteVaultDocumentsForVehicle,
   VAULT_CATEGORIES,
   VAULT_MAX_DOCUMENTS_PER_VEHICLE,
   VAULT_MAX_FILE_SIZE_BYTES,
@@ -28,6 +40,9 @@ beforeEach(() => {
   mocks.upsert.mockReset();
   mocks.fetchAll.mockReset();
   mocks.deleteFn.mockReset();
+  mocks.deleteFn.mockResolvedValue(undefined);
+  mocks.blobDeleteIfExists.mockReset();
+  mocks.blobDeleteIfExists.mockResolvedValue(undefined);
 });
 
 describe("createVaultDocument", () => {
@@ -133,6 +148,47 @@ describe("deleteVaultDocument", () => {
   it("deletes the doc by id within the caller's partition", async () => {
     await deleteVaultDocument("owner@example.com", "d1");
     expect(mocks.deleteFn).toHaveBeenCalled();
+  });
+});
+
+describe("deleteVaultDocumentsForVehicle", () => {
+  it("deletes both the blob and the Cosmos doc for every vault document tied to the vehicle", async () => {
+    mocks.fetchAll.mockResolvedValue({
+      resources: [
+        { id: "d1", pk: "owner@example.com", type: "vaultDocument", vehicleId: "bike-1", blobName: "blob-1.pdf" },
+        { id: "d2", pk: "owner@example.com", type: "vaultDocument", vehicleId: "bike-1", blobName: "blob-2.jpg" },
+      ],
+    });
+
+    await deleteVaultDocumentsForVehicle("owner@example.com", "bike-1");
+
+    expect(mocks.blobDeleteIfExists).toHaveBeenCalledWith("blob-1.pdf");
+    expect(mocks.blobDeleteIfExists).toHaveBeenCalledWith("blob-2.jpg");
+    expect(mocks.deleteFn).toHaveBeenCalledTimes(2);
+  });
+
+  it("does nothing, and never touches blob storage, when the vehicle has no vault documents", async () => {
+    mocks.fetchAll.mockResolvedValue({ resources: [] });
+
+    await deleteVaultDocumentsForVehicle("owner@example.com", "bike-1");
+
+    expect(mocks.blobDeleteIfExists).not.toHaveBeenCalled();
+    expect(mocks.deleteFn).not.toHaveBeenCalled();
+  });
+
+  it("a failure deleting one document's blob or Cosmos doc never blocks the others", async () => {
+    mocks.fetchAll.mockResolvedValue({
+      resources: [
+        { id: "d1", pk: "owner@example.com", type: "vaultDocument", vehicleId: "bike-1", blobName: "blob-1.pdf" },
+        { id: "d2", pk: "owner@example.com", type: "vaultDocument", vehicleId: "bike-1", blobName: "blob-2.jpg" },
+      ],
+    });
+    mocks.blobDeleteIfExists.mockImplementation((blobName: string) =>
+      blobName === "blob-1.pdf" ? Promise.reject(new Error("blob gone")) : Promise.resolve(undefined)
+    );
+
+    await expect(deleteVaultDocumentsForVehicle("owner@example.com", "bike-1")).resolves.toBeUndefined();
+    expect(mocks.deleteFn).toHaveBeenCalledTimes(2);
   });
 });
 

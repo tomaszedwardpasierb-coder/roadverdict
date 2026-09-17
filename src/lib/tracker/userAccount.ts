@@ -7,6 +7,7 @@
 // this builds on, and subscriptions.ts's isPro(), which reads the same
 // `plan` field grantPremium() writes here.
 import { getContainer } from "@/lib/cosmos";
+import { getAttachmentContainer } from "@/lib/blobStorage";
 import { getUserDoc, type UserDoc, type OnboardingStep } from "@/lib/tracker/userDoc";
 import { getBikesForUser, deleteBike } from "@/lib/tracker/bike";
 import { getCarsForUser, deleteCar } from "@/lib/tracker/car";
@@ -202,32 +203,92 @@ export function getPendingDeletionInfo(user: UserDoc | null): { daysRemaining: n
   return { daysRemaining, deleteAfterLabel };
 }
 
+// Shared by deleteAccount below for every doc type that's NOT
+// partitioned by this account's own email - assistantQuestion (a fixed
+// shared partition, see assistantQuestionLog.ts) and vdiPurchase (pk is
+// its own generated id, email only a field on the doc - see
+// vdiPurchase.ts) both need this cross-partition query-then-delete
+// rather than the plain point-delete loop below. Best-effort: a
+// leftover row here is a cosmetic/minor-retention loss, not a reason to
+// fail the whole account deletion.
+async function deleteCrossPartitionDocsByEmailField(
+  container: ReturnType<typeof getContainer>,
+  type: string,
+  email: string
+): Promise<void> {
+  try {
+    const { resources } = await container.items
+      .query<{ id: string; pk: string }>({
+        query: "SELECT c.id, c.pk FROM c WHERE c.type = @type AND c.email = @email",
+        parameters: [
+          { name: "@type", value: type },
+          { name: "@email", value: email },
+        ],
+      })
+      .fetchAll();
+    await Promise.all(resources.map((r) => container.item(r.id, r.pk).delete()));
+  } catch (err) {
+    console.error(`deleteAccount: failed to clean up ${type} entries for ${email}:`, err);
+  }
+}
+
+// Best-effort - a leftover avatar blob is a storage cost, not a reason
+// to fail the whole account deletion. Previously never called at all:
+// the Cosmos "user" doc pointing at this blob was gone once deleted,
+// but the JPEG/PNG itself stayed in the attachments container forever.
+async function deleteAvatarBlobBestEffort(email: string, avatarBlobName: string | undefined): Promise<void> {
+  if (!avatarBlobName) return;
+  const container = await getAttachmentContainer();
+  await container.getBlockBlobClient(avatarBlobName).deleteIfExists().catch((err) => {
+    console.error(`deleteAccount: failed to delete avatar blob for ${email}:`, err);
+  });
+}
+
 // Permanently deletes an account and everything tied to its email -
 // there is no "undo" here, matched by the strongest confirmation this
 // admin panel has (see DeleteAccountButton.tsx - a typed-email prompt,
 // not just a yes/no dialog). Cascades:
-// - every bike, via the existing deleteBike() (already cascades
-//   service/fuel/mod/bill/reminder/labour records plus that bike's own
-//   share-link doc - see bike.ts's own comment on deleteBike)
-// - every car, via the existing deleteCar() (same idea, car-prefixed
-//   record types - see car.ts's own comment on deleteCar)
+// - every bike, via deleteBike() (service/fuel/mod/bill/billSeries/
+//   reminder/labour/fine/toll records, every share-link doc this bike
+//   ever had, every Vault document and its blob, and every attachment
+//   blob any of those records referenced - see bike.ts's own comment)
+// - every car, via deleteCar() (same idea, car-prefixed - see car.ts's
+//   own comment)
+// - the account's own avatar blob (deleteAvatarBlobBestEffort)
 // - every other document type keyed by this email as partition key,
 //   point-deleted directly below
-// - assistantQuestionLog entries mentioning this email - the one doc
-//   type NOT partitioned by email (a fixed shared partition instead,
-//   see assistantQuestionLog.ts), so this is a cross-partition query
-//   rather than a point-delete, and best-effort: a leftover log line
-//   is a cosmetic loss, not a reason to fail the whole deletion.
+// - assistantQuestion and vdiPurchase entries mentioning this email -
+//   the two doc types NOT partitioned by email (see
+//   deleteCrossPartitionDocsByEmailField above)
 export async function deleteAccount(email: string): Promise<void> {
   const container = getContainer();
+
+  // Read once, up front - the point-delete loop below removes the
+  // "user" doc that carries avatarBlobName, but the blob delete itself
+  // doesn't need to be sequenced with that, only this read does.
+  const user = await getUserDoc(email);
 
   const [bikes, cars] = await Promise.all([getBikesForUser(email), getCarsForUser(email)]);
   await Promise.all([
     ...bikes.map((bike) => deleteBike(email, bike.id)),
     ...cars.map((car) => deleteCar(email, car.id)),
+    deleteAvatarBlobBestEffort(email, user?.avatarBlobName),
   ]);
 
-  const pointDeleteTypes = ["user", "session", "magicLink", "notification", "pendingScanBatch", "bikeTransferRequest", "receiptRequest"];
+  // carTransferRequest/carReceiptRequest were missing here despite being
+  // pk=email like their bike-side equivalents already in this list - a
+  // real asymmetry, not an intentional car/bike difference. The
+  // totp*/trackerWriteAttempt/vaultSession/vaultUploadLock types all
+  // self-expire via their own short TTL regardless, but there's no
+  // reason to wait that out when a real deletion request has already
+  // been made - deleting them now just makes erasure immediate instead
+  // of eventual.
+  const pointDeleteTypes = [
+    "user", "session", "magicLink", "notification", "pendingScanBatch",
+    "bikeTransferRequest", "receiptRequest", "carTransferRequest", "carReceiptRequest",
+    "totpEnrollmentPending", "totpPendingLogin", "totpAttempt", "trackerWriteAttempt",
+    "vaultSession", "vaultUploadLock",
+  ];
   await Promise.all(
     pointDeleteTypes.map(async (type) => {
       const { resources } = await container.items
@@ -240,15 +301,8 @@ export async function deleteAccount(email: string): Promise<void> {
     })
   );
 
-  try {
-    const { resources } = await container.items
-      .query<{ id: string; pk: string }>({
-        query: "SELECT c.id, c.pk FROM c WHERE c.type = 'assistantQuestion' AND c.email = @email",
-        parameters: [{ name: "@email", value: email }],
-      })
-      .fetchAll();
-    await Promise.all(resources.map((r) => container.item(r.id, r.pk).delete()));
-  } catch (err) {
-    console.error(`deleteAccount: failed to clean up assistantQuestion entries for ${email}:`, err);
-  }
+  await Promise.all([
+    deleteCrossPartitionDocsByEmailField(container, "assistantQuestion", email),
+    deleteCrossPartitionDocsByEmailField(container, "vdiPurchase", email),
+  ]);
 }

@@ -13,7 +13,8 @@
     "test:coverage": "vitest run --coverage",
     "test:integration": "vitest run --config vitest.integration.config.ts",
     "test:components": "vitest run --config vitest.components.config.ts",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "verify-erasure": "node scripts/verify-account-erasure.js"
   },
   "dependencies": {
     "@azure/cosmos": "^4.9.3",

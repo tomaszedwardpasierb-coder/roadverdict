@@ -8,6 +8,8 @@ import type { DistanceUnit, FuelEconomyUnit } from "@/lib/tracker/unitFormat";
 import type { Currency } from "@/lib/tracker/currency";
 import type { BikeIdentity, CategorySpend } from "@/lib/tracker/storyFacts";
 import { REFRESH_DATA_COOLDOWN_MS } from "@/lib/tracker/refreshDataCooldown";
+import { deleteAttachmentBlobsBestEffort } from "@/lib/blobStorage";
+import { deleteVaultDocumentsForVehicle } from "@/lib/tracker/vaultDocument";
 
 // Free-tier cap - Pro accounts (see isPro() below) skip it entirely.
 // Kept in sync with vehicleLimit.ts's MAX_FREE_VEHICLES by convention,
@@ -640,14 +642,17 @@ export async function addRegistrationChange(
 
 // Permanently deletes a bike and every record that belongs to it - there
 // is no "undo" here by design, matched by a confirmation dialog on the
-// client before this is ever called. Deletes the bike's share-link doc
-// too if it has one (that lives in a different partition, keyed by
-// token, so it needs its own explicit delete - it wouldn't be caught by
-// deleting the bike's own partition).
+// client before this is ever called. Also deletes every share-link doc
+// for this bike (its own partition, keyed by token - found by querying
+// bikeId across partitions, not a single shareToken pointer field, since
+// a bike can have had several links created over its life and every one
+// needs to go), every Vault document and its underlying blob
+// (deleteVaultDocumentsForVehicle), and every attachment blob referenced
+// by a deleted record (deleteAttachmentBlobsBestEffort) - none of which
+// this function used to touch at all, leaving real files (receipts,
+// V5C/insurance/licence scans) orphaned in storage after "deletion".
 export async function deleteBike(email: string, bikeId: string): Promise<void> {
   const container = getContainer();
-
-  const { resource: bike } = await container.item(bikeId, email).read<BikeDoc>();
 
   // Every record type queried and deleted in parallel, not sequentially
   // one type then the next then the next - each type's query and delete
@@ -657,14 +662,18 @@ export async function deleteBike(email: string, bikeId: string): Promise<void> {
   // rather than one network round-trip at a time - for an account with
   // real history (hundreds of fuel logs, say), sequential deletes here
   // could genuinely take long enough to risk a request timeout; this
-  // does the same work in a fraction of the wall-clock time.
-  const recordTypes = ["serviceRecord", "fuelLog", "mod", "bill", "billSeries", "reminder", "labour"];
+  // does the same work in a fraction of the wall-clock time. attachments
+  // is only ever populated for serviceRecord/fuelLog/mod/bill (see
+  // attachmentOwnership.ts's ATTACHMENT_BEARING_TYPES), but selecting it
+  // for every type here is harmless - it's simply absent on the rest.
+  const recordTypes = ["serviceRecord", "fuelLog", "mod", "bill", "billSeries", "reminder", "labour", "fine", "toll"];
+  const blobNames: string[] = [];
   await Promise.all(
     recordTypes.map(async (type) => {
       const { resources } = await container.items
-        .query<{ id: string }>(
+        .query<{ id: string; attachments?: { blobName: string }[] }>(
           {
-            query: "SELECT c.id FROM c WHERE c.type = @type AND c.bikeId = @bikeId",
+            query: "SELECT c.id, c.attachments FROM c WHERE c.type = @type AND c.bikeId = @bikeId",
             parameters: [
               { name: "@type", value: type },
               { name: "@bikeId", value: bikeId },
@@ -673,17 +682,28 @@ export async function deleteBike(email: string, bikeId: string): Promise<void> {
           { partitionKey: email }
         )
         .fetchAll();
+      for (const r of resources) {
+        if (r.attachments) blobNames.push(...r.attachments.map((a) => a.blobName));
+      }
       await Promise.all(resources.map((r) => container.item(r.id, email).delete()));
     })
   );
 
-  if (bike?.shareToken) {
-    try {
-      await container.item(bike.shareToken, bike.shareToken).delete();
-    } catch {
-      // Already gone or never existed - not a reason to fail the whole deletion.
-    }
-  }
+  const { resources: shareLinks } = await container.items
+    .query<{ id: string; pk: string }>({
+      query: "SELECT c.id, c.pk FROM c WHERE c.type = 'shareLink' AND c.bikeId = @bikeId",
+      parameters: [{ name: "@bikeId", value: bikeId }],
+    })
+    .fetchAll();
+  await Promise.all(
+    shareLinks.map((r) =>
+      container.item(r.id, r.pk).delete().catch(() => {
+        // Already gone or never existed - not a reason to fail the whole deletion.
+      })
+    )
+  );
+
+  await Promise.all([deleteAttachmentBlobsBestEffort(blobNames), deleteVaultDocumentsForVehicle(email, bikeId)]);
 
   await container.item(bikeId, email).delete();
 }

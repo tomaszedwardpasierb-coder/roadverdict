@@ -6,6 +6,8 @@ const mocks = vi.hoisted(() => ({
   deleteFn: vi.fn(),
   fetchAll: vi.fn(),
   cookieGet: vi.fn(),
+  deleteAttachmentBlobsBestEffort: vi.fn(),
+  deleteVaultDocumentsForVehicle: vi.fn(),
 }));
 
 const mockContainer = {
@@ -21,6 +23,8 @@ vi.mock("next/headers", () => ({ cookies: vi.fn(async () => ({ get: mocks.cookie
 // No isPro mock, deliberately unlike bike.ts's own test file - createCar
 // has no free-tier cap (see the ADR: no unified Pro-cap logic has been
 // built for cars yet, since that's a business decision for a later pass).
+vi.mock("@/lib/blobStorage", () => ({ deleteAttachmentBlobsBestEffort: mocks.deleteAttachmentBlobsBestEffort }));
+vi.mock("@/lib/tracker/vaultDocument", () => ({ deleteVaultDocumentsForVehicle: mocks.deleteVaultDocumentsForVehicle }));
 
 import {
   generateCarId,
@@ -514,50 +518,117 @@ describe("deleteCar", () => {
   beforeEach(() => {
     resetAllMocks();
     mocks.deleteFn.mockResolvedValue(undefined);
+    mocks.deleteAttachmentBlobsBestEffort.mockResolvedValue(undefined);
+    mocks.deleteVaultDocumentsForVehicle.mockResolvedValue(undefined);
   });
 
-  function mockRecordsByType(fixtures: Record<string, Array<{ id: string }>>) {
+  // Record-type queries are told apart from the carShareLink
+  // cross-partition query by whether they carry an @type parameter at
+  // all - carShareLink's own query hardcodes the type directly in the
+  // query string instead (see deleteCar's own source), so it has none.
+  function mockRecordsByType(fixtures: Record<string, Array<{ id: string; attachments?: { blobName: string }[] }>>, shareLinks: Array<{ id: string; pk: string }> = []) {
     mocks.fetchAll.mockImplementation(async (queryObj: any) => {
-      const type = queryObj.parameters.find((p: any) => p.name === "@type")?.value;
+      const type = queryObj.parameters?.find((p: any) => p.name === "@type")?.value;
+      if (type === undefined) return { resources: shareLinks };
       return { resources: fixtures[type] ?? [] };
     });
   }
 
-  it("queries and deletes every matching record across all six car record types", async () => {
-    mocks.read.mockResolvedValue({ resource: makeCar() });
+  it("queries and deletes every matching record across all nine car record types", async () => {
     mockRecordsByType({
       carServiceRecord: [{ id: "sr-1" }],
       carFuelLog: [{ id: "fl-1" }, { id: "fl-2" }],
       carMod: [],
       carBill: [{ id: "bl-1" }],
+      carBillSeries: [],
       carLabour: [{ id: "lb-1" }],
       carReminder: [],
+      carFine: [{ id: "fn-1" }],
+      carToll: [{ id: "tl-1" }],
     });
 
     await deleteCar("owner@example.com", "car-1");
 
-    const queriedTypes = mockContainer.items.query.mock.calls.map((call: any) => call[0].parameters.find((p: any) => p.name === "@type").value);
-    expect(queriedTypes.sort()).toEqual(["carBill", "carFuelLog", "carLabour", "carMod", "carReminder", "carServiceRecord"].sort());
-    // 5 real records deleted, plus the car document itself = 6 deletes.
-    expect(mocks.deleteFn).toHaveBeenCalledTimes(6);
+    const queriedTypes = mockContainer.items.query.mock.calls
+      .map((call: any) => call[0].parameters?.find((p: any) => p.name === "@type")?.value)
+      .filter((t: unknown) => t !== undefined);
+    expect(queriedTypes.sort()).toEqual(
+      ["carBill", "carBillSeries", "carFine", "carFuelLog", "carLabour", "carMod", "carReminder", "carServiceRecord", "carToll"].sort()
+    );
+    // 7 real records deleted, plus the car document itself = 8 deletes.
+    expect(mocks.deleteFn).toHaveBeenCalledTimes(8);
   });
 
-  // Regression test: carLabour and carReminder existed as real,
+  // Regression test: carBillSeries/carFine/carToll existed as real,
   // separate Cosmos doc types but were never in deleteCar's own
-  // record-type list, meaning deleting a car left both behind forever.
-  it("cleans up carLabour and carReminder specifically, not just the original four types", async () => {
-    mocks.read.mockResolvedValue({ resource: makeCar() });
-    mockRecordsByType({ carLabour: [{ id: "lb-1" }], carReminder: [{ id: "rm-1" }] });
+  // record-type list, meaning deleting a car left all three behind forever.
+  it("cleans up carBillSeries, carFine, and carToll specifically", async () => {
+    mockRecordsByType({ carBillSeries: [{ id: "bs-1" }], carFine: [{ id: "fn-1" }], carToll: [{ id: "tl-1" }] });
 
     await deleteCar("owner@example.com", "car-1");
 
-    const queriedTypes = mockContainer.items.query.mock.calls.map((call: any) => call[0].parameters.find((p: any) => p.name === "@type").value);
-    expect(queriedTypes).toContain("carLabour");
-    expect(queriedTypes).toContain("carReminder");
+    const queriedTypes = mockContainer.items.query.mock.calls
+      .map((call: any) => call[0].parameters?.find((p: any) => p.name === "@type")?.value)
+      .filter((t: unknown) => t !== undefined);
+    expect(queriedTypes).toContain("carBillSeries");
+    expect(queriedTypes).toContain("carFine");
+    expect(queriedTypes).toContain("carToll");
   });
 
-  it("scopes every record-type query by carId, not just type", async () => {
-    mocks.read.mockResolvedValue({ resource: makeCar() });
+  it("collects every attachment blobName across every record type and passes it to deleteAttachmentBlobsBestEffort", async () => {
+    mockRecordsByType({
+      carServiceRecord: [{ id: "sr-1", attachments: [{ blobName: "blob-1" }] }],
+      carFuelLog: [],
+      carMod: [{ id: "mod-1", attachments: [{ blobName: "blob-2" }, { blobName: "blob-3" }] }],
+      carBill: [],
+      carBillSeries: [],
+      carLabour: [{ id: "lb-1" }], // never carries attachments - must not appear in the collected list
+      carReminder: [],
+      carFine: [],
+      carToll: [],
+    });
+
+    await deleteCar("owner@example.com", "car-1");
+
+    expect(mocks.deleteAttachmentBlobsBestEffort).toHaveBeenCalledWith(["blob-1", "blob-2", "blob-3"]);
+  });
+
+  it("calls deleteVaultDocumentsForVehicle for this car", async () => {
+    mockRecordsByType({});
+
+    await deleteCar("owner@example.com", "car-1");
+
+    expect(mocks.deleteVaultDocumentsForVehicle).toHaveBeenCalledWith("owner@example.com", "car-1");
+  });
+
+  // Regression test: CarShareLinkDoc has no CarDoc-side pointer field to
+  // follow (unlike bike's own now-removed shareToken), so carId is the
+  // only way to find every carShareLink this car ever had - deleteCar
+  // previously had no cleanup for this type whatsoever.
+  it("deletes every carShareLink document this car ever had, keyed by its own token as both id and partition key", async () => {
+    mockRecordsByType({}, [
+      { id: "tok_abc123", pk: "tok_abc123" },
+      { id: "tok_def456", pk: "tok_def456" },
+    ]);
+
+    await deleteCar("owner@example.com", "car-1");
+
+    expect(mockContainer.item).toHaveBeenCalledWith("tok_abc123", "tok_abc123");
+    expect(mockContainer.item).toHaveBeenCalledWith("tok_def456", "tok_def456");
+  });
+
+  it("swallows an error deleting a carShareLink doc and still deletes the car itself", async () => {
+    mockRecordsByType({}, [{ id: "tok_abc123", pk: "tok_abc123" }]);
+    mockContainer.item.mockImplementation((id?: string) => ({
+      read: mocks.read,
+      delete: id === "tok_abc123" ? vi.fn(async () => { throw new Error("already gone"); }) : mocks.deleteFn,
+    }));
+
+    await expect(deleteCar("owner@example.com", "car-1")).resolves.toBeUndefined();
+    expect(mocks.deleteFn).toHaveBeenCalledTimes(1);
+  });
+
+  it("scopes every query (record types and the carShareLink cleanup alike) by this car's own carId", async () => {
     mockRecordsByType({});
     await deleteCar("owner@example.com", "car-1");
     for (const call of mockContainer.items.query.mock.calls) {
@@ -567,7 +638,6 @@ describe("deleteCar", () => {
   });
 
   it("does not throw when the car document itself was already gone", async () => {
-    mocks.read.mockResolvedValue({ resource: undefined });
     mockRecordsByType({});
     await expect(deleteCar("owner@example.com", "car-1")).resolves.toBeUndefined();
   });

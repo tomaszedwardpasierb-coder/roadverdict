@@ -22,6 +22,7 @@
 // same one-line stripping logic avoids dragging next/headers along.
 import crypto from "crypto";
 import { getContainer } from "@/lib/cosmos";
+import { getVaultContainer } from "@/lib/blobStorage";
 
 const COSMOS_SYSTEM_KEYS = ["_rid", "_self", "_etag", "_attachments", "_ts"] as const;
 
@@ -177,4 +178,32 @@ export async function countAndSizeVaultDocuments(email: string, vehicleId: strin
 export async function deleteVaultDocument(email: string, id: string): Promise<void> {
   const container = getContainer();
   await container.item(id, email).delete();
+}
+
+// Called from deleteBike/deleteCar (bike.ts/car.ts) when a whole vehicle
+// is being permanently deleted - unlike deleteVaultDocument above (whose
+// blob cleanup is the caller's own responsibility, see
+// api/vault/documents/[id]/route.ts), this deletes both the Cosmos doc
+// AND its underlying blob in the vault-documents container itself, since
+// there's no per-document API route in the loop here to do it
+// separately. Vault documents were previously untouched by vehicle/
+// account deletion entirely - a real V5C/insurance/licence file left
+// permanently orphaned in storage. Best-effort per document: one
+// failure never blocks the rest, or the vehicle deletion this is part
+// of, from completing.
+export async function deleteVaultDocumentsForVehicle(email: string, vehicleId: string): Promise<void> {
+  const docs = await getVaultDocumentsForVehicle(email, vehicleId);
+  if (!docs.length) return;
+  const container = getContainer();
+  const vaultContainer = await getVaultContainer();
+  await Promise.all(
+    docs.map(async (doc) => {
+      await vaultContainer.getBlockBlobClient(doc.blobName).deleteIfExists().catch((err) => {
+        console.error(`deleteVaultDocumentsForVehicle: failed to delete blob ${doc.blobName}:`, err);
+      });
+      await container.item(doc.id, email).delete().catch((err) => {
+        console.error(`deleteVaultDocumentsForVehicle: failed to delete doc ${doc.id}:`, err);
+      });
+    })
+  );
 }

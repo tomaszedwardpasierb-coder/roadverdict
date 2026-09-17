@@ -58,6 +58,23 @@ export async function getAttachmentContainer(): Promise<ContainerClient> {
   return container;
 }
 
+// Best-effort cleanup for every attachment blob referenced by a set of
+// records about to be permanently deleted - see deleteBike/deleteCar in
+// bike.ts/car.ts, the only callers. One failure never blocks the rest,
+// or the vehicle deletion this is part of, from completing; a leftover
+// blob is a storage cost, not a reason to fail someone's delete request.
+export async function deleteAttachmentBlobsBestEffort(blobNames: string[]): Promise<void> {
+  if (!blobNames.length) return;
+  const container = await getAttachmentContainer();
+  await Promise.all(
+    blobNames.map((blobName) =>
+      container.getBlockBlobClient(blobName).deleteIfExists().catch((err) => {
+        console.error(`deleteAttachmentBlobsBestEffort: failed to delete blob ${blobName}:`, err);
+      })
+    )
+  );
+}
+
 export async function getVaultContainer(): Promise<ContainerClient> {
   if (vaultContainerClientInstance) return vaultContainerClientInstance;
 

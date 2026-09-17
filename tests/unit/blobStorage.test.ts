@@ -4,13 +4,18 @@ const mocks = vi.hoisted(() => ({
   fromConnectionString: vi.fn(),
   getContainerClient: vi.fn(),
   createIfNotExists: vi.fn(),
+  deleteIfExists: vi.fn(),
 }));
 
 vi.mock("@azure/storage-blob", () => ({
   BlobServiceClient: { fromConnectionString: mocks.fromConnectionString },
 }));
 
-const fakeContainer = { marker: "attachments-container", createIfNotExists: mocks.createIfNotExists };
+const fakeContainer = {
+  marker: "attachments-container",
+  createIfNotExists: mocks.createIfNotExists,
+  getBlockBlobClient: (blobName: string) => ({ deleteIfExists: () => mocks.deleteIfExists(blobName) }),
+};
 
 beforeEach(() => {
   vi.resetModules();
@@ -18,6 +23,8 @@ beforeEach(() => {
   mocks.getContainerClient.mockReset();
   mocks.createIfNotExists.mockReset();
   mocks.createIfNotExists.mockResolvedValue(undefined);
+  mocks.deleteIfExists.mockReset();
+  mocks.deleteIfExists.mockResolvedValue(undefined);
   mocks.getContainerClient.mockReturnValue(fakeContainer);
   mocks.fromConnectionString.mockReturnValue({ getContainerClient: mocks.getContainerClient });
   delete process.env.AZURE_STORAGE_CONNECTION_STRING;
@@ -84,5 +91,37 @@ describe("getAttachmentContainer", () => {
     const result = await getAttachmentContainer();
     expect(result).toBe(fakeContainer);
     expect(mocks.fromConnectionString).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("deleteAttachmentBlobsBestEffort", () => {
+  it("deletes every blobName given", async () => {
+    process.env.AZURE_STORAGE_CONNECTION_STRING = "conn";
+    const { deleteAttachmentBlobsBestEffort } = await import("@/lib/blobStorage");
+
+    await deleteAttachmentBlobsBestEffort(["blob-1.jpg", "blob-2.pdf"]);
+
+    expect(mocks.deleteIfExists).toHaveBeenCalledWith("blob-1.jpg");
+    expect(mocks.deleteIfExists).toHaveBeenCalledWith("blob-2.pdf");
+  });
+
+  it("never even opens the container when given an empty list", async () => {
+    process.env.AZURE_STORAGE_CONNECTION_STRING = "conn";
+    const { deleteAttachmentBlobsBestEffort } = await import("@/lib/blobStorage");
+
+    await deleteAttachmentBlobsBestEffort([]);
+
+    expect(mocks.fromConnectionString).not.toHaveBeenCalled();
+  });
+
+  it("a failure deleting one blob never blocks the others, or throws", async () => {
+    process.env.AZURE_STORAGE_CONNECTION_STRING = "conn";
+    mocks.deleteIfExists.mockImplementation((blobName: string) =>
+      blobName === "blob-1.jpg" ? Promise.reject(new Error("already gone")) : Promise.resolve(undefined)
+    );
+    const { deleteAttachmentBlobsBestEffort } = await import("@/lib/blobStorage");
+
+    await expect(deleteAttachmentBlobsBestEffort(["blob-1.jpg", "blob-2.pdf"])).resolves.toBeUndefined();
+    expect(mocks.deleteIfExists).toHaveBeenCalledWith("blob-2.pdf");
   });
 });
