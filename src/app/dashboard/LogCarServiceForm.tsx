@@ -1,9 +1,8 @@
 // Place at: src/app/dashboard/LogCarServiceForm.tsx
 //
-// Car equivalent of LogServiceForm.tsx. CAR_JOB_LABELS is a flat,
-// ~28-key catalog (no JOB_GROUPS-style grouping exists or is needed at
-// this size) - a plain <select> replaces the motorcycle form's grouped
-// optgroups.
+// Car equivalent of LogServiceForm.tsx - same grouped-optgroup picker,
+// built from CAR_JOB_GROUPS/CAR_JOB_LABELS the same way the motorcycle
+// form builds it from JOB_GROUPS/JOB_LABELS.
 'use client';
 
 import { useState } from 'react';
@@ -12,7 +11,7 @@ import { ReminderFields, type ReminderTriggerRow } from './ReminderFields';
 import { MileageWarning } from './MileageWarning';
 import { AttachmentUploader } from './AttachmentUploader';
 import { useEstimatedMileage } from './useEstimatedMileage';
-import { CAR_JOB_LABELS, CAR_JOB_REMINDER_DEFAULTS } from '@/lib/tracker/carJobTypes';
+import { CAR_JOB_GROUPS, CAR_JOB_LABELS, CAR_JOB_REMINDER_DEFAULTS } from '@/lib/tracker/carJobTypes';
 import { isBeforeProduction } from '@/lib/tracker/productionYearCheck';
 import { checkMileageConsistency, type HistoryPoint } from '@/lib/tracker/mileageCheck';
 import { convertDisplayToGbp, CURRENCY_SYMBOLS, type Currency, type ExchangeRates } from '@/lib/tracker/currency';
@@ -115,8 +114,12 @@ export function LogCarServiceForm({ initialMileage, mileageHistory, startingMile
         <div className="field" style={{ marginTop: '0.9rem' }}>
           <label htmlFor="carsvc-jobtype">Job</label>
           <select id="carsvc-jobtype" value={jobType} onChange={(e) => handleJobChange(e.target.value)}>
-            {Object.entries(CAR_JOB_LABELS).map(([key, label]) => (
-              <option key={key} value={key}>{label}</option>
+            {CAR_JOB_GROUPS.map((g) => (
+              <optgroup key={g.group} label={g.group}>
+                {g.jobs.map((j) => (
+                  <option key={j} value={j}>{CAR_JOB_LABELS[j]}</option>
+                ))}
+              </optgroup>
             ))}
           </select>
         </div>
