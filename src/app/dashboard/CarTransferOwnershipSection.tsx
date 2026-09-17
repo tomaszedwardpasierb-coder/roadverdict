@@ -4,6 +4,7 @@
 
 import { useState } from 'react';
 import { VehicleSpinner } from '@/components/VehicleSpinner';
+import { useMarkOnboardingStepSeen } from '@/components/OnboardingStepSeen';
 import styles from './dashboard.module.css';
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -25,6 +26,7 @@ export function CarTransferOwnershipSection({ pendingRequest, carIsReadOnly }: P
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sentTo, setSentTo] = useState<string | null>(null);
+  useMarkOnboardingStepSeen('explored-transfer');
 
   async function handleSubmit() {
     const cleaned = email.trim();

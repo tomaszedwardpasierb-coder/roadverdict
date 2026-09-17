@@ -1,6 +1,7 @@
 ﻿// Place at: src/app/api/tracker/services/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/session";
+import { markOnboardingStepComplete } from "@/lib/tracker/userAccount";
 import { createServiceRecord, getServiceRecords } from "@/lib/tracker/serviceRecord";
 import { getPrimaryBike, updateBikeMileage, isBikeReadOnly, BIKE_READ_ONLY_MESSAGE } from "@/lib/tracker/bike";
 import { createReminder, deleteRemindersBySourceKey } from "@/lib/tracker/reminder";
@@ -123,5 +124,6 @@ export async function POST(request: NextRequest) {
     });
   }
 
+  await markOnboardingStepComplete(session.email, "logged-first-entry").catch(() => {});
   return NextResponse.json({ record });
 }

@@ -4,6 +4,7 @@
 
 import { useState } from 'react';
 import { VehicleSpinner } from '@/components/VehicleSpinner';
+import { useMarkOnboardingStepSeen } from '@/components/OnboardingStepSeen';
 import { Icon } from './Icon';
 import { NotificationBell } from './NotificationBell';
 import { convertMilesToDisplay, type DistanceUnit } from '@/lib/tracker/unitFormat';
@@ -144,6 +145,7 @@ export function CarStorySoFarTab({ carNickname, registration, currentMileage, di
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [story, setStory] = useState<StoryResponse | null>(initialStory);
+  useMarkOnboardingStepSeen('viewed-report');
 
   const carTag = (carNickname || registration) ? (
     <span className={styles.headingBikeTag}>

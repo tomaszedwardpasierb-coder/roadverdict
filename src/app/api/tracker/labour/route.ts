@@ -1,6 +1,7 @@
 // Place at: src/app/api/tracker/labour/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/session";
+import { markOnboardingStepComplete } from "@/lib/tracker/userAccount";
 import { createLabour, getLabour } from "@/lib/tracker/labour";
 import { getPrimaryBike, updateBikeMileage, isBikeReadOnly, BIKE_READ_ONLY_MESSAGE } from "@/lib/tracker/bike";
 import { getServiceRecords } from "@/lib/tracker/serviceRecord";
@@ -85,5 +86,6 @@ export async function POST(request: NextRequest) {
     await updateBikeMileage(session.email, bike.id, mileage);
   }
 
+  await markOnboardingStepComplete(session.email, "logged-first-entry").catch(() => {});
   return NextResponse.json({ labour });
 }

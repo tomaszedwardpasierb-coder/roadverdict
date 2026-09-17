@@ -45,6 +45,9 @@ import {
   cancelAccountDeletion,
   getPendingDeletionInfo,
   ACCOUNT_DELETION_GRACE_PERIOD_DAYS,
+  markOnboardingStepComplete,
+  setOnboardingChecklistDismissed,
+  enableOnboardingChecklist,
 } from "@/lib/tracker/userAccount";
 
 const email = "rider@example.com";
@@ -298,5 +301,73 @@ describe("getPendingDeletionInfo", () => {
   it("never returns a negative day count for a deadline that's already passed", () => {
     const result = getPendingDeletionInfo({ email, pendingDeletionAt: new Date(Date.now() - 86_400_000).toISOString() } as never);
     expect(result!.daysRemaining).toBe(0);
+  });
+});
+
+describe("markOnboardingStepComplete", () => {
+  it("does nothing on an account with no onboarding field at all", async () => {
+    mocks.getUserDoc.mockResolvedValue({ email });
+    await markOnboardingStepComplete(email, "logged-first-entry");
+    expect(mocks.upsert).not.toHaveBeenCalled();
+  });
+
+  it("appends the step when it isn't already recorded", async () => {
+    mocks.getUserDoc.mockResolvedValue({ email, onboarding: { completedSteps: ["used-ai-assistant"] } });
+    await markOnboardingStepComplete(email, "logged-first-entry");
+    const saved = mocks.upsert.mock.calls[0][0];
+    expect(saved.onboarding.completedSteps).toEqual(["used-ai-assistant", "logged-first-entry"]);
+  });
+
+  it("is idempotent - never writes again once the step is already recorded", async () => {
+    mocks.getUserDoc.mockResolvedValue({ email, onboarding: { completedSteps: ["logged-first-entry"] } });
+    await markOnboardingStepComplete(email, "logged-first-entry");
+    expect(mocks.upsert).not.toHaveBeenCalled();
+  });
+});
+
+describe("setOnboardingChecklistDismissed", () => {
+  it("does nothing on an account with no onboarding field at all", async () => {
+    mocks.getUserDoc.mockResolvedValue({ email });
+    await setOnboardingChecklistDismissed(email, true);
+    expect(mocks.upsert).not.toHaveBeenCalled();
+  });
+
+  it("sets dismissedChecklistAt without touching completedSteps", async () => {
+    mocks.getUserDoc.mockResolvedValue({ email, onboarding: { completedSteps: ["used-ai-assistant"] } });
+    await setOnboardingChecklistDismissed(email, true);
+    const saved = mocks.upsert.mock.calls[0][0];
+    expect(saved.onboarding.dismissedChecklistAt).toEqual(expect.any(String));
+    expect(saved.onboarding.completedSteps).toEqual(["used-ai-assistant"]);
+  });
+
+  it("clears dismissedChecklistAt when un-dismissed, preserving prior progress", async () => {
+    mocks.getUserDoc.mockResolvedValue({
+      email,
+      onboarding: { completedSteps: ["used-ai-assistant"], dismissedChecklistAt: "2026-01-01T00:00:00.000Z" },
+    });
+    await setOnboardingChecklistDismissed(email, false);
+    const saved = mocks.upsert.mock.calls[0][0];
+    expect(saved.onboarding.dismissedChecklistAt).toBeUndefined();
+    expect(saved.onboarding.completedSteps).toEqual(["used-ai-assistant"]);
+  });
+});
+
+describe("enableOnboardingChecklist", () => {
+  it("throws when no account exists for that email", async () => {
+    mocks.getUserDoc.mockResolvedValue(null);
+    await expect(enableOnboardingChecklist(email)).rejects.toThrow(`No account found for ${email}.`);
+    expect(mocks.upsert).not.toHaveBeenCalled();
+  });
+
+  it("turns onboarding on for an existing account that never had it", async () => {
+    mocks.getUserDoc.mockResolvedValue({ email });
+    await enableOnboardingChecklist(email);
+    expect(mocks.upsert).toHaveBeenCalledWith(expect.objectContaining({ onboarding: { completedSteps: [] } }));
+  });
+
+  it("is idempotent - never overwrites real progress on an account that already has it on", async () => {
+    mocks.getUserDoc.mockResolvedValue({ email, onboarding: { completedSteps: ["logged-first-entry", "used-ai-assistant"] } });
+    await enableOnboardingChecklist(email);
+    expect(mocks.upsert).not.toHaveBeenCalled();
   });
 });

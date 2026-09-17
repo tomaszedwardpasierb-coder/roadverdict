@@ -91,6 +91,7 @@ import { DashboardStatCards } from "./DashboardStatCards";
 import { CustomFilterPanel } from "./CustomFilterPanel";
 import { ScanReceiptButton } from "./ScanReceiptButton";
 import { RegistrationBackfillBanner } from "./RegistrationBackfillBanner";
+import { OnboardingChecklistCard } from "./OnboardingChecklistCard";
 import { Icon } from "./Icon";
 import { LockedStatCard } from "./LockedStatCard";
 import { getProStatus } from "@/lib/subscriptions";
@@ -161,6 +162,13 @@ function classFromEngineLitres(engineLitres: number): CarBenchmarkClass {
 
 export const dynamic = "force-dynamic";
 
+// See the "Reopens a specific tab on load" comment inside DashboardPage
+// below for what each of these is for. Shared with renderCarDashboard's
+// own initialSection parameter, so both render paths accept exactly the
+// same set.
+const DEEP_LINK_SECTIONS = ["buyingGuide", "security", "service", "story", "shareLinks", "transferOwnership"] as const;
+type DeepLinkSection = (typeof DEEP_LINK_SECTIONS)[number];
+
 export default async function DashboardPage(props: { searchParams: Promise<{ addVehicle?: string; tab?: string }> }) {
   const searchParams = await props.searchParams;
   const session = await getSession();
@@ -173,11 +181,13 @@ export default async function DashboardPage(props: { searchParams: Promise<{ add
   // buyingGuideVdiCheckout.ts's BuyingGuideReturnContext). "security" is
   // set by the Vault's "enable 2FA to continue" prompt (TwoFactorGate),
   // which needs a real navigation back to Settings rather than in-SPA
-  // tab-switch plumbing threaded into a server-rendered child tree.
-  // Deliberately a narrow allow-list, not a general "deep link to any
-  // tab" mechanism - nothing else needs that yet.
-  const initialSection =
-    searchParams.tab === "buyingGuide" ? ("buyingGuide" as const) : searchParams.tab === "security" ? ("security" as const) : undefined;
+  // tab-switch plumbing threaded into a server-rendered child tree. The
+  // other four are what OnboardingChecklistCard.tsx's own items link to
+  // (see ONBOARDING_STEPS in userDoc.ts) - still a deliberate allow-list,
+  // not a general "deep link to any tab" mechanism.
+  const initialSection = (DEEP_LINK_SECTIONS as readonly string[]).includes(searchParams.tab ?? "")
+    ? (searchParams.tab as DeepLinkSection)
+    : undefined;
 
   // Account-level, not bike/car-specific - fetched once here so it's
   // available before the car/bike branch decision below, and passed
@@ -403,6 +413,9 @@ export default async function DashboardPage(props: { searchParams: Promise<{ add
 
   const dashboardContent = (
     <ChartFilterProvider>
+      {userAccount?.onboarding && (
+        <OnboardingChecklistCard completedSteps={userAccount.onboarding.completedSteps} dismissed={!!userAccount.onboarding.dismissedChecklistAt} />
+      )}
       {!bike.originalRegistration && (
         <RegistrationBackfillBanner bikeName={bike.nickname ? `${bike.nickname} (${bike.make} ${bike.model})` : `${bike.make} ${bike.model}`} />
       )}
@@ -1064,7 +1077,7 @@ async function renderCarDashboard(
   hasAnyBike: boolean,
   userAccount: Awaited<ReturnType<typeof getUserDoc>>,
   pendingDeletion: ReturnType<typeof getPendingDeletionInfo>,
-  initialSection?: "buyingGuide" | "security"
+  initialSection?: DeepLinkSection
 ) {
   const [bikes, proStatus, twoFactorEnabled] = await Promise.all([
     hasAnyBike ? getBikesForUser(email) : Promise.resolve([]),
@@ -1190,6 +1203,9 @@ async function renderCarDashboard(
 
   const dashboardContent = (
     <ChartFilterProvider>
+      {userAccount?.onboarding && (
+        <OnboardingChecklistCard completedSteps={userAccount.onboarding.completedSteps} dismissed={!!userAccount.onboarding.dismissedChecklistAt} />
+      )}
       {overBudget && (
         <div className={styles.budgetWarningBanner}>
           ⚠ <strong>You&apos;re over your {currentYear} budget</strong> - {formatCurrency(yearSpend, currency, rates)} spent against a{" "}

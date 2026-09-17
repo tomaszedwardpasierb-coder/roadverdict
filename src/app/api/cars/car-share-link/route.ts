@@ -2,6 +2,7 @@
 // Car mirror of api/tracker/share-link/route.ts.
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/session";
+import { markOnboardingStepComplete } from "@/lib/tracker/userAccount";
 import { createCarShareLink } from "@/lib/tracker/carShareLink";
 import type { ShareLinkDuration } from "@/lib/tracker/shareLink";
 import { getPrimaryCar } from "@/lib/tracker/car";
@@ -47,6 +48,7 @@ export async function POST(request: NextRequest) {
 
   const link = await createCarShareLink(session.email, car.id, duration, recipientEmail, validatedAskingPrice);
   void logImpersonationActivityForCurrentRequest("carShareLink", link.id, "create");
+  await markOnboardingStepComplete(session.email, "created-share-link").catch(() => {});
   const appUrl = process.env.APP_URL ?? "https://roadverdict.co.uk";
   return NextResponse.json({
     url: `${appUrl}/car-report/${link.id}`,

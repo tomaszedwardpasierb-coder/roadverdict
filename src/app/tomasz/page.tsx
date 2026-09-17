@@ -35,6 +35,7 @@ import { GrantPremiumForm } from './GrantPremiumForm';
 import { DeleteAccountButton } from './DeleteAccountButton';
 import { ResetStoryCooldownButton } from './ResetStoryCooldownButton';
 import { RevokeSessionsButton } from './RevokeSessionsButton';
+import { EnableOnboardingButton } from './EnableOnboardingButton';
 
 export const dynamic = 'force-dynamic';
 
@@ -552,6 +553,7 @@ export default async function AdminDashboardPage(
               <th>Premium</th>
               <th>Story cooldown</th>
               <th>Sessions</th>
+              <th>Onboarding</th>
               <th>Delete</th>
             </tr>
           </thead>
@@ -567,6 +569,7 @@ export default async function AdminDashboardPage(
                 <td><GrantPremiumForm email={u.email} plan={u.plan ?? null} /></td>
                 <td><ResetStoryCooldownButton email={u.email} /></td>
                 <td><RevokeSessionsButton email={u.email} /></td>
+                <td><EnableOnboardingButton email={u.email} enabled={!!u.onboarding} /></td>
                 <td><DeleteAccountButton email={u.email} /></td>
               </tr>
             ))}

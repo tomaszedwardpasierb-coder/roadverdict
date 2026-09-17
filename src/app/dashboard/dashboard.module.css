@@ -466,6 +466,49 @@
   border: 1px solid var(--border);
   border-radius: 4px;
 }
+
+.onboardingCard {
+  background: #fff8ec;
+  border: 1px solid var(--amber);
+  border-radius: 8px;
+  padding: 1rem 1.2rem;
+  margin-bottom: 1.2rem;
+}
+.onboardingHeader { display: flex; justify-content: space-between; align-items: baseline; gap: 0.8rem; flex-wrap: wrap; margin-bottom: 0.7rem; }
+.onboardingTitle { font-family: var(--font-display); font-size: 1rem; color: var(--amber-ink); margin: 0; }
+.onboardingProgress { font-size: 0.78rem; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
+.onboardingHideBtn { background: none; border: none; color: var(--ink-soft); font-size: 0.78rem; text-decoration: underline; cursor: pointer; padding: 0; }
+.onboardingList { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.45rem; }
+.onboardingItem { display: flex; align-items: center; gap: 0.55rem; }
+.onboardingTick {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 1.5px solid var(--amber);
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.65rem;
+}
+.onboardingTickDone { background: var(--green); border-color: var(--green); color: #fff; }
+.onboardingItemLink { font-size: 0.88rem; color: var(--ink); text-decoration: none; }
+.onboardingItemLink:hover { text-decoration: underline; }
+.onboardingItemDone .onboardingItemLink { color: var(--ink-soft); text-decoration: line-through; }
+.onboardingPill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: none;
+  border: 1px dashed var(--border);
+  border-radius: 99px;
+  padding: 0.3rem 0.8rem;
+  margin-bottom: 1.2rem;
+  font-size: 0.78rem;
+  color: var(--ink-soft);
+  cursor: pointer;
+}
+.onboardingPill:hover { border-color: var(--amber); color: var(--amber-ink); }
 .scanReceiptBtn {
   font-family: var(--font-body);
   font-weight: 700;

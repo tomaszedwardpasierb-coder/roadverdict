@@ -9,6 +9,7 @@
 // for the full reasoning behind that boundary.
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/session";
+import { markOnboardingStepComplete } from "@/lib/tracker/userAccount";
 import {
   canSendAnonAssistantMessage,
   generateAnonId,
@@ -644,6 +645,7 @@ export async function POST(req: NextRequest) {
         return respond(anonIdToSetCookie, { error: "Assistant is temporarily unavailable." }, { status: 502 });
       }
       await logAssistantQuestion(question, signedIn, false, session?.email);
+      if (session) await markOnboardingStepComplete(session.email, "used-ai-assistant").catch(() => {});
       return respond(anonIdToSetCookie, {
         reply: replyText,
         ...(proposedEntry ? { proposedEntry } : {}),

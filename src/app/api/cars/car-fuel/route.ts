@@ -1,6 +1,7 @@
 // Place at: src/app/api/cars/car-fuel/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/session";
+import { markOnboardingStepComplete } from "@/lib/tracker/userAccount";
 import { createCarFuelLog, getCarFuelLogs } from "@/lib/tracker/carFuelLog";
 import { getPrimaryCar, updateCarMileage, isCarReadOnly, CAR_READ_ONLY_MESSAGE } from "@/lib/tracker/car";
 import { isBeforeProduction } from "@/lib/tracker/productionYearCheck";
@@ -116,5 +117,6 @@ export async function POST(request: NextRequest) {
     await updateCarMileage(session.email, car.id, mileage);
   }
 
+  await markOnboardingStepComplete(session.email, "logged-first-entry").catch(() => {});
   return NextResponse.json({ log });
 }

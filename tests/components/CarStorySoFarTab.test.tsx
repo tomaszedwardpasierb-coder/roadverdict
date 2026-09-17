@@ -244,4 +244,15 @@ describe("CarStorySoFarTab", () => {
     await screen.findByText("x");
     expect(fetchMock).toHaveBeenCalledWith("/api/cars/car-story-so-far");
   });
+
+  it("marks the 'viewed-report' onboarding step seen once, on mount", () => {
+    mockFetchRouter(() => Promise.resolve({ ok: true, json: async () => ({}) }));
+    render(
+      <CarStorySoFarTab currentMileage={12000} distanceUnit="mi" initialStory={null} sellerPrep={emptySellerPrep} />
+    );
+    expect(fetch).toHaveBeenCalledWith(
+      "/api/onboarding/complete",
+      expect.objectContaining({ method: "POST", body: JSON.stringify({ step: "viewed-report" }) })
+    );
+  });
 });

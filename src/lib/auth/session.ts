@@ -57,6 +57,13 @@ export async function createSessionForEmail(email: string, ip: string, userAgent
         type: "user",
         email,
         createdAt: new Date().toISOString(),
+        // Active by default for every brand new account (see
+        // OnboardingChecklistCard.tsx and UserDoc.onboarding's own
+        // comment) - an account that already existed before this
+        // shipped never passes through this branch again, so nothing
+        // suddenly appears for a long-time user unless an admin turns
+        // it on explicitly via /tomasz.
+        onboarding: { completedSteps: [] },
       });
     }
   } catch (err) {

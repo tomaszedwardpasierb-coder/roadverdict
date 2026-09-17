@@ -131,6 +131,15 @@ describe("createSessionForEmail", () => {
     });
   });
 
+  it("initializes onboarding as active on a brand new account, so the getting-started checklist shows immediately", async () => {
+    mocks.read.mockResolvedValue({ resource: undefined });
+
+    await createSessionForEmail("user@example.com", "1.2.3.4", "test-agent");
+
+    const userCreateCall = mocks.itemsCreate.mock.calls.find((call) => call[0].type === "user");
+    expect(userCreateCall![0].onboarding).toEqual({ completedSteps: [] });
+  });
+
   it("does not create a duplicate user document when one already exists", async () => {
     mocks.read.mockResolvedValue({ resource: { id: "user@example.com", type: "user" } });
 

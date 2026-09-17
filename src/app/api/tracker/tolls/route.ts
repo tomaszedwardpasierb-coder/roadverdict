@@ -1,6 +1,7 @@
 // Place at: src/app/api/tracker/tolls/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/session";
+import { markOnboardingStepComplete } from "@/lib/tracker/userAccount";
 import { createToll } from "@/lib/tracker/toll";
 import { getPrimaryBike, isBikeReadOnly, BIKE_READ_ONLY_MESSAGE } from "@/lib/tracker/bike";
 import { isBeforeProduction } from "@/lib/tracker/productionYearCheck";
@@ -51,5 +52,6 @@ export async function POST(request: NextRequest) {
 
   const toll = await createToll(session.email, { bikeId: bike.id, tollType, cost, date, notes: notes ?? "", attachments });
 
+  await markOnboardingStepComplete(session.email, "logged-first-entry").catch(() => {});
   return NextResponse.json({ toll });
 }

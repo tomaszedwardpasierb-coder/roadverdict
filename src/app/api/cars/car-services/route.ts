@@ -1,6 +1,7 @@
 // Place at: src/app/api/cars/car-services/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/session";
+import { markOnboardingStepComplete } from "@/lib/tracker/userAccount";
 import { createCarServiceRecord, getCarServiceRecords } from "@/lib/tracker/carServiceRecord";
 import { getPrimaryCar, updateCarMileage, isCarReadOnly, CAR_READ_ONLY_MESSAGE } from "@/lib/tracker/car";
 import { createCarReminder, deleteCarRemindersBySourceKey } from "@/lib/tracker/carReminder";
@@ -111,5 +112,6 @@ export async function POST(request: NextRequest) {
     });
   }
 
+  await markOnboardingStepComplete(session.email, "logged-first-entry").catch(() => {});
   return NextResponse.json({ record });
 }

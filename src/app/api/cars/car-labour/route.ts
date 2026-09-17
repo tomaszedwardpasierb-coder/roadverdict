@@ -1,6 +1,7 @@
 // Place at: src/app/api/cars/car-labour/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/session";
+import { markOnboardingStepComplete } from "@/lib/tracker/userAccount";
 import { createCarLabour, getCarLabour } from "@/lib/tracker/carLabour";
 import { getPrimaryCar, updateCarMileage, isCarReadOnly, CAR_READ_ONLY_MESSAGE } from "@/lib/tracker/car";
 import { getCarServiceRecords } from "@/lib/tracker/carServiceRecord";
@@ -85,5 +86,6 @@ export async function POST(request: NextRequest) {
     await updateCarMileage(session.email, car.id, mileage);
   }
 
+  await markOnboardingStepComplete(session.email, "logged-first-entry").catch(() => {});
   return NextResponse.json({ labour });
 }

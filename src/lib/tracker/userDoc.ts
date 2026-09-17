@@ -86,7 +86,44 @@ export interface UserDoc {
   // <country>" as a spot-unauthorised-access signal, without exposing a
   // full audit trail.
   vaultAccessLog?: { at: string; browser: string; country: string | null }[];
+  // The first-time-user checklist (OnboardingChecklistCard.tsx) - absent
+  // entirely for every account created before this shipped, so nothing
+  // suddenly appears for someone who's used this app for years. Set on
+  // every brand new account at the moment its doc is first created (see
+  // createSessionForEmail in auth/session.ts); for an existing account,
+  // only an admin turning it on explicitly (enableOnboardingChecklist in
+  // userAccount.ts, /tomasz's EnableOnboardingButton) creates it. Once
+  // present, its mere presence is what makes the checklist render at
+  // all - see OnboardingChecklistCard.tsx.
+  onboarding?: {
+    completedSteps: OnboardingStep[];
+    dismissedChecklistAt?: string;
+  };
 }
+
+// One step per real action, not per page visited - each is marked done by
+// the action actually happening server-side (a real entry logged, a real
+// share link created, and so on - see markOnboardingStepComplete in
+// userAccount.ts and its call sites), never by a "yes I did this" click
+// inside a scripted tour.
+export type OnboardingStep =
+  | "logged-first-entry"
+  | "used-ai-assistant"
+  | "compared-vehicles"
+  | "created-share-link"
+  | "viewed-report"
+  | "explored-transfer";
+
+// Display order and copy for OnboardingChecklistCard.tsx - one place so
+// the card's rendering never has to know the step keys' own meaning.
+export const ONBOARDING_STEPS: { step: OnboardingStep; label: string; href: string }[] = [
+  { step: "logged-first-entry", label: "Log your first bit of history", href: "/dashboard?tab=service" },
+  { step: "viewed-report", label: "Check your own report", href: "/dashboard?tab=story" },
+  { step: "created-share-link", label: "See what a buyer would see", href: "/dashboard?tab=shareLinks" },
+  { step: "used-ai-assistant", label: "Ask the AI assistant something", href: "/dashboard" },
+  { step: "compared-vehicles", label: "Compare two vehicles", href: "/garage/compare" },
+  { step: "explored-transfer", label: "See how transferring ownership works", href: "/dashboard?tab=transferOwnership" },
+];
 
 export async function getUserDoc(email: string): Promise<UserDoc | null> {
   const container = getContainer();

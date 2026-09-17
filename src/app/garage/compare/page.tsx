@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { getSession } from "@/lib/auth/session";
 import { isPro } from "@/lib/subscriptions";
+import { markOnboardingStepComplete } from "@/lib/tracker/userAccount";
 import { getBikesForUser, isBikeReadOnly } from "@/lib/tracker/bike";
 import { getCarsForUser, isCarReadOnly } from "@/lib/tracker/car";
 import { buildBikeComparison } from "@/lib/tracker/bikeComparison";
@@ -95,6 +96,10 @@ export default async function ComparePage(
     ...carEntries.map((e): [string, VehicleComparisonEntry] => [e.bikeId, e]),
   ]);
   const entries = requestedIds.map((id) => entryById.get(id)).filter((e): e is VehicleComparisonEntry => e != null);
+
+  if (showComparison && entries.length >= MIN_COMPARE) {
+    await markOnboardingStepComplete(session.email, "compared-vehicles").catch(() => {});
+  }
 
   const rates = showComparison ? await getExchangeRates() : null;
   // The first selected vehicle's own display settings become the whole

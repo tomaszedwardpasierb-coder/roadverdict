@@ -3,6 +3,7 @@
 
 import { useState } from 'react';
 import { VehicleSpinner } from '@/components/VehicleSpinner';
+import { useMarkOnboardingStepSeen } from '@/components/OnboardingStepSeen';
 import styles from './dashboard.module.css';
 
 // A real (if intentionally simple) shape check - "contains an @" alone
@@ -27,6 +28,7 @@ export function TransferOwnershipSection({ pendingRequest, bikeIsReadOnly }: Pro
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sentTo, setSentTo] = useState<string | null>(null);
+  useMarkOnboardingStepSeen('explored-transfer');
 
   async function handleSubmit() {
     const cleaned = email.trim();

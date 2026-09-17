@@ -16,7 +16,12 @@ import { TransferOwnershipSection } from "@/app/dashboard/TransferOwnershipSecti
 
 describe("TransferOwnershipSection", () => {
   beforeEach(() => {
-    vi.stubGlobal("fetch", vi.fn());
+    // Defaulted so useMarkOnboardingStepSeen's own background mount call
+    // (POSTs /api/onboarding/complete, fire-and-forget) never crashes an
+    // unrelated test that hasn't configured fetch itself - individual
+    // tests below still override this per-call via mockResolvedValue/
+    // mockRejectedValue/mockReturnValue for the real handover submit.
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true, json: async () => ({}) }));
   });
 
   afterEach(() => {
@@ -49,7 +54,10 @@ describe("TransferOwnershipSection", () => {
     await user.click(screen.getByRole("button", { name: "Start handover" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent("Enter a valid email address.");
-    expect(fetch).not.toHaveBeenCalled();
+    // Not "never called at all" - useMarkOnboardingStepSeen's own
+    // unrelated background call on mount means fetch does get called;
+    // what actually matters here is that the handover itself never was.
+    expect(fetch).not.toHaveBeenCalledWith("/api/tracker/bike-transfer", expect.anything());
   });
 
   it("rejects a bare '@' with nothing else, instead of sending it to the server", async () => {
@@ -60,7 +68,7 @@ describe("TransferOwnershipSection", () => {
     await user.click(screen.getByRole("button", { name: "Start handover" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent("Enter a valid email address.");
-    expect(fetch).not.toHaveBeenCalled();
+    expect(fetch).not.toHaveBeenCalledWith("/api/tracker/bike-transfer", expect.anything());
   });
 
   it("rejects an address with no domain suffix (no dot after the @)", async () => {
@@ -118,7 +126,7 @@ describe("TransferOwnershipSection", () => {
     expect(screen.getByText(/Waiting for/)).toBeInTheDocument();
     expect(screen.getByText("already-offered@example.com", { exact: false })).toBeInTheDocument();
     expect(screen.getByText(/logged service records, fuel logs, mods, bills, and any attached receipts go with it too/)).toBeInTheDocument();
-    expect(fetch).not.toHaveBeenCalled();
+    expect(fetch).not.toHaveBeenCalledWith("/api/tracker/bike-transfer", expect.anything());
   });
 
   it("shows the server's own error message on a not-ok response, and leaves the form in place to retry", async () => {
@@ -140,6 +148,15 @@ describe("TransferOwnershipSection", () => {
     await user.click(screen.getByRole("button", { name: "Start handover" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent("Couldn't reach the server. Try again.");
+  });
+
+  it("marks the 'explored-transfer' onboarding step seen once, on mount, regardless of whether a request is ever sent", () => {
+    render(<TransferOwnershipSection bikeIsReadOnly={false} pendingRequest={null} />);
+    expect(fetch).toHaveBeenCalledWith(
+      "/api/onboarding/complete",
+      expect.objectContaining({ method: "POST", body: JSON.stringify({ step: "explored-transfer" }) })
+    );
+    expect(fetch).toHaveBeenCalledTimes(1);
   });
 
   it("KNOWN GAP (not fixed - needs a new cancel-offer API endpoint): once an offer is sent, there is no cancel/withdraw control anywhere in this component", async () => {

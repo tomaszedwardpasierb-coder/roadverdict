@@ -7,7 +7,7 @@
 // this builds on, and subscriptions.ts's isPro(), which reads the same
 // `plan` field grantPremium() writes here.
 import { getContainer } from "@/lib/cosmos";
-import { getUserDoc, type UserDoc } from "@/lib/tracker/userDoc";
+import { getUserDoc, type UserDoc, type OnboardingStep } from "@/lib/tracker/userDoc";
 import { getBikesForUser, deleteBike } from "@/lib/tracker/bike";
 import { getCarsForUser, deleteCar } from "@/lib/tracker/car";
 
@@ -109,6 +109,48 @@ export async function updateProfile(
     if (updates.avatarBlobName) user.avatarBlobName = updates.avatarBlobName;
     else delete user.avatarBlobName;
   }
+  await container.items.upsert(user);
+}
+
+// Silently does nothing on an account with no `onboarding` field at all -
+// every call site (14 log-entry routes, the assistant route, both
+// share-link routes, the compare page) calls this unconditionally after
+// its own real success, best-effort, rather than checking first whether
+// the feature happens to be active for this account. That's deliberate:
+// it keeps every one of those call sites a plain one-line addition, not
+// a conditional guarded on a field they'd otherwise have no reason to
+// know about.
+export async function markOnboardingStepComplete(email: string, step: OnboardingStep): Promise<void> {
+  const container = getContainer();
+  const user = await getUserDoc(email);
+  if (!user?.onboarding) return;
+  if (user.onboarding.completedSteps.includes(step)) return;
+  user.onboarding.completedSteps = [...user.onboarding.completedSteps, step];
+  await container.items.upsert(user);
+}
+
+// Toggles the checklist card's own visibility, independent of progress -
+// dismissing never clears completedSteps, and un-dismissing (the card's
+// own "show again" link once collapsed) picks up exactly where it left off.
+export async function setOnboardingChecklistDismissed(email: string, dismissed: boolean): Promise<void> {
+  const container = getContainer();
+  const user = await getUserDoc(email);
+  if (!user?.onboarding) return;
+  if (dismissed) user.onboarding.dismissedChecklistAt = new Date().toISOString();
+  else delete user.onboarding.dismissedChecklistAt;
+  await container.items.upsert(user);
+}
+
+// The /tomasz admin action for an account that existed before this
+// feature shipped (see UserDoc.onboarding's own comment) - idempotent,
+// so re-running it on an account that already has the field on (e.g. a
+// double-click) never wipes real progress back to zero.
+export async function enableOnboardingChecklist(email: string): Promise<void> {
+  const container = getContainer();
+  const user = await getUserDoc(email);
+  if (!user) throw new Error(`No account found for ${email}.`);
+  if (user.onboarding) return;
+  user.onboarding = { completedSteps: [] };
   await container.items.upsert(user);
 }
 

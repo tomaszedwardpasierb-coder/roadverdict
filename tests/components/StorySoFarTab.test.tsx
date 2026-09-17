@@ -176,6 +176,17 @@ describe("StorySoFarTab", () => {
     expect(fetch).not.toHaveBeenCalledWith("/api/tracker/story-so-far");
   });
 
+  it("marks the 'viewed-report' onboarding step seen once, on mount", () => {
+    mockFetchRouter(() => Promise.resolve({ ok: true, json: async () => ({}) }));
+    render(
+      <StorySoFarTab currentMileage={12000} distanceUnit="mi" initialStory={null} sellerPrep={emptySellerPrep} />
+    );
+    expect(fetch).toHaveBeenCalledWith(
+      "/api/onboarding/complete",
+      expect.objectContaining({ method: "POST", body: JSON.stringify({ step: "viewed-report" }) })
+    );
+  });
+
   it("shows the cooldown note and disables Regenerate while nextAvailableAt is still in the future", () => {
     const future = new Date(Date.now() + 3 * 86400000).toISOString();
     const initialStory = {

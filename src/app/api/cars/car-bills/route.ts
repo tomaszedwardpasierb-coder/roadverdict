@@ -1,6 +1,7 @@
 // Place at: src/app/api/cars/car-bills/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/session";
+import { markOnboardingStepComplete } from "@/lib/tracker/userAccount";
 import { createCarBill } from "@/lib/tracker/carBill";
 import { getPrimaryCar, isCarReadOnly, CAR_READ_ONLY_MESSAGE } from "@/lib/tracker/car";
 import { createCarReminder, deleteCarRemindersBySourceKey } from "@/lib/tracker/carReminder";
@@ -82,5 +83,6 @@ export async function POST(request: NextRequest) {
     });
   }
 
+  await markOnboardingStepComplete(session.email, "logged-first-entry").catch(() => {});
   return NextResponse.json({ bill });
 }

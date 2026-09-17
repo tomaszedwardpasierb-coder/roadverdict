@@ -1,6 +1,7 @@
 // Place at: src/app/api/tracker/fines/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/session";
+import { markOnboardingStepComplete } from "@/lib/tracker/userAccount";
 import { createFine } from "@/lib/tracker/fine";
 import { getPrimaryBike, isBikeReadOnly, BIKE_READ_ONLY_MESSAGE } from "@/lib/tracker/bike";
 import { isBeforeProduction } from "@/lib/tracker/productionYearCheck";
@@ -51,5 +52,6 @@ export async function POST(request: NextRequest) {
 
   const fine = await createFine(session.email, { bikeId: bike.id, fineType, cost, date, notes: notes ?? "", attachments });
 
+  await markOnboardingStepComplete(session.email, "logged-first-entry").catch(() => {});
   return NextResponse.json({ fine });
 }

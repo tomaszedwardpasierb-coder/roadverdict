@@ -3,6 +3,7 @@
 
 import { useState } from 'react';
 import { VehicleSpinner } from '@/components/VehicleSpinner';
+import { useMarkOnboardingStepSeen } from '@/components/OnboardingStepSeen';
 import { Icon } from './Icon';
 import { NotificationBell } from './NotificationBell';
 import { convertMilesToDisplay, type DistanceUnit } from '@/lib/tracker/unitFormat';
@@ -159,6 +160,7 @@ export function StorySoFarTab({ bikeNickname, registration, currentMileage, dist
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [story, setStory] = useState<StoryResponse | null>(initialStory);
+  useMarkOnboardingStepSeen('viewed-report');
 
   // Same tag shown next to every other tab's page title - built the
   // same way page.tsx builds it, since this component doesn't have

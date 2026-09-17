@@ -1,6 +1,7 @@
 // Place at: src/app/api/cars/car-tolls/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/session";
+import { markOnboardingStepComplete } from "@/lib/tracker/userAccount";
 import { createCarToll } from "@/lib/tracker/carToll";
 import { getPrimaryCar, isCarReadOnly, CAR_READ_ONLY_MESSAGE } from "@/lib/tracker/car";
 import { isBeforeProduction } from "@/lib/tracker/productionYearCheck";
@@ -51,5 +52,6 @@ export async function POST(request: NextRequest) {
 
   const toll = await createCarToll(session.email, { carId: car.id, tollType, cost, date, notes: notes ?? "", attachments });
 
+  await markOnboardingStepComplete(session.email, "logged-first-entry").catch(() => {});
   return NextResponse.json({ toll });
 }
