@@ -84,4 +84,19 @@ describe("CarServiceHistoryCard", () => {
       expect.objectContaining({ method: "DELETE" })
     );
   });
+
+  it("shows a 'not shown in buyer report' note for a valet entry when includeCleaningInReport is false", () => {
+    render(<CarServiceHistoryCard record={{ ...record, jobType: "valet" }} distanceUnit="mi" currency="GBP" rates={null} includeCleaningInReport={false} />);
+    expect(screen.getByText("Not shown in buyer report")).toBeInTheDocument();
+  });
+
+  it("hides the note once includeCleaningInReport is true", () => {
+    render(<CarServiceHistoryCard record={{ ...record, jobType: "wash" }} distanceUnit="mi" currency="GBP" rates={null} includeCleaningInReport />);
+    expect(screen.queryByText("Not shown in buyer report")).not.toBeInTheDocument();
+  });
+
+  it("never shows the note for an ordinary mechanical job type, regardless of the setting", () => {
+    render(<CarServiceHistoryCard record={record} distanceUnit="mi" currency="GBP" rates={null} includeCleaningInReport={false} />);
+    expect(screen.queryByText("Not shown in buyer report")).not.toBeInTheDocument();
+  });
 });

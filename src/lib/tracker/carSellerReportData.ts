@@ -30,7 +30,7 @@ import {
   type CarMileagePlausibilityCheck,
 } from "@/lib/tracker/carReportNarrative";
 import { generateStoryParagraphs, type JobTypeGroup } from "@/lib/tracker/reportNarrative";
-import { CAR_JOB_LABELS } from "@/lib/tracker/carJobTypes";
+import { CAR_JOB_LABELS, isCleaningCarJob } from "@/lib/tracker/carJobTypes";
 import { CAR_MOD_LABELS } from "@/lib/tracker/carModTypes";
 import { CAR_BILL_LABELS } from "@/lib/tracker/carBillTypes";
 import { CAR_FINE_LABELS as FINE_LABELS } from "@/lib/tracker/carFineTypes";
@@ -128,7 +128,7 @@ export function computeCarSellerReportRowsAndMetrics(
     (billType === "finance" && !car.includeFinanceInReport);
 
   const allRows: (CarReportRow & { hiddenFromBuyer: boolean })[] = [
-    ...records.map((r) => ({ id: r.id, date: r.date, createdAt: r.createdAt, category: "Service", description: CAR_JOB_LABELS[r.jobType] ?? r.jobType, cost: r.cost, attachment: r.attachments?.[0] ?? null, hiddenFromBuyer: false })),
+    ...records.map((r) => ({ id: r.id, date: r.date, createdAt: r.createdAt, category: "Service", description: CAR_JOB_LABELS[r.jobType] ?? r.jobType, cost: r.cost, attachment: r.attachments?.[0] ?? null, hiddenFromBuyer: isCleaningCarJob(r.jobType) && !car.includeCleaningInReport })),
     ...mods.map((m) => ({ id: m.id, date: m.date, createdAt: m.createdAt, category: "Modification", description: `${CAR_MOD_LABELS[m.category] ?? m.category}: ${m.name}`, cost: m.cost, attachment: m.attachments?.[0] ?? null, hiddenFromBuyer: false })),
     ...bills.map((b) => ({
       id: b.id,
@@ -283,8 +283,11 @@ export async function getCarSellerReportCore(email: string, carId: string): Prom
   );
 
   const mileageCheck = checkCurrentCarMileagePlausibility(car.currentMileage, car);
+  // Same off-by-default exclusion as allRows above - see
+  // sellerReportData.ts's own comment on jobTypeRecordsForReport.
+  const jobTypeRecordsForReport = car.includeCleaningInReport ? records : records.filter((r) => !isCleaningCarJob(r.jobType));
   const jobTypeGroups = groupCarServiceHistoryByJobType(
-    records.map((r) => ({ id: r.id, jobType: r.jobType, date: r.date, cost: r.cost, hasReceipt: !!r.attachments?.[0] }))
+    jobTypeRecordsForReport.map((r) => ({ id: r.id, jobType: r.jobType, date: r.date, cost: r.cost, hasReceipt: !!r.attachments?.[0] }))
   );
   const totalExactDuplicates = jobTypeGroups.reduce((sum, g) => sum + g.exactDuplicateCount, 0);
   const otherGroup = jobTypeGroups.find((g) => g.jobType === "other");

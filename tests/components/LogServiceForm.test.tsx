@@ -110,6 +110,19 @@ describe("LogServiceForm", () => {
     expect(screen.getByLabelText(/Remind me when this is due again/)).not.toBeChecked();
   });
 
+  it("offers Valet / detailing and Wash under Cleaning & cosmetic care, also with no reminder default", async () => {
+    const user = userEvent.setup();
+    render(<LogServiceForm initialMileage={5000} startingMileage={0} dateAdded="2020-01-01" mileageHistory={[]} distanceUnit="mi" currency="GBP" rates={null} />);
+
+    await user.selectOptions(screen.getByLabelText("Job"), "valet");
+    expect(screen.getByLabelText("Job")).toHaveValue("valet");
+    expect(screen.getByLabelText(/Remind me when this is due again/)).not.toBeChecked();
+
+    await user.selectOptions(screen.getByLabelText("Job"), "wash");
+    expect(screen.getByLabelText("Job")).toHaveValue("wash");
+    expect(screen.getByLabelText(/Remind me when this is due again/)).not.toBeChecked();
+  });
+
   it("blocks submit when the mileage is lower than the bike's current mileage for a today-dated entry", async () => {
     const user = userEvent.setup();
     render(<LogServiceForm initialMileage={5000} startingMileage={0} dateAdded="2020-01-01" mileageHistory={[]} distanceUnit="mi" currency="GBP" rates={null} />);

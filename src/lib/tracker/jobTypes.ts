@@ -18,6 +18,8 @@ export const JOB_LABELS: Record<string, string> = {
   "chain-and-sprockets": "Chain and sprockets",
   "drive-belt": "Drive belt",
   "battery": "Battery",
+  "valet": "Valet / detailing",
+  "wash": "Wash",
   "other": "Other",
 };
 
@@ -28,6 +30,7 @@ export const JOB_GROUPS: { group: string; jobs: string[] }[] = [
   { group: "Brakes", jobs: ["brake-pads-front", "brake-pads-rear"] },
   { group: "Tyres", jobs: ["tyres-pair", "tyres-front", "tyres-rear"] },
   { group: "Drivetrain", jobs: ["chain-and-sprockets", "drive-belt"] },
+  { group: "Cleaning & cosmetic care", jobs: ["valet", "wash"] },
   { group: "Other", jobs: ["battery", "other"] },
 ];
 
@@ -41,6 +44,16 @@ export const BENCHMARKED_JOB_TYPES: JobType[] = [
 
 export function isBenchmarkedJob(jobType: string): jobType is JobType {
   return (BENCHMARKED_JOB_TYPES as string[]).includes(jobType);
+}
+
+// Cosmetic care, not mechanical maintenance - used to gate the
+// buyer-report toggle (BikeDoc.includeCleaningInReport) and its
+// per-entry "not shown" note, the same off-by-default pattern already
+// used for insurance/finance/fines/tolls.
+export const CLEANING_JOB_TYPES: string[] = ["valet", "wash"];
+
+export function isCleaningJob(jobType: string): boolean {
+  return CLEANING_JOB_TYPES.includes(jobType);
 }
 
 export const AFFILIATE_LINKS: Record<string, { name: string; url: string }[]> = {

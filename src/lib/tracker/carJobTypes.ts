@@ -33,6 +33,8 @@ export const CAR_JOB_LABELS: Record<string, string> = {
   "mot-advisory": "MOT advisory repair",
   "bodywork": "Bodywork / paint repair",
   "windscreen": "Windscreen repair or replacement",
+  "valet": "Valet / detailing",
+  "wash": "Wash",
   "other": "Other",
 };
 
@@ -49,6 +51,7 @@ export const CAR_JOB_GROUPS: { group: string; jobs: string[] }[] = [
   { group: "Electrical & climate", jobs: ["battery-12v", "battery-hv", "aircon-regas"] },
   { group: "Emissions", jobs: ["dpf-clean"] },
   { group: "Bodywork & glass", jobs: ["mot-advisory", "bodywork", "windscreen"] },
+  { group: "Cleaning & cosmetic care", jobs: ["valet", "wash"] },
   { group: "Other", jobs: ["other"] },
 ];
 
@@ -84,4 +87,12 @@ export const CAR_BENCHMARKED_JOB_TYPES: string[] = [
 // Mirrors jobTypes.ts's isBenchmarkedJob.
 export function isBenchmarkedCarJob(jobType: string): jobType is CarJobType {
   return (CAR_BENCHMARKED_JOB_TYPES as string[]).includes(jobType);
+}
+
+// Mirrors jobTypes.ts's CLEANING_JOB_TYPES/isCleaningJob - see that
+// file's comment for the full reasoning.
+export const CAR_CLEANING_JOB_TYPES: string[] = ["valet", "wash"];
+
+export function isCleaningCarJob(jobType: string): boolean {
+  return CAR_CLEANING_JOB_TYPES.includes(jobType);
 }

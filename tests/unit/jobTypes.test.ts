@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { isBenchmarkedJob, BENCHMARKED_JOB_TYPES } from "@/lib/tracker/jobTypes";
+import { isBenchmarkedJob, BENCHMARKED_JOB_TYPES, JOB_LABELS, JOB_GROUPS } from "@/lib/tracker/jobTypes";
+
+describe("JOB_GROUPS completeness", () => {
+  it("every JOB_LABELS key appears in exactly one JOB_GROUPS entry", () => {
+    const allJobsInGroups = JOB_GROUPS.flatMap((g) => g.jobs);
+    expect(new Set(allJobsInGroups).size).toBe(allJobsInGroups.length);
+    expect(new Set(allJobsInGroups)).toEqual(new Set(Object.keys(JOB_LABELS)));
+  });
+});
 
 describe("isBenchmarkedJob", () => {
   it("is true for every job type actually listed as benchmarked", () => {

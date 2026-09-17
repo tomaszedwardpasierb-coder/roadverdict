@@ -135,6 +135,12 @@ export interface BikeDoc {
   // charges - which roads or zones a previous owner drove through says
   // nothing about the bike either.
   includeTollsInReport?: boolean;
+  // Same off-by-default pattern again, for valet/wash entries logged
+  // under Service (see jobTypes.ts's CLEANING_JOB_TYPES) - keeping a
+  // bike clean is good practice, but it's cosmetic, not mechanical
+  // maintenance, so it's excluded from the buyer-facing cost total by
+  // default unless the seller chooses to include it.
+  includeCleaningInReport?: boolean;
   // Set once, at creation (or backfilled once for bikes added before this
   // existed) - never editable after that through any normal flow, not
   // even "edit bike". Optional on the type only because bikes created
@@ -578,6 +584,15 @@ export async function updateBikeIncludeTollsInReport(email: string, bikeId: stri
   const { resource } = await container.item(bikeId, email).read<BikeDoc>();
   if (!resource) return null;
   resource.includeTollsInReport = includeTollsInReport;
+  await container.items.upsert(resource);
+  return resource;
+}
+
+export async function updateBikeIncludeCleaningInReport(email: string, bikeId: string, includeCleaningInReport: boolean): Promise<BikeDoc | null> {
+  const container = getContainer();
+  const { resource } = await container.item(bikeId, email).read<BikeDoc>();
+  if (!resource) return null;
+  resource.includeCleaningInReport = includeCleaningInReport;
   await container.items.upsert(resource);
   return resource;
 }

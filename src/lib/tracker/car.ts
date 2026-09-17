@@ -90,6 +90,9 @@ export interface CarDoc {
   // comment on includeFinesInReport/includeTollsInReport.
   includeFinesInReport?: boolean;
   includeTollsInReport?: boolean;
+  // Same pattern again for valet/wash entries logged under Service -
+  // see bike.ts's own comment on includeCleaningInReport.
+  includeCleaningInReport?: boolean;
   // Cached AI-generated buyer opinion for the detailed car report -
   // mirrors bike.ts's own field exactly. That report page has no login
   // and can be viewed by anyone with the link, any number of times, so
@@ -332,6 +335,15 @@ export async function updateCarIncludeTollsInReport(email: string, carId: string
   const { resource } = await container.item(carId, email).read<CarDoc>();
   if (!resource) return null;
   resource.includeTollsInReport = includeTollsInReport;
+  await container.items.upsert(resource);
+  return resource;
+}
+
+export async function updateCarIncludeCleaningInReport(email: string, carId: string, includeCleaningInReport: boolean): Promise<CarDoc | null> {
+  const container = getContainer();
+  const { resource } = await container.item(carId, email).read<CarDoc>();
+  if (!resource) return null;
+  resource.includeCleaningInReport = includeCleaningInReport;
   await container.items.upsert(resource);
   return resource;
 }

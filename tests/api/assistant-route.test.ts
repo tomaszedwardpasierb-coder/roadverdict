@@ -35,8 +35,11 @@ vi.mock("@/lib/tracker/assistantTools", () => ({
   COMPARISON_TOOL_DECLARATIONS: [{ name: "getViewedComparison" }],
   buildLogEntryToolDeclarations: (vehicleKind: "bike" | "car") =>
     vehicleKind === "car"
-      ? [{ name: "proposeLogEntry", parameters: { properties: { category: { enum: ["labour", "fine", "toll"] } } } }]
+      ? [{ name: "proposeLogEntry", parameters: { properties: { category: { enum: ["service", "bill", "mod", "fuel", "labour", "fine", "toll"] } } } }]
       : [{ name: "proposeLogEntry", parameters: { properties: { category: { enum: ["service", "bill", "mod", "fuel", "labour", "fine", "toll"] } } } }],
+  SETTINGS_TOOL_DECLARATIONS: [{ name: "proposeSettingsChange" }],
+  SHARE_LINK_TOOL_DECLARATIONS: [{ name: "proposeShareLink" }],
+  EDIT_TOOL_DECLARATIONS: [{ name: "proposeEditEntry" }],
   runAssistantTool: mocks.runAssistantTool,
 }));
 vi.mock("@/lib/tracker/assistantQuestionLog", () => ({ logAssistantQuestion: mocks.logAssistantQuestion }));
@@ -737,11 +740,11 @@ describe("POST /api/assistant - car-active knowledge base and log-entry gating",
     expect(callBody.systemInstruction.parts[0].text).toContain("KB content.");
   });
 
-  // Labour, Fine, and Toll are the categories a car-active session's
-  // draft card actually supports - the tool is now offered (Pro-gated
-  // exactly like a bike session), just with that three-category enum,
-  // not the full 7-category schema a bike session gets.
-  it("offers the log-entry tool (labour/fine/toll only) for a car-active Pro session", async () => {
+  // Every real category is now available identically for a car-active
+  // session, same 7-category schema a bike session gets (see
+  // assistantTools.ts's buildLogEntryToolDeclarations) - this mock
+  // returns the same enum for both, matching production.
+  it("offers the full log-entry tool for a car-active Pro session, with the shared system-instruction text", async () => {
     mocks.getSession.mockResolvedValue({ email: "driver@example.com" });
     mocks.resolveActiveVehicle.mockResolvedValue({ kind: "car", car: { id: "car-1" }, hasAnyBike: false });
     mocks.isPro.mockResolvedValue(true);
@@ -752,9 +755,25 @@ describe("POST /api/assistant - car-active knowledge base and log-entry gating",
     const declarations = callBody.tools[0].functionDeclarations;
     const proposeLogEntry = declarations.find((d: { name: string }) => d.name === "proposeLogEntry");
     expect(proposeLogEntry).toBeDefined();
-    expect(proposeLogEntry.parameters.properties.category.enum).toEqual(["labour", "fine", "toll"]);
-    expect(callBody.systemInstruction.parts[0].text).toContain("LOGGING VIA CHAT (Pro feature, active now - Labour, Fines, and Tolls only)");
+    expect(proposeLogEntry.parameters.properties.category.enum).toEqual(["service", "bill", "mod", "fuel", "labour", "fine", "toll"]);
+    expect(callBody.systemInstruction.parts[0].text).toContain("LOGGING VIA CHAT (Pro feature, active now)");
     expect(mocks.isPro).toHaveBeenCalled();
+  });
+
+  it("also offers the settings-change and share-link tools for a car-active Pro session", async () => {
+    mocks.getSession.mockResolvedValue({ email: "driver@example.com" });
+    mocks.resolveActiveVehicle.mockResolvedValue({ kind: "car", car: { id: "car-1" }, hasAnyBike: false });
+    mocks.isPro.mockResolvedValue(true);
+
+    await POST(request({ messages: [{ role: "user", content: "Set my mileage to 40000" }] }));
+
+    const callBody = JSON.parse(mocks.fetch.mock.calls[0][1].body);
+    const names = callBody.tools[0].functionDeclarations.map((d: { name: string }) => d.name);
+    expect(names).toContain("proposeSettingsChange");
+    expect(names).toContain("proposeShareLink");
+    expect(names).toContain("proposeEditEntry");
+    expect(callBody.systemInstruction.parts[0].text).toContain("CHANGING SETTINGS OR CREATING A SHARE LINK VIA CHAT (Pro feature, active now)");
+    expect(callBody.systemInstruction.parts[0].text).toContain("EDITING AN ALREADY-LOGGED ENTRY VIA CHAT (Pro feature, active now)");
   });
 
   it("does not offer the log-entry tool for a car-active session that isn't Pro, and shows the upsell message", async () => {
@@ -767,7 +786,10 @@ describe("POST /api/assistant - car-active knowledge base and log-entry gating",
     const callBody = JSON.parse(mocks.fetch.mock.calls[0][1].body);
     const names = (callBody.tools?.[0]?.functionDeclarations ?? []).map((d: { name: string }) => d.name);
     expect(names).not.toContain("proposeLogEntry");
-    expect(callBody.systemInstruction.parts[0].text).toContain("LOGGING VIA CHAT: adding or logging a new entry by describing it in chat is a Pro feature");
+    expect(names).not.toContain("proposeSettingsChange");
+    expect(names).not.toContain("proposeShareLink");
+    expect(names).not.toContain("proposeEditEntry");
+    expect(callBody.systemInstruction.parts[0].text).toContain("LOGGING VIA CHAT: adding or logging a new entry, editing an existing one, changing a setting, or creating a share link by describing it in chat is a Pro feature");
   });
 
   it("still offers the log-entry tool normally for a bike-active Pro session", async () => {

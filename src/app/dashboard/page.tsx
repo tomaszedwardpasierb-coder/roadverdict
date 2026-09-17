@@ -540,12 +540,19 @@ export default async function DashboardPage(props: { searchParams: Promise<{ add
       </div>
       <p className={styles.subtext}>Every oil change, every brake job - a real maintenance record, not a hazy memory of &quot;I think I did it.&quot;</p>
       <LogServiceForm initialMileage={bike.currentMileage} mileageHistory={mileagePoints} startingMileage={bike.startingMileage} dateAdded={bike.dateAdded} distanceUnit={distanceUnit} currency={currency} rates={rates} bikeYear={bike.year} isCustomBuild={bike.isCustomBuild} />
+      <ExcludeFromReportToggle
+        fieldName="includeCleaningInReport"
+        included={Boolean(bike.includeCleaningInReport)}
+        checkboxLabel="Show valeting/washing costs in my buyer report"
+        confirmMessage="Keeping your bike clean is good practice, but it's cosmetic, not mechanical care - showing it could pad your maintenance total without telling a buyer anything meaningful. Show anyway?"
+        noteText="Off by default - valeting and washing don't reflect the bike's mechanical condition, so they're excluded from your buyer report's cost total and item-by-item breakdown unless you choose to include them."
+      />
       <h2 className={styles.sectionHeading}>Service history</h2>
       {records.length === 0 ? (
         <div className={styles.card}><p className={styles.cardBody}>No service records logged yet. Log your first one above.</p></div>
       ) : (
         records.map((r) => (
-          <ServiceHistoryCard key={r.id} record={r} bikeClass={bike.bikeClass} brandValue={brandValue} region={bike.region as Region} distanceUnit={distanceUnit} currency={currency} rates={rates} pendingReviewIds={pendingReviewIds} mileageHistory={mileagePoints} currentMileage={bike.currentMileage} />
+          <ServiceHistoryCard key={r.id} record={r} bikeClass={bike.bikeClass} brandValue={brandValue} region={bike.region as Region} distanceUnit={distanceUnit} currency={currency} rates={rates} pendingReviewIds={pendingReviewIds} mileageHistory={mileagePoints} currentMileage={bike.currentMileage} includeCleaningInReport={Boolean(bike.includeCleaningInReport)} />
         ))
       )}
     </>
@@ -1404,11 +1411,18 @@ async function renderCarDashboard(
       </div>
       <p className={styles.subtext}>Every oil change, every brake job - a real maintenance record, not a hazy memory of &quot;I think I did it.&quot;</p>
       <LogCarServiceForm initialMileage={car.currentMileage} mileageHistory={mileagePoints} startingMileage={car.startingMileage} dateAdded={car.dateAdded} distanceUnit={distanceUnit} currency={currency} rates={rates} carYear={car.year} isCustomBuild={car.isCustomBuild} />
+      <CarExcludeFromReportToggle
+        fieldName="includeCleaningInReport"
+        included={Boolean(car.includeCleaningInReport)}
+        checkboxLabel="Show valeting/washing costs in my buyer report"
+        confirmMessage="Keeping your car clean is good practice, but it's cosmetic, not mechanical care - showing it could pad your maintenance total without telling a buyer anything meaningful. Show anyway?"
+        noteText="Off by default - valeting and washing don't reflect the car's mechanical condition, so they're excluded from your buyer report's cost total and item-by-item breakdown unless you choose to include them."
+      />
       <h2 className={styles.sectionHeading}>Service history</h2>
       {records.length === 0 ? (
         <div className={styles.card}><p className={styles.cardBody}>No service records logged yet. Log your first one above.</p></div>
       ) : (
-        records.map((r) => <CarServiceHistoryCard key={r.id} record={r} distanceUnit={distanceUnit} currency={currency} rates={rates} />)
+        records.map((r) => <CarServiceHistoryCard key={r.id} record={r} distanceUnit={distanceUnit} currency={currency} rates={rates} includeCleaningInReport={Boolean(car.includeCleaningInReport)} />)
       )}
     </>
   );

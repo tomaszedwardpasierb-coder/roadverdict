@@ -3,7 +3,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { VehicleSpinner } from '@/components/VehicleSpinner';
-import { JOB_GROUPS, JOB_LABELS, JOB_REMINDER_DEFAULTS, AFFILIATE_LINKS, isBenchmarkedJob } from '@/lib/tracker/jobTypes';
+import { JOB_GROUPS, JOB_LABELS, JOB_REMINDER_DEFAULTS, AFFILIATE_LINKS, isBenchmarkedJob, isCleaningJob } from '@/lib/tracker/jobTypes';
 import { getAdjustedBenchmark, type BikeClass, type Region } from '@/lib/priceData';
 import type { ServiceRecordDoc } from '@/lib/tracker/serviceRecord';
 import { useTrackerFormSubmit } from './useTrackerFormSubmit';
@@ -57,9 +57,10 @@ interface Props {
   pendingReviewIds: Record<ReviewCategory, string[]>;
   mileageHistory: HistoryPoint[];
   currentMileage: number;
+  includeCleaningInReport?: boolean;
 }
 
-export function ServiceHistoryCard({ record, bikeClass, brandValue, region, distanceUnit, currency, rates, pendingReviewIds, mileageHistory, currentMileage }: Props) {
+export function ServiceHistoryCard({ record, bikeClass, brandValue, region, distanceUnit, currency, rates, pendingReviewIds, mileageHistory, currentMileage, includeCleaningInReport = false }: Props) {
   const { switchTo, focusId, setFocusId, highlightIds } = useTabSwitch();
   const [isEditing, setIsEditing] = useState(false);
   const [isHighlighted, setIsHighlighted] = useState(false);
@@ -284,6 +285,9 @@ export function ServiceHistoryCard({ record, bikeClass, brandValue, region, dist
           </span>
         )}
       </div>
+      {isCleaningJob(record.jobType) && !includeCleaningInReport && (
+        <div className={styles.jobCardMeta}>Not shown in buyer report</div>
+      )}
       {record.currencyConversion && (
         <div className={styles.currencyConversionNote}>
           Originally {record.currencyConversion.originalAmount.toFixed(2)} {record.currencyConversion.originalCurrency},

@@ -314,4 +314,21 @@ describe("ServiceHistoryCard", () => {
 
     await waitFor(() => expect(onSwitchTab).toHaveBeenCalledWith("fuel"));
   });
+
+  it("shows a 'not shown in buyer report' tag for a valet entry when includeCleaningInReport is false", () => {
+    const record = { ...baseRecord, jobType: "valet" };
+    render(<ServiceHistoryCard {...defaultProps} record={record} includeCleaningInReport={false} />);
+    expect(screen.getByText("Not shown in buyer report")).toBeInTheDocument();
+  });
+
+  it("hides the tag once includeCleaningInReport is true", () => {
+    const record = { ...baseRecord, jobType: "wash" };
+    render(<ServiceHistoryCard {...defaultProps} record={record} includeCleaningInReport />);
+    expect(screen.queryByText("Not shown in buyer report")).not.toBeInTheDocument();
+  });
+
+  it("never shows the tag for an ordinary mechanical job type, regardless of the setting", () => {
+    render(<ServiceHistoryCard {...defaultProps} record={baseRecord} includeCleaningInReport={false} />);
+    expect(screen.queryByText("Not shown in buyer report")).not.toBeInTheDocument();
+  });
 });

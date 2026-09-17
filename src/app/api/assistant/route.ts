@@ -26,9 +26,14 @@ import {
   REPORT_TOOL_DECLARATIONS,
   COMPARISON_TOOL_DECLARATIONS,
   buildLogEntryToolDeclarations,
+  SETTINGS_TOOL_DECLARATIONS,
+  SHARE_LINK_TOOL_DECLARATIONS,
+  EDIT_TOOL_DECLARATIONS,
   runAssistantTool,
   type CompareContext,
   type ProposedEntry,
+  type ProposedSettingsChange,
+  type ProposedShareLink,
 } from "@/lib/tracker/assistantTools";
 import { logAssistantQuestion } from "@/lib/tracker/assistantQuestionLog";
 import { logGeminiUsage } from "@/lib/tracker/geminiUsageLog";
@@ -182,17 +187,19 @@ function buildSystemInstruction(config: AssistantConfigDoc, signedIn: boolean, p
     );
   }
 
-  if (logEntryAccess === "available" && activeVehicleKind === "car") {
+  if (logEntryAccess === "available") {
     parts.push(
-      "\n\n---\n\nLOGGING VIA CHAT (Pro feature, active now - Labour, Fines, and Tolls only): if the signed-in user describes a Labour/workshop-time charge, a fine/penalty, or a toll/parking charge they want to log for their car, use the proposeLogEntry tool to draft it, rather than telling them to go find the right form themselves. Only call it when they're clearly asking you to add/log something, never speculatively. This never saves anything by itself - it hands back a draft that appears on screen for them to review, edit, and confirm with their own click. Every OTHER category (service, fuel, mods, bills) is a real, current product gap for cars, not available via chat yet - if asked to log one of those, say so plainly and point them to the dashboard's own logging forms instead."
+      "\n\n---\n\nLOGGING VIA CHAT (Pro feature, active now): if the signed-in user describes something they want to log - a consumable, a small maintenance item, an insurance/road-tax/MOT/finance payment (plus ULEZ/CAZ or Congestion Charge for a car), a modification/accessory (including general things like wax, polish, or cleaning products), a fuel fill-up or EV charging session, labour/workshop time, a fine/penalty, or a toll/parking charge - use the proposeLogEntry tool to draft it, rather than telling them to go find the right form themselves. Only call it when they're clearly asking you to add/log something, never speculatively. This never saves anything by itself - it hands back a draft that appears on screen for them to review, edit, and confirm with their own click. Don't worry about picking the exact right sub-category yourself (e.g. the precise accessory type) - a reasonable guess is fine, since the draft card lets them correct it before confirming. Available identically for both bike and car accounts."
     );
-  } else if (logEntryAccess === "available") {
     parts.push(
-      "\n\n---\n\nLOGGING VIA CHAT (Pro feature, active now): if the signed-in user describes something they want to log - a consumable, a small maintenance item, an insurance/road-tax/MOT/finance payment, a modification/accessory (including general things like wax, polish, or cleaning products), a fuel fill-up, labour/workshop time, a fine/penalty, or a toll/parking charge - use the proposeLogEntry tool to draft it, rather than telling them to go find the right form themselves. Only call it when they're clearly asking you to add/log something, never speculatively. This never saves anything by itself - it hands back a draft that appears on screen for them to review, edit, and confirm with their own click. Don't worry about picking the exact right sub-category yourself (e.g. the precise accessory type) - a reasonable guess is fine, since the draft card lets them correct it before confirming."
+      "\n\n---\n\nCHANGING SETTINGS OR CREATING A SHARE LINK VIA CHAT (Pro feature, active now): if they ask to change an account/vehicle setting - current mileage, region, annual budget, currency, distance/fuel-economy units, or which categories (insurance, finance, fines, tolls, valeting/washing) show in their buyer report - use the proposeSettingsChange tool, including only the fields they actually asked to change. If they ask for a shareable report link to send a buyer, use the proposeShareLink tool - always ask who it's for (their email) first, unless already given, and never invent one. Both tools only ever prepare a draft for the user to review and confirm themselves on screen; neither changes or creates anything by itself."
+    );
+    parts.push(
+      "\n\n---\n\nEDITING AN ALREADY-LOGGED ENTRY VIA CHAT (Pro feature, active now): if they ask to change something already logged - a wrong cost, date, category, or anything else about an existing service/bill/mod/fuel/labour/fine/toll entry - use the proposeEditEntry tool. It REQUIRES a real entryId, which only ever comes from actually looking the entry up first (getEntries for a date/range, or getLastLoggedJob for something like 'my last oil change') - never invent or guess one, and never call proposeEditEntry before you've resolved which specific entry they mean. If more than one entry could match, ask which one rather than guessing. Only include the fields that are actually changing - everything else keeps its current logged value. This can only edit an entry that already exists, and can NEVER delete one - if asked to delete something, say plainly that deleting isn't available via chat yet and point them to the dashboard instead."
     );
   } else if (logEntryAccess === "upsell") {
     parts.push(
-      "\n\n---\n\nLOGGING VIA CHAT: adding or logging a new entry by describing it in chat is a Pro feature, not available on this account. If asked to add/log something, say so plainly, and mention they can still add it themselves from the dashboard in a few seconds, or upgrade to Pro to have the assistant do it for them next time. Never attempt to draft or describe an entry as if it were being logged when this isn't available."
+      "\n\n---\n\nLOGGING VIA CHAT: adding or logging a new entry, editing an existing one, changing a setting, or creating a share link by describing it in chat is a Pro feature, not available on this account. If asked to do any of those, say so plainly, and mention they can still do it themselves from the dashboard in a few seconds, or upgrade to Pro to have the assistant do it for them next time. Never attempt to draft or describe any of this as if it were actually happening when it isn't available."
     );
   }
 
@@ -494,6 +501,12 @@ export async function POST(req: NextRequest) {
     ...(reportToken ? REPORT_TOOL_DECLARATIONS : []),
     ...(compareContext ? COMPARISON_TOOL_DECLARATIONS : []),
     ...(logEntryAccess === "available" ? buildLogEntryToolDeclarations(activeVehicleKind === "car" ? "car" : "bike") : []),
+    // Same Premium-only gate as log-entry drafting above - settings
+    // changes and share-link creation are the same class of capability
+    // (the assistant changing something on the account), not a lookup.
+    ...(logEntryAccess === "available" ? SETTINGS_TOOL_DECLARATIONS : []),
+    ...(logEntryAccess === "available" ? SHARE_LINK_TOOL_DECLARATIONS : []),
+    ...(logEntryAccess === "available" ? EDIT_TOOL_DECLARATIONS : []),
   ];
   const tools = toolDeclarations.length > 0 ? [{ functionDeclarations: toolDeclarations }] : undefined;
 
@@ -503,6 +516,8 @@ export async function POST(req: NextRequest) {
   // "the last thing it proposed is what's on screen" rather than
   // stacking multiple cards from one exchange.
   let proposedEntry: ProposedEntry | null = null;
+  let proposedSettingsChange: ProposedSettingsChange | null = null;
+  let proposedShareLink: ProposedShareLink | null = null;
 
   try {
     // Bounded rather than while(true) - a tool-call loop that somehow
@@ -540,8 +555,14 @@ export async function POST(req: NextRequest) {
         // from above, for the same reason.
         const toolResult = await runAssistantTool(name, args ?? {}, session?.email ?? "", reportToken ?? undefined, compareContext ?? undefined);
 
-        if (name === "proposeLogEntry" && toolResult && typeof toolResult === "object" && !("error" in toolResult)) {
+        if ((name === "proposeLogEntry" || name === "proposeEditEntry") && toolResult && typeof toolResult === "object" && !("error" in toolResult)) {
           proposedEntry = toolResult as ProposedEntry;
+        }
+        if (name === "proposeSettingsChange" && toolResult && typeof toolResult === "object" && !("error" in toolResult)) {
+          proposedSettingsChange = toolResult as ProposedSettingsChange;
+        }
+        if (name === "proposeShareLink" && toolResult && typeof toolResult === "object" && !("error" in toolResult)) {
+          proposedShareLink = toolResult as ProposedShareLink;
         }
 
         // Echo back every part from the model's actual turn, verbatim -
@@ -560,7 +581,12 @@ export async function POST(req: NextRequest) {
         return respond(anonIdToSetCookie, { error: "Assistant is temporarily unavailable." }, { status: 502 });
       }
       await logAssistantQuestion(question, signedIn, false, session?.email);
-      return respond(anonIdToSetCookie, { reply: replyText, ...(proposedEntry ? { proposedEntry } : {}) });
+      return respond(anonIdToSetCookie, {
+        reply: replyText,
+        ...(proposedEntry ? { proposedEntry } : {}),
+        ...(proposedSettingsChange ? { proposedSettingsChange } : {}),
+        ...(proposedShareLink ? { proposedShareLink } : {}),
+      });
     }
 
     await logAssistantQuestion(question, signedIn, true, session?.email);

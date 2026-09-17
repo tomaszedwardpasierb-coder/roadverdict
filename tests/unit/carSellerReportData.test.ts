@@ -215,6 +215,28 @@ describe("computeCarSellerReportRowsAndMetrics", () => {
       expect(result.rows.find((r) => r.id === "t-1")).toMatchObject({ category: "Toll", description: "Dartford Crossing (Dart Charge)" });
     });
   });
+
+  describe("hiding valet/wash entries from the buyer-facing rows and total", () => {
+    const valet = makeRecord({ id: "sr-valet", jobType: "valet", cost: 40, date: "2025-05-01", createdAt: "2025-05-02T00:00:00.000Z" });
+    const wash = makeRecord({ id: "sr-wash", jobType: "wash", cost: 8, date: "2025-05-05", createdAt: "2025-05-06T00:00:00.000Z" });
+
+    it("excludes valet/wash entries from rows and total by default", () => {
+      const result = computeCarSellerReportRowsAndMetrics(makeCar(), [valet, wash], [], [], [], []);
+      expect(result.rows).toEqual([]);
+      expect(result.total).toBe(0);
+    });
+
+    it("shows valet/wash entries once includeCleaningInReport is true", () => {
+      const result = computeCarSellerReportRowsAndMetrics(makeCar({ includeCleaningInReport: true }), [valet, wash], [], [], [], []);
+      expect(result.rows.map((r) => r.id).sort()).toEqual(["sr-valet", "sr-wash"]);
+      expect(result.total).toBe(48);
+    });
+
+    it("never hides an ordinary mechanical service job type like an oil-filter", () => {
+      const result = computeCarSellerReportRowsAndMetrics(makeCar(), [makeRecord()], [], [], [], []);
+      expect(result.rows).toHaveLength(1);
+    });
+  });
 });
 
 describe("getCarSellerReportCore", () => {
@@ -249,6 +271,18 @@ describe("getCarSellerReportCore", () => {
     expect(Array.isArray(core.buyerQuestions)).toBe(true);
     expect(Array.isArray(core.storyParagraphs)).toBe(true);
     expect(core.mileageCheck).toEqual({ implausible: false });
+  });
+
+  it("excludes valet/wash entries from the item-by-item jobTypeGroups breakdown by default, but includes them once includeCleaningInReport is true", async () => {
+    mocks.getCarServiceRecords.mockResolvedValue([makeRecord(), makeRecord({ id: "sr-valet", jobType: "valet", cost: 40 })]);
+
+    mocks.getCarById.mockResolvedValue(makeCar());
+    const hiddenCore = await getCarSellerReportCore("owner@example.com", "car-1");
+    expect(hiddenCore.jobTypeGroups.map((g) => g.jobType).sort()).toEqual(["oil-filter"]);
+
+    mocks.getCarById.mockResolvedValue(makeCar({ includeCleaningInReport: true }));
+    const shownCore = await getCarSellerReportCore("owner@example.com", "car-1");
+    expect(shownCore.jobTypeGroups.map((g) => g.jobType).sort()).toEqual(["oil-filter", "valet"]);
   });
 
   it("materialises due instalments before reading the car's bills, same as the bike version", async () => {

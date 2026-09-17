@@ -6,6 +6,8 @@ import { usePathname, useSearchParams } from 'next/navigation';
 import { Mic } from 'lucide-react';
 import { useActiveSection } from './ActiveSectionContext';
 import { AssistantProposedEntryCard, type ProposedEntry } from './AssistantProposedEntryCard';
+import { AssistantProposedSettingsCard, type ProposedSettingsChange } from './AssistantProposedSettingsCard';
+import { AssistantProposedShareLinkCard, type ProposedShareLink } from './AssistantProposedShareLinkCard';
 import { VehicleSpinner } from './VehicleSpinner';
 import styles from './AssistantWidget.module.css';
 
@@ -54,6 +56,8 @@ interface Message {
   role: 'user' | 'assistant';
   content: string;
   proposedEntry?: ProposedEntry;
+  proposedSettingsChange?: ProposedSettingsChange;
+  proposedShareLink?: ProposedShareLink;
 }
 
 const GREETING: Message = {
@@ -104,7 +108,9 @@ interface CompareContext {
   to: string | null;
 }
 
-type SendResult = { ok: true; reply: string; proposedEntry?: ProposedEntry } | { ok: false; error: string; retryable: boolean };
+type SendResult =
+  | { ok: true; reply: string; proposedEntry?: ProposedEntry; proposedSettingsChange?: ProposedSettingsChange; proposedShareLink?: ProposedShareLink }
+  | { ok: false; error: string; retryable: boolean };
 
 async function attemptSend(
   payload: Message[],
@@ -143,7 +149,13 @@ async function attemptSend(
     status = res.status;
     const data = await res.json().catch(() => null);
     if (res.ok && data?.reply) {
-      return { ok: true, reply: data.reply, ...(data.proposedEntry ? { proposedEntry: data.proposedEntry } : {}) };
+      return {
+        ok: true,
+        reply: data.reply,
+        ...(data.proposedEntry ? { proposedEntry: data.proposedEntry } : {}),
+        ...(data.proposedSettingsChange ? { proposedSettingsChange: data.proposedSettingsChange } : {}),
+        ...(data.proposedShareLink ? { proposedShareLink: data.proposedShareLink } : {}),
+      };
     }
     return {
       ok: false,
@@ -277,7 +289,16 @@ function AssistantWidgetInner() {
 
     setSending(false);
     if (result.ok) {
-      setMessages((prev) => [...prev, { role: 'assistant', content: result.reply, ...(result.proposedEntry ? { proposedEntry: result.proposedEntry } : {}) }]);
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: 'assistant',
+          content: result.reply,
+          ...(result.proposedEntry ? { proposedEntry: result.proposedEntry } : {}),
+          ...(result.proposedSettingsChange ? { proposedSettingsChange: result.proposedSettingsChange } : {}),
+          ...(result.proposedShareLink ? { proposedShareLink: result.proposedShareLink } : {}),
+        },
+      ]);
     } else {
       setError(result.retryable ? `${result.error} Try again.` : result.error);
       if (result.retryable) setLastFailedMessages(payload);
@@ -322,6 +343,8 @@ function AssistantWidgetInner() {
               <div key={i} style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', alignItems: m.role === 'user' ? 'flex-end' : 'flex-start' }}>
                 <div className={m.role === 'user' ? styles.bubbleUser : styles.bubbleAssistant}>{m.content}</div>
                 {m.proposedEntry && <AssistantProposedEntryCard entry={m.proposedEntry} />}
+                {m.proposedSettingsChange && <AssistantProposedSettingsCard change={m.proposedSettingsChange} />}
+                {m.proposedShareLink && <AssistantProposedShareLinkCard link={m.proposedShareLink} />}
               </div>
             ))}
             {sending && (

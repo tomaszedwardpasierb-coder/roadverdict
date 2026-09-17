@@ -374,7 +374,7 @@ describe("AssistantWidget", () => {
           reply: "Here's a draft for that.",
           proposedEntry: {
             category: "service", jobType: "oil-filter", jobLabel: "Oil & filter change",
-            description: "Valve cleaner", cost: 4, date: "2026-01-01", mileage: 15000,
+            description: "Valve cleaner", cost: 4, date: "2026-01-01", mileage: 15000, vehicleKind: "bike",
           },
         }),
       })
@@ -393,7 +393,10 @@ describe("AssistantWidget", () => {
     await screen.findByText(/Logged/);
     expect(fetchMock).toHaveBeenLastCalledWith("/api/tracker/services", expect.objectContaining({ method: "POST" }));
     const body = JSON.parse(fetchMock.mock.calls[1][1].body);
-    expect(body).toEqual({ jobType: "oil-filter", cost: 4.5, mileage: 15000, date: "2026-01-01", notes: "Valve cleaner", mileageAcknowledged: false });
+    expect(body).toEqual({
+      jobType: "oil-filter", cost: 4.5, mileage: 15000, date: "2026-01-01", notes: "Valve cleaner", mileageAcknowledged: false,
+      reminder: { intervalType: "mileage", intervalValue: 4000 },
+    });
     expect(mockRouterRefresh).toHaveBeenCalled();
   });
 

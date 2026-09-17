@@ -21,13 +21,13 @@
 // car-aware too (both features shipped for cars after this file's
 // original bike-only branches were written - CarDoc does have its own
 // storyCache, and carShareLink.ts/carReceiptRequest.ts are full mirrors).
-// proposeLogEntry is bike-only for service/bill/mod/fuel (the on-screen
-// draft card, AssistantProposedEntryCard.tsx, is deeply bike-shaped for
-// those four - grouped job/mod catalogs, a hardcoded /api/tracker/*
-// endpoint, no litres-vs-kWh branching), but IS available for a
-// car-active session's Labour, Fine, and Toll categories specifically,
-// since those three were all built vehicle-kind-aware from the start -
-// see the labourCategory/fineType/tollType/vehicleKind handling below.
+// proposeLogEntry is bike-only for bill/mod/fuel (the on-screen draft
+// card, AssistantProposedEntryCard.tsx, is deeply bike-shaped for those
+// three - grouped mod catalog, a hardcoded /api/tracker/* endpoint, no
+// litres-vs-kWh branching), but IS available for a car-active session's
+// Service, Labour, Fine, and Toll categories specifically, since those
+// four were all built vehicle-kind-aware from the start - see the
+// jobType/labourCategory/fineType/tollType/vehicleKind handling below.
 // Fines and Tolls carry no mileage at all, unlike every other category -
 // the simplest shape here, closer to Bill than to Labour.
 
@@ -71,16 +71,25 @@ import { FINE_LABELS } from "./fineTypes";
 import { CAR_FINE_LABELS } from "./carFineTypes";
 import { TOLL_LABELS } from "./tollTypes";
 import { CAR_TOLL_LABELS } from "./carTollTypes";
+import { getFines } from "./fine";
+import { getCarFines } from "./carFine";
+import { getTolls } from "./toll";
+import { getCarTolls } from "./carToll";
 import { estimateMileage } from "./mileageEstimate";
+import type { Region } from "@/lib/priceData";
+import { REGION_LABELS } from "@/lib/priceData";
+import type { Currency } from "./currency";
+import type { DistanceUnit, FuelEconomyUnit } from "./unitFormat";
+import type { ShareLinkDuration } from "./shareLink";
 
-type CostItem = { date: string; cost: number };
+type CostItem = { id: string; date: string; cost: number };
 // Minimal structural shapes both a bike doc type and its car sister
 // satisfy - genuinely identical on every field these tools touch, only
 // their nominal `type` literal differs (see carSummary.ts's own comment
 // for the same reasoning applied to aggregation instead of lookup).
-interface ServiceLike { date: string; jobType: string; notes: string; cost: number; mileage: number; }
-interface ModLike { date: string; category: string; name: string; notes: string; cost: number; mileage: number; }
-interface BillLike { date: string; billType: string; notes: string; cost: number; }
+interface ServiceLike { id: string; date: string; jobType: string; notes: string; cost: number; mileage: number; }
+interface ModLike { id: string; date: string; category: string; name: string; notes: string; cost: number; mileage: number; }
+interface BillLike { id: string; date: string; billType: string; notes: string; cost: number; }
 
 function inRange(dateStr: string, start?: string, end?: string): boolean {
   const t = new Date(dateStr).getTime();
@@ -154,6 +163,12 @@ export interface GetEntriesArgs {
 }
 
 interface HistoryEntry {
+  // The underlying record's own id - lets a later chat message ("edit
+  // that to £50 instead") reference this exact entry via
+  // proposeEditEntry, without the model ever having to invent one:
+  // it can only ever be a value that came from a real, email-scoped
+  // lookup like this one or findLastLoggedJob below.
+  id: string;
   date: string;
   category: "service" | "fuel" | "mod" | "bill";
   description: string;
@@ -193,28 +208,28 @@ function computeEntries(
   if (!args.category || args.category === "servicing") {
     for (const r of records) {
       if (inRange(r.date, start, end)) {
-        entries.push({ date: r.date, category: "service", description: describeWithNotes(labels.job[r.jobType] ?? r.jobType, r.notes), cost: r.cost });
+        entries.push({ id: r.id, date: r.date, category: "service", description: describeWithNotes(labels.job[r.jobType] ?? r.jobType, r.notes), cost: r.cost });
       }
     }
   }
   if (!args.category || args.category === "fuel") {
     for (const f of fuelLogs) {
       if (inRange(f.date, start, end)) {
-        entries.push({ date: f.date, category: "fuel", description: describeFuel(f), cost: f.cost });
+        entries.push({ id: f.id, date: f.date, category: "fuel", description: describeFuel(f), cost: f.cost });
       }
     }
   }
   if (!args.category || args.category === "mods") {
     for (const m of mods) {
       if (inRange(m.date, start, end)) {
-        entries.push({ date: m.date, category: "mod", description: describeWithNotes(`${labels.mod[m.category] ?? m.category} - ${m.name}`, m.notes), cost: m.cost });
+        entries.push({ id: m.id, date: m.date, category: "mod", description: describeWithNotes(`${labels.mod[m.category] ?? m.category} - ${m.name}`, m.notes), cost: m.cost });
       }
     }
   }
   if (!args.category || args.category === "bills") {
     for (const b of bills) {
       if (inRange(b.date, start, end)) {
-        entries.push({ date: b.date, category: "bill", description: describeWithNotes(labels.bill[b.billType] ?? b.billType, b.notes), cost: b.cost });
+        entries.push({ id: b.id, date: b.date, category: "bill", description: describeWithNotes(labels.bill[b.billType] ?? b.billType, b.notes), cost: b.cost });
       }
     }
   }
@@ -452,7 +467,7 @@ function findLastLoggedJob(records: ServiceLike[], jobQuery: string, jobLabels: 
 
   matches.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   const latest = matches[0];
-  return { found: true, date: latest.date, mileage: latest.mileage, cost: latest.cost, jobType: jobLabels[latest.jobType] ?? latest.jobType };
+  return { found: true, id: latest.id, date: latest.date, mileage: latest.mileage, cost: latest.cost, jobType: jobLabels[latest.jobType] ?? latest.jobType };
 }
 
 // Takes the raw, unchecked args - jobQuery is declared "required" in the
@@ -846,6 +861,7 @@ export interface ProposeLogEntryArgs {
   billType?: string;
   modCategory?: string;
   litres?: number;
+  kwh?: number;
   filledToFull?: boolean;
   labourCategory?: string;
   fineType?: string;
@@ -853,19 +869,25 @@ export interface ProposeLogEntryArgs {
 }
 
 export type ProposedEntry =
-  | { category: "service"; jobType: string; jobLabel: string; description: string; cost: number; date: string; mileage: number; mileageNote?: string }
-  | { category: "bill"; billType: string; billLabel: string; description: string; cost: number; date: string }
-  | { category: "mod"; modCategory: string; modLabel: string; description: string; cost: number; date: string; mileage: number; mileageNote?: string }
-  | { category: "fuel"; litres: number; cost: number; date: string; mileage: number; mileageNote?: string; filledToFull: boolean }
-  // These three are the categories that can come from a car-active
-  // session (see the top-of-file comment) - vehicleKind is carried on
-  // the entry itself, not inferred later, so the draft card and its
-  // confirm handler know which catalog and which /api/tracker vs
-  // /api/cars endpoint to use without re-resolving the account's active
-  // vehicle a second time.
-  | { category: "labour"; labourCategory: string; labourLabel: string; description: string; cost: number; date: string; mileage: number; mileageNote?: string; vehicleKind: "bike" | "car" }
-  | { category: "fine"; fineType: string; fineLabel: string; description: string; cost: number; date: string; vehicleKind: "bike" | "car" }
-  | { category: "toll"; tollType: string; tollLabel: string; description: string; cost: number; date: string; vehicleKind: "bike" | "car" };
+  // Every category can now come from either vehicle kind (see the
+  // top-of-file comment) - vehicleKind is carried on the entry itself,
+  // not inferred later, so the draft card and its confirm handler know
+  // which catalog and which /api/tracker vs /api/cars endpoint to use
+  // without re-resolving the account's active vehicle a second time.
+  // entryId is only ever set by proposeEditEntry (never by
+  // proposeLogEntry) - its presence, not a separate flag, is what tells
+  // the draft card this is an edit of something real (PATCH to
+  // <endpoint>/<entryId>) rather than a brand-new entry (POST).
+  | { category: "service"; jobType: string; jobLabel: string; description: string; cost: number; date: string; mileage: number; mileageNote?: string; vehicleKind: "bike" | "car"; entryId?: string }
+  | { category: "bill"; billType: string; billLabel: string; description: string; cost: number; date: string; vehicleKind: "bike" | "car"; entryId?: string }
+  | { category: "mod"; modCategory: string; modLabel: string; description: string; cost: number; date: string; mileage: number; mileageNote?: string; vehicleKind: "bike" | "car"; entryId?: string }
+  // litres for anything with an engine, kwh for an EV charging session -
+  // never both, mirroring CarFuelLogDoc's own shape. Bike always uses
+  // litres (kwh is always undefined there).
+  | { category: "fuel"; litres?: number; kwh?: number; cost: number; date: string; mileage: number; mileageNote?: string; filledToFull: boolean; vehicleKind: "bike" | "car"; entryId?: string }
+  | { category: "labour"; labourCategory: string; labourLabel: string; description: string; cost: number; date: string; mileage: number; mileageNote?: string; vehicleKind: "bike" | "car"; entryId?: string }
+  | { category: "fine"; fineType: string; fineLabel: string; description: string; cost: number; date: string; vehicleKind: "bike" | "car"; entryId?: string }
+  | { category: "toll"; tollType: string; tollLabel: string; description: string; cost: number; date: string; vehicleKind: "bike" | "car"; entryId?: string };
 
 // Same date-based estimate the manual dashboard forms show via
 // useEstimatedMileage.ts (same estimateMileage() maths, just run
@@ -902,16 +924,16 @@ function estimateDraftMileage(
   };
 }
 
-function resolveModCategory(input: string | undefined): string {
+function resolveModCategory(input: string | undefined, labels: Record<string, string>): string {
   const fallback = "other-accessory";
   if (typeof input !== "string" || !input.trim()) return fallback;
   const q = input.trim().toLowerCase();
-  if (q in MOD_LABELS) return q;
+  if (q in labels) return q;
 
-  const exact = Object.entries(MOD_LABELS).find(([, label]) => label.toLowerCase() === q);
+  const exact = Object.entries(labels).find(([, label]) => label.toLowerCase() === q);
   if (exact) return exact[0];
 
-  const substring = Object.entries(MOD_LABELS).find(([, label]) => {
+  const substring = Object.entries(labels).find(([, label]) => {
     const l = label.toLowerCase();
     return l.includes(q) || q.includes(l);
   });
@@ -963,12 +985,16 @@ export async function toolProposeLogEntry(email: string, args: ProposeLogEntryAr
   if (!vehicle) return { error: "No vehicle found on this account." };
 
   if (vehicle.kind === "car") {
-    // Labour, Fine, and Toll are the categories the car-active draft
-    // card actually supports (see the top-of-file comment) - everything
-    // else still gets the honest "not available" reply, now naming the
-    // category it was asked for rather than a blanket refusal.
-    if (args.category !== "labour" && args.category !== "fine" && args.category !== "toll") {
-      return { error: "Drafting a new entry from chat is only available for Labour, Fines, and Tolls on a car-active account right now - log other categories directly from the dashboard instead." };
+    if (
+      args.category !== "service" &&
+      args.category !== "bill" &&
+      args.category !== "mod" &&
+      args.category !== "fuel" &&
+      args.category !== "labour" &&
+      args.category !== "fine" &&
+      args.category !== "toll"
+    ) {
+      return { error: "Not sure what category that is - a service item, a bill (insurance/road tax/MOT/finance/ULEZ or CAZ/congestion charge), a modification/accessory, a fuel or charging session, labour/workshop time, a fine, or a toll/parking charge?" };
     }
     const car = vehicle.car;
     if (typeof args.cost !== "number" || !Number.isFinite(args.cost) || args.cost <= 0) {
@@ -977,13 +1003,45 @@ export async function toolProposeLogEntry(email: string, args: ProposeLogEntryAr
     const resolvedCarDate = resolveRequiredDraftDate(args);
     if ("error" in resolvedCarDate) return resolvedCarDate;
     const { date } = resolvedCarDate;
+
+    // Fuel needs no description (same as the bike branch below) - just
+    // litres or kwh, whichever this car's own fuelType actually uses.
+    if (args.category === "fuel") {
+      const isElectric = car.fuelType === "electric";
+      const amount = isElectric ? args.kwh : args.litres;
+      if (typeof amount !== "number" || !Number.isFinite(amount) || amount <= 0) {
+        return { error: isElectric ? "Needs a valid, positive number of kWh." : "Needs a valid, positive number of litres." };
+      }
+      const [records, mods, fuelLogs, bills, labour] = await Promise.all([
+        getCarServiceRecords(email, car.id),
+        getCarMods(email, car.id),
+        getCarFuelLogs(email, car.id),
+        getCarBills(email, car.id),
+        getCarLabour(email, car.id),
+      ]);
+      const points = gatherCarMileagePoints(records, mods, fuelLogs, bills, labour);
+      const { mileage, mileageNote } = estimateDraftMileage(date, points, car);
+      const entry: ProposedEntry = {
+        category: "fuel",
+        litres: isElectric ? undefined : amount,
+        kwh: isElectric ? amount : undefined,
+        cost: args.cost,
+        date,
+        mileage,
+        mileageNote,
+        filledToFull: !isElectric && args.filledToFull === true,
+        vehicleKind: "car",
+      };
+      return entry;
+    }
+
     if (typeof args.description !== "string" || !args.description.trim()) {
       return { error: "Needs a short description of what this is." };
     }
     const description = args.description.trim();
 
-    // Fines and Tolls carry no mileage at all (unlike Labour) - a plain
-    // draft with no mileage-history fetch needed.
+    // Fines and Tolls carry no mileage at all (unlike Service/Mod/Labour) -
+    // a plain draft with no mileage-history fetch needed.
     if (args.category === "fine") {
       const fineType = resolveCatalogKey(args.fineType, CAR_FINE_LABELS);
       const entry: ProposedEntry = { category: "fine", fineType, fineLabel: CAR_FINE_LABELS[fineType], description, cost: args.cost, date, vehicleKind: "car" };
@@ -994,8 +1052,15 @@ export async function toolProposeLogEntry(email: string, args: ProposeLogEntryAr
       const entry: ProposedEntry = { category: "toll", tollType, tollLabel: CAR_TOLL_LABELS[tollType], description, cost: args.cost, date, vehicleKind: "car" };
       return entry;
     }
+    if (args.category === "bill") {
+      const carBillType = typeof args.billType === "string" ? args.billType : undefined;
+      if (!carBillType || !(carBillType in CAR_BILL_LABELS)) {
+        return { error: "Which of these is this for: insurance, road tax, MOT test, finance, ULEZ/CAZ, or Congestion Charge?" };
+      }
+      const entry: ProposedEntry = { category: "bill", billType: carBillType, billLabel: CAR_BILL_LABELS[carBillType], description, cost: args.cost, date, vehicleKind: "car" };
+      return entry;
+    }
 
-    const carLabourCategory = resolveCatalogKey(args.labourCategory, CAR_LABOUR_LABELS);
     const [records, mods, fuelLogs, bills, labour] = await Promise.all([
       getCarServiceRecords(email, car.id),
       getCarMods(email, car.id),
@@ -1005,6 +1070,19 @@ export async function toolProposeLogEntry(email: string, args: ProposeLogEntryAr
     ]);
     const points = gatherCarMileagePoints(records, mods, fuelLogs, bills, labour);
     const { mileage, mileageNote } = estimateDraftMileage(date, points, car);
+
+    if (args.category === "service") {
+      const jobType = typeof args.jobType === "string" && args.jobType in CAR_JOB_LABELS ? args.jobType : "other";
+      const entry: ProposedEntry = { category: "service", jobType, jobLabel: CAR_JOB_LABELS[jobType], description, cost: args.cost, date, mileage, mileageNote, vehicleKind: "car" };
+      return entry;
+    }
+    if (args.category === "mod") {
+      const modCategory = resolveModCategory(args.modCategory, CAR_MOD_LABELS);
+      const entry: ProposedEntry = { category: "mod", modCategory, modLabel: CAR_MOD_LABELS[modCategory], description, cost: args.cost, date, mileage, mileageNote, vehicleKind: "car" };
+      return entry;
+    }
+
+    const carLabourCategory = resolveCatalogKey(args.labourCategory, CAR_LABOUR_LABELS);
     const entry: ProposedEntry = {
       category: "labour",
       labourCategory: carLabourCategory,
@@ -1052,7 +1130,7 @@ export async function toolProposeLogEntry(email: string, args: ProposeLogEntryAr
     ]);
     const points = gatherMileagePoints(records, mods, fuelLogs, bills, labour);
     const { mileage, mileageNote } = estimateDraftMileage(date, points, bike);
-    const entry: ProposedEntry = { category: "fuel", litres: args.litres, cost: args.cost, date, mileage, mileageNote, filledToFull: args.filledToFull === true };
+    const entry: ProposedEntry = { category: "fuel", litres: args.litres, cost: args.cost, date, mileage, mileageNote, filledToFull: args.filledToFull === true, vehicleKind: "bike" };
     return entry;
   }
 
@@ -1088,12 +1166,12 @@ export async function toolProposeLogEntry(email: string, args: ProposeLogEntryAr
 
     if (args.category === "service") {
       const jobType = typeof args.jobType === "string" && args.jobType in JOB_LABELS ? args.jobType : "other";
-      const entry: ProposedEntry = { category: "service", jobType, jobLabel: JOB_LABELS[jobType], description, cost: args.cost, date, mileage, mileageNote };
+      const entry: ProposedEntry = { category: "service", jobType, jobLabel: JOB_LABELS[jobType], description, cost: args.cost, date, mileage, mileageNote, vehicleKind: "bike" };
       return entry;
     }
     if (args.category === "mod") {
-      const modCategory = resolveModCategory(args.modCategory);
-      const entry: ProposedEntry = { category: "mod", modCategory, modLabel: MOD_LABELS[modCategory], description, cost: args.cost, date, mileage, mileageNote };
+      const modCategory = resolveModCategory(args.modCategory, MOD_LABELS);
+      const entry: ProposedEntry = { category: "mod", modCategory, modLabel: MOD_LABELS[modCategory], description, cost: args.cost, date, mileage, mileageNote, vehicleKind: "bike" };
       return entry;
     }
     const labourCategory = resolveCatalogKey(args.labourCategory, LABOUR_LABELS);
@@ -1105,39 +1183,56 @@ export async function toolProposeLogEntry(email: string, args: ProposeLogEntryAr
   if (!billType || !(billType in BILL_LABELS)) {
     return { error: "Which of these is this for: insurance, road tax, MOT test, or finance?" };
   }
-  const entry: ProposedEntry = { category: "bill", billType, billLabel: BILL_LABELS[billType], description, cost: args.cost, date };
+  const entry: ProposedEntry = { category: "bill", billType, billLabel: BILL_LABELS[billType], description, cost: args.cost, date, vehicleKind: "bike" };
   return entry;
 }
 
 // Vehicle-kind-dependent, unlike every other declaration array in this
-// file: a car-active session's draft card only supports Labour, Fine,
-// and Toll (see toolProposeLogEntry above), so its schema offers just
-// those three categories and the car's own labour/fine/toll catalogs -
-// never the bike-only categories or LABOUR_LABELS' own keys, which would
-// let the model draft something the car-active card can't actually post
-// anywhere correct.
+// file: a car-active session's draft card only supports Service,
+// Labour, Fine, and Toll (see toolProposeLogEntry above), so its schema
+// offers just those four categories and the car's own job/labour/fine/
+// toll catalogs - never the bike-only categories or LABOUR_LABELS' own
+// keys, which would let the model draft something the car-active card
+// can't actually post anywhere correct.
 export function buildLogEntryToolDeclarations(vehicleKind: "bike" | "car") {
   if (vehicleKind === "car") {
     return [
       {
         name: "proposeLogEntry",
         description:
-          "Draft a new Labour entry (workshop time, diagnostic hours), Fine, or Toll/parking charge for the signed-in user's car, from their description of what they want to log. This only prepares a draft for the user to review, edit, and confirm themselves on screen - it NEVER saves anything by itself. Doesn't need an exact category match - your best guess is fine, the user can correct it on the draft card. Only Labour, Fines, and Tolls are available for a car-active account right now - every other category still needs to be logged directly from the dashboard. IMPORTANT: always ask the user what date this happened before calling this tool, unless they've already said (including just 'today') - never assume today's date yourself. For Labour, this tool works out a suggested mileage for that day automatically; Fines and Tolls need no mileage at all.",
+          "Draft a new service record, insurance/road-tax/MOT/finance/ULEZ-CAZ/congestion-charge bill, modification/accessory, fuel or charging session, labour/workshop-time entry, fine, or toll/parking charge for the signed-in user's car, from their description of what they want to log. This only prepares a draft for the user to review, edit, and confirm themselves on screen - it NEVER saves anything by itself, and never changes or deletes an existing entry. Doesn't need an exact category match - your best guess is fine, the user can correct it on the draft card. IMPORTANT: always ask the user what date this happened before calling this tool, unless they've already said (including just 'today') - never assume today's date yourself. Once you have the date, this tool works out a suggested mileage for that day automatically (for every category except 'bill', 'fine', and 'toll', which need no mileage at all); you don't need to ask the user for it.",
         parameters: {
           type: "OBJECT",
           properties: {
             category: {
               type: "STRING",
-              enum: ["labour", "fine", "toll"],
-              description: "'labour' for workshop time/diagnostic hours, 'fine' for a driving offence or penalty charge, 'toll' for a road/bridge/tunnel charge or parking.",
+              enum: ["service", "bill", "mod", "fuel", "labour", "fine", "toll"],
+              description: "'service' for maintenance/consumables/small parts (including a valet, detailing, or wash), 'bill' for insurance/road-tax/MOT/finance/ULEZ or CAZ/Congestion Charge, 'mod' for a modification or accessory (including general detailing products like wax/polish), 'fuel' for a fuel fill-up or EV charging session, 'labour' for workshop time/labour charges billed separately from parts, 'fine' for a driving offence or penalty charge, 'toll' for a road/bridge/tunnel charge or parking.",
             },
-            description: { type: "STRING", description: "A short, plain label for what this is, e.g. 'Cambelt replacement', 'Speeding fine on the M25', or 'Parking near the hospital'." },
+            description: { type: "STRING", description: "Not used for 'fuel'. A short, plain label for what this is, e.g. 'Cambelt replacement', 'Annual insurance renewal', 'Speeding fine on the M25', or 'Parking near the hospital'." },
             cost: { type: "NUMBER", description: "The amount paid, in GBP, as a plain number." },
             date: {
               type: "STRING",
               description:
                 "ISO date (YYYY-MM-DD) this was paid/done. Required - ask the user first if they haven't said, and convert a reply like 'today' or 'last Tuesday' to the actual date yourself.",
             },
+            jobType: {
+              type: "STRING",
+              enum: Object.keys(CAR_JOB_LABELS),
+              description: "Only for category 'service' - the closest matching job type, or 'other' if genuinely nothing fits.",
+            },
+            billType: {
+              type: "STRING",
+              enum: Object.keys(CAR_BILL_LABELS),
+              description: "Only for category 'bill'.",
+            },
+            modCategory: {
+              type: "STRING",
+              description: "Only for category 'mod' - your best guess at what kind of part/accessory this is, in plain words (e.g. 'wax', 'roof box', 'dash cam'). Doesn't need to be exact - it's matched to the closest real category, or filed as 'Other accessory' if nothing fits.",
+            },
+            litres: { type: "NUMBER", description: "Only for category 'fuel', on a petrol/diesel/hybrid/PHEV car - litres put in, as a plain number." },
+            kwh: { type: "NUMBER", description: "Only for category 'fuel', on an electric car - kWh added in a charging session, as a plain number." },
+            filledToFull: { type: "BOOLEAN", description: "Only for category 'fuel' on a non-electric car - true only if they said something like 'filled up' or 'full tank', otherwise omit." },
             labourCategory: {
               type: "STRING",
               description: "Only for category 'labour' - your best guess at what kind of labour job this is, in plain words (e.g. 'brake bleed', 'timing belt', 'EV battery health check'). Doesn't need to be exact - it's matched to the closest real category, or filed as 'Other' if nothing fits.",
@@ -1168,7 +1263,7 @@ export function buildLogEntryToolDeclarations(vehicleKind: "bike" | "car") {
           category: {
             type: "STRING",
             enum: ["service", "bill", "mod", "fuel", "labour", "fine", "toll"],
-            description: "'service' for maintenance/consumables/small parts, 'bill' for insurance/road-tax/MOT/finance, 'mod' for a modification or accessory (including general detailing products like wax/polish), 'fuel' for a fuel fill-up, 'labour' for workshop time/labour charges billed separately from parts, 'fine' for a driving offence or penalty charge, 'toll' for a road/bridge/tunnel charge or parking.",
+            description: "'service' for maintenance/consumables/small parts (including a valet, detailing, or wash), 'bill' for insurance/road-tax/MOT/finance, 'mod' for a modification or accessory (including general detailing products like wax/polish), 'fuel' for a fuel fill-up, 'labour' for workshop time/labour charges billed separately from parts, 'fine' for a driving offence or penalty charge, 'toll' for a road/bridge/tunnel charge or parking.",
           },
           description: { type: "STRING", description: "Not used for 'fuel'. A short, plain label for what this is, e.g. 'Valve cleaner', 'Annual insurance renewal', 'Speeding fine on the A1', or 'Parking near the station'." },
           cost: { type: "NUMBER", description: "The amount paid, in GBP, as a plain number." },
@@ -1212,6 +1307,424 @@ export function buildLogEntryToolDeclarations(vehicleKind: "bike" | "car") {
   ] as const;
 }
 
+// ---- Account/vehicle settings, drafted then confirmed - never applied
+// directly, same "propose, review, click to confirm" pattern as
+// proposeLogEntry above. Gated behind the same Premium-only
+// logEntryAccess check in route.ts (see buildLogEntryToolDeclarations'
+// own gating), since this is exactly the same class of capability: the
+// assistant changing something on the account, not just answering
+// about it.
+
+const REGIONS: Region[] = ["london-se", "rest-england-wales", "scotland-ni"];
+const CURRENCIES: Currency[] = ["GBP", "EUR", "PLN", "CZK", "HUF", "RON", "SEK", "DKK", "BGN"];
+const DISTANCE_UNITS: DistanceUnit[] = ["mi", "km"];
+const FUEL_ECONOMY_UNITS: FuelEconomyUnit[] = ["mpg", "l100km"];
+
+export interface ProposeSettingsChangeArgs {
+  currentMileage?: number;
+  region?: string;
+  annualBudget?: number;
+  currency?: string;
+  distanceUnit?: string;
+  fuelEconomyUnit?: string;
+  includeInsuranceInReport?: boolean;
+  includeFinanceInReport?: boolean;
+  includeFinesInReport?: boolean;
+  includeTollsInReport?: boolean;
+  includeCleaningInReport?: boolean;
+}
+
+export interface ProposedSettingsChange {
+  category: "settings";
+  vehicleKind: "bike" | "car";
+  currentMileage?: number;
+  region?: Region;
+  annualBudget?: number;
+  currency?: Currency;
+  distanceUnit?: DistanceUnit;
+  fuelEconomyUnit?: FuelEconomyUnit;
+  includeInsuranceInReport?: boolean;
+  includeFinanceInReport?: boolean;
+  includeFinesInReport?: boolean;
+  includeTollsInReport?: boolean;
+  includeCleaningInReport?: boolean;
+}
+
+export async function toolProposeSettingsChange(email: string, args: ProposeSettingsChangeArgs) {
+  const vehicle = await resolveActiveVehicle(email);
+  if (!vehicle) return { error: "No vehicle found on this account." };
+
+  const change: ProposedSettingsChange = { category: "settings", vehicleKind: vehicle.kind };
+  let hasAny = false;
+
+  if (args.currentMileage != null) {
+    if (typeof args.currentMileage !== "number" || !Number.isFinite(args.currentMileage) || args.currentMileage < 0) {
+      return { error: "Needs a valid, non-negative mileage." };
+    }
+    change.currentMileage = args.currentMileage;
+    hasAny = true;
+  }
+  if (args.region != null) {
+    if (!REGIONS.includes(args.region as Region)) {
+      return { error: `Which region: ${REGIONS.map((r) => REGION_LABELS[r]).join(", ")}?` };
+    }
+    change.region = args.region as Region;
+    hasAny = true;
+  }
+  if (args.annualBudget != null) {
+    if (typeof args.annualBudget !== "number" || !Number.isFinite(args.annualBudget) || args.annualBudget <= 0) {
+      return { error: "Needs a valid, positive annual budget." };
+    }
+    change.annualBudget = args.annualBudget;
+    hasAny = true;
+  }
+  if (args.currency != null) {
+    if (!CURRENCIES.includes(args.currency as Currency)) {
+      return { error: "Which currency should costs be shown in?" };
+    }
+    change.currency = args.currency as Currency;
+    hasAny = true;
+  }
+  if (args.distanceUnit != null) {
+    if (!DISTANCE_UNITS.includes(args.distanceUnit as DistanceUnit)) {
+      return { error: "Miles or kilometres?" };
+    }
+    change.distanceUnit = args.distanceUnit as DistanceUnit;
+    hasAny = true;
+  }
+  if (args.fuelEconomyUnit != null) {
+    if (!FUEL_ECONOMY_UNITS.includes(args.fuelEconomyUnit as FuelEconomyUnit)) {
+      return { error: "MPG or litres/100km?" };
+    }
+    change.fuelEconomyUnit = args.fuelEconomyUnit as FuelEconomyUnit;
+    hasAny = true;
+  }
+  if (typeof args.includeInsuranceInReport === "boolean") {
+    change.includeInsuranceInReport = args.includeInsuranceInReport;
+    hasAny = true;
+  }
+  if (typeof args.includeFinanceInReport === "boolean") {
+    change.includeFinanceInReport = args.includeFinanceInReport;
+    hasAny = true;
+  }
+  if (typeof args.includeFinesInReport === "boolean") {
+    change.includeFinesInReport = args.includeFinesInReport;
+    hasAny = true;
+  }
+  if (typeof args.includeTollsInReport === "boolean") {
+    change.includeTollsInReport = args.includeTollsInReport;
+    hasAny = true;
+  }
+  if (typeof args.includeCleaningInReport === "boolean") {
+    change.includeCleaningInReport = args.includeCleaningInReport;
+    hasAny = true;
+  }
+
+  if (!hasAny) {
+    return { error: "What would you like to change - mileage, region, annual budget, currency, units, or what's shown in your buyer report?" };
+  }
+  return change;
+}
+
+export const SETTINGS_TOOL_DECLARATIONS = [
+  {
+    name: "proposeSettingsChange",
+    description:
+      "Draft a change to one or more of the signed-in user's account/vehicle settings - current mileage, region (used for price benchmarks), annual running-cost budget, display currency, distance/fuel-economy units, or which categories (insurance, finance, fines, tolls, valeting/washing) are shown in their buyer-facing report. This only prepares a draft for the user to review and confirm themselves on screen - it NEVER changes anything by itself. Only include the fields the user actually asked to change; leave every other field out entirely, don't guess at ones they didn't mention.",
+    parameters: {
+      type: "OBJECT",
+      properties: {
+        currentMileage: { type: "NUMBER", description: "The vehicle's current odometer reading." },
+        region: { type: "STRING", enum: REGIONS, description: "Used to adjust price benchmarks to their local area." },
+        annualBudget: { type: "NUMBER", description: "Their yearly running-cost budget, in GBP." },
+        currency: { type: "STRING", enum: CURRENCIES, description: "Which currency costs are displayed in." },
+        distanceUnit: { type: "STRING", enum: DISTANCE_UNITS, description: "Miles or kilometres." },
+        fuelEconomyUnit: { type: "STRING", enum: FUEL_ECONOMY_UNITS, description: "MPG or litres per 100km." },
+        includeInsuranceInReport: { type: "BOOLEAN", description: "Whether insurance history is shown in their buyer-facing report." },
+        includeFinanceInReport: { type: "BOOLEAN", description: "Whether finance history is shown in their buyer-facing report." },
+        includeFinesInReport: { type: "BOOLEAN", description: "Whether fines are shown in their buyer-facing report." },
+        includeTollsInReport: { type: "BOOLEAN", description: "Whether tolls are shown in their buyer-facing report." },
+        includeCleaningInReport: { type: "BOOLEAN", description: "Whether valeting/washing costs are shown in their buyer-facing report." },
+      },
+      required: [],
+    },
+  },
+] as const;
+
+// ---- Shareable link creation, drafted then confirmed - the recipient
+// email always stays editable on the draft card, never silently sent
+// to whoever the model thinks was meant, since a share link is what
+// actually grants outside access to this vehicle's history.
+
+export interface ProposeShareLinkArgs {
+  duration?: string;
+  recipientEmail?: string;
+  askingPrice?: number;
+}
+
+export interface ProposedShareLink {
+  category: "shareLink";
+  vehicleKind: "bike" | "car";
+  duration: ShareLinkDuration;
+  recipientEmail: string;
+  askingPrice?: number;
+}
+
+const SHARE_LINK_DURATIONS: ShareLinkDuration[] = ["1week", "1month", "6months"];
+
+export async function toolProposeShareLink(email: string, args: ProposeShareLinkArgs) {
+  const vehicle = await resolveActiveVehicle(email);
+  if (!vehicle) return { error: "No vehicle found on this account." };
+
+  const duration = typeof args.duration === "string" && SHARE_LINK_DURATIONS.includes(args.duration as ShareLinkDuration)
+    ? (args.duration as ShareLinkDuration)
+    : "1month";
+
+  if (args.askingPrice != null && (typeof args.askingPrice !== "number" || !Number.isFinite(args.askingPrice) || args.askingPrice <= 0)) {
+    return { error: "Needs a valid, positive asking price, or none at all." };
+  }
+
+  const change: ProposedShareLink = {
+    category: "shareLink",
+    vehicleKind: vehicle.kind,
+    duration,
+    // Never blank on the draft - always something for the user to
+    // check or fill in themselves before the real create call, which
+    // requires it anyway.
+    recipientEmail: typeof args.recipientEmail === "string" ? args.recipientEmail.trim() : "",
+    askingPrice: args.askingPrice,
+  };
+  return change;
+}
+
+export const SHARE_LINK_TOOL_DECLARATIONS = [
+  {
+    name: "proposeShareLink",
+    description:
+      "Draft a new shareable report link for the signed-in user's vehicle, to send to a prospective buyer. This only prepares a draft for the user to review, edit the recipient email, and confirm themselves on screen - it NEVER creates the link by itself. IMPORTANT: always ask who this is for (their email address) before calling this tool, unless they've already said - never invent or guess an email address.",
+    parameters: {
+      type: "OBJECT",
+      properties: {
+        recipientEmail: { type: "STRING", description: "The email address of the person this link is being shared with. Ask if not already given." },
+        duration: { type: "STRING", enum: SHARE_LINK_DURATIONS, description: "How long the link stays valid for. Defaults to 1 month if not specified." },
+        askingPrice: { type: "NUMBER", description: "Optional - the asking price to show alongside the report, in GBP." },
+      },
+      required: [],
+    },
+  },
+] as const;
+
+// ---- Editing an existing entry, drafted then confirmed - same
+// "propose, review, click to confirm" pattern as everything above, the
+// one real difference being that this one's entryId can only ever have
+// come from a genuine prior lookup (getEntries/getLastLoggedJob) scoped
+// to this same session's own email, never invented by the model. The
+// tool re-fetches the real record by that id (through the same
+// email-scoped bulk getters those lookups themselves use) before
+// building the draft, so an id that doesn't actually belong to this
+// account's active vehicle simply isn't found, exactly like every other
+// tool here that never trusts a model-supplied identifier for account
+// scoping. Every field the model doesn't mention changing keeps the
+// record's own current value - this is an edit, not a blank redraft.
+
+export interface ProposeEditEntryArgs {
+  category?: string;
+  entryId?: string;
+  cost?: number;
+  date?: string;
+  description?: string;
+  jobType?: string;
+  billType?: string;
+  modCategory?: string;
+  labourCategory?: string;
+  fineType?: string;
+  tollType?: string;
+  litres?: number;
+  kwh?: number;
+  filledToFull?: boolean;
+  mileage?: number;
+}
+
+function resolveOptionalEditDate(rawDate: string | undefined, existingDate: string): { date: string } | { error: string } {
+  if (rawDate == null) return { date: existingDate };
+  const trimmed = rawDate.trim();
+  const parsed = trimmed ? new Date(trimmed) : null;
+  if (!trimmed || !parsed || Number.isNaN(parsed.getTime())) {
+    return { error: "That doesn't look like a valid date." };
+  }
+  if (parsed.getTime() > Date.now() + 86_400_000) {
+    return { error: "That date is in the future - this can only edit something that's already happened." };
+  }
+  return { date: trimmed };
+}
+
+export async function toolProposeEditEntry(email: string, args: ProposeEditEntryArgs) {
+  const vehicle = await resolveActiveVehicle(email);
+  if (!vehicle) return { error: "No vehicle found on this account." };
+
+  if (
+    args.category !== "service" && args.category !== "bill" && args.category !== "mod" &&
+    args.category !== "fuel" && args.category !== "labour" && args.category !== "fine" && args.category !== "toll"
+  ) {
+    return { error: "Not sure what category that entry is - service, bill, mod, fuel, labour, fine, or toll?" };
+  }
+  if (typeof args.entryId !== "string" || !args.entryId.trim()) {
+    return { error: "Which entry? Look it up first - e.g. ask what was logged on a given date - so there's a specific one to edit." };
+  }
+  const entryId = args.entryId;
+
+  if (args.cost != null && (typeof args.cost !== "number" || !Number.isFinite(args.cost) || args.cost <= 0)) {
+    return { error: "Needs a valid, positive cost." };
+  }
+  if (args.mileage != null && (typeof args.mileage !== "number" || !Number.isFinite(args.mileage) || args.mileage < 0)) {
+    return { error: "Needs a valid, non-negative mileage." };
+  }
+
+  const isCar = vehicle.kind === "car";
+  const vehicleId = isCar ? vehicle.car.id : vehicle.bike.id;
+  const jobLabels = isCar ? CAR_JOB_LABELS : JOB_LABELS;
+  const billLabels = isCar ? CAR_BILL_LABELS : BILL_LABELS;
+  const modLabels = isCar ? CAR_MOD_LABELS : MOD_LABELS;
+  const labourLabels = isCar ? CAR_LABOUR_LABELS : LABOUR_LABELS;
+  const fineLabels = isCar ? CAR_FINE_LABELS : FINE_LABELS;
+  const tollLabels = isCar ? CAR_TOLL_LABELS : TOLL_LABELS;
+
+  if (args.category === "service") {
+    const existing = (isCar ? await getCarServiceRecords(email, vehicleId) : await getServiceRecords(email, vehicleId)).find((r) => r.id === entryId);
+    if (!existing) return { error: "Couldn't find that service record - it may have been deleted, or check the dashboard directly." };
+    const resolvedDate = resolveOptionalEditDate(args.date, existing.date);
+    if ("error" in resolvedDate) return resolvedDate;
+    const jobType = typeof args.jobType === "string" && args.jobType in jobLabels ? args.jobType : existing.jobType;
+    const entry: ProposedEntry = {
+      category: "service", jobType, jobLabel: jobLabels[jobType],
+      description: typeof args.description === "string" ? args.description : existing.notes,
+      cost: args.cost ?? existing.cost, date: resolvedDate.date, mileage: args.mileage ?? existing.mileage,
+      vehicleKind: vehicle.kind, entryId,
+    };
+    return entry;
+  }
+  if (args.category === "bill") {
+    const existing = (isCar ? await getCarBills(email, vehicleId) : await getBills(email, vehicleId)).find((b) => b.id === entryId);
+    if (!existing) return { error: "Couldn't find that bill - it may have been deleted, or check the dashboard directly." };
+    const resolvedDate = resolveOptionalEditDate(args.date, existing.date);
+    if ("error" in resolvedDate) return resolvedDate;
+    const billType = typeof args.billType === "string" && args.billType in billLabels ? args.billType : existing.billType;
+    const entry: ProposedEntry = {
+      category: "bill", billType, billLabel: billLabels[billType],
+      description: typeof args.description === "string" ? args.description : existing.notes,
+      cost: args.cost ?? existing.cost, date: resolvedDate.date, vehicleKind: vehicle.kind, entryId,
+    };
+    return entry;
+  }
+  if (args.category === "mod") {
+    const existing = (isCar ? await getCarMods(email, vehicleId) : await getMods(email, vehicleId)).find((m) => m.id === entryId);
+    if (!existing) return { error: "Couldn't find that modification/accessory - it may have been deleted, or check the dashboard directly." };
+    const resolvedDate = resolveOptionalEditDate(args.date, existing.date);
+    if ("error" in resolvedDate) return resolvedDate;
+    const modCategory = typeof args.modCategory === "string" && args.modCategory in modLabels ? args.modCategory : existing.category;
+    const entry: ProposedEntry = {
+      category: "mod", modCategory, modLabel: modLabels[modCategory],
+      description: typeof args.description === "string" ? args.description : existing.name,
+      cost: args.cost ?? existing.cost, date: resolvedDate.date, mileage: args.mileage ?? existing.mileage,
+      vehicleKind: vehicle.kind, entryId,
+    };
+    return entry;
+  }
+  if (args.category === "fuel") {
+    // Both FuelLogDoc (bike, litres only) and CarFuelLogDoc (litres OR
+    // kwh) are structurally compatible with this narrower shape - the
+    // only two fields this branch actually reads from either.
+    const fuelLogs: { id: string; date: string; cost: number; mileage: number; litres?: number; kwh?: number; filledToFull?: boolean }[] =
+      isCar ? await getCarFuelLogs(email, vehicleId) : await getFuelLogs(email, vehicleId);
+    const existing = fuelLogs.find((f) => f.id === entryId);
+    if (!existing) return { error: "Couldn't find that fuel/charging entry - it may have been deleted, or check the dashboard directly." };
+    const resolvedDate = resolveOptionalEditDate(args.date, existing.date);
+    if ("error" in resolvedDate) return resolvedDate;
+    const wasElectric = existing.kwh != null;
+    const entry: ProposedEntry = {
+      category: "fuel",
+      litres: wasElectric ? undefined : (args.litres ?? existing.litres),
+      kwh: wasElectric ? (args.kwh ?? existing.kwh) : undefined,
+      cost: args.cost ?? existing.cost, date: resolvedDate.date, mileage: args.mileage ?? existing.mileage,
+      filledToFull: wasElectric ? false : (args.filledToFull ?? existing.filledToFull ?? false),
+      vehicleKind: vehicle.kind, entryId,
+    };
+    return entry;
+  }
+  if (args.category === "labour") {
+    const existing = (isCar ? await getCarLabour(email, vehicleId) : await getLabour(email, vehicleId)).find((l) => l.id === entryId);
+    if (!existing) return { error: "Couldn't find that labour entry - it may have been deleted, or check the dashboard directly." };
+    const resolvedDate = resolveOptionalEditDate(args.date, existing.date);
+    if ("error" in resolvedDate) return resolvedDate;
+    const labourCategory = typeof args.labourCategory === "string" && args.labourCategory in labourLabels ? args.labourCategory : existing.category;
+    const entry: ProposedEntry = {
+      category: "labour", labourCategory, labourLabel: labourLabels[labourCategory],
+      description: typeof args.description === "string" ? args.description : existing.notes,
+      cost: args.cost ?? existing.cost, date: resolvedDate.date, mileage: args.mileage ?? existing.mileage,
+      vehicleKind: vehicle.kind, entryId,
+    };
+    return entry;
+  }
+  if (args.category === "fine") {
+    const existing = (isCar ? await getCarFines(email, vehicleId) : await getFines(email, vehicleId)).find((f) => f.id === entryId);
+    if (!existing) return { error: "Couldn't find that fine - it may have been deleted, or check the dashboard directly." };
+    const resolvedDate = resolveOptionalEditDate(args.date, existing.date);
+    if ("error" in resolvedDate) return resolvedDate;
+    const fineType = typeof args.fineType === "string" && args.fineType in fineLabels ? args.fineType : existing.fineType;
+    const entry: ProposedEntry = {
+      category: "fine", fineType, fineLabel: fineLabels[fineType],
+      description: typeof args.description === "string" ? args.description : existing.notes,
+      cost: args.cost ?? existing.cost, date: resolvedDate.date, vehicleKind: vehicle.kind, entryId,
+    };
+    return entry;
+  }
+
+  const existing = (isCar ? await getCarTolls(email, vehicleId) : await getTolls(email, vehicleId)).find((t) => t.id === entryId);
+  if (!existing) return { error: "Couldn't find that toll - it may have been deleted, or check the dashboard directly." };
+  const resolvedDate = resolveOptionalEditDate(args.date, existing.date);
+  if ("error" in resolvedDate) return resolvedDate;
+  const tollType = typeof args.tollType === "string" && args.tollType in tollLabels ? args.tollType : existing.tollType;
+  const entry: ProposedEntry = {
+    category: "toll", tollType, tollLabel: tollLabels[tollType],
+    description: typeof args.description === "string" ? args.description : existing.notes,
+    cost: args.cost ?? existing.cost, date: resolvedDate.date, vehicleKind: vehicle.kind, entryId,
+  };
+  return entry;
+}
+
+export const EDIT_TOOL_DECLARATIONS = [
+  {
+    name: "proposeEditEntry",
+    description:
+      "Draft a change to an entry the signed-in user has ALREADY logged - service, bill, modification/accessory, fuel/charging, labour, fine, or toll. This only prepares a draft for the user to review and confirm themselves on screen - it NEVER changes anything by itself. REQUIRES a real entryId - always look the entry up first (e.g. with getEntries for a date/range, or getLastLoggedJob for 'my last oil change') and use the id it returns; never invent or guess one. Only include the fields that are actually changing - every field left out keeps its current logged value. This can only edit an entry that already exists - it can never delete one.",
+    parameters: {
+      type: "OBJECT",
+      properties: {
+        category: {
+          type: "STRING",
+          enum: ["service", "bill", "mod", "fuel", "labour", "fine", "toll"],
+          description: "Which kind of entry this is - must match what it was actually logged as.",
+        },
+        entryId: { type: "STRING", description: "The real id of the entry to edit, from a prior getEntries or getLastLoggedJob result. Required." },
+        cost: { type: "NUMBER", description: "The new amount paid, in GBP, as a plain number - only if the cost is changing." },
+        date: { type: "STRING", description: "New ISO date (YYYY-MM-DD) - only if the date is changing." },
+        description: { type: "STRING", description: "New short description/notes - only if changing. Not used for 'fuel'." },
+        jobType: { type: "STRING", enum: [...Object.keys(JOB_LABELS), ...Object.keys(CAR_JOB_LABELS)], description: "Only for category 'service' - the new job type, only if changing." },
+        billType: { type: "STRING", enum: [...Object.keys(BILL_LABELS), ...Object.keys(CAR_BILL_LABELS)], description: "Only for category 'bill' - the new bill type, only if changing." },
+        modCategory: { type: "STRING", description: "Only for category 'mod' - the new part/accessory category, in plain words, only if changing." },
+        labourCategory: { type: "STRING", description: "Only for category 'labour' - the new labour category, in plain words, only if changing." },
+        fineType: { type: "STRING", description: "Only for category 'fine' - the new fine type, in plain words, only if changing." },
+        tollType: { type: "STRING", description: "Only for category 'toll' - the new toll/charge type, in plain words, only if changing." },
+        litres: { type: "NUMBER", description: "Only for category 'fuel' on a non-electric entry - new litres, only if changing." },
+        kwh: { type: "NUMBER", description: "Only for category 'fuel' on an electric-charging entry - new kWh, only if changing." },
+        filledToFull: { type: "BOOLEAN", description: "Only for category 'fuel' on a non-electric entry - only if this is changing." },
+        mileage: { type: "NUMBER", description: "Only for service/mod/fuel/labour - the new mileage reading, only if changing." },
+      },
+      required: ["category", "entryId"],
+    },
+  },
+] as const;
+
 // Single dispatch point - the API route calls this instead of a
 // hand-written switch of its own, so the set of callable tools is
 // defined in exactly one place.
@@ -1246,6 +1759,15 @@ export async function runAssistantTool(
   // switch with a lying type cast.
   if (name === "proposeLogEntry") {
     return toolProposeLogEntry(email, args as ProposeLogEntryArgs);
+  }
+  if (name === "proposeSettingsChange") {
+    return toolProposeSettingsChange(email, args as ProposeSettingsChangeArgs);
+  }
+  if (name === "proposeShareLink") {
+    return toolProposeShareLink(email, args as ProposeShareLinkArgs);
+  }
+  if (name === "proposeEditEntry") {
+    return toolProposeEditEntry(email, args as ProposeEditEntryArgs);
   }
 
   switch (name as ToolName) {

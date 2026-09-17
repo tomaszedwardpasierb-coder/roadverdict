@@ -13,7 +13,7 @@
 import { useState } from 'react';
 import { VehicleSpinner } from '@/components/VehicleSpinner';
 import { useTrackerFormSubmit } from './useTrackerFormSubmit';
-import { CAR_JOB_LABELS } from '@/lib/tracker/carJobTypes';
+import { CAR_JOB_LABELS, isCleaningCarJob } from '@/lib/tracker/carJobTypes';
 import { formatCurrency, type Currency, type ExchangeRates } from '@/lib/tracker/currency';
 import { formatDistance, type DistanceUnit } from '@/lib/tracker/unitFormat';
 import type { CarServiceRecordDoc } from '@/lib/tracker/carServiceRecord';
@@ -24,9 +24,10 @@ interface Props {
   distanceUnit: DistanceUnit;
   currency: Currency;
   rates: ExchangeRates | null;
+  includeCleaningInReport?: boolean;
 }
 
-export function CarServiceHistoryCard({ record, distanceUnit, currency, rates }: Props) {
+export function CarServiceHistoryCard({ record, distanceUnit, currency, rates, includeCleaningInReport = false }: Props) {
   const [isEditing, setIsEditing] = useState(false);
   const [jobType, setJobType] = useState(record.jobType);
   const [cost, setCost] = useState(String(record.cost));
@@ -95,6 +96,9 @@ export function CarServiceHistoryCard({ record, distanceUnit, currency, rates }:
       <div style={{ fontSize: '0.85rem', color: 'var(--ink-soft)', marginTop: '0.2rem' }}>
         {new Date(record.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })} · {formatDistance(record.mileage, distanceUnit)}
       </div>
+      {isCleaningCarJob(record.jobType) && !includeCleaningInReport && (
+        <p style={{ marginTop: '0.4rem', fontSize: '0.85rem', color: 'var(--ink-soft)' }}>Not shown in buyer report</p>
+      )}
       {record.notes && <p style={{ marginTop: '0.4rem' }}>{record.notes}</p>}
       <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.6rem' }}>
         <button type="button" className={styles.iconBtn} onClick={() => setIsEditing(true)}>Edit</button>

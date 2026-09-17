@@ -19,6 +19,7 @@ const mocks = vi.hoisted(() => ({
   updateCarIncludeFinanceInReport: vi.fn(),
   updateCarIncludeFinesInReport: vi.fn(),
   updateCarIncludeTollsInReport: vi.fn(),
+  updateCarIncludeCleaningInReport: vi.fn(),
   isCarReadOnly: vi.fn(),
   fetchDvlaDataFromVdg: vi.fn(),
   fetchVehicleTaxDetailsFromVdg: vi.fn(),
@@ -49,6 +50,7 @@ vi.mock("@/lib/tracker/car", async () => {
     updateCarIncludeFinanceInReport: mocks.updateCarIncludeFinanceInReport,
     updateCarIncludeFinesInReport: mocks.updateCarIncludeFinesInReport,
     updateCarIncludeTollsInReport: mocks.updateCarIncludeTollsInReport,
+    updateCarIncludeCleaningInReport: mocks.updateCarIncludeCleaningInReport,
     isCarReadOnly: mocks.isCarReadOnly,
     CAR_READ_ONLY_MESSAGE: "This car has been transferred and is now read-only.",
   };
@@ -500,6 +502,14 @@ describe("PATCH /api/cars/car", () => {
     const response = await PATCH(request("PATCH", JSON.stringify({ includeTollsInReport: true })));
     expect(response.status).toBe(200);
     expect(mocks.updateCarIncludeTollsInReport).toHaveBeenCalledWith("owner@example.com", "car-1", true);
+  });
+
+  it("updates includeCleaningInReport", async () => {
+    mocks.getSession.mockResolvedValue({ email: "owner@example.com" });
+    mocks.updateCarIncludeCleaningInReport.mockResolvedValue({ id: "car-1", includeCleaningInReport: true });
+    const response = await PATCH(request("PATCH", JSON.stringify({ includeCleaningInReport: true })));
+    expect(response.status).toBe(200);
+    expect(mocks.updateCarIncludeCleaningInReport).toHaveBeenCalledWith("owner@example.com", "car-1", true);
   });
 
   // Real, slightly surprising behaviour worth pinning as-is, same as the

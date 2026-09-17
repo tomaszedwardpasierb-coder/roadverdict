@@ -29,6 +29,10 @@ const mocks = vi.hoisted(() => ({
   gatherCarMileagePoints: vi.fn(),
   getLabour: vi.fn(),
   getCarLabour: vi.fn(),
+  getFines: vi.fn(),
+  getCarFines: vi.fn(),
+  getTolls: vi.fn(),
+  getCarTolls: vi.fn(),
 }));
 
 // resolveActiveVehicle (activeVehicle.ts) is the one boundary every tool
@@ -70,6 +74,10 @@ vi.mock("@/lib/tracker/carReminderStatus", () => ({
 vi.mock("@/lib/tracker/carSummary", () => ({ gatherCarMileagePoints: mocks.gatherCarMileagePoints }));
 vi.mock("@/lib/tracker/labour", () => ({ getLabour: mocks.getLabour }));
 vi.mock("@/lib/tracker/carLabour", () => ({ getCarLabour: mocks.getCarLabour }));
+vi.mock("@/lib/tracker/fine", () => ({ getFines: mocks.getFines }));
+vi.mock("@/lib/tracker/carFine", () => ({ getCarFines: mocks.getCarFines }));
+vi.mock("@/lib/tracker/toll", () => ({ getTolls: mocks.getTolls }));
+vi.mock("@/lib/tracker/carToll", () => ({ getCarTolls: mocks.getCarTolls }));
 // mileageEstimate.ts (estimateMileage) is deliberately NOT mocked - same
 // "pure, no I/O, exercise the real logic" reasoning this file already
 // applies to bikeComparisonVerdict.ts.
@@ -93,6 +101,9 @@ import {
   toolGetViewedReport,
   toolGetViewedComparison,
   toolProposeLogEntry,
+  toolProposeSettingsChange,
+  toolProposeShareLink,
+  toolProposeEditEntry,
   ASSISTANT_TOOL_DECLARATIONS,
 } from "@/lib/tracker/assistantTools";
 
@@ -138,6 +149,10 @@ beforeEach(() => {
   mocks.getCarReminders.mockResolvedValue([]);
   mocks.getLabour.mockResolvedValue([]);
   mocks.getCarLabour.mockResolvedValue([]);
+  mocks.getFines.mockResolvedValue([]);
+  mocks.getCarFines.mockResolvedValue([]);
+  mocks.getTolls.mockResolvedValue([]);
+  mocks.getCarTolls.mockResolvedValue([]);
   mocks.buildCarComparison.mockResolvedValue([]);
   mocks.getCarShareLinksForUser.mockResolvedValue([]);
   mocks.getPendingCarReceiptRequestsForOwner.mockResolvedValue([]);
@@ -786,10 +801,10 @@ describe("toolProposeLogEntry", () => {
     expect(result).toEqual({ error: "No vehicle found on this account." });
   });
 
-  it("is not available for a car-active session's non-labour categories, and never reaches any cost/description/date validation", async () => {
+  it("rejects a genuinely unrecognized category on a car-active session too, since every real category is now available on both vehicle kinds", async () => {
     mocks.resolveActiveVehicle.mockResolvedValue(carActive());
-    const result: any = await toolProposeLogEntry("owner@example.com", { category: "service", description: "Oil", cost: 20 });
-    expect(result.error).toMatch(/only available for Labour/i);
+    const result: any = await toolProposeLogEntry("owner@example.com", { category: "not-a-real-category", description: "Tank pads", cost: 20 } as any);
+    expect(result.error).toMatch(/Not sure what category/);
   });
 
   it("rejects a genuinely unrecognized category rather than guessing", async () => {
@@ -833,7 +848,7 @@ describe("toolProposeLogEntry", () => {
     expect(result2.error).toMatch(/what date/i);
   });
 
-  it("asks for the date on a car-active session too, once past the labour-only/cost gate", async () => {
+  it("asks for the date on a car-active session too, once past the category/cost gate", async () => {
     mocks.resolveActiveVehicle.mockResolvedValue(carActive());
     const result: any = await toolProposeLogEntry("owner@example.com", { category: "labour", description: "Cambelt", cost: 60 });
     expect(result.error).toMatch(/what date/i);
@@ -845,9 +860,17 @@ describe("toolProposeLogEntry", () => {
     });
     expect(result).toEqual({
       category: "service", jobType: "oil-filter", jobLabel: expect.any(String),
-      description: "Valve cleaner", cost: 4, date: today, mileage: 15000,
+      description: "Valve cleaner", cost: 4, date: today, mileage: 15000, vehicleKind: "bike",
     });
     expect(result.mileageNote).toBeUndefined(); // today needs no estimate - it's just the current mileage
+  });
+
+  it("drafts a valet/wash entry the same way as any other recognized job type", async () => {
+    const result: any = await toolProposeLogEntry("owner@example.com", {
+      category: "service", description: "Full valet", cost: 40, date: today, jobType: "valet",
+    });
+    expect(result.jobType).toBe("valet");
+    expect(result.vehicleKind).toBe("bike");
   });
 
   it("defaults an unrecognized or missing jobType to 'other' rather than rejecting the draft", async () => {
@@ -858,11 +881,37 @@ describe("toolProposeLogEntry", () => {
     expect(result2.jobType).toBe("other");
   });
 
+  describe("service (car-active)", () => {
+    it("drafts a service entry against the car's own catalog and mileage, tagged vehicleKind: 'car'", async () => {
+      mocks.resolveActiveVehicle.mockResolvedValue(carActive());
+      const result: any = await toolProposeLogEntry("owner@example.com", {
+        category: "service", description: "Full valet", cost: 40, date: today, jobType: "valet",
+      });
+      expect(result).toEqual({
+        category: "service", jobType: "valet", jobLabel: expect.any(String),
+        description: "Full valet", cost: 40, date: today, mileage: 20000, vehicleKind: "car",
+      });
+    });
+
+    it("defaults an unrecognized or missing jobType to 'other' for a car too", async () => {
+      mocks.resolveActiveVehicle.mockResolvedValue(carActive());
+      const result: any = await toolProposeLogEntry("owner@example.com", { category: "service", description: "Something unusual", cost: 40, date: today, jobType: "not-a-real-car-job" });
+      expect(result.jobType).toBe("other");
+    });
+
+    it("still requires a description and a valid, non-future date for car service", async () => {
+      mocks.resolveActiveVehicle.mockResolvedValue(carActive());
+      expect((await toolProposeLogEntry("owner@example.com", { category: "service", cost: 40, date: today }) as any).error).toMatch(/description/i);
+      const tomorrow = new Date(Date.now() + 2 * 86_400_000).toISOString().slice(0, 10);
+      expect((await toolProposeLogEntry("owner@example.com", { category: "service", description: "Full valet", cost: 40, date: tomorrow }) as any).error).toMatch(/future/);
+    });
+  });
+
   it("drafts a bill entry with a valid billType", async () => {
     const result: any = await toolProposeLogEntry("owner@example.com", {
       category: "bill", description: "Annual renewal", cost: 300, date: today, billType: "insurance",
     });
-    expect(result).toEqual({ category: "bill", billType: "insurance", billLabel: expect.any(String), description: "Annual renewal", cost: 300, date: today });
+    expect(result).toEqual({ category: "bill", billType: "insurance", billLabel: expect.any(String), description: "Annual renewal", cost: 300, date: today, vehicleKind: "bike" });
   });
 
   it("asks a clarifying question rather than guessing when billType is missing or invalid, since bills have no safe 'other' fallback", async () => {
@@ -873,9 +922,25 @@ describe("toolProposeLogEntry", () => {
     expect(result2.error).toMatch(/insurance, road tax, MOT test, or finance/);
   });
 
+  describe("bill (car-active)", () => {
+    it("drafts a bill entry against the car's own catalog, including a car-only bill type, tagged vehicleKind: 'car'", async () => {
+      mocks.resolveActiveVehicle.mockResolvedValue(carActive());
+      const result: any = await toolProposeLogEntry("owner@example.com", {
+        category: "bill", description: "Central London trip", cost: 15, date: today, billType: "congestion",
+      });
+      expect(result).toEqual({ category: "bill", billType: "congestion", billLabel: expect.any(String), description: "Central London trip", cost: 15, date: today, vehicleKind: "car" });
+    });
+
+    it("asks a clarifying question rather than guessing when billType is missing or invalid, mentioning the car-only options", async () => {
+      mocks.resolveActiveVehicle.mockResolvedValue(carActive());
+      const result: any = await toolProposeLogEntry("owner@example.com", { category: "bill", description: "Annual renewal", cost: 300, date: today });
+      expect(result.error).toMatch(/ULEZ\/CAZ/);
+    });
+  });
+
   it("drafts a mod/accessory entry, resolving an exact category key or label", async () => {
     const byKey: any = await toolProposeLogEntry("owner@example.com", { category: "mod", description: "Öhlins rear shock", cost: 400, date: today, modCategory: "suspension-upgrade" });
-    expect(byKey).toEqual({ category: "mod", modCategory: "suspension-upgrade", modLabel: expect.any(String), description: "Öhlins rear shock", cost: 400, date: today, mileage: 15000 });
+    expect(byKey).toEqual({ category: "mod", modCategory: "suspension-upgrade", modLabel: expect.any(String), description: "Öhlins rear shock", cost: 400, date: today, mileage: 15000, vehicleKind: "bike" });
 
     const byLabel: any = await toolProposeLogEntry("owner@example.com", { category: "mod", description: "Tank pads", cost: 20, date: today, modCategory: "Tank pads / protectors" });
     expect(byLabel.modCategory).toBe("tank-pads");
@@ -896,9 +961,23 @@ describe("toolProposeLogEntry", () => {
     expect(result.modCategory).toBe("other-accessory");
   });
 
+  describe("mod (car-active)", () => {
+    it("drafts a mod entry against the car's own catalog, tagged vehicleKind: 'car'", async () => {
+      mocks.resolveActiveVehicle.mockResolvedValue(carActive());
+      const result: any = await toolProposeLogEntry("owner@example.com", { category: "mod", description: "Dash cam", cost: 90, date: today, modCategory: "dash-cam" });
+      expect(result).toEqual({ category: "mod", modCategory: "dash-cam", modLabel: expect.any(String), description: "Dash cam", cost: 90, date: today, mileage: 20000, vehicleKind: "car" });
+    });
+
+    it("falls back to 'other-accessory' for an unmatched car mod category", async () => {
+      mocks.resolveActiveVehicle.mockResolvedValue(carActive());
+      const result: any = await toolProposeLogEntry("owner@example.com", { category: "mod", description: "Something unusual", cost: 12, date: today, modCategory: "not-a-real-car-mod" });
+      expect(result.modCategory).toBe("other-accessory");
+    });
+  });
+
   it("drafts a fuel entry with litres, cost, and the account's current mileage - no description needed", async () => {
     const result: any = await toolProposeLogEntry("owner@example.com", { category: "fuel", cost: 15, date: today, litres: 10 });
-    expect(result).toEqual({ category: "fuel", litres: 10, cost: 15, date: today, mileage: 15000, filledToFull: false });
+    expect(result).toEqual({ category: "fuel", litres: 10, cost: 15, date: today, mileage: 15000, filledToFull: false, vehicleKind: "bike" });
   });
 
   it("only marks a fuel entry filledToFull when explicitly told true", async () => {
@@ -910,6 +989,32 @@ describe("toolProposeLogEntry", () => {
     expect((await toolProposeLogEntry("owner@example.com", { category: "fuel", cost: 15, date: today }) as any).error).toMatch(/litres/i);
     expect((await toolProposeLogEntry("owner@example.com", { category: "fuel", cost: 15, date: today, litres: 0 }) as any).error).toMatch(/litres/i);
     expect((await toolProposeLogEntry("owner@example.com", { category: "fuel", cost: 15, date: today, litres: -3 }) as any).error).toMatch(/litres/i);
+  });
+
+  describe("fuel (car-active)", () => {
+    it("drafts a litres-based fuel entry for a non-electric car, tagged vehicleKind: 'car'", async () => {
+      mocks.resolveActiveVehicle.mockResolvedValue(carActive());
+      const result: any = await toolProposeLogEntry("owner@example.com", { category: "fuel", cost: 60, date: today, litres: 40 });
+      expect(result).toEqual({ category: "fuel", litres: 40, kwh: undefined, cost: 60, date: today, mileage: 20000, filledToFull: false, vehicleKind: "car" });
+    });
+
+    it("rejects a missing litres for a non-electric car", async () => {
+      mocks.resolveActiveVehicle.mockResolvedValue(carActive());
+      const result: any = await toolProposeLogEntry("owner@example.com", { category: "fuel", cost: 60, date: today });
+      expect(result.error).toMatch(/litres/i);
+    });
+
+    it("drafts a kwh-based fuel entry for an electric car, ignoring litres and never offering filledToFull", async () => {
+      mocks.resolveActiveVehicle.mockResolvedValue(carActive({ fuelType: "electric" }));
+      const result: any = await toolProposeLogEntry("owner@example.com", { category: "fuel", cost: 12, date: today, kwh: 35, filledToFull: true });
+      expect(result).toEqual({ category: "fuel", litres: undefined, kwh: 35, cost: 12, date: today, mileage: 20000, filledToFull: false, vehicleKind: "car" });
+    });
+
+    it("rejects a missing kwh for an electric car, even if litres was supplied instead", async () => {
+      mocks.resolveActiveVehicle.mockResolvedValue(carActive({ fuelType: "electric" }));
+      const result: any = await toolProposeLogEntry("owner@example.com", { category: "fuel", cost: 12, date: today, litres: 40 });
+      expect(result.error).toMatch(/kWh/i);
+    });
   });
 
   // Labour is the one category available on both vehicle kinds - see
@@ -1131,6 +1236,320 @@ describe("toolProposeLogEntry", () => {
       });
       expect(result.mileage).toBe(8000); // bike.startingMileage - a provisional anchor, not a fabricated guess
       expect(result.mileageNote).toMatch(/before this bike was added/);
+    });
+  });
+});
+
+describe("toolProposeSettingsChange", () => {
+  it("returns an error when the account has no vehicle at all", async () => {
+    mocks.resolveActiveVehicle.mockResolvedValue(null);
+    const result = await toolProposeSettingsChange("owner@example.com", { currentMileage: 9000 });
+    expect(result).toEqual({ error: "No vehicle found on this account." });
+  });
+
+  it("asks what to change when no field is given at all", async () => {
+    const result: any = await toolProposeSettingsChange("owner@example.com", {});
+    expect(result.error).toMatch(/What would you like to change/);
+  });
+
+  it("drafts a mileage-only change, tagged with the bike's own vehicleKind, leaving every other field out entirely", async () => {
+    const result: any = await toolProposeSettingsChange("owner@example.com", { currentMileage: 16000 });
+    expect(result).toEqual({ category: "settings", vehicleKind: "bike", currentMileage: 16000 });
+  });
+
+  it("rejects a negative mileage", async () => {
+    const result: any = await toolProposeSettingsChange("owner@example.com", { currentMileage: -5 });
+    expect(result.error).toMatch(/mileage/i);
+  });
+
+  it("drafts a region change for a valid region, rejecting an invalid one", async () => {
+    const ok: any = await toolProposeSettingsChange("owner@example.com", { region: "scotland-ni" });
+    expect(ok.region).toBe("scotland-ni");
+
+    const bad: any = await toolProposeSettingsChange("owner@example.com", { region: "mars" });
+    expect(bad.error).toMatch(/Which region/);
+  });
+
+  it("rejects a zero or negative annual budget", async () => {
+    expect((await toolProposeSettingsChange("owner@example.com", { annualBudget: 0 }) as any).error).toMatch(/budget/i);
+    expect((await toolProposeSettingsChange("owner@example.com", { annualBudget: -100 }) as any).error).toMatch(/budget/i);
+  });
+
+  it("drafts a currency change for a real currency, rejecting an unrecognized one", async () => {
+    const ok: any = await toolProposeSettingsChange("owner@example.com", { currency: "EUR" });
+    expect(ok.currency).toBe("EUR");
+
+    const bad: any = await toolProposeSettingsChange("owner@example.com", { currency: "USD" });
+    expect(bad.error).toMatch(/currency/i);
+  });
+
+  it("drafts distance/fuel-economy unit changes, rejecting invalid values", async () => {
+    const ok: any = await toolProposeSettingsChange("owner@example.com", { distanceUnit: "km", fuelEconomyUnit: "l100km" });
+    expect(ok.distanceUnit).toBe("km");
+    expect(ok.fuelEconomyUnit).toBe("l100km");
+
+    expect((await toolProposeSettingsChange("owner@example.com", { distanceUnit: "furlongs" }) as any).error).toMatch(/Miles or kilometres/);
+    expect((await toolProposeSettingsChange("owner@example.com", { fuelEconomyUnit: "nope" }) as any).error).toMatch(/MPG/);
+  });
+
+  it("passes each buyer-report toggle through independently, including an explicit false", async () => {
+    const result: any = await toolProposeSettingsChange("owner@example.com", {
+      includeInsuranceInReport: true, includeCleaningInReport: false,
+    });
+    expect(result.includeInsuranceInReport).toBe(true);
+    expect(result.includeCleaningInReport).toBe(false);
+    expect(result.includeFinanceInReport).toBeUndefined();
+  });
+
+  it("tags a car-active session's draft with vehicleKind: 'car'", async () => {
+    mocks.resolveActiveVehicle.mockResolvedValue(carActive());
+    const result: any = await toolProposeSettingsChange("owner@example.com", { currentMileage: 41000 });
+    expect(result).toEqual({ category: "settings", vehicleKind: "car", currentMileage: 41000 });
+  });
+
+  it("drafts several fields at once", async () => {
+    const result: any = await toolProposeSettingsChange("owner@example.com", { currentMileage: 16000, currency: "EUR", includeFinesInReport: true });
+    expect(result).toEqual({ category: "settings", vehicleKind: "bike", currentMileage: 16000, currency: "EUR", includeFinesInReport: true });
+  });
+});
+
+describe("toolProposeShareLink", () => {
+  it("returns an error when the account has no vehicle at all", async () => {
+    mocks.resolveActiveVehicle.mockResolvedValue(null);
+    const result = await toolProposeShareLink("owner@example.com", { recipientEmail: "buyer@example.com" });
+    expect(result).toEqual({ error: "No vehicle found on this account." });
+  });
+
+  it("drafts a link with the given recipient, defaulting duration to 1month when not specified", async () => {
+    const result: any = await toolProposeShareLink("owner@example.com", { recipientEmail: "buyer@example.com" });
+    expect(result).toEqual({ category: "shareLink", vehicleKind: "bike", duration: "1month", recipientEmail: "buyer@example.com", askingPrice: undefined });
+  });
+
+  it("falls back to 1month for an invalid duration rather than rejecting the draft", async () => {
+    const result: any = await toolProposeShareLink("owner@example.com", { recipientEmail: "buyer@example.com", duration: "1year" });
+    expect(result.duration).toBe("1month");
+  });
+
+  it("accepts a real duration", async () => {
+    const result: any = await toolProposeShareLink("owner@example.com", { recipientEmail: "buyer@example.com", duration: "6months" });
+    expect(result.duration).toBe("6months");
+  });
+
+  it("leaves recipientEmail blank (never invented) when not given, for the draft card to require before confirming", async () => {
+    const result: any = await toolProposeShareLink("owner@example.com", {});
+    expect(result.recipientEmail).toBe("");
+  });
+
+  it("rejects a zero or negative asking price", async () => {
+    expect((await toolProposeShareLink("owner@example.com", { recipientEmail: "buyer@example.com", askingPrice: 0 }) as any).error).toMatch(/asking price/i);
+    expect((await toolProposeShareLink("owner@example.com", { recipientEmail: "buyer@example.com", askingPrice: -10 }) as any).error).toMatch(/asking price/i);
+  });
+
+  it("carries a valid asking price through", async () => {
+    const result: any = await toolProposeShareLink("owner@example.com", { recipientEmail: "buyer@example.com", askingPrice: 3200 });
+    expect(result.askingPrice).toBe(3200);
+  });
+
+  it("tags a car-active session's draft with vehicleKind: 'car'", async () => {
+    mocks.resolveActiveVehicle.mockResolvedValue(carActive());
+    const result: any = await toolProposeShareLink("owner@example.com", { recipientEmail: "buyer@example.com" });
+    expect(result.vehicleKind).toBe("car");
+  });
+});
+
+describe("toolProposeEditEntry", () => {
+  const today = new Date().toISOString().slice(0, 10);
+
+  it("returns an error when the account has no vehicle at all", async () => {
+    mocks.resolveActiveVehicle.mockResolvedValue(null);
+    const result = await toolProposeEditEntry("owner@example.com", { category: "service", entryId: "sr-1" });
+    expect(result).toEqual({ error: "No vehicle found on this account." });
+  });
+
+  it("rejects a genuinely unrecognized category rather than guessing", async () => {
+    const result: any = await toolProposeEditEntry("owner@example.com", { category: "not-a-real-category", entryId: "sr-1" } as any);
+    expect(result.error).toMatch(/Not sure what category/);
+  });
+
+  it("requires a real entryId", async () => {
+    const result: any = await toolProposeEditEntry("owner@example.com", { category: "service" });
+    expect(result.error).toMatch(/Which entry/);
+  });
+
+  it("rejects a non-positive cost when one is given", async () => {
+    mocks.getServiceRecords.mockResolvedValue([{ id: "sr-1", jobType: "oil-filter", cost: 40, mileage: 12000, notes: "", date: "2025-01-01" }]);
+    const result: any = await toolProposeEditEntry("owner@example.com", { category: "service", entryId: "sr-1", cost: 0 });
+    expect(result.error).toMatch(/cost/i);
+  });
+
+  it("rejects a negative mileage when one is given", async () => {
+    mocks.getServiceRecords.mockResolvedValue([{ id: "sr-1", jobType: "oil-filter", cost: 40, mileage: 12000, notes: "", date: "2025-01-01" }]);
+    const result: any = await toolProposeEditEntry("owner@example.com", { category: "service", entryId: "sr-1", mileage: -5 });
+    expect(result.error).toMatch(/mileage/i);
+  });
+
+  describe("service", () => {
+    const record = { id: "sr-1", jobType: "oil-filter", cost: 40, mileage: 12000, notes: "Done at Halfords", date: "2025-06-01" };
+
+    it("returns an error when the entryId doesn't match any real record", async () => {
+      mocks.getServiceRecords.mockResolvedValue([record]);
+      const result: any = await toolProposeEditEntry("owner@example.com", { category: "service", entryId: "not-real", cost: 50 });
+      expect(result.error).toMatch(/Couldn't find that service record/);
+    });
+
+    it("changes only the given field, keeping every other field at its current logged value", async () => {
+      mocks.getServiceRecords.mockResolvedValue([record]);
+      const result: any = await toolProposeEditEntry("owner@example.com", { category: "service", entryId: "sr-1", cost: 55 });
+      expect(result).toEqual({
+        category: "service", jobType: "oil-filter", jobLabel: expect.any(String),
+        description: "Done at Halfords", cost: 55, date: "2025-06-01", mileage: 12000,
+        vehicleKind: "bike", entryId: "sr-1",
+      });
+    });
+
+    it("falls back to the record's own current jobType for an unrecognized new one, rather than defaulting to 'other'", async () => {
+      mocks.getServiceRecords.mockResolvedValue([record]);
+      const result: any = await toolProposeEditEntry("owner@example.com", { category: "service", entryId: "sr-1", jobType: "not-a-real-job" });
+      expect(result.jobType).toBe("oil-filter");
+    });
+
+    it("changes jobType, description, cost, date, and mileage together", async () => {
+      mocks.getServiceRecords.mockResolvedValue([record]);
+      const result: any = await toolProposeEditEntry("owner@example.com", {
+        category: "service", entryId: "sr-1", jobType: "valet", description: "Full valet instead", cost: 60, date: today, mileage: 13000,
+      });
+      expect(result).toMatchObject({ jobType: "valet", description: "Full valet instead", cost: 60, date: today, mileage: 13000 });
+    });
+
+    it("rejects a future date", async () => {
+      mocks.getServiceRecords.mockResolvedValue([record]);
+      const tomorrow = new Date(Date.now() + 2 * 86_400_000).toISOString().slice(0, 10);
+      const result: any = await toolProposeEditEntry("owner@example.com", { category: "service", entryId: "sr-1", date: tomorrow });
+      expect(result.error).toMatch(/future/);
+    });
+
+    it("rejects an unparseable date", async () => {
+      mocks.getServiceRecords.mockResolvedValue([record]);
+      const result: any = await toolProposeEditEntry("owner@example.com", { category: "service", entryId: "sr-1", date: "not-a-date" });
+      expect(result.error).toMatch(/valid date/);
+    });
+
+    it("looks up against the car's own catalog and records for a car-active session, tagged vehicleKind: 'car'", async () => {
+      mocks.resolveActiveVehicle.mockResolvedValue(carActive());
+      mocks.getCarServiceRecords.mockResolvedValue([{ id: "csr-1", jobType: "valet", cost: 40, mileage: 32000, notes: "", date: "2025-06-01" }]);
+      const result: any = await toolProposeEditEntry("owner@example.com", { category: "service", entryId: "csr-1", cost: 45 });
+      expect(result.vehicleKind).toBe("car");
+      expect(result.cost).toBe(45);
+      expect(mocks.getServiceRecords).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("bill", () => {
+    it("changes only the given field for a bike bill", async () => {
+      mocks.getBills.mockResolvedValue([{ id: "b-1", billType: "insurance", cost: 300, notes: "Annual renewal", date: "2025-01-01" }]);
+      const result: any = await toolProposeEditEntry("owner@example.com", { category: "bill", entryId: "b-1", cost: 320 });
+      expect(result).toEqual({
+        category: "bill", billType: "insurance", billLabel: expect.any(String),
+        description: "Annual renewal", cost: 320, date: "2025-01-01", vehicleKind: "bike", entryId: "b-1",
+      });
+    });
+
+    it("returns an error when the entryId doesn't match any real bill", async () => {
+      mocks.getBills.mockResolvedValue([]);
+      const result: any = await toolProposeEditEntry("owner@example.com", { category: "bill", entryId: "b-1", cost: 320 });
+      expect(result.error).toMatch(/Couldn't find that bill/);
+    });
+
+    it("resolves against the car-only bill catalog for a car-active session", async () => {
+      mocks.resolveActiveVehicle.mockResolvedValue(carActive());
+      mocks.getCarBills.mockResolvedValue([{ id: "cb-1", billType: "congestion", cost: 15, notes: "", date: "2025-01-01" }]);
+      const result: any = await toolProposeEditEntry("owner@example.com", { category: "bill", entryId: "cb-1", billType: "ulez-caz" });
+      expect(result.billType).toBe("ulez-caz");
+      expect(result.vehicleKind).toBe("car");
+    });
+  });
+
+  describe("mod", () => {
+    it("changes only the given field, defaulting the description to the mod's own name", async () => {
+      mocks.getMods.mockResolvedValue([{ id: "m-1", category: "tank-pads", name: "Tank pads", cost: 20, mileage: 12000, date: "2025-01-01" }]);
+      const result: any = await toolProposeEditEntry("owner@example.com", { category: "mod", entryId: "m-1", cost: 25 });
+      expect(result).toEqual({
+        category: "mod", modCategory: "tank-pads", modLabel: expect.any(String),
+        description: "Tank pads", cost: 25, date: "2025-01-01", mileage: 12000, vehicleKind: "bike", entryId: "m-1",
+      });
+    });
+
+    it("returns an error when the entryId doesn't match any real mod", async () => {
+      mocks.getMods.mockResolvedValue([]);
+      const result: any = await toolProposeEditEntry("owner@example.com", { category: "mod", entryId: "m-1" });
+      expect(result.error).toMatch(/Couldn't find that modification/);
+    });
+  });
+
+  describe("fuel", () => {
+    it("changes only the given field on a bike (litres) entry, never touching kwh", async () => {
+      mocks.getFuelLogs.mockResolvedValue([{ id: "f-1", litres: 10, cost: 15, mileage: 12000, date: "2025-01-01", filledToFull: true }]);
+      const result: any = await toolProposeEditEntry("owner@example.com", { category: "fuel", entryId: "f-1", cost: 16 });
+      expect(result).toEqual({
+        category: "fuel", litres: 10, kwh: undefined, cost: 16, date: "2025-01-01", mileage: 12000,
+        filledToFull: true, vehicleKind: "bike", entryId: "f-1",
+      });
+    });
+
+    it("keeps a car entry on kwh (never falls back to litres) when it was originally a charging session", async () => {
+      mocks.resolveActiveVehicle.mockResolvedValue(carActive());
+      mocks.getCarFuelLogs.mockResolvedValue([{ id: "cf-1", kwh: 30, cost: 10, mileage: 32000, date: "2025-01-01" }]);
+      const result: any = await toolProposeEditEntry("owner@example.com", { category: "fuel", entryId: "cf-1", cost: 11, litres: 40 });
+      expect(result.kwh).toBe(30);
+      expect(result.litres).toBeUndefined();
+      expect(result.cost).toBe(11);
+      expect(result.filledToFull).toBe(false);
+    });
+
+    it("returns an error when the entryId doesn't match any real fuel entry", async () => {
+      mocks.getFuelLogs.mockResolvedValue([]);
+      const result: any = await toolProposeEditEntry("owner@example.com", { category: "fuel", entryId: "f-1" });
+      expect(result.error).toMatch(/Couldn't find that fuel\/charging entry/);
+    });
+  });
+
+  describe("labour", () => {
+    it("changes only the given field", async () => {
+      mocks.getLabour.mockResolvedValue([{ id: "l-1", category: "brake-bleeding", cost: 45, mileage: 12000, notes: "Front brakes", date: "2025-01-01" }]);
+      const result: any = await toolProposeEditEntry("owner@example.com", { category: "labour", entryId: "l-1", cost: 50 });
+      expect(result).toEqual({
+        category: "labour", labourCategory: "brake-bleeding", labourLabel: expect.any(String),
+        description: "Front brakes", cost: 50, date: "2025-01-01", mileage: 12000, vehicleKind: "bike", entryId: "l-1",
+      });
+    });
+  });
+
+  describe("fine", () => {
+    it("changes only the given field, with no mileage field at all", async () => {
+      mocks.getFines.mockResolvedValue([{ id: "fn-1", fineType: "speeding", cost: 100, notes: "M25", date: "2025-01-01" }]);
+      const result: any = await toolProposeEditEntry("owner@example.com", { category: "fine", entryId: "fn-1", cost: 110 });
+      expect(result).toEqual({
+        category: "fine", fineType: "speeding", fineLabel: expect.any(String),
+        description: "M25", cost: 110, date: "2025-01-01", vehicleKind: "bike", entryId: "fn-1",
+      });
+      expect(result.mileage).toBeUndefined();
+    });
+  });
+
+  describe("toll", () => {
+    it("changes only the given field, with no mileage field at all", async () => {
+      mocks.getTolls.mockResolvedValue([{ id: "t-1", tollType: "parking", cost: 4, notes: "", date: "2025-01-01" }]);
+      const result: any = await toolProposeEditEntry("owner@example.com", { category: "toll", entryId: "t-1", cost: 5 });
+      expect(result).toEqual({
+        category: "toll", tollType: "parking", tollLabel: expect.any(String),
+        description: "", cost: 5, date: "2025-01-01", vehicleKind: "bike", entryId: "t-1",
+      });
+    });
+
+    it("returns an error when the entryId doesn't match any real toll", async () => {
+      mocks.getTolls.mockResolvedValue([]);
+      const result: any = await toolProposeEditEntry("owner@example.com", { category: "toll", entryId: "t-1" });
+      expect(result.error).toMatch(/Couldn't find that toll/);
     });
   });
 });

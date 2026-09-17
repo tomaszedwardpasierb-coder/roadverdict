@@ -291,6 +291,34 @@ describe("computeSellerReportRowsAndMetrics", () => {
       expect(result.verdictMetrics.totalEntries).toBe(1);
     });
   });
+
+  describe("hiding valet/wash entries from the buyer-facing rows and total", () => {
+    const valet = makeRecord({ id: "sr-valet", jobType: "valet", cost: 40, date: "2025-05-01", createdAt: "2025-05-02T00:00:00.000Z" });
+    const wash = makeRecord({ id: "sr-wash", jobType: "wash", cost: 8, date: "2025-05-05", createdAt: "2025-05-06T00:00:00.000Z" });
+
+    it("excludes valet/wash entries from rows and total by default", () => {
+      const result = computeSellerReportRowsAndMetrics(makeBike(), [valet, wash], [], [], [], []);
+      expect(result.rows).toEqual([]);
+      expect(result.total).toBe(0);
+    });
+
+    it("shows valet/wash entries once includeCleaningInReport is true", () => {
+      const result = computeSellerReportRowsAndMetrics(makeBike({ includeCleaningInReport: true }), [valet, wash], [], [], [], []);
+      expect(result.rows.map((r) => r.id).sort()).toEqual(["sr-valet", "sr-wash"]);
+      expect(result.total).toBe(48);
+    });
+
+    it("still counts a hidden valet entry toward totalEntries, even though it's excluded from rows/total", () => {
+      const result = computeSellerReportRowsAndMetrics(makeBike(), [valet], [], [], [], []);
+      expect(result.rows).toEqual([]);
+      expect(result.verdictMetrics.totalEntries).toBe(1);
+    });
+
+    it("never hides an ordinary mechanical service job type like an oil-filter", () => {
+      const result = computeSellerReportRowsAndMetrics(makeBike(), [makeRecord()], [], [], [], []);
+      expect(result.rows).toHaveLength(1);
+    });
+  });
 });
 
 describe("getSellerReportCore", () => {
@@ -327,6 +355,18 @@ describe("getSellerReportCore", () => {
     expect(Array.isArray(core.buyerQuestions)).toBe(true);
     expect(Array.isArray(core.storyParagraphs)).toBe(true);
     expect(core.mileageCheck).toEqual({ implausible: false });
+  });
+
+  it("excludes valet/wash entries from the item-by-item jobTypeGroups breakdown by default, but includes them once includeCleaningInReport is true", async () => {
+    mocks.getServiceRecords.mockResolvedValue([makeRecord(), makeRecord({ id: "sr-valet", jobType: "valet", cost: 40 })]);
+
+    mocks.getBike.mockResolvedValue(makeBike());
+    const hiddenCore = await getSellerReportCore("owner@example.com", "bike-1");
+    expect(hiddenCore.jobTypeGroups.map((g) => g.jobType).sort()).toEqual(["oil-filter"]);
+
+    mocks.getBike.mockResolvedValue(makeBike({ includeCleaningInReport: true }));
+    const shownCore = await getSellerReportCore("owner@example.com", "bike-1");
+    expect(shownCore.jobTypeGroups.map((g) => g.jobType).sort()).toEqual(["oil-filter", "valet"]);
   });
 });
 

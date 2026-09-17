@@ -17,6 +17,7 @@ import {
   updateCarIncludeFinanceInReport,
   updateCarIncludeFinesInReport,
   updateCarIncludeTollsInReport,
+  updateCarIncludeCleaningInReport,
   isCarReadOnly,
   CAR_READ_ONLY_MESSAGE,
   type CarFuelType,
@@ -169,7 +170,7 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
   }
 
-  const { currentMileage, region, annualBudget, distanceUnit, fuelEconomyUnit, currency, chartType, includeInsuranceInReport, includeFinanceInReport, includeFinesInReport, includeTollsInReport } = body as {
+  const { currentMileage, region, annualBudget, distanceUnit, fuelEconomyUnit, currency, chartType, includeInsuranceInReport, includeFinanceInReport, includeFinesInReport, includeTollsInReport, includeCleaningInReport } = body as {
     currentMileage?: number;
     region?: Region;
     annualBudget?: number;
@@ -181,6 +182,7 @@ export async function PATCH(request: NextRequest) {
     includeFinanceInReport?: boolean;
     includeFinesInReport?: boolean;
     includeTollsInReport?: boolean;
+    includeCleaningInReport?: boolean;
   };
 
   if (
@@ -194,7 +196,8 @@ export async function PATCH(request: NextRequest) {
     includeInsuranceInReport === undefined &&
     includeFinanceInReport === undefined &&
     includeFinesInReport === undefined &&
-    includeTollsInReport === undefined
+    includeTollsInReport === undefined &&
+    includeCleaningInReport === undefined
   ) {
     return NextResponse.json({ error: "Nothing to update." }, { status: 400 });
   }
@@ -256,6 +259,10 @@ export async function PATCH(request: NextRequest) {
   }
   if (includeTollsInReport !== undefined) {
     car = await updateCarIncludeTollsInReport(session.email, carId, includeTollsInReport);
+    void logImpersonationActivityForCurrentRequest("car", carId, "update");
+  }
+  if (includeCleaningInReport !== undefined) {
+    car = await updateCarIncludeCleaningInReport(session.email, carId, includeCleaningInReport);
     void logImpersonationActivityForCurrentRequest("car", carId, "update");
   }
 

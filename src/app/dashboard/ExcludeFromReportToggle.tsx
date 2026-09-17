@@ -19,7 +19,7 @@ export function ExcludeFromReportToggle({
   confirmMessage,
   noteText,
 }: {
-  fieldName: 'includeInsuranceInReport' | 'includeFinanceInReport' | 'includeFinesInReport' | 'includeTollsInReport';
+  fieldName: 'includeInsuranceInReport' | 'includeFinanceInReport' | 'includeFinesInReport' | 'includeTollsInReport' | 'includeCleaningInReport';
   included: boolean;
   checkboxLabel: string;
   confirmMessage: string;

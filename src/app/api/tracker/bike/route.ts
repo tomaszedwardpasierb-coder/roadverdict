@@ -15,6 +15,7 @@ import {
   updateBikeIncludeFinanceInReport,
   updateBikeIncludeFinesInReport,
   updateBikeIncludeTollsInReport,
+  updateBikeIncludeCleaningInReport,
   updateBikeChartType,
   updateBikeDvlaData,
   isBikeReadOnly,
@@ -181,7 +182,7 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
   }
 
-  const { currentMileage, region, annualBudget, distanceUnit, fuelEconomyUnit, currency, chartType, includeInsuranceInReport, includeFinanceInReport, includeFinesInReport, includeTollsInReport } = body as {
+  const { currentMileage, region, annualBudget, distanceUnit, fuelEconomyUnit, currency, chartType, includeInsuranceInReport, includeFinanceInReport, includeFinesInReport, includeTollsInReport, includeCleaningInReport } = body as {
     currentMileage?: number;
     region?: Region;
     annualBudget?: number;
@@ -193,6 +194,7 @@ export async function PATCH(request: NextRequest) {
     includeFinanceInReport?: boolean;
     includeFinesInReport?: boolean;
     includeTollsInReport?: boolean;
+    includeCleaningInReport?: boolean;
   };
 
   if (
@@ -206,7 +208,8 @@ export async function PATCH(request: NextRequest) {
     includeInsuranceInReport === undefined &&
     includeFinanceInReport === undefined &&
     includeFinesInReport === undefined &&
-    includeTollsInReport === undefined
+    includeTollsInReport === undefined &&
+    includeCleaningInReport === undefined
   ) {
     return NextResponse.json({ error: "Nothing to update." }, { status: 400 });
   }
@@ -269,6 +272,10 @@ export async function PATCH(request: NextRequest) {
   }
   if (includeTollsInReport !== undefined) {
     bike = await updateBikeIncludeTollsInReport(session.email, bikeId, includeTollsInReport);
+    void logImpersonationActivityForCurrentRequest("bike", bikeId, "update");
+  }
+  if (includeCleaningInReport !== undefined) {
+    bike = await updateBikeIncludeCleaningInReport(session.email, bikeId, includeCleaningInReport);
     void logImpersonationActivityForCurrentRequest("bike", bikeId, "update");
   }
 

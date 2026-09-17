@@ -28,7 +28,7 @@ import {
   type JobTypeGroup,
   type MileagePlausibilityCheck,
 } from "@/lib/tracker/reportNarrative";
-import { JOB_LABELS } from "@/lib/tracker/jobTypes";
+import { JOB_LABELS, isCleaningJob } from "@/lib/tracker/jobTypes";
 import { MOD_LABELS } from "@/lib/tracker/modTypes";
 import { BILL_LABELS } from "@/lib/tracker/billTypes";
 import { FINE_LABELS } from "@/lib/tracker/fineTypes";
@@ -181,7 +181,7 @@ export function computeSellerReportRowsAndMetrics(
   // includeFinesInReport, ALL tolls by includeTollsInReport.
 
   const allRows: (ReportRow & { hiddenFromBuyer: boolean })[] = [
-    ...records.map((r) => ({ id: r.id, date: r.date, createdAt: r.createdAt, category: "Service", description: JOB_LABELS[r.jobType] ?? r.jobType, cost: r.cost, attachment: r.attachments?.[0] ?? null, hiddenFromBuyer: false })),
+    ...records.map((r) => ({ id: r.id, date: r.date, createdAt: r.createdAt, category: "Service", description: JOB_LABELS[r.jobType] ?? r.jobType, cost: r.cost, attachment: r.attachments?.[0] ?? null, hiddenFromBuyer: isCleaningJob(r.jobType) && !bike.includeCleaningInReport })),
     ...mods.map((m) => ({ id: m.id, date: m.date, createdAt: m.createdAt, category: "Modification", description: `${MOD_LABELS[m.category] ?? m.category}: ${m.name}`, cost: m.cost, attachment: m.attachments?.[0] ?? null, hiddenFromBuyer: false })),
     ...bills.map((b) => ({
       id: b.id,
@@ -345,8 +345,13 @@ export async function getSellerReportCore(email: string, bikeId: string): Promis
   );
 
   const mileageCheck = checkCurrentMileagePlausibility(bike.currentMileage, bike);
+  // Same off-by-default exclusion as allRows above - the "Item by item"
+  // breakdown is buyer-facing, so it must never show a cleaning entry
+  // the owner has chosen to keep out of their report, even though the
+  // trust/documentation metrics above still count it.
+  const jobTypeRecordsForReport = bike.includeCleaningInReport ? records : records.filter((r) => !isCleaningJob(r.jobType));
   const jobTypeGroups = groupServiceHistoryByJobType(
-    records.map((r) => ({ id: r.id, jobType: r.jobType, date: r.date, cost: r.cost, hasReceipt: !!r.attachments?.[0] }))
+    jobTypeRecordsForReport.map((r) => ({ id: r.id, jobType: r.jobType, date: r.date, cost: r.cost, hasReceipt: !!r.attachments?.[0] }))
   );
   const totalExactDuplicates = jobTypeGroups.reduce((sum, g) => sum + g.exactDuplicateCount, 0);
   const otherGroup = jobTypeGroups.find((g) => g.jobType === "other");
