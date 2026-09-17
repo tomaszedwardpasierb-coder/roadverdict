@@ -659,7 +659,7 @@ describe("AssistantWidget", () => {
       expect(screen.getByRole("button", { name: "Send" })).toBeEnabled();
     });
 
-    it("a real recognition error (e.g. microphone permission denied) shows an inline note", async () => {
+    it("a permission-denied recognition error shows a permission-specific inline note", async () => {
       vi.stubGlobal("SpeechRecognition", MockSpeechRecognition);
       const user = userEvent.setup();
       render(<AssistantWidget />);
@@ -671,11 +671,37 @@ describe("AssistantWidget", () => {
         recognition.onerror?.({ error: "not-allowed" });
       });
 
-      expect(await screen.findByText(/check your microphone permission/i)).toBeInTheDocument();
+      expect(await screen.findByText(/microphone access is blocked/i)).toBeInTheDocument();
+    });
+
+    // Each real error code gets its own accurate message - previously
+    // every one of these showed the same "check your microphone
+    // permission" text, which is actively wrong for e.g. `network`
+    // (the most common real-world cause: Chrome's built-in recognition
+    // talks to a Google backend, so a firewall/DNS block surfaces as
+    // `network` even with a working, permitted mic).
+    it.each([
+      ["network", /couldn't reach the voice service/i],
+      ["audio-capture", /no microphone found/i],
+      ["service-not-allowed", /voice input isn't available/i],
+      ["some-unrecognised-future-code", /couldn't hear that - try again/i],
+    ])("a '%s' recognition error shows its own specific message", async (errorCode, expectedText) => {
+      vi.stubGlobal("SpeechRecognition", MockSpeechRecognition);
+      const user = userEvent.setup();
+      render(<AssistantWidget />);
+      await user.click(screen.getByRole("button", { name: "Open assistant" }));
+      await user.click(await screen.findByRole("button", { name: "Start voice input" }));
+
+      const recognition = MockSpeechRecognition.instances[0];
+      act(() => {
+        recognition.onerror?.({ error: errorCode });
+      });
+
+      expect(await screen.findByText(expectedText)).toBeInTheDocument();
     });
 
     it.each(["no-speech", "aborted"])(
-      "a '%s' recognition event is a normal outcome, not an error shown to the user",
+      "a '%s' recognition event is a normal outcome, shown to the user as no error at all",
       async (errorCode) => {
         vi.stubGlobal("SpeechRecognition", MockSpeechRecognition);
         const user = userEvent.setup();
@@ -688,9 +714,42 @@ describe("AssistantWidget", () => {
           recognition.onerror?.({ error: errorCode });
         });
 
-        expect(screen.queryByText(/check your microphone permission/i)).not.toBeInTheDocument();
+        expect(screen.queryByRole("alert")).not.toBeInTheDocument();
       }
     );
+
+    it("stops listening immediately when clicked again, even if the browser never fires onend", async () => {
+      class NeverEndsMockSpeechRecognition extends MockSpeechRecognition {
+        stop = vi.fn(); // deliberately does NOT call onend - simulates the real-world stuck case
+      }
+      vi.stubGlobal("SpeechRecognition", NeverEndsMockSpeechRecognition);
+      const user = userEvent.setup();
+      render(<AssistantWidget />);
+      await user.click(screen.getByRole("button", { name: "Open assistant" }));
+      await user.click(await screen.findByRole("button", { name: "Start voice input" }));
+      expect(await screen.findByRole("button", { name: "Stop voice input" })).toHaveAttribute("aria-pressed", "true");
+
+      await user.click(screen.getByRole("button", { name: "Stop voice input" }));
+
+      expect(await screen.findByRole("button", { name: "Start voice input" })).toHaveAttribute("aria-pressed", "false");
+      expect(NeverEndsMockSpeechRecognition.instances[0].stop).toHaveBeenCalledTimes(1);
+    });
+
+    it("never gets stuck listening when start() throws synchronously", async () => {
+      class ThrowsOnStartMockSpeechRecognition extends MockSpeechRecognition {
+        start = vi.fn(() => {
+          throw new Error("recognition already started");
+        });
+      }
+      vi.stubGlobal("SpeechRecognition", ThrowsOnStartMockSpeechRecognition);
+      const user = userEvent.setup();
+      render(<AssistantWidget />);
+      await user.click(screen.getByRole("button", { name: "Open assistant" }));
+      await user.click(await screen.findByRole("button", { name: "Start voice input" }));
+
+      expect(screen.getByRole("button", { name: "Start voice input" })).toHaveAttribute("aria-pressed", "false");
+      expect(await screen.findByText(/couldn't start voice input/i)).toBeInTheDocument();
+    });
 
     it("disables the mic button while a message is sending, same as the textarea and Send button", async () => {
       vi.stubGlobal("SpeechRecognition", MockSpeechRecognition);

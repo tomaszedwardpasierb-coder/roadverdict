@@ -56,6 +56,24 @@ function getSpeechRecognitionConstructor(): SpeechRecognitionConstructor | null 
   return w.SpeechRecognition ?? w.webkitSpeechRecognition ?? null;
 }
 
+// What each Web Speech API error code actually means - previously every
+// non-silent error (network failure reaching the browser's speech
+// service, no microphone present, the service being unavailable at all)
+// was shown as the same "check your microphone permission" message,
+// which is only actually true for `not-allowed`. On a real network
+// restriction (the most common cause in practice - Chrome's built-in
+// recognition talks to a Google backend, so any firewall/DNS-level block
+// surfaces as `network` even with a working, permitted mic), that
+// message sent people checking a permission that was never the problem.
+// See https://developer.mozilla.org/en-US/docs/Web/API/SpeechRecognitionErrorEvent/error
+// for the full code list.
+const SPEECH_ERROR_MESSAGES: Record<string, string> = {
+  'not-allowed': "Microphone access is blocked - allow it in your browser's site settings and try again.",
+  'service-not-allowed': "Voice input isn't available in this browser right now - try typing instead.",
+  'audio-capture': 'No microphone found - check one is connected and try again.',
+  'network': "Couldn't reach the voice service - check your connection and try again.",
+};
+
 interface Message {
   role: 'user' | 'assistant';
   content: string;
@@ -256,7 +274,14 @@ function AssistantWidgetInner() {
 
   function handleMicClick() {
     if (listening) {
+      // Reset immediately rather than waiting on the browser's own onend
+      // event - stop() asks the recognition session to end, but nothing
+      // guarantees it actually fires onend promptly (or at all, on some
+      // browsers/error paths), which is exactly what left the mic button
+      // stuck pulsing with no way to cancel it.
       recognitionRef.current?.stop();
+      recognitionRef.current = null;
+      setListening(false);
       return;
     }
     const SpeechRecognitionCtor = getSpeechRecognitionConstructor();
@@ -280,24 +305,38 @@ function AssistantWidgetInner() {
     // "no-speech" (nobody said anything before it timed out) and
     // "aborted" (the person clicked the mic again to stop it themselves)
     // are both normal, silent outcomes, not failures worth surfacing -
-    // onend below already resets the listening state either way. Anything
-    // else (mic permission denied, no microphone, a real browser error)
-    // gets a brief inline note the same way a failed send does.
+    // onend below already resets the listening state either way.
     recognition.onerror = (event) => {
       const errorEvent = event as Event & { error?: string };
-      if (errorEvent.error !== 'no-speech' && errorEvent.error !== 'aborted') {
-        setError("Couldn't hear that - check your microphone permission and try again.");
+      const code = errorEvent.error ?? '';
+      if (code !== 'no-speech' && code !== 'aborted') {
+        setError(SPEECH_ERROR_MESSAGES[code] ?? "Couldn't hear that - try again.");
       }
     };
+    // Guarded by identity - if a later session has already replaced this
+    // one in recognitionRef (e.g. stop-then-restart in quick succession),
+    // this stale onend must not reset state for the session that's
+    // actually still running now.
     recognition.onend = () => {
+      if (recognitionRef.current !== recognition) return;
       setListening(false);
       recognitionRef.current = null;
     };
 
     recognitionRef.current = recognition;
-    setListening(true);
     setError(null);
-    recognition.start();
+    try {
+      recognition.start();
+      setListening(true);
+    } catch {
+      // start() can throw synchronously (e.g. a session already winding
+      // down) - without this, that left `listening` never set true in
+      // the first place, but recognitionRef pointing at a dead object,
+      // so a follow-up click's stop() was a no-op and the button read as
+      // permanently stuck.
+      recognitionRef.current = null;
+      setError("Couldn't start voice input - try again.");
+    }
   }
 
   // Uploads immediately on pick, same as AttachmentUploader.tsx's own
