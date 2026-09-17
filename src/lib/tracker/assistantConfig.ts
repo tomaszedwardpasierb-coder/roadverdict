@@ -34,6 +34,15 @@ export interface AssistantConfigDoc {
   personalities: [PersonalitySlot, PersonalitySlot, PersonalitySlot];
   knowledgeBaseUpdatedAt: string;
   personalityUpdatedAt: string;
+  // Off (undefined/false) by default, on purpose - a brand new account
+  // gets the getting-started checklist automatically only while this is
+  // true; otherwise the only way any account gets it is /tomasz's
+  // per-account EnableOnboardingButton (see createSessionForEmail in
+  // auth/session.ts, which reads this before deciding). Optional rather
+  // than required so the existing live config document - which predates
+  // this field - reads as "off" without needing a migration to backfill
+  // it first.
+  autoEnableOnboardingForNewSignups?: boolean;
 }
 
 export interface KnowledgeBaseVersionDoc {
@@ -126,6 +135,18 @@ export async function updatePersonalityConfig(
     savedAt: now,
   };
   await container.items.create(version);
+}
+
+// No version history, unlike knowledge base/personality above - this is
+// a single on/off flag, not editorial content worth keeping a
+// chronology of.
+export async function updateAutoEnableOnboarding(enabled: boolean): Promise<void> {
+  const container = getContainer();
+  const existing = await getAssistantConfig();
+  if (!existing) {
+    throw new Error("Cannot update onboarding auto-enable - no assistant config exists yet. Run the seed migration first.");
+  }
+  await container.items.upsert({ ...existing, autoEnableOnboardingForNewSignups: enabled });
 }
 
 export async function getKnowledgeBaseVersions(limit = 20): Promise<KnowledgeBaseVersionDoc[]> {

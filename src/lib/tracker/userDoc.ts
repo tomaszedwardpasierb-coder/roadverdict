@@ -86,15 +86,17 @@ export interface UserDoc {
   // <country>" as a spot-unauthorised-access signal, without exposing a
   // full audit trail.
   vaultAccessLog?: { at: string; browser: string; country: string | null }[];
-  // The first-time-user checklist (OnboardingChecklistCard.tsx) - absent
-  // entirely for every account created before this shipped, so nothing
-  // suddenly appears for someone who's used this app for years. Set on
-  // every brand new account at the moment its doc is first created (see
-  // createSessionForEmail in auth/session.ts); for an existing account,
-  // only an admin turning it on explicitly (enableOnboardingChecklist in
-  // userAccount.ts, /tomasz's EnableOnboardingButton) creates it. Once
-  // present, its mere presence is what makes the checklist render at
-  // all - see OnboardingChecklistCard.tsx.
+  // The first-time-user checklist (OnboardingChecklistCard.tsx) - off by
+  // default for everyone, new and existing accounts alike. The only two
+  // ways an account ever gets this field at all: /tomasz's global
+  // "auto-enable for new signups" toggle (assistantConfig.
+  // autoEnableOnboardingForNewSignups) being on at the moment a brand
+  // new account's doc is first created (see createSessionForEmail in
+  // auth/session.ts), or an admin turning it on explicitly for one
+  // existing account (enableOnboardingChecklist in userAccount.ts,
+  // /tomasz's EnableOnboardingButton). Once present, its mere presence
+  // is what makes the checklist render at all - see
+  // OnboardingChecklistCard.tsx.
   onboarding?: {
     completedSteps: OnboardingStep[];
     dismissedChecklistAt?: string;

@@ -4,6 +4,7 @@ const mocks = vi.hoisted(() => ({
   read: vi.fn(),
   itemsCreate: vi.fn(),
   cookieGet: vi.fn(),
+  getAssistantConfig: vi.fn(),
 }));
 
 const mockContainer = {
@@ -15,6 +16,12 @@ const mockContainer = {
 
 vi.mock("@/lib/cosmos", () => ({ getContainer: () => mockContainer }));
 vi.mock("next/headers", () => ({ cookies: vi.fn(async () => ({ get: mocks.cookieGet })) }));
+// Mocked directly, separate from the raw container mock above - kept
+// decoupled from the same `mocks.read` every other `.item(...).read()`
+// call in this file shares, so per-test onboarding-auto-enable behaviour
+// doesn't depend on routing by which id/pk a given test's setup happens
+// to read.
+vi.mock("@/lib/tracker/assistantConfig", () => ({ getAssistantConfig: mocks.getAssistantConfig }));
 // @/lib/auth/crypto (hashToken/generateToken/encodeEmail/decodeEmail) is
 // deliberately NOT mocked - it's pure, real SHA-256/randomBytes/base64url,
 // so these tests verify the genuine cookie-encodes-to-what-getSession-
@@ -28,6 +35,11 @@ function resetAllMocks() {
   mocks.itemsCreate.mockReset();
   mocks.cookieGet.mockReset();
   mockContainer.item.mockClear();
+  mocks.getAssistantConfig.mockReset();
+  // Off by default, matching the real assistantConfig.
+  // autoEnableOnboardingForNewSignups's own default - individual tests
+  // override this where the auto-enable setting is what's under test.
+  mocks.getAssistantConfig.mockResolvedValue(null);
 }
 
 // ---------------------------------------------------------------------
@@ -131,13 +143,34 @@ describe("createSessionForEmail", () => {
     });
   });
 
-  it("initializes onboarding as active on a brand new account, so the getting-started checklist shows immediately", async () => {
+  it("does not initialize onboarding on a brand new account by default - /tomasz's global toggle is off", async () => {
     mocks.read.mockResolvedValue({ resource: undefined });
+    mocks.getAssistantConfig.mockResolvedValue(null); // no assistantConfig doc, or the field simply unset
+
+    await createSessionForEmail("user@example.com", "1.2.3.4", "test-agent");
+
+    const userCreateCall = mocks.itemsCreate.mock.calls.find((call) => call[0].type === "user");
+    expect(userCreateCall![0].onboarding).toBeUndefined();
+  });
+
+  it("initializes onboarding as active on a brand new account when /tomasz's auto-enable toggle is on", async () => {
+    mocks.read.mockResolvedValue({ resource: undefined });
+    mocks.getAssistantConfig.mockResolvedValue({ autoEnableOnboardingForNewSignups: true });
 
     await createSessionForEmail("user@example.com", "1.2.3.4", "test-agent");
 
     const userCreateCall = mocks.itemsCreate.mock.calls.find((call) => call[0].type === "user");
     expect(userCreateCall![0].onboarding).toEqual({ completedSteps: [] });
+  });
+
+  it("does not initialize onboarding when the auto-enable toggle is explicitly false", async () => {
+    mocks.read.mockResolvedValue({ resource: undefined });
+    mocks.getAssistantConfig.mockResolvedValue({ autoEnableOnboardingForNewSignups: false });
+
+    await createSessionForEmail("user@example.com", "1.2.3.4", "test-agent");
+
+    const userCreateCall = mocks.itemsCreate.mock.calls.find((call) => call[0].type === "user");
+    expect(userCreateCall![0].onboarding).toBeUndefined();
   });
 
   it("does not create a duplicate user document when one already exists", async () => {

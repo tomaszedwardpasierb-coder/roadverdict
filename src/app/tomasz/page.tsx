@@ -36,6 +36,7 @@ import { DeleteAccountButton } from './DeleteAccountButton';
 import { ResetStoryCooldownButton } from './ResetStoryCooldownButton';
 import { RevokeSessionsButton } from './RevokeSessionsButton';
 import { EnableOnboardingButton } from './EnableOnboardingButton';
+import { OnboardingAutoEnableToggle } from './OnboardingAutoEnableToggle';
 
 export const dynamic = 'force-dynamic';
 
@@ -541,6 +542,7 @@ export default async function AdminDashboardPage(
         a re-authentication without blocking - every device signed out now, but they can sign straight back in.
         Delete is permanent - every bike, record, and share link tied to that email is gone, with no undo.
       </p>
+      <OnboardingAutoEnableToggle enabled={!!assistantConfig?.autoEnableOnboardingForNewSignups} />
       {allUserAccounts.length === 0 ? (
         <p className={styles.warnNote}>No accounts found.</p>
       ) : (

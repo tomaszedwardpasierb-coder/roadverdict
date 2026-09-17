@@ -22,6 +22,7 @@ import {
   getAssistantConfig,
   updateKnowledgeBase,
   updatePersonalityConfig,
+  updateAutoEnableOnboarding,
   getKnowledgeBaseVersions,
   getPersonalityVersions,
   pruneKnowledgeBaseVersions,
@@ -144,6 +145,42 @@ describe("updatePersonalityConfig", () => {
     await updatePersonalityConfig(true, "1", newPersonalities);
     const updated = mocks.upsert.mock.calls[0][0];
     expect(updated.knowledgeBase).toBe(existingConfig.knowledgeBase);
+  });
+});
+
+describe("updateAutoEnableOnboarding", () => {
+  beforeEach(() => {
+    Object.values(mocks).forEach((m) => m.mockReset());
+    mocks.read.mockResolvedValue({ resource: existingConfig });
+    mocks.upsert.mockResolvedValue(undefined);
+  });
+
+  it("throws with a clear message when no config exists yet", async () => {
+    mocks.read.mockResolvedValue({ resource: undefined });
+    await expect(updateAutoEnableOnboarding(true)).rejects.toThrow("Run the seed migration first");
+    expect(mocks.upsert).not.toHaveBeenCalled();
+  });
+
+  it("upserts the flag on", async () => {
+    await updateAutoEnableOnboarding(true);
+    expect(mocks.upsert).toHaveBeenCalledWith(expect.objectContaining({ autoEnableOnboardingForNewSignups: true }));
+  });
+
+  it("upserts the flag off", async () => {
+    await updateAutoEnableOnboarding(false);
+    expect(mocks.upsert).toHaveBeenCalledWith(expect.objectContaining({ autoEnableOnboardingForNewSignups: false }));
+  });
+
+  it("writes no version-history snapshot - this is a plain flag, not editorial content", async () => {
+    await updateAutoEnableOnboarding(true);
+    expect(mocks.create).not.toHaveBeenCalled();
+  });
+
+  it("does not touch the knowledge base or personality fields", async () => {
+    await updateAutoEnableOnboarding(true);
+    const updated = mocks.upsert.mock.calls[0][0];
+    expect(updated.knowledgeBase).toBe(existingConfig.knowledgeBase);
+    expect(updated.personalities).toEqual(existingConfig.personalities);
   });
 });
 

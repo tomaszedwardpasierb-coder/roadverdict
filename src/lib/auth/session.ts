@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import { getContainer } from "@/lib/cosmos";
 import { hashToken, decodeEmail, generateToken, encodeEmail } from "@/lib/auth/crypto";
 import { isAccountBlocked } from "@/lib/tracker/userDoc";
+import { getAssistantConfig } from "@/lib/tracker/assistantConfig";
 
 export async function getSession(): Promise<{ email: string } | null> {
   const container = getContainer();
@@ -51,19 +52,20 @@ export async function createSessionForEmail(email: string, ip: string, userAgent
   try {
     const { resource: existingUser } = await container.item(email, email).read();
     if (!existingUser) {
+      // Off by default - only included when an admin has turned on
+      // /tomasz's global "auto-enable for new signups" toggle
+      // (assistantConfig.autoEnableOnboardingForNewSignups). The only
+      // other way any account ever gets the checklist is /tomasz's own
+      // per-account EnableOnboardingButton - see UserDoc.onboarding's
+      // own comment in userDoc.ts.
+      const config = await getAssistantConfig();
       await container.items.create({
         id: email,
         pk: email,
         type: "user",
         email,
         createdAt: new Date().toISOString(),
-        // Active by default for every brand new account (see
-        // OnboardingChecklistCard.tsx and UserDoc.onboarding's own
-        // comment) - an account that already existed before this
-        // shipped never passes through this branch again, so nothing
-        // suddenly appears for a long-time user unless an admin turns
-        // it on explicitly via /tomasz.
-        onboarding: { completedSteps: [] },
+        ...(config?.autoEnableOnboardingForNewSignups ? { onboarding: { completedSteps: [] } } : {}),
       });
     }
   } catch (err) {
