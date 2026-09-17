@@ -216,7 +216,11 @@ function reminderDefault(entry: ProposedEntry): { checked: boolean; type: 'milea
 // use, so every existing server-side check (mileage consistency,
 // production-year, litres plausibility, etc.) still applies. This never
 // writes anything on its own; only the person's own click does.
-export function AssistantProposedEntryCard({ entry }: { entry: ProposedEntry }) {
+// onConfirmed - called once, right after a successful log/update, never
+// on the initial render or on an error - lets a parent (AssistantWidget)
+// react to a real confirm happening, e.g. to auto-continue a multi-item
+// logging request without the person needing to type "next" themselves.
+export function AssistantProposedEntryCard({ entry, onConfirmed }: { entry: ProposedEntry; onConfirmed?: () => void }) {
   const router = useRouter();
   const isCar = entry.vehicleKind === 'car';
   const [jobType, setJobType] = useState(entry.category === 'service' ? entry.jobType : '');
@@ -355,6 +359,7 @@ export function AssistantProposedEntryCard({ entry }: { entry: ProposedEntry }) 
       setLogged(true);
       setSubmitting(false);
       router.refresh();
+      onConfirmed?.();
     } catch {
       setError('Could not reach RoadVerdict. Check your connection and try again.');
       setSubmitting(false);

@@ -173,6 +173,30 @@ describe("AssistantProposedEntryCard", () => {
     expect(refresh).toHaveBeenCalled();
   });
 
+  it("calls onConfirmed once, only after a real successful confirm", async () => {
+    (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({ ok: true, json: async () => ({}) });
+    const onConfirmed = vi.fn();
+    const user = userEvent.setup();
+    render(<AssistantProposedEntryCard entry={serviceEntry} onConfirmed={onConfirmed} />);
+
+    expect(onConfirmed).not.toHaveBeenCalled();
+    await user.click(screen.getByRole("button", { name: "Log it" }));
+
+    await screen.findByText(/Logged/);
+    expect(onConfirmed).toHaveBeenCalledTimes(1);
+  });
+
+  it("never calls onConfirmed when the confirm fails", async () => {
+    (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({ ok: false, json: async () => ({ error: "Something went wrong." }) });
+    const onConfirmed = vi.fn();
+    const user = userEvent.setup();
+    render(<AssistantProposedEntryCard entry={serviceEntry} onConfirmed={onConfirmed} />);
+    await user.click(screen.getByRole("button", { name: "Log it" }));
+
+    await screen.findByText("Something went wrong.");
+    expect(onConfirmed).not.toHaveBeenCalled();
+  });
+
   it("a service entry is pre-checked with its job type's own reminder default, and includes it in the POST body", async () => {
     (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({ ok: true, json: async () => ({}) });
     const user = userEvent.setup();

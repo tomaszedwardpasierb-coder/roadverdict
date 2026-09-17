@@ -378,7 +378,10 @@ describe("AssistantWidget", () => {
           },
         }),
       })
-      .mockResolvedValueOnce({ ok: true, status: 200, json: async () => ({ record: { id: "svc-1" } }) });
+      .mockResolvedValueOnce({ ok: true, status: 200, json: async () => ({ record: { id: "svc-1" } }) })
+      // The automatic continuation message confirming fires - see
+      // "confirming an entry automatically sends a continuation message" below.
+      .mockResolvedValueOnce({ ok: true, status: 200, json: async () => ({ reply: "That's everything!" }) });
     vi.stubGlobal("fetch", fetchMock);
 
     const user = userEvent.setup();
@@ -391,13 +394,57 @@ describe("AssistantWidget", () => {
     await user.click(screen.getByRole("button", { name: "Log it" }));
 
     await screen.findByText(/Logged/);
-    expect(fetchMock).toHaveBeenLastCalledWith("/api/tracker/services", expect.objectContaining({ method: "POST" }));
+    expect(fetchMock.mock.calls[1]).toEqual(["/api/tracker/services", expect.objectContaining({ method: "POST" })]);
     const body = JSON.parse(fetchMock.mock.calls[1][1].body);
     expect(body).toEqual({
       jobType: "oil-filter", cost: 4.5, mileage: 15000, date: "2026-01-01", notes: "Valve cleaner", mileageAcknowledged: false,
       reminder: { intervalType: "mileage", intervalValue: 4000 },
     });
     expect(mockRouterRefresh).toHaveBeenCalled();
+  });
+
+  // Regression test for the actual complaint: logging several things in
+  // one request ("log an oil change and a new tyre") drafted the first
+  // item, and then just sat there once it was confirmed - nothing
+  // prompted the model to draft the second one without the person typing
+  // something themselves.
+  it("confirming a proposed entry automatically sends a visible continuation message, without the person typing anything", async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce({
+        ok: true, status: 200,
+        json: async () => ({
+          reply: "Here's the oil change - I'll do the tyre next once you've confirmed this one.",
+          proposedEntry: { category: "service", jobType: "oil-filter", jobLabel: "Oil & filter change", description: "", cost: 45, date: "2026-01-01", mileage: 15000, vehicleKind: "bike" },
+        }),
+      })
+      .mockResolvedValueOnce({ ok: true, status: 200, json: async () => ({ record: { id: "svc-1" } }) })
+      .mockResolvedValueOnce({
+        ok: true, status: 200,
+        json: async () => ({
+          reply: "Here's the tyre.",
+          proposedEntry: { category: "mod", modCategory: "tyres", modLabel: "Tyres", description: "New rear tyre", cost: 90, date: "2026-01-01", mileage: 15000 },
+        }),
+      });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const user = userEvent.setup();
+    render(<AssistantWidget />);
+    await openWidgetAndSend(user, "log an oil change for £45 and a new tyre for £90");
+    await screen.findByText(/I'll do the tyre next/);
+
+    await user.click(screen.getByRole("button", { name: "Log it" }));
+    await screen.findByText(/Logged/);
+
+    // The continuation is a real, visible turn - not a hidden message -
+    // through the exact same send pipeline typing would use.
+    expect(await screen.findByText("That's logged. If there's anything else from what I just asked you to log, draft the next one now.")).toBeInTheDocument();
+    expect(await screen.findByText("Here's the tyre.")).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    const continuationBody = JSON.parse(fetchMock.mock.calls[2][1].body);
+    expect(continuationBody.messages.at(-1)).toEqual({
+      role: "user",
+      content: "That's logged. If there's anything else from what I just asked you to log, draft the next one now.",
+    });
   });
 
   it("shows the server's error inline on the card, without disturbing the surrounding chat, when confirming fails", async () => {
@@ -435,7 +482,8 @@ describe("AssistantWidget", () => {
           },
         }),
       })
-      .mockResolvedValueOnce({ ok: true, status: 200, json: async () => ({ mod: { id: "mod-1" } }) });
+      .mockResolvedValueOnce({ ok: true, status: 200, json: async () => ({ mod: { id: "mod-1" } }) })
+      .mockResolvedValueOnce({ ok: true, status: 200, json: async () => ({ reply: "That's everything!" }) });
     vi.stubGlobal("fetch", fetchMock);
 
     const user = userEvent.setup();
@@ -447,7 +495,7 @@ describe("AssistantWidget", () => {
     await user.click(screen.getByRole("button", { name: "Log it" }));
 
     await screen.findByText(/Logged/);
-    expect(fetchMock).toHaveBeenLastCalledWith("/api/tracker/mods", expect.objectContaining({ method: "POST" }));
+    expect(fetchMock.mock.calls[1]).toEqual(["/api/tracker/mods", expect.objectContaining({ method: "POST" })]);
     const body = JSON.parse(fetchMock.mock.calls[1][1].body);
     expect(body).toEqual({ category: "other-accessory", name: "Szuwax detailing spray", cost: 12, mileage: 15000, date: "2026-01-01", mileageAcknowledged: false });
   });
@@ -461,7 +509,8 @@ describe("AssistantWidget", () => {
           proposedEntry: { category: "fuel", litres: 10, cost: 15, date: "2026-01-01", mileage: 15000, filledToFull: false },
         }),
       })
-      .mockResolvedValueOnce({ ok: true, status: 200, json: async () => ({ log: { id: "fuel-1" } }) });
+      .mockResolvedValueOnce({ ok: true, status: 200, json: async () => ({ log: { id: "fuel-1" } }) })
+      .mockResolvedValueOnce({ ok: true, status: 200, json: async () => ({ reply: "That's everything!" }) });
     vi.stubGlobal("fetch", fetchMock);
 
     const user = userEvent.setup();
@@ -474,7 +523,7 @@ describe("AssistantWidget", () => {
     await user.click(screen.getByRole("button", { name: "Log it" }));
 
     await screen.findByText(/Logged/);
-    expect(fetchMock).toHaveBeenLastCalledWith("/api/tracker/fuel", expect.objectContaining({ method: "POST" }));
+    expect(fetchMock.mock.calls[1]).toEqual(["/api/tracker/fuel", expect.objectContaining({ method: "POST" })]);
     const body = JSON.parse(fetchMock.mock.calls[1][1].body);
     expect(body).toEqual({ litres: 10, cost: 15, mileage: 15000, date: "2026-01-01", filledToFull: false, mileageAcknowledged: false });
   });
@@ -620,6 +669,10 @@ describe("AssistantWidget", () => {
       expect(MockSpeechRecognition.instances[0].start).toHaveBeenCalledTimes(1);
       expect(MockSpeechRecognition.instances[0].lang).toBe("en-GB");
       expect(MockSpeechRecognition.instances[0].interimResults).toBe(true);
+      // true, not false - a session should keep listening across pauses;
+      // the 5-second silence timer (not the browser's own end-of-speech
+      // heuristic) is what decides when to stop and send.
+      expect(MockSpeechRecognition.instances[0].continuous).toBe(true);
       expect(await screen.findByRole("button", { name: "Stop voice input" })).toHaveAttribute("aria-pressed", "true");
     });
 
@@ -764,6 +817,150 @@ describe("AssistantWidget", () => {
 
       resolveFetch({ ok: true, status: 200, json: async () => ({ reply: "Done." }) });
       await screen.findByText("Done.");
+    });
+
+    it("auto-sends after 5 seconds of silence following the last recognized word", async () => {
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+      const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => ({ reply: "Got it." }) });
+      vi.stubGlobal("fetch", fetchMock);
+      vi.stubGlobal("SpeechRecognition", MockSpeechRecognition);
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+      render(<AssistantWidget />);
+      await user.click(screen.getByRole("button", { name: "Open assistant" }));
+      await user.click(await screen.findByRole("button", { name: "Start voice input" }));
+
+      const recognition = MockSpeechRecognition.instances[0];
+      act(() => {
+        recognition.onresult?.({ results: [[{ transcript: "check my fuel economy" }]] });
+      });
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(5000);
+      });
+
+      expect(recognition.stop).toHaveBeenCalledTimes(1);
+      expect(fetchMock).toHaveBeenCalledWith("/api/assistant", expect.objectContaining({ method: "POST" }));
+      const body = JSON.parse(fetchMock.mock.calls[0][1].body);
+      expect(body.messages.at(-1)).toEqual({ role: "user", content: "check my fuel economy" });
+      expect(await screen.findByText("Got it.")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Start voice input" })).toHaveAttribute("aria-pressed", "false");
+      vi.useRealTimers();
+    });
+
+    it("does not auto-send while still hearing new speech - only after a real 5-second gap since the last word", async () => {
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+      const fetchMock = vi.fn();
+      vi.stubGlobal("fetch", fetchMock);
+      vi.stubGlobal("SpeechRecognition", MockSpeechRecognition);
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+      render(<AssistantWidget />);
+      await user.click(screen.getByRole("button", { name: "Open assistant" }));
+      await user.click(await screen.findByRole("button", { name: "Start voice input" }));
+      const recognition = MockSpeechRecognition.instances[0];
+
+      act(() => {
+        recognition.onresult?.({ results: [[{ transcript: "check" }]] });
+      });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(3000);
+      });
+      act(() => {
+        recognition.onresult?.({ results: [[{ transcript: "check my fuel" }]] }); // resets the 5s window
+      });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(3000); // 6s since the first word, only 3s since the latest
+      });
+
+      expect(fetchMock).not.toHaveBeenCalled();
+      vi.useRealTimers();
+    });
+
+    it("restarting the mic appends to what's already in the box instead of replacing it", async () => {
+      vi.stubGlobal("SpeechRecognition", MockSpeechRecognition);
+      const user = userEvent.setup();
+      render(<AssistantWidget />);
+      await user.click(screen.getByRole("button", { name: "Open assistant" }));
+      await user.click(await screen.findByRole("button", { name: "Start voice input" }));
+
+      const first = MockSpeechRecognition.instances[0];
+      act(() => {
+        first.onresult?.({ results: [[{ transcript: "log an oil change" }]] });
+      });
+      await user.click(screen.getByRole("button", { name: "Stop voice input" })); // manual stop, no auto-send
+
+      await user.click(await screen.findByRole("button", { name: "Start voice input" }));
+      const second = MockSpeechRecognition.instances[1];
+      act(() => {
+        second.onresult?.({ results: [[{ transcript: "for £40" }]] });
+      });
+
+      expect((screen.getByRole("textbox") as HTMLTextAreaElement).value).toBe("log an oil change for £40");
+    });
+
+    it("typing into the box manually cancels a pending voice auto-send", async () => {
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+      const fetchMock = vi.fn();
+      vi.stubGlobal("fetch", fetchMock);
+      vi.stubGlobal("SpeechRecognition", MockSpeechRecognition);
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+      render(<AssistantWidget />);
+      await user.click(screen.getByRole("button", { name: "Open assistant" }));
+      await user.click(await screen.findByRole("button", { name: "Start voice input" }));
+      const recognition = MockSpeechRecognition.instances[0];
+      act(() => {
+        recognition.onresult?.({ results: [[{ transcript: "log an oil change" }]] });
+      });
+
+      await user.type(screen.getByRole("textbox"), " actually wait");
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(5000);
+      });
+
+      expect(fetchMock).not.toHaveBeenCalled();
+      vi.useRealTimers();
+    });
+
+    it("clicking into the box to edit also cancels a pending voice auto-send, even without typing", async () => {
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+      const fetchMock = vi.fn();
+      vi.stubGlobal("fetch", fetchMock);
+      vi.stubGlobal("SpeechRecognition", MockSpeechRecognition);
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+      render(<AssistantWidget />);
+      await user.click(screen.getByRole("button", { name: "Open assistant" }));
+      await user.click(await screen.findByRole("button", { name: "Start voice input" }));
+      const recognition = MockSpeechRecognition.instances[0];
+      act(() => {
+        recognition.onresult?.({ results: [[{ transcript: "log an oil change" }]] });
+      });
+
+      await user.click(screen.getByRole("textbox"));
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(5000);
+      });
+
+      expect(fetchMock).not.toHaveBeenCalled();
+      vi.useRealTimers();
+    });
+
+    it("sending manually while still listening stops recognition, so a trailing result can't refill the box after it's cleared", async () => {
+      const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => ({ reply: "Got it." }) });
+      vi.stubGlobal("fetch", fetchMock);
+      vi.stubGlobal("SpeechRecognition", MockSpeechRecognition);
+      const user = userEvent.setup();
+      render(<AssistantWidget />);
+      await user.click(screen.getByRole("button", { name: "Open assistant" }));
+      await user.click(await screen.findByRole("button", { name: "Start voice input" }));
+      const recognition = MockSpeechRecognition.instances[0];
+      act(() => {
+        recognition.onresult?.({ results: [[{ transcript: "check my fuel economy" }]] });
+      });
+
+      await user.click(screen.getByRole("button", { name: "Send" }));
+
+      expect(recognition.stop).toHaveBeenCalledTimes(1);
+      await waitFor(() => expect((screen.getByRole("textbox") as HTMLTextAreaElement).value).toBe(""));
+      expect(screen.getByRole("button", { name: "Start voice input" })).toHaveAttribute("aria-pressed", "false");
     });
   });
 });

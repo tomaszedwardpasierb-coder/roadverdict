@@ -779,6 +779,7 @@ describe("POST /api/assistant - car-active knowledge base and log-entry gating",
     expect(names).toContain("proposeEditEntry");
     expect(callBody.systemInstruction.parts[0].text).toContain("CHANGING SETTINGS OR CREATING A SHARE LINK VIA CHAT (Pro feature, active now)");
     expect(callBody.systemInstruction.parts[0].text).toContain("EDITING AN ALREADY-LOGGED ENTRY VIA CHAT (Pro feature, active now)");
+    expect(callBody.systemInstruction.parts[0].text).toContain("LOGGING SEVERAL THINGS IN ONE REQUEST");
   });
 
   it("does not offer the log-entry tool for a car-active session that isn't Pro, and shows the upsell message", async () => {

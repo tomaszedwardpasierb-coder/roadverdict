@@ -116,6 +116,10 @@ function extractReportToken(pathname: string): string | null {
 // transient in the first place - see isRetryable below.
 const MAX_AUTO_RETRIES = 1;
 const RETRY_DELAY_MS = 1200;
+// How long voice input waits after the last new word before sending on
+// its own - long enough for a normal pause mid-sentence, short enough
+// that it doesn't feel like it's just hanging there once you've stopped.
+const VOICE_SILENCE_AUTOSEND_MS = 5000;
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -245,6 +249,22 @@ function AssistantWidgetInner() {
   // appears once the browser has actually confirmed support.
   const [micSupported, setMicSupported] = useState(false);
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
+  // Whatever was already in the box (typed, or left over from an earlier
+  // voice segment) at the moment the CURRENT recognition session started -
+  // onresult below prepends this so restarting the mic to add more by
+  // voice appends onto it instead of overwriting it.
+  const voiceBaseTextRef = useRef('');
+  // Cleared/rescheduled on every onresult, and on any manual edit - see
+  // handleMicClick, handleInputChange and handleInputFocus below.
+  const autoSendTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // handleSend is redefined on every render (it closes over `input` and
+  // other state), but the auto-send timer is scheduled from inside
+  // recognition.onresult, itself created once per mic session and never
+  // redefined on re-render - calling a directly-closed-over handleSend
+  // from that timer would call a stale copy. Kept in sync via the effect
+  // below instead, so the timer always calls whichever handleSend is
+  // actually current.
+  const latestHandleSendRef = useRef<() => void>(() => {});
   const listRef = useRef<HTMLDivElement>(null);
   // Already uploaded (see handleAttachmentPick) by the time it's
   // "pending" - a real Attachment reference, not a raw File, ready to
@@ -269,8 +289,16 @@ function AssistantWidgetInner() {
   useEffect(() => {
     return () => {
       recognitionRef.current?.stop();
+      if (autoSendTimerRef.current) clearTimeout(autoSendTimerRef.current);
     };
   }, []);
+
+  function clearAutoSendTimer() {
+    if (autoSendTimerRef.current) {
+      clearTimeout(autoSendTimerRef.current);
+      autoSendTimerRef.current = null;
+    }
+  }
 
   function handleMicClick() {
     if (listening) {
@@ -278,18 +306,33 @@ function AssistantWidgetInner() {
       // event - stop() asks the recognition session to end, but nothing
       // guarantees it actually fires onend promptly (or at all, on some
       // browsers/error paths), which is exactly what left the mic button
-      // stuck pulsing with no way to cancel it.
+      // stuck pulsing with no way to cancel it. A manual stop-click never
+      // auto-sends on its own - only the silence timer below does that;
+      // this just leaves whatever's been said so far in the box to review.
       recognitionRef.current?.stop();
       recognitionRef.current = null;
       setListening(false);
+      clearAutoSendTimer();
       return;
     }
     const SpeechRecognitionCtor = getSpeechRecognitionConstructor();
     if (!SpeechRecognitionCtor) return;
 
+    // Whatever's already in the box - typed, or left over from an earlier
+    // voice segment - becomes the prefix onresult below builds onto, so
+    // clicking the mic again to add more by voice appends onto it
+    // instead of replacing it outright.
+    voiceBaseTextRef.current = input;
+
     const recognition = new SpeechRecognitionCtor();
     recognition.lang = 'en-GB';
-    recognition.continuous = false;
+    // true, not false - this session keeps listening across pauses
+    // instead of the browser silently ending it on its own
+    // (unconfigurable, inconsistent-length) idea of "done talking". The
+    // 5-second silence timer below is what actually decides when to stop
+    // and send, on purpose - one clear, predictable rule instead of
+    // whatever a given browser happens to do.
+    recognition.continuous = true;
     recognition.interimResults = true;
     // Writes straight into the same `input` state the textarea already
     // renders and Send already reads from - interim results update it
@@ -300,7 +343,21 @@ function AssistantWidgetInner() {
       for (let i = 0; i < event.results.length; i++) {
         transcript += event.results[i][0].transcript;
       }
-      setInput(transcript);
+      const base = voiceBaseTextRef.current;
+      setInput(base ? `${base} ${transcript}` : transcript);
+
+      // Rescheduled on every new word recognized - only a real 5-second
+      // gap with nothing new said triggers the auto-send, not 5 seconds
+      // from whenever listening merely started.
+      clearAutoSendTimer();
+      autoSendTimerRef.current = setTimeout(() => {
+        autoSendTimerRef.current = null;
+        if (recognitionRef.current !== recognition) return; // superseded or already stopped
+        recognitionRef.current.stop();
+        recognitionRef.current = null;
+        setListening(false);
+        latestHandleSendRef.current();
+      }, VOICE_SILENCE_AUTOSEND_MS);
     };
     // "no-speech" (nobody said anything before it timed out) and
     // "aborted" (the person clicked the mic again to stop it themselves)
@@ -321,6 +378,7 @@ function AssistantWidgetInner() {
       if (recognitionRef.current !== recognition) return;
       setListening(false);
       recognitionRef.current = null;
+      clearAutoSendTimer();
     };
 
     recognitionRef.current = recognition;
@@ -415,6 +473,20 @@ function AssistantWidgetInner() {
     const text = input.trim();
     if (!text || sending) return;
 
+    // Stop any still-active voice session before clearing the box below -
+    // stop() is asynchronous, so a trailing onresult landing right after
+    // the box is cleared would otherwise silently refill it with
+    // already-sent speech.
+    if (recognitionRef.current) {
+      recognitionRef.current.stop();
+      recognitionRef.current = null;
+      setListening(false);
+    }
+    if (autoSendTimerRef.current) {
+      clearTimeout(autoSendTimerRef.current);
+      autoSendTimerRef.current = null;
+    }
+
     const nextMessages: Message[] = [
       ...messages,
       { role: 'user', content: text, ...(pendingAttachment ? { attachment: pendingAttachment } : {}) },
@@ -423,6 +495,32 @@ function AssistantWidgetInner() {
     setInput('');
     setPendingAttachment(null);
     setAttachmentError(null);
+    await sendWithRetry(nextMessages, reportToken, dashboardTab, compareContext);
+  }
+
+  // Runs after every render, keeping the ref the voice auto-send timer
+  // calls always pointed at the freshest handleSend - see
+  // latestHandleSendRef's own comment above.
+  useEffect(() => {
+    latestHandleSendRef.current = handleSend;
+  });
+
+  // Fired once, from AssistantProposedEntryCard, right after a real
+  // confirm succeeds - closes the gap where logging several things in
+  // one request ("log an oil change and a new tyre") drafted the first
+  // one, and then just sat there once it was confirmed, needing the
+  // person to type something themselves to get the second one drafted.
+  // A genuine, visible follow-up turn through the normal send pipeline
+  // (not a hidden message) - the model already has the original request
+  // in its own context, so it can tell whether there's really another
+  // item left to draft or the whole thing's done; see the "MULTI-ITEM
+  // LOGGING" system-instruction block in assistant/route.ts for how it's
+  // told to handle this specific message.
+  async function continueAfterEntryConfirmed() {
+    if (sending) return;
+    const text = "That's logged. If there's anything else from what I just asked you to log, draft the next one now.";
+    const nextMessages: Message[] = [...messages, { role: 'user', content: text }];
+    setMessages(nextMessages);
     await sendWithRetry(nextMessages, reportToken, dashboardTab, compareContext);
   }
 
@@ -436,6 +534,20 @@ function AssistantWidgetInner() {
       e.preventDefault();
       handleSend();
     }
+  }
+
+  // Taking manual control of the box - by typing, or just by clicking/
+  // tabbing into it - cancels any pending voice auto-send so it can't
+  // fire out from under a genuinely-manual edit. Recognition itself (if
+  // still running) is left alone: a fresh onresult reschedules the timer
+  // again on its own once there's something new to hear, same as ever.
+  function handleInputChange(e: React.ChangeEvent<HTMLTextAreaElement>) {
+    setInput(e.target.value);
+    clearAutoSendTimer();
+  }
+
+  function handleInputFocus() {
+    clearAutoSendTimer();
   }
 
   return (
@@ -459,7 +571,7 @@ function AssistantWidgetInner() {
                     <span style={{ fontSize: '0.75rem' }}>{m.attachment.fileName}</span>
                   </div>
                 )}
-                {m.proposedEntry && <AssistantProposedEntryCard entry={m.proposedEntry} />}
+                {m.proposedEntry && <AssistantProposedEntryCard entry={m.proposedEntry} onConfirmed={continueAfterEntryConfirmed} />}
                 {m.proposedSettingsChange && <AssistantProposedSettingsCard change={m.proposedSettingsChange} />}
                 {m.proposedShareLink && <AssistantProposedShareLinkCard link={m.proposedShareLink} />}
                 {m.proposedVaultDocument && <AssistantProposedVaultDocumentCard document={m.proposedVaultDocument} />}
@@ -528,7 +640,8 @@ function AssistantWidgetInner() {
             <textarea
               className={styles.input}
               value={input}
-              onChange={(e) => setInput(e.target.value)}
+              onChange={handleInputChange}
+              onFocus={handleInputFocus}
               onKeyDown={handleKeyDown}
               placeholder={listening ? 'Listening…' : 'Ask about using RoadVerdict…'}
               rows={1}
