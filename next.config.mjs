@@ -28,9 +28,19 @@ const nextConfig = {
           { key: 'X-Content-Type-Options', value: 'nosniff' },
           { key: 'X-Frame-Options', value: 'DENY' },
           { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
+          // microphone=(self), not (self "https://roadverdict.co.uk") or the
+          // default (self) omitted entirely - the assistant's voice input
+          // (AssistantWidget.tsx) calls the Web Speech API, which needs
+          // microphone access granted to this origin. The empty-allowlist
+          // `()` this used to be blocks the feature at the browser-platform
+          // level before the page's JS ever gets to request it - the
+          // browser's own "this site wants to use your microphone" prompt
+          // never even appears, on any browser, because the request never
+          // reaches that stage. Camera and geolocation are still denied to
+          // everyone - nothing in this app uses either.
           {
             key: 'Permissions-Policy',
-            value: 'camera=(), microphone=(), geolocation=()',
+            value: 'camera=(), microphone=(self), geolocation=()',
           },
           {
             key: 'Strict-Transport-Security',
