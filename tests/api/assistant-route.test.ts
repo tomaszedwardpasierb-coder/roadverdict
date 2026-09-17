@@ -15,6 +15,7 @@ const mocks = vi.hoisted(() => ({
   getCarsForUser: vi.fn(),
   isCarReadOnly: vi.fn(),
   isPro: vi.fn(),
+  isTwoFactorEnabled: vi.fn(),
   resolveActiveVehicle: vi.fn(),
   getCarAssistantConfig: vi.fn(),
   getDocWithEtag: vi.fn(),
@@ -40,6 +41,7 @@ vi.mock("@/lib/tracker/assistantTools", () => ({
   SETTINGS_TOOL_DECLARATIONS: [{ name: "proposeSettingsChange" }],
   SHARE_LINK_TOOL_DECLARATIONS: [{ name: "proposeShareLink" }],
   EDIT_TOOL_DECLARATIONS: [{ name: "proposeEditEntry" }],
+  VAULT_TOOL_DECLARATIONS: [{ name: "proposeVaultDocument" }],
   runAssistantTool: mocks.runAssistantTool,
 }));
 vi.mock("@/lib/tracker/assistantQuestionLog", () => ({ logAssistantQuestion: mocks.logAssistantQuestion }));
@@ -49,6 +51,7 @@ vi.mock("@/lib/tracker/geminiUsageLog", () => ({ logGeminiUsage: mocks.logGemini
 vi.mock("@/lib/tracker/bike", () => ({ getBikesForUser: mocks.getBikesForUser, isBikeReadOnly: mocks.isBikeReadOnly }));
 vi.mock("@/lib/tracker/car", () => ({ getCarsForUser: mocks.getCarsForUser, isCarReadOnly: mocks.isCarReadOnly }));
 vi.mock("@/lib/subscriptions", () => ({ isPro: mocks.isPro }));
+vi.mock("@/lib/auth/twoFactor", () => ({ isTwoFactorEnabled: mocks.isTwoFactorEnabled }));
 vi.mock("@/lib/tracker/assistantAnonUsage", () => ({
   canSendAnonAssistantMessage: mocks.canSendAnonAssistantMessage,
   generateAnonId: mocks.generateAnonId,
@@ -249,6 +252,7 @@ describe("POST /api/assistant", () => {
       { email: "attacker@example.com" },
       "rider@example.com",
       "tok-a",
+      undefined,
       undefined
     );
   });
@@ -496,7 +500,8 @@ describe("POST /api/assistant", () => {
       { bikeIds: ["attacker-id"] },
       "rider@example.com",
       undefined,
-      { vehicleIds: ["bike-1", "bike-2"], bikeIds: ["bike-1", "bike-2"], carIds: [], from: "2025-01-01", to: undefined }
+      { vehicleIds: ["bike-1", "bike-2"], bikeIds: ["bike-1", "bike-2"], carIds: [], from: "2025-01-01", to: undefined },
+      undefined
     );
   });
 
@@ -802,6 +807,154 @@ describe("POST /api/assistant - car-active knowledge base and log-entry gating",
     const callBody = JSON.parse(mocks.fetch.mock.calls[0][1].body);
     const names = callBody.tools[0].functionDeclarations.map((d: { name: string }) => d.name);
     expect(names).toContain("proposeLogEntry");
+  });
+});
+
+// ── Vault-via-chat gating (Pro AND 2FA, independent of logEntryAccess) ──
+
+describe("POST /api/assistant - Vault tool gating", () => {
+  it("offers the Vault tool when signed in, Pro, and 2FA is enabled", async () => {
+    mocks.getSession.mockResolvedValue({ email: "rider@example.com" });
+    mocks.isPro.mockResolvedValue(true);
+    mocks.isTwoFactorEnabled.mockResolvedValue(true);
+
+    await POST(request({ messages: [{ role: "user", content: "Add my V5C to the vault" }] }));
+
+    const callBody = JSON.parse(mocks.fetch.mock.calls[0][1].body);
+    const names = callBody.tools[0].functionDeclarations.map((d: { name: string }) => d.name);
+    expect(names).toContain("proposeVaultDocument");
+    expect(callBody.systemInstruction.parts[0].text).toContain("ADDING A DOCUMENT TO THE VAULT VIA CHAT (Pro + 2FA feature, active now)");
+  });
+
+  it("does not offer the Vault tool when Pro but 2FA is not enabled", async () => {
+    mocks.getSession.mockResolvedValue({ email: "rider@example.com" });
+    mocks.isPro.mockResolvedValue(true);
+    mocks.isTwoFactorEnabled.mockResolvedValue(false);
+
+    await POST(request({ messages: [{ role: "user", content: "Add my V5C to the vault" }] }));
+
+    const callBody = JSON.parse(mocks.fetch.mock.calls[0][1].body);
+    const names = (callBody.tools?.[0]?.functionDeclarations ?? []).map((d: { name: string }) => d.name);
+    expect(names).not.toContain("proposeVaultDocument");
+    expect(callBody.systemInstruction.parts[0].text).toContain("ADDING A DOCUMENT TO THE VAULT VIA CHAT: not available on this account yet");
+  });
+
+  it("does not offer the Vault tool when 2FA is enabled but the account isn't Pro", async () => {
+    mocks.getSession.mockResolvedValue({ email: "rider@example.com" });
+    mocks.isPro.mockResolvedValue(false);
+    mocks.isTwoFactorEnabled.mockResolvedValue(true);
+
+    await POST(request({ messages: [{ role: "user", content: "Add my V5C to the vault" }] }));
+
+    const callBody = JSON.parse(mocks.fetch.mock.calls[0][1].body);
+    const names = (callBody.tools?.[0]?.functionDeclarations ?? []).map((d: { name: string }) => d.name);
+    expect(names).not.toContain("proposeVaultDocument");
+  });
+
+  it("does not offer the Vault tool, and mentions nothing Vault-related, for a signed-out visitor", async () => {
+    mocks.getSession.mockResolvedValue(null);
+
+    await POST(request({ messages: [{ role: "user", content: "hi" }] }));
+
+    const callBody = JSON.parse(mocks.fetch.mock.calls[0][1].body);
+    const names = (callBody.tools?.[0]?.functionDeclarations ?? []).map((d: { name: string }) => d.name);
+    expect(names).not.toContain("proposeVaultDocument");
+    expect(callBody.systemInstruction.parts[0].text).not.toContain("ADDING A DOCUMENT TO THE VAULT");
+  });
+
+  it("still offers the Vault tool even when the Vault itself is currently locked - that's resolved on the draft card, not here", async () => {
+    // No vault-lock-state mock exists at all in this test file - proving
+    // route.ts genuinely never checks it, only Pro+2FA.
+    mocks.getSession.mockResolvedValue({ email: "rider@example.com" });
+    mocks.isPro.mockResolvedValue(true);
+    mocks.isTwoFactorEnabled.mockResolvedValue(true);
+
+    await POST(request({ messages: [{ role: "user", content: "Add my insurance certificate to the vault" }] }));
+
+    const callBody = JSON.parse(mocks.fetch.mock.calls[0][1].body);
+    const names = callBody.tools[0].functionDeclarations.map((d: { name: string }) => d.name);
+    expect(names).toContain("proposeVaultDocument");
+  });
+
+  it("degrades to unavailable, not a crash, if isTwoFactorEnabled itself throws", async () => {
+    mocks.getSession.mockResolvedValue({ email: "rider@example.com" });
+    mocks.isPro.mockResolvedValue(true);
+    mocks.isTwoFactorEnabled.mockRejectedValue(new Error("Cosmos unavailable"));
+
+    const response = await POST(request({ messages: [{ role: "user", content: "hi" }] }));
+
+    expect(response.status).toBe(200);
+    const callBody = JSON.parse(mocks.fetch.mock.calls[0][1].body);
+    const names = (callBody.tools?.[0]?.functionDeclarations ?? []).map((d: { name: string }) => d.name);
+    expect(names).not.toContain("proposeVaultDocument");
+  });
+});
+
+// ── Chat attachments (already-uploaded Attachment reference, passed
+// through to runAssistantTool for the model's own draft tools to use) ──
+
+describe("POST /api/assistant - chat attachments", () => {
+  const realAttachment = { blobName: "abc123.jpg", fileName: "receipt.jpg", fileType: "image/jpeg", uploadedAt: "2026-01-01T00:00:00.000Z" };
+
+  it("passes a well-formed attachment through to runAssistantTool as the 6th argument on an actual tool call", async () => {
+    mocks.getSession.mockResolvedValue({ email: "rider@example.com" });
+    mocks.isPro.mockResolvedValue(true);
+    mocks.fetch
+      .mockResolvedValueOnce(geminiFunctionCallResponse("proposeLogEntry", { category: "service", description: "Oil change", cost: 40 }))
+      .mockResolvedValueOnce(geminiTextResponse("Here's your draft."));
+    mocks.runAssistantTool.mockResolvedValue({ category: "service", jobType: "other", jobLabel: "Other", description: "Oil change", cost: 40, date: "2026-01-01", mileage: 12000 });
+
+    await POST(request({ messages: [{ role: "user", content: "Log this receipt" }], attachment: realAttachment }));
+
+    expect(mocks.runAssistantTool).toHaveBeenCalledWith(
+      "proposeLogEntry",
+      { category: "service", description: "Oil change", cost: 40 },
+      "rider@example.com",
+      undefined,
+      undefined,
+      realAttachment
+    );
+  });
+
+  it("mentions the attachment in the system instruction whenever one is sent, regardless of whether a tool call happens", async () => {
+    mocks.getSession.mockResolvedValue({ email: "rider@example.com" });
+    mocks.runAssistantTool.mockResolvedValue({ total: 400 });
+
+    await POST(request({ messages: [{ role: "user", content: "Log this receipt" }], attachment: realAttachment }));
+
+    const callBody = JSON.parse(mocks.fetch.mock.calls[0][1].body);
+    expect(callBody.systemInstruction.parts[0].text).toContain("THE USER HAS JUST ATTACHED A FILE");
+  });
+
+  it("mentions no attachment in the system instruction when none was sent", async () => {
+    mocks.getSession.mockResolvedValue({ email: "rider@example.com" });
+
+    await POST(request({ messages: [{ role: "user", content: "hi" }] }));
+
+    const callBody = JSON.parse(mocks.fetch.mock.calls[0][1].body);
+    expect(callBody.systemInstruction.parts[0].text).not.toContain("THE USER HAS JUST ATTACHED A FILE");
+  });
+
+  it("silently ignores a malformed attachment (missing fields) rather than erroring the request", async () => {
+    mocks.getSession.mockResolvedValue({ email: "rider@example.com" });
+
+    const response = await POST(request({ messages: [{ role: "user", content: "hi" }], attachment: { blobName: "abc" } }));
+
+    expect(response.status).toBe(200);
+    const callBody = JSON.parse(mocks.fetch.mock.calls[0][1].body);
+    expect(callBody.systemInstruction.parts[0].text).not.toContain("THE USER HAS JUST ATTACHED A FILE");
+  });
+
+  it("silently ignores an attachment with a disallowed fileType", async () => {
+    mocks.getSession.mockResolvedValue({ email: "rider@example.com" });
+
+    await POST(request({
+      messages: [{ role: "user", content: "hi" }],
+      attachment: { ...realAttachment, fileType: "application/zip" },
+    }));
+
+    const callBody = JSON.parse(mocks.fetch.mock.calls[0][1].body);
+    expect(callBody.systemInstruction.parts[0].text).not.toContain("THE USER HAS JUST ATTACHED A FILE");
   });
 });
 

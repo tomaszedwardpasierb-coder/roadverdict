@@ -36,6 +36,8 @@ import { getMods } from "./mod";
 import { getBills } from "./bill";
 import { getFuelLogs } from "./fuelLog";
 import type { FuelLogDoc } from "./fuelLog";
+import type { Attachment } from "./cosmosHelpers";
+import { VAULT_CATEGORIES, type VaultDocumentCategory } from "./vaultDocument";
 import { getReminders } from "./reminder";
 import { computeReminderStatus, reminderDetailLabel } from "./reminderStatus";
 import { computeActualMPG, computeMPGSeries, type MpgCalcInput } from "./mpgCalc";
@@ -877,17 +879,21 @@ export type ProposedEntry =
   // entryId is only ever set by proposeEditEntry (never by
   // proposeLogEntry) - its presence, not a separate flag, is what tells
   // the draft card this is an edit of something real (PATCH to
-  // <endpoint>/<entryId>) rather than a brand-new entry (POST).
-  | { category: "service"; jobType: string; jobLabel: string; description: string; cost: number; date: string; mileage: number; mileageNote?: string; vehicleKind: "bike" | "car"; entryId?: string }
-  | { category: "bill"; billType: string; billLabel: string; description: string; cost: number; date: string; vehicleKind: "bike" | "car"; entryId?: string }
-  | { category: "mod"; modCategory: string; modLabel: string; description: string; cost: number; date: string; mileage: number; mileageNote?: string; vehicleKind: "bike" | "car"; entryId?: string }
+  // <endpoint>/<entryId>) rather than a brand-new entry (POST). attachment
+  // is set server-side in runAssistantTool below, from whatever file the
+  // person attached to this chat turn's own message (already uploaded via
+  // the same /api/tracker/upload-attachment endpoint the manual forms
+  // use) - never something the model itself supplies or invents.
+  | { category: "service"; jobType: string; jobLabel: string; description: string; cost: number; date: string; mileage: number; mileageNote?: string; vehicleKind: "bike" | "car"; entryId?: string; attachment?: Attachment }
+  | { category: "bill"; billType: string; billLabel: string; description: string; cost: number; date: string; vehicleKind: "bike" | "car"; entryId?: string; attachment?: Attachment }
+  | { category: "mod"; modCategory: string; modLabel: string; description: string; cost: number; date: string; mileage: number; mileageNote?: string; vehicleKind: "bike" | "car"; entryId?: string; attachment?: Attachment }
   // litres for anything with an engine, kwh for an EV charging session -
   // never both, mirroring CarFuelLogDoc's own shape. Bike always uses
   // litres (kwh is always undefined there).
-  | { category: "fuel"; litres?: number; kwh?: number; cost: number; date: string; mileage: number; mileageNote?: string; filledToFull: boolean; vehicleKind: "bike" | "car"; entryId?: string }
-  | { category: "labour"; labourCategory: string; labourLabel: string; description: string; cost: number; date: string; mileage: number; mileageNote?: string; vehicleKind: "bike" | "car"; entryId?: string }
-  | { category: "fine"; fineType: string; fineLabel: string; description: string; cost: number; date: string; vehicleKind: "bike" | "car"; entryId?: string }
-  | { category: "toll"; tollType: string; tollLabel: string; description: string; cost: number; date: string; vehicleKind: "bike" | "car"; entryId?: string };
+  | { category: "fuel"; litres?: number; kwh?: number; cost: number; date: string; mileage: number; mileageNote?: string; filledToFull: boolean; vehicleKind: "bike" | "car"; entryId?: string; attachment?: Attachment }
+  | { category: "labour"; labourCategory: string; labourLabel: string; description: string; cost: number; date: string; mileage: number; mileageNote?: string; vehicleKind: "bike" | "car"; entryId?: string; attachment?: Attachment }
+  | { category: "fine"; fineType: string; fineLabel: string; description: string; cost: number; date: string; vehicleKind: "bike" | "car"; entryId?: string; attachment?: Attachment }
+  | { category: "toll"; tollType: string; tollLabel: string; description: string; cost: number; date: string; vehicleKind: "bike" | "car"; entryId?: string; attachment?: Attachment };
 
 // Same date-based estimate the manual dashboard forms show via
 // useEstimatedMileage.ts (same estimateMileage() maths, just run
@@ -1725,6 +1731,79 @@ export const EDIT_TOOL_DECLARATIONS = [
   },
 ] as const;
 
+// ---- Adding a document to the Vault, drafted then confirmed - the
+// model never sees or handles the file itself; it only guesses a
+// category/label from the conversation. The actual file is picked (and
+// uploaded, straight to the Vault's own /api/vault/documents endpoint,
+// never through the generic attachment one above) on the draft card
+// itself, the same "review and confirm on screen" boundary as every
+// other propose* tool. Gated behind Pro AND 2FA in route.ts, mirroring
+// exactly what opening the Vault tab itself already requires (see
+// vaultAccess.ts's checkVaultGate) - a locked-but-otherwise-eligible
+// account still gets the tool offered, since unlocking happens on the
+// card (same VaultAuthModal the Vault tab itself uses), not here.
+
+export interface ProposeVaultDocumentArgs {
+  category?: string;
+  label?: string;
+}
+
+export interface ProposedVaultDocument {
+  category: "vaultDocument";
+  vehicleKind: "bike" | "car";
+  vehicleId: string;
+  vaultCategory: VaultDocumentCategory | "";
+  label: string;
+}
+
+export async function toolProposeVaultDocument(email: string, args: ProposeVaultDocumentArgs) {
+  const vehicle = await resolveActiveVehicle(email);
+  if (!vehicle) return { error: "No vehicle found on this account." };
+
+  const vaultCategory =
+    typeof args.category === "string" && VAULT_CATEGORIES.some((c) => c.key === args.category)
+      ? (args.category as VaultDocumentCategory)
+      : "";
+
+  const entry: ProposedVaultDocument = {
+    category: "vaultDocument",
+    vehicleKind: vehicle.kind,
+    vehicleId: vehicle.kind === "car" ? vehicle.car.id : vehicle.bike.id,
+    vaultCategory,
+    label: typeof args.label === "string" ? args.label.trim() : "",
+  };
+  return entry;
+}
+
+export const VAULT_TOOL_DECLARATIONS = [
+  {
+    name: "proposeVaultDocument",
+    description:
+      "Draft adding a document to the signed-in user's Vault - secure storage for real paperwork like a V5C logbook, MOT certificate, insurance certificate, driving licence, warranty, or similar (see the knowledge base's own Vault section for the full category list and what it's for). This only prepares a draft; the user picks the actual file themselves and confirms on screen - it NEVER uploads or saves anything by itself, and you never see or need the file's own contents. Only call this when they're clearly asking to store/add a document to the Vault, not for logging a cost (use proposeLogEntry for that instead). Guess the best category from what they describe, and a short label if one makes sense (e.g. 'V5C', 'MOT 2026') - both stay editable on the card.",
+    parameters: {
+      type: "OBJECT",
+      properties: {
+        category: {
+          type: "STRING",
+          enum: VAULT_CATEGORIES.map((c) => c.key),
+          description: "Best-guess Vault category for this document.",
+        },
+        label: { type: "STRING", description: "Optional short label for the document, e.g. 'V5C' or 'MOT 2026'." },
+      },
+      required: [],
+    },
+  },
+] as const;
+
+// Merges the session's own attachment (if any) onto a successful draft,
+// without every branch inside toolProposeLogEntry/toolProposeEditEntry
+// needing to thread it through their own dozen-plus return points - a
+// single wrapping point here instead. Left untouched on an error result.
+function withAttachment<T extends { error: string } | Record<string, unknown>>(result: T, attachment?: Attachment): T {
+  if (!attachment || !result || "error" in result) return result;
+  return { ...result, attachment };
+}
+
 // Single dispatch point - the API route calls this instead of a
 // hand-written switch of its own, so the set of callable tools is
 // defined in exactly one place.
@@ -1733,7 +1812,12 @@ export async function runAssistantTool(
   args: Record<string, unknown>,
   email: string,
   reportToken?: string,
-  compareContext?: CompareContext
+  compareContext?: CompareContext,
+  // Always route.ts's own value (whatever the person attached to this
+  // chat turn's own message, already uploaded server-side before the
+  // model ever runs) - never read from `args`, for the same reason
+  // reportToken/compareContext above never are.
+  attachment?: Attachment
 ) {
   // Checked before the session-scoped switch below, and independent of
   // it - this tool works with no session at all, as long as route.ts
@@ -1758,7 +1842,8 @@ export async function runAssistantTool(
   // above, kept as its own explicit branch rather than folded into the
   // switch with a lying type cast.
   if (name === "proposeLogEntry") {
-    return toolProposeLogEntry(email, args as ProposeLogEntryArgs);
+    const result = await toolProposeLogEntry(email, args as ProposeLogEntryArgs);
+    return withAttachment(result, attachment);
   }
   if (name === "proposeSettingsChange") {
     return toolProposeSettingsChange(email, args as ProposeSettingsChangeArgs);
@@ -1767,7 +1852,11 @@ export async function runAssistantTool(
     return toolProposeShareLink(email, args as ProposeShareLinkArgs);
   }
   if (name === "proposeEditEntry") {
-    return toolProposeEditEntry(email, args as ProposeEditEntryArgs);
+    const result = await toolProposeEditEntry(email, args as ProposeEditEntryArgs);
+    return withAttachment(result, attachment);
+  }
+  if (name === "proposeVaultDocument") {
+    return toolProposeVaultDocument(email, args as ProposeVaultDocumentArgs);
   }
 
   switch (name as ToolName) {

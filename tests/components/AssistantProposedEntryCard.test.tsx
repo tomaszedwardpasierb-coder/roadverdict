@@ -445,4 +445,41 @@ describe("AssistantProposedEntryCard", () => {
       expect(screen.queryByText(/Updated/)).not.toBeInTheDocument();
     });
   });
+
+  describe("an attachment carried on the draft (set server-side from the chat turn's own file)", () => {
+    const attachment = { blobName: "abc123.jpg", fileName: "receipt.jpg", fileType: "image/jpeg" as const, uploadedAt: "2026-01-01T00:00:00.000Z" };
+    const entryWithAttachment: ProposedEntry = { ...serviceEntry, attachment };
+
+    it("shows the attached file's name on the card", () => {
+      render(<AssistantProposedEntryCard entry={entryWithAttachment} />);
+      expect(screen.getByText("receipt.jpg")).toBeInTheDocument();
+    });
+
+    it("shows nothing extra when no attachment was carried", () => {
+      render(<AssistantProposedEntryCard entry={serviceEntry} />);
+      expect(screen.queryByText("Attached")).not.toBeInTheDocument();
+    });
+
+    it("includes the attachment in the confirm POST body", async () => {
+      (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({ ok: true, json: async () => ({}) });
+      const user = userEvent.setup();
+      render(<AssistantProposedEntryCard entry={entryWithAttachment} />);
+      await user.click(screen.getByRole("button", { name: "Log it" }));
+
+      await screen.findByText(/Logged/);
+      const [, init] = (fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+      expect(JSON.parse(init.body).attachments).toEqual([attachment]);
+    });
+
+    it("omits attachments from the body entirely (not an empty array) when there's no attachment", async () => {
+      (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({ ok: true, json: async () => ({}) });
+      const user = userEvent.setup();
+      render(<AssistantProposedEntryCard entry={serviceEntry} />);
+      await user.click(screen.getByRole("button", { name: "Log it" }));
+
+      await screen.findByText(/Logged/);
+      const [, init] = (fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+      expect(JSON.parse(init.body).attachments).toBeUndefined();
+    });
+  });
 });

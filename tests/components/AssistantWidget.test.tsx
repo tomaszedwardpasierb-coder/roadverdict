@@ -479,6 +479,104 @@ describe("AssistantWidget", () => {
     expect(body).toEqual({ litres: 10, cost: 15, mileage: 15000, date: "2026-01-01", filledToFull: false, mileageAcknowledged: false });
   });
 
+  describe("chat attachments", () => {
+    const uploadedAttachment = { blobName: "abc123.jpg", fileName: "receipt.jpg", fileType: "image/jpeg", uploadedAt: "2026-01-01T00:00:00.000Z" };
+
+    function makeFile(name = "receipt.jpg", type = "image/jpeg") {
+      return new File(["file contents"], name, { type });
+    }
+
+    it("uploads the picked file immediately and shows it as a pending chip, before anything is sent", async () => {
+      (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({ ok: true, json: async () => ({ attachment: uploadedAttachment }) });
+      const user = userEvent.setup();
+      render(<AssistantWidget />);
+      await user.click(screen.getByRole("button", { name: "Open assistant" }));
+
+      await user.upload(screen.getByLabelText("Choose a photo or file to attach"), makeFile());
+
+      expect(await screen.findByText("receipt.jpg")).toBeInTheDocument();
+      expect(fetch).toHaveBeenCalledWith("/api/tracker/upload-attachment", expect.objectContaining({ method: "POST" }));
+      const [, init] = (fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+      expect((init.body as FormData).get("file")).toBeInstanceOf(File);
+    });
+
+    it("removing the pending chip clears it, with no further fetch call", async () => {
+      (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({ ok: true, json: async () => ({ attachment: uploadedAttachment }) });
+      const user = userEvent.setup();
+      render(<AssistantWidget />);
+      await user.click(screen.getByRole("button", { name: "Open assistant" }));
+      await user.upload(screen.getByLabelText("Choose a photo or file to attach"), makeFile());
+      await screen.findByText("receipt.jpg");
+
+      await user.click(screen.getByRole("button", { name: "Remove attachment" }));
+
+      expect(screen.queryByText("receipt.jpg")).not.toBeInTheDocument();
+      expect(fetch).toHaveBeenCalledTimes(1); // only the original upload, no extra call from removing
+    });
+
+    it("shows the server's own upload error, without ever showing a pending chip", async () => {
+      (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({ ok: false, json: async () => ({ error: "File too large." }) });
+      const user = userEvent.setup();
+      render(<AssistantWidget />);
+      await user.click(screen.getByRole("button", { name: "Open assistant" }));
+
+      await user.upload(screen.getByLabelText("Choose a photo or file to attach"), makeFile());
+
+      expect(await screen.findByText("File too large.")).toBeInTheDocument();
+      expect(screen.queryByText("receipt.jpg")).not.toBeInTheDocument();
+    });
+
+    it("sends the pending attachment's reference in the request body, shows it on the sent message's own bubble, and clears the pending chip", async () => {
+      const fetchMock = vi.fn()
+        .mockResolvedValueOnce({ ok: true, json: async () => ({ attachment: uploadedAttachment }) })
+        .mockResolvedValueOnce({ ok: true, status: 200, json: async () => ({ reply: "Got it, drafting that now." }) });
+      vi.stubGlobal("fetch", fetchMock);
+      const user = userEvent.setup();
+      render(<AssistantWidget />);
+      await user.click(screen.getByRole("button", { name: "Open assistant" }));
+      await user.upload(screen.getByLabelText("Choose a photo or file to attach"), makeFile());
+      await screen.findByText("receipt.jpg");
+
+      await user.type(screen.getByPlaceholderText("Ask about using RoadVerdict…"), "Log this receipt");
+      await user.click(screen.getByRole("button", { name: "Send" }));
+
+      await screen.findByText("Got it, drafting that now.");
+      const sendBody = JSON.parse(fetchMock.mock.calls[1][1].body);
+      expect(sendBody.attachment).toEqual(uploadedAttachment);
+      // Two "receipt.jpg" now: one on the sent user bubble, the pending
+      // composer chip is gone - queryAllBy, not getBy, confirms exactly one.
+      expect(screen.getAllByText("receipt.jpg")).toHaveLength(1);
+    });
+
+    it("never includes an attachment field at all when nothing was picked", async () => {
+      (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({ ok: true, status: 200, json: async () => ({ reply: "Sure." }) });
+      const user = userEvent.setup();
+      render(<AssistantWidget />);
+      await openWidgetAndSend(user, "hello");
+
+      await screen.findByText("Sure.");
+      const body = JSON.parse((fetch as ReturnType<typeof vi.fn>).mock.calls[0][1].body);
+      expect(body.attachment).toBeUndefined();
+    });
+
+    it("renders a proposedVaultDocument card alongside the reply", async () => {
+      (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          reply: "Here's a draft for the Vault.",
+          proposedVaultDocument: { category: "vaultDocument", vehicleKind: "bike", vehicleId: "bike-1", vaultCategory: "dvlaLegal", label: "V5C" },
+        }),
+      });
+      const user = userEvent.setup();
+      render(<AssistantWidget />);
+      await openWidgetAndSend(user, "Add my V5C to the vault");
+
+      await screen.findByText("Here's a draft for the Vault.");
+      expect(screen.getByText("Add to Vault")).toBeInTheDocument();
+    });
+  });
+
   describe("voice input", () => {
     it("hides the mic button entirely when the browser has no SpeechRecognition support", async () => {
       const user = userEvent.setup();

@@ -17,6 +17,8 @@ import { TOLL_LABELS } from '@/lib/tracker/tollTypes';
 import { CAR_TOLL_LABELS } from '@/lib/tracker/carTollTypes';
 import { ReminderFields, type ReminderTriggerRow } from '@/app/dashboard/ReminderFields';
 import type { ReminderTrigger } from '@/lib/tracker/reminder';
+import { AttachmentThumb } from '@/app/dashboard/AttachmentThumb';
+import type { Attachment } from '@/lib/tracker/cosmosHelpers';
 import { VehicleSpinner } from './VehicleSpinner';
 import styles from './AssistantProposedEntryCard.module.css';
 
@@ -37,6 +39,7 @@ export interface ProposedServiceEntry {
   // Service entry can now be drafted from either vehicle kind.
   vehicleKind: 'bike' | 'car';
   entryId?: string;
+  attachment?: Attachment;
 }
 
 export interface ProposedBillEntry {
@@ -48,6 +51,7 @@ export interface ProposedBillEntry {
   date: string;
   vehicleKind: 'bike' | 'car';
   entryId?: string;
+  attachment?: Attachment;
 }
 
 export interface ProposedModEntry {
@@ -61,6 +65,7 @@ export interface ProposedModEntry {
   mileageNote?: string;
   vehicleKind: 'bike' | 'car';
   entryId?: string;
+  attachment?: Attachment;
 }
 
 export interface ProposedFuelEntry {
@@ -77,6 +82,7 @@ export interface ProposedFuelEntry {
   filledToFull: boolean;
   vehicleKind: 'bike' | 'car';
   entryId?: string;
+  attachment?: Attachment;
 }
 
 export interface ProposedLabourEntry {
@@ -94,6 +100,7 @@ export interface ProposedLabourEntry {
   // without re-resolving the account's active vehicle a second time.
   vehicleKind: 'bike' | 'car';
   entryId?: string;
+  attachment?: Attachment;
 }
 
 export interface ProposedFineEntry {
@@ -107,6 +114,7 @@ export interface ProposedFineEntry {
   // Fine can be drafted from either vehicle kind.
   vehicleKind: 'bike' | 'car';
   entryId?: string;
+  attachment?: Attachment;
 }
 
 export interface ProposedTollEntry {
@@ -118,6 +126,7 @@ export interface ProposedTollEntry {
   date: string;
   vehicleKind: 'bike' | 'car';
   entryId?: string;
+  attachment?: Attachment;
 }
 
 export type ProposedEntry =
@@ -307,22 +316,29 @@ export function AssistantProposedEntryCard({ entry }: { entry: ProposedEntry }) 
       reminder = rest.length > 0 ? { ...primary, additionalTriggers: rest } : primary;
     }
 
+    // Included on every category alike - every one of these endpoints
+    // already accepts the same `attachments: Attachment[]` field the
+    // manual dashboard forms send, so a file attached in chat carries
+    // straight through to the saved record exactly like AttachmentUploader's
+    // own value already does elsewhere.
+    const attachments = entry.attachment ? [entry.attachment] : undefined;
+
     const body =
       entry.category === 'service'
-        ? { jobType, cost: costValue, mileage: Number(mileage), date, notes: description, mileageAcknowledged: mileageAck, reminder }
+        ? { jobType, cost: costValue, mileage: Number(mileage), date, notes: description, mileageAcknowledged: mileageAck, reminder, attachments }
         : entry.category === 'bill'
-        ? { billType, cost: costValue, date, notes: description, reminder }
+        ? { billType, cost: costValue, date, notes: description, reminder, attachments }
         : entry.category === 'mod'
-        ? { category: modCategory, name: description, cost: costValue, mileage: Number(mileage), date, mileageAcknowledged: mileageAck }
+        ? { category: modCategory, name: description, cost: costValue, mileage: Number(mileage), date, mileageAcknowledged: mileageAck, attachments }
         : entry.category === 'labour'
-        ? { category: labourCategory, cost: costValue, mileage: Number(mileage), date, notes: description, mileageAcknowledged: mileageAck }
+        ? { category: labourCategory, cost: costValue, mileage: Number(mileage), date, notes: description, mileageAcknowledged: mileageAck, attachments }
         : entry.category === 'fine'
-        ? { fineType, cost: costValue, date, notes: description }
+        ? { fineType, cost: costValue, date, notes: description, attachments }
         : entry.category === 'toll'
-        ? { tollType, cost: costValue, date, notes: description }
+        ? { tollType, cost: costValue, date, notes: description, attachments }
         : isElectricFuel
-        ? { kwh: Number(kwh), cost: costValue, mileage: Number(mileage), date, filledToFull: false, mileageAcknowledged: mileageAck }
-        : { litres: Number(litres), cost: costValue, mileage: Number(mileage), date, filledToFull, mileageAcknowledged: mileageAck };
+        ? { kwh: Number(kwh), cost: costValue, mileage: Number(mileage), date, filledToFull: false, mileageAcknowledged: mileageAck, attachments }
+        : { litres: Number(litres), cost: costValue, mileage: Number(mileage), date, filledToFull, mileageAcknowledged: mileageAck, attachments };
 
     try {
       const res = await fetch(getEndpoint(entry), {
@@ -521,6 +537,16 @@ export function AssistantProposedEntryCard({ entry }: { entry: ProposedEntry }) 
           idPrefix={`ai-remind-${entry.category}`}
           checkboxLabel={entry.category === 'service' ? '🔔 Remind me when this is due again' : '🔔 Remind me when this is due for renewal'}
         />
+      )}
+
+      {entry.attachment && (
+        <div className={styles.field}>
+          <label>Attached</label>
+          <div className={styles.row}>
+            <AttachmentThumb attachment={entry.attachment} />
+            <span>{entry.attachment.fileName}</span>
+          </div>
+        </div>
       )}
 
       {error && <p className={styles.errorNote} role="alert">{error}</p>}

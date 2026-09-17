@@ -104,6 +104,7 @@ import {
   toolProposeSettingsChange,
   toolProposeShareLink,
   toolProposeEditEntry,
+  toolProposeVaultDocument,
   ASSISTANT_TOOL_DECLARATIONS,
 } from "@/lib/tracker/assistantTools";
 
@@ -1551,5 +1552,102 @@ describe("toolProposeEditEntry", () => {
       const result: any = await toolProposeEditEntry("owner@example.com", { category: "toll", entryId: "t-1" });
       expect(result.error).toMatch(/Couldn't find that toll/);
     });
+  });
+});
+
+describe("toolProposeVaultDocument", () => {
+  it("returns an error when the account has no vehicle at all", async () => {
+    mocks.resolveActiveVehicle.mockResolvedValue(null);
+    const result = await toolProposeVaultDocument("owner@example.com", {});
+    expect(result).toEqual({ error: "No vehicle found on this account." });
+  });
+
+  it("drafts against the bike's own id, with an empty category/label when none was given", async () => {
+    const result: any = await toolProposeVaultDocument("owner@example.com", {});
+    expect(result).toEqual({ category: "vaultDocument", vehicleKind: "bike", vehicleId: "bike-1", vaultCategory: "", label: "" });
+  });
+
+  it("accepts a real Vault category and trims a given label", async () => {
+    const result: any = await toolProposeVaultDocument("owner@example.com", { category: "dvlaLegal", label: "  V5C  " });
+    expect(result.vaultCategory).toBe("dvlaLegal");
+    expect(result.label).toBe("V5C");
+  });
+
+  it("falls back to an empty category for an unrecognized one, rather than rejecting the draft", async () => {
+    const result: any = await toolProposeVaultDocument("owner@example.com", { category: "not-a-real-vault-category" });
+    expect(result.vaultCategory).toBe("");
+  });
+
+  it("drafts against the car's own id for a car-active session", async () => {
+    mocks.resolveActiveVehicle.mockResolvedValue(carActive());
+    const result: any = await toolProposeVaultDocument("owner@example.com", { category: "insurance" });
+    expect(result).toEqual({ category: "vaultDocument", vehicleKind: "car", vehicleId: "car-1", vaultCategory: "insurance", label: "" });
+  });
+});
+
+describe("runAssistantTool - attachment merging", () => {
+  // withAttachment isn't exported directly - exercised here through the
+  // one real dispatch path that uses it, same as every other piece of
+  // this file's own security-dispatch behaviour.
+  const today = new Date().toISOString().slice(0, 10);
+  const attachment = { blobName: "abc123.jpg", fileName: "receipt.jpg", fileType: "image/jpeg" as const, uploadedAt: "2026-01-01T00:00:00.000Z" };
+
+  it("merges the given attachment onto a successful proposeLogEntry draft", async () => {
+    const result: any = await runAssistantTool(
+      "proposeLogEntry",
+      { category: "service", description: "Oil change", cost: 40, date: today, jobType: "oil-filter" },
+      "owner@example.com",
+      undefined,
+      undefined,
+      attachment
+    );
+    expect(result.attachment).toEqual(attachment);
+  });
+
+  it("never attaches anything when none was given this turn", async () => {
+    const result: any = await runAssistantTool(
+      "proposeLogEntry",
+      { category: "service", description: "Oil change", cost: 40, date: today, jobType: "oil-filter" },
+      "owner@example.com"
+    );
+    expect(result.attachment).toBeUndefined();
+  });
+
+  it("never attaches anything onto an error result", async () => {
+    const result: any = await runAssistantTool(
+      "proposeLogEntry",
+      { category: "service", description: "Oil change", cost: -5, date: today },
+      "owner@example.com",
+      undefined,
+      undefined,
+      attachment
+    );
+    expect(result.error).toBeDefined();
+    expect(result.attachment).toBeUndefined();
+  });
+
+  it("merges the given attachment onto a successful proposeEditEntry draft too", async () => {
+    mocks.getServiceRecords.mockResolvedValue([{ id: "sr-1", jobType: "oil-filter", cost: 40, mileage: 12000, notes: "", date: "2025-01-01" }]);
+    const result: any = await runAssistantTool(
+      "proposeEditEntry",
+      { category: "service", entryId: "sr-1", cost: 45 },
+      "owner@example.com",
+      undefined,
+      undefined,
+      attachment
+    );
+    expect(result.attachment).toEqual(attachment);
+  });
+
+  it("never attaches anything onto an unrelated tool's result (e.g. proposeSettingsChange)", async () => {
+    const result: any = await runAssistantTool(
+      "proposeSettingsChange",
+      { currentMileage: 16000 },
+      "owner@example.com",
+      undefined,
+      undefined,
+      attachment
+    );
+    expect(result.attachment).toBeUndefined();
   });
 });

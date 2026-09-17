@@ -181,11 +181,13 @@ declarations before treating every item above as individually confirmed live.
 - Look up, compare against, or in any way reference another account's data - see above.
 - Read or describe the contents of a receipt image or attachment itself - only the data that
   was extracted from it and saved (amount, date, category), never the document.
-- Directly change anything on your account by itself, beyond the one narrow exception in 6.22 -
-  and even there, only for Service, Labour, Fine, and Toll entries, and only ever as a draft you
-  review and confirm yourself. Everything else - editing or deleting anything already logged,
-  changing account settings like 2FA, drafting any other category - is still lookup/explain only,
-  never something it does for you.
+- Directly change anything on your account by itself. On a Premium account, it can prepare a
+  draft of a new entry (6.22), a change to one already logged (6.22a), an account/vehicle setting
+  (6.22b), a new shareable link (6.22c), or a new Vault document (6.13a, Premium AND 2FA) from
+  what you describe - but it never saves, changes, or creates any of that without you reviewing
+  it and clicking confirm yourself. It can never delete anything, logged entry or otherwise, and
+  can never change account settings like 2FA - those stay lookup/explain only, never something it
+  does for you.
 - Never answer as if a lookup returning nothing or failing settles the question. It should
   say plainly that it doesn't see anything logged for that, rather than estimate a figure to
   avoid an empty answer.
@@ -441,6 +443,16 @@ and the assistant shouldn't describe it as anything stronger than that.
 shareable report link (6.14) - a buyer you've sent a link to never sees anything you've stored in
 the Vault, no matter what else you've chosen to share. It's the one part of your car's record
 that's genuinely just for you.
+**Adding a document via chat:** ask the assistant to add something to the Vault (e.g. "add my V5C
+to the vault") and it drafts the add - guessing the best of the 7 categories and a short label from
+what you describe. The assistant never sees or handles the file itself: the draft card that appears
+is where you actually pick and upload it, exactly like the Vault tab's own upload form. If the Vault
+happens to be locked, the card asks you to re-enter your 2FA code right there, the same as opening
+the tab normally would. **Premium AND 2FA required**, same as opening the Vault tab itself - asked
+to do this without both, the assistant says so plainly rather than attempting it. Note that a file
+attached earlier in the same conversation (for logging a cost - see 6.22) does NOT carry over here;
+the Vault's upload is a separate, more secure step with its own container, so you pick the file
+again on this card.
 
 ### 6.14 Sharing your car's history with a buyer
 **What:** Generate a link that shows a prospective buyer your car's logged history, without
@@ -703,32 +715,81 @@ send. It's emailed straight to the team; there's no in-app inbox or ticket statu
 ---
 
 ### 6.22 Logging a new entry via chat
-**What:** Describe something you want to log, and the assistant drafts it for you right there in
-the conversation, instead of you going to find the right form yourself.
+**What:** Describe something you want to log - a service item, a bill, a modification or
+accessory, a fuel fill-up or EV charging session, labour/workshop time, a fine, or a toll/parking
+charge - in plain language, and the assistant drafts it for you right there in the conversation,
+instead of you going to find the right form yourself. You can also attach a photo or file to your
+message first (the paperclip icon next to the text box) - if you're logging something, it carries
+straight onto the draft automatically, with no extra step.
 **Why:** Typing "add 2 hours labour for £90, today" is faster than opening the Labour tab and
 filling in a form for something small.
-**Status:** Live, but **only for Service, Labour, Fine, and Toll entries right now, and Premium
-only.** This is a real, current gap on the car side, not a design choice: bills (insurance/road
-tax/MOT/finance), modifications/accessories, and fuel fill-ups still can't be drafted via chat for
-a car - only Service, Labour, Fine, and Toll can. If asked to draft anything else, say plainly
-that it isn't available for cars via chat yet and point to the matching Logbook tab instead,
-rather than attempting it or pretending the category doesn't exist. (The motorcycle side of
-RoadVerdict supports all seven categories via chat - this gap is specific to cars.) Asked to draft
-anything at all on a free account, the assistant says so plainly and points to the dashboard forms
-instead.
-**How, for Service and Labour:** describe what happened - what it was, the cost, and (if not
-today) the date - and the assistant replies with an editable draft card: for Service, a job type
-(including a valet, detailing, or wash) plus description, cost, date, and mileage; for Labour,
-description, cost, date, and mileage. Nothing is saved yet. Review it, change anything that's
-wrong, then click **Log it** yourself - only that click actually saves it, going through the exact
-same check the manual form already uses (so a mileage that doesn't add up against your history is
-flagged the same way, with the same option to confirm it anyway).
-**How, for Fine and Toll:** the same drafting flow as Service and Labour, except the draft card
-has no mileage field at all - just a category (fine/toll type), description, cost, and date, since
-neither of these is tracked against mileage.
-**What this can't do:** edit or delete anything already logged - only draft a brand-new Service,
-Labour, Fine, or Toll entry. And it's exactly as bound by the date checks as the manual forms - it
-can't skip past a check the person themselves couldn't skip past either.
+**Status:** Live, for all seven categories identically to a motorcycle account - **Premium only**,
+not available on a free account. Asked to log something on a free account, the assistant says so
+plainly and points to the dashboard forms instead, rather than pretending to do it.
+**How:** describe what happened - what it was, the cost, and (if not today) the date - and the
+assistant replies with an editable draft card: category, description, cost, date, and mileage
+where relevant (for Service, this includes a job type, including a valet, detailing, or wash),
+plus a small preview of any file attached to the message. Fine and Toll carry no mileage field at
+all, same as a bill. Nothing is saved yet. Review it, change anything that's wrong, then click
+**Log it** yourself - only that click actually saves it, going through the exact same check every
+manual form already uses (so a mileage that doesn't add up against your history is flagged the
+same way, with the same option to confirm it anyway).
+**Getting the category right:** for a bill, if it isn't clear which type it is (insurance/road
+tax/MOT/finance/ULEZ or CAZ/Congestion Charge), the assistant asks rather than guessing, since
+there's no safe default for a bill. For a modification/accessory, a fine, or a toll, an unclear or
+very specific item is filed under the catalog's own "Other" entry rather than blocking the draft -
+correct it on the card if the guess is wrong.
+**Reminders:** for a service or a bill, the draft card offers the same "remind me when this is due
+again" default the manual form would suggest for that exact job/bill type (6.10) - reviewable and
+editable before confirming, same as everything else on the card.
+**What this can't do:** delete anything already logged - only draft a brand-new entry, or edit one
+that already exists (see 6.22a). And it's exactly as bound by the mileage/date checks as the
+manual forms - it can't skip past a check the person themselves couldn't skip past either.
+
+---
+
+### 6.22a Editing an already-logged entry via chat
+**What:** Ask to change something you've already logged - a wrong cost, date, category, or
+anything else about an existing service/bill/mod/fuel/labour/fine/toll entry - and the assistant
+drafts the correction, the same review-and-confirm card as logging something new.
+**Why:** Faster than finding the entry on its own tab and opening its edit form, for a small
+correction like "that cambelt job was actually £420, not £400".
+**Status:** Live. **Premium only**, same as logging a new entry (6.22).
+**How:** this needs a specific real entry to point at - the assistant looks it up first (e.g.
+"what did I log on [date]", or "when did I last do an oil change") before drafting anything, never
+guessing which entry is meant. If more than one entry could match, it asks which one rather than
+picking for you. Once it has the right one, describe what's wrong and it drafts the correction -
+every field not mentioned keeps its current logged value. Review and click **Save changes**
+yourself; nothing changes until then.
+**What this can't do:** delete an entry - editing only. Asked to delete something, the assistant
+says so plainly and points to the dashboard, where deleting an entry is still a normal, one-click
+action from its own card.
+
+---
+
+### 6.22b Changing settings via chat
+**What:** Ask to change an account or vehicle setting - current mileage, region, annual budget,
+display currency, distance/fuel-economy units, or which categories (insurance, finance, fines,
+tolls, valeting/washing) show in your buyer report (6.14) - and the assistant drafts the change
+for review and confirmation.
+**Why:** Faster than finding the right settings control for a quick change like "my mileage's now
+41,200" or "switch me to euros".
+**Status:** Live. **Premium only**, same as logging a new entry (6.22).
+**How:** only the fields actually asked to change appear on the draft card - everything else is
+left alone. Review and click **Save changes** yourself; nothing changes until then.
+
+---
+
+### 6.22c Creating a shareable link via chat
+**What:** Ask for a shareable report link to send a buyer, and the assistant drafts one for
+review and confirmation - the same kind of link the Export & share section (6.14) creates.
+**Why:** Faster than finding the Shareable Links tab for a quick "get me a link for this
+weekend's viewing" request.
+**Status:** Live. **Premium only**, same as logging a new entry (6.22).
+**How:** the assistant asks who the link is for (their email address) before drafting it, unless
+already said - it never invents one. The draft card allows reviewing and editing the recipient
+email, how long the link stays valid, and an optional asking price, before clicking **Create
+link**. The finished link appears on the card once created, ready to copy.
 
 ---
 

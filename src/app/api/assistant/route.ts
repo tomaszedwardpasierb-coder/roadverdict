@@ -29,12 +29,15 @@ import {
   SETTINGS_TOOL_DECLARATIONS,
   SHARE_LINK_TOOL_DECLARATIONS,
   EDIT_TOOL_DECLARATIONS,
+  VAULT_TOOL_DECLARATIONS,
   runAssistantTool,
   type CompareContext,
   type ProposedEntry,
   type ProposedSettingsChange,
   type ProposedShareLink,
+  type ProposedVaultDocument,
 } from "@/lib/tracker/assistantTools";
+import type { Attachment } from "@/lib/tracker/cosmosHelpers";
 import { logAssistantQuestion } from "@/lib/tracker/assistantQuestionLog";
 import { logGeminiUsage } from "@/lib/tracker/geminiUsageLog";
 import { resolveShareToken } from "@/lib/tracker/shareLink";
@@ -42,6 +45,7 @@ import { hasReportAccess } from "@/lib/tracker/reportAccess";
 import { getBikesForUser, isBikeReadOnly } from "@/lib/tracker/bike";
 import { getCarsForUser, isCarReadOnly } from "@/lib/tracker/car";
 import { isPro } from "@/lib/subscriptions";
+import { isTwoFactorEnabled } from "@/lib/auth/twoFactor";
 import { MIN_COMPARE_VEHICLES, MAX_COMPARE_VEHICLES } from "@/lib/tracker/vehicleComparison";
 
 export const dynamic = "force-dynamic";
@@ -130,7 +134,7 @@ const TAB_GROUP_LABELS: Record<string, string> = {
 const NO_CAR_KB_FALLBACK =
   "No car-specific knowledge base has been written yet for RoadVerdict's car support. Be honest that detailed car guidance isn't set up yet rather than guessing, and never use motorcycle-specific facts, terminology, or figures as if they applied to a car.";
 
-function buildSystemInstruction(config: AssistantConfigDoc, signedIn: boolean, privacyPolicyText: string | null, reportOpen: boolean, dashboardTabLabel: string | null, dashboardTabGroupLabel: string | null, compareVehicleNames: string[] | null, logEntryAccess: "available" | "upsell" | "none", activeVehicleKind: "bike" | "car" | null, displayName: string | null, carKnowledgeBase?: string): string {
+function buildSystemInstruction(config: AssistantConfigDoc, signedIn: boolean, privacyPolicyText: string | null, reportOpen: boolean, dashboardTabLabel: string | null, dashboardTabGroupLabel: string | null, compareVehicleNames: string[] | null, logEntryAccess: "available" | "upsell" | "none", activeVehicleKind: "bike" | "car" | null, displayName: string | null, carKnowledgeBase?: string, vaultChatAccess?: "available" | "unavailable", hasAttachment?: boolean): string {
   // A car-active session's knowledge base is a completely separate
   // document (see the ADR: one shared assistant, two knowledge bases) -
   // swapped in here instead of config.knowledgeBase (motorcycle-only)
@@ -203,6 +207,22 @@ function buildSystemInstruction(config: AssistantConfigDoc, signedIn: boolean, p
     );
   }
 
+  if (vaultChatAccess === "available") {
+    parts.push(
+      "\n\n---\n\nADDING A DOCUMENT TO THE VAULT VIA CHAT (Pro + 2FA feature, active now): if they want to store a real document - a V5C logbook, MOT certificate, insurance certificate, driving licence, warranty, or similar (see the knowledge base's own Vault section, 6.13a, for the full category list) - use the proposeVaultDocument tool. Guess the best category and an optional short label from what they describe; you never see or need the file itself, since the draft card is where they pick and upload it themselves. If the Vault happens to be locked, the card handles re-authentication itself - you don't need to ask them to unlock anything first. Never use this for a cost/expense - that's proposeLogEntry, not the Vault."
+    );
+  } else if (signedIn) {
+    parts.push(
+      "\n\n---\n\nADDING A DOCUMENT TO THE VAULT VIA CHAT: not available on this account yet - the Vault itself requires Pro AND two-factor authentication enabled (Security tab), regardless of whether chat drafting is otherwise available. If asked to add a document to the Vault, say so plainly and name whichever of Pro/2FA is actually missing if you can tell, rather than attempting to draft it."
+    );
+  }
+
+  if (hasAttachment) {
+    parts.push(
+      "\n\n---\n\nTHE USER HAS JUST ATTACHED A FILE to this message (a receipt, photo, or document). If they're describing something to log (proposeLogEntry/proposeEditEntry), the draft you create will automatically carry this attachment - you don't need to ask them to attach it again, and you don't need to mention the file mechanically; just draft normally. If instead they want to store this as a Vault document, use proposeVaultDocument as usual - the file they already picked here does NOT carry over to the Vault automatically (it's a different, more secure storage system with its own upload step), so the Vault draft card will ask them to pick the file again there; mention that plainly if it's relevant."
+    );
+  }
+
   if (compareVehicleNames) {
     parts.push(
       `\n\n---\n\nCURRENT PAGE: the signed-in user has the Compare vehicles page open, currently comparing: ${compareVehicleNames.join(", ")}. The getViewedComparison tool is available now. Call it BEFORE answering any question that could plausibly be about this comparison, even a vague, pronoun-only, or unqualified question with no explicit mention of "this comparison" - e.g. "which is cheaper?", "what does this show?", "is that right?". While this page is open, an unqualified question about "these vehicles" or "which one" defaults to being about THIS specific comparison, not a generic account-wide question - never fall back to a different personal-data tool without checking this one first just because the question didn't use those exact words.`
@@ -263,7 +283,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Assistant is not configured." }, { status: 503 });
   }
 
-  let body: { messages?: ChatMessage[]; reportToken?: string; dashboardTab?: string; compareVehicleIds?: string[]; compareFrom?: string; compareTo?: string };
+  let body: { messages?: ChatMessage[]; reportToken?: string; dashboardTab?: string; compareVehicleIds?: string[]; compareFrom?: string; compareTo?: string; attachment?: unknown };
   try {
     body = await req.json();
   } catch {
@@ -279,6 +299,25 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Message too long." }, { status: 400 });
     }
   }
+
+  // Whatever the person attached to THIS turn's own message - already
+  // uploaded via the same /api/tracker/upload-attachment endpoint the
+  // manual dashboard forms use, so by the time it reaches here it's a
+  // real blobName, not a file. Shape-checked, not trusted blindly: a
+  // malformed value is simply ignored (treated as no attachment) rather
+  // than failing the whole request over something that only affects a
+  // nice-to-have.
+  const ATTACHMENT_FILE_TYPES = ["image/jpeg", "image/png", "application/pdf"];
+  const rawAttachment = body.attachment as { blobName?: unknown; fileName?: unknown; fileType?: unknown; uploadedAt?: unknown } | undefined;
+  const attachment: Attachment | undefined =
+    rawAttachment &&
+    typeof rawAttachment.blobName === "string" &&
+    typeof rawAttachment.fileName === "string" &&
+    typeof rawAttachment.uploadedAt === "string" &&
+    typeof rawAttachment.fileType === "string" &&
+    ATTACHMENT_FILE_TYPES.includes(rawAttachment.fileType)
+      ? (rawAttachment as Attachment)
+      : undefined;
 
   // If this throws for any reason - Cosmos genuinely unavailable, not
   // just a missing local env var - fail closed rather than crash: treat
@@ -456,6 +495,24 @@ export async function POST(req: NextRequest) {
     logEntryAccess = userIsPro === null ? "none" : userIsPro ? "available" : "upsell";
   }
 
+  // Same Pro requirement as logEntryAccess, plus 2FA - exactly what
+  // opening the Vault tab itself already requires (see vaultAccess.ts's
+  // checkVaultGate). Whether the Vault is currently LOCKED is
+  // deliberately not part of this check - that's resolved on the draft
+  // card itself (same VaultAuthModal re-auth flow the Vault tab uses),
+  // not here, so a locked-but-otherwise-eligible account still gets the
+  // tool offered rather than a confusing "not available" for something
+  // that's really just one code entry away.
+  let vaultChatAccess: "available" | "unavailable" = "unavailable";
+  if (signedIn && session) {
+    try {
+      const [userIsPro, has2fa] = await Promise.all([userIsProResult, isTwoFactorEnabled(session.email)]);
+      vaultChatAccess = userIsPro && has2fa ? "available" : "unavailable";
+    } catch (err) {
+      console.error("Assistant: vaultChatAccess check failed, continuing without the Vault tool:", err);
+    }
+  }
+
   // The client always appends the new message before sending, so this
   // is the actual question being asked right now - not the full
   // history, which would have already been logged on earlier requests.
@@ -493,7 +550,7 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  const systemInstruction = buildSystemInstruction(config, signedIn, privacyPolicyText, !!reportToken, dashboardTabLabel, dashboardTabGroupLabel, compareVehicleNames, logEntryAccess, activeVehicleKind, displayName, carKnowledgeBase);
+  const systemInstruction = buildSystemInstruction(config, signedIn, privacyPolicyText, !!reportToken, dashboardTabLabel, dashboardTabGroupLabel, compareVehicleNames, logEntryAccess, activeVehicleKind, displayName, carKnowledgeBase, vaultChatAccess, !!attachment);
 
   const contents: GeminiContent[] = toGeminiContents(messages);
   const toolDeclarations = [
@@ -507,6 +564,8 @@ export async function POST(req: NextRequest) {
     ...(logEntryAccess === "available" ? SETTINGS_TOOL_DECLARATIONS : []),
     ...(logEntryAccess === "available" ? SHARE_LINK_TOOL_DECLARATIONS : []),
     ...(logEntryAccess === "available" ? EDIT_TOOL_DECLARATIONS : []),
+    // Its own, stricter gate (Pro AND 2FA) - see vaultChatAccess above.
+    ...(vaultChatAccess === "available" ? VAULT_TOOL_DECLARATIONS : []),
   ];
   const tools = toolDeclarations.length > 0 ? [{ functionDeclarations: toolDeclarations }] : undefined;
 
@@ -518,6 +577,7 @@ export async function POST(req: NextRequest) {
   let proposedEntry: ProposedEntry | null = null;
   let proposedSettingsChange: ProposedSettingsChange | null = null;
   let proposedShareLink: ProposedShareLink | null = null;
+  let proposedVaultDocument: ProposedVaultDocument | null = null;
 
   try {
     // Bounded rather than while(true) - a tool-call loop that somehow
@@ -553,7 +613,7 @@ export async function POST(req: NextRequest) {
         // model-supplied and therefore untrusted for identity purposes.
         // reportToken is this same request's own server-validated value
         // from above, for the same reason.
-        const toolResult = await runAssistantTool(name, args ?? {}, session?.email ?? "", reportToken ?? undefined, compareContext ?? undefined);
+        const toolResult = await runAssistantTool(name, args ?? {}, session?.email ?? "", reportToken ?? undefined, compareContext ?? undefined, attachment);
 
         if ((name === "proposeLogEntry" || name === "proposeEditEntry") && toolResult && typeof toolResult === "object" && !("error" in toolResult)) {
           proposedEntry = toolResult as ProposedEntry;
@@ -563,6 +623,9 @@ export async function POST(req: NextRequest) {
         }
         if (name === "proposeShareLink" && toolResult && typeof toolResult === "object" && !("error" in toolResult)) {
           proposedShareLink = toolResult as ProposedShareLink;
+        }
+        if (name === "proposeVaultDocument" && toolResult && typeof toolResult === "object" && !("error" in toolResult)) {
+          proposedVaultDocument = toolResult as ProposedVaultDocument;
         }
 
         // Echo back every part from the model's actual turn, verbatim -
@@ -586,6 +649,7 @@ export async function POST(req: NextRequest) {
         ...(proposedEntry ? { proposedEntry } : {}),
         ...(proposedSettingsChange ? { proposedSettingsChange } : {}),
         ...(proposedShareLink ? { proposedShareLink } : {}),
+        ...(proposedVaultDocument ? { proposedVaultDocument } : {}),
       });
     }
 

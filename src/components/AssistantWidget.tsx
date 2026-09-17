@@ -3,11 +3,14 @@
 
 import { Suspense, useEffect, useRef, useState } from 'react';
 import { usePathname, useSearchParams } from 'next/navigation';
-import { Mic } from 'lucide-react';
+import { Mic, Paperclip, X } from 'lucide-react';
 import { useActiveSection } from './ActiveSectionContext';
 import { AssistantProposedEntryCard, type ProposedEntry } from './AssistantProposedEntryCard';
 import { AssistantProposedSettingsCard, type ProposedSettingsChange } from './AssistantProposedSettingsCard';
 import { AssistantProposedShareLinkCard, type ProposedShareLink } from './AssistantProposedShareLinkCard';
+import { AssistantProposedVaultDocumentCard, type ProposedVaultDocument } from './AssistantProposedVaultDocumentCard';
+import { AttachmentThumb } from '@/app/dashboard/AttachmentThumb';
+import type { Attachment } from '@/lib/tracker/cosmosHelpers';
 import { VehicleSpinner } from './VehicleSpinner';
 import styles from './AssistantWidget.module.css';
 
@@ -55,9 +58,15 @@ function getSpeechRecognitionConstructor(): SpeechRecognitionConstructor | null 
 interface Message {
   role: 'user' | 'assistant';
   content: string;
+  // Set on a user message that had a file attached when sent - already
+  // uploaded by then (see handleAttachmentPick), so this is only ever a
+  // real Attachment reference, shown as a small thumbnail on that
+  // message's own bubble.
+  attachment?: Attachment;
   proposedEntry?: ProposedEntry;
   proposedSettingsChange?: ProposedSettingsChange;
   proposedShareLink?: ProposedShareLink;
+  proposedVaultDocument?: ProposedVaultDocument;
 }
 
 const GREETING: Message = {
@@ -109,30 +118,40 @@ interface CompareContext {
 }
 
 type SendResult =
-  | { ok: true; reply: string; proposedEntry?: ProposedEntry; proposedSettingsChange?: ProposedSettingsChange; proposedShareLink?: ProposedShareLink }
+  | {
+      ok: true;
+      reply: string;
+      proposedEntry?: ProposedEntry;
+      proposedSettingsChange?: ProposedSettingsChange;
+      proposedShareLink?: ProposedShareLink;
+      proposedVaultDocument?: ProposedVaultDocument;
+    }
   | { ok: false; error: string; retryable: boolean };
 
 async function attemptSend(
   payload: Message[],
   reportToken: string | null,
   dashboardTab: string | null,
-  compareContext: CompareContext | null
+  compareContext: CompareContext | null,
+  attachment: Attachment | null
 ): Promise<SendResult> {
   let status: number | null = null;
   try {
     const res = await fetch('/api/assistant', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      // Only role/content (and, if a report page, dashboard tab, or the
-      // compare page is open, that context) goes over the wire - nothing
-      // else about the user is sent from here; anything the assistant
-      // knows about their own account, it gets server-side from their
-      // own session, never from this request body. dashboardTab is just
-      // the raw Section key (e.g. "shareLinks"), not a label, and
-      // compareContext's vehicle ids are just what's currently in this
-      // page's own URL - the server independently re-validates both
-      // against the real session (bikes AND cars) before trusting
-      // either for anything.
+      // Only role/content (and, if a report page, dashboard tab, the
+      // compare page, or an attached file, that context) goes over the
+      // wire - nothing else about the user is sent from here; anything
+      // the assistant knows about their own account, it gets
+      // server-side from their own session, never from this request
+      // body. dashboardTab is just the raw Section key (e.g.
+      // "shareLinks"), not a label, and compareContext's vehicle ids are
+      // just what's currently in this page's own URL - the server
+      // independently re-validates both against the real session (bikes
+      // AND cars) before trusting either for anything. attachment is
+      // just the reference already returned by uploading the file
+      // moments ago (see handleAttachmentPick) - never the file itself.
       body: JSON.stringify({
         messages: payload.map((m) => ({ role: m.role, content: m.content })),
         ...(reportToken ? { reportToken } : {}),
@@ -144,6 +163,7 @@ async function attemptSend(
               ...(compareContext.to ? { compareTo: compareContext.to } : {}),
             }
           : {}),
+        ...(attachment ? { attachment } : {}),
       }),
     });
     status = res.status;
@@ -155,6 +175,7 @@ async function attemptSend(
         ...(data.proposedEntry ? { proposedEntry: data.proposedEntry } : {}),
         ...(data.proposedSettingsChange ? { proposedSettingsChange: data.proposedSettingsChange } : {}),
         ...(data.proposedShareLink ? { proposedShareLink: data.proposedShareLink } : {}),
+        ...(data.proposedVaultDocument ? { proposedVaultDocument: data.proposedVaultDocument } : {}),
       };
     }
     return {
@@ -206,6 +227,13 @@ function AssistantWidgetInner() {
   const [micSupported, setMicSupported] = useState(false);
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
+  // Already uploaded (see handleAttachmentPick) by the time it's
+  // "pending" - a real Attachment reference, not a raw File, ready to
+  // send with the next message. Cleared once that message is sent.
+  const [pendingAttachment, setPendingAttachment] = useState<Attachment | null>(null);
+  const [uploadingAttachment, setUploadingAttachment] = useState(false);
+  const [attachmentError, setAttachmentError] = useState<string | null>(null);
+  const attachmentInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     setMicSupported(getSpeechRecognitionConstructor() !== null);
@@ -271,19 +299,52 @@ function AssistantWidgetInner() {
     recognition.start();
   }
 
+  // Uploads immediately on pick, same as AttachmentUploader.tsx's own
+  // manual-form flow - by the time it's "pending" this already IS a
+  // real Attachment reference (blobName etc.), never a raw File held in
+  // state waiting to be sent, so a chat-drafted entry's own confirm step
+  // needs no upload of its own (see AssistantProposedEntryCard.tsx).
+  async function handleAttachmentPick(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    setAttachmentError(null);
+    setUploadingAttachment(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      const res = await fetch('/api/tracker/upload-attachment', { method: 'POST', body: formData });
+      const data = await res.json();
+      if (!res.ok) {
+        setAttachmentError(data.error ?? 'Upload failed. Try again.');
+        return;
+      }
+      setPendingAttachment(data.attachment);
+    } catch {
+      setAttachmentError('Could not reach the server.');
+    } finally {
+      setUploadingAttachment(false);
+    }
+  }
+
   async function sendWithRetry(payload: Message[], reportToken: string | null, dashboardTab: string | null, compareContext: CompareContext | null) {
     setSending(true);
     setError(null);
     setLastFailedMessages(null);
 
-    let result = await attemptSend(payload, reportToken, dashboardTab, compareContext);
+    // Always the newest user message's own attachment (or none) - every
+    // caller below passes a payload ending in the message that was just
+    // added, whether this is a fresh send or a retry of one that failed.
+    const attachment = payload[payload.length - 1]?.attachment ?? null;
+
+    let result = await attemptSend(payload, reportToken, dashboardTab, compareContext, attachment);
     let attempts = 1;
     // Retries silently, still inside the same "sending" state - the
     // person just sees the normal typing indicator for slightly longer
     // if this happens, never a flash of an error that then recovers.
     while (!result.ok && result.retryable && attempts <= MAX_AUTO_RETRIES) {
       await sleep(RETRY_DELAY_MS);
-      result = await attemptSend(payload, reportToken, dashboardTab, compareContext);
+      result = await attemptSend(payload, reportToken, dashboardTab, compareContext, attachment);
       attempts++;
     }
 
@@ -297,6 +358,7 @@ function AssistantWidgetInner() {
           ...(result.proposedEntry ? { proposedEntry: result.proposedEntry } : {}),
           ...(result.proposedSettingsChange ? { proposedSettingsChange: result.proposedSettingsChange } : {}),
           ...(result.proposedShareLink ? { proposedShareLink: result.proposedShareLink } : {}),
+          ...(result.proposedVaultDocument ? { proposedVaultDocument: result.proposedVaultDocument } : {}),
         },
       ]);
     } else {
@@ -309,9 +371,14 @@ function AssistantWidgetInner() {
     const text = input.trim();
     if (!text || sending) return;
 
-    const nextMessages = [...messages, { role: 'user' as const, content: text }];
+    const nextMessages: Message[] = [
+      ...messages,
+      { role: 'user', content: text, ...(pendingAttachment ? { attachment: pendingAttachment } : {}) },
+    ];
     setMessages(nextMessages);
     setInput('');
+    setPendingAttachment(null);
+    setAttachmentError(null);
     await sendWithRetry(nextMessages, reportToken, dashboardTab, compareContext);
   }
 
@@ -342,9 +409,16 @@ function AssistantWidgetInner() {
             {messages.map((m, i) => (
               <div key={i} style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', alignItems: m.role === 'user' ? 'flex-end' : 'flex-start' }}>
                 <div className={m.role === 'user' ? styles.bubbleUser : styles.bubbleAssistant}>{m.content}</div>
+                {m.attachment && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                    <AttachmentThumb attachment={m.attachment} />
+                    <span style={{ fontSize: '0.75rem' }}>{m.attachment.fileName}</span>
+                  </div>
+                )}
                 {m.proposedEntry && <AssistantProposedEntryCard entry={m.proposedEntry} />}
                 {m.proposedSettingsChange && <AssistantProposedSettingsCard change={m.proposedSettingsChange} />}
                 {m.proposedShareLink && <AssistantProposedShareLinkCard link={m.proposedShareLink} />}
+                {m.proposedVaultDocument && <AssistantProposedVaultDocumentCard document={m.proposedVaultDocument} />}
               </div>
             ))}
             {sending && (
@@ -364,7 +438,49 @@ function AssistantWidgetInner() {
             )}
           </div>
 
+          {(pendingAttachment || uploadingAttachment || attachmentError) && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.3rem 0.6rem', fontSize: '0.78rem' }}>
+              {uploadingAttachment && (
+                <>
+                  <VehicleSpinner kind={vehicleKind ?? 'bike'} size={14} /> Uploading…
+                </>
+              )}
+              {pendingAttachment && !uploadingAttachment && (
+                <>
+                  <AttachmentThumb attachment={pendingAttachment} />
+                  <span>{pendingAttachment.fileName}</span>
+                  <button
+                    type="button"
+                    onClick={() => setPendingAttachment(null)}
+                    aria-label="Remove attachment"
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', padding: 0 }}
+                  >
+                    <X size={14} />
+                  </button>
+                </>
+              )}
+              {attachmentError && <span className={styles.errorNote}>{attachmentError}</span>}
+            </div>
+          )}
+
           <div className={styles.inputRow}>
+            <input
+              ref={attachmentInputRef}
+              type="file"
+              accept="image/jpeg,image/png,application/pdf"
+              onChange={handleAttachmentPick}
+              aria-label="Choose a photo or file to attach"
+              hidden
+            />
+            <button
+              type="button"
+              className={styles.micBtn}
+              onClick={() => attachmentInputRef.current?.click()}
+              disabled={sending || uploadingAttachment}
+              aria-label="Attach a photo or file"
+            >
+              <Paperclip size={18} />
+            </button>
             <textarea
               className={styles.input}
               value={input}
