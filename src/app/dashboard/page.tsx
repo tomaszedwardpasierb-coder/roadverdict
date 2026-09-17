@@ -21,7 +21,7 @@ import { ShareLinksSection } from "./ShareLinksSection";
 import { getCarShareLinksForUser } from "@/lib/tracker/carShareLink";
 import { getPendingCarReceiptRequestsForOwner } from "@/lib/tracker/carReceiptRequest";
 import { CarShareLinksSection } from "./CarShareLinksSection";
-import { computeSpendSummary, computeYearSpend, gatherMileagePoints } from "@/lib/tracker/summary";
+import { computeSpendSummary, computeYearSpend, gatherMileagePoints, projectYearEndSpend } from "@/lib/tracker/summary";
 import { slugifyMake, getBikeClassForCC, getModelsForBrand } from "@/lib/motorcycleModels";
 import { BRAND_OPTIONS, type Region } from "@/lib/priceData";
 import { JOB_LABELS } from "@/lib/tracker/jobTypes";
@@ -87,6 +87,8 @@ import { buildCarWalkAwayIssues } from "@/lib/tracker/carWalkAwayRisks";
 import { CarStorySoFarTab } from "./CarStorySoFarTab";
 import { ChartFilterProvider } from "./ChartFilterContext";
 import { ChartFilterBar } from "./ChartFilterBar";
+import { buildBikeCostForecastAllWindows, pickCategoryForecast } from "@/lib/tracker/costForecast";
+import { buildCarCostForecastAllWindows } from "@/lib/tracker/carCostForecast";
 import { DashboardStatCards } from "./DashboardStatCards";
 import { CustomFilterPanel } from "./CustomFilterPanel";
 import { ScanReceiptButton } from "./ScanReceiptButton";
@@ -340,6 +342,17 @@ export default async function DashboardPage(props: { searchParams: Promise<{ add
   const actualMpg = computeActualMPG(fuelLogs, bike.dvlaData?.officialCombinedMpg);
   const mpgSeries = computeMPGSeries(fuelLogs, bike.dvlaData?.officialCombinedMpg);
   const mileagePoints = gatherMileagePoints(records, mods, fuelLogs, bills, labour);
+  // Computed for all three forecast windows up front, not just the
+  // currently-selected one - see buildBikeCostForecastAllWindows's own
+  // comment on why (page.tsx is a server component, forecastWindow is
+  // client-side state it has no way to read at render time).
+  const bikeForecastByWindow = buildBikeCostForecastAllWindows({
+    records, mods, bills, labour, reminders,
+    currentMileage: bike.currentMileage,
+    mileagePoints,
+    bikeLifetime: { startingMileage: bike.startingMileage, currentMileage: bike.currentMileage, dateAdded: bike.dateAdded },
+    bikeClass: bike.bikeClass,
+  });
   const fuelCostPoints = fuelLogs.map((f) => ({ id: f.id, date: f.date, cost: f.cost, mileage: f.mileage }));
   const summary = computeSpendSummary(records, mods, fuelLogs, bills, labour);
   const currentYear = new Date().getFullYear();
@@ -511,7 +524,7 @@ export default async function DashboardPage(props: { searchParams: Promise<{ add
       </div>
 
       <div className={`${styles.dashboardTwoCol} ${styles.equalHeightRow}`}>
-        <BudgetWidget yearSpend={yearSpend} currentYear={currentYear} initialBudget={bike.annualBudget} currency={currency} rates={rates} />
+        <BudgetWidget yearSpend={yearSpend} currentYear={currentYear} initialBudget={bike.annualBudget} currency={currency} rates={rates} yearEndProjection={projectYearEndSpend(yearSpend, currentYear)} />
         <div className={styles.chartCard}>
           {summary.grandTotal > 0 ? (
             <SpendDonutChart records={records} mods={mods} fuelLogs={fuelLogs} bills={bills} labour={labour} currency={currency} rates={rates} initialChartType={bike.chartTypes?.["spend-donut"] === "bar" ? "bar" : "pie"} isPro={userIsPro} />
@@ -802,7 +815,7 @@ export default async function DashboardPage(props: { searchParams: Promise<{ add
         </div>
         <div className={styles.chartCard}>
           {records.length > 0 ? (
-            <CategorySpendChart chartId="servicing-spend" title="Servicing spend over time" items={records} category="service" color="#1C1D20" currency={currency} rates={rates} distanceUnit={distanceUnit} initialChartType={bike.chartTypes?.["servicing-spend"] === "line" ? "line" : "bar"} />
+            <CategorySpendChart chartId="servicing-spend" title="Servicing spend over time" items={records} category="service" color="#1C1D20" currency={currency} rates={rates} distanceUnit={distanceUnit} initialChartType={bike.chartTypes?.["servicing-spend"] === "line" ? "line" : "bar"} forecast={pickCategoryForecast(bikeForecastByWindow, "servicing")} />
           ) : (
             <>
               <div className={styles.chartCardTitle}>Servicing spend over time</div>
@@ -812,7 +825,7 @@ export default async function DashboardPage(props: { searchParams: Promise<{ add
         </div>
         <div className={styles.chartCard}>
           {mods.length > 0 ? (
-            <CategorySpendChart chartId="mods-spend" title="Parts & Accessories spend over time" items={mods} category="mods" color="#EE9A2E" currency={currency} rates={rates} distanceUnit={distanceUnit} initialChartType={bike.chartTypes?.["mods-spend"] === "line" ? "line" : "bar"} />
+            <CategorySpendChart chartId="mods-spend" title="Parts & Accessories spend over time" items={mods} category="mods" color="#EE9A2E" currency={currency} rates={rates} distanceUnit={distanceUnit} initialChartType={bike.chartTypes?.["mods-spend"] === "line" ? "line" : "bar"} forecast={pickCategoryForecast(bikeForecastByWindow, "mods")} />
           ) : (
             <>
               <div className={styles.chartCardTitle}>Parts & Accessories spend over time</div>
@@ -822,7 +835,7 @@ export default async function DashboardPage(props: { searchParams: Promise<{ add
         </div>
         <div className={styles.chartCard}>
           {bills.length > 0 ? (
-            <CategorySpendChart chartId="bills-spend" title="Insurance, tax, MOT & finance spend over time" items={bills} category="bills" color="#8A867D" currency={currency} rates={rates} distanceUnit={distanceUnit} supportsMileageView={false} initialChartType={bike.chartTypes?.["bills-spend"] === "line" ? "line" : "bar"} />
+            <CategorySpendChart chartId="bills-spend" title="Insurance, tax, MOT & finance spend over time" items={bills} category="bills" color="#8A867D" currency={currency} rates={rates} distanceUnit={distanceUnit} supportsMileageView={false} initialChartType={bike.chartTypes?.["bills-spend"] === "line" ? "line" : "bar"} forecast={pickCategoryForecast(bikeForecastByWindow, "bills")} />
           ) : (
             <>
               <div className={styles.chartCardTitle}>Insurance, tax, MOT & finance spend over time</div>
@@ -832,7 +845,7 @@ export default async function DashboardPage(props: { searchParams: Promise<{ add
         </div>
         <div className={styles.chartCard}>
           {labour.length > 0 ? (
-            <CategorySpendChart chartId="labour-spend" title="Labour spend over time" items={labour} category="labour" color="#3E6B99" currency={currency} rates={rates} distanceUnit={distanceUnit} initialChartType={bike.chartTypes?.["labour-spend"] === "line" ? "line" : "bar"} />
+            <CategorySpendChart chartId="labour-spend" title="Labour spend over time" items={labour} category="labour" color="#3E6B99" currency={currency} rates={rates} distanceUnit={distanceUnit} initialChartType={bike.chartTypes?.["labour-spend"] === "line" ? "line" : "bar"} forecast={pickCategoryForecast(bikeForecastByWindow, "labour")} />
           ) : (
             <>
               <div className={styles.chartCardTitle}>Labour spend over time</div>
@@ -1126,6 +1139,13 @@ async function renderCarDashboard(
   };
 
   const mileagePoints = gatherCarMileagePoints(records, mods, fuelLogs, bills, labour);
+  const carForecastByWindow = buildCarCostForecastAllWindows({
+    records, mods, bills, labour, reminders,
+    currentMileage: car.currentMileage,
+    mileagePoints,
+    carLifetime: { startingMileage: car.startingMileage, currentMileage: car.currentMileage, dateAdded: car.dateAdded },
+    carClass: car.fuelType !== "electric" && car.engineLitres ? classFromEngineLitres(car.engineLitres) : "medium",
+  });
   const currentYear = new Date().getFullYear();
   const yearSpend = computeCarYearSpend(records, mods, fuelLogs, bills, currentYear, labour);
   const overBudget = car.annualBudget != null && yearSpend >= car.annualBudget;
@@ -1254,7 +1274,7 @@ async function renderCarDashboard(
       </div>
 
       <div className={`${styles.dashboardTwoCol} ${styles.equalHeightRow}`}>
-        <BudgetWidget yearSpend={yearSpend} currentYear={currentYear} initialBudget={car.annualBudget} currency={currency} rates={rates} vehicleKind="car" />
+        <BudgetWidget yearSpend={yearSpend} currentYear={currentYear} initialBudget={car.annualBudget} currency={currency} rates={rates} vehicleKind="car" yearEndProjection={projectYearEndSpend(yearSpend, currentYear)} />
         <div className={styles.chartCard}>
           {summary.grandTotal > 0 ? (
             <SpendDonutChart records={records} mods={mods} fuelLogs={fuelLogs} bills={bills} labour={labour} currency={currency} rates={rates} initialChartType={car.chartTypes?.["spend-donut"] === "bar" ? "bar" : "pie"} isPro={userIsPro} vehicleKind="car" />
@@ -1332,7 +1352,7 @@ async function renderCarDashboard(
         </div>
         <div className={styles.chartCard}>
           {records.length > 0 ? (
-            <CategorySpendChart chartId="servicing-spend" title="Servicing spend over time" items={records} category="service" color="#1C1D20" currency={currency} rates={rates} distanceUnit={distanceUnit} initialChartType={car.chartTypes?.["servicing-spend"] === "line" ? "line" : "bar"} vehicleKind="car" />
+            <CategorySpendChart chartId="servicing-spend" title="Servicing spend over time" items={records} category="service" color="#1C1D20" currency={currency} rates={rates} distanceUnit={distanceUnit} initialChartType={car.chartTypes?.["servicing-spend"] === "line" ? "line" : "bar"} vehicleKind="car" forecast={pickCategoryForecast(carForecastByWindow, "servicing")} />
           ) : (
             <>
               <div className={styles.chartCardTitle}>Servicing spend over time</div>
@@ -1342,7 +1362,7 @@ async function renderCarDashboard(
         </div>
         <div className={styles.chartCard}>
           {mods.length > 0 ? (
-            <CategorySpendChart chartId="mods-spend" title="Parts & Accessories spend over time" items={mods} category="mods" color="#EE9A2E" currency={currency} rates={rates} distanceUnit={distanceUnit} initialChartType={car.chartTypes?.["mods-spend"] === "line" ? "line" : "bar"} vehicleKind="car" />
+            <CategorySpendChart chartId="mods-spend" title="Parts & Accessories spend over time" items={mods} category="mods" color="#EE9A2E" currency={currency} rates={rates} distanceUnit={distanceUnit} initialChartType={car.chartTypes?.["mods-spend"] === "line" ? "line" : "bar"} vehicleKind="car" forecast={pickCategoryForecast(carForecastByWindow, "mods")} />
           ) : (
             <>
               <div className={styles.chartCardTitle}>Parts & Accessories spend over time</div>
@@ -1352,7 +1372,7 @@ async function renderCarDashboard(
         </div>
         <div className={styles.chartCard}>
           {bills.length > 0 ? (
-            <CategorySpendChart chartId="bills-spend" title="Insurance, tax, MOT & finance spend over time" items={bills} category="bills" color="#8A867D" currency={currency} rates={rates} distanceUnit={distanceUnit} supportsMileageView={false} initialChartType={car.chartTypes?.["bills-spend"] === "line" ? "line" : "bar"} vehicleKind="car" />
+            <CategorySpendChart chartId="bills-spend" title="Insurance, tax, MOT & finance spend over time" items={bills} category="bills" color="#8A867D" currency={currency} rates={rates} distanceUnit={distanceUnit} supportsMileageView={false} initialChartType={car.chartTypes?.["bills-spend"] === "line" ? "line" : "bar"} vehicleKind="car" forecast={pickCategoryForecast(carForecastByWindow, "bills")} />
           ) : (
             <>
               <div className={styles.chartCardTitle}>Insurance, tax, MOT & finance spend over time</div>
@@ -1362,7 +1382,7 @@ async function renderCarDashboard(
         </div>
         <div className={styles.chartCard}>
           {labour.length > 0 ? (
-            <CategorySpendChart chartId="labour-spend" title="Labour spend over time" items={labour} category="labour" color="#3E6B99" currency={currency} rates={rates} distanceUnit={distanceUnit} initialChartType={car.chartTypes?.["labour-spend"] === "line" ? "line" : "bar"} vehicleKind="car" />
+            <CategorySpendChart chartId="labour-spend" title="Labour spend over time" items={labour} category="labour" color="#3E6B99" currency={currency} rates={rates} distanceUnit={distanceUnit} initialChartType={car.chartTypes?.["labour-spend"] === "line" ? "line" : "bar"} vehicleKind="car" forecast={pickCategoryForecast(carForecastByWindow, "labour")} />
           ) : (
             <>
               <div className={styles.chartCardTitle}>Labour spend over time</div>

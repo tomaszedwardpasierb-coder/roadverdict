@@ -605,6 +605,29 @@
 .rangeTabActive { background: var(--asphalt); color: var(--stone); border-color: var(--asphalt); }
 .rangeTab:hover:not(.rangeTabActive) { border-color: var(--asphalt); color: var(--asphalt); }
 
+/* Deliberately its own bordered group, not another row of .rangeTab
+   pills - switching into Forecast mode needs to read as a genuinely
+   different action, not just another filter choice, so accidentally
+   clicking it while reaching for a range tab is far less likely. Blue,
+   not amber - this app's accent is already amber (see .rangeTabActive),
+   so Forecast gets its own colour precisely so it never reads as "just
+   another selected filter" at a glance. */
+.forecastToggleGroup { display: flex; align-items: center; gap: 0.6rem; background: var(--paper); border: 1.5px solid var(--blue); border-radius: 8px; padding: 0.45rem 0.7rem; margin-bottom: 1rem; flex-wrap: wrap; }
+.forecastToggleBtns { display: flex; gap: 0.3rem; }
+.forecastToggleBtn { font-family: var(--font-mono); font-size: 0.72rem; font-weight: 600; padding: 0.3rem 0.7rem; border: 1px solid var(--border); border-radius: 20px; background: #fff; cursor: pointer; color: var(--ink-soft); }
+.forecastToggleBtnActive { background: var(--blue); color: #fff; border-color: var(--blue); }
+.forecastToggleBtn:hover:not(.forecastToggleBtnActive) { border-color: var(--blue); color: var(--blue); }
+.forecastWindowTabs { display: flex; gap: 0.3rem; }
+.forecastWindowTab { font-family: var(--font-mono); font-size: 0.7rem; padding: 0.25rem 0.5rem; border: 1px solid var(--blue-tint); border-radius: 20px; background: var(--blue-tint); cursor: pointer; color: var(--blue); }
+.forecastWindowTabActive { background: var(--blue); color: #fff; border-color: var(--blue); }
+
+/* The on-chart signal that a given chart is currently showing a
+   projection, not real recorded spend - shown right on the chart itself
+   (not just in a tooltip someone has to hover to see), same reasoning as
+   the toggle above having its own colour. */
+.forecastBadge { display: inline-flex; align-items: center; gap: 0.3rem; font-family: var(--font-mono); font-size: 0.68rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--blue); background: var(--blue-tint); border-radius: 20px; padding: 0.2rem 0.55rem; }
+.forecastBasis { font-size: 0.78rem; color: var(--ink-soft); margin-top: 0.4rem; }
+
 .budgetCard { background: var(--paper); border: 1px solid var(--line); border-radius: var(--radius-lg); box-shadow: var(--shadow-card); padding: 1rem 1.2rem; margin-bottom: 1.4rem; }
 .budgetCardOver { border-color: var(--verdict-red); }
 .budgetCardWarning { border-color: var(--amber-ink); }
@@ -616,6 +639,11 @@
 .budgetBarFillWarning { background: var(--amber); }
 .budgetBarFillOver { background: var(--verdict-red); }
 .budgetCardStatus { font-size: 0.85rem; color: var(--ink-soft); }
+/* Same blue the Forecast toggle/badge use elsewhere (see
+   .forecastToggleGroup) - this line is a projection too, just inline in
+   the budget card rather than its own chart, so it gets the same
+   "this is forward-looking, not what's already happened" colour cue. */
+.budgetProjection { font-size: 0.82rem; color: var(--blue); margin-top: 0.4rem; }
 
 .budgetWarningBanner { background: #f8e2dd; border: 2px solid var(--verdict-red); border-radius: 6px; padding: 0.9rem 1.1rem; margin-bottom: 1.3rem; font-size: 0.9rem; color: #7a251b; }
 

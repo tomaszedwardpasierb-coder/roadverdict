@@ -4,6 +4,7 @@ import {
   estimateFuelMileageFromLitres,
   estimateMileage,
   mileageConfidenceLabel,
+  projectFutureMileage,
 } from "@/lib/tracker/mileageEstimate";
 
 const bike = { startingMileage: 3000, currentMileage: 20000, dateAdded: "2024-01-01" };
@@ -195,5 +196,45 @@ describe("estimateMileage", () => {
     const result = estimateMileage("2020-01-01", [], { ...bike, startingMileage: 0 });
     expect(result.mileage).toBeGreaterThanOrEqual(0);
     expect(result.mileage).toBeLessThanOrEqual(bike.currentMileage);
+  });
+});
+
+// The forward-looking sibling to estimateMileage above - powers
+// costForecast.ts's servicing forecast (converting a mileage-due
+// reminder into an actual future calendar date).
+describe("projectFutureMileage", () => {
+  it("projects forward at the bike's own observed pace between two real points", () => {
+    const points = [
+      { date: new Date(Date.now() - 60 * 86400000).toISOString(), mileage: 1000 },
+      { date: new Date(Date.now() - 30 * 86400000).toISOString(), mileage: 1300 }, // 10 mi/day over that window
+    ];
+    const b = { startingMileage: 0, currentMileage: 1300, dateAdded: new Date(Date.now() - 90 * 86400000).toISOString() };
+    const target = new Date(Date.now() + 30 * 86400000).toISOString(); // 30 days ahead
+    const result = projectFutureMileage(target, points, b);
+    expect(result).toBeGreaterThan(1550);
+    expect(result).toBeLessThan(1650); // ~1300 + 10*30 = 1600, loose bound for day-boundary rounding
+  });
+
+  it("never projects below the vehicle's current mileage, even from a flat or negative-looking pace", () => {
+    const points = [{ date: new Date().toISOString(), mileage: 500 }];
+    const b = { startingMileage: 500, currentMileage: 500, dateAdded: new Date().toISOString() };
+    const target = new Date(Date.now() + 30 * 86400000).toISOString();
+    const result = projectFutureMileage(target, points, b);
+    expect(result).toBeGreaterThanOrEqual(500);
+  });
+
+  it("falls back to the flat 3,000 mi/year UK-wide default when there's no bike-specific signal at all", () => {
+    const b = { startingMileage: 0, currentMileage: 0, dateAdded: new Date().toISOString() };
+    const target = new Date(Date.now() + 365 * 86400000).toISOString();
+    const result = projectFutureMileage(target, [], b);
+    expect(result).toBeGreaterThan(2800);
+    expect(result).toBeLessThan(3200);
+  });
+
+  it("has no upper clamp at the vehicle's current mileage, unlike estimateMileage's own backward-looking clampToPlausible - exceeding today's mileage is the entire point of a forecast", () => {
+    const b = { startingMileage: 0, currentMileage: 1000, dateAdded: new Date(Date.now() - 100 * 86400000).toISOString() };
+    const target = new Date(Date.now() + 365 * 86400000).toISOString();
+    const result = projectFutureMileage(target, [], b);
+    expect(result).toBeGreaterThan(1000);
   });
 });

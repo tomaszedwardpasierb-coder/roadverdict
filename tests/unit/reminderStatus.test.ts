@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { monthsBetween, computeReminderStatus, reminderDetailLabel } from "@/lib/tracker/reminderStatus";
+import { monthsBetween, computeReminderStatus, reminderDetailLabel, computeTriggerDueValue } from "@/lib/tracker/reminderStatus";
 
 function isoDaysFromNow(n: number): string {
   return new Date(Date.now() + n * 86400000).toISOString();
@@ -100,5 +100,56 @@ describe("reminderDetailLabel", () => {
   it("explains what clears a permanent-type reminder, rather than a due date/mileage it doesn't have", () => {
     const r = { intervalType: "permanent", date: "2025-01-01" } as any;
     expect(reminderDetailLabel(r)).toBe("Clears automatically once the vehicle is confirmed taxed again");
+  });
+});
+
+// The real due-value math, lifted out of triggerDetail's string
+// formatting above so costForecast.ts can use the same numbers rather
+// than parsing them back out of human-readable text - see this
+// function's own comment for the full reasoning.
+describe("computeTriggerDueValue", () => {
+  it("returns the due mileage for a mileage-type trigger, added onto baseMileage", () => {
+    const t = { intervalType: "mileage" as const, intervalValue: 4000 };
+    const r = { intervalType: "mileage", intervalValue: 4000, baseMileage: 10000, date: "2025-01-01" } as any;
+    expect(computeTriggerDueValue(t, r)).toEqual({ type: "mileage", dueMileage: 14000 });
+  });
+
+  it("treats a missing baseMileage as zero", () => {
+    const t = { intervalType: "mileage" as const, intervalValue: 4000 };
+    const r = { intervalType: "mileage", intervalValue: 4000, date: "2025-01-01" } as any;
+    expect(computeTriggerDueValue(t, r)).toEqual({ type: "mileage", dueMileage: 4000 });
+  });
+
+  it("returns the due date for a months-type trigger, added onto the reminder's own date", () => {
+    const t = { intervalType: "months" as const, intervalValue: 6 };
+    const r = { intervalType: "months", intervalValue: 6, date: "2025-01-15" } as any;
+    const due = computeTriggerDueValue(t, r);
+    expect(due?.type).toBe("months");
+    // Compared as local calendar values, not via toISOString() - the
+    // source builds this date with `new Date(year, month, day)` (local
+    // time), so a UTC-string comparison would shift by a day whenever
+    // the machine running this test isn't itself on UTC.
+    const dueDate = new Date(due!.dueDate!);
+    expect(dueDate.getFullYear()).toBe(2025);
+    expect(dueDate.getMonth()).toBe(6); // July, 0-indexed
+    expect(dueDate.getDate()).toBe(15);
+  });
+
+  it("returns exactDate as-is for a date-type trigger", () => {
+    const t = { intervalType: "date" as const, exactDate: "2026-03-01" };
+    const r = { intervalType: "date", exactDate: "2026-03-01", date: "2025-01-01" } as any;
+    expect(computeTriggerDueValue(t, r)).toEqual({ type: "date", dueDate: "2026-03-01" });
+  });
+
+  it("returns a bare permanent marker, with no due point at all", () => {
+    const t = { intervalType: "permanent" as const };
+    const r = { intervalType: "permanent", date: "2025-01-01" } as any;
+    expect(computeTriggerDueValue(t, r)).toEqual({ type: "permanent" });
+  });
+
+  it("returns null for a mileage/months trigger with no intervalValue - nothing to compute a due point from", () => {
+    const t = { intervalType: "mileage" as const };
+    const r = { intervalType: "mileage", date: "2025-01-01" } as any;
+    expect(computeTriggerDueValue(t, r)).toBeNull();
   });
 });

@@ -4,6 +4,7 @@
 import { useState } from 'react';
 import { useTrackerFormSubmit } from './useTrackerFormSubmit';
 import { convertGbpToDisplay, convertDisplayToGbp, formatCurrency, CURRENCY_SYMBOLS, type Currency, type ExchangeRates } from '@/lib/tracker/currency';
+import type { YearEndProjection } from '@/lib/tracker/summary';
 import { VehicleSpinner } from '@/components/VehicleSpinner';
 import styles from './dashboard.module.css';
 
@@ -18,9 +19,14 @@ interface Props {
   // already uses, rather than a duplicate car-only component for what's
   // otherwise identical UI.
   vehicleKind?: 'bike' | 'car';
+  // null whenever there isn't enough of the year elapsed yet to trust a
+  // projection (see summary.ts's projectYearEndSpend) - shown regardless
+  // of whether the reactive over/under-so-far status below is already
+  // "over", since the whole point is catching it BEFORE that happens.
+  yearEndProjection?: YearEndProjection | null;
 }
 
-export function BudgetWidget({ yearSpend, currentYear, initialBudget, currency, rates, vehicleKind = 'bike' }: Props) {
+export function BudgetWidget({ yearSpend, currentYear, initialBudget, currency, rates, vehicleKind = 'bike', yearEndProjection }: Props) {
   const [editing, setEditing] = useState(!initialBudget);
   const [amountDisplay, setAmountDisplay] = useState(
     initialBudget ? convertGbpToDisplay(initialBudget, currency, rates).toFixed(2) : ''
@@ -78,6 +84,19 @@ export function BudgetWidget({ yearSpend, currentYear, initialBudget, currency, 
       ? `Approaching your budget for ${currentYear}`
       : `On track for ${currentYear}`;
 
+  // Forward-looking, unlike statusText above (which only ever reports
+  // what's already happened) - this is the whole reason it's a separate
+  // line rather than folded into statusText: it can say something useful
+  // even while status is still "ok", which is exactly when catching a
+  // coming overspend is actually still useful.
+  const projectionText = (() => {
+    if (!yearEndProjection) return null;
+    const diff = budget - yearEndProjection.projected;
+    return diff >= 0
+      ? `At this rate, you'll finish ${currentYear} about ${formatCurrency(diff, currency, rates)} under budget.`
+      : `At this rate, you'll go about ${formatCurrency(Math.abs(diff), currency, rates)} over budget by the end of ${currentYear}.`;
+  })();
+
   return (
     <div className={`${styles.budgetCard} ${statusClass}`}>
       <div className={styles.budgetCardTitle}>Annual budget ({currentYear})</div>
@@ -88,6 +107,7 @@ export function BudgetWidget({ yearSpend, currentYear, initialBudget, currency, 
         <div className={`${styles.budgetBarFill} ${fillClass}`} style={{ width: `${pct}%` }} />
       </div>
       <div className={styles.budgetCardStatus}>{statusText}</div>
+      {projectionText && <div className={styles.budgetProjection}>{projectionText}</div>}
       <button type="button" className={styles.iconBtn} style={{ marginTop: '0.6rem' }} onClick={() => setEditing(true)}>
         Change budget
       </button>

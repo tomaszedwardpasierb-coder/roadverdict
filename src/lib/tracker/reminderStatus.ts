@@ -54,6 +54,36 @@ export function computeReminderStatus(r: ReminderDoc, currentMileage: number): "
   return worst;
 }
 
+// The actual due point as a real value, not a formatted string - lifted
+// out of triggerDetail below rather than duplicated, so the forecast
+// feature (costForecast.ts) and the existing label text can never
+// silently disagree about what "due" means for the same trigger.
+// Mileage-type due points come back as a mileage number the caller still
+// has to convert to a calendar date itself (via mileageEstimate.ts's own
+// forward-projection helper) - this file stays free of that maths on
+// purpose, see the top-of-file comment on why it can't import anything
+// Cosmos-adjacent.
+export interface TriggerDueValue {
+  type: "mileage" | "months" | "date" | "permanent";
+  dueMileage?: number;
+  dueDate?: string; // ISO date - only ever set directly for "date" triggers; "months" triggers compute their own ISO date inline
+}
+export function computeTriggerDueValue(t: ReminderTrigger, r: ReminderDoc): TriggerDueValue | null {
+  if (t.intervalType === "permanent") return { type: "permanent" };
+  if (t.intervalType === "date" && t.exactDate) {
+    return { type: "date", dueDate: t.exactDate };
+  }
+  if (t.intervalType === "mileage" && t.intervalValue) {
+    return { type: "mileage", dueMileage: (r.baseMileage ?? 0) + t.intervalValue };
+  }
+  if (t.intervalType === "months" && t.intervalValue) {
+    const base = new Date(r.date);
+    const due = new Date(base.getFullYear(), base.getMonth() + t.intervalValue, base.getDate());
+    return { type: "months", dueDate: due.toISOString() };
+  }
+  return null;
+}
+
 function triggerDetail(t: ReminderTrigger, r: ReminderDoc): string {
   if (t.intervalType === "date" && t.exactDate) {
     return `on ${new Date(t.exactDate).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}`;

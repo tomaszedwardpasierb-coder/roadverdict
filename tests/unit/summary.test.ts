@@ -1,10 +1,11 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   computeSpendSummary,
   computeYearSpend,
   gatherMileagePoints,
   bucketByMonth,
   bucketByMileage,
+  projectYearEndSpend,
 } from "@/lib/tracker/summary";
 
 describe("computeSpendSummary", () => {
@@ -138,5 +139,36 @@ describe("bucketByMileage", () => {
     const lowBandSize = lowResult[0].bandEnd - lowResult[0].bandStart;
     const highBandSize = highResult[0].bandEnd - highResult[0].bandStart;
     expect(highBandSize).toBeGreaterThan(lowBandSize);
+  });
+});
+
+// Powers BudgetWidget.tsx's forward-looking "at this rate, you'll be
+// £X under/over by year-end" line.
+describe("projectYearEndSpend", () => {
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => vi.useRealTimers());
+
+  it("returns null for a year that isn't the current one - nothing to project for a year already finished", () => {
+    vi.setSystemTime(new Date("2026-06-15"));
+    expect(projectYearEndSpend(1000, 2025)).toBeNull();
+  });
+
+  it("returns null when too little of the year has elapsed to trust a rate (the noisy-early-year case)", () => {
+    vi.setSystemTime(new Date("2026-01-10")); // 10 days in - below the 21-day floor
+    expect(projectYearEndSpend(500, 2026)).toBeNull();
+  });
+
+  it("projects the full year's spend once past the floor, at the observed daily rate", () => {
+    vi.setSystemTime(new Date("2026-02-10")); // day 41 of a non-leap year
+    const result = projectYearEndSpend(410, 2026); // £10/day observed
+    expect(result).not.toBeNull();
+    expect(result!.daysElapsed).toBe(41);
+    expect(result!.projected).toBeCloseTo(10 * 365, 0);
+  });
+
+  it("uses 366 days for a leap year", () => {
+    vi.setSystemTime(new Date("2024-02-10")); // day 41 of a leap year
+    const result = projectYearEndSpend(410, 2024);
+    expect(result!.projected).toBeCloseTo(10 * 366, 0);
   });
 });

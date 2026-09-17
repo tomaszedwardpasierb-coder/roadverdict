@@ -102,4 +102,63 @@ describe("BudgetWidget", () => {
 
     resolveFetch({ ok: true, json: async () => ({}) });
   });
+
+  // Forward-looking projection line, powered by summary.ts's
+  // projectYearEndSpend - deliberately separate from the reactive
+  // over/warning/ok status above it (see BudgetWidget.tsx's own comment).
+  describe("year-end projection", () => {
+    it("shows no projection line when yearEndProjection is omitted (too early in the year to trust one)", () => {
+      render(<BudgetWidget yearSpend={400} currentYear={2026} initialBudget={2000} currency="GBP" rates={null} />);
+      expect(screen.getByText("On track for 2026")).toBeInTheDocument();
+      expect(screen.queryByText(/At this rate/)).not.toBeInTheDocument();
+    });
+
+    it("shows an under-budget projection alongside the 'on track' status", () => {
+      render(
+        <BudgetWidget
+          yearSpend={400}
+          currentYear={2026}
+          initialBudget={2000}
+          currency="GBP"
+          rates={null}
+          yearEndProjection={{ projected: 1200, daysElapsed: 100 }}
+        />
+      );
+      expect(screen.getByText("On track for 2026")).toBeInTheDocument();
+      expect(screen.getByText("At this rate, you'll finish 2026 about £800.00 under budget.")).toBeInTheDocument();
+    });
+
+    // The whole point of this line: it fires even while the reactive
+    // status is still "ok" (spend so far is comfortably under budget),
+    // catching a coming overspend before it's already happened.
+    it("shows an over-budget projection even while the reactive status so far is still 'ok'", () => {
+      render(
+        <BudgetWidget
+          yearSpend={400}
+          currentYear={2026}
+          initialBudget={2000}
+          currency="GBP"
+          rates={null}
+          yearEndProjection={{ projected: 2500, daysElapsed: 60 }}
+        />
+      );
+      expect(screen.getByText("On track for 2026")).toBeInTheDocument();
+      expect(screen.getByText("At this rate, you'll go about £500.00 over budget by the end of 2026.")).toBeInTheDocument();
+    });
+
+    it("shows the projection line alongside the reactive over-budget status when both agree spend is already over", () => {
+      render(
+        <BudgetWidget
+          yearSpend={2500}
+          currentYear={2026}
+          initialBudget={2000}
+          currency="GBP"
+          rates={null}
+          yearEndProjection={{ projected: 3000, daysElapsed: 300 }}
+        />
+      );
+      expect(screen.getByText(/Over budget by £500/)).toBeInTheDocument();
+      expect(screen.getByText("At this rate, you'll go about £1000.00 over budget by the end of 2026.")).toBeInTheDocument();
+    });
+  });
 });

@@ -41,6 +41,29 @@ export function computeCarReminderStatus(r: CarReminderDoc, currentMileage: numb
   return worst;
 }
 
+// See reminderStatus.ts's own computeTriggerDueValue for the full
+// reasoning - byte-for-byte mirrored here for the car equivalent types.
+export interface CarTriggerDueValue {
+  type: "mileage" | "months" | "date" | "permanent";
+  dueMileage?: number;
+  dueDate?: string;
+}
+export function computeCarTriggerDueValue(t: CarReminderTrigger, r: CarReminderDoc): CarTriggerDueValue | null {
+  if (t.intervalType === "permanent") return { type: "permanent" };
+  if (t.intervalType === "date" && t.exactDate) {
+    return { type: "date", dueDate: t.exactDate };
+  }
+  if (t.intervalType === "mileage" && t.intervalValue) {
+    return { type: "mileage", dueMileage: (r.baseMileage ?? 0) + t.intervalValue };
+  }
+  if (t.intervalType === "months" && t.intervalValue) {
+    const base = new Date(r.date);
+    const due = new Date(base.getFullYear(), base.getMonth() + t.intervalValue, base.getDate());
+    return { type: "months", dueDate: due.toISOString() };
+  }
+  return null;
+}
+
 function triggerDetail(t: CarReminderTrigger, r: CarReminderDoc): string {
   if (t.intervalType === "date" && t.exactDate) {
     return `on ${new Date(t.exactDate).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}`;

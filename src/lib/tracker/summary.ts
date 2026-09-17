@@ -38,6 +38,32 @@ export function computeSpendSummary(
   };
 }
 
+export interface YearEndProjection {
+  projected: number;
+  daysElapsed: number;
+}
+
+// "At this rate, you'll be £X under/over budget by year-end" - powers
+// BudgetWidget.tsx's own forward-looking line, alongside its existing
+// (purely reactive) over/under-budget-so-far status. Only meaningful for
+// the CURRENT calendar year - a past year's spend is already final, not
+// a rate to extrapolate. Returns null rather than a wild figure when
+// only a few days of the year have passed - see BudgetWidget.tsx's own
+// comment on why a short window is actively misleading here, the same
+// reasoning costForecast.ts's averaging methods already apply.
+const MIN_DAYS_BEFORE_PROJECTING = 21;
+
+export function projectYearEndSpend(yearSpend: number, year: number): YearEndProjection | null {
+  const now = new Date();
+  if (now.getFullYear() !== year) return null;
+  const startOfYear = new Date(year, 0, 1);
+  const daysElapsed = Math.max(1, Math.floor((now.getTime() - startOfYear.getTime()) / 86400000) + 1);
+  if (daysElapsed < MIN_DAYS_BEFORE_PROJECTING) return null;
+  const isLeapYear = (year % 4 === 0 && year % 100 !== 0) || year % 400 === 0;
+  const daysInYear = isLeapYear ? 366 : 365;
+  return { projected: (yearSpend / daysElapsed) * daysInYear, daysElapsed };
+}
+
 export function computeYearSpend(
   records: ServiceRecordDoc[],
   mods: ModDoc[],
@@ -85,12 +111,16 @@ export function gatherMileagePoints(
   return points.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 }
 
-function monthKey(dateStr: string): string {
+// Exported for costForecast.ts/carCostForecast.ts - a forecast's future
+// months need to be labelled identically to bucketByMonth's real past
+// ones below, or the two would read as two different charts glued
+// together rather than one continuous timeline.
+export function monthKey(dateStr: string): string {
   const d = new Date(dateStr);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
 }
 
-function monthLabel(key: string): string {
+export function monthLabel(key: string): string {
   const [y, m] = key.split("-").map(Number);
   return new Date(y, m - 1, 1).toLocaleDateString("en-GB", { month: "short", year: "2-digit" });
 }

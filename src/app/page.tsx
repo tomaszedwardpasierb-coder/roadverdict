@@ -127,6 +127,10 @@ export default async function HomePage() {
               <span className="rv-proof-check" aria-hidden="true">✓</span>
               Real UK price data
             </li>
+            <li className="rv-proof-item">
+              <span className="rv-proof-check" aria-hidden="true">✓</span>
+              See what&apos;s coming next
+            </li>
           </ul>
         </div>
       </section>

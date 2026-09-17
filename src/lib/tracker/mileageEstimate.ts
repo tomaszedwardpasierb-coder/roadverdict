@@ -29,7 +29,7 @@ export interface MileageEstimateResult {
   requiresManualEntry: boolean;
 }
 
-interface BikeLifetime {
+export interface BikeLifetime {
   startingMileage: number;
   currentMileage: number;
   dateAdded: string;
@@ -141,8 +141,12 @@ function trustedExtrapolationDays(observedWindowDays: number): number {
 // generic UK-wide constant. Only falls back to the constant when there
 // is genuinely no bike-specific signal to compute a rate from at all.
 // Also returns the size of the window the rate was actually observed
-// over, so callers know how far it's reasonable to trust it.
-function overallRatePerDay(
+// over, so callers know how far it's reasonable to trust it. Exported
+// for costForecast.ts/carCostForecast.ts - the only caller so far that
+// needs the rate itself rather than a bounded past-date estimate (see
+// projectFutureMileage below, the forward-looking sibling to
+// estimateMileage's backward-looking interpolation/extrapolation).
+export function overallRatePerDay(
   sorted: MileagePoint[],
   bike: BikeLifetime
 ): { rate: number; isBikeSpecific: boolean; observedWindowDays: number } {
@@ -159,6 +163,23 @@ function overallRatePerDay(
 
 function clampToPlausible(mileage: number, bike: BikeLifetime): number {
   return Math.min(Math.max(Math.round(mileage), 0), bike.currentMileage);
+}
+
+// The forward-looking sibling to estimateMileage above - deliberately
+// much simpler, since a forecast carries inherently lower stakes than
+// backfilling a real logged record's mileage. No upper clampToPlausible
+// here on purpose: that clamp exists specifically to stop a backward
+// guess exceeding today's real mileage, which is backwards for a
+// forecast - exceeding today's mileage is the entire point. Thin data
+// already degrades gracefully on its own, via overallRatePerDay's own
+// existing fallback chain (bike-specific rate, then bike's whole-lifetime
+// average, then a flat 3,000 mi/year UK-wide default) - a forecast
+// doesn't need its own separate trust-distance cutoff on top of that.
+export function projectFutureMileage(targetDate: string, knownPoints: MileagePoint[], bike: BikeLifetime): number {
+  const sorted = [...knownPoints].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+  const { rate } = overallRatePerDay(sorted, bike);
+  const daysAhead = (new Date(targetDate).getTime() - Date.now()) / 86400000;
+  return Math.max(bike.currentMileage, Math.round(bike.currentMileage + rate * daysAhead));
 }
 
 export function mileageConfidenceLabel(confidence: "interpolated" | "estimated" | "confirmed"): string {
