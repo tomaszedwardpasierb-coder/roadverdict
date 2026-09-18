@@ -16,15 +16,7 @@ import { ResetDemoButton } from './ResetDemoButton';
 import { DEMO_EMAIL } from '@/lib/tracker/demoSeed';
 import { Icon, type IconName } from './Icon';
 import styles from './dashboard.module.css';
-
-// The full set of dashboard tabs, and the single source of truth for
-// what a `?tab=` value on /dashboard is allowed to be - dashboard/
-// page.tsx imports this same array to validate the query param and to
-// decide which single tab's content to actually build server-side,
-// rather than keeping its own separately-maintained list that could
-// drift out of sync with the nav below.
-export const ALL_SECTIONS = ['dashboard', 'service', 'fuel', 'mods', 'bills', 'labour', 'fines', 'tolls', 'reminders', 'reports', 'shareLinks', 'story', 'vault', 'quoteChecker', 'costCalculator', 'buyingGuide', 'privacy', 'transferOwnership', 'security'] as const;
-export type Section = (typeof ALL_SECTIONS)[number];
+import type { Section } from './sections';
 
 const REVIEW_CATEGORIES: ReviewCategory[] = ['service', 'fuel', 'mods', 'bills', 'labour'];
 function asReviewCategory(key: string): ReviewCategory | null {
