@@ -1,22 +1,34 @@
 // Place at: tests/components/DashboardShell.test.tsx
 //
-// DashboardShell is the top-level client shell: it owns the active-tab
-// state, renders every nav item (desktop sidebar + mobile bottom bar +
-// "More" sheet) with their real pending/ready/incoming-request dots, and
-// is the ONE place that actually supplies a real TabSwitchProvider (see
-// TabSwitchContext.tsx - its useTabSwitch() hook has a safe no-provider
-// fallback, but that fallback's switchTo/setFocusId are no-ops; the
-// point of the test below is to prove DashboardShell wires the REAL
-// thing through to setActive, not that fallback). Only next/navigation's
-// useRouter is mocked - it's pulled in transitively by several of
-// DashboardShell's real child buttons (VehicleSwitcher, UpdateMileageButton,
-// RefreshVehicleDataButton, LogoutButton, ResetDemoButton).
+// DashboardShell is the top-level client shell: it renders every nav item
+// (desktop sidebar + mobile bottom bar + "More" sheet) with their real
+// pending/ready/incoming-request dots, and is the ONE place that
+// actually supplies a real TabSwitchProvider (see TabSwitchContext.tsx -
+// its useTabSwitch() hook has a safe no-provider fallback, but that
+// fallback's switchTo/setFocusId are no-ops; the point of the tests
+// below is to prove DashboardShell wires the REAL thing through to
+// goToTab, not that fallback).
+//
+// Which tab is active is no longer local state: it's a plain value
+// derived from the activeSection prop, and switching tabs means
+// navigating to /dashboard?tab=<key> (see DashboardShell.tsx's own
+// goToTab) - dashboard/page.tsx re-runs server-side and re-supplies
+// activeSection for whichever tab the URL now names. In this isolated
+// component test there's no real router to complete that round trip, so
+// clicking a nav item is tested as "requests navigation to the right
+// URL" (asserting on the mocked push below), while "given this
+// activeSection, the right content/badges/group-expansion show" is
+// tested separately via the activeSection prop directly (including via
+// `rerender`, which is what a real navigation looks like from
+// DashboardShell's own point of view - it stays mounted, just re-rendered
+// with a new prop).
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
+const mockRouter = vi.hoisted(() => ({ push: vi.fn(), refresh: vi.fn() }));
 vi.mock("next/navigation", () => ({
-  useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }),
+  useRouter: () => mockRouter,
 }));
 
 import { DashboardShell } from "@/app/dashboard/DashboardShell";
@@ -69,6 +81,8 @@ function baseProps(overrides: Partial<Parameters<typeof DashboardShell>[0]> = {}
 describe("DashboardShell", () => {
   beforeEach(() => {
     vi.stubGlobal("fetch", vi.fn());
+    mockRouter.push.mockClear();
+    mockRouter.refresh.mockClear();
   });
 
   afterEach(() => {
@@ -87,37 +101,37 @@ describe("DashboardShell", () => {
   // back on that same tab, not the default Dashboard overview - see
   // dashboard/page.tsx's own `tab` query param and
   // buyingGuideVdiCheckout.ts's BuyingGuideReturnContext.
-  it("reopens the Buying Guide tab on load when initialSection is set, instead of the default Dashboard tab", () => {
-    render(<DashboardShell {...baseProps({ initialSection: "buyingGuide" })} />);
+  it("reopens the Buying Guide tab on load when activeSection is set, instead of the default Dashboard tab", () => {
+    render(<DashboardShell {...baseProps({ activeSection: "buyingGuide" })} />);
     expect(screen.getByText("BuyingGuide content")).toBeInTheDocument();
     expect(screen.queryByText("Dashboard content")).not.toBeInTheDocument();
   });
 
-  // The real-world case this covers: a same-page navigation (e.g.
-  // TwoFactorGate's "Go to Settings" link, both ?tab=... on /dashboard)
-  // is a soft client-side transition - this exact DashboardShell instance
-  // stays mounted and is simply re-rendered with a new initialSection
-  // prop, never remounted. useState's initializer alone (what this used
-  // to rely on) only runs on first mount, so without an effect re-syncing
-  // to a changed prop, a later initialSection value would silently do
-  // nothing - this is the regression test for that bug.
-  it("switches to the tab named by initialSection when that prop changes on an already-mounted instance, not just at first mount", () => {
+  // The real-world case this covers: every tab switch is a real
+  // navigation (see DashboardShell.tsx's own goToTab) - dashboard/
+  // page.tsx re-runs server-side and re-passes activeSection for
+  // whichever tab the URL now names, and Next.js keeps this exact
+  // DashboardShell instance mounted throughout a same-page ?tab=...
+  // transition (e.g. TwoFactorGate's "Go to Settings" link), simply
+  // re-rendering it with the new prop rather than remounting it. `active`
+  // is a plain derived value now (not local state seeded once at mount),
+  // so it must pick up a changed activeSection prop on every render.
+  it("switches to the tab named by activeSection when that prop changes on an already-mounted instance, not just at first mount", () => {
     const { rerender } = render(<DashboardShell {...baseProps()} />);
     expect(screen.getByText("Dashboard content")).toBeInTheDocument();
 
-    rerender(<DashboardShell {...baseProps({ initialSection: "security" })} />);
+    rerender(<DashboardShell {...baseProps({ activeSection: "security" })} />);
 
     expect(screen.getByText("Security content")).toBeInTheDocument();
     expect(screen.queryByText("Dashboard content")).not.toBeInTheDocument();
   });
 
-  it("clicking a sidebar nav item switches the visible content to that tab's own real content", async () => {
+  it("clicking a sidebar nav item requests navigation to that tab's own URL", async () => {
     const user = userEvent.setup();
     render(<DashboardShell {...baseProps()} />);
     await user.click(screen.getAllByRole("button", { name: "Fuel" })[0]);
 
-    expect(screen.getByText("Fuel content")).toBeInTheDocument();
-    expect(screen.queryByText("Dashboard content")).not.toBeInTheDocument();
+    expect(mockRouter.push).toHaveBeenCalledWith("/dashboard?tab=fuel");
   });
 
   it("a real child inside the tab content can switch tabs itself via the REAL TabSwitchProvider (not its no-op fallback)", async () => {
@@ -134,7 +148,7 @@ describe("DashboardShell", () => {
     render(<DashboardShell {...baseProps({ dashboardContent: <SwitchToFuelButton /> })} />);
     await user.click(screen.getByRole("button", { name: "Jump to fuel from inside the tab" }));
 
-    expect(screen.getByText("Fuel content")).toBeInTheDocument();
+    expect(mockRouter.push).toHaveBeenCalledWith("/dashboard?tab=fuel");
   });
 
   it("shows a review-pending dot next to a nav item whose category has pending ids, and none when it doesn't", () => {
@@ -192,14 +206,13 @@ describe("DashboardShell", () => {
   // own tree entirely, so it can only learn which tab is open if
   // DashboardShell actually publishes it to the shared context - not
   // just tracks it in its own local `active` state.
-  it("publishes the active tab to the shared ActiveSectionContext so the assistant widget (mounted elsewhere) can read it", async () => {
+  it("publishes the active tab to the shared ActiveSectionContext so the assistant widget (mounted elsewhere) can read it", () => {
     function ShowActiveSection() {
       const { activeSection } = useActiveSection();
       return <div>Active section: {activeSection ?? "none"}</div>;
     }
 
-    const user = userEvent.setup();
-    render(
+    const { rerender } = render(
       <ActiveSectionProvider>
         <DashboardShell {...baseProps()} />
         <ShowActiveSection />
@@ -208,7 +221,16 @@ describe("DashboardShell", () => {
 
     expect(screen.getByText("Active section: dashboard")).toBeInTheDocument();
 
-    await user.click(screen.getAllByRole("button", { name: "Fuel" })[0]);
+    // A tab switch is a real navigation now, not a click DashboardShell
+    // can resolve on its own in this isolated test - rerendering with a
+    // new activeSection prop is what that navigation looks like from
+    // DashboardShell's own point of view (see this file's header note).
+    rerender(
+      <ActiveSectionProvider>
+        <DashboardShell {...baseProps({ activeSection: "fuel" })} />
+        <ShowActiveSection />
+      </ActiveSectionProvider>
+    );
     expect(screen.getByText("Active section: fuel")).toBeInTheDocument();
   });
 
@@ -272,7 +294,7 @@ describe("DashboardShell", () => {
     expect(screen.queryByRole("button", { name: "↺ Reset Demo" })).not.toBeInTheDocument();
   });
 
-  it("opening the mobile More sheet reveals its own items, and picking one switches tabs and closes the sheet", async () => {
+  it("opening the mobile More sheet reveals its own items, and picking one requests that tab's navigation and closes the sheet", async () => {
     const user = userEvent.setup();
     render(<DashboardShell {...baseProps()} />);
     expect(screen.queryByText(/Signed in as/)).not.toBeInTheDocument();
@@ -284,7 +306,7 @@ describe("DashboardShell", () => {
     // the sheet's own copy (rendered later in the DOM) is the last match.
     const remindersButtons = screen.getAllByRole("button", { name: /Reminders/ });
     await user.click(remindersButtons[remindersButtons.length - 1]);
-    expect(screen.getByText("Reminders content")).toBeInTheDocument();
+    expect(mockRouter.push).toHaveBeenCalledWith("/dashboard?tab=reminders");
     expect(screen.queryByText(/Signed in as/)).not.toBeInTheDocument();
   });
 
@@ -304,7 +326,7 @@ describe("DashboardShell", () => {
 
     const billsButtons = screen.getAllByRole("button", { name: /Insurance, Tax, MOT & Finance/ });
     await user.click(billsButtons[billsButtons.length - 1]);
-    expect(screen.getByText("Bills content")).toBeInTheDocument();
+    expect(mockRouter.push).toHaveBeenCalledWith("/dashboard?tab=bills");
   });
 
   it("renders the real VehicleSwitcher child for a single-bike account, not a stub", () => {
@@ -388,11 +410,13 @@ describe("DashboardShell", () => {
 
     it("a group stays expanded even if its own header is clicked to collapse it, as long as its item is the active tab", async () => {
       const user = userEvent.setup();
-      render(<DashboardShell {...baseProps()} />);
+      // Reports is the active tab from the start (simulating having
+      // navigated there) - Insights isn't in defaultExpanded, so this
+      // alone proves an active tab's own group opens with no click at all.
+      render(<DashboardShell {...baseProps({ activeSection: "reports" })} />);
       const insightsHeader = screen.getAllByRole("button", { name: /Insights/ })[0];
-      await user.click(insightsHeader);
-      await user.click(screen.getByRole("button", { name: "Reports" }));
       expect(screen.getByText("Reports content")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Reports" })).toBeInTheDocument();
 
       await user.click(insightsHeader);
       // Still expanded - Reports is the active tab, so its own group
@@ -451,7 +475,7 @@ describe("DashboardShell", () => {
 
       expect(screen.getByRole("button", { name: "Reports" })).toBeInTheDocument();
       await user.click(screen.getByRole("button", { name: "Reports" }));
-      expect(screen.getByText("Reports content")).toBeInTheDocument();
+      expect(mockRouter.push).toHaveBeenCalledWith("/dashboard?tab=reports");
     });
 
     // Story has a real car equivalent now too - same Insights group as
@@ -464,7 +488,7 @@ describe("DashboardShell", () => {
 
       expect(screen.getByRole("button", { name: "The Story So Far" })).toBeInTheDocument();
       await user.click(screen.getByRole("button", { name: "The Story So Far" }));
-      expect(screen.getByText("Story content")).toBeInTheDocument();
+      expect(mockRouter.push).toHaveBeenCalledWith("/dashboard?tab=story");
     });
 
     // The Vault ships for both vehicle kinds from day one - same Insights
@@ -477,7 +501,7 @@ describe("DashboardShell", () => {
 
       expect(screen.getByRole("button", { name: "The Vault" })).toBeInTheDocument();
       await user.click(screen.getByRole("button", { name: "The Vault" }));
-      expect(screen.getByText("Vault content")).toBeInTheDocument();
+      expect(mockRouter.push).toHaveBeenCalledWith("/dashboard?tab=vault");
     });
 
     // Shareable Links has a real car equivalent now - it must actually
@@ -490,7 +514,7 @@ describe("DashboardShell", () => {
 
       expect(screen.getByRole("button", { name: "Shareable Links" })).toBeInTheDocument();
       await user.click(screen.getByRole("button", { name: "Shareable Links" }));
-      expect(screen.getByText("ShareLinks content")).toBeInTheDocument();
+      expect(mockRouter.push).toHaveBeenCalledWith("/dashboard?tab=shareLinks");
     });
 
     // Transfer ownership has a real car equivalent now too - same
@@ -504,7 +528,7 @@ describe("DashboardShell", () => {
 
       expect(screen.getByRole("button", { name: "Transfer ownership" })).toBeInTheDocument();
       await user.click(screen.getByRole("button", { name: "Transfer ownership" }));
-      expect(screen.getByText("TransferOwnership content")).toBeInTheDocument();
+      expect(mockRouter.push).toHaveBeenCalledWith("/dashboard?tab=transferOwnership");
     });
 
     // Quote Checker/Cost calculator/Buying a used car all have real car
@@ -523,14 +547,14 @@ describe("DashboardShell", () => {
       // the kind by name; see DashboardShell.tsx's navLabelFor).
       expect(screen.queryByRole("button", { name: "Buying a used bike" })).not.toBeInTheDocument();
 
-      for (const [label, content] of [
-        ["Quote Checker", "QuoteChecker content"],
-        ["Cost calculator", "CostCalculator content"],
-        ["Buying a used car", "BuyingGuide content"],
+      for (const [label, tabKey] of [
+        ["Quote Checker", "quoteChecker"],
+        ["Cost calculator", "costCalculator"],
+        ["Buying a used car", "buyingGuide"],
       ]) {
         expect(screen.getByRole("button", { name: label })).toBeInTheDocument();
         await user.click(screen.getByRole("button", { name: label }));
-        expect(screen.getByText(content)).toBeInTheDocument();
+        expect(mockRouter.push).toHaveBeenCalledWith(`/dashboard?tab=${tabKey}`);
       }
     });
 

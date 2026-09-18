@@ -17,7 +17,14 @@ import { DEMO_EMAIL } from '@/lib/tracker/demoSeed';
 import { Icon, type IconName } from './Icon';
 import styles from './dashboard.module.css';
 
-type Section = 'dashboard' | 'service' | 'fuel' | 'mods' | 'bills' | 'labour' | 'fines' | 'tolls' | 'reminders' | 'reports' | 'shareLinks' | 'story' | 'vault' | 'quoteChecker' | 'costCalculator' | 'buyingGuide' | 'privacy' | 'transferOwnership' | 'security';
+// The full set of dashboard tabs, and the single source of truth for
+// what a `?tab=` value on /dashboard is allowed to be - dashboard/
+// page.tsx imports this same array to validate the query param and to
+// decide which single tab's content to actually build server-side,
+// rather than keeping its own separately-maintained list that could
+// drift out of sync with the nav below.
+export const ALL_SECTIONS = ['dashboard', 'service', 'fuel', 'mods', 'bills', 'labour', 'fines', 'tolls', 'reminders', 'reports', 'shareLinks', 'story', 'vault', 'quoteChecker', 'costCalculator', 'buyingGuide', 'privacy', 'transferOwnership', 'security'] as const;
+export type Section = (typeof ALL_SECTIONS)[number];
 
 const REVIEW_CATEGORIES: ReviewCategory[] = ['service', 'fuel', 'mods', 'bills', 'labour'];
 function asReviewCategory(key: string): ReviewCategory | null {
@@ -179,13 +186,11 @@ interface Props {
   securityContent: ReactNode;
   storyReady: boolean;
   hasIncomingRequest: boolean;
-  // Reopens a specific tab on load instead of the usual 'dashboard'
-  // default - currently only ever set to 'buyingGuide', for a buyer
-  // returning from Stripe checkout (see buyingGuideVdiCheckout.ts's
-  // BuyingGuideReturnContext and dashboard/page.tsx's own `tab` query
-  // param) - the dashboard has no URL per tab otherwise, since tab
-  // selection below is plain client-side state.
-  initialSection?: Section;
+  // The tab dashboard/page.tsx actually built content for, driven by
+  // /dashboard's own `?tab=` query param (defaulting to 'dashboard') -
+  // re-supplied on every render (not just at mount), since every tab
+  // switch is a real navigation that re-runs the server component.
+  activeSection?: Section;
 }
 
 function PendingDot() {
@@ -242,23 +247,28 @@ export function DashboardShell({
   securityContent,
   storyReady,
   hasIncomingRequest,
-  initialSection,
+  activeSection,
 }: Props) {
   const router = useRouter();
-  const [active, setActive] = useState<Section>(initialSection ?? 'dashboard');
+  // Not local state: every tab switch is a real navigation (see goToTab
+  // below), so dashboard/page.tsx always re-computes and re-passes
+  // activeSection for whichever tab the URL now names - this plain
+  // derived value picks that straight up on every render, including a
+  // same-page ?tab=... transition (e.g. TwoFactorGate's "Go to Settings"
+  // link, or the Stripe Buying Guide return) where this same
+  // DashboardShell instance stays mounted and is simply re-rendered with
+  // a new prop, never remounted.
+  const active: Section = activeSection ?? 'dashboard';
+  // Requests the server-built content for another tab - dashboard/
+  // page.tsx reads this same `tab` query param to decide which single
+  // tab's content to actually build, instead of building and shipping
+  // all of them on every load. Router Cache makes a tab already visited
+  // this session feel instant again; a first visit to a given tab pays
+  // one real round trip.
+  function goToTab(key: Section) {
+    router.push(`/dashboard?tab=${key}`);
+  }
   const [cancellingDeletion, setCancellingDeletion] = useState(false);
-  // useState's initializer above only ever runs on this component's very
-  // first mount - it does nothing on a later render that arrives with a
-  // different initialSection prop. That matters here because a same-page
-  // navigation (e.g. TwoFactorGate's "Go to Settings" link, or the Stripe
-  // Buying Guide return, both ?tab=... query changes on /dashboard) is
-  // handled by Next.js as a soft, client-side transition: this same
-  // DashboardShell instance stays mounted throughout, it's only re-rendered
-  // with new props - so without this effect, initialSection changing from
-  // undefined to e.g. "security" would silently do nothing at all.
-  useEffect(() => {
-    if (initialSection) setActive(initialSection);
-  }, [initialSection]);
   // Mobile only: which bottom-bar "shelf" is currently open - either a
   // bottom-bar group's own key (its shelf shows just that group's items)
   // or 'more' (the catch-all sheet: Buying Tools, Reminders, Security,
@@ -330,7 +340,7 @@ export function DashboardShell({
         type="button"
         className={className}
         onClick={() => {
-          setActive(item.key);
+          goToTab(item.key);
           onSelect?.();
         }}
       >
@@ -395,7 +405,7 @@ export function DashboardShell({
   const isMoreActive = active !== 'dashboard' && !bottomBarGroupItemKeys.has(active);
 
   return (
-    <TabSwitchProvider onSwitchTab={(cat) => setActive(cat)}>
+    <TabSwitchProvider onSwitchTab={(cat) => goToTab(cat)}>
       <div className={styles.shell}>
         <aside className={styles.sidebar}>
           <div className={styles.sidebarLogo}>
@@ -493,7 +503,7 @@ export function DashboardShell({
             <button
               type="button"
               className={`${styles.sidebarNavItem} ${active === 'privacy' ? styles.sidebarNavItemActive : ''}`}
-              onClick={() => setActive('privacy')}
+              onClick={() => goToTab('privacy')}
             >
               <Icon name="privacy" className={styles.navIcon} />
               <span>Privacy</span>
@@ -545,7 +555,7 @@ export function DashboardShell({
           <button
             type="button"
             onClick={() => {
-              setActive('dashboard');
+              goToTab('dashboard');
               setOpenMobileSheet(null);
             }}
             style={{

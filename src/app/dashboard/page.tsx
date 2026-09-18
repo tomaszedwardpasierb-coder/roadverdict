@@ -66,7 +66,7 @@ import { UnitSettings } from "./UnitSettings";
 import { ExportShareSection } from "./ExportShareSection";
 import { CarExportShareSection } from "./CarExportShareSection";
 import { RecentActivity, type RecentActivityItem } from "./RecentActivity";
-import { DashboardShell } from "./DashboardShell";
+import { DashboardShell, ALL_SECTIONS, type Section } from "./DashboardShell";
 import { NotificationBell } from "./NotificationBell";
 import { QuoteForm } from "@/components/QuoteForm";
 import { CostCalculatorForm } from "@/components/CostCalculatorForm";
@@ -205,32 +205,32 @@ function buildStatCardForecasts(
 
 export const dynamic = "force-dynamic";
 
-// See the "Reopens a specific tab on load" comment inside DashboardPage
-// below for what each of these is for. Shared with renderCarDashboard's
-// own initialSection parameter, so both render paths accept exactly the
-// same set.
-const DEEP_LINK_SECTIONS = ["buyingGuide", "security", "service", "story", "shareLinks", "transferOwnership"] as const;
-type DeepLinkSection = (typeof DEEP_LINK_SECTIONS)[number];
-
 export default async function DashboardPage(props: { searchParams: Promise<{ addVehicle?: string; tab?: string }> }) {
   const searchParams = await props.searchParams;
   const session = await getSession();
   if (!session) redirect("/login");
 
-  // Reopens a specific tab on load instead of the default dashboard
-  // overview. "buyingGuide" is set by the Stripe checkout return URL for
-  // a buyer who started the Buying Guide's paid report purchase from
-  // inside the dashboard rather than the public page (see
-  // buyingGuideVdiCheckout.ts's BuyingGuideReturnContext). "security" is
-  // set by the Vault's "enable 2FA to continue" prompt (TwoFactorGate),
-  // which needs a real navigation back to Settings rather than in-SPA
-  // tab-switch plumbing threaded into a server-rendered child tree. The
-  // other four are what OnboardingChecklistCard.tsx's own items link to
-  // (see ONBOARDING_STEPS in userDoc.ts) - still a deliberate allow-list,
-  // not a general "deep link to any tab" mechanism.
-  const initialSection = (DEEP_LINK_SECTIONS as readonly string[]).includes(searchParams.tab ?? "")
-    ? (searchParams.tab as DeepLinkSection)
-    : undefined;
+  // Which tab to actually build content for, from /dashboard's own
+  // `?tab=` query param - defaults to 'dashboard' for a bare visit or an
+  // unrecognised value. This is the ONLY tab whose content gets built
+  // below (every xContent assignment is gated on `activeSection === '...'`)
+  // - the rest stay `undefined`, so a dashboard visit ships and renders
+  // one tab's worth of data instead of all nineteen. Switching tabs is a
+  // real navigation to a new `?tab=` value (see DashboardShell.tsx's own
+  // goToTab), not client-side-only state, which is what makes gating the
+  // content here actually save anything.
+  //
+  // A few known entry points already relied on a *subset* of these
+  // values before every tab had a real URL: "buyingGuide" from the
+  // Stripe checkout return (see buyingGuideVdiCheckout.ts's
+  // BuyingGuideReturnContext), "security" from the Vault's "enable 2FA
+  // to continue" prompt (TwoFactorGate), and four more from
+  // OnboardingChecklistCard.tsx's own items (see ONBOARDING_STEPS in
+  // userDoc.ts). All six keep working unchanged - they're ordinary
+  // members of ALL_SECTIONS now, not a separate allow-list.
+  const activeSection: Section = (ALL_SECTIONS as readonly string[]).includes(searchParams.tab ?? "")
+    ? (searchParams.tab as Section)
+    : "dashboard";
 
   // Account-level, not bike/car-specific - fetched once here so it's
   // available before the car/bike branch decision below, and passed
@@ -287,7 +287,7 @@ export default async function DashboardPage(props: { searchParams: Promise<{ add
   if (effectiveKind === "car") {
     // Already resolved to "car" the ordinary way - reuse it as-is.
     if (activeVehicle?.kind === "car") {
-      return renderCarDashboard(session.email, activeVehicle.car, existingCars, activeVehicle.hasAnyBike, userAccount, pendingDeletion, initialSection);
+      return renderCarDashboard(session.email, activeVehicle.car, existingCars, activeVehicle.hasAnyBike, userAccount, pendingDeletion, activeSection);
     }
     // Forced past a cookie that resolved to "bike" (or no cookie at all
     // for an account with both, defaulting to bike) - existingCars.length
@@ -296,7 +296,7 @@ export default async function DashboardPage(props: { searchParams: Promise<{ add
     // "bike" is what got us here, which itself guarantees bikes exist.
     const forcedCar = await pickActiveCar(existingCars);
     if (forcedCar) {
-      return renderCarDashboard(session.email, forcedCar, existingCars, true, userAccount, pendingDeletion, initialSection);
+      return renderCarDashboard(session.email, forcedCar, existingCars, true, userAccount, pendingDeletion, activeSection);
     }
   }
 
@@ -468,7 +468,7 @@ export default async function DashboardPage(props: { searchParams: Promise<{ add
     </div>
   );
 
-  const dashboardContent = (
+  const dashboardContent = activeSection !== 'dashboard' ? undefined : (
     <ChartFilterProvider>
       {userAccount?.onboarding && (
         <OnboardingChecklistCard completedSteps={userAccount.onboarding.completedSteps} dismissed={!!userAccount.onboarding.dismissedChecklistAt} />
@@ -589,7 +589,7 @@ export default async function DashboardPage(props: { searchParams: Promise<{ add
     </ChartFilterProvider>
   );
 
-  const serviceContent = (
+  const serviceContent = activeSection !== 'service' ? undefined : (
     <>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "0.75rem" }}>
         <h1 className={styles.heading}>Service{bikeTag}</h1>
@@ -615,7 +615,7 @@ export default async function DashboardPage(props: { searchParams: Promise<{ add
     </>
   );
 
-  const fuelContent = (
+  const fuelContent = activeSection !== 'fuel' ? undefined : (
     <>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "0.75rem" }}>
         <h1 className={styles.heading}>Fuel{bikeTag}</h1>
@@ -648,7 +648,7 @@ export default async function DashboardPage(props: { searchParams: Promise<{ add
     </>
   );
 
-  const modsContent = (
+  const modsContent = activeSection !== 'mods' ? undefined : (
     <>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "0.75rem" }}>
         <h1 className={styles.heading}>Parts & Accessories{bikeTag}</h1>
@@ -665,7 +665,7 @@ export default async function DashboardPage(props: { searchParams: Promise<{ add
     </>
   );
 
-  const billsContent = (
+  const billsContent = activeSection !== 'bills' ? undefined : (
     <>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "0.75rem" }}>
         <h1 className={styles.heading}>Insurance, Tax, MOT &amp; Finance{bikeTag}</h1>
@@ -708,7 +708,7 @@ export default async function DashboardPage(props: { searchParams: Promise<{ add
     </>
   );
 
-  const finesContent = (
+  const finesContent = activeSection !== 'fines' ? undefined : (
     <>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "0.75rem" }}>
         <h1 className={styles.heading}>Fines{bikeTag}</h1>
@@ -734,7 +734,7 @@ export default async function DashboardPage(props: { searchParams: Promise<{ add
     </>
   );
 
-  const tollsContent = (
+  const tollsContent = activeSection !== 'tolls' ? undefined : (
     <>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "0.75rem" }}>
         <h1 className={styles.heading}>Tolls{bikeTag}</h1>
@@ -760,7 +760,7 @@ export default async function DashboardPage(props: { searchParams: Promise<{ add
     </>
   );
 
-  const labourContent = (
+  const labourContent = activeSection !== 'labour' ? undefined : (
     <>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "0.75rem" }}>
         <h1 className={styles.heading}>Labour{bikeTag}</h1>
@@ -777,7 +777,7 @@ export default async function DashboardPage(props: { searchParams: Promise<{ add
     </>
   );
 
-  const remindersContent = (
+  const remindersContent = activeSection !== 'reminders' ? undefined : (
     <>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "0.75rem" }}>
         <h1 className={styles.heading}>Reminders{bikeTag}</h1>
@@ -803,7 +803,7 @@ export default async function DashboardPage(props: { searchParams: Promise<{ add
     </>
   );
 
-  const reportsContent = (
+  const reportsContent = activeSection !== 'reports' ? undefined : (
     <ProGate featureName="Reports" description="Every chart in one place - fuel economy, running costs, and category spend trends over the life of your bike." isPro={userIsPro}>
     <ChartFilterProvider>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "0.75rem" }}>
@@ -895,7 +895,7 @@ export default async function DashboardPage(props: { searchParams: Promise<{ add
   const outgoingOffer = requestsForThisBike.find((r) => r.initiatedBy === "owner");
   const incomingRequest = requestsForThisBike.find((r) => r.initiatedBy === "recipient");
 
-  const shareLinksContent = (
+  const shareLinksContent = activeSection !== 'shareLinks' ? undefined : (
     <ShareLinksSection
       links={shareLinks}
       bikeNames={bikeNames}
@@ -908,7 +908,7 @@ export default async function DashboardPage(props: { searchParams: Promise<{ add
     />
   );
 
-  const transferOwnershipContent = (
+  const transferOwnershipContent = activeSection !== 'transferOwnership' ? undefined : (
     <>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "0.75rem" }}>
         <h1 className={styles.heading}>Transfer ownership{bikeTag}</h1>
@@ -1004,7 +1004,7 @@ export default async function DashboardPage(props: { searchParams: Promise<{ add
     ),
   };
 
-  const quoteCheckerContent = (
+  const quoteCheckerContent = activeSection !== 'quoteChecker' ? undefined : (
     <ProGate featureName="Quote Checker" description="Check whether a quote you've been given is fair, benchmarked against real UK motorcycle service and repair prices." isPro={userIsPro}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "0.75rem" }}>
         <h1 className={styles.heading}>Quote Checker{bikeTag}</h1>
@@ -1015,7 +1015,7 @@ export default async function DashboardPage(props: { searchParams: Promise<{ add
     </ProGate>
   );
 
-  const costCalculatorContent = (
+  const costCalculatorContent = activeSection !== 'costCalculator' ? undefined : (
     <ProGate featureName="Cost Calculator" description="Work out what a bike really costs to run a year - servicing, tyres, MOT, tax, and fuel, benchmarked against typical UK prices." isPro={userIsPro}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "0.75rem" }}>
         <h1 className={styles.heading}>Cost calculator{bikeTag}</h1>
@@ -1026,7 +1026,7 @@ export default async function DashboardPage(props: { searchParams: Promise<{ add
     </ProGate>
   );
 
-  const buyingGuideContent = (
+  const buyingGuideContent = activeSection !== 'buyingGuide' ? undefined : (
     <ProGate featureName="Buying a Used Bike" description="A buyer's checklist weighted by how old the bike actually is, so you know exactly what to check before handing any money over." isPro={userIsPro}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "0.75rem" }}>
         <h1 className={styles.heading}>Buying a used bike{bikeTag}</h1>
@@ -1050,7 +1050,7 @@ export default async function DashboardPage(props: { searchParams: Promise<{ add
   // privacyContent above - this is account-level, not about this
   // specific bike.
   const twoFactorEnabled = await isTwoFactorEnabled(session.email);
-  const securityContent = (
+  const securityContent = activeSection !== 'security' ? undefined : (
     <SettingsTab
       email={session.email}
       displayName={userAccount?.displayName ?? ""}
@@ -1089,8 +1089,8 @@ export default async function DashboardPage(props: { searchParams: Promise<{ add
       tollsContent={tollsContent}
       remindersContent={remindersContent}
       reportsContent={reportsContent}
-      storyContent={<ProGate featureName="The Story So Far" description="An AI-generated narrative of your ownership - your bike's history told as a story, with insights on what's been done, what's coming, and how your costs compare." isPro={userIsPro}><StorySoFarTab bikeNickname={bike.nickname} registration={currentRegistration} currentMileage={bike.currentMileage} distanceUnit={distanceUnit} initialStory={initialStory} sellerPrep={sellerPrep} /></ProGate>}
-      vaultContent={<ProGate featureName="The Vault" description="Encrypted storage for your V5C, insurance, MOT, and every document that matters. 2FA-protected. Private. Never shared." isPro={userIsPro}><TwoFactorGate twoFactorEnabled={twoFactorEnabled}><VaultTab vehicleKind="bike" vehicleId={bike.id} currentMileage={bike.currentMileage} distanceUnit={distanceUnit} /></TwoFactorGate></ProGate>}
+      storyContent={activeSection !== 'story' ? undefined : <ProGate featureName="The Story So Far" description="An AI-generated narrative of your ownership - your bike's history told as a story, with insights on what's been done, what's coming, and how your costs compare." isPro={userIsPro}><StorySoFarTab bikeNickname={bike.nickname} registration={currentRegistration} currentMileage={bike.currentMileage} distanceUnit={distanceUnit} initialStory={initialStory} sellerPrep={sellerPrep} /></ProGate>}
+      vaultContent={activeSection !== 'vault' ? undefined : <ProGate featureName="The Vault" description="Encrypted storage for your V5C, insurance, MOT, and every document that matters. 2FA-protected. Private. Never shared." isPro={userIsPro}><TwoFactorGate twoFactorEnabled={twoFactorEnabled}><VaultTab vehicleKind="bike" vehicleId={bike.id} currentMileage={bike.currentMileage} distanceUnit={distanceUnit} /></TwoFactorGate></ProGate>}
       shareLinksContent={shareLinksContent}
       quoteCheckerContent={quoteCheckerContent}
       costCalculatorContent={costCalculatorContent}
@@ -1100,7 +1100,7 @@ export default async function DashboardPage(props: { searchParams: Promise<{ add
       securityContent={securityContent}
       storyReady={storyReady}
       hasIncomingRequest={!!incomingRequest}
-      initialSection={initialSection}
+      activeSection={activeSection}
     />
   );
 }
@@ -1109,11 +1109,9 @@ export default async function DashboardPage(props: { searchParams: Promise<{ add
 // giant if/else woven through the ~700 lines above. Keeps the existing,
 // working bike path completely untouched (verified: same route list,
 // same component behaviour) rather than risking it via an inline
-// branch. Trimmed to what's actually built for cars so far: no Reports/
-// Story/Shareable Links/Transfer ownership/Quote Checker/Cost
-// Calculator/Buying Guide content is assembled at all (DashboardShell's
-// own CAR_UNAVAILABLE_SECTIONS hides their nav entries, so nothing here
-// needs to produce placeholder JSX for them).
+// branch. Full car/bike tab parity today - see DashboardShell.tsx's own
+// CAR_UNAVAILABLE_SECTIONS (empty, kept only as a real list a future
+// car-only gap could go back onto).
 async function renderCarDashboard(
   email: string,
   car: CarDoc,
@@ -1121,7 +1119,7 @@ async function renderCarDashboard(
   hasAnyBike: boolean,
   userAccount: Awaited<ReturnType<typeof getUserDoc>>,
   pendingDeletion: ReturnType<typeof getPendingDeletionInfo>,
-  initialSection?: DeepLinkSection
+  activeSection: Section
 ) {
   const [bikes, proStatus, twoFactorEnabled] = await Promise.all([
     hasAnyBike ? getBikesForUser(email) : Promise.resolve([]),
@@ -1255,7 +1253,7 @@ async function renderCarDashboard(
     </div>
   );
 
-  const dashboardContent = (
+  const dashboardContent = activeSection !== 'dashboard' ? undefined : (
     <ChartFilterProvider>
       {userAccount?.onboarding && (
         <OnboardingChecklistCard completedSteps={userAccount.onboarding.completedSteps} dismissed={!!userAccount.onboarding.dismissedChecklistAt} />
@@ -1333,7 +1331,7 @@ async function renderCarDashboard(
     </ChartFilterProvider>
   );
 
-  const carReportsContent = (
+  const carReportsContent = activeSection !== 'reports' ? undefined : (
     <ProGate featureName="Reports" description="Every chart in one place - fuel economy, running costs, and category spend trends over the life of your car." isPro={userIsPro}>
     <ChartFilterProvider>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "0.75rem" }}>
@@ -1431,7 +1429,7 @@ async function renderCarDashboard(
   const toolInitialCarClass: CarBenchmarkClass | undefined =
     car.fuelType !== "electric" && car.engineLitres ? classFromEngineLitres(car.engineLitres) : undefined;
 
-  const carQuoteCheckerContent = (
+  const carQuoteCheckerContent = activeSection !== 'quoteChecker' ? undefined : (
     <ProGate featureName="Quote Checker" description="Check whether a quote you've been given is fair, benchmarked against real UK car service and repair prices." isPro={userIsPro}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "0.75rem" }}>
         <h1 className={styles.heading}>Quote Checker{carTag}</h1>
@@ -1442,7 +1440,7 @@ async function renderCarDashboard(
     </ProGate>
   );
 
-  const carCostCalculatorContent = (
+  const carCostCalculatorContent = activeSection !== 'costCalculator' ? undefined : (
     <ProGate featureName="Cost Calculator" description="Work out what a car really costs to run a year - servicing, tyres, MOT, tax, and fuel, benchmarked against typical UK prices." isPro={userIsPro}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "0.75rem" }}>
         <h1 className={styles.heading}>Cost calculator{carTag}</h1>
@@ -1453,7 +1451,7 @@ async function renderCarDashboard(
     </ProGate>
   );
 
-  const carBuyingGuideContent = (
+  const carBuyingGuideContent = activeSection !== 'buyingGuide' ? undefined : (
     <ProGate featureName="Buying a Used Car" description="A buyer's checklist weighted by how old the car actually is, so you know exactly what to check before handing any money over." isPro={userIsPro}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "0.75rem" }}>
         <h1 className={styles.heading}>Buying a used car{carTag}</h1>
@@ -1464,7 +1462,7 @@ async function renderCarDashboard(
     </ProGate>
   );
 
-  const serviceContent = (
+  const serviceContent = activeSection !== 'service' ? undefined : (
     <>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "0.75rem" }}>
         <h1 className={styles.heading}>Service{carTag}</h1>
@@ -1488,7 +1486,7 @@ async function renderCarDashboard(
     </>
   );
 
-  const fuelContent = (
+  const fuelContent = activeSection !== 'fuel' ? undefined : (
     <>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "0.75rem" }}>
         <h1 className={styles.heading}>Fuel{carTag}</h1>
@@ -1505,7 +1503,7 @@ async function renderCarDashboard(
     </>
   );
 
-  const modsContent = (
+  const modsContent = activeSection !== 'mods' ? undefined : (
     <>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "0.75rem" }}>
         <h1 className={styles.heading}>Parts & Accessories{carTag}</h1>
@@ -1522,7 +1520,7 @@ async function renderCarDashboard(
     </>
   );
 
-  const billsContent = (
+  const billsContent = activeSection !== 'bills' ? undefined : (
     <>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "0.75rem" }}>
         <h1 className={styles.heading}>Insurance, Tax, MOT &amp; Finance{carTag}</h1>
@@ -1563,7 +1561,7 @@ async function renderCarDashboard(
     </>
   );
 
-  const finesContent = (
+  const finesContent = activeSection !== 'fines' ? undefined : (
     <>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "0.75rem" }}>
         <h1 className={styles.heading}>Fines{carTag}</h1>
@@ -1589,7 +1587,7 @@ async function renderCarDashboard(
     </>
   );
 
-  const tollsContent = (
+  const tollsContent = activeSection !== 'tolls' ? undefined : (
     <>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "0.75rem" }}>
         <h1 className={styles.heading}>Tolls{carTag}</h1>
@@ -1615,7 +1613,7 @@ async function renderCarDashboard(
     </>
   );
 
-  const labourContent = (
+  const labourContent = activeSection !== 'labour' ? undefined : (
     <>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "0.75rem" }}>
         <h1 className={styles.heading}>Labour{carTag}</h1>
@@ -1632,7 +1630,7 @@ async function renderCarDashboard(
     </>
   );
 
-  const remindersContent = (
+  const remindersContent = activeSection !== 'reminders' ? undefined : (
     <>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "0.75rem" }}>
         <h1 className={styles.heading}>Reminders{carTag}</h1>
@@ -1655,7 +1653,7 @@ async function renderCarDashboard(
     </>
   );
 
-  const carShareLinksContent = (
+  const carShareLinksContent = activeSection !== 'shareLinks' ? undefined : (
     <CarShareLinksSection
       links={carShareLinks}
       carNames={carNames}
@@ -1700,13 +1698,13 @@ async function renderCarDashboard(
     ),
   };
 
-  const carStoryContent = (
+  const carStoryContent = activeSection !== 'story' ? undefined : (
     <ProGate featureName="The Story So Far" description="An AI-generated narrative of your ownership - your car's history told as a story, with insights on what's been done, what's coming, and how your costs compare." isPro={userIsPro}>
       <CarStorySoFarTab carNickname={car.nickname} registration={currentRegistration} currentMileage={car.currentMileage} distanceUnit={distanceUnit} initialStory={initialCarStory} sellerPrep={carSellerPrep} />
     </ProGate>
   );
 
-  const carVaultContent = (
+  const carVaultContent = activeSection !== 'vault' ? undefined : (
     <ProGate featureName="The Vault" description="Encrypted storage for your V5C, insurance, MOT, and every document that matters. 2FA-protected. Private. Never shared." isPro={userIsPro}>
       <TwoFactorGate twoFactorEnabled={twoFactorEnabled}>
         <VaultTab vehicleKind="car" vehicleId={car.id} currentMileage={car.currentMileage} distanceUnit={distanceUnit} />
@@ -1719,7 +1717,7 @@ async function renderCarDashboard(
   const carOutgoingOffer = carRequestsForThisCar.find((r) => r.initiatedBy === "owner");
   const carIncomingRequest = carRequestsForThisCar.find((r) => r.initiatedBy === "recipient");
 
-  const carTransferOwnershipContent = (
+  const carTransferOwnershipContent = activeSection !== 'transferOwnership' ? undefined : (
     <>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "0.75rem" }}>
         <h1 className={styles.heading}>Transfer ownership{carTag}</h1>
@@ -1741,7 +1739,7 @@ async function renderCarDashboard(
   );
 
   const privacyContent = <PrivacyContent />;
-  const securityContent = (
+  const securityContent = activeSection !== 'security' ? undefined : (
     <SettingsTab
       email={email}
       displayName={userAccount?.displayName ?? ""}
@@ -1804,7 +1802,7 @@ async function renderCarDashboard(
       securityContent={securityContent}
       storyReady={carStoryReady}
       hasIncomingRequest={!!carIncomingRequest}
-      initialSection={initialSection}
+      activeSection={activeSection}
     />
   );
 }
