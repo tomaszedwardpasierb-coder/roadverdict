@@ -51,18 +51,19 @@ function ForecastControls() {
     <div>
       <button type="button" onClick={() => setForecastMode(true)}>enable forecast</button>
       <button type="button" onClick={() => setForecastMode(false)}>disable forecast</button>
-      <button type="button" onClick={() => setForecastWindow("3m")}>window 3m</button>
+      <button type="button" onClick={() => setForecastWindow("1m")}>window 1m</button>
       <button type="button" onClick={() => setForecastWindow("1y")}>window 1y</button>
     </div>
   );
 }
 
-// Distinguishable point counts per window (2/3/4) so a test can tell
+// Distinguishable point counts per window (1/1/3/4) so a test can tell
 // which window's forecast actually got picked, without depending on the
 // real engine's FORECAST_WINDOW_MONTHS - this component only ever
 // renders whatever bundle it's handed (see its own comment on `forecast`).
 const sampleForecast: Record<ForecastWindow, CategoryForecast> = {
-  "3m": { points: [{ month: "Mar 24", total: 40 }, { month: "Apr 24", total: 40 }], basis: "3m basis text" },
+  "1w": { points: [{ month: "Next week", total: 10 }], basis: "1w basis text" },
+  "1m": { points: [{ month: "Next month", total: 40 }], basis: "1m basis text" },
   "6m": { points: [{ month: "Mar 24", total: 40 }, { month: "Apr 24", total: 40 }, { month: "May 24", total: 40 }], basis: "6m basis text" },
   "1y": {
     points: [

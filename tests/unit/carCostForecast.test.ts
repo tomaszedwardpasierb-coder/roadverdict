@@ -47,11 +47,22 @@ describe("buildCarModsForecast / buildCarLabourForecast", () => {
       { date: "2026-04-01", cost: 60 },
       { date: "2026-03-01", cost: 60 },
     ];
-    const result = buildCarLabourForecast(items as any, "3m");
-    expect(result.points).toHaveLength(3);
+    const result = buildCarLabourForecast(items as any, "6m");
+    expect(result.points).toHaveLength(6);
     const [first, ...rest] = result.points;
     expect(rest.every((p) => p.total === first.total)).toBe(true);
     expect(first.total).toBeGreaterThan(0);
+  });
+
+  // "1w"/"1m" collapse to a single flat bucket instead of a monthly
+  // line - see costForecast.test.ts's own fuller coverage of this; only
+  // the car-specific delta (that this collapsing logic is imported and
+  // genuinely shared, not re-implemented here) is worth checking again.
+  it("collapses to a single point for a sub-month window", () => {
+    const items = [{ date: "2026-05-01", cost: 60 }] as any;
+    const result = buildCarLabourForecast(items, "1w");
+    expect(result.points).toHaveLength(1);
+    expect(result.points[0].month).toBe("Next week");
   });
 });
 
@@ -128,6 +139,19 @@ describe("buildCarServicingForecast", () => {
     expect(result.points.every((p) => p.total === 0)).toBe(true);
     expect(result.basis).toContain("no cost history or estimate available yet");
   });
+
+  it("counts a due item within a sub-month '1 week' window, in its single collapsed bucket", () => {
+    const reminders = [
+      { id: "r1", pk: "e", type: "carReminder" as const, carId: "c1", date: "2026-01-01", createdAt: "2026-01-01", name: "Oil change", intervalType: "mileage" as const, intervalValue: 100, baseMileage: 10000, sourceKey: "service:oil-filter" },
+    ];
+    const records = [
+      { id: "s1", pk: "e", type: "carServiceRecord" as const, carId: "c1", date: "2026-01-01", createdAt: "2026-01-01", jobType: "oil-filter", cost: 65, mileage: 10000, notes: "" },
+    ];
+    // Due at 10,100 miles - 100 miles at ~19.4 mi/day is about 5 days away.
+    const result = buildCarServicingForecast({ records, reminders, currentMileage: 10000, mileagePoints, carLifetime, carClass, window: "1w" });
+    expect(result.points).toHaveLength(1);
+    expect(result.points[0].total).toBe(65);
+  });
 });
 
 describe("buildCarBillsForecast", () => {
@@ -176,9 +200,10 @@ describe("buildCarCostForecast / buildCarCostForecastAllWindows", () => {
     expect(result).toHaveProperty("labour");
   });
 
-  it("computes all three windows, each with the right number of future months", () => {
+  it("computes every window, each with the right number of points", () => {
     const result = buildCarCostForecastAllWindows(baseInput);
-    expect(result["3m"].mods.points).toHaveLength(3);
+    expect(result["1w"].mods.points).toHaveLength(1);
+    expect(result["1m"].mods.points).toHaveLength(1);
     expect(result["6m"].mods.points).toHaveLength(6);
     expect(result["1y"].mods.points).toHaveLength(12);
   });

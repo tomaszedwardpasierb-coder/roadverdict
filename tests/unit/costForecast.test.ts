@@ -11,9 +11,13 @@ import {
   buildModsForecast,
   buildLabourForecast,
   buildBillsForecast,
+  buildFuelForecast,
   buildBikeCostForecast,
   buildBikeCostForecastAllWindows,
   pickCategoryForecast,
+  categoryForecastTotal,
+  buildCategoryTotalsForWindow,
+  projectMileageOverWindow,
   FORECAST_WINDOW_MONTHS,
 } from "@/lib/tracker/costForecast";
 
@@ -41,25 +45,60 @@ describe("buildModsForecast / buildLabourForecast", () => {
     expect(result.basis).toContain("No parts & accessories spend logged yet");
   });
 
-  it("extrapolates a flat monthly rate from the trailing average, identical across every future month", () => {
+  it("extrapolates a flat monthly rate from the trailing average, identical across every future month, for a whole-month window", () => {
     const items = [
       { date: "2026-05-01", cost: 60 },
       { date: "2026-04-01", cost: 60 },
       { date: "2026-03-01", cost: 60 },
     ] as any; // £180 over ~3 months -> roughly £60/month
-    const result = buildLabourForecast(items, "3m");
-    expect(result.points).toHaveLength(3);
+    const result = buildLabourForecast(items, "6m");
+    expect(result.points).toHaveLength(6);
     const [first, ...rest] = result.points;
     expect(rest.every((p) => p.total === first.total)).toBe(true); // "very steady lines"
     expect(first.total).toBeGreaterThan(0);
     expect(result.basis).toContain("steady");
-    expect(result.basis).toContain("last 3 months");
+    expect(result.basis).toContain("last 6 months");
   });
 
   it("ignores spend outside the lookback window entirely", () => {
     const items = [{ date: "2020-01-01", cost: 5000 }] as any; // ancient, well outside any lookback
-    const result = buildModsForecast(items, "3m");
+    const result = buildModsForecast(items, "6m");
     expect(result.points.every((p) => p.total === 0)).toBe(true);
+  });
+
+  // "1w"/"1m" are too short to bucket into real calendar months - they
+  // collapse to a single flat bucket sized to the window's own day
+  // count instead of a monthly-rate line (see costForecast.ts's
+  // isSubMonthWindow).
+  describe("sub-month windows (1w/1m)", () => {
+    const items = [
+      { date: "2026-05-01", cost: 60 },
+      { date: "2026-04-01", cost: 60 },
+      { date: "2026-03-01", cost: 60 },
+    ] as any; // ~£2/day over the 3-month lookback
+
+    it("collapses to a single point labelled with the window's own name for '1 week'", () => {
+      const result = buildLabourForecast(items, "1w");
+      expect(result.points).toHaveLength(1);
+      expect(result.points[0].month).toBe("Next week");
+      // ~£2/day * 7 days - a real number, not the monthly-equivalent figure.
+      expect(result.points[0].total).toBeGreaterThan(0);
+      expect(result.points[0].total).toBeLessThan(30);
+    });
+
+    it("collapses to a single point labelled with the window's own name for '1 month'", () => {
+      const result = buildLabourForecast(items, "1m");
+      expect(result.points).toHaveLength(1);
+      expect(result.points[0].month).toBe("Next month");
+      // ~£2/day * 30 days, noticeably larger than the 1-week total above.
+      expect(result.points[0].total).toBeGreaterThan(30);
+    });
+
+    it("still reports the basis in monthly-equivalent terms even though the window itself isn't a month", () => {
+      const result = buildLabourForecast(items, "1w");
+      expect(result.basis).toContain("/month");
+      expect(result.basis).toContain("last 3 months"); // the lookback, not the forecast window
+    });
   });
 });
 
@@ -147,6 +186,36 @@ describe("buildServicingForecast", () => {
     expect(result.points.every((p) => p.total === 0)).toBe(true);
     expect(result.basis).toContain("no cost history or estimate available yet");
   });
+
+  it("counts a due item within a sub-month '1 week' window, in its single collapsed bucket", () => {
+    const reminders = [
+      { id: "r1", pk: "e", type: "reminder" as const, date: "2026-01-01", createdAt: "2026-01-01", name: "Oil change", intervalType: "mileage" as const, intervalValue: 100, baseMileage: 10000, sourceKey: "service:oil-filter" },
+    ];
+    const records = [
+      { id: "s1", pk: "e", type: "serviceRecord" as const, date: "2026-01-01", createdAt: "2026-01-01", jobType: "oil-filter", cost: 45, mileage: 10000, notes: "" },
+    ];
+    // Due at 10,100 miles - 100 miles at ~19.4 mi/day is about 5 days
+    // away, inside a 7-day window.
+    const result = buildServicingForecast({ records, reminders, currentMileage: 10000, mileagePoints, bikeLifetime, bikeClass, window: "1w" });
+    expect(result.points).toHaveLength(1);
+    expect(result.points[0].month).toBe("Next week");
+    expect(result.points[0].total).toBe(45);
+  });
+
+  it("excludes a due item from a '1 week' window when it's really due later, in '1 month'", () => {
+    const reminders = [
+      { id: "r1", pk: "e", type: "reminder" as const, date: "2026-01-01", createdAt: "2026-01-01", name: "Oil change", intervalType: "mileage" as const, intervalValue: 500, baseMileage: 10000, sourceKey: "service:oil-filter" },
+    ];
+    const records = [
+      { id: "s1", pk: "e", type: "serviceRecord" as const, date: "2026-01-01", createdAt: "2026-01-01", jobType: "oil-filter", cost: 45, mileage: 10000, notes: "" },
+    ];
+    // Due at 10,500 miles - about 26 days away at this pace, so it
+    // belongs in "1 month" but not the much shorter "1 week" window.
+    const oneWeek = buildServicingForecast({ records, reminders, currentMileage: 10000, mileagePoints, bikeLifetime, bikeClass, window: "1w" });
+    expect(oneWeek.points[0].total).toBe(0);
+    const oneMonth = buildServicingForecast({ records, reminders, currentMileage: 10000, mileagePoints, bikeLifetime, bikeClass, window: "1m" });
+    expect(oneMonth.points[0].total).toBe(45);
+  });
 });
 
 describe("buildBillsForecast", () => {
@@ -176,12 +245,13 @@ describe("buildBillsForecast", () => {
     expect(withReminder.basis).toContain("insurance");
   });
 
-  it("falls back to a flat average baseline for a bill type with no known due point (e.g. finance)", () => {
+  it("falls back to a flat average baseline for a bill type with no known due point (e.g. finance), even in a sub-month window", () => {
     const bills = [
       { id: "b1", pk: "e", type: "bill" as const, date: "2026-05-01", createdAt: "2026-05-01", billType: "finance", cost: 200, notes: "" },
       { id: "b2", pk: "e", type: "bill" as const, date: "2026-04-01", createdAt: "2026-04-01", billType: "finance", cost: 200, notes: "" },
     ];
-    const result = buildBillsForecast({ bills, reminders: [], window: "3m" });
+    const result = buildBillsForecast({ bills, reminders: [], window: "1m" });
+    expect(result.points).toHaveLength(1);
     expect(result.points.every((p) => p.total > 0)).toBe(true);
     expect(result.basis).toContain("steady average for everything else");
   });
@@ -206,9 +276,10 @@ describe("buildBikeCostForecast / buildBikeCostForecastAllWindows / pickCategory
     expect(result).toHaveProperty("labour");
   });
 
-  it("computes all three windows, each with the right number of future months", () => {
+  it("computes every window, each with the right number of points - a single collapsed bucket for the two sub-month windows, a real monthly line for the other two", () => {
     const result = buildBikeCostForecastAllWindows(baseInput);
-    expect(result["3m"].mods.points).toHaveLength(3);
+    expect(result["1w"].mods.points).toHaveLength(1);
+    expect(result["1m"].mods.points).toHaveLength(1);
     expect(result["6m"].mods.points).toHaveLength(6);
     expect(result["1y"].mods.points).toHaveLength(12);
   });
@@ -216,8 +287,69 @@ describe("buildBikeCostForecast / buildBikeCostForecastAllWindows / pickCategory
   it("pickCategoryForecast transposes a by-window bundle into a by-window bundle of just one category", () => {
     const byWindow = buildBikeCostForecastAllWindows(baseInput);
     const servicing = pickCategoryForecast(byWindow, "servicing");
-    expect(Object.keys(servicing).sort()).toEqual(["1y", "3m", "6m"]);
-    expect(servicing["3m"]).toBe(byWindow["3m"].servicing);
+    expect(Object.keys(servicing).sort()).toEqual(["1m", "1w", "1y", "6m"]);
+    expect(servicing["1w"]).toBe(byWindow["1w"].servicing);
     expect(servicing["1y"]).toBe(byWindow["1y"].servicing);
+  });
+});
+
+// Fuel has no CategorySpendChart column of its own (Reports has no Fuel
+// chart), so this is the same pure trailing-average method as
+// Mods/Labour, only ever exercised through SpendDonutChart's forecast
+// ring - see buildCategoryTotalsForWindow below.
+describe("buildFuelForecast", () => {
+  it("uses the same pure trailing-average method as Mods/Labour", () => {
+    const fuelLogs = [
+      { date: "2026-05-01", cost: 30 },
+      { date: "2026-04-01", cost: 30 },
+    ] as any;
+    const result = buildFuelForecast(fuelLogs, "6m");
+    expect(result.points).toHaveLength(6);
+    expect(result.points.every((p) => p.total === result.points[0].total)).toBe(true);
+    expect(result.points[0].total).toBeGreaterThan(0);
+  });
+});
+
+describe("categoryForecastTotal / buildCategoryTotalsForWindow", () => {
+  it("categoryForecastTotal sums every point in a CategoryForecast", () => {
+    const cf = { points: [{ month: "Jul 26", total: 10 }, { month: "Aug 26", total: 15 }], basis: "" };
+    expect(categoryForecastTotal(cf)).toBe(25);
+  });
+
+  it("buildCategoryTotalsForWindow sums the four real categories plus a fifth Fuel total it computes itself", () => {
+    const forecast = {
+      servicing: { points: [{ month: "Jul 26", total: 100 }], basis: "" },
+      mods: { points: [{ month: "Jul 26", total: 20 }], basis: "" },
+      bills: { points: [{ month: "Jul 26", total: 50 }], basis: "" },
+      labour: { points: [{ month: "Jul 26", total: 10 }], basis: "" },
+    };
+    const fuelLogs = [{ date: "2026-05-01", cost: 30 }, { date: "2026-04-01", cost: 30 }] as any;
+    const totals = buildCategoryTotalsForWindow(forecast, fuelLogs, "6m");
+    expect(totals.servicing).toBe(100);
+    expect(totals.mods).toBe(20);
+    expect(totals.bills).toBe(50);
+    expect(totals.labour).toBe(10);
+    expect(totals.fuel).toBeGreaterThan(0);
+  });
+});
+
+describe("projectMileageOverWindow", () => {
+  it("returns one point per future month for a whole-month window (6m/1y), each a genuine trend point, not just an endpoint", () => {
+    const result = projectMileageOverWindow("6m", mileagePoints, bikeLifetime);
+    expect(result).toHaveLength(6);
+    // Each future month's projection should be at or beyond the current
+    // mileage, and strictly increasing month over month at this bike's
+    // steady observed pace.
+    for (let i = 1; i < result.length; i++) {
+      expect(result[i].total).toBeGreaterThan(result[i - 1].total);
+    }
+    expect(result[0].total).toBeGreaterThan(bikeLifetime.currentMileage);
+  });
+
+  it("collapses to the window's own single point for a sub-month window (1w/1m)", () => {
+    const result = projectMileageOverWindow("1w", mileagePoints, bikeLifetime);
+    expect(result).toHaveLength(1);
+    expect(result[0].month).toBe("Next week");
+    expect(result[0].total).toBeGreaterThan(bikeLifetime.currentMileage);
   });
 });

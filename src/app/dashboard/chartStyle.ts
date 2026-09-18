@@ -65,6 +65,14 @@ export function lastPointRingWidth(baseWidth: number, ringWidth: number) {
   return (context: ScriptableContext<'line'>) => (isLastPoint(context) ? ringWidth : baseWidth);
 }
 
+// One fixed colour for every forecast segment/bar/point across every
+// chart in the app (CategorySpendChart, MileageChart), regardless of
+// that chart's own normal colour - so "blue and dashed" reads as "this
+// is a projection" everywhere the same way, not just on one chart.
+// Matches --blue in globals.css; Chart.js options can't read CSS custom
+// properties directly.
+export const FORECAST_COLOR = '#4A5FBF';
+
 // Shared axis look for every line/bar chart in the app: dashed 1px
 // horizontal gridlines in --line, a solid axis line, and small mono
 // labels in --slate. Defined once here so every chart stays consistent

@@ -10,6 +10,7 @@ import { useChartTypePreference } from './useChartTypePreference';
 import { ChartTypeToggle } from './ChartTypeToggle';
 import { barGradient, BAR_BORDER_RADIUS } from './chartStyle';
 import { useChartFilter } from './ChartFilterContext';
+import type { ForecastWindow, ForecastCategoryTotals } from '@/lib/tracker/costForecast';
 import { Icon } from './Icon';
 import styles from './dashboard.module.css';
 
@@ -55,6 +56,13 @@ interface Props {
   // much each one cost) is Premium.
   isPro?: boolean;
   vehicleKind?: 'bike' | 'car';
+  // One total per category, per window, precomputed server-side (see
+  // costForecast.ts's buildCategoryTotalsForWindow) - same "page.tsx
+  // can't read client-side forecastWindow at render time" reason
+  // CategorySpendChart's own `forecast` prop exists for. A donut only
+  // ever needs a single grand-total-per-category for the window, not the
+  // monthly-trend points a line/bar chart needs.
+  forecast?: Record<ForecastWindow, ForecastCategoryTotals>;
 }
 
 function sumCost(items: CostItem[]): number {
@@ -67,16 +75,19 @@ function sumCost(items: CostItem[]): number {
 // now take raw arrays instead of pre-summed totals: a pre-summed number
 // computed once on the server has no way to react to the client-side
 // Range control changing after the page has already loaded.
-export function SpendDonutChart({ records, mods, fuelLogs, bills, labour, currency, rates, initialChartType, isPro = false, vehicleKind = 'bike' }: Props) {
-  const { range } = useChartFilter();
+export function SpendDonutChart({ records, mods, fuelLogs, bills, labour, currency, rates, initialChartType, isPro = false, vehicleKind = 'bike', forecast }: Props) {
+  const { range, forecastMode, forecastWindow } = useChartFilter();
   const { kind, changeKind } = useChartTypePreference(CHART_ID, initialChartType ?? 'pie', vehicleKind);
   const symbol = CURRENCY_SYMBOLS[currency];
 
-  const servicingTotal = sumCost(filterByDateRange(records, range));
-  const modsTotal = sumCost(filterByDateRange(mods, range));
-  const fuelTotal = sumCost(filterByDateRange(fuelLogs, range));
-  const billsTotal = sumCost(filterByDateRange(bills, range));
-  const labourTotal = sumCost(filterByDateRange(labour, range));
+  const activeForecast = forecast?.[forecastWindow];
+  const showingForecast = forecastMode && !!activeForecast;
+
+  const servicingTotal = showingForecast ? activeForecast!.servicing : sumCost(filterByDateRange(records, range));
+  const modsTotal = showingForecast ? activeForecast!.mods : sumCost(filterByDateRange(mods, range));
+  const fuelTotal = showingForecast ? activeForecast!.fuel : sumCost(filterByDateRange(fuelLogs, range));
+  const billsTotal = showingForecast ? activeForecast!.bills : sumCost(filterByDateRange(bills, range));
+  const labourTotal = showingForecast ? activeForecast!.labour : sumCost(filterByDateRange(labour, range));
   const grandTotal = servicingTotal + modsTotal + fuelTotal + billsTotal + labourTotal;
 
   const rawValues = [servicingTotal, modsTotal, fuelTotal, billsTotal, labourTotal];
@@ -86,7 +97,10 @@ export function SpendDonutChart({ records, mods, fuelLogs, bills, labour, curren
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
       <div className={styles.chartCardHeader}>
         <span className={styles.chartCardTitle}>Spend by category</span>
-        <ChartTypeToggle value={kind === 'bar' ? 'bar' : 'pie'} onChange={changeKind} options={['pie', 'bar']} />
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          {showingForecast && <span className={styles.forecastBadge}>Estimate</span>}
+          <ChartTypeToggle value={kind === 'bar' ? 'bar' : 'pie'} onChange={changeKind} options={['pie', 'bar']} />
+        </div>
       </div>
       {grandTotal > 0 && (
         <div className={styles.chartCardTotalLine}>
@@ -94,7 +108,7 @@ export function SpendDonutChart({ records, mods, fuelLogs, bills, labour, curren
         </div>
       )}
       {grandTotal <= 0 ? (
-        <p className={styles.emptyNote}>Nothing logged in this range.</p>
+        <p className={styles.emptyNote}>{showingForecast ? 'Nothing predicted for this window yet.' : 'Nothing logged in this range.'}</p>
       ) : (
         <div style={{ position: 'relative', flex: 1 }}>
           {kind === 'bar' ? (
@@ -119,7 +133,7 @@ export function SpendDonutChart({ records, mods, fuelLogs, bills, labour, curren
                   // and axis ticks that would name a category or read
                   // off its exact value are switched off entirely.
                   tooltip: isPro
-                    ? { callbacks: { label: (ctx) => `${symbol}${Math.round(ctx.parsed.y as number)}` } }
+                    ? { callbacks: { label: (ctx) => `${showingForecast ? 'Est. ' : ''}${symbol}${Math.round(ctx.parsed.y as number)}` } }
                     : { enabled: false },
                 },
                 scales: {
@@ -154,7 +168,7 @@ export function SpendDonutChart({ records, mods, fuelLogs, bills, labour, curren
                       // above for why.
                       legend: { display: false },
                       tooltip: isPro
-                        ? { callbacks: { label: (ctx) => `${ctx.label}: ${symbol}${Math.round(ctx.parsed as number)}` } }
+                        ? { callbacks: { label: (ctx) => `${ctx.label}: ${showingForecast ? 'Est. ' : ''}${symbol}${Math.round(ctx.parsed as number)}` } }
                         : { enabled: false },
                     },
                     maintainAspectRatio: false,

@@ -1,14 +1,16 @@
 // Place at: tests/components/DashboardStatCards.test.tsx
 //
-// The three sidebar/summary stat cards. ChartFilterContext has a safe
-// no-Provider fallback ("all" range) - exercised directly in most tests
-// below, with one test wrapping in a real ChartFilterProvider to check
-// the range filter is genuinely applied, not just accepted as a prop.
+// The five dashboard stat cards. ChartFilterContext has a safe
+// no-Provider fallback ("all" range, forecast off) - exercised directly
+// in most tests below, with real ChartFilterProvider wrapping used where
+// a test needs to actually change range or forecast state.
 import { useEffect } from "react";
 import { describe, expect, it } from "vitest";
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { DashboardStatCards } from "@/app/dashboard/DashboardStatCards";
 import { ChartFilterProvider, useChartFilter } from "@/app/dashboard/ChartFilterContext";
+import styles from "@/app/dashboard/dashboard.module.css";
 
 function SetRange({ value }: { value: "all" | "1w" }) {
   const { setRange } = useChartFilter();
@@ -17,6 +19,20 @@ function SetRange({ value }: { value: "all" | "1w" }) {
   }, [value, setRange]);
   return null;
 }
+
+function ForecastControls() {
+  const { setForecastMode, setForecastWindow } = useChartFilter();
+  return (
+    <div>
+      <button type="button" onClick={() => setForecastMode(true)}>enable forecast</button>
+      <button type="button" onClick={() => setForecastWindow("1y")}>window 1y</button>
+    </div>
+  );
+}
+
+// Neutral defaults for the props every test needs but few tests actually
+// care about - spread first, individual tests override what matters.
+const yearDefaults = { currentYear: 2026, yearSpend: 0, yearEndProjection: null };
 
 describe("DashboardStatCards", () => {
   it("sums every category's cost, shows a dash for economy with no fuel logs, and computes cost-per-mile from the bike's lifetime bookends", () => {
@@ -34,6 +50,7 @@ describe("DashboardStatCards", () => {
         distanceUnit="mi"
         fuelEconomyUnit="mpg"
         isPro
+        {...yearDefaults}
       />
     );
     expect(screen.getByText("Total spend")).toBeInTheDocument();
@@ -62,6 +79,7 @@ describe("DashboardStatCards", () => {
         distanceUnit="mi"
         fuelEconomyUnit="mpg"
         isPro
+        {...yearDefaults}
       />
     );
     // 100 miles on 1 UK gallon (4.546L) between the two full fill-ups = 100.0 mpg
@@ -84,6 +102,7 @@ describe("DashboardStatCards", () => {
         distanceUnit="km"
         fuelEconomyUnit="mpg"
         isPro
+        {...yearDefaults}
       />
     );
     expect(screen.getByText("€100.00")).toBeInTheDocument(); // £50 * rate 2
@@ -109,6 +128,7 @@ describe("DashboardStatCards", () => {
         distanceUnit="mi"
         fuelEconomyUnit="mpg"
         isPro
+        {...yearDefaults}
       />
     );
     expect(screen.getByText("£20.00")).toBeInTheDocument();
@@ -136,6 +156,7 @@ describe("DashboardStatCards", () => {
           rates={null}
           distanceUnit="mi"
           fuelEconomyUnit="mpg"
+          {...yearDefaults}
         />
       </ChartFilterProvider>
     );
@@ -143,7 +164,7 @@ describe("DashboardStatCards", () => {
     expect(screen.queryByText("£550.00")).not.toBeInTheDocument();
   });
 
-  it("locks Actual economy and Per mile behind Premium when isPro is false, while Total spend stays real", () => {
+  it("locks Actual economy and Per mile behind Premium when isPro is false, while Total spend and Current miles stay real", () => {
     render(
       <DashboardStatCards
         records={[{ date: "2026-01-01", cost: 100, mileage: 500 }]}
@@ -157,13 +178,17 @@ describe("DashboardStatCards", () => {
         rates={null}
         distanceUnit="mi"
         fuelEconomyUnit="mpg"
+        {...yearDefaults}
       />
     );
     expect(screen.getByText("Total spend")).toBeInTheDocument();
     expect(screen.getByText("£100.00")).toBeInTheDocument();
     expect(screen.getByText("Actual economy")).toBeInTheDocument();
     expect(screen.getByText("Per mile")).toBeInTheDocument();
-    expect(screen.getAllByText("Premium")).toHaveLength(2);
+    expect(screen.getByText("Current miles")).toBeInTheDocument();
+    expect(screen.getByText("1,000")).toBeInTheDocument();
+    // Actual economy, Per mile, Spend this year - 3 locked cards.
+    expect(screen.getAllByText("Premium")).toHaveLength(3);
     // Real computed values must not leak out from behind the lock.
     expect(screen.queryByText("-")).not.toBeInTheDocument();
   });
@@ -182,8 +207,236 @@ describe("DashboardStatCards", () => {
         rates={null}
         distanceUnit="mi"
         fuelEconomyUnit="mpg"
+        {...yearDefaults}
       />
     );
-    expect(screen.getAllByText("Premium")).toHaveLength(2);
+    expect(screen.getAllByText("Premium")).toHaveLength(3);
+  });
+
+  it("shows Current miles unlocked and Spend this year unlocked-but-Premium-gated even when isPro is false", () => {
+    render(
+      <DashboardStatCards
+        records={[]}
+        mods={[]}
+        labour={[]}
+        bills={[]}
+        fuelLogs={[]}
+        currentMileage={12345}
+        startingMileage={0}
+        currency="GBP"
+        rates={null}
+        distanceUnit="mi"
+        fuelEconomyUnit="mpg"
+        {...yearDefaults}
+      />
+    );
+    expect(screen.getByText("Current miles")).toBeInTheDocument();
+    expect(screen.getByText("12,345")).toBeInTheDocument();
+    expect(screen.getByText("Spend this year")).toBeInTheDocument();
+  });
+
+  it("shows the real year-to-date spend for 'Spend this year' when isPro", () => {
+    render(
+      <DashboardStatCards
+        records={[]}
+        mods={[]}
+        labour={[]}
+        bills={[]}
+        fuelLogs={[]}
+        currentMileage={0}
+        startingMileage={0}
+        currency="GBP"
+        rates={null}
+        distanceUnit="mi"
+        fuelEconomyUnit="mpg"
+        isPro
+        currentYear={2026}
+        yearSpend={840}
+        yearEndProjection={null}
+      />
+    );
+    expect(screen.getByText("Spend this year")).toBeInTheDocument();
+    expect(screen.getByText("£840.00")).toBeInTheDocument();
+  });
+
+  // Forecast mode - Total spend/Per mile/Current miles swap to their
+  // projected figures once there's a precomputed number for the
+  // currently selected window; Spend this year swaps independently,
+  // keyed off yearEndProjection rather than forecastWindow (see
+  // DashboardStatCards.tsx's own comment on why).
+  describe("forecast mode", () => {
+    const spendForecastByWindow = { "1w": 5, "1m": 20, "6m": 300, "1y": 600 } as const;
+    // This card only reads the LAST point of each window's mileage
+    // trend (mileage at the end of the window) - a single-point array
+    // per window is enough to exercise that, without needing the real
+    // engine's full multi-point shape.
+    const mileageForecastByWindow = {
+      "1w": [{ month: "Next week", total: 1050 }],
+      "1m": [{ month: "Next month", total: 1200 }],
+      "6m": [{ month: "Nov 26", total: 1600 }],
+      "1y": [{ month: "May 27", total: 2000 }],
+    };
+
+    it("swaps Total spend, Per mile, and Current miles to their projected figures for the active window", async () => {
+      const user = userEvent.setup();
+      render(
+        <ChartFilterProvider>
+          <ForecastControls />
+          <DashboardStatCards
+            records={[]}
+            mods={[]}
+            labour={[]}
+            bills={[]}
+            fuelLogs={[]}
+            currentMileage={1000}
+            startingMileage={0}
+            currency="GBP"
+            rates={null}
+            distanceUnit="mi"
+            fuelEconomyUnit="mpg"
+            isPro
+            {...yearDefaults}
+            spendForecastByWindow={spendForecastByWindow}
+            mileageForecastByWindow={mileageForecastByWindow}
+          />
+        </ChartFilterProvider>
+      );
+
+      await user.click(screen.getByRole("button", { name: "enable forecast" }));
+
+      // Default window is 6m: spend £300, mileage 1600.
+      expect(screen.getByText("Projected spend")).toBeInTheDocument();
+      expect(screen.getByText("£300.00")).toBeInTheDocument();
+      expect(screen.getByText("Projected miles")).toBeInTheDocument();
+      expect(screen.getByText("1,600")).toBeInTheDocument();
+      // £300 spent over 600 projected extra miles (1600 - 1000) = 50p/mile.
+      expect(screen.getByText("Projected per mile")).toBeInTheDocument();
+      expect(screen.getByText("50.0p")).toBeInTheDocument();
+    });
+
+    it("switching the forecast window swaps in that window's own precomputed figures", async () => {
+      const user = userEvent.setup();
+      render(
+        <ChartFilterProvider>
+          <ForecastControls />
+          <DashboardStatCards
+            records={[]}
+            mods={[]}
+            labour={[]}
+            bills={[]}
+            fuelLogs={[]}
+            currentMileage={1000}
+            startingMileage={0}
+            currency="GBP"
+            rates={null}
+            distanceUnit="mi"
+            fuelEconomyUnit="mpg"
+            isPro
+            {...yearDefaults}
+            spendForecastByWindow={spendForecastByWindow}
+            mileageForecastByWindow={mileageForecastByWindow}
+          />
+        </ChartFilterProvider>
+      );
+
+      await user.click(screen.getByRole("button", { name: "enable forecast" }));
+      await user.click(screen.getByRole("button", { name: "window 1y" }));
+
+      expect(screen.getByText("£600.00")).toBeInTheDocument();
+      expect(screen.getByText("2,000")).toBeInTheDocument();
+    });
+
+    it("shows real, not projected, figures when Forecast mode is on but no forecast data was ever wired up", async () => {
+      const user = userEvent.setup();
+      render(
+        <ChartFilterProvider>
+          <ForecastControls />
+          <DashboardStatCards
+            records={[{ date: "2026-01-01", cost: 100, mileage: 500 }]}
+            mods={[]}
+            labour={[]}
+            bills={[]}
+            fuelLogs={[]}
+            currentMileage={1000}
+            startingMileage={0}
+            currency="GBP"
+            rates={null}
+            distanceUnit="mi"
+            fuelEconomyUnit="mpg"
+            isPro
+            {...yearDefaults}
+          />
+        </ChartFilterProvider>
+      );
+
+      await user.click(screen.getByRole("button", { name: "enable forecast" }));
+
+      expect(screen.getByText("Total spend")).toBeInTheDocument();
+      expect(screen.getByText("£100.00")).toBeInTheDocument();
+      expect(screen.getByText("Current miles")).toBeInTheDocument();
+    });
+
+    it("swaps 'Spend this year' to the year-end projection once Forecast mode is on and there is one, independent of forecastWindow", async () => {
+      const user = userEvent.setup();
+      render(
+        <ChartFilterProvider>
+          <ForecastControls />
+          <DashboardStatCards
+            records={[]}
+            mods={[]}
+            labour={[]}
+            bills={[]}
+            fuelLogs={[]}
+            currentMileage={0}
+            startingMileage={0}
+            currency="GBP"
+            rates={null}
+            distanceUnit="mi"
+            fuelEconomyUnit="mpg"
+            isPro
+            currentYear={2026}
+            yearSpend={400}
+            yearEndProjection={{ projected: 1200, daysElapsed: 100 }}
+          />
+        </ChartFilterProvider>
+      );
+
+      await user.click(screen.getByRole("button", { name: "enable forecast" }));
+
+      expect(screen.getByText("Projected for 2026")).toBeInTheDocument();
+      expect(screen.getByText("£1200.00")).toBeInTheDocument();
+      expect(screen.queryByText("£400.00")).not.toBeInTheDocument();
+    });
+
+    it("keeps showing the real year-to-date spend in Forecast mode when there's no year-end projection yet", async () => {
+      const user = userEvent.setup();
+      render(
+        <ChartFilterProvider>
+          <ForecastControls />
+          <DashboardStatCards
+            records={[]}
+            mods={[]}
+            labour={[]}
+            bills={[]}
+            fuelLogs={[]}
+            currentMileage={0}
+            startingMileage={0}
+            currency="GBP"
+            rates={null}
+            distanceUnit="mi"
+            fuelEconomyUnit="mpg"
+            isPro
+            currentYear={2026}
+            yearSpend={400}
+            yearEndProjection={null}
+          />
+        </ChartFilterProvider>
+      );
+
+      await user.click(screen.getByRole("button", { name: "enable forecast" }));
+
+      expect(screen.getByText("Spend this year")).toBeInTheDocument();
+      expect(screen.getByText("£400.00")).toBeInTheDocument();
+    });
   });
 });

@@ -310,7 +310,12 @@
 .statCardIconNeutral { background: var(--line-soft); color: var(--ink-soft); }
 .statCardIconGreen { background: var(--green-tint); color: var(--green); }
 .statCardIconAmber { background: var(--amber-tint); color: var(--amber-dark); }
+/* Same blue every other forecast element uses - swapped in on a stat
+   card's icon (and value, below) whenever Forecast mode is showing a
+   projected figure instead of the card's normal real-data one. */
+.statCardIconForecast { background: var(--blue-tint); color: var(--blue); }
 .statCardValue { font-family: var(--font-display); font-size: 1.4rem; color: var(--asphalt); line-height: 1.1; }
+.statCardValueForecast { color: var(--blue); }
 .statCardLabel { font-family: var(--font-mono); font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.03em; color: var(--ink-soft); margin-top: 0.3rem; }
 
 .statCardLocked {
@@ -617,8 +622,10 @@
 .forecastToggleBtn { font-family: var(--font-mono); font-size: 0.72rem; font-weight: 600; padding: 0.3rem 0.7rem; border: 1px solid var(--border); border-radius: 20px; background: #fff; cursor: pointer; color: var(--ink-soft); }
 .forecastToggleBtnActive { background: var(--blue); color: #fff; border-color: var(--blue); }
 .forecastToggleBtn:hover:not(.forecastToggleBtnActive) { border-color: var(--blue); color: var(--blue); }
-.forecastWindowTabs { display: flex; gap: 0.3rem; }
-.forecastWindowTab { font-family: var(--font-mono); font-size: 0.7rem; padding: 0.25rem 0.5rem; border: 1px solid var(--blue-tint); border-radius: 20px; background: var(--blue-tint); cursor: pointer; color: var(--blue); }
+/* Reused as the active-pill modifier on a plain .rangeTab when it's
+   showing a Forecast window (see ChartFilterBar.tsx) - same pill shape
+   as a real Range tab, but blue instead of asphalt so it still reads as
+   "Forecast", not just another selected filter. */
 .forecastWindowTabActive { background: var(--blue); color: #fff; border-color: var(--blue); }
 
 /* The on-chart signal that a given chart is currently showing a

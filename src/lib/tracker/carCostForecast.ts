@@ -1,102 +1,53 @@
 // Place at: src/lib/tracker/carCostForecast.ts
 // Car equivalent of costForecast.ts - see that file's own comment for
-// the full reasoning behind the three forecasting methods. Mirrored,
-// not shared, same sister-schema convention as every other bike/car pair
-// in this app. BILL_REMINDER_DEFAULTS is reused directly from
-// billTypes.ts, not duplicated - "insurance"/"road-tax"/"mot-test" are
-// shared, generic bill-type keys used by both vehicle kinds alike (see
-// CAR_BILL_LABELS extending BILL_LABELS in carBillTypes.ts), there's
-// never been a car-specific version of this one constant.
+// the full reasoning behind the three forecasting methods and the
+// window model (1w/1m/6m/1y). The vehicle-specific logic here (servicing
+// due-items, bills lumps, and the composer types) is mirrored, not
+// shared, same sister-schema convention as every other bike/car pair in
+// this app. The generic date/bucket helpers (futureMonthKeys through
+// mergePointsIntoBuckets, buildAverageForecast, window constants) are
+// genuinely vehicle-agnostic, though - they're imported directly from
+// costForecast.ts rather than duplicated, so the two engines can never
+// drift apart on how a window's due-date cutoff or bucket keys work.
+// BILL_REMINDER_DEFAULTS is likewise reused directly from billTypes.ts,
+// not duplicated - "insurance"/"road-tax"/"mot-test" are shared, generic
+// bill-type keys used by both vehicle kinds alike (see CAR_BILL_LABELS
+// extending BILL_LABELS in carBillTypes.ts), there's never been a
+// car-specific version of this one constant.
 import { CAR_JOB_REMINDER_DEFAULTS, CAR_JOB_LABELS, isBenchmarkedCarJob } from "./carJobTypes";
 import { getCarBenchmark, type CarBenchmarkClass } from "@/lib/carPriceData";
 import { BILL_REMINDER_DEFAULTS } from "./billTypes";
 import { computeCarTriggerDueValue } from "./carReminderStatus";
 import { projectFutureMileage, type BikeLifetime, type MileagePoint } from "./mileageEstimate";
-import { monthKey, monthLabel } from "./summary";
 import type { CarReminderDoc, CarReminderTrigger } from "./carReminder";
 import type { CarServiceRecordDoc } from "./carServiceRecord";
 import type { CarModDoc } from "./carMod";
 import type { CarBillDoc } from "./carBill";
 import type { CarLabourDoc } from "./carLabour";
-import { type ForecastWindow, FORECAST_WINDOW_MONTHS, type ForecastMonthPoint, type CategoryForecast } from "./costForecast";
+import {
+  type ForecastWindow,
+  type ForecastMonthPoint,
+  type CategoryForecast,
+  forecastWindowEndDate,
+  ownAverageByKey,
+  addToMonth,
+  bucketKeyForDate,
+  pointsFromBuckets,
+  mergePointsIntoBuckets,
+  buildAverageForecast,
+} from "./costForecast";
 
 export type { ForecastWindow, ForecastMonthPoint, CategoryForecast };
-export { FORECAST_WINDOW_MONTHS, FORECAST_WINDOW_LABELS, pickCategoryForecast } from "./costForecast";
-
-function futureMonthKeys(windowMonths: number): string[] {
-  const now = new Date();
-  const keys: string[] = [];
-  for (let i = 1; i <= windowMonths; i++) {
-    const d = new Date(now.getFullYear(), now.getMonth() + i, 1);
-    keys.push(monthKey(d.toISOString()));
-  }
-  return keys;
-}
-
-function emptyPoints(windowMonths: number): ForecastMonthPoint[] {
-  return futureMonthKeys(windowMonths).map((k) => ({ month: monthLabel(k), total: 0 }));
-}
-
-function averageDailyRate(items: { date: string; cost: number }[], lookbackMonths: number): number {
-  const cutoff = new Date();
-  cutoff.setMonth(cutoff.getMonth() - lookbackMonths);
-  const inWindow = items.filter((i) => new Date(i.date) >= cutoff);
-  if (inWindow.length === 0) return 0;
-  const total = inWindow.reduce((sum, i) => sum + i.cost, 0);
-  const oldestDate = inWindow.reduce((min, i) => (new Date(i.date) < min ? new Date(i.date) : min), new Date());
-  const daysSpanned = Math.max(1, (Date.now() - oldestDate.getTime()) / 86400000);
-  return total / daysSpanned;
-}
-
-function formatGbp(n: number): string {
-  return `£${n.toLocaleString("en-GB")}`;
-}
-
-function buildAverageForecast(
-  items: { date: string; cost: number }[],
-  windowMonths: number,
-  categoryLabel: string
-): CategoryForecast {
-  const ratePerDay = averageDailyRate(items, windowMonths);
-  if (ratePerDay === 0) {
-    return { points: emptyPoints(windowMonths), basis: `No ${categoryLabel.toLowerCase()} spend logged yet to base an estimate on.` };
-  }
-  const daysPerMonth = 30.44;
-  const monthlyAmount = ratePerDay * daysPerMonth;
-  const points = futureMonthKeys(windowMonths).map((k) => ({ month: monthLabel(k), total: Math.round(monthlyAmount) }));
-  const monthlyRounded = Math.round(monthlyAmount);
-  return {
-    points,
-    basis: `A steady ${formatGbp(monthlyRounded)}/month, based on your average ${categoryLabel.toLowerCase()} spend over the last ${windowMonths} month${windowMonths === 1 ? "" : "s"}.`,
-  };
-}
-
-function ownAverageByKey<T extends { cost: number }>(items: T[], keyFn: (item: T) => string): Map<string, number> {
-  const sums = new Map<string, { total: number; count: number }>();
-  for (const item of items) {
-    const key = keyFn(item);
-    const entry = sums.get(key) ?? { total: 0, count: 0 };
-    entry.total += item.cost;
-    entry.count += 1;
-    sums.set(key, entry);
-  }
-  const averages = new Map<string, number>();
-  for (const [key, { total, count }] of sums) averages.set(key, total / count);
-  return averages;
-}
-
-function addToMonth(buckets: Map<string, number>, monthKeyStr: string, amount: number) {
-  buckets.set(monthKeyStr, (buckets.get(monthKeyStr) ?? 0) + amount);
-}
-
-// See costForecast.ts's own bucketKeyForDate for why this clamp exists -
-// a due date can legitimately fall later in the CURRENT calendar month,
-// which futureMonthKeys never enumerates on its own.
-function bucketKeyForDate(date: Date, windowMonths: number): string {
-  const key = monthKey(date.toISOString());
-  const validKeys = futureMonthKeys(windowMonths);
-  return validKeys.includes(key) ? key : validKeys[0];
-}
+export {
+  FORECAST_WINDOW_OPTIONS,
+  FORECAST_WINDOW_MONTHS,
+  FORECAST_WINDOW_LABELS,
+  FORECAST_WINDOW_DAYS,
+  ALL_FORECAST_WINDOWS,
+  pickCategoryForecast,
+  totalForecastSpend,
+} from "./costForecast";
+import { ALL_FORECAST_WINDOWS } from "./costForecast";
 
 interface DueItem {
   jobType: string;
@@ -133,9 +84,7 @@ export function buildCarServicingForecast(input: {
   carClass: CarBenchmarkClass;
   window: ForecastWindow;
 }): CategoryForecast {
-  const windowMonths = FORECAST_WINDOW_MONTHS[input.window];
-  const windowEnd = new Date();
-  windowEnd.setMonth(windowEnd.getMonth() + windowMonths);
+  const windowEnd = forecastWindowEndDate(input.window);
 
   const ownAverages = ownAverageByKey(input.records, (r) => r.jobType);
   const dueItems: DueItem[] = [];
@@ -179,7 +128,7 @@ export function buildCarServicingForecast(input: {
   const pricedLabels: string[] = [];
   let unpricedCount = 0;
   for (const item of dueItems) {
-    const key = bucketKeyForDate(item.dueDate, windowMonths);
+    const key = bucketKeyForDate(item.dueDate, input.window);
     const ownAverage = ownAverages.get(item.jobType);
     const cost =
       ownAverage ??
@@ -194,7 +143,7 @@ export function buildCarServicingForecast(input: {
     pricedLabels.push(CAR_JOB_LABELS[item.jobType] ?? item.jobType);
   }
 
-  const points = futureMonthKeys(windowMonths).map((k) => ({ month: monthLabel(k), total: Math.round(buckets.get(k) ?? 0) }));
+  const points = pointsFromBuckets(buckets, input.window);
   const basis =
     pricedLabels.length === 0 && unpricedCount === 0
       ? "Nothing due yet, based on your reminders and usual service intervals for this window."
@@ -207,19 +156,17 @@ export function buildCarServicingForecast(input: {
 }
 
 export function buildCarModsForecast(mods: CarModDoc[], window: ForecastWindow): CategoryForecast {
-  return buildAverageForecast(mods, FORECAST_WINDOW_MONTHS[window], "Parts & accessories");
+  return buildAverageForecast(mods, window, "Parts & accessories");
 }
 
 export function buildCarLabourForecast(labour: CarLabourDoc[], window: ForecastWindow): CategoryForecast {
-  return buildAverageForecast(labour, FORECAST_WINDOW_MONTHS[window], "Labour");
+  return buildAverageForecast(labour, window, "Labour");
 }
 
 const KNOWN_DATE_BILL_TYPES = new Set(["road-tax", "insurance", "mot-test"]);
 
 export function buildCarBillsForecast(input: { bills: CarBillDoc[]; reminders: CarReminderDoc[]; window: ForecastWindow }): CategoryForecast {
-  const windowMonths = FORECAST_WINDOW_MONTHS[input.window];
-  const windowEnd = new Date();
-  windowEnd.setMonth(windowEnd.getMonth() + windowMonths);
+  const windowEnd = forecastWindowEndDate(input.window);
   const buckets = new Map<string, number>();
   const lumpLabels: string[] = [];
 
@@ -233,19 +180,16 @@ export function buildCarBillsForecast(input: { bills: CarBillDoc[]; reminders: C
     const due = new Date(latest.date);
     due.setMonth(due.getMonth() + def.value);
     if (due <= windowEnd && due >= new Date()) {
-      addToMonth(buckets, bucketKeyForDate(due, windowMonths), latest.cost);
+      addToMonth(buckets, bucketKeyForDate(due, input.window), latest.cost);
       lumpLabels.push(billType);
     }
   }
 
   const baselineItems = input.bills.filter((b) => !(KNOWN_DATE_BILL_TYPES.has(b.billType) && lumpLabels.includes(b.billType)));
-  const baseline = buildAverageForecast(baselineItems, windowMonths, "other bills");
-  baseline.points.forEach((p, i) => {
-    const key = futureMonthKeys(windowMonths)[i];
-    addToMonth(buckets, key, p.total);
-  });
+  const baseline = buildAverageForecast(baselineItems, input.window, "other bills");
+  mergePointsIntoBuckets(buckets, baseline.points, input.window);
 
-  const points = futureMonthKeys(windowMonths).map((k) => ({ month: monthLabel(k), total: Math.round(buckets.get(k) ?? 0) }));
+  const points = pointsFromBuckets(buckets, input.window);
   const basisParts: string[] = [];
   if (lumpLabels.length > 0) basisParts.push(`known renewals (${lumpLabels.join(", ")}) at last year's cost`);
   if (baseline.points.some((p) => p.total > 0)) basisParts.push("a steady average for everything else");
@@ -280,10 +224,8 @@ export function buildCarCostForecast(input: {
   };
 }
 
-const ALL_FORECAST_WINDOWS: ForecastWindow[] = ["3m", "6m", "1y"];
-
 // See buildBikeCostForecastAllWindows's own comment in costForecast.ts
-// for why this computes all three windows up front rather than one.
+// for why this computes every window up front rather than one.
 export function buildCarCostForecastAllWindows(
   input: Omit<Parameters<typeof buildCarCostForecast>[0], "window">
 ): Record<ForecastWindow, CarCostForecast> {

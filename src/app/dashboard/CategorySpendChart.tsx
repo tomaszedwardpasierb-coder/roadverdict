@@ -9,7 +9,7 @@ import { convertGbpToDisplay, CURRENCY_SYMBOLS, type Currency, type ExchangeRate
 import { convertMilesToDisplay, distanceUnitLabel, type DistanceUnit } from '@/lib/tracker/unitFormat';
 import { useChartTypePreference } from './useChartTypePreference';
 import { ChartTypeToggle } from './ChartTypeToggle';
-import { barGradient, BAR_BORDER_RADIUS, lineAreaGradient, lastPointRadius, lastPointRing, lastPointRingWidth, dashedValueAxis, plainCategoryAxis } from './chartStyle';
+import { barGradient, BAR_BORDER_RADIUS, lineAreaGradient, lastPointRadius, lastPointRing, lastPointRingWidth, dashedValueAxis, plainCategoryAxis, FORECAST_COLOR } from './chartStyle';
 import { useChartFilter } from './ChartFilterContext';
 import { useTabSwitch, viewRecords, type ReviewCategory } from './TabSwitchContext';
 import type { CategoryForecast, ForecastWindow } from '@/lib/tracker/costForecast';
@@ -133,12 +133,6 @@ export function CategorySpendChart({
     if (target) target.style.cursor = elements.length > 0 ? 'pointer' : 'default';
   }
 
-  // One fixed colour for every forecast segment/bar, on every chart,
-  // regardless of that chart's own category colour - so "blue and
-  // dashed" reads as "this is a projection" everywhere in the app the
-  // same way, not just on this one chart. Matches --blue in globals.css;
-  // Chart.js options can't read CSS custom properties directly.
-  const FORECAST_COLOR = '#4A5FBF';
   const isForecastSegment = (p0DataIndex: number) => showingForecast && p0DataIndex >= pastCount - 1;
   const isForecastIndex = (dataIndex: number) => showingForecast && dataIndex >= pastCount;
   // "Today" - the last real, already-logged point - gets the same

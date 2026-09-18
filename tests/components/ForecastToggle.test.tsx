@@ -3,7 +3,10 @@
 // A real ChartFilterContext producer/consumer, same pattern as
 // ChartFilterBar.test.tsx - renders inside a real ChartFilterProvider and
 // checks that clicking a button both updates the active styling and the
-// shared context state a sibling (CategorySpendChart) would see.
+// shared context state a sibling (CategorySpendChart) would see. Just
+// the Past/Forecast switch itself - the window selector (Next
+// week/month/6 months/year) now lives in ChartFilterBar.tsx, reusing the
+// real Range bar's own component pattern, and is tested there.
 import { describe, expect, it } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -12,12 +15,12 @@ import { ChartFilterProvider, useChartFilter } from "@/app/dashboard/ChartFilter
 import styles from "@/app/dashboard/dashboard.module.css";
 
 function ForecastObserver() {
-  const { forecastMode, forecastWindow } = useChartFilter();
-  return <span>state:{String(forecastMode)}/{forecastWindow}</span>;
+  const { forecastMode } = useChartFilter();
+  return <span>state:{String(forecastMode)}</span>;
 }
 
 describe("ForecastToggle", () => {
-  it("defaults to Past active, with no window selector shown", () => {
+  it("defaults to Past active", () => {
     render(
       <ChartFilterProvider>
         <ForecastToggle />
@@ -25,10 +28,9 @@ describe("ForecastToggle", () => {
     );
     expect(screen.getByRole("button", { name: "Past" })).toHaveClass(styles.forecastToggleBtnActive);
     expect(screen.getByRole("button", { name: "Forecast" })).not.toHaveClass(styles.forecastToggleBtnActive);
-    expect(screen.queryByRole("button", { name: "6 months" })).not.toBeInTheDocument();
   });
 
-  it("clicking Forecast switches the shared context into forecast mode and reveals the window selector, defaulting to 6 months", async () => {
+  it("clicking Forecast switches the shared context into forecast mode", async () => {
     const user = userEvent.setup();
     render(
       <ChartFilterProvider>
@@ -39,12 +41,12 @@ describe("ForecastToggle", () => {
 
     await user.click(screen.getByRole("button", { name: "Forecast" }));
 
-    expect(screen.getByText("state:true/6m")).toBeInTheDocument();
+    expect(screen.getByText("state:true")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Forecast" })).toHaveClass(styles.forecastToggleBtnActive);
-    expect(screen.getByRole("button", { name: "6 months" })).toHaveClass(styles.forecastWindowTabActive);
+    expect(screen.getByRole("button", { name: "Past" })).not.toHaveClass(styles.forecastToggleBtnActive);
   });
 
-  it("clicking a window option updates the shared context independently of the Past/Forecast toggle", async () => {
+  it("clicking back to Past switches the shared context back", async () => {
     const user = userEvent.setup();
     render(
       <ChartFilterProvider>
@@ -54,25 +56,8 @@ describe("ForecastToggle", () => {
     );
 
     await user.click(screen.getByRole("button", { name: "Forecast" }));
-    await user.click(screen.getByRole("button", { name: "1 year" }));
-
-    expect(screen.getByText("state:true/1y")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "1 year" })).toHaveClass(styles.forecastWindowTabActive);
-    expect(screen.getByRole("button", { name: "6 months" })).not.toHaveClass(styles.forecastWindowTabActive);
-  });
-
-  it("clicking back to Past hides the window selector again", async () => {
-    const user = userEvent.setup();
-    render(
-      <ChartFilterProvider>
-        <ForecastToggle />
-      </ChartFilterProvider>
-    );
-
-    await user.click(screen.getByRole("button", { name: "Forecast" }));
-    expect(screen.getByRole("button", { name: "6 months" })).toBeInTheDocument();
-
     await user.click(screen.getByRole("button", { name: "Past" }));
-    expect(screen.queryByRole("button", { name: "6 months" })).not.toBeInTheDocument();
+
+    expect(screen.getByText("state:false")).toBeInTheDocument();
   });
 });

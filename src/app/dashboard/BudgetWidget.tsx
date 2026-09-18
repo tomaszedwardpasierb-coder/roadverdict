@@ -5,6 +5,8 @@ import { useState } from 'react';
 import { useTrackerFormSubmit } from './useTrackerFormSubmit';
 import { convertGbpToDisplay, convertDisplayToGbp, formatCurrency, CURRENCY_SYMBOLS, type Currency, type ExchangeRates } from '@/lib/tracker/currency';
 import type { YearEndProjection } from '@/lib/tracker/summary';
+import { useChartFilter } from './ChartFilterContext';
+import { FORECAST_WINDOW_LABELS, FORECAST_WINDOW_DAYS, type ForecastWindow } from '@/lib/tracker/costForecast';
 import { VehicleSpinner } from '@/components/VehicleSpinner';
 import styles from './dashboard.module.css';
 
@@ -20,18 +22,24 @@ interface Props {
   // otherwise identical UI.
   vehicleKind?: 'bike' | 'car';
   // null whenever there isn't enough of the year elapsed yet to trust a
-  // projection (see summary.ts's projectYearEndSpend) - shown regardless
-  // of whether the reactive over/under-so-far status below is already
-  // "over", since the whole point is catching it BEFORE that happens.
+  // projection (see summary.ts's projectYearEndSpend) - only used in the
+  // real (non-Forecast) view below; Forecast mode has its own, genuinely
+  // forward-looking comparison instead (see spendForecastByWindow).
   yearEndProjection?: YearEndProjection | null;
+  // Same precomputed-per-window bundle DashboardStatCards' own
+  // "Projected spend" card uses (see costForecast.ts's
+  // totalForecastSpend) - what "Future budget" compares the prorated
+  // target against.
+  spendForecastByWindow?: Record<ForecastWindow, number>;
 }
 
-export function BudgetWidget({ yearSpend, currentYear, initialBudget, currency, rates, vehicleKind = 'bike', yearEndProjection }: Props) {
+export function BudgetWidget({ yearSpend, currentYear, initialBudget, currency, rates, vehicleKind = 'bike', yearEndProjection, spendForecastByWindow }: Props) {
   const [editing, setEditing] = useState(!initialBudget);
   const [amountDisplay, setAmountDisplay] = useState(
     initialBudget ? convertGbpToDisplay(initialBudget, currency, rates).toFixed(2) : ''
   );
   const { submit, submitting, error } = useTrackerFormSubmit(vehicleKind === 'car' ? '/api/cars/car' : '/api/tracker/bike');
+  const { forecastMode, forecastWindow } = useChartFilter();
 
   const symbol = CURRENCY_SYMBOLS[currency];
 
@@ -72,36 +80,64 @@ export function BudgetWidget({ yearSpend, currentYear, initialBudget, currency, 
   }
 
   const budget = initialBudget ?? 0;
-  const pct = Math.min(100, (yearSpend / budget) * 100);
-  const status = yearSpend >= budget ? 'over' : yearSpend >= budget * 0.8 ? 'warning' : 'ok';
+
+  // "Future budget" - the same annual figure, prorated down to however
+  // much of it is "allowed" for the selected window, so the number means
+  // something at a glance regardless of which window is picked ("am I on
+  // pace") rather than always showing the full annual figure next to a
+  // much smaller window total. "1y" is the literal full annual amount,
+  // not (budget/365)*365 - stated separately so it's never off by a
+  // rounding cent from the real figure the person actually typed in.
+  const windowLabel = FORECAST_WINDOW_LABELS[forecastWindow];
+  const proratedBudget = forecastWindow === '1y' ? budget : Math.round((budget / 365) * FORECAST_WINDOW_DAYS[forecastWindow]);
+  const projectedSpendForWindow = spendForecastByWindow?.[forecastWindow] ?? 0;
+
+  const displayBudget = forecastMode ? proratedBudget : budget;
+  const displaySpend = forecastMode ? projectedSpendForWindow : yearSpend;
+  const pct = displayBudget > 0 ? Math.min(100, (displaySpend / displayBudget) * 100) : 0;
+  const status = displaySpend >= displayBudget ? 'over' : displaySpend >= displayBudget * 0.8 ? 'warning' : 'ok';
   const statusClass = status === 'over' ? styles.budgetCardOver : status === 'warning' ? styles.budgetCardWarning : '';
   const fillClass =
     status === 'over' ? styles.budgetBarFillOver : status === 'warning' ? styles.budgetBarFillWarning : styles.budgetBarFillOk;
-  const statusText =
-    status === 'over'
-      ? `⚠️ Over budget by ${formatCurrency(yearSpend - budget, currency, rates)}`
+  const statusText = forecastMode
+    ? status === 'over'
+      ? `⚠️ Projected to go ${formatCurrency(displaySpend - displayBudget, currency, rates)} over your budget for the ${windowLabel.toLowerCase()}`
       : status === 'warning'
-      ? `Approaching your budget for ${currentYear}`
-      : `On track for ${currentYear}`;
+      ? `Approaching your budget for the ${windowLabel.toLowerCase()}`
+      : `On track for the ${windowLabel.toLowerCase()}`
+    : status === 'over'
+    ? `⚠️ Over budget by ${formatCurrency(displaySpend - displayBudget, currency, rates)}`
+    : status === 'warning'
+    ? `Approaching your budget for ${currentYear}`
+    : `On track for ${currentYear}`;
 
   // Forward-looking, unlike statusText above (which only ever reports
   // what's already happened) - this is the whole reason it's a separate
   // line rather than folded into statusText: it can say something useful
   // even while status is still "ok", which is exactly when catching a
-  // coming overspend is actually still useful.
-  const projectionText = (() => {
-    if (!yearEndProjection) return null;
-    const diff = budget - yearEndProjection.projected;
-    return diff >= 0
-      ? `At this rate, you'll finish ${currentYear} about ${formatCurrency(diff, currency, rates)} under budget.`
-      : `At this rate, you'll go about ${formatCurrency(Math.abs(diff), currency, rates)} over budget by the end of ${currentYear}.`;
-  })();
+  // coming overspend is actually still useful. Only shown in the real
+  // (non-Forecast) view - Future budget above is already the forward-
+  // looking figure, so this sentence would be redundant (or worse,
+  // conflicting - it's a full-year projection, not scoped to whichever
+  // window is currently selected) once Forecast mode is on.
+  const projectionText = forecastMode
+    ? null
+    : (() => {
+        if (!yearEndProjection) return null;
+        const diff = budget - yearEndProjection.projected;
+        return diff >= 0
+          ? `At this rate, you'll finish ${currentYear} about ${formatCurrency(diff, currency, rates)} under budget.`
+          : `At this rate, you'll go about ${formatCurrency(Math.abs(diff), currency, rates)} over budget by the end of ${currentYear}.`;
+      })();
 
   return (
     <div className={`${styles.budgetCard} ${statusClass}`}>
-      <div className={styles.budgetCardTitle}>Annual budget ({currentYear})</div>
+      <div className={styles.budgetCardTitle} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+        {forecastMode ? `Future budget (${windowLabel})` : `Annual budget (${currentYear})`}
+        {forecastMode && <span className={styles.forecastBadge}>Estimate</span>}
+      </div>
       <div className={styles.budgetCardAmounts}>
-        {formatCurrency(yearSpend, currency, rates)} of {formatCurrency(budget, currency, rates)}
+        {formatCurrency(displaySpend, currency, rates)} of {formatCurrency(displayBudget, currency, rates)}
       </div>
       <div className={styles.budgetBar}>
         <div className={`${styles.budgetBarFill} ${fillClass}`} style={{ width: `${pct}%` }} />

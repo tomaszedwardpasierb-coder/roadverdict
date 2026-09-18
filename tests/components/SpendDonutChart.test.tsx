@@ -21,12 +21,26 @@ vi.mock("react-chartjs-2", () => ({
 }));
 
 import { SpendDonutChart } from "@/app/dashboard/SpendDonutChart";
+import { ChartFilterProvider, useChartFilter } from "@/app/dashboard/ChartFilterContext";
+import type { ForecastWindow, ForecastCategoryTotals } from "@/lib/tracker/costForecast";
 
 const records = [{ date: "2024-01-01", cost: 100 }];
 const mods = [{ date: "2024-01-01", cost: 50 }];
 const fuelLogs = [{ date: "2024-01-01", cost: 30 }];
 const bills = [{ date: "2024-01-01", cost: 20 }];
 const labour = [{ date: "2024-01-01", cost: 10 }];
+
+function ForecastControls() {
+  const { setForecastMode } = useChartFilter();
+  return <button type="button" onClick={() => setForecastMode(true)}>enable forecast</button>;
+}
+
+const sampleForecast: Record<ForecastWindow, ForecastCategoryTotals> = {
+  "1w": { servicing: 1, mods: 1, fuel: 1, bills: 1, labour: 1 },
+  "1m": { servicing: 4, mods: 3, fuel: 2, bills: 1, labour: 0 },
+  "6m": { servicing: 200, mods: 40, fuel: 60, bills: 80, labour: 20 },
+  "1y": { servicing: 400, mods: 80, fuel: 120, bills: 160, labour: 40 },
+};
 
 describe("SpendDonutChart", () => {
   beforeEach(() => {
@@ -160,5 +174,60 @@ describe("SpendDonutChart", () => {
     const proProps = chartMocks.bar.mock.calls[0][0] as any;
     expect(proProps.options.scales.x.ticks.callback(100, 0)).toBe("Servicing & repairs");
     expect(proProps.options.scales.y.ticks.callback(50)).toBe("£50");
+  });
+
+  describe("forecast mode", () => {
+    it("shows the Estimate badge and swaps in the active window's predicted per-category totals, instead of the real filtered ones", async () => {
+      const user = userEvent.setup();
+      render(
+        <ChartFilterProvider>
+          <ForecastControls />
+          <SpendDonutChart records={records} mods={mods} fuelLogs={fuelLogs} bills={bills} labour={labour} currency="GBP" rates={null} isPro forecast={sampleForecast} />
+        </ChartFilterProvider>
+      );
+      expect(screen.queryByText("Estimate")).not.toBeInTheDocument();
+
+      await user.click(screen.getByRole("button", { name: "enable forecast" }));
+
+      expect(screen.getByText("Estimate")).toBeInTheDocument();
+      // Default window is 6m: servicing 200, mods 40, fuel 60, bills 80, labour 20 -> total 400.
+      const props = chartMocks.doughnut.mock.calls[chartMocks.doughnut.mock.calls.length - 1][0] as any;
+      expect(props.data.datasets[0].data).toEqual([200, 40, 60, 80, 20]);
+      expect(screen.getAllByText("£400").length).toBeGreaterThan(0);
+    });
+
+    it("shows the predicted-empty note, not the real-data one, when a window's forecast is entirely zero", async () => {
+      const user = userEvent.setup();
+      const zeroForecast: Record<ForecastWindow, ForecastCategoryTotals> = {
+        ...sampleForecast,
+        "6m": { servicing: 0, mods: 0, fuel: 0, bills: 0, labour: 0 },
+      };
+      render(
+        <ChartFilterProvider>
+          <ForecastControls />
+          <SpendDonutChart records={records} mods={mods} fuelLogs={fuelLogs} bills={bills} labour={labour} currency="GBP" rates={null} forecast={zeroForecast} />
+        </ChartFilterProvider>
+      );
+
+      await user.click(screen.getByRole("button", { name: "enable forecast" }));
+
+      expect(screen.getByText("Nothing predicted for this window yet.")).toBeInTheDocument();
+    });
+
+    it("behaves like the normal real-data view when forecast mode is on but no forecast prop was ever passed", async () => {
+      const user = userEvent.setup();
+      render(
+        <ChartFilterProvider>
+          <ForecastControls />
+          <SpendDonutChart records={records} mods={mods} fuelLogs={fuelLogs} bills={bills} labour={labour} currency="GBP" rates={null} isPro />
+        </ChartFilterProvider>
+      );
+
+      await user.click(screen.getByRole("button", { name: "enable forecast" }));
+
+      expect(screen.queryByText("Estimate")).not.toBeInTheDocument();
+      const props = chartMocks.doughnut.mock.calls[chartMocks.doughnut.mock.calls.length - 1][0] as any;
+      expect(props.data.datasets[0].data).toEqual([100, 50, 30, 20, 10]);
+    });
   });
 });

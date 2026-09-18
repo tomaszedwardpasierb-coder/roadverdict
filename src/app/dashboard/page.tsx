@@ -87,8 +87,19 @@ import { buildCarWalkAwayIssues } from "@/lib/tracker/carWalkAwayRisks";
 import { CarStorySoFarTab } from "./CarStorySoFarTab";
 import { ChartFilterProvider } from "./ChartFilterContext";
 import { ChartFilterBar } from "./ChartFilterBar";
-import { buildBikeCostForecastAllWindows, pickCategoryForecast } from "@/lib/tracker/costForecast";
+import {
+  buildBikeCostForecastAllWindows,
+  pickCategoryForecast,
+  totalForecastSpend,
+  buildCategoryTotalsForWindow,
+  projectMileageOverWindow,
+  ALL_FORECAST_WINDOWS,
+  type ForecastWindow,
+  type ForecastMonthPoint,
+  type ForecastCategoryTotals,
+} from "@/lib/tracker/costForecast";
 import { buildCarCostForecastAllWindows } from "@/lib/tracker/carCostForecast";
+import type { BikeLifetime } from "@/lib/tracker/mileageEstimate";
 import { DashboardStatCards } from "./DashboardStatCards";
 import { CustomFilterPanel } from "./CustomFilterPanel";
 import { ScanReceiptButton } from "./ScanReceiptButton";
@@ -160,6 +171,36 @@ function classFromEngineLitres(engineLitres: number): CarBenchmarkClass {
   if (engineLitres <= 1.2) return "small";
   if (engineLitres <= 2.0) return "medium";
   return "large";
+}
+
+// Feeds DashboardStatCards' "Projected spend"/"Projected miles" cards,
+// MileageChart's own forecast trend, BudgetWidget's "Future budget", and
+// SpendDonutChart's forecast ring - shared between the bike and car
+// render paths below since the maths is identical either way (both
+// forecast bundles have the same four named categories, both lifetimes
+// have the same shape). Computed for every window up front, same
+// "page.tsx can't read client-side forecastWindow at render time" reason
+// buildBikeCostForecastAllWindows itself exists for.
+function buildStatCardForecasts(
+  forecastByWindow: Record<ForecastWindow, Parameters<typeof totalForecastSpend>[0]>,
+  mileagePoints: Parameters<typeof projectMileageOverWindow>[1],
+  lifetime: BikeLifetime,
+  fuelLogs: Parameters<typeof buildCategoryTotalsForWindow>[1]
+): {
+  spendForecastByWindow: Record<ForecastWindow, number>;
+  mileageForecastByWindow: Record<ForecastWindow, ForecastMonthPoint[]>;
+  donutForecastByWindow: Record<ForecastWindow, ForecastCategoryTotals>;
+} {
+  const spendForecastByWindow = Object.fromEntries(
+    ALL_FORECAST_WINDOWS.map((w) => [w, totalForecastSpend(forecastByWindow[w])])
+  ) as Record<ForecastWindow, number>;
+  const mileageForecastByWindow = Object.fromEntries(
+    ALL_FORECAST_WINDOWS.map((w) => [w, projectMileageOverWindow(w, mileagePoints, lifetime)])
+  ) as Record<ForecastWindow, ForecastMonthPoint[]>;
+  const donutForecastByWindow = Object.fromEntries(
+    ALL_FORECAST_WINDOWS.map((w) => [w, buildCategoryTotalsForWindow(forecastByWindow[w], fuelLogs, w)])
+  ) as Record<ForecastWindow, ForecastCategoryTotals>;
+  return { spendForecastByWindow, mileageForecastByWindow, donutForecastByWindow };
 }
 
 export const dynamic = "force-dynamic";
@@ -346,17 +387,20 @@ export default async function DashboardPage(props: { searchParams: Promise<{ add
   // currently-selected one - see buildBikeCostForecastAllWindows's own
   // comment on why (page.tsx is a server component, forecastWindow is
   // client-side state it has no way to read at render time).
+  const bikeLifetime = { startingMileage: bike.startingMileage, currentMileage: bike.currentMileage, dateAdded: bike.dateAdded };
   const bikeForecastByWindow = buildBikeCostForecastAllWindows({
     records, mods, bills, labour, reminders,
     currentMileage: bike.currentMileage,
     mileagePoints,
-    bikeLifetime: { startingMileage: bike.startingMileage, currentMileage: bike.currentMileage, dateAdded: bike.dateAdded },
+    bikeLifetime,
     bikeClass: bike.bikeClass,
   });
+  const { spendForecastByWindow, mileageForecastByWindow, donutForecastByWindow } = buildStatCardForecasts(bikeForecastByWindow, mileagePoints, bikeLifetime, fuelLogs);
   const fuelCostPoints = fuelLogs.map((f) => ({ id: f.id, date: f.date, cost: f.cost, mileage: f.mileage }));
   const summary = computeSpendSummary(records, mods, fuelLogs, bills, labour);
   const currentYear = new Date().getFullYear();
   const yearSpend = computeYearSpend(records, mods, fuelLogs, bills, currentYear, labour);
+  const yearEndProjection = projectYearEndSpend(yearSpend, currentYear);
   const overBudget = bike.annualBudget != null && yearSpend >= bike.annualBudget;
 
   const recentActivity: RecentActivityItem[] = [
@@ -502,32 +546,19 @@ export default async function DashboardPage(props: { searchParams: Promise<{ add
           distanceUnit={distanceUnit}
           fuelEconomyUnit={fuelEconomyUnit}
           isPro={userIsPro}
+          currentYear={currentYear}
+          yearSpend={yearSpend}
+          yearEndProjection={yearEndProjection}
+          spendForecastByWindow={spendForecastByWindow}
+          mileageForecastByWindow={mileageForecastByWindow}
         />
-        <div className={styles.statCard}>
-          <div className={`${styles.statCardIcon} ${styles.statCardIconNeutral}`}>
-            <Icon name="currentMiles" size={16} />
-          </div>
-          <div className={styles.statCardValue}>{Math.round(convertMilesToDisplay(bike.currentMileage, distanceUnit)).toLocaleString()}</div>
-          <div className={styles.statCardLabel}>Current {distanceUnit === "km" ? "km" : "miles"}</div>
-        </div>
-        {userIsPro ? (
-          <div className={styles.statCard}>
-            <div className={`${styles.statCardIcon} ${styles.statCardIconNeutral}`}>
-              <Icon name="spendThisYear" size={16} />
-            </div>
-            <div className={styles.statCardValue}>{formatCurrency(yearSpend, currency, rates)}</div>
-            <div className={styles.statCardLabel}>Spend this year</div>
-          </div>
-        ) : (
-          <LockedStatCard icon="spendThisYear" iconClass={styles.statCardIconNeutral} label="Spend this year" />
-        )}
       </div>
 
       <div className={`${styles.dashboardTwoCol} ${styles.equalHeightRow}`}>
-        <BudgetWidget yearSpend={yearSpend} currentYear={currentYear} initialBudget={bike.annualBudget} currency={currency} rates={rates} yearEndProjection={projectYearEndSpend(yearSpend, currentYear)} />
+        <BudgetWidget yearSpend={yearSpend} currentYear={currentYear} initialBudget={bike.annualBudget} currency={currency} rates={rates} yearEndProjection={yearEndProjection} spendForecastByWindow={spendForecastByWindow} />
         <div className={styles.chartCard}>
           {summary.grandTotal > 0 ? (
-            <SpendDonutChart records={records} mods={mods} fuelLogs={fuelLogs} bills={bills} labour={labour} currency={currency} rates={rates} initialChartType={bike.chartTypes?.["spend-donut"] === "bar" ? "bar" : "pie"} isPro={userIsPro} />
+            <SpendDonutChart records={records} mods={mods} fuelLogs={fuelLogs} bills={bills} labour={labour} currency={currency} rates={rates} initialChartType={bike.chartTypes?.["spend-donut"] === "bar" ? "bar" : "pie"} isPro={userIsPro} forecast={donutForecastByWindow} />
           ) : (
             <>
               <div className={styles.chartCardTitle}>Spend by category</div>
@@ -540,7 +571,7 @@ export default async function DashboardPage(props: { searchParams: Promise<{ add
       <div className={styles.dashboardTwoCol}>
         <div className={styles.chartCard}>
           {mileagePoints.length > 0 ? (
-            <MileageChart points={mileagePoints} distanceUnit={distanceUnit} initialChartType={bike.chartTypes?.["mileage"] === "bar" ? "bar" : "line"} />
+            <MileageChart points={mileagePoints} distanceUnit={distanceUnit} initialChartType={bike.chartTypes?.["mileage"] === "bar" ? "bar" : "line"} forecast={mileageForecastByWindow} />
           ) : (
             <>
               <div className={styles.chartCardTitle}>{distanceUnit === "km" ? "Kilometres" : "Mileage"} over time</div>
@@ -1139,15 +1170,18 @@ async function renderCarDashboard(
   };
 
   const mileagePoints = gatherCarMileagePoints(records, mods, fuelLogs, bills, labour);
+  const carLifetime = { startingMileage: car.startingMileage, currentMileage: car.currentMileage, dateAdded: car.dateAdded };
   const carForecastByWindow = buildCarCostForecastAllWindows({
     records, mods, bills, labour, reminders,
     currentMileage: car.currentMileage,
     mileagePoints,
-    carLifetime: { startingMileage: car.startingMileage, currentMileage: car.currentMileage, dateAdded: car.dateAdded },
+    carLifetime,
     carClass: car.fuelType !== "electric" && car.engineLitres ? classFromEngineLitres(car.engineLitres) : "medium",
   });
+  const { spendForecastByWindow, mileageForecastByWindow, donutForecastByWindow } = buildStatCardForecasts(carForecastByWindow, mileagePoints, carLifetime, fuelLogs);
   const currentYear = new Date().getFullYear();
   const yearSpend = computeCarYearSpend(records, mods, fuelLogs, bills, currentYear, labour);
+  const yearEndProjection = projectYearEndSpend(yearSpend, currentYear);
   const overBudget = car.annualBudget != null && yearSpend >= car.annualBudget;
   const summary = computeCarSpendSummary(records, mods, fuelLogs, bills, labour);
 
@@ -1256,28 +1290,19 @@ async function renderCarDashboard(
           distanceUnit={distanceUnit}
           fuelEconomyUnit={fuelEconomyUnit}
           isPro={userIsPro}
+          currentYear={currentYear}
+          yearSpend={yearSpend}
+          yearEndProjection={yearEndProjection}
+          spendForecastByWindow={spendForecastByWindow}
+          mileageForecastByWindow={mileageForecastByWindow}
         />
-        <div className={styles.statCard}>
-          <div className={`${styles.statCardIcon} ${styles.statCardIconNeutral}`}><Icon name="currentMiles" size={16} /></div>
-          <div className={styles.statCardValue}>{Math.round(convertMilesToDisplay(car.currentMileage, distanceUnit)).toLocaleString()}</div>
-          <div className={styles.statCardLabel}>Current {distanceUnit === "km" ? "km" : "miles"}</div>
-        </div>
-        {userIsPro ? (
-          <div className={styles.statCard}>
-            <div className={`${styles.statCardIcon} ${styles.statCardIconNeutral}`}><Icon name="spendThisYear" size={16} /></div>
-            <div className={styles.statCardValue}>{formatCurrency(yearSpend, currency, rates)}</div>
-            <div className={styles.statCardLabel}>Spend this year</div>
-          </div>
-        ) : (
-          <LockedStatCard icon="spendThisYear" iconClass={styles.statCardIconNeutral} label="Spend this year" />
-        )}
       </div>
 
       <div className={`${styles.dashboardTwoCol} ${styles.equalHeightRow}`}>
-        <BudgetWidget yearSpend={yearSpend} currentYear={currentYear} initialBudget={car.annualBudget} currency={currency} rates={rates} vehicleKind="car" yearEndProjection={projectYearEndSpend(yearSpend, currentYear)} />
+        <BudgetWidget yearSpend={yearSpend} currentYear={currentYear} initialBudget={car.annualBudget} currency={currency} rates={rates} vehicleKind="car" yearEndProjection={yearEndProjection} spendForecastByWindow={spendForecastByWindow} />
         <div className={styles.chartCard}>
           {summary.grandTotal > 0 ? (
-            <SpendDonutChart records={records} mods={mods} fuelLogs={fuelLogs} bills={bills} labour={labour} currency={currency} rates={rates} initialChartType={car.chartTypes?.["spend-donut"] === "bar" ? "bar" : "pie"} isPro={userIsPro} vehicleKind="car" />
+            <SpendDonutChart records={records} mods={mods} fuelLogs={fuelLogs} bills={bills} labour={labour} currency={currency} rates={rates} initialChartType={car.chartTypes?.["spend-donut"] === "bar" ? "bar" : "pie"} isPro={userIsPro} vehicleKind="car" forecast={donutForecastByWindow} />
           ) : (
             <>
               <div className={styles.chartCardTitle}>Spend by category</div>
@@ -1290,7 +1315,7 @@ async function renderCarDashboard(
       <div className={styles.dashboardTwoCol}>
         <div className={styles.chartCard}>
           {mileagePoints.length > 0 ? (
-            <MileageChart points={mileagePoints} distanceUnit={distanceUnit} initialChartType={car.chartTypes?.["mileage"] === "bar" ? "bar" : "line"} vehicleKind="car" />
+            <MileageChart points={mileagePoints} distanceUnit={distanceUnit} initialChartType={car.chartTypes?.["mileage"] === "bar" ? "bar" : "line"} vehicleKind="car" forecast={mileageForecastByWindow} />
           ) : (
             <>
               <div className={styles.chartCardTitle}>{distanceUnit === "km" ? "Kilometres" : "Mileage"} over time</div>
