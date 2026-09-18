@@ -137,13 +137,23 @@ jobs:
       # the runner's disk and are gone the moment the job ends, which is
       # why a failure log names a file path with nothing to actually
       # download. if: failure() only, so a normal green run uploads
-      # nothing.
+      # nothing. server.log is included too - `next start` runs in
+      # production mode, which redacts a server-side exception down to a
+      # generic "Application error" + digest on the actual page (what
+      # Playwright's error-context.md captures), but still logs the full
+      # error and stack trace server-side via console.error, which lands
+      # in server.log thanks to the redirect in "Start the app server"
+      # above. Without this, that's the one place the real cause of a
+      # server-side exception ever showed up, and it only ever existed on
+      # the runner's disk.
       - name: Upload Playwright failure artifacts
         if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: playwright-report
-          path: test-results/
+          path: |
+            test-results/
+            server.log
           retention-days: 14
       - name: Stop the app server
         if: always()
