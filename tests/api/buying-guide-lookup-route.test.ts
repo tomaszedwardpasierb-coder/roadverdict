@@ -222,7 +222,7 @@ describe("GET /api/tracker/buying-guide-lookup", () => {
 
   it("normalises the VRM to uppercase with spaces stripped before sending to VDG", async () => {
     await GET(request("ab20 yam"));
-    expect(mocks.fetch).toHaveBeenCalledWith(expect.stringContaining("AB20YAM"));
+    expect(mocks.fetch).toHaveBeenCalledWith(expect.stringContaining("AB20YAM"), expect.anything());
   });
 
   // ── Free tax status (always attempted) ──────────────────────────────

@@ -10,6 +10,7 @@
 // no deterministic fallback text for this, so nothing shows rather than
 // something broken.
 import { logGeminiUsage } from "@/lib/tracker/geminiUsageLog";
+import { fetchWithTimeout } from "@/lib/fetchWithTimeout";
 import type { VdiCheckResult } from "@/lib/tracker/vdiUnlock";
 import type { VehicleTaxDetails } from "@/lib/tracker/vehicleTaxFetch";
 
@@ -115,7 +116,7 @@ export async function generateBuyingGuideBriefing(
 ): Promise<BuyingGuideBriefingResult | null> {
   const factsBlock = buildFactsBlock(input);
   try {
-    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`, {
+    const res = await fetchWithTimeout(`https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`, {
       method: "POST",
       headers: { "Content-Type": "application/json", "X-goog-api-key": apiKey },
       body: JSON.stringify({
@@ -124,31 +125,31 @@ export async function generateBuyingGuideBriefing(
       }),
     });
     if (!res.ok) {
-      await logGeminiUsage("buyingGuideBriefing", GEMINI_MODEL, false);
+      logGeminiUsage("buyingGuideBriefing", GEMINI_MODEL, false);
       return null;
     }
 
     const data = await res.json();
     const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text;
     if (!rawText) {
-      await logGeminiUsage("buyingGuideBriefing", GEMINI_MODEL, false);
+      logGeminiUsage("buyingGuideBriefing", GEMINI_MODEL, false);
       return null;
     }
 
     const parsed = JSON.parse(rawText);
     if (!Array.isArray(parsed.motFlags) || !Array.isArray(parsed.modelNotes) || typeof parsed.summary !== "string") {
-      await logGeminiUsage("buyingGuideBriefing", GEMINI_MODEL, false);
+      logGeminiUsage("buyingGuideBriefing", GEMINI_MODEL, false);
       return null;
     }
 
-    await logGeminiUsage("buyingGuideBriefing", GEMINI_MODEL, true);
+    logGeminiUsage("buyingGuideBriefing", GEMINI_MODEL, true);
     return {
       motFlags: parsed.motFlags.filter((s: unknown): s is string => typeof s === "string"),
       modelNotes: parsed.modelNotes.filter((s: unknown): s is string => typeof s === "string"),
       summary: parsed.summary,
     };
   } catch {
-    await logGeminiUsage("buyingGuideBriefing", GEMINI_MODEL, false);
+    logGeminiUsage("buyingGuideBriefing", GEMINI_MODEL, false);
     return null;
   }
 }

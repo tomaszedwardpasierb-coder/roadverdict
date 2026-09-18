@@ -248,7 +248,7 @@ describe("GET /api/cars/buying-guide-lookup", () => {
 
   it("normalises the VRM to uppercase with spaces stripped before sending to VDG", async () => {
     await GET(request("ab20 foc"));
-    expect(mocks.fetch).toHaveBeenCalledWith(expect.stringContaining("AB20FOC"));
+    expect(mocks.fetch).toHaveBeenCalledWith(expect.stringContaining("AB20FOC"), expect.anything());
   });
 
   // ── Free tax status (always attempted) ──────────────────────────────

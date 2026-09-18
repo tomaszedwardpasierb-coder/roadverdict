@@ -166,6 +166,6 @@ describe("fetchDvlaDataFromVdg", () => {
   it("includes the VRM in the VDG request URL", async () => {
     mocks.fetch.mockResolvedValue(vdgSuccess());
     await fetchDvlaDataFromVdg("XY99ZZZ");
-    expect(mocks.fetch).toHaveBeenCalledWith(expect.stringContaining("XY99ZZZ"));
+    expect(mocks.fetch).toHaveBeenCalledWith(expect.stringContaining("XY99ZZZ"), expect.anything());
   });
 });

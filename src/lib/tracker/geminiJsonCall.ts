@@ -16,6 +16,7 @@
 // different per use case, so it stays with each caller rather than
 // being forced in here.
 import { logGeminiUsage } from "@/lib/tracker/geminiUsageLog";
+import { fetchWithTimeout } from "@/lib/fetchWithTimeout";
 
 // Reverted to the exact model already proven live in production - see
 // receiptParse.ts's GEMINI_MODEL comment for why the
@@ -33,7 +34,7 @@ export async function callGeminiForJson<T>(
   task: string
 ): Promise<T | null> {
   try {
-    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`, {
+    const res = await fetchWithTimeout(`https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`, {
       method: "POST",
       headers: { "Content-Type": "application/json", "X-goog-api-key": apiKey },
       body: JSON.stringify({
@@ -42,22 +43,25 @@ export async function callGeminiForJson<T>(
       }),
     });
     if (!res.ok) {
-      await logGeminiUsage(task, GEMINI_MODEL, false);
+      logGeminiUsage(task, GEMINI_MODEL, false);
       return null;
     }
 
     const data = await res.json();
     const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text;
     if (!rawText) {
-      await logGeminiUsage(task, GEMINI_MODEL, false);
+      logGeminiUsage(task, GEMINI_MODEL, false);
       return null;
     }
 
     const result = validate(JSON.parse(rawText));
-    await logGeminiUsage(task, GEMINI_MODEL, result !== null);
+    // Fire-and-forget, per geminiUsageLog.ts's own doc comment - it never
+    // throws, so awaiting it here only adds a Cosmos round-trip to every
+    // Gemini call's latency for no benefit.
+    logGeminiUsage(task, GEMINI_MODEL, result !== null);
     return result;
   } catch {
-    await logGeminiUsage(task, GEMINI_MODEL, false);
+    logGeminiUsage(task, GEMINI_MODEL, false);
     return null;
   }
 }

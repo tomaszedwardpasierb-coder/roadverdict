@@ -6,6 +6,7 @@ import { getExchangeRates } from "@/lib/tracker/currencyRates";
 import { convertDisplayToGbp, ALL_CURRENCIES, type Currency } from "@/lib/tracker/currency";
 import { logGeminiUsage } from "@/lib/tracker/geminiUsageLog";
 import { ownsAttachment } from "@/lib/tracker/attachmentOwnership";
+import { fetchWithTimeout } from "@/lib/fetchWithTimeout";
 
 export const dynamic = "force-dynamic";
 
@@ -16,6 +17,9 @@ export const dynamic = "force-dynamic";
 // is on Google's deprecation path. Pinned rather than a "-latest" alias,
 // which Google could silently repoint at any time.
 const GEMINI_MODEL = "gemini-3.5-flash-lite";
+// Longer than fetchWithTimeout's own 15s default - this sends an inline
+// receipt image for vision inference, not a small text completion.
+const GEMINI_VISION_TIMEOUT_MS = 30_000;
 
 // A discrepancy only gets flagged past this margin - rounding and
 // currency-conversion noise is expected and shouldn't produce a false
@@ -89,33 +93,33 @@ export async function POST(request: NextRequest) {
     const buffer = await streamToBuffer(downloadResponse.readableStreamBody);
     const base64 = buffer.toString("base64");
 
-    const geminiRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`, {
+    const geminiRes = await fetchWithTimeout(`https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`, {
       method: "POST",
       headers: { "Content-Type": "application/json", "X-goog-api-key": apiKey },
       body: JSON.stringify({
         contents: [{ parts: [{ text: PROMPT }, { inline_data: { mime_type: contentType, data: base64 } }] }],
         generationConfig: { responseMimeType: "application/json" },
       }),
-    });
+    }, GEMINI_VISION_TIMEOUT_MS);
 
     if (!geminiRes.ok) {
-      await logGeminiUsage("verifyReceipt", GEMINI_MODEL, false);
+      logGeminiUsage("verifyReceipt", GEMINI_MODEL, false);
       return NextResponse.json({ discrepancies: [], checked: false });
     }
 
     const geminiData = await geminiRes.json();
     const rawText = geminiData?.candidates?.[0]?.content?.parts?.[0]?.text;
     if (!rawText) {
-      await logGeminiUsage("verifyReceipt", GEMINI_MODEL, false);
+      logGeminiUsage("verifyReceipt", GEMINI_MODEL, false);
       return NextResponse.json({ discrepancies: [], checked: false });
     }
 
     let parsed: { cost?: number; currency?: string; date?: string };
     try {
       parsed = JSON.parse(rawText);
-      await logGeminiUsage("verifyReceipt", GEMINI_MODEL, true);
+      logGeminiUsage("verifyReceipt", GEMINI_MODEL, true);
     } catch {
-      await logGeminiUsage("verifyReceipt", GEMINI_MODEL, false);
+      logGeminiUsage("verifyReceipt", GEMINI_MODEL, false);
       return NextResponse.json({ discrepancies: [], checked: false });
     }
 

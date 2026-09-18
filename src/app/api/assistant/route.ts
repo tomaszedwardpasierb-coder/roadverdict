@@ -43,6 +43,7 @@ import {
 import type { Attachment } from "@/lib/tracker/cosmosHelpers";
 import { logAssistantQuestion } from "@/lib/tracker/assistantQuestionLog";
 import { logGeminiUsage } from "@/lib/tracker/geminiUsageLog";
+import { fetchWithTimeout } from "@/lib/fetchWithTimeout";
 import { resolveShareToken } from "@/lib/tracker/shareLink";
 import { hasReportAccess } from "@/lib/tracker/reportAccess";
 import { getBikesForUser, isBikeReadOnly } from "@/lib/tracker/bike";
@@ -604,7 +605,7 @@ export async function POST(req: NextRequest) {
     // never terminates should fail loudly with a real response, not
     // hang the request indefinitely.
     for (let round = 0; round <= MAX_TOOL_ROUNDS; round++) {
-      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`, {
+      const res = await fetchWithTimeout(`https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`, {
         method: "POST",
         headers: { "Content-Type": "application/json", "X-goog-api-key": apiKey },
         body: JSON.stringify({
@@ -617,11 +618,11 @@ export async function POST(req: NextRequest) {
       if (!res.ok) {
         const errBody = await res.text().catch(() => "(could not read response body)");
         console.error(`Assistant: Gemini API returned ${res.status} ${res.statusText}:`, errBody);
-        await logGeminiUsage("assistant", GEMINI_MODEL, false);
+        logGeminiUsage("assistant", GEMINI_MODEL, false);
         await logAssistantQuestion(question, signedIn, true, session?.email);
         return respond(anonIdToSetCookie, { error: "Assistant is temporarily unavailable." }, { status: 502 });
       }
-      await logGeminiUsage("assistant", GEMINI_MODEL, true);
+      logGeminiUsage("assistant", GEMINI_MODEL, true);
 
       const data = await res.json();
       const parts: GeminiPart[] = data?.candidates?.[0]?.content?.parts ?? [];

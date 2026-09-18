@@ -12,6 +12,7 @@
 // after purchase, and cached forever on the share link's own vdiUnlock
 // field.
 import { logGeminiUsage } from "@/lib/tracker/geminiUsageLog";
+import { fetchWithTimeout } from "@/lib/fetchWithTimeout";
 import type { VdiCheckResult, ValuationResult, VdiSummaryResult } from "@/lib/tracker/vdiUnlock";
 
 const GEMINI_MODEL = "gemini-3.7-flash";
@@ -135,7 +136,7 @@ Return ONLY valid JSON matching this shape, nothing else, no markdown fences:
 export async function generateVdiSummary(input: VdiSummaryInput, apiKey: string): Promise<VdiSummaryResult | null> {
   const factsBlock = buildFactsBlock(input);
   try {
-    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`, {
+    const res = await fetchWithTimeout(`https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`, {
       method: "POST",
       headers: { "Content-Type": "application/json", "X-goog-api-key": apiKey },
       body: JSON.stringify({
@@ -145,31 +146,31 @@ export async function generateVdiSummary(input: VdiSummaryInput, apiKey: string)
       }),
     });
     if (!res.ok) {
-      await logGeminiUsage("vdiSummary", GEMINI_MODEL, false);
+      logGeminiUsage("vdiSummary", GEMINI_MODEL, false);
       return null;
     }
 
     const data = await res.json();
     const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text;
     if (!rawText) {
-      await logGeminiUsage("vdiSummary", GEMINI_MODEL, false);
+      logGeminiUsage("vdiSummary", GEMINI_MODEL, false);
       return null;
     }
 
     const parsed = JSON.parse(rawText);
     if (!Array.isArray(parsed.keyFindings) || typeof parsed.summary !== "string") {
-      await logGeminiUsage("vdiSummary", GEMINI_MODEL, false);
+      logGeminiUsage("vdiSummary", GEMINI_MODEL, false);
       return null;
     }
 
-    await logGeminiUsage("vdiSummary", GEMINI_MODEL, true);
+    logGeminiUsage("vdiSummary", GEMINI_MODEL, true);
     return {
       keyFindings: parsed.keyFindings.filter((s: unknown): s is string => typeof s === "string"),
       valuationNote: typeof parsed.valuationNote === "string" ? parsed.valuationNote : null,
       summary: parsed.summary,
     };
   } catch {
-    await logGeminiUsage("vdiSummary", GEMINI_MODEL, false);
+    logGeminiUsage("vdiSummary", GEMINI_MODEL, false);
     return null;
   }
 }

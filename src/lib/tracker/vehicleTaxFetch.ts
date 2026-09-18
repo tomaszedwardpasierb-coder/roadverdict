@@ -7,6 +7,8 @@
 // Deliberately does NOT return Model - this package only carries Make,
 // confirmed from a real sample (unlike MotHistoryDetails, which carries
 // both).
+import { fetchWithTimeout } from "@/lib/fetchWithTimeout";
+
 const VDG_ENDPOINT = "https://uk.api.vehicledataglobal.com/r2/lookup";
 
 export interface VehicleTaxDetails {
@@ -38,7 +40,7 @@ interface RawVehicleTaxResponse {
 
 export async function fetchVehicleTaxDetailsFromVdg(vrm: string, apiKey: string): Promise<VehicleTaxDetails | null> {
   try {
-    const res = await fetch(`${VDG_ENDPOINT}?apiKey=${apiKey}&packageName=VehicleTaxDetails&vrm=${encodeURIComponent(vrm)}`);
+    const res = await fetchWithTimeout(`${VDG_ENDPOINT}?apiKey=${apiKey}&packageName=VehicleTaxDetails&vrm=${encodeURIComponent(vrm)}`);
     const data: RawVehicleTaxResponse = await res.json();
     const details = data?.ResponseInformation?.IsSuccessStatusCode ? data.Results?.VehicleTaxDetails : undefined;
     if (!details) {

@@ -5,6 +5,7 @@
 // mot-history/route.ts, mot-history-preview/route.ts, and now the buyer
 // report page, rather than duplicating the VDG call a third time.
 import { parseMotHistory, type RawMotTest, type ParsedMotHistory } from "./motHistory";
+import { fetchWithTimeout } from "@/lib/fetchWithTimeout";
 
 const VDG_ENDPOINT = "https://uk.api.vehicledataglobal.com/r2/lookup";
 
@@ -16,7 +17,7 @@ export async function fetchMotHistoryFromVdg(vrm: string): Promise<ParsedMotHist
   }
 
   try {
-    const res = await fetch(
+    const res = await fetchWithTimeout(
       `${VDG_ENDPOINT}?apiKey=${apiKey}&packageName=MotHistoryDetails&vrm=${encodeURIComponent(vrm)}`
     );
     const data = await res.json();

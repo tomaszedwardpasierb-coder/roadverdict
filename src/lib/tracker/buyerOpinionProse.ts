@@ -14,6 +14,7 @@
 // this section - unlike Story So Far there's no deterministic fallback
 // text for an opinion, so nothing shows rather than something broken.
 import { logGeminiUsage } from "@/lib/tracker/geminiUsageLog";
+import { fetchWithTimeout } from "@/lib/fetchWithTimeout";
 
 // Promoted from gemini-3.5-flash-lite to gemini-3.7-flash - this call
 // site was always meant to be the premium tier in
@@ -163,7 +164,7 @@ Return ONLY valid JSON matching this shape, nothing else, no markdown fences:
 export async function generateBuyerOpinion(input: BuyerOpinionInput, apiKey: string): Promise<BuyerOpinionResult | null> {
   const factsBlock = buildFactsBlock(input);
   try {
-    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`, {
+    const res = await fetchWithTimeout(`https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`, {
       method: "POST",
       headers: { "Content-Type": "application/json", "X-goog-api-key": apiKey },
       body: JSON.stringify({
@@ -173,31 +174,31 @@ export async function generateBuyerOpinion(input: BuyerOpinionInput, apiKey: str
       }),
     });
     if (!res.ok) {
-      await logGeminiUsage("buyerOpinion", GEMINI_MODEL, false);
+      logGeminiUsage("buyerOpinion", GEMINI_MODEL, false);
       return null;
     }
 
     const data = await res.json();
     const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text;
     if (!rawText) {
-      await logGeminiUsage("buyerOpinion", GEMINI_MODEL, false);
+      logGeminiUsage("buyerOpinion", GEMINI_MODEL, false);
       return null;
     }
 
     const parsed = JSON.parse(rawText);
     if (!Array.isArray(parsed.strengths) || !Array.isArray(parsed.concerns) || typeof parsed.honestRead !== "string") {
-      await logGeminiUsage("buyerOpinion", GEMINI_MODEL, false);
+      logGeminiUsage("buyerOpinion", GEMINI_MODEL, false);
       return null;
     }
 
-    await logGeminiUsage("buyerOpinion", GEMINI_MODEL, true);
+    logGeminiUsage("buyerOpinion", GEMINI_MODEL, true);
     return {
       strengths: parsed.strengths.filter((s: unknown): s is string => typeof s === "string"),
       concerns: parsed.concerns.filter((s: unknown): s is string => typeof s === "string"),
       honestRead: parsed.honestRead,
     };
   } catch {
-    await logGeminiUsage("buyerOpinion", GEMINI_MODEL, false);
+    logGeminiUsage("buyerOpinion", GEMINI_MODEL, false);
     return null;
   }
 }

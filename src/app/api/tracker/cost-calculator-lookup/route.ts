@@ -13,6 +13,7 @@ import { parseMotHistory, type RawMotTest } from "@/lib/tracker/motHistory";
 import { fetchVehicleTaxDetailsFromVdg, type VehicleTaxDetails } from "@/lib/tracker/vehicleTaxFetch";
 import { getUserDoc } from "@/lib/tracker/userDoc";
 import { canRunVehicleLookup, recordVehicleLookupRun } from "@/lib/tracker/vehicleLookupCooldown";
+import { fetchWithTimeout } from "@/lib/fetchWithTimeout";
 
 export const dynamic = "force-dynamic";
 
@@ -80,7 +81,7 @@ export async function GET(request: NextRequest) {
   let taxDetails: VehicleTaxDetails | null;
   try {
     const [motRes, tax] = await Promise.all([
-      fetch(`${VDG_ENDPOINT}?apiKey=${apiKey}&packageName=MotHistoryDetails&vrm=${encodeURIComponent(vrm)}`),
+      fetchWithTimeout(`${VDG_ENDPOINT}?apiKey=${apiKey}&packageName=MotHistoryDetails&vrm=${encodeURIComponent(vrm)}`),
       fetchVehicleTaxDetailsFromVdg(vrm, apiKey),
     ]);
     motData = await motRes.json();

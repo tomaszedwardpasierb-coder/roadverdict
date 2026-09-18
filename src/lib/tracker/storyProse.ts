@@ -18,6 +18,7 @@
 import type { SellerReportCore } from "@/lib/tracker/sellerReportData";
 import type { BikeIdentity, CategorySpend, ServiceRhythm, MpgTrend } from "@/lib/tracker/storyFacts";
 import { logGeminiUsage } from "@/lib/tracker/geminiUsageLog";
+import { fetchWithTimeout } from "@/lib/fetchWithTimeout";
 
 // Promoted from gemini-3.5-flash-lite to gemini-3.7-flash - the
 // AI-Models-for-Different-Tasks.docx tier split originally wanted a
@@ -131,7 +132,7 @@ Return ONLY valid JSON matching this shape, nothing else, no markdown fences:
 export async function generateStoryProse(input: StoryProseInput, apiKey: string): Promise<StoryProseResult | null> {
   const factsBlock = buildFactsBlock(input);
   try {
-    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`, {
+    const res = await fetchWithTimeout(`https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`, {
       method: "POST",
       headers: { "Content-Type": "application/json", "X-goog-api-key": apiKey },
       body: JSON.stringify({
@@ -141,30 +142,30 @@ export async function generateStoryProse(input: StoryProseInput, apiKey: string)
       }),
     });
     if (!res.ok) {
-      await logGeminiUsage("storyProse", GEMINI_MODEL, false);
+      logGeminiUsage("storyProse", GEMINI_MODEL, false);
       return null;
     }
 
     const data = await res.json();
     const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text;
     if (!rawText) {
-      await logGeminiUsage("storyProse", GEMINI_MODEL, false);
+      logGeminiUsage("storyProse", GEMINI_MODEL, false);
       return null;
     }
 
     const parsed = JSON.parse(rawText);
     if (!Array.isArray(parsed.sharedStory) || !Array.isArray(parsed.ownerNotes)) {
-      await logGeminiUsage("storyProse", GEMINI_MODEL, false);
+      logGeminiUsage("storyProse", GEMINI_MODEL, false);
       return null;
     }
 
-    await logGeminiUsage("storyProse", GEMINI_MODEL, true);
+    logGeminiUsage("storyProse", GEMINI_MODEL, true);
     return {
       sharedStory: parsed.sharedStory.filter((s: unknown): s is string => typeof s === "string"),
       ownerNotes: parsed.ownerNotes.filter((s: unknown): s is string => typeof s === "string"),
     };
   } catch {
-    await logGeminiUsage("storyProse", GEMINI_MODEL, false);
+    logGeminiUsage("storyProse", GEMINI_MODEL, false);
     return null;
   }
 }

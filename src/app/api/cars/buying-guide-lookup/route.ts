@@ -13,6 +13,7 @@
 // first), so this adds real latency to the response, not just cost.
 // Worth revisiting if that turns out to feel slow in practice.
 import { NextRequest, NextResponse } from "next/server";
+import { fetchWithTimeout } from "@/lib/fetchWithTimeout";
 import { getSession } from "@/lib/auth/session";
 import { parseMotHistory, type RawMotTest, type ParsedMotTest } from "@/lib/tracker/motHistory";
 import { generateCarBuyingGuideBriefing, type CarBuyingGuideBriefingResult } from "@/lib/tracker/carBuyingGuideBriefing";
@@ -260,7 +261,7 @@ export async function GET(request: NextRequest) {
     let motData: VdgMotResponse;
     try {
       const [motRes, tax] = await Promise.all([
-        fetch(`${VDG_ENDPOINT}?apiKey=${apiKey}&packageName=MotHistoryDetails&vrm=${encodeURIComponent(vrm)}`),
+        fetchWithTimeout(`${VDG_ENDPOINT}?apiKey=${apiKey}&packageName=MotHistoryDetails&vrm=${encodeURIComponent(vrm)}`),
         fetchVehicleTaxDetailsFromVdg(vrm, apiKey),
       ]);
       motData = await motRes.json();

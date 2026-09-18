@@ -10,6 +10,7 @@
 // from the Java sample - that sample's request params were wrong once
 // already this session, so it's not trusted as a schema reference here.
 import type { DvlaVehicleData, DvlaKeeperChange, DvlaPlateChange } from "./bike";
+import { fetchWithTimeout } from "@/lib/fetchWithTimeout";
 
 const VDG_ENDPOINT = "https://uk.api.vehicledataglobal.com/r2/lookup";
 
@@ -21,7 +22,7 @@ export async function fetchDvlaDataFromVdg(vrm: string): Promise<DvlaVehicleData
   }
 
   try {
-    const res = await fetch(
+    const res = await fetchWithTimeout(
       `${VDG_ENDPOINT}?apiKey=${apiKey}&packageName=VehicleDetails&vrm=${encodeURIComponent(vrm)}`
     );
     const data = await res.json();

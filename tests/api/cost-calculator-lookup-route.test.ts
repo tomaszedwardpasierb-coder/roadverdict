@@ -158,6 +158,6 @@ describe("GET /api/tracker/cost-calculator-lookup", () => {
 
   it("normalises the VRM to uppercase with spaces stripped before sending to VDG", async () => {
     await GET(request("pa63 erb"));
-    expect(mocks.fetch).toHaveBeenCalledWith(expect.stringContaining("PA63ERB"));
+    expect(mocks.fetch).toHaveBeenCalledWith(expect.stringContaining("PA63ERB"), expect.anything());
   });
 });

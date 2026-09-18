@@ -7,6 +7,7 @@
 // instead of engineCC, no "which chain/tyres" motorcycle-specific
 // phrasing).
 import { logGeminiUsage } from "@/lib/tracker/geminiUsageLog";
+import { fetchWithTimeout } from "@/lib/fetchWithTimeout";
 
 const GEMINI_MODEL = "gemini-3.7-flash";
 
@@ -149,7 +150,7 @@ Return ONLY valid JSON matching this shape, nothing else, no markdown fences:
 export async function generateCarBuyerOpinion(input: CarBuyerOpinionInput, apiKey: string): Promise<CarBuyerOpinionResult | null> {
   const factsBlock = buildFactsBlock(input);
   try {
-    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`, {
+    const res = await fetchWithTimeout(`https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`, {
       method: "POST",
       headers: { "Content-Type": "application/json", "X-goog-api-key": apiKey },
       body: JSON.stringify({
@@ -159,31 +160,31 @@ export async function generateCarBuyerOpinion(input: CarBuyerOpinionInput, apiKe
       }),
     });
     if (!res.ok) {
-      await logGeminiUsage("carBuyerOpinion", GEMINI_MODEL, false);
+      logGeminiUsage("carBuyerOpinion", GEMINI_MODEL, false);
       return null;
     }
 
     const data = await res.json();
     const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text;
     if (!rawText) {
-      await logGeminiUsage("carBuyerOpinion", GEMINI_MODEL, false);
+      logGeminiUsage("carBuyerOpinion", GEMINI_MODEL, false);
       return null;
     }
 
     const parsed = JSON.parse(rawText);
     if (!Array.isArray(parsed.strengths) || !Array.isArray(parsed.concerns) || typeof parsed.honestRead !== "string") {
-      await logGeminiUsage("carBuyerOpinion", GEMINI_MODEL, false);
+      logGeminiUsage("carBuyerOpinion", GEMINI_MODEL, false);
       return null;
     }
 
-    await logGeminiUsage("carBuyerOpinion", GEMINI_MODEL, true);
+    logGeminiUsage("carBuyerOpinion", GEMINI_MODEL, true);
     return {
       strengths: parsed.strengths.filter((s: unknown): s is string => typeof s === "string"),
       concerns: parsed.concerns.filter((s: unknown): s is string => typeof s === "string"),
       honestRead: parsed.honestRead,
     };
   } catch {
-    await logGeminiUsage("carBuyerOpinion", GEMINI_MODEL, false);
+    logGeminiUsage("carBuyerOpinion", GEMINI_MODEL, false);
     return null;
   }
 }

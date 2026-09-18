@@ -18,6 +18,7 @@ import { convertDisplayToGbp, ALL_CURRENCIES, type Currency } from "@/lib/tracke
 import { isBeforeProduction } from "@/lib/tracker/productionYearCheck";
 import { matchesDeclaredFileType, type SniffableFileType } from "@/lib/tracker/fileSignature";
 import { logGeminiUsage } from "@/lib/tracker/geminiUsageLog";
+import { fetchWithTimeout } from "@/lib/fetchWithTimeout";
 import type { Attachment, CurrencyConversionInfo } from "@/lib/tracker/cosmosHelpers";
 import type { BikeDoc } from "@/lib/tracker/bike";
 import type { CarDoc } from "@/lib/tracker/car";
@@ -51,6 +52,11 @@ const GEMINI_MODEL = "gemini-3.5-flash-lite";
 const GEMINI_ESCALATION_MODEL = GEMINI_MODEL;
 const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024;
 const ALLOWED_TYPES = new Set(["image/jpeg", "image/png", "application/pdf"]);
+// Longer than fetchWithTimeout's own 15s default - this call sends an
+// inline image/PDF for vision inference, not a small text completion, so
+// it genuinely needs more time before a slow-but-successful read is
+// mistaken for a hang.
+const GEMINI_VISION_TIMEOUT_MS = 30_000;
 
 // Only the handful of spots that are genuinely vehicle-specific are
 // parametrised - the rest of the prompt (JSON shape, field-by-field
@@ -185,31 +191,31 @@ async function callGeminiReceiptModel(
   vehicleKind: VehicleKind
 ): Promise<GeminiResponse | null> {
   try {
-    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
+    const res = await fetchWithTimeout(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
       method: "POST",
       headers: { "Content-Type": "application/json", "X-goog-api-key": apiKey },
       body: JSON.stringify({
         contents: [{ parts: [{ text: buildPrompt(vehicleKind) }, { inline_data: { mime_type: mimeTypeForGemini, data: base64 } }] }],
         generationConfig: { responseMimeType: "application/json" },
       }),
-    });
+    }, GEMINI_VISION_TIMEOUT_MS);
     if (!res.ok) {
-      await logGeminiUsage("receiptScan", model, false);
+      logGeminiUsage("receiptScan", model, false);
       return null;
     }
 
     const data = await res.json();
     const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text;
     if (!rawText) {
-      await logGeminiUsage("receiptScan", model, false);
+      logGeminiUsage("receiptScan", model, false);
       return null;
     }
 
     const parsed = JSON.parse(rawText) as GeminiResponse;
-    await logGeminiUsage("receiptScan", model, true);
+    logGeminiUsage("receiptScan", model, true);
     return parsed;
   } catch {
-    await logGeminiUsage("receiptScan", model, false);
+    logGeminiUsage("receiptScan", model, false);
     return null;
   }
 }

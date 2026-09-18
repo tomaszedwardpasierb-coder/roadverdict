@@ -29,6 +29,7 @@ import type {
   VdiEvTransmission,
   VdiRangeTestCycle,
 } from "./vdiUnlock";
+import { fetchWithTimeout } from "@/lib/fetchWithTimeout";
 
 const VDG_ENDPOINT = "https://uk.api.vehicledataglobal.com/r2/lookup";
 
@@ -277,7 +278,7 @@ interface RawVdiCheckResponse {
 
 export async function fetchVdiCheckFromVdg(vrm: string, apiKey: string): Promise<VdiCheckResult | null> {
   try {
-    const res = await fetch(`${VDG_ENDPOINT}?apiKey=${apiKey}&packageName=VDICheck&vrm=${encodeURIComponent(vrm)}`);
+    const res = await fetchWithTimeout(`${VDG_ENDPOINT}?apiKey=${apiKey}&packageName=VDICheck&vrm=${encodeURIComponent(vrm)}`);
     const data: RawVdiCheckResponse = await res.json();
     if (!data?.ResponseInformation?.IsSuccessStatusCode) {
       return null;

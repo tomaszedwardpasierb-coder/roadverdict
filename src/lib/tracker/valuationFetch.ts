@@ -5,6 +5,7 @@
 // separate from vdiUnlock.ts (pure types, no fetch) same as
 // vdiCheckFetch.ts/motHistoryFetch.ts.
 import type { ValuationResult } from "./vdiUnlock";
+import { fetchWithTimeout } from "@/lib/fetchWithTimeout";
 
 const VDG_ENDPOINT = "https://uk.api.vehicledataglobal.com/r2/lookup";
 
@@ -32,7 +33,7 @@ interface RawValuationResponse {
 
 export async function fetchValuationFromVdg(vrm: string, apiKey: string): Promise<ValuationResult | null> {
   try {
-    const res = await fetch(`${VDG_ENDPOINT}?apiKey=${apiKey}&packageName=ValuationDetails&vrm=${encodeURIComponent(vrm)}`);
+    const res = await fetchWithTimeout(`${VDG_ENDPOINT}?apiKey=${apiKey}&packageName=ValuationDetails&vrm=${encodeURIComponent(vrm)}`);
     const data: RawValuationResponse = await res.json();
     const vd = data?.ResponseInformation?.IsSuccessStatusCode ? data.Results?.ValuationDetails : undefined;
     if (!vd) {

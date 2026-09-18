@@ -16,6 +16,7 @@
 // concatenate-into-contents pattern - an intentional improvement on this
 // newer file, not a change to the bike one.
 import { logGeminiUsage } from "@/lib/tracker/geminiUsageLog";
+import { fetchWithTimeout } from "@/lib/fetchWithTimeout";
 import type { VdiCheckResult, ValuationResult } from "@/lib/tracker/vdiUnlock";
 import type { VehicleTaxDetails } from "@/lib/tracker/vehicleTaxFetch";
 
@@ -150,7 +151,7 @@ export async function generateCarBuyingGuideBriefing(
 ): Promise<CarBuyingGuideBriefingResult | null> {
   const factsBlock = buildFactsBlock(input);
   try {
-    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`, {
+    const res = await fetchWithTimeout(`https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`, {
       method: "POST",
       headers: { "Content-Type": "application/json", "X-goog-api-key": apiKey },
       body: JSON.stringify({
@@ -160,31 +161,31 @@ export async function generateCarBuyingGuideBriefing(
       }),
     });
     if (!res.ok) {
-      await logGeminiUsage("carBuyingGuideBriefing", GEMINI_MODEL, false);
+      logGeminiUsage("carBuyingGuideBriefing", GEMINI_MODEL, false);
       return null;
     }
 
     const data = await res.json();
     const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text;
     if (!rawText) {
-      await logGeminiUsage("carBuyingGuideBriefing", GEMINI_MODEL, false);
+      logGeminiUsage("carBuyingGuideBriefing", GEMINI_MODEL, false);
       return null;
     }
 
     const parsed = JSON.parse(rawText);
     if (!Array.isArray(parsed.motFlags) || !Array.isArray(parsed.modelNotes) || typeof parsed.summary !== "string") {
-      await logGeminiUsage("carBuyingGuideBriefing", GEMINI_MODEL, false);
+      logGeminiUsage("carBuyingGuideBriefing", GEMINI_MODEL, false);
       return null;
     }
 
-    await logGeminiUsage("carBuyingGuideBriefing", GEMINI_MODEL, true);
+    logGeminiUsage("carBuyingGuideBriefing", GEMINI_MODEL, true);
     return {
       motFlags: parsed.motFlags.filter((s: unknown): s is string => typeof s === "string"),
       modelNotes: parsed.modelNotes.filter((s: unknown): s is string => typeof s === "string"),
       summary: parsed.summary,
     };
   } catch {
-    await logGeminiUsage("carBuyingGuideBriefing", GEMINI_MODEL, false);
+    logGeminiUsage("carBuyingGuideBriefing", GEMINI_MODEL, false);
     return null;
   }
 }

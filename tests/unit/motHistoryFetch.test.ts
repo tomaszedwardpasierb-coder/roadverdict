@@ -121,7 +121,7 @@ describe("fetchMotHistoryFromVdg", () => {
   it("includes the VRM, URL-encoded, in the VDG request", async () => {
     mocks.fetch.mockResolvedValue(vdgSuccess());
     await fetchMotHistoryFromVdg("AB 12 CDE");
-    expect(mocks.fetch).toHaveBeenCalledWith(expect.stringContaining(encodeURIComponent("AB 12 CDE")));
+    expect(mocks.fetch).toHaveBeenCalledWith(expect.stringContaining(encodeURIComponent("AB 12 CDE")), expect.anything());
   });
 
   it("hits the VDG MOT history endpoint with the MotHistoryDetails package and the configured API key", async () => {
