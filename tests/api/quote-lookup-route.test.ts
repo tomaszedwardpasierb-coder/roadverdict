@@ -8,6 +8,8 @@ const mocks = vi.hoisted(() => ({
   getUserDoc: vi.fn(),
   canRunVehicleLookup: vi.fn(),
   recordVehicleLookupRun: vi.fn(),
+  getCachedMotHistoryLookup: vi.fn(),
+  setCachedMotHistoryLookup: vi.fn(),
 }));
 
 vi.mock("@/lib/auth/session", () => ({ getSession: mocks.getSession }));
@@ -16,6 +18,10 @@ vi.mock("@/lib/tracker/userDoc", () => ({ getUserDoc: mocks.getUserDoc }));
 vi.mock("@/lib/tracker/vehicleLookupCooldown", () => ({
   canRunVehicleLookup: mocks.canRunVehicleLookup,
   recordVehicleLookupRun: mocks.recordVehicleLookupRun,
+}));
+vi.mock("@/lib/tracker/motHistoryLookupCache", () => ({
+  getCachedMotHistoryLookup: mocks.getCachedMotHistoryLookup,
+  setCachedMotHistoryLookup: mocks.setCachedMotHistoryLookup,
 }));
 vi.stubGlobal("fetch", mocks.fetch);
 
@@ -65,6 +71,8 @@ beforeEach(() => {
   mocks.fetch.mockResolvedValue(vdgSuccess());
   mocks.getUserDoc.mockResolvedValue(null);
   mocks.canRunVehicleLookup.mockReturnValue(true);
+  mocks.getCachedMotHistoryLookup.mockResolvedValue(null);
+  mocks.setCachedMotHistoryLookup.mockResolvedValue(undefined);
   process.env.VDG_API_KEY = "test-key";
 });
 
@@ -146,6 +154,50 @@ describe("GET /api/tracker/quote-lookup", () => {
 
   it("normalises the VRM to uppercase with spaces stripped before sending to VDG", async () => {
     await GET(request("pa63 erb"));
-    expect(mocks.fetch).toHaveBeenCalledWith(expect.stringContaining("PA63ERB"));
+    expect(mocks.fetch).toHaveBeenCalledWith(expect.stringContaining("PA63ERB"), expect.anything());
+  });
+
+  // ── Shared MOT-history lookup cache ─────────────────────────────────────
+
+  describe("MOT history lookup cache", () => {
+    const cachedData = {
+      make: "BMW", model: "640", fuelType: "Petrol", colour: "Silver",
+      plateInRetention: false, motDueDate: "2026-10-18",
+      motTestsOldestFirst: [{ testDate: "2025-10-17", passed: true, mileage: 43851, mileageTrusted: true, notes: "Passed" }],
+    };
+
+    it("returns the cached result (newest-first) without calling VDG or checking the cooldown", async () => {
+      mocks.getCachedMotHistoryLookup.mockResolvedValue(cachedData);
+      const response = await GET(request("PA63ERB"));
+      const body = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(body).toMatchObject({ vrm: "PA63ERB", make: "BMW", model: "640", fuelType: "Petrol", colour: "Silver" });
+      expect(body.motTests[0].testDate).toBe("2025-10-17");
+      expect(mocks.fetch).not.toHaveBeenCalled();
+      expect(mocks.canRunVehicleLookup).not.toHaveBeenCalled();
+      expect(mocks.recordVehicleLookupRun).not.toHaveBeenCalled();
+      expect(mocks.setCachedMotHistoryLookup).not.toHaveBeenCalled();
+    });
+
+    it("still enforces the cooldown on a cache miss", async () => {
+      mocks.canRunVehicleLookup.mockReturnValue(false);
+      const response = await GET(request("PA63ERB"));
+      expect(response.status).toBe(429);
+      expect(mocks.fetch).not.toHaveBeenCalled();
+    });
+
+    it("caches a fresh successful lookup, keyed by the normalised VRM", async () => {
+      await GET(request("pa63 erb"));
+      expect(mocks.setCachedMotHistoryLookup).toHaveBeenCalledWith("PA63ERB", expect.objectContaining({
+        make: "BMW", model: "640",
+      }));
+    });
+
+    it("does not cache a not-found result", async () => {
+      mocks.fetch.mockResolvedValue(vdgNotFound());
+      await GET(request("PA63ERB"));
+      expect(mocks.setCachedMotHistoryLookup).not.toHaveBeenCalled();
+    });
   });
 });

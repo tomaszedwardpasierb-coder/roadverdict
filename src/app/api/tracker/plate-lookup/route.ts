@@ -3,6 +3,8 @@ import { getSession } from '@/lib/auth/session';
 import { classifyVehicleType, type VehicleTypeCheck } from '@/lib/tracker/vehicleTypeCheck';
 import { getUserDoc } from '@/lib/tracker/userDoc';
 import { canRunVehicleLookup, recordVehicleLookupRun } from '@/lib/tracker/vehicleLookupCooldown';
+import { getCachedPlateLookup, setCachedPlateLookup } from '@/lib/tracker/vehicleLookupCache';
+import { fetchWithTimeout } from '@/lib/fetchWithTimeout';
 
 export const dynamic = 'force-dynamic';
 
@@ -59,11 +61,6 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized.' }, { status: 401 });
   }
 
-  const lookupUser = await getUserDoc(session.email);
-  if (!canRunVehicleLookup(lookupUser)) {
-    return NextResponse.json({ error: 'Please wait a few seconds before looking up another registration.' }, { status: 429 });
-  }
-
   const vrm = request.nextUrl.searchParams.get('vrm')?.trim().toUpperCase().replace(/\s+/g, '');
   if (!vrm) {
     return NextResponse.json({ error: 'Registration number is required.' }, { status: 400 });
@@ -75,11 +72,25 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Plate lookup is not available right now.' }, { status: 503 });
   }
 
+  // Checked before the cooldown gate below, same ordering as
+  // buying-guide-lookup/route.ts: these are objective facts about the
+  // vehicle, so a cache hit skips both the billed VDG call AND the
+  // per-account rate limit that exists specifically to protect it.
+  const cached = await getCachedPlateLookup(vrm);
+  if (cached) {
+    return NextResponse.json({ vrm, ...cached });
+  }
+
+  const lookupUser = await getUserDoc(session.email);
+  if (!canRunVehicleLookup(lookupUser)) {
+    return NextResponse.json({ error: 'Please wait a few seconds before looking up another registration.' }, { status: 429 });
+  }
+
   const url = `${VDG_ENDPOINT}?apiKey=${apiKey}&packageName=VehicleDetails&vrm=${encodeURIComponent(vrm)}`;
 
   let data: VdgResponse;
   try {
-    const res = await fetch(url);
+    const res = await fetchWithTimeout(url);
     data = await res.json();
   } catch (err) {
     console.error('VDG lookup request failed:', err);
@@ -106,8 +117,7 @@ export async function GET(request: NextRequest) {
   // the UI needs to surface this rather than present it as a clean match.
   const plateInRetention = data.ResponseInformation.StatusCode === 21;
 
-  const result: PlateLookupResult = {
-    vrm: vd.VehicleIdentification.Vrm,
+  const resultData: Omit<PlateLookupResult, 'vrm'> = {
     make: md?.ModelIdentification?.Make || vd.VehicleIdentification.DvlaMake,
     model: md?.ModelIdentification?.Model || vd.VehicleIdentification.DvlaModel,
     year: vd.VehicleIdentification.YearOfManufacture,
@@ -117,6 +127,8 @@ export async function GET(request: NextRequest) {
     plateInRetention,
     vehicleType: classifyVehicleType(vd.VehicleIdentification.DvlaBodyType ?? ''),
   };
+  await setCachedPlateLookup(vrm, resultData);
 
+  const result: PlateLookupResult = { vrm: vd.VehicleIdentification.Vrm, ...resultData };
   return NextResponse.json(result);
 }

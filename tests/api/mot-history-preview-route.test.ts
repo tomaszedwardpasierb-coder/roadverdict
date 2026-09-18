@@ -8,6 +8,8 @@ const mocks = vi.hoisted(() => ({
   getUserDoc: vi.fn(),
   canRunVehicleLookup: vi.fn(),
   recordVehicleLookupRun: vi.fn(),
+  getCachedMotHistoryLookup: vi.fn(),
+  setCachedMotHistoryLookup: vi.fn(),
 }));
 
 vi.mock("@/lib/auth/session", () => ({ getSession: mocks.getSession }));
@@ -18,6 +20,10 @@ vi.mock("@/lib/tracker/userDoc", () => ({ getUserDoc: mocks.getUserDoc }));
 vi.mock("@/lib/tracker/vehicleLookupCooldown", () => ({
   canRunVehicleLookup: mocks.canRunVehicleLookup,
   recordVehicleLookupRun: mocks.recordVehicleLookupRun,
+}));
+vi.mock("@/lib/tracker/motHistoryLookupCache", () => ({
+  getCachedMotHistoryLookup: mocks.getCachedMotHistoryLookup,
+  setCachedMotHistoryLookup: mocks.setCachedMotHistoryLookup,
 }));
 vi.stubGlobal("fetch", mocks.fetch);
 
@@ -64,6 +70,8 @@ beforeEach(() => {
   mocks.parseMotHistory.mockReturnValue({ motDueDate: "2026-05-01", tests: [] });
   mocks.getUserDoc.mockResolvedValue(null);
   mocks.canRunVehicleLookup.mockReturnValue(true);
+  mocks.getCachedMotHistoryLookup.mockResolvedValue(null);
+  mocks.setCachedMotHistoryLookup.mockResolvedValue(undefined);
 });
 
 describe("GET /api/tracker/mot-history-preview", () => {
@@ -174,7 +182,59 @@ describe("GET /api/tracker/mot-history-preview", () => {
     mocks.parseMotHistory.mockReturnValue({ motDueDate: null, tests: [] });
     await GET(request("ab12 cde"));
     expect(mocks.fetch).toHaveBeenCalledWith(
-      expect.stringContaining("AB12CDE")
+      expect.stringContaining("AB12CDE"),
+      expect.anything()
     );
+  });
+
+  // ── Shared MOT-history lookup cache ─────────────────────────────────────
+
+  describe("MOT history lookup cache", () => {
+    const cachedData = {
+      make: "Honda", model: "CB500F", fuelType: "PETROL", colour: "Black",
+      plateInRetention: false, motDueDate: "2026-05-01",
+      motTestsOldestFirst: [
+        { testDate: "2023-01-01", passed: true, mileage: 10000, mileageTrusted: true, notes: "" },
+        { testDate: "2024-01-01", passed: true, mileage: 14000, mileageTrusted: true, notes: "" },
+      ],
+    };
+
+    it("derives the mileage/date from a cache hit without calling VDG or checking the cooldown", async () => {
+      mocks.getCachedMotHistoryLookup.mockResolvedValue(cachedData);
+      const response = await GET(request("AB12CDE"));
+      const body = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(body).toEqual({ latestTrustedMileage: 14000, latestTestDate: "2024-01-01" });
+      expect(mocks.fetch).not.toHaveBeenCalled();
+      expect(mocks.canRunVehicleLookup).not.toHaveBeenCalled();
+      expect(mocks.recordVehicleLookupRun).not.toHaveBeenCalled();
+      expect(mocks.setCachedMotHistoryLookup).not.toHaveBeenCalled();
+    });
+
+    it("still enforces the cooldown on a cache miss", async () => {
+      mocks.canRunVehicleLookup.mockReturnValue(false);
+      const response = await GET(request("AB12CDE"));
+      expect(response.status).toBe(429);
+      expect(mocks.fetch).not.toHaveBeenCalled();
+    });
+
+    it("caches a fresh successful lookup, keyed by the normalised VRM", async () => {
+      mocks.fetch.mockResolvedValue(vdgSuccess([{}]));
+      mocks.parseMotHistory.mockReturnValue({
+        motDueDate: "2026-05-01",
+        tests: [{ testDate: "2024-01-01", mileage: 14000, mileageTrusted: true, passed: true, notes: "" }],
+      });
+      await GET(request("ab12 cde"));
+      expect(mocks.setCachedMotHistoryLookup).toHaveBeenCalledWith("AB12CDE", expect.objectContaining({
+        motDueDate: "2026-05-01",
+      }));
+    });
+
+    it("does not cache when VDG finds no MOT history", async () => {
+      mocks.fetch.mockResolvedValue(vdgNoHistory());
+      await GET(request("AB12CDE"));
+      expect(mocks.setCachedMotHistoryLookup).not.toHaveBeenCalled();
+    });
   });
 });

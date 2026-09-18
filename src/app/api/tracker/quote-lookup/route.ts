@@ -25,6 +25,8 @@ import { getSession } from "@/lib/auth/session";
 import { parseMotHistory, type RawMotTest } from "@/lib/tracker/motHistory";
 import { getUserDoc } from "@/lib/tracker/userDoc";
 import { canRunVehicleLookup, recordVehicleLookupRun } from "@/lib/tracker/vehicleLookupCooldown";
+import { getCachedMotHistoryLookup, setCachedMotHistoryLookup } from "@/lib/tracker/motHistoryLookupCache";
+import { fetchWithTimeout } from "@/lib/fetchWithTimeout";
 
 export const dynamic = "force-dynamic";
 
@@ -67,11 +69,6 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Not signed in." }, { status: 401 });
   }
 
-  const lookupUser = await getUserDoc(session.email);
-  if (!canRunVehicleLookup(lookupUser)) {
-    return NextResponse.json({ error: "Please wait a few seconds before looking up another registration." }, { status: 429 });
-  }
-
   const vrm = request.nextUrl.searchParams.get("vrm")?.trim().toUpperCase().replace(/\s+/g, "");
   if (!vrm) {
     return NextResponse.json({ error: "Registration number is required." }, { status: 400 });
@@ -83,9 +80,33 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Lookup is not available right now." }, { status: 503 });
   }
 
+  // Checked before the cooldown gate below, same ordering as
+  // buying-guide-lookup/route.ts and plate-lookup/route.ts - shared with
+  // mot-history-preview, which queries this exact same VDG package for
+  // the same plate.
+  const cached = await getCachedMotHistoryLookup(vrm);
+  if (cached) {
+    const result: QuoteLookupResult = {
+      vrm,
+      make: cached.make,
+      model: cached.model,
+      fuelType: cached.fuelType,
+      colour: cached.colour,
+      plateInRetention: cached.plateInRetention,
+      motDueDate: cached.motDueDate,
+      motTests: [...cached.motTestsOldestFirst].reverse(),
+    };
+    return NextResponse.json(result);
+  }
+
+  const lookupUser = await getUserDoc(session.email);
+  if (!canRunVehicleLookup(lookupUser)) {
+    return NextResponse.json({ error: "Please wait a few seconds before looking up another registration." }, { status: 429 });
+  }
+
   let data: VdgMotResponse;
   try {
-    const res = await fetch(`${VDG_ENDPOINT}?apiKey=${apiKey}&packageName=MotHistoryDetails&vrm=${encodeURIComponent(vrm)}`);
+    const res = await fetchWithTimeout(`${VDG_ENDPOINT}?apiKey=${apiKey}&packageName=MotHistoryDetails&vrm=${encodeURIComponent(vrm)}`);
     data = await res.json();
   } catch (err) {
     console.error("Quote lookup request failed:", err);
@@ -100,6 +121,16 @@ export async function GET(request: NextRequest) {
   const details = data.Results.MotHistoryDetails;
   const plateInRetention = data.ResponseInformation.StatusCode === 21;
   const parsed = parseMotHistory(details.MotDueDate ?? null, details.MotTestDetailsList ?? []);
+
+  await setCachedMotHistoryLookup(vrm, {
+    make: details.Make ?? "",
+    model: details.Model ?? "",
+    fuelType: details.FuelType ?? "",
+    colour: details.Colour ?? "",
+    plateInRetention,
+    motDueDate: parsed.motDueDate,
+    motTestsOldestFirst: parsed.tests,
+  });
 
   const result: QuoteLookupResult = {
     vrm,

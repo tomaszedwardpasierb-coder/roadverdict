@@ -8,6 +8,8 @@ const mocks = vi.hoisted(() => ({
   getUserDoc: vi.fn(),
   canRunVehicleLookup: vi.fn(),
   recordVehicleLookupRun: vi.fn(),
+  getCachedPlateLookup: vi.fn(),
+  setCachedPlateLookup: vi.fn(),
 }));
 
 vi.mock("@/lib/auth/session", () => ({ getSession: mocks.getSession }));
@@ -18,6 +20,10 @@ vi.mock("@/lib/tracker/userDoc", () => ({ getUserDoc: mocks.getUserDoc }));
 vi.mock("@/lib/tracker/vehicleLookupCooldown", () => ({
   canRunVehicleLookup: mocks.canRunVehicleLookup,
   recordVehicleLookupRun: mocks.recordVehicleLookupRun,
+}));
+vi.mock("@/lib/tracker/vehicleLookupCache", () => ({
+  getCachedPlateLookup: mocks.getCachedPlateLookup,
+  setCachedPlateLookup: mocks.setCachedPlateLookup,
 }));
 vi.stubGlobal("fetch", mocks.fetch);
 
@@ -111,6 +117,8 @@ beforeEach(() => {
   mocks.classifyVehicleType.mockReturnValue("motorcycle");
   mocks.getUserDoc.mockResolvedValue(null);
   mocks.canRunVehicleLookup.mockReturnValue(true);
+  mocks.getCachedPlateLookup.mockResolvedValue(null);
+  mocks.setCachedPlateLookup.mockResolvedValue(undefined);
   process.env.VDG_API_KEY = "test-key";
 });
 
@@ -241,7 +249,7 @@ describe("GET /api/tracker/plate-lookup", () => {
   it("normalises the VRM to uppercase with spaces stripped before sending to VDG", async () => {
     mocks.fetch.mockResolvedValue(vdgSuccess());
     await GET(request("ab20 yam"));
-    expect(mocks.fetch).toHaveBeenCalledWith(expect.stringContaining("AB20YAM"));
+    expect(mocks.fetch).toHaveBeenCalledWith(expect.stringContaining("AB20YAM"), expect.anything());
   });
 
   it("returns an empty string for colour when VehicleHistory colour is absent", async () => {
@@ -268,5 +276,49 @@ describe("GET /api/tracker/plate-lookup", () => {
     const response = await GET(request("AB20YAM"));
     const body = await response.json();
     expect(body.colour).toBe("");
+  });
+
+  // ── Plate-level cache ─────────────────────────────────────────────────
+
+  describe("plate lookup cache", () => {
+    const cachedData = {
+      make: "Yamaha", model: "MT-07", year: 2020, fuelType: "PETROL", colour: "BLUE",
+      engineCapacityCc: 689, plateInRetention: false, vehicleType: "motorcycle" as const,
+    };
+
+    it("returns the cached result without calling VDG or checking the cooldown", async () => {
+      mocks.getCachedPlateLookup.mockResolvedValue(cachedData);
+      const response = await GET(request("AB20YAM"));
+      const body = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(body).toEqual({ vrm: "AB20YAM", ...cachedData });
+      expect(mocks.fetch).not.toHaveBeenCalled();
+      expect(mocks.canRunVehicleLookup).not.toHaveBeenCalled();
+      expect(mocks.recordVehicleLookupRun).not.toHaveBeenCalled();
+      expect(mocks.setCachedPlateLookup).not.toHaveBeenCalled();
+    });
+
+    it("still enforces the cooldown on a cache miss", async () => {
+      mocks.getCachedPlateLookup.mockResolvedValue(null);
+      mocks.canRunVehicleLookup.mockReturnValue(false);
+      const response = await GET(request("AB20YAM"));
+      expect(response.status).toBe(429);
+      expect(mocks.fetch).not.toHaveBeenCalled();
+    });
+
+    it("caches a fresh successful lookup, keyed by the normalised VRM", async () => {
+      mocks.fetch.mockResolvedValue(vdgSuccess());
+      await GET(request("ab20 yam"));
+      expect(mocks.setCachedPlateLookup).toHaveBeenCalledWith("AB20YAM", expect.objectContaining({
+        make: "Yamaha", model: "MT-07", year: 2020,
+      }));
+    });
+
+    it("does not cache a not-found result", async () => {
+      mocks.fetch.mockResolvedValue(vdgNotFound());
+      await GET(request("AB20YAM"));
+      expect(mocks.setCachedPlateLookup).not.toHaveBeenCalled();
+    });
   });
 });
