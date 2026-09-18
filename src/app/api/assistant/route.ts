@@ -18,7 +18,7 @@ import {
 } from "@/lib/tracker/assistantAnonUsage";
 import { getLivePrivacyPolicyText } from "@/lib/tracker/assistantKnowledge";
 import { getAssistantConfig, getCarAssistantConfig, type AssistantConfigDoc } from "@/lib/tracker/assistantConfig";
-import { resolveActiveVehicle } from "@/lib/tracker/activeVehicle";
+import { resolveActiveVehicle, type ResolvedActiveVehicle } from "@/lib/tracker/activeVehicle";
 import { getDocWithEtag } from "@/lib/tracker/atomicUpdate";
 import type { UserDoc } from "@/lib/tracker/userDoc";
 import { canSendAssistantMessage, recordAssistantMessage } from "@/lib/tracker/assistantSignedInUsage";
@@ -405,16 +405,21 @@ export async function POST(req: NextRequest) {
   }
 
   // Which knowledge base and log-entry gating apply for this request -
-  // resolved once here via the same resolveActiveVehicle() every tool in
-  // assistantTools.ts already uses, rather than re-deriving it a second,
-  // possibly-inconsistent way. Fails soft to null (treated as "bike",
+  // resolved once here, and threaded through to every tool call below
+  // (see the runAssistantTool call's resolvedVehicle argument) rather
+  // than each tool independently re-resolving the same account's same
+  // active vehicle via its own resolveActiveVehicle(email) call - a
+  // multi-tool exchange was re-querying bikes+cars once per tool call
+  // for a value that can't change mid-request (same email, same
+  // request-scoped cookie jar). Fails soft to null (treated as "bike",
   // the pre-car-support default) on any error, same reasoning as every
   // other best-effort block in this route.
   let activeVehicleKind: "bike" | "car" | null = null;
+  let resolvedVehicle: ResolvedActiveVehicle | null = null;
   if (signedIn && session) {
     try {
-      const vehicle = await resolveActiveVehicle(session.email);
-      activeVehicleKind = vehicle?.kind ?? null;
+      resolvedVehicle = await resolveActiveVehicle(session.email);
+      activeVehicleKind = resolvedVehicle?.kind ?? null;
     } catch (err) {
       console.error("Assistant: resolveActiveVehicle() failed, continuing without a known vehicle kind:", err);
     }
@@ -634,7 +639,7 @@ export async function POST(req: NextRequest) {
         // model-supplied and therefore untrusted for identity purposes.
         // reportToken is this same request's own server-validated value
         // from above, for the same reason.
-        const toolResult = await runAssistantTool(name, args ?? {}, session?.email ?? "", reportToken ?? undefined, compareContext ?? undefined, attachment);
+        const toolResult = await runAssistantTool(name, args ?? {}, session?.email ?? "", resolvedVehicle, reportToken ?? undefined, compareContext ?? undefined, attachment);
 
         if ((name === "proposeLogEntry" || name === "proposeEditEntry") && toolResult && typeof toolResult === "object" && !("error" in toolResult)) {
           proposedEntry = toolResult as ProposedEntry;

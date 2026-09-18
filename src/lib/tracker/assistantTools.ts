@@ -10,10 +10,13 @@
 // `email` is ever read from - always `session.email`, never the
 // request body, never a model-supplied argument.
 //
-// Vehicle-kind-aware since Phase 6: each read tool below resolves the
-// account's own active vehicle via resolveActiveVehicle() (bike.ts's
-// getPrimaryBike() is no longer called directly anywhere here) and
-// branches to a bike-shaped or car-shaped fetch, then feeds both into
+// Vehicle-kind-aware since Phase 6: each read tool below takes the
+// account's own active vehicle as a resolvedVehicle parameter - resolved
+// exactly once per request by route.ts's own resolveActiveVehicle() call
+// and threaded through runAssistantTool, rather than each tool
+// re-resolving it independently (bike.ts's getPrimaryBike() is no longer
+// called directly anywhere here) - and branches to a bike-shaped or
+// car-shaped fetch, then feeds both into
 // one shared, vehicle-agnostic compute helper - exactly the same
 // "genuinely generic logic, vehicle-specific data-fetch" split every
 // other part of this build already uses (see carSummary.ts,
@@ -54,7 +57,7 @@ import { buildBikeComparison } from "./bikeComparison";
 import { buildCarComparison } from "./carComparison";
 import { buildCostPerMileVerdict } from "./bikeComparisonVerdict";
 import type { ComparisonPeriod } from "./bikeComparisonPeriod";
-import { resolveActiveVehicle, resolveAllActiveVehicles, type ResolvedVehicleRef } from "./activeVehicle";
+import { resolveAllActiveVehicles, type ResolvedVehicleRef, type ResolvedActiveVehicle } from "./activeVehicle";
 import { getCarServiceRecords } from "./carServiceRecord";
 import { getCarMods } from "./carMod";
 import { getCarBills } from "./carBill";
@@ -107,8 +110,9 @@ function round2(n: number): number {
 // ---- Cross-vehicle aggregation (spend/money tools only) ----
 //
 // Every tool below this point still defaults to the single active
-// vehicle (resolveActiveVehicle) unless the model explicitly passes
-// scope: "all" - see each tool's own branch. Only the spend/money tools
+// vehicle (its own resolvedVehicle parameter) unless the model
+// explicitly passes scope: "all" - see each tool's own branch. Only the
+// spend/money tools
 // (getSpendTotal, getEntries, getReminders, getBudgetProgress) support
 // "all"; getMileage/getMpgTrend/getLastLoggedJob/getStorySoFar etc. stay
 // single-vehicle, since those answer a question about ONE vehicle's own
@@ -181,7 +185,7 @@ function computeSpendTotal(records: CostItem[], mods: CostItem[], fuelLogs: Cost
   };
 }
 
-export async function toolGetSpendTotal(email: string, args: SpendTotalArgs) {
+export async function toolGetSpendTotal(email: string, resolvedVehicle: ResolvedActiveVehicle | null, args: SpendTotalArgs) {
   if (args.scope === "all") {
     const vehicles = await resolveAllActiveVehicles(email);
     if (vehicles.length === 0) return { error: "No vehicle found on this account." };
@@ -208,7 +212,7 @@ export async function toolGetSpendTotal(email: string, args: SpendTotalArgs) {
     };
   }
 
-  const vehicle = await resolveActiveVehicle(email);
+  const vehicle = resolvedVehicle;
   if (!vehicle) return { error: "No vehicle found on this account." };
   const { records, mods, fuelLogs, bills } = await fetchVehicleCostItems(email, vehicle);
   const currency = vehicle.kind === "car" ? vehicle.car.currency ?? "GBP" : vehicle.bike.currency ?? "GBP";
@@ -343,7 +347,7 @@ async function computeEntriesForVehicle(email: string, ref: ResolvedVehicleRef, 
   return entries.map((e) => ({ ...e, vehicleName: name, vehicleKind: "bike" as const }));
 }
 
-export async function toolGetEntries(email: string, args: GetEntriesArgs) {
+export async function toolGetEntries(email: string, resolvedVehicle: ResolvedActiveVehicle | null, args: GetEntriesArgs) {
   if (!args.date && !args.startDate && !args.endDate) {
     return { error: "Needs a date, or a start/end range, to look up - which day, or which period?" };
   }
@@ -363,7 +367,7 @@ export async function toolGetEntries(email: string, args: GetEntriesArgs) {
     };
   }
 
-  const vehicle = await resolveActiveVehicle(email);
+  const vehicle = resolvedVehicle;
   if (!vehicle) return { error: "No vehicle found on this account." };
 
   if (vehicle.kind === "car") {
@@ -412,8 +416,8 @@ function closestMileagePoint(points: MileagePoint[], atDate: string) {
   return { mileage: closest.mileage, asOf: closest.date, note: "Closest logged reading to the date asked about, not the exact date itself unless they match." };
 }
 
-export async function toolGetMileage(email: string, args: MileageArgs) {
-  const vehicle = await resolveActiveVehicle(email);
+export async function toolGetMileage(email: string, resolvedVehicle: ResolvedActiveVehicle | null, args: MileageArgs) {
+  const vehicle = resolvedVehicle;
   if (!vehicle) return { error: "No vehicle found on this account." };
 
   if (vehicle.kind === "car") {
@@ -457,8 +461,8 @@ function computeMpgTrendResult(fuelLogs: MpgCalcInput[], officialMpg?: number) {
   };
 }
 
-export async function toolGetMpgTrend(email: string) {
-  const vehicle = await resolveActiveVehicle(email);
+export async function toolGetMpgTrend(email: string, resolvedVehicle: ResolvedActiveVehicle | null) {
+  const vehicle = resolvedVehicle;
   if (!vehicle) return { error: "No vehicle found on this account." };
 
   if (vehicle.kind === "car") {
@@ -522,7 +526,7 @@ async function remindersForVehicle(email: string, ref: ResolvedVehicleRef) {
   return groupReminders(reminders.map((r) => ({ name: r.name, status: computeReminderStatus(r, bike.currentMileage), detail: reminderDetailLabel(r) })));
 }
 
-export async function toolGetReminders(email: string, args: ReminderArgs = {}) {
+export async function toolGetReminders(email: string, resolvedVehicle: ResolvedActiveVehicle | null, args: ReminderArgs = {}) {
   if (args.scope === "all") {
     const vehicles = await resolveAllActiveVehicles(email);
     if (vehicles.length === 0) return { error: "No vehicle found on this account." };
@@ -537,7 +541,7 @@ export async function toolGetReminders(email: string, args: ReminderArgs = {}) {
     };
   }
 
-  const vehicle = await resolveActiveVehicle(email);
+  const vehicle = resolvedVehicle;
   if (!vehicle) return { error: "No vehicle found on this account." };
   return remindersForVehicle(email, vehicle);
 }
@@ -559,7 +563,7 @@ export interface BudgetProgressArgs {
   scope?: "active" | "all";
 }
 
-export async function toolGetBudgetProgress(email: string, args: BudgetProgressArgs = {}) {
+export async function toolGetBudgetProgress(email: string, resolvedVehicle: ResolvedActiveVehicle | null, args: BudgetProgressArgs = {}) {
   const year = new Date().getFullYear();
 
   if (args.scope === "all") {
@@ -591,7 +595,7 @@ export async function toolGetBudgetProgress(email: string, args: BudgetProgressA
     };
   }
 
-  const vehicle = await resolveActiveVehicle(email);
+  const vehicle = resolvedVehicle;
   if (!vehicle) return { error: "No vehicle found on this account." };
   const budget = vehicleAnnualBudget(vehicle);
   if (!budget) return { hasBudget: false };
@@ -627,12 +631,12 @@ function findLastLoggedJob(records: ServiceLike[], jobQuery: string, jobLabels: 
 // tool schema, but that's a hint to the model, not a runtime guarantee.
 // Trusting it without checking is exactly the kind of assumption that
 // caused the build to correctly fail here - see the case below.
-export async function toolGetLastLoggedJob(email: string, args: Record<string, unknown>) {
+export async function toolGetLastLoggedJob(email: string, resolvedVehicle: ResolvedActiveVehicle | null, args: Record<string, unknown>) {
   if (typeof args.jobQuery !== "string" || !args.jobQuery.trim()) {
     return { error: "No job type specified." };
   }
 
-  const vehicle = await resolveActiveVehicle(email);
+  const vehicle = resolvedVehicle;
   if (!vehicle) return { error: "No vehicle found on this account." };
 
   if (vehicle.kind === "car") {
@@ -654,8 +658,8 @@ export async function toolGetLastLoggedJob(email: string, args: Record<string, u
 // on the account), matching how every other tool here answers about
 // "this account's vehicle" singular, not the account in general.
 
-export async function toolGetShareLinks(email: string) {
-  const vehicle = await resolveActiveVehicle(email);
+export async function toolGetShareLinks(email: string, resolvedVehicle: ResolvedActiveVehicle | null) {
+  const vehicle = resolvedVehicle;
   if (!vehicle) return { error: "No vehicle found on this account." };
 
   if (vehicle.kind === "car") {
@@ -717,14 +721,15 @@ export async function toolGetShareLinks(email: string) {
 //
 // Reads bike.storyCache/car.storyCache directly off the already-fetched
 // vehicle document - no extra query needed, same document every other
-// tool here already loads via resolveActiveVehicle. Deliberately
+// tool here already receives via its own resolvedVehicle parameter.
+// Deliberately
 // doesn't trigger a fresh generation if none exists yet (that's a
 // paid-in-AI-calls action with its own weekly cooldown, gated behind an
 // explicit button click on the Story So Far tab - a chat question
 // should never silently spend it).
 
-export async function toolGetStorySoFar(email: string) {
-  const vehicle = await resolveActiveVehicle(email);
+export async function toolGetStorySoFar(email: string, resolvedVehicle: ResolvedActiveVehicle | null) {
+  const vehicle = resolvedVehicle;
   if (!vehicle) return { error: "No vehicle found on this account." };
 
   if (vehicle.kind === "car") {
@@ -1149,8 +1154,8 @@ function resolveRequiredDraftDate(args: ProposeLogEntryArgs): { date: string } |
   return { date: rawDate };
 }
 
-export async function toolProposeLogEntry(email: string, args: ProposeLogEntryArgs) {
-  const vehicle = await resolveActiveVehicle(email);
+export async function toolProposeLogEntry(email: string, resolvedVehicle: ResolvedActiveVehicle | null, args: ProposeLogEntryArgs) {
+  const vehicle = resolvedVehicle;
   if (!vehicle) return { error: "No vehicle found on this account." };
 
   if (vehicle.kind === "car") {
@@ -1519,8 +1524,8 @@ export interface ProposedSettingsChange {
   includeCleaningInReport?: boolean;
 }
 
-export async function toolProposeSettingsChange(email: string, args: ProposeSettingsChangeArgs) {
-  const vehicle = await resolveActiveVehicle(email);
+export async function toolProposeSettingsChange(email: string, resolvedVehicle: ResolvedActiveVehicle | null, args: ProposeSettingsChangeArgs) {
+  const vehicle = resolvedVehicle;
   if (!vehicle) return { error: "No vehicle found on this account." };
 
   const change: ProposedSettingsChange = { category: "settings", vehicleKind: vehicle.kind };
@@ -1641,8 +1646,8 @@ export interface ProposedShareLink {
 
 const SHARE_LINK_DURATIONS: ShareLinkDuration[] = ["1week", "1month", "6months"];
 
-export async function toolProposeShareLink(email: string, args: ProposeShareLinkArgs) {
-  const vehicle = await resolveActiveVehicle(email);
+export async function toolProposeShareLink(email: string, resolvedVehicle: ResolvedActiveVehicle | null, args: ProposeShareLinkArgs) {
+  const vehicle = resolvedVehicle;
   if (!vehicle) return { error: "No vehicle found on this account." };
 
   const duration = typeof args.duration === "string" && SHARE_LINK_DURATIONS.includes(args.duration as ShareLinkDuration)
@@ -1727,8 +1732,8 @@ function resolveOptionalEditDate(rawDate: string | undefined, existingDate: stri
   return { date: trimmed };
 }
 
-export async function toolProposeEditEntry(email: string, args: ProposeEditEntryArgs) {
-  const vehicle = await resolveActiveVehicle(email);
+export async function toolProposeEditEntry(email: string, resolvedVehicle: ResolvedActiveVehicle | null, args: ProposeEditEntryArgs) {
+  const vehicle = resolvedVehicle;
   if (!vehicle) return { error: "No vehicle found on this account." };
 
   if (
@@ -1919,8 +1924,8 @@ export interface ProposedVaultDocument {
   label: string;
 }
 
-export async function toolProposeVaultDocument(email: string, args: ProposeVaultDocumentArgs) {
-  const vehicle = await resolveActiveVehicle(email);
+export async function toolProposeVaultDocument(email: string, resolvedVehicle: ResolvedActiveVehicle | null, args: ProposeVaultDocumentArgs) {
+  const vehicle = resolvedVehicle;
   if (!vehicle) return { error: "No vehicle found on this account." };
 
   const vaultCategory =
@@ -2031,6 +2036,13 @@ export async function runAssistantTool(
   name: string,
   args: Record<string, unknown>,
   email: string,
+  // route.ts's own single resolveActiveVehicle(email) call for this
+  // request, threaded through to every tool below instead of each one
+  // re-resolving the same account's same active vehicle itself - see
+  // route.ts's own comment on why one resolution is enough for the
+  // whole request. Still null for an anonymous report-only session
+  // (no session to resolve a vehicle for), same as before.
+  resolvedVehicle: ResolvedActiveVehicle | null,
   reportToken?: string,
   compareContext?: CompareContext,
   // Always route.ts's own value (whatever the person attached to this
@@ -2062,21 +2074,21 @@ export async function runAssistantTool(
   // above, kept as its own explicit branch rather than folded into the
   // switch with a lying type cast.
   if (name === "proposeLogEntry") {
-    const result = await toolProposeLogEntry(email, args as ProposeLogEntryArgs);
+    const result = await toolProposeLogEntry(email, resolvedVehicle, args as ProposeLogEntryArgs);
     return withAttachment(result, attachment);
   }
   if (name === "proposeSettingsChange") {
-    return toolProposeSettingsChange(email, args as ProposeSettingsChangeArgs);
+    return toolProposeSettingsChange(email, resolvedVehicle, args as ProposeSettingsChangeArgs);
   }
   if (name === "proposeShareLink") {
-    return toolProposeShareLink(email, args as ProposeShareLinkArgs);
+    return toolProposeShareLink(email, resolvedVehicle, args as ProposeShareLinkArgs);
   }
   if (name === "proposeEditEntry") {
-    const result = await toolProposeEditEntry(email, args as ProposeEditEntryArgs);
+    const result = await toolProposeEditEntry(email, resolvedVehicle, args as ProposeEditEntryArgs);
     return withAttachment(result, attachment);
   }
   if (name === "proposeVaultDocument") {
-    return toolProposeVaultDocument(email, args as ProposeVaultDocumentArgs);
+    return toolProposeVaultDocument(email, resolvedVehicle, args as ProposeVaultDocumentArgs);
   }
   if (name === "proposeFeedback") {
     return toolProposeFeedback(args as ProposeFeedbackArgs);
@@ -2084,23 +2096,23 @@ export async function runAssistantTool(
 
   switch (name as ToolName) {
     case "getSpendTotal":
-      return toolGetSpendTotal(email, args as SpendTotalArgs);
+      return toolGetSpendTotal(email, resolvedVehicle, args as SpendTotalArgs);
     case "getEntries":
-      return toolGetEntries(email, args as GetEntriesArgs);
+      return toolGetEntries(email, resolvedVehicle, args as GetEntriesArgs);
     case "getMileage":
-      return toolGetMileage(email, args as MileageArgs);
+      return toolGetMileage(email, resolvedVehicle, args as MileageArgs);
     case "getMpgTrend":
-      return toolGetMpgTrend(email);
+      return toolGetMpgTrend(email, resolvedVehicle);
     case "getReminders":
-      return toolGetReminders(email, args as ReminderArgs);
+      return toolGetReminders(email, resolvedVehicle, args as ReminderArgs);
     case "getBudgetProgress":
-      return toolGetBudgetProgress(email, args as BudgetProgressArgs);
+      return toolGetBudgetProgress(email, resolvedVehicle, args as BudgetProgressArgs);
     case "getLastLoggedJob":
-      return toolGetLastLoggedJob(email, args);
+      return toolGetLastLoggedJob(email, resolvedVehicle, args);
     case "getShareLinks":
-      return toolGetShareLinks(email);
+      return toolGetShareLinks(email, resolvedVehicle);
     case "getStorySoFar":
-      return toolGetStorySoFar(email);
+      return toolGetStorySoFar(email, resolvedVehicle);
     default:
       return { error: `Unknown tool: ${name}` };
   }

@@ -252,6 +252,7 @@ describe("POST /api/assistant", () => {
       "getSpendTotal",
       { email: "attacker@example.com" },
       "rider@example.com",
+      null,
       "tok-a",
       undefined,
       undefined
@@ -500,6 +501,7 @@ describe("POST /api/assistant", () => {
       "getViewedComparison",
       { bikeIds: ["attacker-id"] },
       "rider@example.com",
+      null,
       undefined,
       { vehicleIds: ["bike-1", "bike-2"], bikeIds: ["bike-1", "bike-2"], carIds: [], from: "2025-01-01", to: undefined },
       undefined
@@ -953,7 +955,7 @@ describe("POST /api/assistant - Feedback tool gating", () => {
 describe("POST /api/assistant - chat attachments", () => {
   const realAttachment = { blobName: "abc123.jpg", fileName: "receipt.jpg", fileType: "image/jpeg", uploadedAt: "2026-01-01T00:00:00.000Z" };
 
-  it("passes a well-formed attachment through to runAssistantTool as the 6th argument on an actual tool call", async () => {
+  it("passes a well-formed attachment through to runAssistantTool as the 7th argument on an actual tool call", async () => {
     mocks.getSession.mockResolvedValue({ email: "rider@example.com" });
     mocks.isPro.mockResolvedValue(true);
     mocks.fetch
@@ -967,6 +969,7 @@ describe("POST /api/assistant - chat attachments", () => {
       "proposeLogEntry",
       { category: "service", description: "Oil change", cost: 40 },
       "rider@example.com",
+      null,
       undefined,
       undefined,
       realAttachment
