@@ -7,8 +7,11 @@ import { getMods } from "@/lib/tracker/mod";
 import { getBills } from "@/lib/tracker/bill";
 import { getFines } from "@/lib/tracker/fine";
 import { getTolls } from "@/lib/tracker/toll";
+import { getLabour } from "@/lib/tracker/labour";
 import { materializeAllDueForBike } from "@/lib/tracker/billSeries";
 import { getFuelLogs } from "@/lib/tracker/fuelLog";
+import { gatherMileagePoints } from "@/lib/tracker/summary";
+import { buildBikeCostForecast, projectMileageOverWindow, type BikeCostForecast } from "@/lib/tracker/costForecast";
 import { getReminders, type ReminderDoc } from "@/lib/tracker/reminder";
 import { computeReminderStatus } from "@/lib/tracker/reminderStatus";
 import { findMileageMonotonicityViolations } from "@/lib/tracker/mileageAudit";
@@ -42,6 +45,7 @@ import type { BillDoc } from "@/lib/tracker/bill";
 import type { FineDoc } from "@/lib/tracker/fine";
 import type { TollDoc } from "@/lib/tracker/toll";
 import type { FuelLogDoc } from "@/lib/tracker/fuelLog";
+import type { LabourDoc } from "@/lib/tracker/labour";
 
 export interface ReportRow {
   id: string;
@@ -101,6 +105,14 @@ export interface SellerReportData {
   supportedFindings: string[];
   unconfirmedFindings: string[];
   detailedQuestions: string[];
+  // Fixed 1-year-out projection, server-rendered - a buyer gets no
+  // interactive window picker (there's no client-side chart state on
+  // this page at all), just the one horizon that answers "what would
+  // owning this cost me". See costForecast.ts's own comment for the
+  // methodology; budget is deliberately never part of this - a budget is
+  // the owner's own target, meaningless to a buyer who has never set one.
+  costForecast: BikeCostForecast;
+  projectedMileageIn1Year: number;
 }
 
 export interface SellerReportCore {
@@ -130,6 +142,8 @@ export interface SellerReportCore {
   supportedFindings: string[];
   unconfirmedFindings: string[];
   detailedQuestions: string[];
+  costForecast: BikeCostForecast;
+  projectedMileageIn1Year: number;
 }
 
 // The actual report computation - everything that depends only on
@@ -303,7 +317,7 @@ export async function getSellerReportCore(email: string, bikeId: string): Promis
     await materializeAllDueForBike(email, bikeId);
   }
 
-  const [records, mods, bills, fuelLogs, reminders, fines, tolls] = await Promise.all([
+  const [records, mods, bills, fuelLogs, reminders, fines, tolls, labour] = await Promise.all([
     getServiceRecords(email, bikeId),
     getMods(email, bikeId),
     getBills(email, bikeId),
@@ -311,6 +325,7 @@ export async function getSellerReportCore(email: string, bikeId: string): Promis
     getReminders(email, bikeId),
     getFines(email, bikeId),
     getTolls(email, bikeId),
+    getLabour(email, bikeId),
   ]);
 
   const {
@@ -378,8 +393,25 @@ export async function getSellerReportCore(email: string, bikeId: string): Promis
     hasTyreEntries
   );
   const detailedQuestions = generateDetailedQuestions(jobTypeGroups, Boolean(otherGroup), hasTyreEntries);
-  const upcomingCostItems = buildUpcomingCostItems(upcomingReminders, consumablesDueSoon, getBikeClassForCC(bike.engineCC));
+  const bikeClass = getBikeClassForCC(bike.engineCC);
+  const upcomingCostItems = buildUpcomingCostItems(upcomingReminders, consumablesDueSoon, bikeClass);
   const evidenceQuality = buildEvidenceQuality(rows.length, receiptCount, realTimeCount, verdictMetrics.longestGapDays, verdictMetrics.mileageViolationCount);
+
+  // Fixed 1-year window, computed server-side same as everything else on
+  // this page - see SellerReportData's own comment on why there's no
+  // window picker here.
+  const mileagePoints = gatherMileagePoints(records, mods, fuelLogs, bills, labour);
+  const bikeLifetime = { startingMileage: bike.startingMileage, currentMileage: bike.currentMileage, dateAdded: bike.dateAdded };
+  const costForecast = buildBikeCostForecast({
+    records, mods, bills, labour, reminders,
+    currentMileage: bike.currentMileage,
+    mileagePoints,
+    bikeLifetime,
+    bikeClass,
+    window: "1y",
+  });
+  const mileageOverWindow = projectMileageOverWindow("1y", mileagePoints, bikeLifetime);
+  const projectedMileageIn1Year = mileageOverWindow[mileageOverWindow.length - 1]?.total ?? bike.currentMileage;
 
   return {
     bike,
@@ -408,6 +440,8 @@ export async function getSellerReportCore(email: string, bikeId: string): Promis
     supportedFindings,
     unconfirmedFindings,
     detailedQuestions,
+    costForecast,
+    projectedMileageIn1Year,
   };
 }
 

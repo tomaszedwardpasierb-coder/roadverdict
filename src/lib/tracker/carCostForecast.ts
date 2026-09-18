@@ -35,6 +35,7 @@ import {
   pointsFromBuckets,
   mergePointsIntoBuckets,
   buildAverageForecast,
+  nextOccurrence,
 } from "./costForecast";
 
 export type { ForecastWindow, ForecastMonthPoint, CategoryForecast };
@@ -177,9 +178,10 @@ export function buildCarBillsForecast(input: { bills: CarBillDoc[]; reminders: C
     const hasReminder = input.reminders.some((r) => r.sourceKey === `bill:${billType}`);
     if (billType !== "road-tax" && !hasReminder) continue;
     const def = BILL_REMINDER_DEFAULTS[billType];
-    const due = new Date(latest.date);
-    due.setMonth(due.getMonth() + def.value);
-    if (due <= windowEnd && due >= new Date()) {
+    const firstDue = new Date(latest.date);
+    firstDue.setMonth(firstDue.getMonth() + def.value);
+    const due = nextOccurrence(firstDue, def.value);
+    if (due <= windowEnd) {
       addToMonth(buckets, bucketKeyForDate(due, input.window), latest.cost);
       lumpLabels.push(billType);
     }

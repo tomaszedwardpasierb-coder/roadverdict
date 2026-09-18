@@ -165,6 +165,20 @@ describe("buildCarBillsForecast", () => {
     expect(result.basis).toContain("road-tax");
   });
 
+  // Regression coverage for the same overdue-renewal bug fixed alongside
+  // this test in costForecast.ts's own fuller version - see that file's
+  // own comment for the full reasoning.
+  it("rolls an overdue-relative-to-now renewal forward to its next real occurrence, rather than silently dropping it", () => {
+    const bills = [
+      { id: "b1", pk: "e", type: "carBill" as const, carId: "c1", date: "2025-01-01", createdAt: "2025-01-01", billType: "road-tax", cost: 190, notes: "" },
+    ];
+    // Naively due 2026-01-01, already before "now" (2026-06-01) - the
+    // next real occurrence is 2027-01-01.
+    const result = buildCarBillsForecast({ bills, reminders: [], window: "1y" });
+    const total = result.points.reduce((sum, p) => sum + p.total, 0);
+    expect(total).toBe(190);
+  });
+
   it("only shows an insurance renewal when an active reminder actually exists for it", () => {
     const bills = [
       { id: "b1", pk: "e", type: "carBill" as const, carId: "c1", date: "2026-01-01", createdAt: "2026-01-01", billType: "insurance", cost: 400, notes: "" },

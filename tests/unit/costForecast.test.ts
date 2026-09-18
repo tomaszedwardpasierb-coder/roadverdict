@@ -260,6 +260,26 @@ describe("buildBillsForecast", () => {
     const result = buildBillsForecast({ bills: [], reminders: [], window: "6m" });
     expect(result.basis).toContain("No bills logged yet");
   });
+
+  // Regression: a renewal reconstructed from the latest logged bill
+  // (last renewal date + 1 interval) can land BEFORE "now" - the owner
+  // hasn't re-logged this cycle's bill yet, or the account's been
+  // dormant a while. The old code required `due >= now` and simply
+  // dropped the lump in that case; the honest next due point is however
+  // many whole cycles further on it takes to catch up, not nothing.
+  it("rolls an overdue-relative-to-now renewal forward to its next real occurrence, rather than silently dropping it", () => {
+    const bills = [
+      { id: "b1", pk: "e", type: "bill" as const, date: "2025-01-01", createdAt: "2025-01-01", billType: "road-tax", cost: 180, notes: "" },
+    ];
+    // Naively due 2026-01-01 (12 months after logging) - already before
+    // "now" (2026-06-01, this file's pinned system time). The next real
+    // occurrence is a further cycle on, 2027-01-01, still inside a
+    // 1-year window.
+    const result = buildBillsForecast({ bills, reminders: [], window: "1y" });
+    const total = result.points.reduce((sum, p) => sum + p.total, 0);
+    expect(total).toBe(180);
+    expect(result.basis).toContain("road-tax");
+  });
 });
 
 describe("buildBikeCostForecast / buildBikeCostForecastAllWindows / pickCategoryForecast", () => {

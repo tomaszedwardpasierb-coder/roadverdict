@@ -12,6 +12,7 @@ const mocks = vi.hoisted(() => ({
   getCarTolls: vi.fn(),
   getCarFuelLogs: vi.fn(),
   getCarReminders: vi.fn(),
+  getCarLabour: vi.fn(),
   resolveCarShareToken: vi.fn(),
   getCarReceiptRequestsForShareToken: vi.fn(),
   materializeAllDueForCar: vi.fn(),
@@ -42,6 +43,7 @@ vi.mock("@/lib/tracker/carFine", () => ({ getCarFines: mocks.getCarFines }));
 vi.mock("@/lib/tracker/carToll", () => ({ getCarTolls: mocks.getCarTolls }));
 vi.mock("@/lib/tracker/carFuelLog", () => ({ getCarFuelLogs: mocks.getCarFuelLogs }));
 vi.mock("@/lib/tracker/carReminder", () => ({ getCarReminders: mocks.getCarReminders }));
+vi.mock("@/lib/tracker/carLabour", () => ({ getCarLabour: mocks.getCarLabour }));
 vi.mock("@/lib/tracker/carBillSeries", () => ({ materializeAllDueForCar: mocks.materializeAllDueForCar }));
 
 // Every other dependency (carReminderStatus, mileageAudit,
@@ -249,6 +251,7 @@ describe("getCarSellerReportCore", () => {
     mocks.getCarTolls.mockResolvedValue([]);
     mocks.getCarFuelLogs.mockResolvedValue([]);
     mocks.getCarReminders.mockResolvedValue([]);
+    mocks.getCarLabour.mockResolvedValue([]);
     mocks.materializeAllDueForCar.mockResolvedValue(undefined);
   });
 
@@ -271,6 +274,15 @@ describe("getCarSellerReportCore", () => {
     expect(Array.isArray(core.buyerQuestions)).toBe(true);
     expect(Array.isArray(core.storyParagraphs)).toBe(true);
     expect(core.mileageCheck).toEqual({ implausible: false });
+    // Same real, already-tested engine (carCostForecast.ts) the
+    // dashboard itself uses, computed for a fixed 1-year window - see
+    // carSellerReportData.ts's own comment on why there's no window
+    // picker here.
+    expect(core.costForecast).toHaveProperty("servicing");
+    expect(core.costForecast).toHaveProperty("mods");
+    expect(core.costForecast).toHaveProperty("bills");
+    expect(core.costForecast).toHaveProperty("labour");
+    expect(core.projectedMileageIn1Year).toBeGreaterThanOrEqual(core.car.currentMileage);
   });
 
   it("excludes valet/wash entries from the item-by-item jobTypeGroups breakdown by default, but includes them once includeCleaningInReport is true", async () => {
@@ -316,6 +328,7 @@ describe("getCarSellerReportData", () => {
     mocks.getCarTolls.mockResolvedValue([]);
     mocks.getCarFuelLogs.mockResolvedValue([]);
     mocks.getCarReminders.mockResolvedValue([]);
+    mocks.getCarLabour.mockResolvedValue([]);
     mocks.getCarReceiptRequestsForShareToken.mockResolvedValue([]);
   });
 

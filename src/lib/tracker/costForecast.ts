@@ -386,6 +386,22 @@ export function buildLabourForecast(labour: LabourDoc[], window: ForecastWindow)
 // Bills - hybrid
 // ---------------------------------------------------------------------
 
+// Rolls a due date forward by whole renewal cycles until it's no longer
+// in the past. A renewal reconstructed from the LATEST logged bill (see
+// buildBillsForecast below) is only ever "last renewal + one interval" -
+// if the owner hasn't re-logged this cycle's bill yet (the common case:
+// they're about to, or it's overdue), that first computed date is
+// already behind "now", and the honest next due point is however many
+// whole cycles further on it takes to catch up - never a date that's
+// already passed. Same "already due counts as due now" idea
+// resolveTriggerDueDate already applies to a mileage-type reminder.
+export function nextOccurrence(from: Date, intervalMonths: number): Date {
+  const next = new Date(from);
+  const now = new Date();
+  while (next < now) next.setMonth(next.getMonth() + intervalMonths);
+  return next;
+}
+
 const KNOWN_DATE_BILL_TYPES = new Set(["road-tax", "insurance", "mot-test"]);
 
 export function buildBillsForecast(input: { bills: BillDoc[]; reminders: ReminderDoc[]; window: ForecastWindow }): CategoryForecast {
@@ -407,9 +423,10 @@ export function buildBillsForecast(input: { bills: BillDoc[]; reminders: Reminde
     const hasReminder = input.reminders.some((r) => r.sourceKey === `bill:${billType}`);
     if (billType !== "road-tax" && !hasReminder) continue;
     const def = BILL_REMINDER_DEFAULTS[billType];
-    const due = new Date(latest.date);
-    due.setMonth(due.getMonth() + def.value);
-    if (due <= windowEnd && due >= new Date()) {
+    const firstDue = new Date(latest.date);
+    firstDue.setMonth(firstDue.getMonth() + def.value);
+    const due = nextOccurrence(firstDue, def.value);
+    if (due <= windowEnd) {
       addToMonth(buckets, bucketKeyForDate(due, input.window), latest.cost);
       lumpLabels.push(billType);
     }

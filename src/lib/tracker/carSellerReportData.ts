@@ -13,7 +13,11 @@ import { getCarBills } from "@/lib/tracker/carBill";
 import { getCarFines } from "@/lib/tracker/carFine";
 import { getCarTolls } from "@/lib/tracker/carToll";
 import { getCarFuelLogs } from "@/lib/tracker/carFuelLog";
+import { getCarLabour } from "@/lib/tracker/carLabour";
 import { getCarReminders } from "@/lib/tracker/carReminder";
+import { gatherCarMileagePoints } from "@/lib/tracker/carSummary";
+import { buildCarCostForecast, type CarCostForecast } from "@/lib/tracker/carCostForecast";
+import { projectMileageOverWindow } from "@/lib/tracker/costForecast";
 import { computeCarReminderStatus } from "@/lib/tracker/carReminderStatus";
 import type { CarReminderDoc } from "@/lib/tracker/carReminder";
 import { findMileageMonotonicityViolations } from "@/lib/tracker/mileageAudit";
@@ -43,6 +47,7 @@ import type { CarBillDoc } from "@/lib/tracker/carBill";
 import type { CarFineDoc } from "@/lib/tracker/carFine";
 import type { CarTollDoc } from "@/lib/tracker/carToll";
 import type { CarFuelLogDoc } from "@/lib/tracker/carFuelLog";
+import type { CarLabourDoc } from "@/lib/tracker/carLabour";
 import type { CarBenchmarkClass } from "@/lib/carPriceData";
 
 export interface CarReportRow {
@@ -82,6 +87,10 @@ export interface CarSellerReportCore {
   supportedFindings: string[];
   unconfirmedFindings: string[];
   detailedQuestions: string[];
+  // Fixed 1-year window, server-rendered - see sellerReportData.ts's own
+  // comment on this same pair of fields for the full reasoning.
+  costForecast: CarCostForecast;
+  projectedMileageIn1Year: number;
 }
 
 export interface CarSellerReportData extends CarSellerReportCore {
@@ -241,7 +250,7 @@ export async function getCarSellerReportCore(email: string, carId: string): Prom
     await materializeAllDueForCar(email, carId);
   }
 
-  const [records, mods, bills, fuelLogs, reminders, fines, tolls] = await Promise.all([
+  const [records, mods, bills, fuelLogs, reminders, fines, tolls, labour] = await Promise.all([
     getCarServiceRecords(email, carId),
     getCarMods(email, carId),
     getCarBills(email, carId),
@@ -249,6 +258,7 @@ export async function getCarSellerReportCore(email: string, carId: string): Prom
     getCarReminders(email, carId),
     getCarFines(email, carId),
     getCarTolls(email, carId),
+    getCarLabour(email, carId),
   ]);
 
   const {
@@ -314,8 +324,24 @@ export async function getCarSellerReportCore(email: string, carId: string): Prom
     hasTyreEntries
   );
   const detailedQuestions = generateCarDetailedQuestions(jobTypeGroups, Boolean(otherGroup), hasTyreEntries);
-  const upcomingCostItems = buildCarUpcomingCostItems(upcomingReminders, consumablesDueSoon, classFromEngineLitres(car.engineLitres));
+  const carClass = classFromEngineLitres(car.engineLitres);
+  const upcomingCostItems = buildCarUpcomingCostItems(upcomingReminders, consumablesDueSoon, carClass);
   const evidenceQuality = buildEvidenceQuality(rows.length, receiptCount, realTimeCount, verdictMetrics.longestGapDays, verdictMetrics.mileageViolationCount);
+
+  // Fixed 1-year window, computed server-side - see sellerReportData.ts's
+  // own comment on this same pair of fields for the full reasoning.
+  const mileagePoints = gatherCarMileagePoints(records, mods, fuelLogs, bills, labour);
+  const carLifetime = { startingMileage: car.startingMileage, currentMileage: car.currentMileage, dateAdded: car.dateAdded };
+  const costForecast = buildCarCostForecast({
+    records, mods, bills, labour, reminders,
+    currentMileage: car.currentMileage,
+    mileagePoints,
+    carLifetime,
+    carClass,
+    window: "1y",
+  });
+  const mileageOverWindow = projectMileageOverWindow("1y", mileagePoints, carLifetime);
+  const projectedMileageIn1Year = mileageOverWindow[mileageOverWindow.length - 1]?.total ?? car.currentMileage;
 
   return {
     car,
@@ -344,6 +370,8 @@ export async function getCarSellerReportCore(email: string, carId: string): Prom
     supportedFindings,
     unconfirmedFindings,
     detailedQuestions,
+    costForecast,
+    projectedMileageIn1Year,
   };
 }
 

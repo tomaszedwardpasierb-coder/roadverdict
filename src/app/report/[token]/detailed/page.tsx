@@ -8,6 +8,7 @@ import { generateVdiSummary } from "@/lib/tracker/vdiSummaryProse";
 import { VdiCheckSection } from "@/components/VdiCheckSection";
 import type { VdiUnlock } from "@/lib/tracker/vdiUnlock";
 import { getSellerReportData } from "@/lib/tracker/sellerReportData";
+import { totalForecastSpend, categoryForecastTotal } from "@/lib/tracker/costForecast";
 import { hasReportAccess } from "@/lib/tracker/reportAccess";
 import { PlateGate } from "../PlateGate";
 import { describeJobTypeGroup } from "@/lib/tracker/reportNarrative";
@@ -104,7 +105,7 @@ export default async function DetailedReportPage(props: {
     bike, rows, total, backdatedCount, realTimeCount, receiptCount,
     currentRegistration, registrationChangesCount, upcomingReminders, consumablesDueSoon, upcomingCostItems,
     evidenceQuality, motCheckUrl, mileageCheck, storyParagraphs, jobTypeGroups, supportedFindings,
-    unconfirmedFindings, detailedQuestions, verdict, askingPrice,
+    unconfirmedFindings, detailedQuestions, verdict, askingPrice, costForecast, projectedMileageIn1Year,
   } = data;
 
   // Lazy-fill, generate-once: unlike buyerOpinionCache's rolling 7-day
@@ -245,10 +246,18 @@ export default async function DetailedReportPage(props: {
     jumpNavItems.push({ href: "#ownership-history", label: "Ownership" });
   }
   if (upcomingCostItems.length > 0) jumpNavItems.push({ href: "#whats-coming-up", label: "Costs" });
+  jumpNavItems.push({ href: "#estimated-running-costs", label: "Estimate" });
   jumpNavItems.push({ href: "#questions", label: "Questions" });
   jumpNavItems.push({ href: "#full-record", label: "Full record" });
 
   const overdueCount = upcomingCostItems.filter((i) => i.timing === "overdue").length;
+  const forecastTotal = totalForecastSpend(costForecast);
+  const forecastCategories = [
+    { label: "Servicing", forecast: costForecast.servicing },
+    { label: "Parts & accessories", forecast: costForecast.mods },
+    { label: "Insurance, tax, MOT & finance", forecast: costForecast.bills },
+    { label: "Labour", forecast: costForecast.labour },
+  ];
   const verdictTierClass =
     verdict.tier === "well-documented" ? styles.verdictGood : verdict.tier === "partially-documented" ? styles.verdictMid : styles.verdictPoor;
 
@@ -645,6 +654,37 @@ export default async function DetailedReportPage(props: {
           </p>
         </div>
       )}
+
+      <div className={styles.forecastBlock}>
+        <p className={styles.forecastTitle} id="estimated-running-costs">
+          Estimated running costs - next 12 months
+          <span className={styles.forecastBadge}>Estimate</span>
+        </p>
+        <p className={styles.forecastIntro}>
+          A forward-looking prediction, not part of the verified record above - see how below.
+        </p>
+        <p className={styles.forecastTotal}>£{Math.round(forecastTotal).toLocaleString()}</p>
+        <ul className={styles.forecastCategoryList}>
+          {forecastCategories.map(({ label, forecast }) => (
+            <li key={label} className={styles.forecastCategoryRow}>
+              <span>
+                <span className={styles.forecastCategoryName}>{label}</span>
+                <span className={styles.forecastCategoryBasis}>{forecast.basis}</span>
+              </span>
+              <span className={styles.forecastCategoryValue}>£{Math.round(categoryForecastTotal(forecast)).toLocaleString()}</span>
+            </li>
+          ))}
+        </ul>
+        <p className={styles.forecastMileage}>
+          Expected mileage in 12 months: <strong>~{Math.round(projectedMileageIn1Year).toLocaleString()} miles</strong>
+          {" "}(up from {bike.currentMileage.toLocaleString()} today) - worth checking against the next MOT/resale mileage.
+        </p>
+        <p className={styles.forecastNote}>
+          These figures are RoadVerdict&apos;s own predictions, based on this bike&apos;s logged history, due
+          reminders, and sourced UK price data - never a quote, and not verified the way the entries above are.
+          Treat as a helpful guide, not a guarantee.
+        </p>
+      </div>
 
       {negotiationSummary && (
         <>
