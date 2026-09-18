@@ -9,6 +9,7 @@ import { AssistantProposedEntryCard, type ProposedEntry } from './AssistantPropo
 import { AssistantProposedSettingsCard, type ProposedSettingsChange } from './AssistantProposedSettingsCard';
 import { AssistantProposedShareLinkCard, type ProposedShareLink } from './AssistantProposedShareLinkCard';
 import { AssistantProposedVaultDocumentCard, type ProposedVaultDocument } from './AssistantProposedVaultDocumentCard';
+import { AssistantProposedFeedbackCard, type ProposedFeedback } from './AssistantProposedFeedbackCard';
 import { AttachmentThumb } from '@/app/dashboard/AttachmentThumb';
 import type { Attachment } from '@/lib/tracker/cosmosHelpers';
 import { fetchWithTimeout, FetchTimeoutError, UPLOAD_TIMEOUT_MS } from '@/lib/fetchWithTimeout';
@@ -86,6 +87,7 @@ interface Message {
   proposedSettingsChange?: ProposedSettingsChange;
   proposedShareLink?: ProposedShareLink;
   proposedVaultDocument?: ProposedVaultDocument;
+  proposedFeedback?: ProposedFeedback;
 }
 
 const GREETING: Message = {
@@ -148,6 +150,7 @@ type SendResult =
       proposedSettingsChange?: ProposedSettingsChange;
       proposedShareLink?: ProposedShareLink;
       proposedVaultDocument?: ProposedVaultDocument;
+      proposedFeedback?: ProposedFeedback;
     }
   | { ok: false; error: string; retryable: boolean };
 
@@ -199,6 +202,7 @@ async function attemptSend(
         ...(data.proposedSettingsChange ? { proposedSettingsChange: data.proposedSettingsChange } : {}),
         ...(data.proposedShareLink ? { proposedShareLink: data.proposedShareLink } : {}),
         ...(data.proposedVaultDocument ? { proposedVaultDocument: data.proposedVaultDocument } : {}),
+        ...(data.proposedFeedback ? { proposedFeedback: data.proposedFeedback } : {}),
       };
     }
     return {
@@ -461,6 +465,7 @@ function AssistantWidgetInner() {
           ...(result.proposedSettingsChange ? { proposedSettingsChange: result.proposedSettingsChange } : {}),
           ...(result.proposedShareLink ? { proposedShareLink: result.proposedShareLink } : {}),
           ...(result.proposedVaultDocument ? { proposedVaultDocument: result.proposedVaultDocument } : {}),
+          ...(result.proposedFeedback ? { proposedFeedback: result.proposedFeedback } : {}),
         },
       ]);
     } else {
@@ -575,6 +580,7 @@ function AssistantWidgetInner() {
                 {m.proposedSettingsChange && <AssistantProposedSettingsCard change={m.proposedSettingsChange} />}
                 {m.proposedShareLink && <AssistantProposedShareLinkCard link={m.proposedShareLink} />}
                 {m.proposedVaultDocument && <AssistantProposedVaultDocumentCard document={m.proposedVaultDocument} />}
+                {m.proposedFeedback && <AssistantProposedFeedbackCard feedback={m.proposedFeedback} />}
               </div>
             ))}
             {sending && (

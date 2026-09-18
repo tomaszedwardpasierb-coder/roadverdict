@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   resolveActiveVehicle: vi.fn(),
+  resolveAllActiveVehicles: vi.fn(),
   getServiceRecords: vi.fn(),
   getMods: vi.fn(),
   getBills: vi.fn(),
@@ -40,7 +41,7 @@ const mocks = vi.hoisted(() => ({
 // the bike.ts/car.ts/next-headers functions it's built on internally,
 // same "mock at the boundary the code under test directly calls"
 // convention used throughout this suite.
-vi.mock("@/lib/tracker/activeVehicle", () => ({ resolveActiveVehicle: mocks.resolveActiveVehicle }));
+vi.mock("@/lib/tracker/activeVehicle", () => ({ resolveActiveVehicle: mocks.resolveActiveVehicle, resolveAllActiveVehicles: mocks.resolveAllActiveVehicles }));
 vi.mock("@/lib/tracker/serviceRecord", () => ({ getServiceRecords: mocks.getServiceRecords }));
 vi.mock("@/lib/tracker/mod", () => ({ getMods: mocks.getMods }));
 vi.mock("@/lib/tracker/bill", () => ({ getBills: mocks.getBills }));
@@ -105,6 +106,7 @@ import {
   toolProposeShareLink,
   toolProposeEditEntry,
   toolProposeVaultDocument,
+  toolProposeFeedback,
   ASSISTANT_TOOL_DECLARATIONS,
 } from "@/lib/tracker/assistantTools";
 
@@ -115,6 +117,9 @@ const bike = {
   annualBudget: null as number | null,
   startingMileage: 8000,
   dateAdded: "2020-01-01",
+  make: "Honda",
+  model: "CB500F",
+  nickname: undefined as string | undefined,
 };
 const car = {
   id: "car-1",
@@ -124,6 +129,9 @@ const car = {
   fuelType: "petrol" as "petrol" | "diesel" | "hybrid" | "phev" | "electric",
   startingMileage: 10000,
   dateAdded: "2020-01-01",
+  make: "Ford",
+  model: "Focus",
+  nickname: undefined as string | undefined,
 };
 
 function bikeActive(overrides: Partial<typeof bike> = {}) {
@@ -132,10 +140,19 @@ function bikeActive(overrides: Partial<typeof bike> = {}) {
 function carActive(overrides: Partial<typeof car> = {}) {
   return { kind: "car" as const, car: { ...car, ...overrides }, hasAnyBike: false };
 }
+// Same shape resolveAllActiveVehicles itself returns (no hasAnyCar/
+// hasAnyBike, unlike the single-vehicle bikeActive/carActive above).
+function bikeRef(overrides: Partial<typeof bike> = {}) {
+  return { kind: "bike" as const, bike: { ...bike, ...overrides } };
+}
+function carRef(overrides: Partial<typeof car> = {}) {
+  return { kind: "car" as const, car: { ...car, ...overrides } };
+}
 
 beforeEach(() => {
   Object.values(mocks).forEach((m) => m.mockReset());
   mocks.resolveActiveVehicle.mockResolvedValue(bikeActive());
+  mocks.resolveAllActiveVehicles.mockResolvedValue([]);
   mocks.getServiceRecords.mockResolvedValue([]);
   mocks.getMods.mockResolvedValue([]);
   mocks.getBills.mockResolvedValue([]);
@@ -178,6 +195,16 @@ describe("runAssistantTool - the core security dispatch layer", () => {
   it("returns a generic error for a genuinely unknown tool name, rather than throwing", async () => {
     const result: any = await runAssistantTool("deleteEverything", {}, "owner@example.com");
     expect(result).toEqual({ error: "Unknown tool: deleteEverything" });
+  });
+
+  // proposeFeedback isn't part of ASSISTANT_TOOL_DECLARATIONS (its own
+  // FEEDBACK_TOOL_DECLARATIONS array, gated independently in route.ts),
+  // so it isn't covered by the "every declared tool dispatches" loop
+  // above - same reason getViewedReport/proposeLogEntry etc. get their
+  // own explicit dispatch tests too.
+  it("dispatches proposeFeedback", async () => {
+    const result: any = await runAssistantTool("proposeFeedback", { feedbackType: "bug", message: "It broke" }, "owner@example.com");
+    expect(result).toEqual({ category: "feedback", feedbackType: "bug", message: "It broke" });
   });
 
   // The entire stated purpose of this file: no session-scoped tool ever
@@ -327,6 +354,41 @@ describe("toolGetSpendTotal", () => {
       expect(mocks.getFuelLogs).not.toHaveBeenCalled();
     });
   });
+
+  describe("scope: 'all'", () => {
+    it("returns an error when the account has no active vehicles at all", async () => {
+      mocks.resolveAllActiveVehicles.mockResolvedValue([]);
+      expect(await toolGetSpendTotal("owner@example.com", { scope: "all" })).toEqual({ error: "No vehicle found on this account." });
+    });
+
+    it("sums spend across a bike and a car, with a per-vehicle breakdown labelled by nickname/make/model", async () => {
+      mocks.resolveAllActiveVehicles.mockResolvedValue([bikeRef({ nickname: "Daily" }), carRef()]);
+      mocks.getServiceRecords.mockResolvedValue([{ date: "2025-01-01", cost: 100 }]);
+      mocks.getCarServiceRecords.mockResolvedValue([{ date: "2025-01-01", cost: 300 }]);
+
+      const result: any = await toolGetSpendTotal("owner@example.com", { scope: "all" });
+
+      expect(result.scope).toBe("all");
+      expect(result.total).toBe(400);
+      expect(result.currency).toBe("GBP");
+      expect(result.byVehicle).toEqual([
+        { name: "Daily (Honda CB500F)", kind: "bike", total: 100, entryCount: 1 },
+        { name: "Ford Focus", kind: "car", total: 300, entryCount: 1 },
+      ]);
+    });
+
+    it("still respects a category filter across every vehicle", async () => {
+      mocks.resolveAllActiveVehicles.mockResolvedValue([bikeRef(), carRef()]);
+      mocks.getServiceRecords.mockResolvedValue([{ date: "2025-01-01", cost: 100 }]);
+      mocks.getFuelLogs.mockResolvedValue([{ date: "2025-01-01", cost: 20 }]);
+      mocks.getCarBills.mockResolvedValue([{ date: "2025-01-01", cost: 300 }]);
+
+      const result: any = await toolGetSpendTotal("owner@example.com", { scope: "all", category: "servicing" });
+
+      expect(result.total).toBe(100); // only the bike's servicing record - fuel and the car's bill are excluded
+      expect(result.category).toBe("servicing");
+    });
+  });
 });
 
 describe("toolGetEntries", () => {
@@ -434,6 +496,27 @@ describe("toolGetEntries", () => {
       mocks.getCarBills.mockResolvedValue([{ date: "2026-01-05", cost: 15, billType: "congestion", notes: "" }]);
       const result: any = await toolGetEntries("owner@example.com", { date: "2026-01-05" });
       expect(result.entries[0].description).toMatch(/congestion/i);
+    });
+  });
+
+  describe("scope: 'all'", () => {
+    it("returns an error when the account has no active vehicles at all", async () => {
+      mocks.resolveAllActiveVehicles.mockResolvedValue([]);
+      expect(await toolGetEntries("owner@example.com", { date: "2026-01-05", scope: "all" })).toEqual({ error: "No vehicle found on this account." });
+    });
+
+    it("merges entries from every vehicle, each tagged with its own vehicle name, sorted by date", async () => {
+      mocks.resolveAllActiveVehicles.mockResolvedValue([bikeRef({ nickname: "Daily" }), carRef()]);
+      mocks.getServiceRecords.mockResolvedValue([{ date: "2026-01-05", cost: 40, jobType: "oil-filter", notes: "" }]);
+      mocks.getCarServiceRecords.mockResolvedValue([{ date: "2026-01-04", cost: 60, jobType: "oil-filter", notes: "" }]);
+
+      const result: any = await toolGetEntries("owner@example.com", { startDate: "2026-01-04", endDate: "2026-01-05", scope: "all" });
+
+      expect(result.scope).toBe("all");
+      expect(result.entries.map((e: any) => e.vehicleName)).toEqual(["Ford Focus", "Daily (Honda CB500F)"]);
+      expect(result.entries.map((e: any) => e.vehicleKind)).toEqual(["car", "bike"]);
+      expect(result.entryCount).toBe(2);
+      expect(result.totalCost).toBe(100);
     });
   });
 });
@@ -569,6 +652,29 @@ describe("toolGetReminders", () => {
       expect(mocks.getReminders).not.toHaveBeenCalled();
     });
   });
+
+  describe("scope: 'all'", () => {
+    it("returns an error when the account has no active vehicles at all", async () => {
+      mocks.resolveAllActiveVehicles.mockResolvedValue([]);
+      expect(await toolGetReminders("owner@example.com", { scope: "all" })).toEqual({ error: "No vehicle found on this account." });
+    });
+
+    it("merges each vehicle's reminders into one grouped result, each tagged with its own vehicle name", async () => {
+      mocks.resolveAllActiveVehicles.mockResolvedValue([bikeRef({ nickname: "Daily" }), carRef()]);
+      mocks.getReminders.mockResolvedValue([{ name: "MOT" }]);
+      mocks.computeReminderStatus.mockReturnValue("overdue");
+      mocks.reminderDetailLabel.mockReturnValue("overdue");
+      mocks.getCarReminders.mockResolvedValue([{ name: "Service" }]);
+      mocks.computeCarReminderStatus.mockReturnValue("due-soon");
+      mocks.carReminderDetailLabel.mockReturnValue("due soon");
+
+      const result: any = await toolGetReminders("owner@example.com", { scope: "all" });
+
+      expect(result.scope).toBe("all");
+      expect(result.overdue).toEqual([{ name: "MOT", status: "overdue", detail: "overdue", vehicleName: "Daily (Honda CB500F)" }]);
+      expect(result.dueSoon).toEqual([{ name: "Service", status: "due-soon", detail: "due soon", vehicleName: "Ford Focus" }]);
+    });
+  });
 });
 
 describe("toolGetBudgetProgress", () => {
@@ -608,6 +714,33 @@ describe("toolGetBudgetProgress", () => {
       expect(result.spentThisYear).toBe(300);
       expect(result.remaining).toBe(700);
       expect(mocks.getServiceRecords).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("scope: 'all'", () => {
+    it("returns an error when the account has no active vehicles at all", async () => {
+      mocks.resolveAllActiveVehicles.mockResolvedValue([]);
+      expect(await toolGetBudgetProgress("owner@example.com", { scope: "all" })).toEqual({ error: "No vehicle found on this account." });
+    });
+
+    it("reports no budget when none of the account's vehicles has one set", async () => {
+      mocks.resolveAllActiveVehicles.mockResolvedValue([bikeRef({ annualBudget: null }), carRef({ annualBudget: null })]);
+      expect(await toolGetBudgetProgress("owner@example.com", { scope: "all" })).toEqual({ scope: "all", hasBudget: false });
+    });
+
+    it("combines budgets across every vehicle that has one set, and notes when a vehicle without one was left out", async () => {
+      mocks.resolveAllActiveVehicles.mockResolvedValue([bikeRef({ nickname: "Daily", annualBudget: 1000 }), carRef({ annualBudget: null })]);
+      mocks.getServiceRecords.mockResolvedValue([{ date: `${new Date().getFullYear()}-01-01`, cost: 200 }]);
+
+      const result: any = await toolGetBudgetProgress("owner@example.com", { scope: "all" });
+
+      expect(result.scope).toBe("all");
+      expect(result.hasBudget).toBe(true);
+      expect(result.byVehicle).toEqual([{ name: "Daily (Honda CB500F)", kind: "bike", budget: 1000, spentThisYear: 200, remaining: 800 }]);
+      expect(result.combinedBudget).toBe(1000);
+      expect(result.combinedSpent).toBe(200);
+      expect(mocks.getCarServiceRecords).not.toHaveBeenCalled(); // the budget-less car is skipped entirely, not fetched
+      expect(result.note).toMatch(/1 of your active vehicles has no budget set/);
     });
   });
 });
@@ -1582,6 +1715,41 @@ describe("toolProposeVaultDocument", () => {
     mocks.resolveActiveVehicle.mockResolvedValue(carActive());
     const result: any = await toolProposeVaultDocument("owner@example.com", { category: "insurance" });
     expect(result).toEqual({ category: "vaultDocument", vehicleKind: "car", vehicleId: "car-1", vaultCategory: "insurance", label: "" });
+  });
+});
+
+describe("toolProposeFeedback", () => {
+  // The one propose* tool that is genuinely account-level, not
+  // vehicle-level - it must never touch resolveActiveVehicle at all,
+  // unlike every other tool in this file.
+  it("never resolves a vehicle - feedback is account-level, not vehicle-level", async () => {
+    await toolProposeFeedback({ feedbackType: "bug", message: "The chart is blank" });
+    expect(mocks.resolveActiveVehicle).not.toHaveBeenCalled();
+  });
+
+  it("rejects a missing or unrecognized feedbackType", async () => {
+    expect(await toolProposeFeedback({ message: "hi" })).toEqual({ error: "Is this a feature request, a bug report, or something else?" });
+    expect(await toolProposeFeedback({ feedbackType: "nonsense", message: "hi" })).toEqual({ error: "Is this a feature request, a bug report, or something else?" });
+  });
+
+  it("rejects a missing or empty message", async () => {
+    expect(await toolProposeFeedback({ feedbackType: "bug" })).toEqual({ error: "What would you like to say? A sentence or two is enough." });
+    expect(await toolProposeFeedback({ feedbackType: "bug", message: "   " })).toEqual({ error: "What would you like to say? A sentence or two is enough." });
+  });
+
+  it("rejects an overlong message", async () => {
+    const result = await toolProposeFeedback({ feedbackType: "feature", message: "x".repeat(4001) });
+    expect(result).toEqual({ error: "That's a bit long - could you shorten it to under 4000 characters?" });
+  });
+
+  it("drafts a valid feature request, trimmed", async () => {
+    const result = await toolProposeFeedback({ feedbackType: "feature", message: "  Add dark mode  " });
+    expect(result).toEqual({ category: "feedback", feedbackType: "feature", message: "Add dark mode" });
+  });
+
+  it("drafts a valid bug report", async () => {
+    const result = await toolProposeFeedback({ feedbackType: "bug", message: "The spend chart shows nothing" });
+    expect(result).toEqual({ category: "feedback", feedbackType: "bug", message: "The spend chart shows nothing" });
   });
 });
 

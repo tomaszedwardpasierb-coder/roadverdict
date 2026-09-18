@@ -2,10 +2,10 @@
 'use client';
 
 import { useState, type ReactNode } from 'react';
-import { Activity, Server, Wrench, Users, Bell, MessageSquare, Database, UserCog } from 'lucide-react';
+import { Activity, Server, Wrench, Users, Bell, MessageSquare, Database, UserCog, Flag } from 'lucide-react';
 import styles from './adminShell.module.css';
 
-type Section = 'overview' | 'traffic' | 'jobs' | 'accounts' | 'impersonations' | 'notifications' | 'assistant' | 'database';
+type Section = 'overview' | 'traffic' | 'jobs' | 'accounts' | 'impersonations' | 'notifications' | 'assistant' | 'feedback' | 'database';
 
 const NAV_ITEMS: { key: Section; label: string; icon: typeof Server }[] = [
   { key: 'overview', label: 'Overview', icon: Server },
@@ -15,6 +15,7 @@ const NAV_ITEMS: { key: Section; label: string; icon: typeof Server }[] = [
   { key: 'impersonations', label: 'Impersonate sessions', icon: UserCog },
   { key: 'notifications', label: 'Notifications', icon: Bell },
   { key: 'assistant', label: 'AI assistant', icon: MessageSquare },
+  { key: 'feedback', label: 'Feedback', icon: Flag },
   { key: 'database', label: 'Database', icon: Database },
 ];
 
@@ -26,6 +27,7 @@ interface Props {
   impersonationsContent: ReactNode;
   notificationsContent: ReactNode;
   assistantContent: ReactNode;
+  feedbackContent: ReactNode;
   databaseContent: ReactNode;
   logoutButton: ReactNode;
 }
@@ -45,6 +47,7 @@ export function AdminShell({
   impersonationsContent,
   notificationsContent,
   assistantContent,
+  feedbackContent,
   databaseContent,
   logoutButton,
 }: Props) {
@@ -58,6 +61,7 @@ export function AdminShell({
     impersonations: impersonationsContent,
     notifications: notificationsContent,
     assistant: assistantContent,
+    feedback: feedbackContent,
     database: databaseContent,
   };
 

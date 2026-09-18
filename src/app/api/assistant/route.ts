@@ -31,12 +31,14 @@ import {
   SHARE_LINK_TOOL_DECLARATIONS,
   EDIT_TOOL_DECLARATIONS,
   VAULT_TOOL_DECLARATIONS,
+  FEEDBACK_TOOL_DECLARATIONS,
   runAssistantTool,
   type CompareContext,
   type ProposedEntry,
   type ProposedSettingsChange,
   type ProposedShareLink,
   type ProposedVaultDocument,
+  type ProposedFeedback,
 } from "@/lib/tracker/assistantTools";
 import type { Attachment } from "@/lib/tracker/cosmosHelpers";
 import { logAssistantQuestion } from "@/lib/tracker/assistantQuestionLog";
@@ -218,6 +220,14 @@ function buildSystemInstruction(config: AssistantConfigDoc, signedIn: boolean, p
   } else if (signedIn) {
     parts.push(
       "\n\n---\n\nADDING A DOCUMENT TO THE VAULT VIA CHAT: not available on this account yet - the Vault itself requires Pro AND two-factor authentication enabled (Security tab), regardless of whether chat drafting is otherwise available. If asked to add a document to the Vault, say so plainly and name whichever of Pro/2FA is actually missing if you can tell, rather than attempting to draft it."
+    );
+  }
+
+  // No Pro/logEntryAccess gate, deliberately - the manual "Feature
+  // request / report a bug" form in Settings has never had one either.
+  if (signedIn) {
+    parts.push(
+      "\n\n---\n\nSENDING FEEDBACK VIA CHAT: if the signed-in user wants to report a bug or request a feature, use the proposeFeedback tool to draft it - never send it yourself, it only prepares a draft for them to review and confirm on screen. If it's a bug report, mention in your reply that they can attach up to 3 screenshots (PNG/JPG only) on the draft card before confirming. This is unrelated to logging a cost/expense (that's proposeLogEntry) - only use this when they're actually asking to report a problem with RoadVerdict itself or suggest an improvement to it."
     );
   }
 
@@ -559,6 +569,11 @@ export async function POST(req: NextRequest) {
   const contents: GeminiContent[] = toGeminiContents(messages);
   const toolDeclarations = [
     ...(signedIn ? ASSISTANT_TOOL_DECLARATIONS : []),
+    // No Pro gate, unlike the write tools further down - matches the
+    // existing manual "Feature request / report a bug" form in
+    // Settings, which has never had one either (see feedback.ts's own
+    // comment on why this stays independent of logEntryAccess).
+    ...(signedIn ? FEEDBACK_TOOL_DECLARATIONS : []),
     ...(reportToken ? REPORT_TOOL_DECLARATIONS : []),
     ...(compareContext ? COMPARISON_TOOL_DECLARATIONS : []),
     ...(logEntryAccess === "available" ? buildLogEntryToolDeclarations(activeVehicleKind === "car" ? "car" : "bike") : []),
@@ -582,6 +597,7 @@ export async function POST(req: NextRequest) {
   let proposedSettingsChange: ProposedSettingsChange | null = null;
   let proposedShareLink: ProposedShareLink | null = null;
   let proposedVaultDocument: ProposedVaultDocument | null = null;
+  let proposedFeedback: ProposedFeedback | null = null;
 
   try {
     // Bounded rather than while(true) - a tool-call loop that somehow
@@ -631,6 +647,9 @@ export async function POST(req: NextRequest) {
         if (name === "proposeVaultDocument" && toolResult && typeof toolResult === "object" && !("error" in toolResult)) {
           proposedVaultDocument = toolResult as ProposedVaultDocument;
         }
+        if (name === "proposeFeedback" && toolResult && typeof toolResult === "object" && !("error" in toolResult)) {
+          proposedFeedback = toolResult as ProposedFeedback;
+        }
 
         // Echo back every part from the model's actual turn, verbatim -
         // not a rebuilt {functionCall: {name, args}}, which silently
@@ -655,6 +674,7 @@ export async function POST(req: NextRequest) {
         ...(proposedSettingsChange ? { proposedSettingsChange } : {}),
         ...(proposedShareLink ? { proposedShareLink } : {}),
         ...(proposedVaultDocument ? { proposedVaultDocument } : {}),
+        ...(proposedFeedback ? { proposedFeedback } : {}),
       });
     }
 

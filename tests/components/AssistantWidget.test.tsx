@@ -645,6 +645,24 @@ describe("AssistantWidget", () => {
       await screen.findByText("Here's a draft for the Vault.");
       expect(screen.getByText("Add to Vault")).toBeInTheDocument();
     });
+
+    it("renders a proposedFeedback card alongside the reply", async () => {
+      (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          reply: "Here's a draft bug report - take a look below.",
+          proposedFeedback: { category: "feedback", feedbackType: "bug", message: "The chart is blank" },
+        }),
+      });
+      const user = userEvent.setup();
+      render(<AssistantWidget />);
+      await openWidgetAndSend(user, "Report a bug: the chart is blank");
+
+      await screen.findByText("Here's a draft bug report - take a look below.");
+      expect(screen.getByLabelText("Type")).toHaveValue("bug");
+      expect(screen.getByLabelText("Message")).toHaveValue("The chart is blank");
+    });
   });
 
   describe("voice input", () => {

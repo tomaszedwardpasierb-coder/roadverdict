@@ -123,6 +123,72 @@ describe("SettingsTab", () => {
     expect(await screen.findByText(/Thanks, we've got it\./)).toBeInTheDocument();
   });
 
+  describe("bug report screenshots", () => {
+    function makeFile(name: string, type = "image/png") {
+      return new File(["contents"], name, { type });
+    }
+
+    it("only shows the screenshot picker once the type is set to 'bug'", async () => {
+      const user = userEvent.setup();
+      render(<SettingsTab {...baseProps} />);
+      expect(screen.queryByLabelText(/Screenshots/)).not.toBeInTheDocument();
+
+      await user.selectOptions(screen.getByLabelText("Type"), "bug");
+      expect(screen.getByLabelText(/Screenshots/)).toBeInTheDocument();
+
+      await user.selectOptions(screen.getByLabelText("Type"), "feature");
+      expect(screen.queryByLabelText(/Screenshots/)).not.toBeInTheDocument();
+    });
+
+    it("uploads each picked screenshot before sending, including the resulting attachments in the feedback POST", async () => {
+      const user = userEvent.setup();
+      const attachment1 = { blobName: "b1", fileName: "one.png", fileType: "image/png", uploadedAt: "2026-01-01" };
+      const fetchSpy = vi.fn(async (url: string, init?: RequestInit) => {
+        const method = init?.method ?? "GET";
+        if (`${method} ${url}` === "POST /api/account/feedback/upload-attachment") {
+          return { ok: true, json: async () => ({ attachment: attachment1 }) } as Response;
+        }
+        return { ok: true, json: async () => ({ ok: true }) } as Response;
+      });
+      vi.stubGlobal("fetch", fetchSpy);
+      render(<SettingsTab {...baseProps} />);
+
+      await user.selectOptions(screen.getByLabelText("Type"), "bug");
+      await user.type(screen.getByLabelText("Message"), "Broken chart");
+      await user.upload(screen.getByLabelText(/Screenshots/), makeFile("one.png"));
+      await user.click(screen.getByRole("button", { name: "Send" }));
+
+      await screen.findByText(/Thanks, we've got it\./);
+      expect(fetchSpy).toHaveBeenCalledWith("/api/account/feedback/upload-attachment", expect.objectContaining({ method: "POST" }));
+      expect(fetchSpy).toHaveBeenCalledWith(
+        "/api/account/feedback",
+        expect.objectContaining({ body: JSON.stringify({ type: "bug", message: "Broken chart", attachments: [attachment1], source: "settings" }) })
+      );
+    });
+
+    it("refuses a single pick of more than 3 screenshots at once", async () => {
+      const user = userEvent.setup();
+      render(<SettingsTab {...baseProps} />);
+      await user.selectOptions(screen.getByLabelText("Type"), "bug");
+
+      await user.upload(screen.getByLabelText(/Screenshots/), [makeFile("a.png"), makeFile("b.png"), makeFile("c.png"), makeFile("d.png")]);
+
+      expect(await screen.findByRole("alert")).toHaveTextContent("Up to 3 screenshots allowed.");
+      expect(screen.queryByText("a.png")).not.toBeInTheDocument();
+    });
+
+    it("lets a picked screenshot be removed before sending", async () => {
+      const user = userEvent.setup();
+      render(<SettingsTab {...baseProps} />);
+      await user.selectOptions(screen.getByLabelText("Type"), "bug");
+      await user.upload(screen.getByLabelText(/Screenshots/), makeFile("a.png"));
+      expect(screen.getByText("a.png")).toBeInTheDocument();
+
+      await user.click(screen.getByRole("button", { name: "Remove a.png" }));
+      expect(screen.queryByText("a.png")).not.toBeInTheDocument();
+    });
+  });
+
   it("opens the delete-account modal, and the confirm button stays disabled until \"DELETE\" is typed exactly", async () => {
     const user = userEvent.setup();
     render(<SettingsTab {...baseProps} />);

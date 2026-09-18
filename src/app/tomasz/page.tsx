@@ -14,6 +14,7 @@ import {
 } from '@/lib/admin/stats';
 import { getSiteStats, type SiteStats } from '@/lib/monitoring/appInsights';
 import { getAllAssistantQuestions, groupSimilarQuestions, type AssistantQuestionLogDoc } from '@/lib/tracker/assistantQuestionLog';
+import { getAllFeedback, type FeedbackDoc } from '@/lib/tracker/feedback';
 import { getAllUserEmails, getBroadcastSummaries, type BroadcastSummary } from '@/lib/tracker/notification';
 import { getAssistantConfig, getCarAssistantConfig } from '@/lib/tracker/assistantConfig';
 import { getAllUserAccounts } from '@/lib/tracker/userAccount';
@@ -25,6 +26,7 @@ import { KnowledgeBaseEditor } from './KnowledgeBaseEditor';
 import styles from './adminShell.module.css';
 import { RunCronButton } from './RunCronButton';
 import { AssistantQuestionsTable } from './AssistantQuestionsTable';
+import { FeedbackTable } from './FeedbackTable';
 import { ImpersonationSessionsTable } from './ImpersonationSessionsTable';
 import { ImpersonateButton } from './ImpersonateButton';
 import { AdminLogoutButton } from './AdminLogoutButton';
@@ -84,6 +86,17 @@ async function getAssistantQuestionsSafe(): Promise<AssistantQuestionLogDoc[]> {
     return await getAllAssistantQuestions();
   } catch (err) {
     console.error('Failed to load assistant questions for /tomasz:', err);
+    return [];
+  }
+}
+
+// Same defensive treatment again - a new query against a document type
+// this page hasn't touched before.
+async function getFeedbackSafe(): Promise<FeedbackDoc[]> {
+  try {
+    return await getAllFeedback();
+  } catch (err) {
+    console.error('Failed to load feedback for /tomasz:', err);
     return [];
   }
 }
@@ -199,6 +212,7 @@ export default async function AdminDashboardPage(
     seedAssistantConfigStatus,
     siteStats,
     assistantQuestions,
+    feedbackItems,
     allUserEmails,
     assistantConfig,
     carAssistantConfig,
@@ -217,6 +231,7 @@ export default async function AdminDashboardPage(
     getSeedAssistantConfigStatus(),
     getSiteStatsSafe(windowHours),
     getAssistantQuestionsSafe(),
+    getFeedbackSafe(),
     getAllUserEmailsSafe(),
     getAssistantConfig(),
     getCarAssistantConfig(),
@@ -776,6 +791,18 @@ export default async function AdminDashboardPage(
     </>
   );
 
+  const feedbackContent = (
+    <>
+      <h2 className={styles.sectionHeading}>Feature requests &amp; bug reports</h2>
+      <p className={styles.note} style={{ marginBottom: '0.6rem' }}>
+        {feedbackItems.length} submitted in total, raised either from the Settings tab&apos;s own
+        form or via the AI assistant (see the Source column) - both post to the same endpoint, so
+        this is the full combined list either way.
+      </p>
+      <FeedbackTable items={feedbackItems} />
+    </>
+  );
+
   const databaseContent = (
     <>
       {cosmosInfo && (
@@ -812,6 +839,7 @@ export default async function AdminDashboardPage(
       impersonationsContent={impersonationsContent}
       notificationsContent={notificationsContent}
       assistantContent={assistantContent}
+      feedbackContent={feedbackContent}
       databaseContent={databaseContent}
       logoutButton={<AdminLogoutButton />}
     />

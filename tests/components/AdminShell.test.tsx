@@ -1,6 +1,6 @@
 // Place at: tests/components/AdminShell.test.tsx
 //
-// The admin dashboard's shell/nav: eight sections switched by local
+// The admin dashboard's shell/nav: nine sections switched by local
 // state, with only the active section's content actually shown. No
 // external boundaries here (no fetch, no next/navigation hooks used
 // directly by this component) - everything is real React state.
@@ -20,6 +20,7 @@ function renderShell() {
       impersonationsContent={<div>Impersonations panel content</div>}
       notificationsContent={<div>Notifications panel content</div>}
       assistantContent={<div>Assistant panel content</div>}
+      feedbackContent={<div>Feedback panel content</div>}
       databaseContent={<div>Database panel content</div>}
       logoutButton={<button type="button">Sign out</button>}
     />
@@ -36,6 +37,7 @@ describe("AdminShell", () => {
     expect(screen.queryByText("Impersonations panel content")).not.toBeInTheDocument();
     expect(screen.queryByText("Notifications panel content")).not.toBeInTheDocument();
     expect(screen.queryByText("Assistant panel content")).not.toBeInTheDocument();
+    expect(screen.queryByText("Feedback panel content")).not.toBeInTheDocument();
     expect(screen.queryByText("Database panel content")).not.toBeInTheDocument();
   });
 
@@ -55,7 +57,7 @@ describe("AdminShell", () => {
     expect(screen.getByText("AI assistant", { selector: `.${styles.breadcrumbCurrent}` })).toBeInTheDocument();
   });
 
-  it("each of the eight nav items switches to its own distinct content", async () => {
+  it("each of the nine nav items switches to its own distinct content", async () => {
     const user = userEvent.setup();
     renderShell();
 
@@ -65,6 +67,7 @@ describe("AdminShell", () => {
       ["Accounts & sessions", "Accounts panel content"],
       ["Impersonate sessions", "Impersonations panel content"],
       ["Notifications", "Notifications panel content"],
+      ["Feedback", "Feedback panel content"],
       ["Database", "Database panel content"],
       ["Overview", "Overview panel content"],
     ];

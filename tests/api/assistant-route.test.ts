@@ -42,6 +42,7 @@ vi.mock("@/lib/tracker/assistantTools", () => ({
   SHARE_LINK_TOOL_DECLARATIONS: [{ name: "proposeShareLink" }],
   EDIT_TOOL_DECLARATIONS: [{ name: "proposeEditEntry" }],
   VAULT_TOOL_DECLARATIONS: [{ name: "proposeVaultDocument" }],
+  FEEDBACK_TOOL_DECLARATIONS: [{ name: "proposeFeedback" }],
   runAssistantTool: mocks.runAssistantTool,
 }));
 vi.mock("@/lib/tracker/assistantQuestionLog", () => ({ logAssistantQuestion: mocks.logAssistantQuestion }));
@@ -888,6 +889,61 @@ describe("POST /api/assistant - Vault tool gating", () => {
     const callBody = JSON.parse(mocks.fetch.mock.calls[0][1].body);
     const names = (callBody.tools?.[0]?.functionDeclarations ?? []).map((d: { name: string }) => d.name);
     expect(names).not.toContain("proposeVaultDocument");
+  });
+});
+
+// ── Feedback tool gating (no Pro gate, unlike every write tool above) ──
+
+describe("POST /api/assistant - Feedback tool gating", () => {
+  it("offers the feedback tool for any signed-in session, even one that isn't Pro", async () => {
+    mocks.getSession.mockResolvedValue({ email: "rider@example.com" });
+    mocks.isPro.mockResolvedValue(false);
+
+    await POST(request({ messages: [{ role: "user", content: "I found a bug" }] }));
+
+    const callBody = JSON.parse(mocks.fetch.mock.calls[0][1].body);
+    const names = callBody.tools[0].functionDeclarations.map((d: { name: string }) => d.name);
+    expect(names).toContain("proposeFeedback");
+    expect(callBody.systemInstruction.parts[0].text).toContain("SENDING FEEDBACK VIA CHAT");
+  });
+
+  it("does not offer the feedback tool for a signed-out visitor", async () => {
+    mocks.getSession.mockResolvedValue(null);
+
+    await POST(request({ messages: [{ role: "user", content: "hi" }] }));
+
+    const callBody = JSON.parse(mocks.fetch.mock.calls[0][1].body);
+    const names = (callBody.tools?.[0]?.functionDeclarations ?? []).map((d: { name: string }) => d.name);
+    expect(names).not.toContain("proposeFeedback");
+    expect(callBody.systemInstruction.parts[0].text).not.toContain("SENDING FEEDBACK VIA CHAT");
+  });
+
+  it("includes the draft in the response when proposeFeedback returns a valid draft", async () => {
+    mocks.getSession.mockResolvedValue({ email: "rider@example.com" });
+    mocks.fetch
+      .mockResolvedValueOnce(geminiFunctionCallResponse("proposeFeedback", { feedbackType: "bug", message: "The chart is blank" }))
+      .mockResolvedValueOnce(geminiTextResponse("Here's a draft bug report - take a look below."));
+    const draft = { category: "feedback", feedbackType: "bug", message: "The chart is blank" };
+    mocks.runAssistantTool.mockResolvedValue(draft);
+
+    const response = await POST(request({ messages: [{ role: "user", content: "Report a bug: the chart is blank" }] }));
+
+    await expect(response.json()).resolves.toEqual({
+      reply: "Here's a draft bug report - take a look below.",
+      proposedFeedback: draft,
+    });
+  });
+
+  it("omits proposedFeedback from the response when the tool call returns an error instead of a draft", async () => {
+    mocks.getSession.mockResolvedValue({ email: "rider@example.com" });
+    mocks.fetch
+      .mockResolvedValueOnce(geminiFunctionCallResponse("proposeFeedback", { message: "hi" }))
+      .mockResolvedValueOnce(geminiTextResponse("Is this a feature request or a bug report?"));
+    mocks.runAssistantTool.mockResolvedValue({ error: "Is this a feature request, a bug report, or something else?" });
+
+    const response = await POST(request({ messages: [{ role: "user", content: "I want to say something" }] }));
+
+    await expect(response.json()).resolves.toEqual({ reply: "Is this a feature request or a bug report?" });
   });
 });
 

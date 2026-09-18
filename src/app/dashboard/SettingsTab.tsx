@@ -14,6 +14,8 @@ import styles from './dashboard.module.css';
 
 type FeedbackType = 'feature' | 'bug' | 'other';
 
+const MAX_FEEDBACK_ATTACHMENTS = 3;
+
 interface Props {
   email: string;
   displayName: string;
@@ -41,6 +43,7 @@ export function SettingsTab({ email, displayName: initialDisplayName, hasAvatar:
 
   const [feedbackType, setFeedbackType] = useState<FeedbackType>('feature');
   const [feedbackMessage, setFeedbackMessage] = useState('');
+  const [feedbackFiles, setFeedbackFiles] = useState<File[]>([]);
   const [sendingFeedback, setSendingFeedback] = useState(false);
   const [feedbackError, setFeedbackError] = useState<string | null>(null);
   const [feedbackSent, setFeedbackSent] = useState(false);
@@ -118,16 +121,50 @@ export function SettingsTab({ email, displayName: initialDisplayName, hasAvatar:
     }
   }
 
+  function handleFeedbackFilesPicked(e: React.ChangeEvent<HTMLInputElement>) {
+    const picked = Array.from(e.target.files ?? []);
+    e.target.value = ''; // lets picking the same file again after removing it still fire onChange
+    if (feedbackFiles.length + picked.length > MAX_FEEDBACK_ATTACHMENTS) {
+      setFeedbackError(`Up to ${MAX_FEEDBACK_ATTACHMENTS} screenshots allowed.`);
+      return;
+    }
+    setFeedbackError(null);
+    setFeedbackFiles((prev) => [...prev, ...picked]);
+  }
+
+  function removeFeedbackFile(index: number) {
+    setFeedbackFiles((prev) => prev.filter((_, i) => i !== index));
+  }
+
+  // Screenshots are picked here but only uploaded at submit time (not on
+  // pick) - same reasoning as AssistantProposedFeedbackCard's own
+  // upload-on-confirm flow, so nothing's uploaded until the whole
+  // submission is actually going ahead.
   async function handleSendFeedback(e: React.FormEvent) {
     e.preventDefault();
     setSendingFeedback(true);
     setFeedbackError(null);
     setFeedbackSent(false);
     try {
+      const attachments = [];
+      if (feedbackType === 'bug') {
+        for (const file of feedbackFiles) {
+          const fd = new FormData();
+          fd.set('file', file);
+          const uploadRes = await fetch('/api/account/feedback/upload-attachment', { method: 'POST', body: fd });
+          const uploadData = await uploadRes.json();
+          if (!uploadRes.ok) {
+            setFeedbackError(uploadData.error ?? 'One of the screenshots failed to upload. Please try again.');
+            return;
+          }
+          attachments.push(uploadData.attachment);
+        }
+      }
+
       const res = await fetch('/api/account/feedback', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type: feedbackType, message: feedbackMessage }),
+        body: JSON.stringify({ type: feedbackType, message: feedbackMessage, attachments, source: 'settings' }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -136,6 +173,7 @@ export function SettingsTab({ email, displayName: initialDisplayName, hasAvatar:
       }
       setFeedbackSent(true);
       setFeedbackMessage('');
+      setFeedbackFiles([]);
     } catch {
       setFeedbackError('Could not reach RoadVerdict. Check your connection and try again.');
     } finally {
@@ -256,6 +294,31 @@ export function SettingsTab({ email, displayName: initialDisplayName, hasAvatar:
               placeholder="What happened, or what would you like to see?"
             />
           </div>
+          {feedbackType === 'bug' && (
+            <div className="field" style={{ marginTop: '0.8rem' }}>
+              <label htmlFor="settings-feedback-attachments">Screenshots (PNG/JPG, up to {MAX_FEEDBACK_ATTACHMENTS}, optional)</label>
+              <input
+                id="settings-feedback-attachments"
+                type="file"
+                accept="image/png,image/jpeg"
+                multiple
+                onChange={handleFeedbackFilesPicked}
+                disabled={sendingFeedback || feedbackFiles.length >= MAX_FEEDBACK_ATTACHMENTS}
+              />
+              {feedbackFiles.length > 0 && (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem', marginTop: '0.4rem' }}>
+                  {feedbackFiles.map((file, i) => (
+                    <span key={`${file.name}-${i}`} style={{ fontSize: '0.78rem', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}>
+                      {file.name}
+                      <button type="button" onClick={() => removeFeedbackFile(i)} disabled={sendingFeedback} aria-label={`Remove ${file.name}`} style={{ cursor: 'pointer' }}>
+                        ×
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
           {feedbackError && <p className="error-text" role="alert">{feedbackError}</p>}
           <button type="submit" className={styles.iconBtn} disabled={sendingFeedback} style={{ marginTop: '0.7rem' }}>
             {sendingFeedback ? 'Sending…' : 'Send'}

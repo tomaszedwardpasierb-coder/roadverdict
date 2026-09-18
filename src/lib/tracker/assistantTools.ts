@@ -54,7 +54,7 @@ import { buildBikeComparison } from "./bikeComparison";
 import { buildCarComparison } from "./carComparison";
 import { buildCostPerMileVerdict } from "./bikeComparisonVerdict";
 import type { ComparisonPeriod } from "./bikeComparisonPeriod";
-import { resolveActiveVehicle } from "./activeVehicle";
+import { resolveActiveVehicle, resolveAllActiveVehicles, type ResolvedVehicleRef } from "./activeVehicle";
 import { getCarServiceRecords } from "./carServiceRecord";
 import { getCarMods } from "./carMod";
 import { getCarBills } from "./carBill";
@@ -104,12 +104,69 @@ function round2(n: number): number {
   return Math.round(n * 100) / 100;
 }
 
+// ---- Cross-vehicle aggregation (spend/money tools only) ----
+//
+// Every tool below this point still defaults to the single active
+// vehicle (resolveActiveVehicle) unless the model explicitly passes
+// scope: "all" - see each tool's own branch. Only the spend/money tools
+// (getSpendTotal, getEntries, getReminders, getBudgetProgress) support
+// "all"; getMileage/getMpgTrend/getLastLoggedJob/getStorySoFar etc. stay
+// single-vehicle, since those answer a question about ONE vehicle's own
+// trend, not something that sums meaningfully across a bike and a car.
+//
+// Same display-name convention route.ts's own compareVehicleNames uses,
+// so a vehicle reads identically whether named by the compare feature or
+// named here.
+function vehicleDisplayName(ref: ResolvedVehicleRef): string {
+  return ref.kind === "car"
+    ? ref.car.nickname
+      ? `${ref.car.nickname} (${ref.car.make} ${ref.car.model})`
+      : `${ref.car.make} ${ref.car.model}`
+    : ref.bike.nickname
+      ? `${ref.bike.nickname} (${ref.bike.make} ${ref.bike.model})`
+      : `${ref.bike.make} ${ref.bike.model}`;
+}
+
+// The same four fetches every spend/budget tool below already makes,
+// just parameterised over a resolved vehicle ref instead of hardcoding
+// bike vs car - used both for the existing single-vehicle path and the
+// new "all vehicles" aggregate path, so there's exactly one place this
+// fetch is written per tool, not two copies that could drift.
+async function fetchVehicleCostItems(
+  email: string,
+  ref: ResolvedVehicleRef
+): Promise<{ records: CostItem[]; mods: CostItem[]; fuelLogs: CostItem[]; bills: CostItem[] }> {
+  if (ref.kind === "car") {
+    const car = ref.car;
+    const [records, mods, fuelLogs, bills] = await Promise.all([
+      getCarServiceRecords(email, car.id),
+      getCarMods(email, car.id),
+      getCarFuelLogs(email, car.id),
+      getCarBills(email, car.id),
+    ]);
+    return { records, mods, fuelLogs, bills };
+  }
+  const bike = ref.bike;
+  const [records, mods, fuelLogs, bills] = await Promise.all([
+    getServiceRecords(email, bike.id),
+    getMods(email, bike.id),
+    getFuelLogs(email, bike.id),
+    getBills(email, bike.id),
+  ]);
+  return { records, mods, fuelLogs, bills };
+}
+
 // ---- Spend total, optionally by category and/or date range ----
 
 export interface SpendTotalArgs {
   startDate?: string;
   endDate?: string;
   category?: "servicing" | "fuel" | "mods" | "bills";
+  // Omitted/"active" behaves exactly as before (the single vehicle
+  // currently selected in the garage switcher). "all" sums every
+  // actively-owned vehicle on the account instead - see
+  // resolveAllActiveVehicles's own comment on what "active" means here.
+  scope?: "active" | "all";
 }
 
 function computeSpendTotal(records: CostItem[], mods: CostItem[], fuelLogs: CostItem[], bills: CostItem[], currency: string, args: SpendTotalArgs) {
@@ -125,28 +182,37 @@ function computeSpendTotal(records: CostItem[], mods: CostItem[], fuelLogs: Cost
 }
 
 export async function toolGetSpendTotal(email: string, args: SpendTotalArgs) {
-  const vehicle = await resolveActiveVehicle(email);
-  if (!vehicle) return { error: "No vehicle found on this account." };
-
-  if (vehicle.kind === "car") {
-    const car = vehicle.car;
-    const [records, mods, fuelLogs, bills] = await Promise.all([
-      getCarServiceRecords(email, car.id),
-      getCarMods(email, car.id),
-      getCarFuelLogs(email, car.id),
-      getCarBills(email, car.id),
-    ]);
-    return computeSpendTotal(records, mods, fuelLogs, bills, car.currency ?? "GBP", args);
+  if (args.scope === "all") {
+    const vehicles = await resolveAllActiveVehicles(email);
+    if (vehicles.length === 0) return { error: "No vehicle found on this account." };
+    const byVehicle = await Promise.all(
+      vehicles.map(async (ref) => {
+        const { records, mods, fuelLogs, bills } = await fetchVehicleCostItems(email, ref);
+        // Every cost figure is stored as plain GBP regardless of a
+        // vehicle's own display-currency preference (that preference is
+        // applied only at render time, never at write time) - so a
+        // combined total needs no real currency conversion, unlike the
+        // single-vehicle path below which still echoes back whichever
+        // display currency that one vehicle happens to be set to.
+        const { total, entryCount } = computeSpendTotal(records, mods, fuelLogs, bills, "GBP", args);
+        return { name: vehicleDisplayName(ref), kind: ref.kind, total, entryCount };
+      })
+    );
+    return {
+      scope: "all" as const,
+      total: round2(byVehicle.reduce((s, v) => s + v.total, 0)),
+      currency: "GBP",
+      entryCount: byVehicle.reduce((s, v) => s + v.entryCount, 0),
+      category: args.category ?? "all",
+      byVehicle,
+    };
   }
 
-  const bike = vehicle.bike;
-  const [records, mods, fuelLogs, bills] = await Promise.all([
-    getServiceRecords(email, bike.id),
-    getMods(email, bike.id),
-    getFuelLogs(email, bike.id),
-    getBills(email, bike.id),
-  ]);
-  return computeSpendTotal(records, mods, fuelLogs, bills, bike.currency ?? "GBP", args);
+  const vehicle = await resolveActiveVehicle(email);
+  if (!vehicle) return { error: "No vehicle found on this account." };
+  const { records, mods, fuelLogs, bills } = await fetchVehicleCostItems(email, vehicle);
+  const currency = vehicle.kind === "car" ? vehicle.car.currency ?? "GBP" : vehicle.bike.currency ?? "GBP";
+  return computeSpendTotal(records, mods, fuelLogs, bills, currency, args);
 }
 
 // ---- The individual entries behind a total, not just the number ----
@@ -162,6 +228,7 @@ export interface GetEntriesArgs {
   startDate?: string;
   endDate?: string;
   category?: "servicing" | "fuel" | "mods" | "bills";
+  scope?: "active" | "all";
 }
 
 interface HistoryEntry {
@@ -247,9 +314,53 @@ function computeEntries(
   };
 }
 
+// Computes one vehicle's own tagged entries for the "all vehicles" path
+// below - reuses computeEntries verbatim (same filter/describe logic the
+// single-vehicle path already relies on), just adding vehicleName so a
+// combined list still reads clearly once every vehicle's entries are
+// merged together.
+async function computeEntriesForVehicle(email: string, ref: ResolvedVehicleRef, args: GetEntriesArgs) {
+  const name = vehicleDisplayName(ref);
+  if (ref.kind === "car") {
+    const car = ref.car;
+    const [records, mods, fuelLogs, bills] = await Promise.all([
+      getCarServiceRecords(email, car.id),
+      getCarMods(email, car.id),
+      getCarFuelLogs(email, car.id),
+      getCarBills(email, car.id),
+    ]);
+    const { entries } = computeEntries(records, mods, fuelLogs, bills, "GBP", args, { job: CAR_JOB_LABELS, bill: CAR_BILL_LABELS, mod: CAR_MOD_LABELS }, describeCarFuel);
+    return entries.map((e) => ({ ...e, vehicleName: name, vehicleKind: "car" as const }));
+  }
+  const bike = ref.bike;
+  const [records, mods, fuelLogs, bills] = await Promise.all([
+    getServiceRecords(email, bike.id),
+    getMods(email, bike.id),
+    getFuelLogs(email, bike.id),
+    getBills(email, bike.id),
+  ]);
+  const { entries } = computeEntries(records, mods, fuelLogs, bills, "GBP", args, { job: JOB_LABELS, bill: BILL_LABELS, mod: MOD_LABELS }, describeBikeFuel);
+  return entries.map((e) => ({ ...e, vehicleName: name, vehicleKind: "bike" as const }));
+}
+
 export async function toolGetEntries(email: string, args: GetEntriesArgs) {
   if (!args.date && !args.startDate && !args.endDate) {
     return { error: "Needs a date, or a start/end range, to look up - which day, or which period?" };
+  }
+
+  if (args.scope === "all") {
+    const vehicles = await resolveAllActiveVehicles(email);
+    if (vehicles.length === 0) return { error: "No vehicle found on this account." };
+    const perVehicleEntries = await Promise.all(vehicles.map((ref) => computeEntriesForVehicle(email, ref, args)));
+    const entries = perVehicleEntries.flat().sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    return {
+      scope: "all" as const,
+      entries,
+      entryCount: entries.length,
+      totalCost: round2(entries.reduce((s, e) => s + e.cost, 0)),
+      currency: "GBP",
+      ...(entries.length === 0 ? { note: "Nothing logged in that range." } : {}),
+    };
   }
 
   const vehicle = await resolveActiveVehicle(email);
@@ -396,19 +507,39 @@ function groupReminders(withStatus: { name: string; status: "ok" | "due-soon" | 
   };
 }
 
-export async function toolGetReminders(email: string) {
-  const vehicle = await resolveActiveVehicle(email);
-  if (!vehicle) return { error: "No vehicle found on this account." };
+export interface ReminderArgs {
+  scope?: "active" | "all";
+}
 
-  if (vehicle.kind === "car") {
-    const car = vehicle.car;
+async function remindersForVehicle(email: string, ref: ResolvedVehicleRef) {
+  if (ref.kind === "car") {
+    const car = ref.car;
     const reminders = await getCarReminders(email, car.id);
     return groupReminders(reminders.map((r) => ({ name: r.name, status: computeCarReminderStatus(r, car.currentMileage), detail: carReminderDetailLabel(r) })));
   }
-
-  const bike = vehicle.bike;
+  const bike = ref.bike;
   const reminders = await getReminders(email, bike.id);
   return groupReminders(reminders.map((r) => ({ name: r.name, status: computeReminderStatus(r, bike.currentMileage), detail: reminderDetailLabel(r) })));
+}
+
+export async function toolGetReminders(email: string, args: ReminderArgs = {}) {
+  if (args.scope === "all") {
+    const vehicles = await resolveAllActiveVehicles(email);
+    if (vehicles.length === 0) return { error: "No vehicle found on this account." };
+    const byVehicle = await Promise.all(
+      vehicles.map(async (ref) => ({ name: vehicleDisplayName(ref), ...(await remindersForVehicle(email, ref)) }))
+    );
+    return {
+      scope: "all" as const,
+      overdue: byVehicle.flatMap((v) => v.overdue.map((r) => ({ ...r, vehicleName: v.name }))),
+      dueSoon: byVehicle.flatMap((v) => v.dueSoon.map((r) => ({ ...r, vehicleName: v.name }))),
+      upcoming: byVehicle.flatMap((v) => v.upcoming.map((r) => ({ ...r, vehicleName: v.name }))),
+    };
+  }
+
+  const vehicle = await resolveActiveVehicle(email);
+  if (!vehicle) return { error: "No vehicle found on this account." };
+  return remindersForVehicle(email, vehicle);
 }
 
 // ---- Annual budget progress ----
@@ -420,32 +551,52 @@ function computeBudgetProgress(budget: number, records: CostItem[], mods: CostIt
   return { hasBudget: true, budget, spentThisYear: spent, remaining: round2(budget - spent), year };
 }
 
-export async function toolGetBudgetProgress(email: string) {
-  const vehicle = await resolveActiveVehicle(email);
-  if (!vehicle) return { error: "No vehicle found on this account." };
+function vehicleAnnualBudget(ref: ResolvedVehicleRef): number | undefined {
+  return ref.kind === "car" ? ref.car.annualBudget : ref.bike.annualBudget;
+}
+
+export interface BudgetProgressArgs {
+  scope?: "active" | "all";
+}
+
+export async function toolGetBudgetProgress(email: string, args: BudgetProgressArgs = {}) {
   const year = new Date().getFullYear();
 
-  if (vehicle.kind === "car") {
-    const car = vehicle.car;
-    if (!car.annualBudget) return { hasBudget: false };
-    const [records, mods, fuelLogs, bills] = await Promise.all([
-      getCarServiceRecords(email, car.id),
-      getCarMods(email, car.id),
-      getCarFuelLogs(email, car.id),
-      getCarBills(email, car.id),
-    ]);
-    return computeBudgetProgress(car.annualBudget, records, mods, fuelLogs, bills, year);
+  if (args.scope === "all") {
+    const vehicles = await resolveAllActiveVehicles(email);
+    if (vehicles.length === 0) return { error: "No vehicle found on this account." };
+    const withBudget = vehicles.filter((ref) => !!vehicleAnnualBudget(ref));
+    if (withBudget.length === 0) return { scope: "all" as const, hasBudget: false };
+
+    const byVehicle = await Promise.all(
+      withBudget.map(async (ref) => {
+        const budget = vehicleAnnualBudget(ref) as number;
+        const { records, mods, fuelLogs, bills } = await fetchVehicleCostItems(email, ref);
+        const { spentThisYear, remaining } = computeBudgetProgress(budget, records, mods, fuelLogs, bills, year);
+        return { name: vehicleDisplayName(ref), kind: ref.kind, budget, spentThisYear, remaining };
+      })
+    );
+    const combinedBudget = round2(byVehicle.reduce((s, v) => s + v.budget, 0));
+    const combinedSpent = round2(byVehicle.reduce((s, v) => s + v.spentThisYear, 0));
+    const skipped = vehicles.length - withBudget.length;
+    return {
+      scope: "all" as const,
+      hasBudget: true,
+      year,
+      byVehicle,
+      combinedBudget,
+      combinedSpent,
+      combinedRemaining: round2(combinedBudget - combinedSpent),
+      ...(skipped > 0 ? { note: `${skipped} of your active vehicles ${skipped === 1 ? "has" : "have"} no budget set and ${skipped === 1 ? "isn't" : "aren't"} included.` } : {}),
+    };
   }
 
-  const bike = vehicle.bike;
-  if (!bike.annualBudget) return { hasBudget: false };
-  const [records, mods, fuelLogs, bills] = await Promise.all([
-    getServiceRecords(email, bike.id),
-    getMods(email, bike.id),
-    getFuelLogs(email, bike.id),
-    getBills(email, bike.id),
-  ]);
-  return computeBudgetProgress(bike.annualBudget, records, mods, fuelLogs, bills, year);
+  const vehicle = await resolveActiveVehicle(email);
+  if (!vehicle) return { error: "No vehicle found on this account." };
+  const budget = vehicleAnnualBudget(vehicle);
+  if (!budget) return { hasBudget: false };
+  const { records, mods, fuelLogs, bills } = await fetchVehicleCostItems(email, vehicle);
+  return computeBudgetProgress(budget, records, mods, fuelLogs, bills, year);
 }
 
 // ---- When a specific type of job was last logged ----
@@ -630,6 +781,7 @@ export const ASSISTANT_TOOL_DECLARATIONS = [
         startDate: { type: "STRING", description: "ISO date (YYYY-MM-DD), inclusive. Omit for no lower bound." },
         endDate: { type: "STRING", description: "ISO date (YYYY-MM-DD), inclusive. Omit for no upper bound." },
         category: { type: "STRING", enum: ["servicing", "fuel", "mods", "bills"], description: "Omit to total across every category." },
+        scope: { type: "STRING", enum: ["active", "all"], description: "'active' (default) for just the vehicle currently selected in the garage switcher. Use 'all' whenever the user asks about their combined/total/overall spend across every vehicle on the account, e.g. someone with multiple bikes/cars asking 'how much am I spending in total'." },
       },
     },
   },
@@ -643,6 +795,7 @@ export const ASSISTANT_TOOL_DECLARATIONS = [
         startDate: { type: "STRING", description: "ISO date (YYYY-MM-DD), inclusive. Use with endDate instead of date for a range." },
         endDate: { type: "STRING", description: "ISO date (YYYY-MM-DD), inclusive." },
         category: { type: "STRING", enum: ["servicing", "fuel", "mods", "bills"], description: "Omit to include every category." },
+        scope: { type: "STRING", enum: ["active", "all"], description: "'active' (default) for just the currently-active vehicle. Use 'all' when the user is asking about entries across every vehicle on the account, not just the one currently selected." },
       },
     },
   },
@@ -664,12 +817,22 @@ export const ASSISTANT_TOOL_DECLARATIONS = [
   {
     name: "getReminders",
     description: "Get all of the signed-in user's reminders and their status - overdue, due soon, and upcoming/on-track - including when each is due. Use this for any question about a reminder, including 'when is X due' for something that isn't overdue or due soon yet.",
-    parameters: { type: "OBJECT", properties: {} },
+    parameters: {
+      type: "OBJECT",
+      properties: {
+        scope: { type: "STRING", enum: ["active", "all"], description: "'active' (default) for just the currently-active vehicle. Use 'all' when the user asks what's due across all of their vehicles." },
+      },
+    },
   },
   {
     name: "getBudgetProgress",
     description: "Get the signed-in user's annual budget and how much of it they've spent this year, if they've set one.",
-    parameters: { type: "OBJECT", properties: {} },
+    parameters: {
+      type: "OBJECT",
+      properties: {
+        scope: { type: "STRING", enum: ["active", "all"], description: "'active' (default) for just the currently-active vehicle's own budget. Use 'all' for a combined view across every vehicle that has a budget set." },
+      },
+    },
   },
   {
     name: "getLastLoggedJob",
@@ -1795,6 +1958,63 @@ export const VAULT_TOOL_DECLARATIONS = [
   },
 ] as const;
 
+// ---- Feature requests / bug reports, drafted then confirmed - the one
+// propose* tool that is genuinely account-level, not vehicle-level (no
+// resolveActiveVehicle call at all). Offered to every signed-in session
+// regardless of Pro status, matching the existing manual "Feature
+// request / report a bug" form in Settings, which has no Pro gate
+// either - see route.ts's own comment on why this sits on the plain
+// `signedIn` tool-declaration line, not one of the Pro-gated ones.
+
+export interface ProposeFeedbackArgs {
+  feedbackType?: string;
+  message?: string;
+}
+
+export interface ProposedFeedback {
+  category: "feedback";
+  feedbackType: "feature" | "bug" | "other";
+  message: string;
+}
+
+const FEEDBACK_TYPES = ["feature", "bug", "other"] as const;
+const MAX_FEEDBACK_MESSAGE_LENGTH = 4000;
+
+export async function toolProposeFeedback(args: ProposeFeedbackArgs) {
+  const feedbackType = (FEEDBACK_TYPES as readonly string[]).includes(args.feedbackType ?? "")
+    ? (args.feedbackType as "feature" | "bug" | "other")
+    : undefined;
+  if (!feedbackType) {
+    return { error: "Is this a feature request, a bug report, or something else?" };
+  }
+  const message = typeof args.message === "string" ? args.message.trim() : "";
+  if (!message) {
+    return { error: "What would you like to say? A sentence or two is enough." };
+  }
+  if (message.length > MAX_FEEDBACK_MESSAGE_LENGTH) {
+    return { error: `That's a bit long - could you shorten it to under ${MAX_FEEDBACK_MESSAGE_LENGTH} characters?` };
+  }
+
+  const draft: ProposedFeedback = { category: "feedback", feedbackType, message };
+  return draft;
+}
+
+export const FEEDBACK_TOOL_DECLARATIONS = [
+  {
+    name: "proposeFeedback",
+    description:
+      "Draft a feature request or bug report from the signed-in user, to send to the RoadVerdict team. This only prepares a draft for the user to review and confirm themselves on screen - it NEVER submits anything by itself. For a bug report, mention on your reply that they can attach up to 3 screenshots (PNG/JPG) on the draft card before confirming.",
+    parameters: {
+      type: "OBJECT",
+      properties: {
+        feedbackType: { type: "STRING", enum: FEEDBACK_TYPES, description: "Whether this is a feature request, a bug report, or general feedback." },
+        message: { type: "STRING", description: "What they want to say, in their own words - what they'd like to see, or what went wrong." },
+      },
+      required: ["feedbackType", "message"],
+    },
+  },
+] as const;
+
 // Merges the session's own attachment (if any) onto a successful draft,
 // without every branch inside toolProposeLogEntry/toolProposeEditEntry
 // needing to thread it through their own dozen-plus return points - a
@@ -1858,6 +2078,9 @@ export async function runAssistantTool(
   if (name === "proposeVaultDocument") {
     return toolProposeVaultDocument(email, args as ProposeVaultDocumentArgs);
   }
+  if (name === "proposeFeedback") {
+    return toolProposeFeedback(args as ProposeFeedbackArgs);
+  }
 
   switch (name as ToolName) {
     case "getSpendTotal":
@@ -1869,9 +2092,9 @@ export async function runAssistantTool(
     case "getMpgTrend":
       return toolGetMpgTrend(email);
     case "getReminders":
-      return toolGetReminders(email);
+      return toolGetReminders(email, args as ReminderArgs);
     case "getBudgetProgress":
-      return toolGetBudgetProgress(email);
+      return toolGetBudgetProgress(email, args as BudgetProgressArgs);
     case "getLastLoggedJob":
       return toolGetLastLoggedJob(email, args);
     case "getShareLinks":
