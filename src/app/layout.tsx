@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { cookies } from 'next/headers';
 import { getAdminSession } from '@/lib/admin/session';
 import { ImpersonationBanner } from './ImpersonationBanner';
-import { AssistantWidget } from '@/components/AssistantWidget';
+import { AssistantWidgetLoader } from '@/components/AssistantWidgetLoader';
 import { ActiveSectionProvider } from '@/components/ActiveSectionContext';
 import { NavigationLoadingOverlay } from '@/components/NavigationLoadingOverlay';
 import { SocialLinks } from '@/components/SocialLinks';
@@ -118,7 +118,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             </p>
             <SocialLinks />
           </footer>
-          <AssistantWidget />
+          <AssistantWidgetLoader />
           <NavigationLoadingOverlay />
         </ActiveSectionProvider>
       </body>
