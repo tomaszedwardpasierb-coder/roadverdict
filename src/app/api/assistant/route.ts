@@ -631,30 +631,46 @@ export async function POST(req: NextRequest) {
 
       const data = await res.json();
       const parts: GeminiPart[] = data?.candidates?.[0]?.content?.parts ?? [];
-      const functionCallPart = parts.find((p) => p.functionCall);
+      const functionCallParts = parts.filter((p) => p.functionCall);
 
-      if (functionCallPart?.functionCall && (session || reportToken) && round < MAX_TOOL_ROUNDS) {
-        const { name, args } = functionCallPart.functionCall;
-        // session.email only - never anything from `args`, which is
-        // model-supplied and therefore untrusted for identity purposes.
-        // reportToken is this same request's own server-validated value
-        // from above, for the same reason.
-        const toolResult = await runAssistantTool(name, args ?? {}, session?.email ?? "", resolvedVehicle, reportToken ?? undefined, compareContext ?? undefined, attachment);
+      if (functionCallParts.length > 0 && (session || reportToken) && round < MAX_TOOL_ROUNDS) {
+        // Gemini can return several functionCall parts in one turn (e.g.
+        // "log this fill-up and check my reminders" in one message) - run
+        // them concurrently rather than one per round-trip. All tool
+        // functions here only read data or build an unsaved draft object
+        // for the user to confirm (see assistantTools.ts - none of the
+        // proposeX tools write to Cosmos), so nothing here can race.
+        const results = await Promise.all(
+          functionCallParts.map(async (part) => {
+            const { name, args } = part.functionCall!;
+            // session.email only - never anything from `args`, which is
+            // model-supplied and therefore untrusted for identity purposes.
+            // reportToken is this same request's own server-validated value
+            // from above, for the same reason.
+            const toolResult = await runAssistantTool(name, args ?? {}, session?.email ?? "", resolvedVehicle, reportToken ?? undefined, compareContext ?? undefined, attachment);
+            return { name, toolResult };
+          })
+        );
 
-        if ((name === "proposeLogEntry" || name === "proposeEditEntry") && toolResult && typeof toolResult === "object" && !("error" in toolResult)) {
-          proposedEntry = toolResult as ProposedEntry;
-        }
-        if (name === "proposeSettingsChange" && toolResult && typeof toolResult === "object" && !("error" in toolResult)) {
-          proposedSettingsChange = toolResult as ProposedSettingsChange;
-        }
-        if (name === "proposeShareLink" && toolResult && typeof toolResult === "object" && !("error" in toolResult)) {
-          proposedShareLink = toolResult as ProposedShareLink;
-        }
-        if (name === "proposeVaultDocument" && toolResult && typeof toolResult === "object" && !("error" in toolResult)) {
-          proposedVaultDocument = toolResult as ProposedVaultDocument;
-        }
-        if (name === "proposeFeedback" && toolResult && typeof toolResult === "object" && !("error" in toolResult)) {
-          proposedFeedback = toolResult as ProposedFeedback;
+        // Array order, not completion order - if the model somehow calls
+        // the same propose tool twice in one round, this keeps the same
+        // "last one in the turn wins" rule the old single-call code had.
+        for (const { name, toolResult } of results) {
+          if ((name === "proposeLogEntry" || name === "proposeEditEntry") && toolResult && typeof toolResult === "object" && !("error" in toolResult)) {
+            proposedEntry = toolResult as ProposedEntry;
+          }
+          if (name === "proposeSettingsChange" && toolResult && typeof toolResult === "object" && !("error" in toolResult)) {
+            proposedSettingsChange = toolResult as ProposedSettingsChange;
+          }
+          if (name === "proposeShareLink" && toolResult && typeof toolResult === "object" && !("error" in toolResult)) {
+            proposedShareLink = toolResult as ProposedShareLink;
+          }
+          if (name === "proposeVaultDocument" && toolResult && typeof toolResult === "object" && !("error" in toolResult)) {
+            proposedVaultDocument = toolResult as ProposedVaultDocument;
+          }
+          if (name === "proposeFeedback" && toolResult && typeof toolResult === "object" && !("error" in toolResult)) {
+            proposedFeedback = toolResult as ProposedFeedback;
+          }
         }
 
         // Echo back every part from the model's actual turn, verbatim -
@@ -662,7 +678,10 @@ export async function POST(req: NextRequest) {
         // dropped thoughtSignature and any other part (e.g. accompanying
         // text) the model may have included alongside the function call.
         contents.push({ role: "model", parts });
-        contents.push({ role: "user", parts: [{ functionResponse: { name, response: toolResult } }] });
+        contents.push({
+          role: "user",
+          parts: results.map(({ name, toolResult }) => ({ functionResponse: { name, response: toolResult } })),
+        });
         continue;
       }
 

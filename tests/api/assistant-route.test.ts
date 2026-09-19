@@ -115,6 +115,16 @@ function geminiFunctionCallResponse(name: string, args: Record<string, unknown> 
   };
 }
 
+function geminiMultiFunctionCallResponse(calls: { name: string; args?: Record<string, unknown> }[]) {
+  return {
+    ok: true,
+    json: () =>
+      Promise.resolve({
+        candidates: [{ content: { parts: calls.map(({ name, args = {} }) => ({ functionCall: { name, args } })) } }],
+      }),
+  };
+}
+
 beforeEach(() => {
   Object.values(mocks).forEach((m) => m.mockReset());
   process.env.GEMINI_API_KEY = "test-key";
@@ -257,6 +267,36 @@ describe("POST /api/assistant", () => {
       undefined,
       undefined
     );
+  });
+
+  // Gemini can return several functionCall parts in one model turn (e.g.
+  // asking for spend and reminders together) - both must actually run and
+  // both must get a matching functionResponse part back, not just the
+  // first one.
+  it("runs every tool call from a single model turn, not just the first", async () => {
+    mocks.getSession.mockResolvedValue({ email: "rider@example.com" });
+    mocks.fetch
+      .mockResolvedValueOnce(
+        geminiMultiFunctionCallResponse([{ name: "getSpendTotal" }, { name: "getReminders" }])
+      )
+      .mockResolvedValueOnce(geminiTextResponse("You've spent £400 and have 2 reminders due."));
+    mocks.runAssistantTool.mockImplementation(async (name: string) =>
+      name === "getSpendTotal" ? { total: 400 } : { reminders: 2 }
+    );
+
+    const response = await POST(request({ messages: [{ role: "user", content: "Spend and reminders?" }] }));
+
+    expect(response.status).toBe(200);
+    expect(mocks.runAssistantTool).toHaveBeenCalledTimes(2);
+    expect(mocks.runAssistantTool).toHaveBeenCalledWith("getSpendTotal", {}, "rider@example.com", null, undefined, undefined, undefined);
+    expect(mocks.runAssistantTool).toHaveBeenCalledWith("getReminders", {}, "rider@example.com", null, undefined, undefined, undefined);
+
+    const secondCallBody = JSON.parse(mocks.fetch.mock.calls[1][1].body);
+    const functionResponseParts = secondCallBody.contents.at(-1).parts;
+    expect(functionResponseParts).toEqual([
+      { functionResponse: { name: "getSpendTotal", response: { total: 400 } } },
+      { functionResponse: { name: "getReminders", response: { reminders: 2 } } },
+    ]);
   });
 
   it("tells the model which dashboard tab is open, using the server-owned label, when signed in with a recognised tab key", async () => {
