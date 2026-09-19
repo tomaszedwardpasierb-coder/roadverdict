@@ -73,29 +73,14 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  // Three independent checks - DVLA vehicle details, MOT history import,
+  // and tax/SORN status - each isolated in its own try/catch and writing
+  // only to its own output variables, so running them concurrently
+  // instead of as three sequential external round trips changes nothing
+  // about the result, just how long it takes to get there.
   let dvlaRefreshed = false;
-  try {
-    const dvlaData = await fetchDvlaDataFromVdg(registration);
-    if (dvlaData) {
-      await updateBikeDvlaData(session.email, bike.id, dvlaData);
-      dvlaRefreshed = true;
-    }
-  } catch (err) {
-    console.error("DVLA data refresh failed:", err);
-  }
-
   let motCreated = 0;
   let motSkipped = 0;
-  try {
-    const result = await importMotHistoryForBike(session.email, bike, registration);
-    if (!("error" in result)) {
-      motCreated = result.createdCount;
-      motSkipped = result.skippedCount;
-    }
-  } catch (err) {
-    console.error("MOT refresh failed:", err);
-  }
-
   // taxStatus/taxDueDate are returned even when the vehicle is simply
   // taxed and nothing is wrong - the button surfaces this either way
   // (see RefreshVehicleDataButton.tsx), rather than only ever saying
@@ -107,23 +92,50 @@ export async function POST(request: NextRequest) {
   let taxStatus: string | null = null;
   let taxDueDate: string | null = null;
   let taxBillLogged = false;
-  try {
-    const apiKey = process.env.VDG_API_KEY;
-    if (apiKey) {
-      const taxDetails = await fetchVehicleTaxDetailsFromVdg(registration, apiKey);
-      await syncSornReminder(session.email, bike.id, taxDetails?.taxStatus ?? null, taxDetails?.taxDueDate ?? null);
-      // A confirmed-taxed vehicle also gets its current VED period
-      // logged as a real expense, once per period - see
-      // bill.ts's logVedBillIfNeeded for how it avoids duplicating this
-      // on every refresh.
-      taxBillLogged = await logVedBillIfNeeded(session.email, bike.id, taxDetails);
-      sorned = taxDetails?.taxStatus?.trim().toUpperCase() === "SORN";
-      taxStatus = taxDetails?.taxStatus ?? null;
-      taxDueDate = taxDetails?.taxDueDate ?? null;
-    }
-  } catch (err) {
-    console.error("Tax/SORN check failed during refresh:", err);
-  }
+
+  await Promise.all([
+    (async () => {
+      try {
+        const dvlaData = await fetchDvlaDataFromVdg(registration);
+        if (dvlaData) {
+          await updateBikeDvlaData(session.email, bike.id, dvlaData);
+          dvlaRefreshed = true;
+        }
+      } catch (err) {
+        console.error("DVLA data refresh failed:", err);
+      }
+    })(),
+    (async () => {
+      try {
+        const result = await importMotHistoryForBike(session.email, bike, registration);
+        if (!("error" in result)) {
+          motCreated = result.createdCount;
+          motSkipped = result.skippedCount;
+        }
+      } catch (err) {
+        console.error("MOT refresh failed:", err);
+      }
+    })(),
+    (async () => {
+      try {
+        const apiKey = process.env.VDG_API_KEY;
+        if (apiKey) {
+          const taxDetails = await fetchVehicleTaxDetailsFromVdg(registration, apiKey);
+          await syncSornReminder(session.email, bike.id, taxDetails?.taxStatus ?? null, taxDetails?.taxDueDate ?? null);
+          // A confirmed-taxed vehicle also gets its current VED period
+          // logged as a real expense, once per period - see
+          // bill.ts's logVedBillIfNeeded for how it avoids duplicating
+          // this on every refresh.
+          taxBillLogged = await logVedBillIfNeeded(session.email, bike.id, taxDetails);
+          sorned = taxDetails?.taxStatus?.trim().toUpperCase() === "SORN";
+          taxStatus = taxDetails?.taxStatus ?? null;
+          taxDueDate = taxDetails?.taxDueDate ?? null;
+        }
+      } catch (err) {
+        console.error("Tax/SORN check failed during refresh:", err);
+      }
+    })(),
+  ]);
 
   await updateBikeLastRefreshedAt(session.email, bike.id);
 

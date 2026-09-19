@@ -125,33 +125,43 @@ export async function POST(request: NextRequest) {
 
   // Best-effort, non-blocking - same convention as bike creation. A
   // failed or empty lookup never stops the car from being created.
-  try {
-    const dvlaData = await fetchDvlaDataFromVdg(car.originalRegistration ?? "");
-    if (dvlaData) {
-      await updateCarDvlaData(session.email, car.id, dvlaData);
-      car.dvlaData = dvlaData;
-    }
-  } catch (err) {
-    console.error("DVLA data fetch failed during car creation:", err);
-  }
-
-  // Same best-effort, non-blocking treatment as the DVLA fetch above -
-  // see the equivalent block in bike creation for why this is its own
-  // try/catch and why it runs at creation time rather than waiting for
-  // the first "Refresh vehicle data" click.
-  try {
-    const apiKey = process.env.VDG_API_KEY;
-    if (apiKey) {
-      const taxDetails = await fetchVehicleTaxDetailsFromVdg(car.originalRegistration ?? "", apiKey);
-      await syncCarSornReminder(session.email, car.id, taxDetails?.taxStatus ?? null, taxDetails?.taxDueDate ?? null);
-      // A confirmed-taxed vehicle also gets its current VED period
-      // logged as a real expense right away - see carBill.ts's
-      // logVedCarBillIfNeeded.
-      await logVedCarBillIfNeeded(session.email, car.id, taxDetails);
-    }
-  } catch (err) {
-    console.error("Tax/SORN check failed during car creation:", err);
-  }
+  // These two are independent VDG calls (DVLA vehicle details vs tax/
+  // SORN status) with no data dependency between them, so they run
+  // concurrently rather than paying for two sequential external round
+  // trips - each still isolated in its own try/catch, so one failing
+  // never stops the other's fetch or its own follow-up writes.
+  await Promise.all([
+    (async () => {
+      try {
+        const dvlaData = await fetchDvlaDataFromVdg(car.originalRegistration ?? "");
+        if (dvlaData) {
+          await updateCarDvlaData(session.email, car.id, dvlaData);
+          car.dvlaData = dvlaData;
+        }
+      } catch (err) {
+        console.error("DVLA data fetch failed during car creation:", err);
+      }
+    })(),
+    (async () => {
+      // Same best-effort, non-blocking treatment as the DVLA fetch above -
+      // see the equivalent block in bike creation for why this runs at
+      // creation time rather than waiting for the first "Refresh vehicle
+      // data" click.
+      try {
+        const apiKey = process.env.VDG_API_KEY;
+        if (apiKey) {
+          const taxDetails = await fetchVehicleTaxDetailsFromVdg(car.originalRegistration ?? "", apiKey);
+          await syncCarSornReminder(session.email, car.id, taxDetails?.taxStatus ?? null, taxDetails?.taxDueDate ?? null);
+          // A confirmed-taxed vehicle also gets its current VED period
+          // logged as a real expense right away - see carBill.ts's
+          // logVedCarBillIfNeeded.
+          await logVedCarBillIfNeeded(session.email, car.id, taxDetails);
+        }
+      } catch (err) {
+        console.error("Tax/SORN check failed during car creation:", err);
+      }
+    })(),
+  ]);
 
   void logImpersonationActivityForCurrentRequest("car", car.id, "create");
   return NextResponse.json({ car });

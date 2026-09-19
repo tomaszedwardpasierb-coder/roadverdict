@@ -136,34 +136,41 @@ export async function POST(request: NextRequest) {
   // bike from being created successfully. Reuses the same VehicleDetails
   // call plate-lookup already makes, just keeping more of the response
   // this time instead of discarding everything past make/model/year.
-  try {
-    const dvlaData = await fetchDvlaDataFromVdg(result.bike.originalRegistration ?? "");
-    if (dvlaData) {
-      await updateBikeDvlaData(session.email, result.bike.id, dvlaData);
-      result.bike.dvlaData = dvlaData;
-    }
-  } catch (err) {
-    console.error("DVLA data fetch failed during bike creation:", err);
-  }
-
-  // Same best-effort, non-blocking treatment as the DVLA fetch above, kept
-  // in its own try/catch so a tax-lookup failure never affects the DVLA
-  // result. A SORN'd vehicle gets a permanent reminder immediately, rather
-  // than only being discovered the first time someone clicks "Refresh
-  // vehicle data" - see reminder.ts's syncSornReminder.
-  try {
-    const apiKey = process.env.VDG_API_KEY;
-    if (apiKey) {
-      const taxDetails = await fetchVehicleTaxDetailsFromVdg(result.bike.originalRegistration ?? "", apiKey);
-      await syncSornReminder(session.email, result.bike.id, taxDetails?.taxStatus ?? null, taxDetails?.taxDueDate ?? null);
-      // A confirmed-taxed vehicle also gets its current VED period
-      // logged as a real expense right away - see bill.ts's
-      // logVedBillIfNeeded.
-      await logVedBillIfNeeded(session.email, result.bike.id, taxDetails);
-    }
-  } catch (err) {
-    console.error("Tax/SORN check failed during bike creation:", err);
-  }
+  // DVLA vehicle details and tax/SORN status are two independent VDG
+  // calls with no data dependency, so they run concurrently rather than
+  // paying for two sequential external round trips - each still isolated
+  // in its own try/catch, so one failing never affects the other.
+  await Promise.all([
+    (async () => {
+      try {
+        const dvlaData = await fetchDvlaDataFromVdg(result.bike.originalRegistration ?? "");
+        if (dvlaData) {
+          await updateBikeDvlaData(session.email, result.bike.id, dvlaData);
+          result.bike.dvlaData = dvlaData;
+        }
+      } catch (err) {
+        console.error("DVLA data fetch failed during bike creation:", err);
+      }
+    })(),
+    (async () => {
+      // A SORN'd vehicle gets a permanent reminder immediately, rather
+      // than only being discovered the first time someone clicks
+      // "Refresh vehicle data" - see reminder.ts's syncSornReminder.
+      try {
+        const apiKey = process.env.VDG_API_KEY;
+        if (apiKey) {
+          const taxDetails = await fetchVehicleTaxDetailsFromVdg(result.bike.originalRegistration ?? "", apiKey);
+          await syncSornReminder(session.email, result.bike.id, taxDetails?.taxStatus ?? null, taxDetails?.taxDueDate ?? null);
+          // A confirmed-taxed vehicle also gets its current VED period
+          // logged as a real expense right away - see bill.ts's
+          // logVedBillIfNeeded.
+          await logVedBillIfNeeded(session.email, result.bike.id, taxDetails);
+        }
+      } catch (err) {
+        console.error("Tax/SORN check failed during bike creation:", err);
+      }
+    })(),
+  ]);
 
   void logImpersonationActivityForCurrentRequest("bike", result.bike.id, "create");
   return NextResponse.json({ bike: result.bike });
