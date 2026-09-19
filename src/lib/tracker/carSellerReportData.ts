@@ -380,9 +380,15 @@ export async function getCarSellerReportData(token: string): Promise<CarSellerRe
   if (!resolved) notFound();
   const { email, carId, askingPrice } = resolved;
 
-  const core = await getCarSellerReportCore(email, carId);
-
-  const requests = await getCarReceiptRequestsForShareToken(email, token);
+  // Independent once resolved is available - getCarReceiptRequestsForShareToken
+  // only needs email+token (both already in hand), not anything
+  // getCarSellerReportCore itself produces - so there's no reason to
+  // wait for that one's own multi-query Promise.all to finish before
+  // starting this, on a public, potentially high-traffic buyer-facing page.
+  const [core, requests] = await Promise.all([
+    getCarSellerReportCore(email, carId),
+    getCarReceiptRequestsForShareToken(email, token),
+  ]);
   // Most recent request wins per entry - handles "declined, then asked
   // again" correctly, since the newer request's pending status should
   // take precedence over an older decline for display purposes.

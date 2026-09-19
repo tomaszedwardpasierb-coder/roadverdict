@@ -450,9 +450,15 @@ export async function getSellerReportData(token: string): Promise<SellerReportDa
   if (!resolved) notFound();
   const { email, bikeId, askingPrice } = resolved;
 
-  const core = await getSellerReportCore(email, bikeId);
-
-  const requests = await getReceiptRequestsForShareToken(email, token);
+  // Independent once resolved is available - getReceiptRequestsForShareToken
+  // only needs email+token (both already in hand), not anything
+  // getSellerReportCore itself produces - so there's no reason to wait
+  // for that one's own 8-query Promise.all to finish before starting
+  // this, on a public, potentially high-traffic buyer-facing page.
+  const [core, requests] = await Promise.all([
+    getSellerReportCore(email, bikeId),
+    getReceiptRequestsForShareToken(email, token),
+  ]);
   // Most recent request wins per entry - handles "declined, then asked
   // again" correctly, since the newer request's pending status should
   // take precedence over an older decline for display purposes.
