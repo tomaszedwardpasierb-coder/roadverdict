@@ -23,18 +23,33 @@ export interface FuelPriceRecord {
   fetchedAt: string; // ISO timestamp of when the cron last updated this
 }
 
+// Both prices only change once a week via the DESNZ cron, but this is
+// read on the cost calculators and every cost-calculation on the
+// dashboard - a plain in-process TTL cache removes the fixed
+// per-call Cosmos round trip for the vast majority of reads. The
+// save functions below update the cache directly too, so a cron run
+// is reflected immediately rather than waiting out the TTL.
+const CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes
+let petrolCache: { price: number; fetchedAt: number } | null = null;
+let dieselCache: { price: number; fetchedAt: number } | null = null;
+
 export async function getCurrentPetrolPricePenceLitre(): Promise<number> {
+  if (petrolCache && Date.now() - petrolCache.fetchedAt < CACHE_TTL_MS) {
+    return petrolCache.price;
+  }
   try {
     const container = getContainer();
     const { resource } = await container
       .item(FUEL_PRICE_DOC_ID, FUEL_PRICE_PK)
       .read<FuelPriceRecord>();
     if (resource && typeof resource.pricePenceLitre === "number") {
-      return resource.pricePenceLitre;
+      petrolCache = { price: resource.pricePenceLitre, fetchedAt: Date.now() };
+      return petrolCache.price;
     }
   } catch {
     // Doc doesn't exist yet, or Cosmos is unreachable - fall through
-    // to the hardcoded fallback below rather than throwing.
+    // to the hardcoded fallback below rather than throwing. Not
+    // cached, so the next call retries against Cosmos.
   }
   return FALLBACK_PETROL_PRICE_PENCE_PER_LITRE;
 }
@@ -53,6 +68,7 @@ export async function saveCurrentPetrolPrice(
     fetchedAt: new Date().toISOString(),
   };
   await container.items.upsert(record);
+  petrolCache = { price: pricePenceLitre, fetchedAt: Date.now() };
 }
 
 // Diesel equivalent, for the car cost calculator (motorcycles are
@@ -69,17 +85,22 @@ const DIESEL_PRICE_DOC_ID = "dieselPrice";
 const FALLBACK_DIESEL_PRICE_PENCE_PER_LITRE = 157.82;
 
 export async function getCurrentDieselPricePenceLitre(): Promise<number> {
+  if (dieselCache && Date.now() - dieselCache.fetchedAt < CACHE_TTL_MS) {
+    return dieselCache.price;
+  }
   try {
     const container = getContainer();
     const { resource } = await container
       .item(DIESEL_PRICE_DOC_ID, FUEL_PRICE_PK)
       .read<FuelPriceRecord>();
     if (resource && typeof resource.pricePenceLitre === "number") {
-      return resource.pricePenceLitre;
+      dieselCache = { price: resource.pricePenceLitre, fetchedAt: Date.now() };
+      return dieselCache.price;
     }
   } catch {
     // Doc doesn't exist yet, or Cosmos is unreachable - fall through
-    // to the hardcoded fallback below rather than throwing.
+    // to the hardcoded fallback below rather than throwing. Not
+    // cached, so the next call retries against Cosmos.
   }
   return FALLBACK_DIESEL_PRICE_PENCE_PER_LITRE;
 }
@@ -98,4 +119,5 @@ export async function saveCurrentDieselPrice(
     fetchedAt: new Date().toISOString(),
   };
   await container.items.upsert(record);
+  dieselCache = { price: pricePenceLitre, fetchedAt: Date.now() };
 }

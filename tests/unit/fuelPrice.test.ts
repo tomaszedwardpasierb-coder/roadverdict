@@ -11,9 +11,14 @@ vi.mock("@/lib/cosmos", () => ({
   getContainer: mocks.getContainer,
 }));
 
-import { getCurrentPetrolPricePenceLitre, saveCurrentPetrolPrice } from "@/lib/fuelPrice";
+// Both getters keep a module-level TTL cache, so each test needs a
+// genuinely fresh module instance - otherwise the first test's result
+// would still be cached and served to every test after it.
+let getCurrentPetrolPricePenceLitre: typeof import("@/lib/fuelPrice").getCurrentPetrolPricePenceLitre;
+let saveCurrentPetrolPrice: typeof import("@/lib/fuelPrice").saveCurrentPetrolPrice;
 
-beforeEach(() => {
+beforeEach(async () => {
+  vi.resetModules();
   mocks.getContainer.mockReset();
   mocks.read.mockReset();
   mocks.item.mockReset();
@@ -21,6 +26,8 @@ beforeEach(() => {
 
   mocks.item.mockReturnValue({ read: mocks.read });
   mocks.getContainer.mockReturnValue({ item: mocks.item, items: { upsert: mocks.upsert } });
+
+  ({ getCurrentPetrolPricePenceLitre, saveCurrentPetrolPrice } = await import("@/lib/fuelPrice"));
 });
 
 describe("getCurrentPetrolPricePenceLitre", () => {
@@ -61,6 +68,20 @@ describe("getCurrentPetrolPricePenceLitre", () => {
     const result = await getCurrentPetrolPricePenceLitre();
     expect(result).toBe(150.53);
   });
+
+  it("caches a successful read, not hitting Cosmos again on the next call", async () => {
+    mocks.read.mockResolvedValue({ resource: { pricePenceLitre: 142.9 } });
+    await getCurrentPetrolPricePenceLitre();
+    await getCurrentPetrolPricePenceLitre();
+    expect(mocks.read).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not cache a failed read, retrying Cosmos on the next call", async () => {
+    mocks.read.mockRejectedValue(new Error("ECONNREFUSED"));
+    await getCurrentPetrolPricePenceLitre();
+    await getCurrentPetrolPricePenceLitre();
+    expect(mocks.read).toHaveBeenCalledTimes(2);
+  });
 });
 
 describe("saveCurrentPetrolPrice", () => {
@@ -89,5 +110,12 @@ describe("saveCurrentPetrolPrice", () => {
   it("propagates the error rather than failing soft, unlike the read path", async () => {
     mocks.upsert.mockRejectedValue(new Error("Cosmos unavailable"));
     await expect(saveCurrentPetrolPrice(148.2, "13/07/2026")).rejects.toThrow("Cosmos unavailable");
+  });
+
+  it("updates the read cache immediately, so a save is reflected without waiting out the TTL", async () => {
+    await saveCurrentPetrolPrice(148.2, "13/07/2026");
+    const result = await getCurrentPetrolPricePenceLitre();
+    expect(result).toBe(148.2);
+    expect(mocks.read).not.toHaveBeenCalled();
   });
 });
