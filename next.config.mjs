@@ -20,6 +20,15 @@ const nextConfig = {
   // experimental.serverComponentsExternalPackages, which the same
   // Next.js 15 upgrade moved out of experimental and stabilized.
   serverExternalPackages: ['applicationinsights'],
+  // Both icon libraries are imported piecemeal (one icon at a time)
+  // across dozens of files - without this, Next.js's own bundler still
+  // has to consider each package's full barrel export graph per import
+  // site rather than rewriting it straight to the specific icon module,
+  // which slows cold builds/cold starts for no runtime benefit (the
+  // final bundle was already tree-shaken correctly either way).
+  experimental: {
+    optimizePackageImports: ['lucide-react', 'react-icons'],
+  },
   async headers() {
     return [
       {
