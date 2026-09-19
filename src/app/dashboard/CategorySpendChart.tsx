@@ -1,6 +1,7 @@
 // Place at: src/app/dashboard/CategorySpendChart.tsx
 'use client';
 
+import { useMemo } from 'react';
 import { Bar, Line } from 'react-chartjs-2';
 import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, PointElement, LineElement, Tooltip, Filler } from 'chart.js';
 import { bucketByMonth, bucketByMileage } from '@/lib/tracker/summary';
@@ -82,40 +83,53 @@ export function CategorySpendChart({
   // switched on.
   const showingForecast = forecastMode && !!activeForecast;
 
-  const filteredItems = filterByDateRange(items, showingForecast ? 'all' : range);
+  // Bucketing, unit conversion, and forecast-merging are all real work
+  // done on the raw record arrays - memoized so a re-render triggered by
+  // something unrelated (e.g. a sibling chart's hover state, chart-type
+  // toggle) doesn't re-bucket and re-convert every item again.
+  const { labels, dataValues, bucketIds, pastCount, anchorIndex } = useMemo(() => {
+    const filteredItems = filterByDateRange(items, showingForecast ? 'all' : range);
 
-  let labels: string[];
-  let dataValues: number[];
-  let bucketIds: string[][];
+    let labels: string[];
+    let dataValues: number[];
+    let bucketIds: string[][];
 
-  if (usingMileageView && !showingForecast) {
-    const withMileage = filteredItems.filter((i): i is CostItem & { mileage: number } => i.mileage != null);
-    const bands = bucketByMileage(withMileage);
-    labels = bands.map(
-      (b) => `${Math.round(convertMilesToDisplay(b.bandStart, distanceUnit))}-${Math.round(convertMilesToDisplay(b.bandEnd, distanceUnit))} ${distanceUnitLabel(distanceUnit)}`
-    );
-    dataValues = bands.map((b) => convertGbpToDisplay(b.total, currency, rates));
-    bucketIds = bands.map((b) => b.ids);
-  } else {
-    const months = bucketByMonth(filteredItems);
-    labels = months.map((m) => m.month);
-    dataValues = months.map((m) => convertGbpToDisplay(m.total, currency, rates));
-    bucketIds = months.map((m) => m.ids);
-  }
-
-  // The real, already-logged months end here - everything from this
-  // index onward in the combined arrays below is a projection, never a
-  // recorded transaction. Used to style forecast points/bars distinctly
-  // (dashed line segments, lighter bars) and to keep handleBarClick a
-  // no-op on them, since there's no real record to jump to.
-  const pastCount = labels.length;
-  if (showingForecast) {
-    for (const point of activeForecast!.points) {
-      labels = [...labels, point.month];
-      dataValues = [...dataValues, convertGbpToDisplay(point.total, currency, rates)];
-      bucketIds = [...bucketIds, []];
+    if (usingMileageView && !showingForecast) {
+      const withMileage = filteredItems.filter((i): i is CostItem & { mileage: number } => i.mileage != null);
+      const bands = bucketByMileage(withMileage);
+      labels = bands.map(
+        (b) => `${Math.round(convertMilesToDisplay(b.bandStart, distanceUnit))}-${Math.round(convertMilesToDisplay(b.bandEnd, distanceUnit))} ${distanceUnitLabel(distanceUnit)}`
+      );
+      dataValues = bands.map((b) => convertGbpToDisplay(b.total, currency, rates));
+      bucketIds = bands.map((b) => b.ids);
+    } else {
+      const months = bucketByMonth(filteredItems);
+      labels = months.map((m) => m.month);
+      dataValues = months.map((m) => convertGbpToDisplay(m.total, currency, rates));
+      bucketIds = months.map((m) => m.ids);
     }
-  }
+
+    // The real, already-logged months end here - everything from this
+    // index onward in the combined arrays below is a projection, never a
+    // recorded transaction. Used to style forecast points/bars distinctly
+    // (dashed line segments, lighter bars) and to keep handleBarClick a
+    // no-op on them, since there's no real record to jump to.
+    const pastCount = labels.length;
+    if (showingForecast) {
+      for (const point of activeForecast!.points) {
+        labels = [...labels, point.month];
+        dataValues = [...dataValues, convertGbpToDisplay(point.total, currency, rates)];
+        bucketIds = [...bucketIds, []];
+      }
+    }
+    // "Today" - the last real, already-logged point - gets the same
+    // stand-out ring treatment the true last point normally gets, so it
+    // still reads as "you are here" even though it's no longer the last
+    // point in the dataset once a forecast is appended after it.
+    const anchorIndex = showingForecast ? pastCount - 1 : labels.length - 1;
+
+    return { labels, dataValues, bucketIds, pastCount, anchorIndex };
+  }, [items, range, showingForecast, usingMileageView, distanceUnit, currency, rates, activeForecast]);
 
   // A bucket here can be several records summed together, so a click
   // switches tabs and highlights every one of them (scrolling to the
@@ -135,11 +149,6 @@ export function CategorySpendChart({
 
   const isForecastSegment = (p0DataIndex: number) => showingForecast && p0DataIndex >= pastCount - 1;
   const isForecastIndex = (dataIndex: number) => showingForecast && dataIndex >= pastCount;
-  // "Today" - the last real, already-logged point - gets the same
-  // stand-out ring treatment the true last point normally gets, so it
-  // still reads as "you are here" even though it's no longer the last
-  // point in the dataset once a forecast is appended after it.
-  const anchorIndex = showingForecast ? pastCount - 1 : labels.length - 1;
 
   return (
     <div>

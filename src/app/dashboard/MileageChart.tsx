@@ -1,6 +1,7 @@
 // Place at: src/app/dashboard/MileageChart.tsx
 'use client';
 
+import { useMemo } from 'react';
 import { Line, Bar } from 'react-chartjs-2';
 import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, BarElement, Tooltip, Legend, Filler } from 'chart.js';
 import { filterByDateRange } from '@/lib/tracker/dateRange';
@@ -49,31 +50,39 @@ export function MileageChart({
   const { kind, changeKind } = useChartTypePreference(CHART_ID, initialChartType ?? 'line', vehicleKind);
   const activeForecast = forecast?.[forecastWindow];
   const showingForecast = forecastMode && !!activeForecast;
-  const filtered = filterByDateRange(points, showingForecast ? 'all' : range);
   const title = `${distanceUnit === 'km' ? 'Kilometres' : 'Mileage'} over time`;
 
-  let dataValues = filtered.map((p) => Math.round(convertMilesToDisplay(p.mileage, distanceUnit)));
-  let labels = filtered.map((p) => fmtDate(p.date));
+  // Filtering, unit conversion, and forecast-merging re-done on every
+  // render otherwise - memoized so an unrelated re-render doesn't redo
+  // this work on the full points array again.
+  const { filtered, labels, dataValues, pastCount, anchorIndex } = useMemo(() => {
+    const filtered = filterByDateRange(points, showingForecast ? 'all' : range);
+    let dataValues = filtered.map((p) => Math.round(convertMilesToDisplay(p.mileage, distanceUnit)));
+    let labels = filtered.map((p) => fmtDate(p.date));
 
-  // The real, already-logged points end here - everything appended after
-  // it is a projection, never a recorded reading. Used to style the
-  // forecast segment/points distinctly and to keep handlePointClick a
-  // no-op on them, since `filtered` (what the click handler indexes
-  // into) never grows past the real points.
-  const pastCount = labels.length;
-  if (showingForecast) {
-    for (const point of activeForecast!) {
-      labels = [...labels, point.month];
-      dataValues = [...dataValues, Math.round(convertMilesToDisplay(point.total, distanceUnit))];
+    // The real, already-logged points end here - everything appended after
+    // it is a projection, never a recorded reading. Used to style the
+    // forecast segment/points distinctly and to keep handlePointClick a
+    // no-op on them, since `filtered` (what the click handler indexes
+    // into) never grows past the real points.
+    const pastCount = labels.length;
+    if (showingForecast) {
+      for (const point of activeForecast!) {
+        labels = [...labels, point.month];
+        dataValues = [...dataValues, Math.round(convertMilesToDisplay(point.total, distanceUnit))];
+      }
     }
-  }
+    // "Today" - the last real, already-logged point - gets the same
+    // stand-out ring treatment the true last point normally gets, so it
+    // still reads as "you are here" even though it's no longer the last
+    // point in the dataset once a forecast point is appended after it.
+    const anchorIndex = showingForecast ? pastCount - 1 : labels.length - 1;
+
+    return { filtered, labels, dataValues, pastCount, anchorIndex };
+  }, [points, range, showingForecast, distanceUnit, activeForecast]);
+
   const isForecastIndex = (dataIndex: number) => showingForecast && dataIndex >= pastCount;
   const isForecastSegment = (p0DataIndex: number) => showingForecast && p0DataIndex >= pastCount - 1;
-  // "Today" - the last real, already-logged point - gets the same
-  // stand-out ring treatment the true last point normally gets, so it
-  // still reads as "you are here" even though it's no longer the last
-  // point in the dataset once a forecast point is appended after it.
-  const anchorIndex = showingForecast ? pastCount - 1 : labels.length - 1;
 
   function handlePointClick(elements: { index: number }[]) {
     if (elements.length === 0) return;

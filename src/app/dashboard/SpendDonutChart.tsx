@@ -1,6 +1,7 @@
 // Place at: src/app/dashboard/SpendDonutChart.tsx
 'use client';
 
+import { useMemo } from 'react';
 import Link from 'next/link';
 import { Doughnut, Bar } from 'react-chartjs-2';
 import { Chart as ChartJS, ArcElement, BarElement, CategoryScale, LinearScale, Tooltip, Legend } from 'chart.js';
@@ -83,15 +84,21 @@ export function SpendDonutChart({ records, mods, fuelLogs, bills, labour, curren
   const activeForecast = forecast?.[forecastWindow];
   const showingForecast = forecastMode && !!activeForecast;
 
-  const servicingTotal = showingForecast ? activeForecast!.servicing : sumCost(filterByDateRange(records, range));
-  const modsTotal = showingForecast ? activeForecast!.mods : sumCost(filterByDateRange(mods, range));
-  const fuelTotal = showingForecast ? activeForecast!.fuel : sumCost(filterByDateRange(fuelLogs, range));
-  const billsTotal = showingForecast ? activeForecast!.bills : sumCost(filterByDateRange(bills, range));
-  const labourTotal = showingForecast ? activeForecast!.labour : sumCost(filterByDateRange(labour, range));
-  const grandTotal = servicingTotal + modsTotal + fuelTotal + billsTotal + labourTotal;
+  // Per-category filtering/summing across five separate raw arrays, plus
+  // currency conversion - memoized so an unrelated re-render doesn't
+  // redo all five filter passes again.
+  const { values, grandTotal } = useMemo(() => {
+    const servicingTotal = showingForecast ? activeForecast!.servicing : sumCost(filterByDateRange(records, range));
+    const modsTotal = showingForecast ? activeForecast!.mods : sumCost(filterByDateRange(mods, range));
+    const fuelTotal = showingForecast ? activeForecast!.fuel : sumCost(filterByDateRange(fuelLogs, range));
+    const billsTotal = showingForecast ? activeForecast!.bills : sumCost(filterByDateRange(bills, range));
+    const labourTotal = showingForecast ? activeForecast!.labour : sumCost(filterByDateRange(labour, range));
+    const grandTotal = servicingTotal + modsTotal + fuelTotal + billsTotal + labourTotal;
 
-  const rawValues = [servicingTotal, modsTotal, fuelTotal, billsTotal, labourTotal];
-  const values = rawValues.map((v) => convertGbpToDisplay(v, currency, rates));
+    const rawValues = [servicingTotal, modsTotal, fuelTotal, billsTotal, labourTotal];
+    const values = rawValues.map((v) => convertGbpToDisplay(v, currency, rates));
+    return { values, grandTotal };
+  }, [records, mods, fuelLogs, bills, labour, range, showingForecast, activeForecast, currency, rates]);
 
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>

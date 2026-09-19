@@ -1,6 +1,7 @@
 // Place at: src/app/dashboard/FuelCostChart.tsx
 'use client';
 
+import { useMemo } from 'react';
 import { Line, Bar } from 'react-chartjs-2';
 import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, BarElement, Tooltip, Legend, Filler } from 'chart.js';
 import { filterByDateRange } from '@/lib/tracker/dateRange';
@@ -47,14 +48,21 @@ export function FuelCostChart({
   const { switchTo, setHighlightIds } = useTabSwitch();
   const { range, viewBy } = useChartFilter();
   const { kind, changeKind } = useChartTypePreference(CHART_ID, initialChartType ?? 'line', vehicleKind);
-  const dateFiltered = filterByDateRange(points, range);
-  const filtered =
-    viewBy === 'mileage'
-      ? [...dateFiltered].sort((a, b) => a.mileage - b.mileage)
-      : [...dateFiltered].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
   const symbol = CURRENCY_SYMBOLS[currency];
-  const labels = viewBy === 'mileage' ? filtered.map((p) => formatDistance(p.mileage, distanceUnit)) : filtered.map((p) => fmtDate(p.date));
-  const dataValues = filtered.map((p) => convertGbpToDisplay(p.cost, currency, rates));
+
+  // Filtering, sorting, and unit/currency conversion re-done on every
+  // render otherwise - memoized so an unrelated re-render doesn't redo
+  // this work on the full points array again.
+  const { filtered, labels, dataValues } = useMemo(() => {
+    const dateFiltered = filterByDateRange(points, range);
+    const filtered =
+      viewBy === 'mileage'
+        ? [...dateFiltered].sort((a, b) => a.mileage - b.mileage)
+        : [...dateFiltered].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    const labels = viewBy === 'mileage' ? filtered.map((p) => formatDistance(p.mileage, distanceUnit)) : filtered.map((p) => fmtDate(p.date));
+    const dataValues = filtered.map((p) => convertGbpToDisplay(p.cost, currency, rates));
+    return { filtered, labels, dataValues };
+  }, [points, range, viewBy, distanceUnit, currency, rates]);
 
   function handlePointClick(elements: { index: number }[]) {
     if (elements.length === 0) return;

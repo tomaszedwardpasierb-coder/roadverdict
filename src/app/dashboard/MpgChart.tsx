@@ -1,6 +1,7 @@
 // Place at: src/app/dashboard/MpgChart.tsx
 'use client';
 
+import { useMemo } from 'react';
 import { Line, Bar } from 'react-chartjs-2';
 import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, BarElement, Tooltip, Legend, Filler, type ScriptableContext } from 'chart.js';
 import { filterByDateRange } from '@/lib/tracker/dateRange';
@@ -79,35 +80,44 @@ export function MpgChart({
   const { switchTo, setHighlightIds } = useTabSwitch();
   const { range, viewBy } = useChartFilter();
   const { kind, changeKind } = useChartTypePreference(CHART_ID, initialChartType ?? 'line', vehicleKind);
-  const dateFiltered = filterByDateRange(series, range);
-  const missedFillUpCount = dateFiltered.filter((s) => s.likelyMissedFillUps && s.exclusionReason !== 'marked-anomaly').length;
-  const markedAnomalyCount = dateFiltered.filter((s) => s.exclusionReason === 'marked-anomaly').length;
-  // Same range the chart itself is currently showing, applied to the
-  // excluded entries too - so the note below always reflects "how much
-  // of what you're looking at right now was left out", not a lifetime
-  // total that wouldn't match the chart on screen.
-  const excludedInRange = filterByDateRange(excludedFuelEntries, range);
-  const excludedSpend = excludedInRange.reduce((sum, e) => sum + e.cost, 0);
-  // Kept together, not split apart - an excluded point still needs to
-  // sit in its correct chronological/mileage position on the x-axis,
-  // shown differently rather than removed, so the reader can see WHERE
-  // the gap or anomaly actually falls, not just that something's missing.
-  const filtered =
-    viewBy === 'time' ? [...dateFiltered].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()) : dateFiltered;
   const yLabel = fuelEconomyUnit === 'l100km' ? 'L/100km' : 'mpg';
-  // Same trusted-only philosophy as computeActualMPG - a flagged reading
-  // shouldn't get to drag the number shown in the title, matching the
-  // fact that it's already excluded from the line itself.
-  const trustedInView = dateFiltered.filter((s) => !s.likelyMissedFillUps);
-  const rangeAverageMpg =
-    trustedInView.length > 0 ? trustedInView.reduce((sum, s) => sum + s.mpg, 0) / trustedInView.length : null;
+
+  // Filtering, sorting, exclusion-aware aggregation, and unit conversion
+  // re-done on every render otherwise - memoized so an unrelated
+  // re-render doesn't redo this work on the full series again.
+  const { filtered, labels, allValues, excludedValues, missedFillUpCount, markedAnomalyCount, excludedSpend, rangeAverageMpg } = useMemo(() => {
+    const dateFiltered = filterByDateRange(series, range);
+    const missedFillUpCount = dateFiltered.filter((s) => s.likelyMissedFillUps && s.exclusionReason !== 'marked-anomaly').length;
+    const markedAnomalyCount = dateFiltered.filter((s) => s.exclusionReason === 'marked-anomaly').length;
+    // Same range the chart itself is currently showing, applied to the
+    // excluded entries too - so the note below always reflects "how much
+    // of what you're looking at right now was left out", not a lifetime
+    // total that wouldn't match the chart on screen.
+    const excludedInRange = filterByDateRange(excludedFuelEntries, range);
+    const excludedSpend = excludedInRange.reduce((sum, e) => sum + e.cost, 0);
+    // Kept together, not split apart - an excluded point still needs to
+    // sit in its correct chronological/mileage position on the x-axis,
+    // shown differently rather than removed, so the reader can see WHERE
+    // the gap or anomaly actually falls, not just that something's missing.
+    const filtered =
+      viewBy === 'time' ? [...dateFiltered].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()) : dateFiltered;
+    // Same trusted-only philosophy as computeActualMPG - a flagged reading
+    // shouldn't get to drag the number shown in the title, matching the
+    // fact that it's already excluded from the line itself.
+    const trustedInView = dateFiltered.filter((s) => !s.likelyMissedFillUps);
+    const rangeAverageMpg =
+      trustedInView.length > 0 ? trustedInView.reduce((sum, s) => sum + s.mpg, 0) / trustedInView.length : null;
+
+    const labels = viewBy === 'time' ? filtered.map((s) => fmtDate(s.date)) : filtered.map((s) => formatDistance(s.mileage, distanceUnit));
+    const allValues = filtered.map((s) => Number(convertMpgValue(s.mpg, fuelEconomyUnit).toFixed(1)));
+    const excludedValues = filtered.map((s, i) => (s.likelyMissedFillUps ? allValues[i] : null));
+
+    return { filtered, labels, allValues, excludedValues, missedFillUpCount, markedAnomalyCount, excludedSpend, rangeAverageMpg };
+  }, [series, range, viewBy, excludedFuelEntries, distanceUnit, fuelEconomyUnit]);
+
   const title = `${fuelEconomyUnit === 'l100km' ? 'Fuel economy' : 'MPG'} over time${
     rangeAverageMpg !== null ? ` - ${formatFuelEconomy(rangeAverageMpg, fuelEconomyUnit)} average` : ''
   }`;
-
-  const labels = viewBy === 'time' ? filtered.map((s) => fmtDate(s.date)) : filtered.map((s) => formatDistance(s.mileage, distanceUnit));
-  const allValues = filtered.map((s) => Number(convertMpgValue(s.mpg, fuelEconomyUnit).toFixed(1)));
-  const excludedValues = filtered.map((s, i) => (s.likelyMissedFillUps ? allValues[i] : null));
 
   function handlePointClick(elements: { index: number }[]) {
     if (elements.length === 0) return;
