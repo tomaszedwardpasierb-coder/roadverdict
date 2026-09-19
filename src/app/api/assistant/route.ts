@@ -164,6 +164,18 @@ function buildSystemInstruction(config: AssistantConfigDoc, signedIn: boolean, p
     }
   }
 
+  // The log-entry/edit tool schemas below explicitly tell the model to
+  // "convert a reply like 'today' or 'last Tuesday' to the actual date
+  // yourself" - without this block, it had no actual anchor to do that
+  // math from and was falling back to guessing from its training data,
+  // producing wrong logged dates. This is the server's own clock, read
+  // fresh on every request - never a client-supplied value, so there's
+  // nothing here a visitor's browser or system clock could spoof.
+  const serverNow = new Date();
+  parts.push(
+    `\n\n---\n\nTODAY'S DATE: ${serverNow.toISOString().slice(0, 10)} (${serverNow.toLocaleDateString("en-GB", { weekday: "long", timeZone: "UTC" })}). This is the real current date from the server's own clock - use it as "today" for resolving any relative date the user gives (today, yesterday, last Tuesday, this morning, etc.) when drafting a log entry or edit, or answering any date-based question. Never fall back to your own sense of the current date, and never ask the user what today's date is.`
+  );
+
   parts.push(
     signedIn
       ? "\n\n---\n\nCURRENT SESSION: a real, signed-in user is asking. The tools described in section 5 of the document above are available to you now - use them for any question about their own logged data rather than guessing or asking them to look it up themselves. Never ask the user for an account identifier, email, or bike ID to look something up - you already have everything you need through the tools; asking for it would be both unnecessary and a sign something's gone wrong."

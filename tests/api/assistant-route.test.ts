@@ -308,6 +308,33 @@ describe("POST /api/assistant", () => {
     expect(callBody.systemInstruction.parts[0].text).toContain('CURRENT DASHBOARD TAB: the signed-in user currently has the "Shareable Links" tab open');
   });
 
+  // Regression test: the log-entry tool schema tells the model to
+  // "convert a reply like 'today' ... to the actual date yourself", but
+  // with nothing anchoring what "today" actually is, it was falling back
+  // to guessing from its training data and logging wrong dates. This
+  // must always be the server's own clock, never anything client-
+  // supplied, since there's nothing else in this request a visitor could
+  // spoof to change what date gets logged.
+  it("tells the model today's real date, from the server's own clock", async () => {
+    mocks.getSession.mockResolvedValue({ email: "rider@example.com" });
+    const realToday = new Date().toISOString().slice(0, 10);
+
+    await POST(request({ messages: [{ role: "user", content: "log 40 quid of petrol today" }] }));
+
+    const callBody = JSON.parse(mocks.fetch.mock.calls[0][1].body);
+    expect(callBody.systemInstruction.parts[0].text).toContain(`TODAY'S DATE: ${realToday}`);
+  });
+
+  it("tells the model today's date even when signed out", async () => {
+    mocks.getSession.mockResolvedValue(null);
+    const realToday = new Date().toISOString().slice(0, 10);
+
+    await POST(request({ messages: [{ role: "user", content: "what's today's date?" }] }));
+
+    const callBody = JSON.parse(mocks.fetch.mock.calls[0][1].body);
+    expect(callBody.systemInstruction.parts[0].text).toContain(`TODAY'S DATE: ${realToday}`);
+  });
+
   // Regression test: DASHBOARD_TAB_LABELS is a hand-maintained copy of
   // DashboardShell.tsx's own Section keys, not derived from it - the
   // "security" tab was added there without a matching entry here,
