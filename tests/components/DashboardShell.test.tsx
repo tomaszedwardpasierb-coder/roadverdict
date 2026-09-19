@@ -124,7 +124,34 @@ describe("DashboardShell", () => {
     rerender(<DashboardShell {...baseProps({ activeSection: "security" })} />);
 
     expect(screen.getByText("Security content")).toBeInTheDocument();
-    expect(screen.queryByText("Dashboard content")).not.toBeInTheDocument();
+    // Not .not.toBeInTheDocument() - a tab that's already been shown once
+    // stays mounted (just hidden) rather than being torn down, see the
+    // "keeps a previously-shown tab mounted" test below for why.
+    expect(screen.queryByText("Dashboard content")).not.toBeVisible();
+  });
+
+  // The actual point of the mountedContent cache in DashboardShell.tsx:
+  // switching away from a tab no longer unmounts it (which used to
+  // destroy every Chart.js canvas and reset every in-progress form on
+  // that tab), it just hides it - and switching a third tab in doesn't
+  // disturb either of the first two still sitting there, hidden.
+  it("keeps a previously-shown tab mounted (present but hidden) after switching away, rather than unmounting it", () => {
+    const { rerender } = render(<DashboardShell {...baseProps()} />);
+    expect(screen.getByText("Dashboard content")).toBeVisible();
+
+    rerender(<DashboardShell {...baseProps({ activeSection: "fuel" })} />);
+    expect(screen.getByText("Fuel content")).toBeVisible();
+    expect(screen.getByText("Dashboard content")).not.toBeVisible();
+
+    rerender(<DashboardShell {...baseProps({ activeSection: "service" })} />);
+    expect(screen.getByText("Service content")).toBeVisible();
+    expect(screen.getByText("Fuel content")).not.toBeVisible();
+    expect(screen.getByText("Dashboard content")).not.toBeVisible();
+
+    // A tab genuinely never visited this session still isn't in the DOM
+    // at all - the cache only grows to cover tabs actually shown, it
+    // doesn't eagerly mount everything up front.
+    expect(screen.queryByText("Reports content")).not.toBeInTheDocument();
   });
 
   it("clicking a sidebar nav item requests navigation to that tab's own URL", async () => {

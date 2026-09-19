@@ -9,7 +9,7 @@ import { convertGbpToDisplay, CURRENCY_SYMBOLS, type Currency, type ExchangeRate
 import { formatDistance, type DistanceUnit } from '@/lib/tracker/unitFormat';
 import { useChartTypePreference } from './useChartTypePreference';
 import { ChartTypeToggle } from './ChartTypeToggle';
-import { barGradient, BAR_BORDER_RADIUS, lineAreaGradient, lastPointRadius, lastPointRing, lastPointRingWidth, dashedValueAxis, plainCategoryAxis } from './chartStyle';
+import { barGradient, BAR_BORDER_RADIUS, lineAreaGradient, lastPointRadius, lastPointRing, lastPointRingWidth, dashedValueAxis, plainCategoryAxis, NO_MOUNT_ANIMATION } from './chartStyle';
 import { useChartFilter } from './ChartFilterContext';
 import { useTabSwitch, viewRecords } from './TabSwitchContext';
 import styles from './dashboard.module.css';
@@ -101,6 +101,7 @@ export function FuelCostChart({
             onClick: (_evt, elements) => handlePointClick(elements),
             onHover: handleHover,
             maintainAspectRatio: true,
+            animation: NO_MOUNT_ANIMATION,
           }}
         />
       ) : (
@@ -137,6 +138,7 @@ export function FuelCostChart({
             onClick: (_evt, elements) => handlePointClick(elements),
             onHover: handleHover,
             maintainAspectRatio: true,
+            animation: NO_MOUNT_ANIMATION,
           }}
         />
       )}

@@ -32,6 +32,19 @@ const nextConfig = {
   async headers() {
     return [
       {
+        // PWA manifest icons (see src/app/manifest.ts) - unlike favicon.ico,
+        // these aren't covered by Next's own static-asset caching, so they
+        // shipped with the framework default (`max-age=0`, revalidate every
+        // time) and re-downloaded their full body on every dashboard tab
+        // switch. Content only ever changes by editing the file in place,
+        // so `immutable` is safe as long as a real icon update also renames
+        // the file (and its reference in manifest.ts) to bust this cache.
+        source: '/icon-:size(192|512).png',
+        headers: [
+          { key: 'Cache-Control', value: 'public, max-age=31536000, immutable' },
+        ],
+      },
+      {
         source: '/:path*',
         headers: [
           { key: 'X-Content-Type-Options', value: 'nosniff' },

@@ -9,7 +9,7 @@ import { convertGbpToDisplay, CURRENCY_SYMBOLS, type Currency, type ExchangeRate
 import { filterByDateRange } from '@/lib/tracker/dateRange';
 import { useChartTypePreference } from './useChartTypePreference';
 import { ChartTypeToggle } from './ChartTypeToggle';
-import { barGradient, BAR_BORDER_RADIUS } from './chartStyle';
+import { barGradient, BAR_BORDER_RADIUS, NO_MOUNT_ANIMATION } from './chartStyle';
 import { useChartFilter } from './ChartFilterContext';
 import type { ForecastWindow, ForecastCategoryTotals } from '@/lib/tracker/costForecast';
 import { Icon } from './Icon';
@@ -132,6 +132,7 @@ export function SpendDonutChart({ records, mods, fuelLogs, bills, labour, curren
               }}
               options={{
                 maintainAspectRatio: false,
+                animation: NO_MOUNT_ANIMATION,
                 plugins: {
                   legend: { display: false },
                   // The category breakdown (which one, and how much) is
@@ -179,6 +180,7 @@ export function SpendDonutChart({ records, mods, fuelLogs, bills, labour, curren
                         : { enabled: false },
                     },
                     maintainAspectRatio: false,
+                    animation: NO_MOUNT_ANIMATION,
                   }}
                 />
                 <div

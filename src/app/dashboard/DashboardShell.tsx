@@ -1,7 +1,7 @@
 // Place at: src/app/dashboard/DashboardShell.tsx
 'use client';
 
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { startTransition, useEffect, useRef, useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { UpdateMileageButton } from './UpdateMileageButton';
@@ -282,7 +282,12 @@ export function DashboardShell({
       if (pendingTabTimeoutRef.current) clearTimeout(pendingTabTimeoutRef.current);
       pendingTabTimeoutRef.current = setTimeout(() => setPendingTab(null), PENDING_TAB_SAFETY_TIMEOUT_MS);
     }
-    router.push(`/dashboard?tab=${key}`);
+    // Marks the resulting re-render as non-urgent, so the click itself
+    // (the nav item's active/pending state above) paints immediately
+    // instead of waiting behind the server round-trip this triggers.
+    startTransition(() => {
+      router.push(`/dashboard?tab=${key}`);
+    });
   }
   // Warms the Router Cache for a tab before it's actually clicked - on
   // hover/focus for desktop/keyboard use, and on touchstart (which fires
@@ -434,6 +439,42 @@ export function DashboardShell({
     security: securityContent,
   };
 
+  // Every tab switch is a real navigation, and page.tsx only ever builds
+  // the ONE tab named by `?tab=` on a given request - contentMap above
+  // has exactly one defined entry per render, everything else is
+  // `undefined`. Rendering `contentMap[active]` directly (as this used
+  // to) means the single DOM slot holding "whichever tab is on screen"
+  // swaps which component tree occupies it on every switch, which is a
+  // full unmount of the outgoing tab and a fresh mount of the incoming
+  // one - every Chart.js canvas rebuilt, every list re-rendered from
+  // scratch, every in-progress form input reset, even when switching
+  // back to a tab already visited this session.
+  //
+  // This cache remembers the last content received for every tab that's
+  // been visited, keyed by section, so each one can get its own STABLE
+  // position in the tree below instead of sharing one slot - switching
+  // which one is visible then only ever toggles a `display` style, never
+  // remounts anything. The trade-off (accepted deliberately, matching
+  // the old DashboardTabs.tsx component this revives the idea from): a
+  // half-filled form left on one tab now survives switching away and
+  // back, rather than resetting; and every tab visited this session stays
+  // mounted (and its data stale until revisited) rather than being torn
+  // down when it's not the active one.
+  // A ref, not state - mutated directly during render rather than from an
+  // effect, so the newly-active tab's div (below) appears in the very
+  // same paint its content arrives in. An effect-based update would only
+  // run after commit, meaning the freshly-navigated-to tab would render
+  // as blank for one extra frame before a second render filled it in.
+  // Safe to mutate here because it's idempotent (re-assigning the same
+  // key to the same content, as happens under StrictMode's double-render,
+  // changes nothing observable) and content is only ever added, not
+  // derived from anything that would make this non-deterministic.
+  const mountedContentRef = useRef<Partial<Record<Section, ReactNode>>>({});
+  if (contentMap[active] !== undefined) {
+    mountedContentRef.current[active] = contentMap[active];
+  }
+  const mountedContent = mountedContentRef.current;
+
   // Self-maintaining: anything not Dashboard and not inside one of the
   // bottom-bar groups (Logbook/Insights/Selling) is "in More" - no future
   // tab addition needs a manual edit here again.
@@ -581,7 +622,11 @@ export function DashboardShell({
               </button>
             </div>
           )}
-          {contentMap[active]}
+          {(Object.keys(mountedContent) as Section[]).map((key) => (
+            <div key={key} style={{ display: key === active ? 'block' : 'none' }}>
+              {mountedContent[key]}
+            </div>
+          ))}
           {pendingTab && (
             <div className={styles.tabLoadingOverlay}>
               <div className={styles.tabLoadingCard}>

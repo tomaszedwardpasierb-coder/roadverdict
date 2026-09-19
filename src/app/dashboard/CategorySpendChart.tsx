@@ -10,7 +10,7 @@ import { convertGbpToDisplay, CURRENCY_SYMBOLS, type Currency, type ExchangeRate
 import { convertMilesToDisplay, distanceUnitLabel, type DistanceUnit } from '@/lib/tracker/unitFormat';
 import { useChartTypePreference } from './useChartTypePreference';
 import { ChartTypeToggle } from './ChartTypeToggle';
-import { barGradient, BAR_BORDER_RADIUS, lineAreaGradient, lastPointRadius, lastPointRing, lastPointRingWidth, dashedValueAxis, plainCategoryAxis, FORECAST_COLOR } from './chartStyle';
+import { barGradient, BAR_BORDER_RADIUS, lineAreaGradient, lastPointRadius, lastPointRing, lastPointRingWidth, dashedValueAxis, plainCategoryAxis, FORECAST_COLOR, NO_MOUNT_ANIMATION } from './chartStyle';
 import { useChartFilter } from './ChartFilterContext';
 import { useTabSwitch, viewRecords, type ReviewCategory } from './TabSwitchContext';
 import type { CategoryForecast, ForecastWindow } from '@/lib/tracker/costForecast';
@@ -193,6 +193,7 @@ export function CategorySpendChart({
           }}
           options={{
             maintainAspectRatio: true,
+            animation: NO_MOUNT_ANIMATION,
             plugins: {
               legend: { display: false },
               tooltip: {
@@ -225,6 +226,7 @@ export function CategorySpendChart({
           }}
           options={{
             maintainAspectRatio: true,
+            animation: NO_MOUNT_ANIMATION,
             plugins: {
               legend: { display: false },
               tooltip: {

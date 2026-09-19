@@ -10,7 +10,7 @@ import { formatDistance, formatFuelEconomy, type FuelEconomyUnit, type DistanceU
 import { formatCurrency, type Currency, type ExchangeRates } from '@/lib/tracker/currency';
 import { useChartTypePreference } from './useChartTypePreference';
 import { ChartTypeToggle } from './ChartTypeToggle';
-import { barGradient, BAR_BORDER_RADIUS, lineAreaGradient, lastPointRadius, lastPointRing, lastPointRingWidth, dashedValueAxis, plainCategoryAxis } from './chartStyle';
+import { barGradient, BAR_BORDER_RADIUS, lineAreaGradient, lastPointRadius, lastPointRing, lastPointRingWidth, dashedValueAxis, plainCategoryAxis, NO_MOUNT_ANIMATION } from './chartStyle';
 import { useChartFilter } from './ChartFilterContext';
 import { useTabSwitch, viewRecords } from './TabSwitchContext';
 import styles from './dashboard.module.css';
@@ -171,6 +171,7 @@ export function MpgChart({
             onClick: (_evt, elements) => handlePointClick(elements),
             onHover: handleHover,
             maintainAspectRatio: true,
+            animation: NO_MOUNT_ANIMATION,
           }}
         />
       ) : (
@@ -231,6 +232,7 @@ export function MpgChart({
             onClick: (_evt, elements) => handlePointClick(elements),
             onHover: handleHover,
             maintainAspectRatio: true,
+            animation: NO_MOUNT_ANIMATION,
           }}
         />
       )}

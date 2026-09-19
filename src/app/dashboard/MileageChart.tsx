@@ -9,7 +9,7 @@ import type { MileagePoint } from '@/lib/tracker/summary';
 import { convertMilesToDisplay, distanceUnitLabel, type DistanceUnit } from '@/lib/tracker/unitFormat';
 import { useChartTypePreference } from './useChartTypePreference';
 import { ChartTypeToggle } from './ChartTypeToggle';
-import { barGradient, BAR_BORDER_RADIUS, lineAreaGradient, lastPointRadius, lastPointRing, lastPointRingWidth, dashedValueAxis, plainCategoryAxis, FORECAST_COLOR } from './chartStyle';
+import { barGradient, BAR_BORDER_RADIUS, lineAreaGradient, lastPointRadius, lastPointRing, lastPointRingWidth, dashedValueAxis, plainCategoryAxis, FORECAST_COLOR, NO_MOUNT_ANIMATION } from './chartStyle';
 import { useChartFilter } from './ChartFilterContext';
 import { useTabSwitch, viewRecords } from './TabSwitchContext';
 import type { ForecastWindow, ForecastMonthPoint } from '@/lib/tracker/costForecast';
@@ -140,6 +140,7 @@ export function MileageChart({
             onClick: (_evt, elements) => handlePointClick(elements),
             onHover: handleHover,
             maintainAspectRatio: true,
+            animation: NO_MOUNT_ANIMATION,
           }}
         />
       ) : (
@@ -180,6 +181,7 @@ export function MileageChart({
             onClick: (_evt, elements) => handlePointClick(elements),
             onHover: handleHover,
             maintainAspectRatio: true,
+            animation: NO_MOUNT_ANIMATION,
           }}
         />
       )}

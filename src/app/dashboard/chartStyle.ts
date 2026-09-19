@@ -65,6 +65,13 @@ export function lastPointRingWidth(baseWidth: number, ringWidth: number) {
   return (context: ScriptableContext<'line'>) => (isLastPoint(context) ? ringWidth : baseWidth);
 }
 
+// Every chart here remounts fresh on each tab switch (see page.tsx's
+// per-tab content gating) rather than staying mounted and just updating
+// data - so Chart.js's default ~1s mount animation replays in full on
+// every single visit to a tab, reading as sluggishness rather than a
+// data update. Spread into each chart's own `options.animation`.
+export const NO_MOUNT_ANIMATION = { duration: 0 } as const;
+
 // One fixed colour for every forecast segment/bar/point across every
 // chart in the app (CategorySpendChart, MileageChart), regardless of
 // that chart's own normal colour - so "blue and dashed" reads as "this
