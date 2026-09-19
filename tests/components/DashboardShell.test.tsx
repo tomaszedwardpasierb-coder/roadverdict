@@ -26,7 +26,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
-const mockRouter = vi.hoisted(() => ({ push: vi.fn(), refresh: vi.fn() }));
+const mockRouter = vi.hoisted(() => ({ push: vi.fn(), refresh: vi.fn(), prefetch: vi.fn() }));
 vi.mock("next/navigation", () => ({
   useRouter: () => mockRouter,
 }));
@@ -83,6 +83,7 @@ describe("DashboardShell", () => {
     vi.stubGlobal("fetch", vi.fn());
     mockRouter.push.mockClear();
     mockRouter.refresh.mockClear();
+    mockRouter.prefetch.mockClear();
   });
 
   afterEach(() => {
@@ -132,6 +133,37 @@ describe("DashboardShell", () => {
     await user.click(screen.getAllByRole("button", { name: "Fuel" })[0]);
 
     expect(mockRouter.push).toHaveBeenCalledWith("/dashboard?tab=fuel");
+  });
+
+  // Nav items aren't real <Link>s (kept as <button> so getByRole("button", ...)
+  // queries throughout this file keep working - see DashboardShell.tsx's own
+  // renderNavButton), so they get no automatic Next.js hover-prefetch either.
+  // This is the explicit stand-in: warm the Router Cache on hover so a tab
+  // switch doesn't always pay the full round trip.
+  it("hovering a sidebar nav item prefetches that tab's URL", async () => {
+    const user = userEvent.setup();
+    render(<DashboardShell {...baseProps()} />);
+    await user.hover(screen.getAllByRole("button", { name: "Fuel" })[0]);
+
+    expect(mockRouter.prefetch).toHaveBeenCalledWith("/dashboard?tab=fuel");
+  });
+
+  // A tab switch has no visual feedback of its own otherwise - see
+  // DashboardShell.tsx's own comment on pendingTab for why the global
+  // NavigationLoadingOverlay can't see this particular kind of navigation.
+  it("shows a loading spinner over the content area after clicking a nav item, and clears it once the new tab's activeSection prop lands", async () => {
+    const user = userEvent.setup();
+    const { rerender } = render(<DashboardShell {...baseProps()} />);
+    expect(screen.queryByLabelText("Loading tab")).not.toBeInTheDocument();
+
+    await user.click(screen.getAllByRole("button", { name: "Fuel" })[0]);
+    expect(screen.getByLabelText("Loading tab")).toBeInTheDocument();
+
+    // Simulates the real navigation actually completing: dashboard/page.tsx
+    // re-runs server-side and re-supplies activeSection for the new tab,
+    // re-rendering this same mounted instance rather than remounting it.
+    rerender(<DashboardShell {...baseProps({ activeSection: "fuel" })} />);
+    expect(screen.queryByLabelText("Loading tab")).not.toBeInTheDocument();
   });
 
   it("a real child inside the tab content can switch tabs itself via the REAL TabSwitchProvider (not its no-op fallback)", async () => {

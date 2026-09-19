@@ -825,8 +825,42 @@
   color: var(--amber);
 }
 
-/* Content area - deliberately NO max-width, fills whatever space the sidebar doesn't take */
-.content { flex: 1; min-width: 0; padding: 2.5rem 3rem 4rem; }
+/* Content area - deliberately NO max-width, fills whatever space the sidebar doesn't take.
+   position: relative so tabLoadingOverlay below can cover exactly this box, not the viewport. */
+.content { flex: 1; min-width: 0; padding: 2.5rem 3rem 4rem; position: relative; }
+
+/* Shown while a tab switch's navigation is in flight (see DashboardShell.tsx's
+   own pendingTab) - covers just the content area, not the sidebar, since the
+   sidebar itself stays interactive throughout a same-page ?tab=... transition.
+   Same delayed-fade-in idea as NavigationLoadingOverlay.module.css: a switch
+   that lands almost instantly (already prefetched, or served from the Router
+   Cache) should never flash this at all. */
+.tabLoadingOverlay {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(23, 24, 27, 0.28);
+  animation: tabLoadingFadeIn 0.4s ease-in 0.15s both;
+}
+.tabLoadingCard {
+  background: var(--paper);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-pop);
+  padding: 1.4rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+@keyframes tabLoadingFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tabLoadingOverlay { animation: none; }
+}
 
 .mobileBottomNav { display: none; }
 

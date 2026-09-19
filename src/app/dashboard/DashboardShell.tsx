@@ -1,7 +1,7 @@
 // Place at: src/app/dashboard/DashboardShell.tsx
 'use client';
 
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { UpdateMileageButton } from './UpdateMileageButton';
@@ -12,11 +12,18 @@ import LogoutButton from './LogoutButton';
 import { formatDistance, type DistanceUnit } from '@/lib/tracker/unitFormat';
 import { TabSwitchProvider, type ReviewCategory } from './TabSwitchContext';
 import { useActiveSection } from '@/components/ActiveSectionContext';
+import { VehicleSpinner } from '@/components/VehicleSpinner';
 import { ResetDemoButton } from './ResetDemoButton';
 import { DEMO_EMAIL } from '@/lib/tracker/demoSeed';
 import { Icon, type IconName } from './Icon';
 import styles from './dashboard.module.css';
 import type { Section } from './sections';
+
+// Same safety-net idea as NavigationLoadingOverlay.tsx's own
+// SAFETY_TIMEOUT_MS - the pendingTab spinner is normally cleared by the
+// activeSection prop actually changing (see goToTab/its cleanup effect
+// below), but this stops it sticking forever if that never happens.
+const PENDING_TAB_SAFETY_TIMEOUT_MS = 12_000;
 
 const REVIEW_CATEGORIES: ReviewCategory[] = ['service', 'fuel', 'mods', 'bills', 'labour'];
 function asReviewCategory(key: string): ReviewCategory | null {
@@ -257,9 +264,41 @@ export function DashboardShell({
   // all of them on every load. Router Cache makes a tab already visited
   // this session feel instant again; a first visit to a given tab pays
   // one real round trip.
+  //
+  // Unlike a client-side state flip, that round trip has no visual
+  // feedback of its own - nothing here is an <a>, so the click-based
+  // NavigationLoadingOverlay in the root layout never sees it (see its
+  // own comment on why it only tracks <a> clicks and pathname changes,
+  // neither of which apply to a same-page ?tab=... transition). pendingTab
+  // is this component's own local stand-in for that: set the moment a
+  // switch is requested, cleared once `active` actually changes to match
+  // (see the effect below) - a click always reads as "accepted, working
+  // on it" rather than looking frozen.
+  const [pendingTab, setPendingTab] = useState<Section | null>(null);
+  const pendingTabTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   function goToTab(key: Section) {
+    if (key !== active) {
+      setPendingTab(key);
+      if (pendingTabTimeoutRef.current) clearTimeout(pendingTabTimeoutRef.current);
+      pendingTabTimeoutRef.current = setTimeout(() => setPendingTab(null), PENDING_TAB_SAFETY_TIMEOUT_MS);
+    }
     router.push(`/dashboard?tab=${key}`);
   }
+  // Warms the Router Cache for a tab before it's actually clicked - on
+  // hover/focus for desktop/keyboard use, and on touchstart (which fires
+  // before the click itself) for mobile, so a tab visited once already
+  // this session, or one whose prefetch had time to land, opens close to
+  // instantly instead of paying the full round trip on every click.
+  function prefetchTab(key: Section) {
+    router.prefetch(`/dashboard?tab=${key}`);
+  }
+  useEffect(() => {
+    setPendingTab(null);
+    if (pendingTabTimeoutRef.current) clearTimeout(pendingTabTimeoutRef.current);
+  }, [active]);
+  useEffect(() => () => {
+    if (pendingTabTimeoutRef.current) clearTimeout(pendingTabTimeoutRef.current);
+  }, []);
   const [cancellingDeletion, setCancellingDeletion] = useState(false);
   // Mobile only: which bottom-bar "shelf" is currently open - either a
   // bottom-bar group's own key (its shelf shows just that group's items)
@@ -335,8 +374,15 @@ export function DashboardShell({
           goToTab(item.key);
           onSelect?.();
         }}
+        onMouseEnter={() => prefetchTab(item.key)}
+        onFocus={() => prefetchTab(item.key)}
+        onTouchStart={() => prefetchTab(item.key)}
       >
-        <Icon name={item.icon} className={styles.navIcon} />
+        {pendingTab === item.key ? (
+          <VehicleSpinner kind={vehicleKind} size={18} className={styles.navIcon} />
+        ) : (
+          <Icon name={item.icon} className={styles.navIcon} />
+        )}
         <span>{navLabelFor(item)}</span>
         {itemHasPending(item) && <PendingDot />}
         {item.key === 'story' && storyReady && <ReadyDot />}
@@ -496,8 +542,15 @@ export function DashboardShell({
               type="button"
               className={`${styles.sidebarNavItem} ${active === 'privacy' ? styles.sidebarNavItemActive : ''}`}
               onClick={() => goToTab('privacy')}
+              onMouseEnter={() => prefetchTab('privacy')}
+              onFocus={() => prefetchTab('privacy')}
+              onTouchStart={() => prefetchTab('privacy')}
             >
-              <Icon name="privacy" className={styles.navIcon} />
+              {pendingTab === 'privacy' ? (
+                <VehicleSpinner kind={vehicleKind} size={18} className={styles.navIcon} />
+              ) : (
+                <Icon name="privacy" className={styles.navIcon} />
+              )}
               <span>Privacy</span>
             </button>
           </div>
@@ -529,6 +582,13 @@ export function DashboardShell({
             </div>
           )}
           {contentMap[active]}
+          {pendingTab && (
+            <div className={styles.tabLoadingOverlay}>
+              <div className={styles.tabLoadingCard}>
+                <VehicleSpinner kind={vehicleKind} size={40} decorative={false} label="Loading tab" />
+              </div>
+            </div>
+          )}
           {/* Every tab renders through this one container, so adding it
               here once - rather than into all 13 tab-content blocks in
               page.tsx - puts it at the true bottom of whichever tab is
@@ -550,6 +610,9 @@ export function DashboardShell({
               goToTab('dashboard');
               setOpenMobileSheet(null);
             }}
+            onMouseEnter={() => prefetchTab('dashboard')}
+            onFocus={() => prefetchTab('dashboard')}
+            onTouchStart={() => prefetchTab('dashboard')}
             style={{
               display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.2rem',
               background: 'none', border: 'none', fontSize: '0.65rem',
@@ -557,7 +620,11 @@ export function DashboardShell({
               position: 'relative',
             }}
           >
-            <Icon name="dashboard" className={styles.navIcon} />
+            {pendingTab === 'dashboard' ? (
+              <VehicleSpinner kind={vehicleKind} size={18} className={styles.navIcon} />
+            ) : (
+              <Icon name="dashboard" className={styles.navIcon} />
+            )}
             Dashboard
           </button>
 
