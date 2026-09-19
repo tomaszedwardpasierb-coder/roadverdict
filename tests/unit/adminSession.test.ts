@@ -47,19 +47,19 @@ afterEach(() => {
 describe("verifyAdminPassword", () => {
   beforeEach(resetMocks);
 
-  it("returns false when no ADMIN_PASSWORD_HASH is configured", () => {
+  it("returns false when no ADMIN_PASSWORD_HASH is configured", async () => {
     delete process.env.ADMIN_PASSWORD_HASH;
-    expect(verifyAdminPassword("anything")).toBe(false);
+    expect(await verifyAdminPassword("anything")).toBe(false);
   });
 
-  it("returns true for the correct password against the configured hash", () => {
+  it("returns true for the correct password against the configured hash", async () => {
     process.env.ADMIN_PASSWORD_HASH = bcrypt.hashSync("correct-horse-battery-staple", 10);
-    expect(verifyAdminPassword("correct-horse-battery-staple")).toBe(true);
+    expect(await verifyAdminPassword("correct-horse-battery-staple")).toBe(true);
   });
 
-  it("returns false for an incorrect password", () => {
+  it("returns false for an incorrect password", async () => {
     process.env.ADMIN_PASSWORD_HASH = bcrypt.hashSync("correct-horse-battery-staple", 10);
-    expect(verifyAdminPassword("wrong-password")).toBe(false);
+    expect(await verifyAdminPassword("wrong-password")).toBe(false);
   });
 });
 

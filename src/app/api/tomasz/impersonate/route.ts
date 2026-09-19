@@ -57,7 +57,7 @@ export async function POST(request: NextRequest) {
   if (!passwordLimit.allowed) {
     return NextResponse.json({ error: "Too many attempts. Please wait and try again." }, { status: 429 });
   }
-  if (!password || !verifyAdminPassword(password)) {
+  if (!password || !(await verifyAdminPassword(password))) {
     await recordAdminLoginAttempt("reauth-password");
     return NextResponse.json({ error: "Incorrect password." }, { status: 401 });
   }

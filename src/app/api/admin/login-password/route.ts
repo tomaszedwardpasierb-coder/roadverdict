@@ -17,7 +17,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid request." }, { status: 400 });
   }
   const { password } = body as { password?: string };
-  if (!password || !verifyAdminPassword(password)) {
+  if (!password || !(await verifyAdminPassword(password))) {
     await recordAdminLoginAttempt("password");
     return NextResponse.json({ error: "Incorrect password." }, { status: 401 });
   }
