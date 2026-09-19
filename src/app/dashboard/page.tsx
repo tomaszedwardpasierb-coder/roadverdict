@@ -395,14 +395,35 @@ export default async function DashboardPage(props: { searchParams: Promise<{ add
   // comment on why (page.tsx is a server component, forecastWindow is
   // client-side state it has no way to read at render time).
   const bikeLifetime = { startingMileage: bike.startingMileage, currentMileage: bike.currentMileage, dateAdded: bike.dateAdded };
-  const bikeForecastByWindow = buildBikeCostForecastAllWindows({
-    records, mods, bills, labour, reminders,
-    currentMileage: bike.currentMileage,
-    mileagePoints,
-    bikeLifetime,
-    bikeClass: bike.bikeClass,
-  });
-  const { spendForecastByWindow, mileageForecastByWindow, donutForecastByWindow } = buildStatCardForecasts(bikeForecastByWindow, mileagePoints, bikeLifetime, fuelLogs);
+  // bikeForecastByWindow feeds both dashboardContent's stat cards (via
+  // buildStatCardForecasts below) AND reportsContent's per-category
+  // CategorySpendChart forecasts (via pickCategoryForecast) further down
+  // this file - so it has to be built for either tab, not just Dashboard.
+  // buildStatCardForecasts itself is dashboard-only. Skipped entirely on
+  // every OTHER tab, since building it (looping records/reminders/mods/
+  // bills/labour across all 4 windows) was previously wasted work on
+  // every single non-dashboard, non-reports tab visit, first or not. The
+  // placeholder casts below are never actually read: dashboardContent/
+  // reportsContent only exist under these exact same activeSection
+  // checks. See DASHBOARD_LATENCY_HANDOVER.md's next-steps item #1.
+  const bikeForecastByWindow =
+    activeSection === "dashboard" || activeSection === "reports"
+      ? buildBikeCostForecastAllWindows({
+          records, mods, bills, labour, reminders,
+          currentMileage: bike.currentMileage,
+          mileagePoints,
+          bikeLifetime,
+          bikeClass: bike.bikeClass,
+        })
+      : ({} as ReturnType<typeof buildBikeCostForecastAllWindows>);
+  const { spendForecastByWindow, mileageForecastByWindow, donutForecastByWindow } =
+    activeSection === "dashboard"
+      ? buildStatCardForecasts(bikeForecastByWindow, mileagePoints, bikeLifetime, fuelLogs)
+      : {
+          spendForecastByWindow: {} as ReturnType<typeof buildStatCardForecasts>["spendForecastByWindow"],
+          mileageForecastByWindow: {} as ReturnType<typeof buildStatCardForecasts>["mileageForecastByWindow"],
+          donutForecastByWindow: {} as ReturnType<typeof buildStatCardForecasts>["donutForecastByWindow"],
+        };
   const fuelCostPoints = fuelLogs.map((f) => ({ id: f.id, date: f.date, cost: f.cost, mileage: f.mileage }));
   const summary = computeSpendSummary(records, mods, fuelLogs, bills, labour);
   const currentYear = new Date().getFullYear();
@@ -1179,14 +1200,28 @@ async function renderCarDashboard(
 
   const mileagePoints = gatherCarMileagePoints(records, mods, fuelLogs, bills, labour);
   const carLifetime = { startingMileage: car.startingMileage, currentMileage: car.currentMileage, dateAdded: car.dateAdded };
-  const carForecastByWindow = buildCarCostForecastAllWindows({
-    records, mods, bills, labour, reminders,
-    currentMileage: car.currentMileage,
-    mileagePoints,
-    carLifetime,
-    carClass: car.fuelType !== "electric" && car.engineLitres ? classFromEngineLitres(car.engineLitres) : "medium",
-  });
-  const { spendForecastByWindow, mileageForecastByWindow, donutForecastByWindow } = buildStatCardForecasts(carForecastByWindow, mileagePoints, carLifetime, fuelLogs);
+  // Needed for Dashboard (via buildStatCardForecasts) AND Reports (via
+  // pickCategoryForecast, further down) - see the matching bike-branch
+  // comment above (DASHBOARD_LATENCY_HANDOVER.md's next-steps item #1)
+  // for why, and why the placeholder casts below are safe.
+  const carForecastByWindow =
+    activeSection === "dashboard" || activeSection === "reports"
+      ? buildCarCostForecastAllWindows({
+          records, mods, bills, labour, reminders,
+          currentMileage: car.currentMileage,
+          mileagePoints,
+          carLifetime,
+          carClass: car.fuelType !== "electric" && car.engineLitres ? classFromEngineLitres(car.engineLitres) : "medium",
+        })
+      : ({} as ReturnType<typeof buildCarCostForecastAllWindows>);
+  const { spendForecastByWindow, mileageForecastByWindow, donutForecastByWindow } =
+    activeSection === "dashboard"
+      ? buildStatCardForecasts(carForecastByWindow, mileagePoints, carLifetime, fuelLogs)
+      : {
+          spendForecastByWindow: {} as ReturnType<typeof buildStatCardForecasts>["spendForecastByWindow"],
+          mileageForecastByWindow: {} as ReturnType<typeof buildStatCardForecasts>["mileageForecastByWindow"],
+          donutForecastByWindow: {} as ReturnType<typeof buildStatCardForecasts>["donutForecastByWindow"],
+        };
   const currentYear = new Date().getFullYear();
   const yearSpend = computeCarYearSpend(records, mods, fuelLogs, bills, currentYear, labour);
   const yearEndProjection = projectYearEndSpend(yearSpend, currentYear);

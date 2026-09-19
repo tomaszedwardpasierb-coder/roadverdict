@@ -25,6 +25,31 @@ import type { Section } from './sections';
 // below), but this stops it sticking forever if that never happens.
 const PENDING_TAB_SAFETY_TIMEOUT_MS = 12_000;
 
+// Real-user click-to-visible timing for a tab switch, reported to
+// Application Insights via /api/rum/tab-switch (see that route's own
+// comment and lib/telemetry/rum.ts) - see DASHBOARD_LATENCY_HANDOVER.md's
+// "Planned next steps" #1. Before this existed there was no way to see
+// actual users' tab-switch duration, only synthetic Playwright/curl
+// spot-checks against a demo account - this is additive visibility, not
+// a dependency, so it fails silently (no navigator.sendBeacon, no
+// network, a thrown error) rather than affecting the switch itself.
+function reportTabSwitchTiming(tab: Section, durationMs: number, firstVisit: boolean) {
+  try {
+    const payload = JSON.stringify({ tab, durationMs, firstVisit });
+    if (typeof navigator !== 'undefined' && typeof navigator.sendBeacon === 'function') {
+      navigator.sendBeacon('/api/rum/tab-switch', new Blob([payload], { type: 'application/json' }));
+    } else if (typeof fetch === 'function') {
+      // sendBeacon isn't available in every environment (e.g. some in-app
+      // browsers) - falls back to a fire-and-forget fetch that doesn't
+      // block navigating away, same intent as sendBeacon's own design.
+      fetch('/api/rum/tab-switch', { method: 'POST', body: payload, keepalive: true }).catch(() => {});
+    }
+  } catch {
+    // Never let a telemetry failure surface to the user - see this
+    // function's own top comment.
+  }
+}
+
 const REVIEW_CATEGORIES: ReviewCategory[] = ['service', 'fuel', 'mods', 'bills', 'labour'];
 function asReviewCategory(key: string): ReviewCategory | null {
   return (REVIEW_CATEGORIES as string[]).includes(key) ? (key as ReviewCategory) : null;
@@ -276,9 +301,21 @@ export function DashboardShell({
   // on it" rather than looking frozen.
   const [pendingTab, setPendingTab] = useState<Section | null>(null);
   const pendingTabTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Every tab reached so far this session (seeded with whichever one is
+  // active on mount) - purely for reportTabSwitchTiming's own
+  // `firstVisit` flag below, kept separate from mountedContentRef (which
+  // exists lower down and actually holds rendered content) so this can
+  // be read from goToTab without depending on that ref's declaration
+  // order.
+  const visitedSectionsRef = useRef<Set<Section>>(new Set([active]));
+  // Set the moment a switch is requested, read and cleared once `active`
+  // actually changes to match (see the effect below) - captures the
+  // click-to-visible duration reportTabSwitchTiming sends.
+  const pendingSwitchRef = useRef<{ tab: Section; start: number; firstVisit: boolean } | null>(null);
   function goToTab(key: Section) {
     if (key !== active) {
       setPendingTab(key);
+      pendingSwitchRef.current = { tab: key, start: performance.now(), firstVisit: !visitedSectionsRef.current.has(key) };
       if (pendingTabTimeoutRef.current) clearTimeout(pendingTabTimeoutRef.current);
       pendingTabTimeoutRef.current = setTimeout(() => setPendingTab(null), PENDING_TAB_SAFETY_TIMEOUT_MS);
     }
@@ -300,6 +337,20 @@ export function DashboardShell({
   useEffect(() => {
     setPendingTab(null);
     if (pendingTabTimeoutRef.current) clearTimeout(pendingTabTimeoutRef.current);
+    visitedSectionsRef.current.add(active);
+    const pending = pendingSwitchRef.current;
+    if (pending && pending.tab === active) {
+      pendingSwitchRef.current = null;
+      // One extra frame so this measures the tab's content actually
+      // having painted, not just React having committed the DOM change -
+      // the commit itself (when this effect runs) happens a frame before
+      // the browser paints it.
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          reportTabSwitchTiming(pending.tab, performance.now() - pending.start, pending.firstVisit);
+        });
+      });
+    }
   }, [active]);
   useEffect(() => () => {
     if (pendingTabTimeoutRef.current) clearTimeout(pendingTabTimeoutRef.current);
