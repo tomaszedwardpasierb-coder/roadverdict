@@ -23,7 +23,12 @@ describe("getLivePrivacyPolicyText", () => {
 
     const [url, init] = fetchMock.mock.calls[0];
     expect(url).toContain("/privacy");
-    expect(init).toEqual({ next: { revalidate: 3600 } });
+    expect(init.next).toEqual({ revalidate: 3600 });
+    // Goes through fetchWithTimeout now, not a bare fetch - this is this
+    // app's own self-fetch of /privacy, called on every single assistant
+    // request; a hang here used to have no timeout at all, unlike every
+    // other external call already fixed.
+    expect(init.signal).toBeInstanceOf(AbortSignal);
   });
 
   // A real discovery, not assumed going in: PRIVACY_POLICY_URL is a

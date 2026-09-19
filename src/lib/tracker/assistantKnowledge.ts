@@ -13,6 +13,7 @@
 // source for that migration (seed-assistant-config/route.ts) and as a
 // known-good reference copy, not dead weight to be removed casually -
 // see the migration route for the reasoning on why this stays for now.
+import { fetchWithTimeout } from "@/lib/fetchWithTimeout";
 
 export const ASSISTANT_KNOWLEDGE_BASE = `# RoadVerdict Assistant Knowledge Base
 
@@ -1114,7 +1115,7 @@ function stripHtml(html: string): string {
 
 export async function getLivePrivacyPolicyText(): Promise<string | null> {
   try {
-    const res = await fetch(PRIVACY_POLICY_URL, { next: { revalidate: 3600 } });
+    const res = await fetchWithTimeout(PRIVACY_POLICY_URL, { next: { revalidate: 3600 } });
     if (!res.ok) return null;
     const html = await res.text();
     const text = stripHtml(html);
