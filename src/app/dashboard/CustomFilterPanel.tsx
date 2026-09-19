@@ -1,7 +1,7 @@
 // Place at: src/app/dashboard/CustomFilterPanel.tsx
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { JOB_LABELS, JOB_GROUPS } from '@/lib/tracker/jobTypes';
 import { MOD_LABELS, MOD_GROUPS, MOD_LABEL_TO_KEY, findGroupForCategory } from '@/lib/tracker/modTypes';
 import { BILL_LABELS } from '@/lib/tracker/billTypes';
@@ -83,61 +83,71 @@ export function CustomFilterPanel({ records, mods, bills, fuelLogs, currency, ra
     }
   }
 
-  function inDateFilter(dateStr: string): boolean {
-    const d = new Date(dateStr);
-    if (dateMode === 'lastN') {
-      const n = Number(lastNDays);
-      if (!Number.isFinite(n) || n <= 0) return true;
-      const cutoff = new Date();
-      cutoff.setDate(cutoff.getDate() - n);
-      return d >= cutoff;
+  // Filtering/mapping/sorting the raw record arrays and computing MPG
+  // segments - real work that used to redo itself on every keystroke or
+  // dropdown change in this panel (each is its own useState), and on any
+  // other unrelated re-render too. Same pattern already fixed in the
+  // dashboard stat cards and the chart components - memoized here for
+  // the same reason.
+  const { entries, total, rangeAverageMpg } = useMemo(() => {
+    function inDateFilter(dateStr: string): boolean {
+      const d = new Date(dateStr);
+      if (dateMode === 'lastN') {
+        const n = Number(lastNDays);
+        if (!Number.isFinite(n) || n <= 0) return true;
+        const cutoff = new Date();
+        cutoff.setDate(cutoff.getDate() - n);
+        return d >= cutoff;
+      }
+      if (fromDate && d < new Date(fromDate)) return false;
+      if (toDate && d > new Date(toDate)) return false;
+      return true;
     }
-    if (fromDate && d < new Date(fromDate)) return false;
-    if (toDate && d > new Date(toDate)) return false;
-    return true;
-  }
 
-  let entries: ResultEntry[] = [];
+    let entries: ResultEntry[] = [];
 
-  if (category === 'service') {
-    entries = records
-      .filter((r) => (serviceJob === 'all' || r.jobType === serviceJob) && inDateFilter(r.date))
-      .map((r) => ({ date: r.date, description: JOB_LABELS[r.jobType] ?? r.jobType, cost: r.cost }));
-  } else if (category === 'mods') {
-    entries = mods
-      .filter((m) => {
-        if (modItem !== 'all') return m.category === modItem && inDateFilter(m.date);
-        if (modGroup !== ALL_MODS_GROUP) {
-          const groupData = MOD_GROUPS.find((g) => g.group === modGroup);
-          const keysInGroup = groupData?.subgroups.flatMap((sg) => sg.mods) ?? [];
-          return keysInGroup.includes(m.category) && inDateFilter(m.date);
-        }
-        return inDateFilter(m.date);
-      })
-      .map((m) => ({ date: m.date, description: `${MOD_LABELS[m.category] ?? m.category}: ${m.name}`, cost: m.cost }));
-  } else if (category === 'bills') {
-    entries = bills
-      .filter((b) => (billType === 'all' || b.billType === billType) && inDateFilter(b.date))
-      .map((b) => ({ date: b.date, description: BILL_LABELS[b.billType] ?? b.billType, cost: b.cost }));
-  } else {
-    entries = fuelLogs.filter((f) => inDateFilter(f.date)).map((f) => ({ date: f.date, description: 'Fuel fill-up', cost: f.cost }));
-  }
+    if (category === 'service') {
+      entries = records
+        .filter((r) => (serviceJob === 'all' || r.jobType === serviceJob) && inDateFilter(r.date))
+        .map((r) => ({ date: r.date, description: JOB_LABELS[r.jobType] ?? r.jobType, cost: r.cost }));
+    } else if (category === 'mods') {
+      entries = mods
+        .filter((m) => {
+          if (modItem !== 'all') return m.category === modItem && inDateFilter(m.date);
+          if (modGroup !== ALL_MODS_GROUP) {
+            const groupData = MOD_GROUPS.find((g) => g.group === modGroup);
+            const keysInGroup = groupData?.subgroups.flatMap((sg) => sg.mods) ?? [];
+            return keysInGroup.includes(m.category) && inDateFilter(m.date);
+          }
+          return inDateFilter(m.date);
+        })
+        .map((m) => ({ date: m.date, description: `${MOD_LABELS[m.category] ?? m.category}: ${m.name}`, cost: m.cost }));
+    } else if (category === 'bills') {
+      entries = bills
+        .filter((b) => (billType === 'all' || b.billType === billType) && inDateFilter(b.date))
+        .map((b) => ({ date: b.date, description: BILL_LABELS[b.billType] ?? b.billType, cost: b.cost }));
+    } else {
+      entries = fuelLogs.filter((f) => inDateFilter(f.date)).map((f) => ({ date: f.date, description: 'Fuel fill-up', cost: f.cost }));
+    }
 
-  // Computed on the FULL, unfiltered fuel log first - filtering the raw
-  // logs by date before computing segments would break the
-  // mileage-consecutive relationship a segment depends on (the same
-  // lesson already applied to the dashboard stat cards and the MPG
-  // chart itself). Only the resulting SEGMENTS get filtered by date,
-  // and only the trusted ones count toward the average, matching
-  // computeActualMPG's own philosophy.
-  let rangeAverageMpg: number | null = null;
-  if (category === 'fuel') {
-    const trustedInRange = computeMPGSeries(fuelLogs).filter((s) => !s.likelyMissedFillUps && inDateFilter(s.date));
-    rangeAverageMpg = trustedInRange.length > 0 ? trustedInRange.reduce((sum, s) => sum + s.mpg, 0) / trustedInRange.length : null;
-  }
+    // Computed on the FULL, unfiltered fuel log first - filtering the raw
+    // logs by date before computing segments would break the
+    // mileage-consecutive relationship a segment depends on (the same
+    // lesson already applied to the dashboard stat cards and the MPG
+    // chart itself). Only the resulting SEGMENTS get filtered by date,
+    // and only the trusted ones count toward the average, matching
+    // computeActualMPG's own philosophy.
+    let rangeAverageMpg: number | null = null;
+    if (category === 'fuel') {
+      const trustedInRange = computeMPGSeries(fuelLogs).filter((s) => !s.likelyMissedFillUps && inDateFilter(s.date));
+      rangeAverageMpg = trustedInRange.length > 0 ? trustedInRange.reduce((sum, s) => sum + s.mpg, 0) / trustedInRange.length : null;
+    }
 
-  entries.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  const total = entries.reduce((sum, e) => sum + e.cost, 0);
+    entries.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    const total = entries.reduce((sum, e) => sum + e.cost, 0);
+
+    return { entries, total, rangeAverageMpg };
+  }, [records, mods, bills, fuelLogs, category, serviceJob, modItem, modGroup, billType, dateMode, fromDate, toDate, lastNDays]);
   const modGroupData = MOD_GROUPS.find((g) => g.group === modGroup);
 
   return (

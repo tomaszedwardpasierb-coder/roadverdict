@@ -1,6 +1,7 @@
 // Place at: src/app/dashboard/DashboardStatCards.tsx
 'use client';
 
+import { useMemo } from 'react';
 import { useChartFilter } from './ChartFilterContext';
 import { filterByDateRange } from '@/lib/tracker/dateRange';
 import { computeMPGSeries, type MpgCalcInput } from '@/lib/tracker/mpgCalc';
@@ -73,59 +74,87 @@ export function DashboardStatCards({
 }: Props) {
   const { range, forecastMode, forecastWindow } = useChartFilter();
 
-  const filteredRecords = filterByDateRange(records, range);
-  const filteredMods = filterByDateRange(mods, range);
-  const filteredBills = filterByDateRange(bills, range);
-  const filteredLabour = filterByDateRange(labour, range);
-  const filteredFuel = filterByDateRange(fuelLogs, range);
-  const totalSpend = [...filteredRecords, ...filteredMods, ...filteredBills, ...filteredLabour, ...filteredFuel].reduce((sum, r) => sum + r.cost, 0);
+  // Filtering five separate record arrays, computing MPG segments, and
+  // reducing/mapping over all of them - real work that used to redo
+  // itself on every render, including ones triggered by something else
+  // on the page entirely. Same pattern already fixed in the chart
+  // components (CategorySpendChart etc.) - memoized here for the same
+  // reason.
+  const {
+    totalSpend,
+    actualMpg,
+    costPerMileDisplay,
+    projectedSpend,
+    projectedMileage,
+    showingForecast,
+    displayProjectedSpend,
+    costPerMileForecastDisplay,
+  } = useMemo(() => {
+    const filteredRecords = filterByDateRange(records, range);
+    const filteredMods = filterByDateRange(mods, range);
+    const filteredBills = filterByDateRange(bills, range);
+    const filteredLabour = filterByDateRange(labour, range);
+    const filteredFuel = filterByDateRange(fuelLogs, range);
+    const totalSpend = [...filteredRecords, ...filteredMods, ...filteredBills, ...filteredLabour, ...filteredFuel].reduce((sum, r) => sum + r.cost, 0);
 
-  // Segments are computed on the FULL, unfiltered fuel log first, so a
-  // fill-up right at the edge of the range still has its preceding
-  // full-tank fill-up available to measure against - only the resulting
-  // segments get date-filtered afterward. Same approach the MPG chart
-  // itself already uses; filtering the raw logs before computing segments
-  // would silently break the mileage-consecutive relationship a segment
-  // depends on.
-  const allSegments = computeMPGSeries(fuelLogs);
-  const segmentsInRange = filterByDateRange(allSegments, range);
-  const actualMpg = segmentsInRange.length > 0 ? segmentsInRange.reduce((sum, s) => sum + s.mpg, 0) / segmentsInRange.length : null;
+    // Segments are computed on the FULL, unfiltered fuel log first, so a
+    // fill-up right at the edge of the range still has its preceding
+    // full-tank fill-up available to measure against - only the resulting
+    // segments get date-filtered afterward. Same approach the MPG chart
+    // itself already uses; filtering the raw logs before computing segments
+    // would silently break the mileage-consecutive relationship a segment
+    // depends on.
+    const allSegments = computeMPGSeries(fuelLogs);
+    const segmentsInRange = filterByDateRange(allSegments, range);
+    const actualMpg = segmentsInRange.length > 0 ? segmentsInRange.reduce((sum, s) => sum + s.mpg, 0) / segmentsInRange.length : null;
 
-  // Miles covered in the selected range. For "all", the bike's own
-  // lifetime bookends (startingMileage/currentMileage) are seeded in so
-  // this exactly matches currentMileage - startingMileage, same as before
-  // this feature existed - not an approximation for that specific case.
-  // For any other range, only the real mileage-bearing entries that
-  // actually fall within the window are used (Bills have no mileage, so
-  // they're never part of this).
-  const mileagePoints: number[] = [
-    ...filteredRecords.map((r) => r.mileage).filter((m): m is number => m != null),
-    ...filteredMods.map((r) => r.mileage).filter((m): m is number => m != null),
-    ...filteredLabour.map((r) => r.mileage).filter((m): m is number => m != null),
-    ...filteredFuel.map((r) => r.mileage),
-  ];
-  if (range === 'all') {
-    mileagePoints.push(startingMileage, currentMileage);
-  }
-  const milesInRange = mileagePoints.length >= 2 ? Math.max(...mileagePoints) - Math.min(...mileagePoints) : 0;
-  // In the bike's own selected display currency, not raw GBP - matches
-  // the "Total spend" card above, which already converts. Previously
-  // this stayed in GBP pence regardless of currency, so a EUR/PLN/etc.
-  // bike showed its per-mile figure mislabeled as GBP pence.
-  const displayTotalSpend = convertGbpToDisplay(totalSpend, currency, rates);
-  const costPerMileDisplay = milesInRange > 0 ? displayTotalSpend / milesInRange : null;
+    // Miles covered in the selected range. For "all", the bike's own
+    // lifetime bookends (startingMileage/currentMileage) are seeded in so
+    // this exactly matches currentMileage - startingMileage, same as before
+    // this feature existed - not an approximation for that specific case.
+    // For any other range, only the real mileage-bearing entries that
+    // actually fall within the window are used (Bills have no mileage, so
+    // they're never part of this).
+    const mileagePoints: number[] = [
+      ...filteredRecords.map((r) => r.mileage).filter((m): m is number => m != null),
+      ...filteredMods.map((r) => r.mileage).filter((m): m is number => m != null),
+      ...filteredLabour.map((r) => r.mileage).filter((m): m is number => m != null),
+      ...filteredFuel.map((r) => r.mileage),
+    ];
+    if (range === 'all') {
+      mileagePoints.push(startingMileage, currentMileage);
+    }
+    const milesInRange = mileagePoints.length >= 2 ? Math.max(...mileagePoints) - Math.min(...mileagePoints) : 0;
+    // In the bike's own selected display currency, not raw GBP - matches
+    // the "Total spend" card above, which already converts. Previously
+    // this stayed in GBP pence regardless of currency, so a EUR/PLN/etc.
+    // bike showed its per-mile figure mislabeled as GBP pence.
+    const displayTotalSpend = convertGbpToDisplay(totalSpend, currency, rates);
+    const costPerMileDisplay = milesInRange > 0 ? displayTotalSpend / milesInRange : null;
 
-  // Forecast-mode figures - only "on" once there's genuinely a
-  // precomputed number for the currently selected window; otherwise
-  // every card below quietly falls back to its normal real-data value,
-  // same as CategorySpendChart's own `showingForecast` guard.
-  const projectedSpend = spendForecastByWindow?.[forecastWindow];
-  const mileageForecastPoints = mileageForecastByWindow?.[forecastWindow];
-  const projectedMileage = mileageForecastPoints?.[mileageForecastPoints.length - 1]?.total;
-  const showingForecast = forecastMode && projectedSpend != null && projectedMileage != null;
-  const extraMilesForecast = showingForecast ? Math.max(0, projectedMileage! - currentMileage) : 0;
-  const displayProjectedSpend = showingForecast ? convertGbpToDisplay(projectedSpend!, currency, rates) : null;
-  const costPerMileForecastDisplay = showingForecast && extraMilesForecast > 0 ? displayProjectedSpend! / extraMilesForecast : null;
+    // Forecast-mode figures - only "on" once there's genuinely a
+    // precomputed number for the currently selected window; otherwise
+    // every card below quietly falls back to its normal real-data value,
+    // same as CategorySpendChart's own `showingForecast` guard.
+    const projectedSpend = spendForecastByWindow?.[forecastWindow];
+    const mileageForecastPoints = mileageForecastByWindow?.[forecastWindow];
+    const projectedMileage = mileageForecastPoints?.[mileageForecastPoints.length - 1]?.total;
+    const showingForecast = forecastMode && projectedSpend != null && projectedMileage != null;
+    const extraMilesForecast = showingForecast ? Math.max(0, projectedMileage! - currentMileage) : 0;
+    const displayProjectedSpend = showingForecast ? convertGbpToDisplay(projectedSpend!, currency, rates) : null;
+    const costPerMileForecastDisplay = showingForecast && extraMilesForecast > 0 ? displayProjectedSpend! / extraMilesForecast : null;
+
+    return {
+      totalSpend,
+      actualMpg,
+      costPerMileDisplay,
+      projectedSpend,
+      projectedMileage,
+      showingForecast,
+      displayProjectedSpend,
+      costPerMileForecastDisplay,
+    };
+  }, [records, mods, bills, labour, fuelLogs, range, startingMileage, currentMileage, currency, rates, forecastMode, forecastWindow, spendForecastByWindow, mileageForecastByWindow]);
 
   // "Spend this year" is a to-year-end concept, unrelated to the
   // 1w/1m/6m/1y window the other cards key off - it switches to a
