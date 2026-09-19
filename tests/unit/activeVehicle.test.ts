@@ -86,6 +86,36 @@ describe("resolveActiveVehicle", () => {
     const result = await resolveActiveVehicle(email);
     expect(result).toEqual({ kind: "bike", bike, hasAnyCar: false });
   });
+
+  // preFetched is an opt-in optimisation for a caller (dashboard/page.tsx)
+  // that already needs the full bikes+cars lists for its own purposes -
+  // it must skip this function's own fetch entirely, not just ignore the
+  // lists it was handed.
+  describe("with preFetched bikes/cars", () => {
+    it("resolves using the given lists without calling getBikesForUser/getCarsForUser itself", async () => {
+      mocks.pickActiveBike.mockResolvedValue(bike);
+      mocks.cookies.mockResolvedValue(cookieStoreWithKind());
+      const result = await resolveActiveVehicle(email, { bikes: [bike], cars: [car] });
+      expect(result).toEqual({ kind: "bike", bike, hasAnyCar: true });
+      expect(mocks.getBikesForUser).not.toHaveBeenCalled();
+      expect(mocks.getCarsForUser).not.toHaveBeenCalled();
+    });
+
+    it("still returns null for an account with neither, using the given empty lists", async () => {
+      mocks.cookies.mockResolvedValue(cookieStoreWithKind());
+      const result = await resolveActiveVehicle(email, { bikes: [], cars: [] });
+      expect(result).toBeNull();
+      expect(mocks.getBikesForUser).not.toHaveBeenCalled();
+      expect(mocks.getCarsForUser).not.toHaveBeenCalled();
+    });
+
+    it("still honours the kind-preference cookie against the given lists", async () => {
+      mocks.pickActiveCar.mockResolvedValue(car);
+      mocks.cookies.mockResolvedValue(cookieStoreWithKind("car"));
+      const result = await resolveActiveVehicle(email, { bikes: [bike], cars: [car] });
+      expect(result).toEqual({ kind: "car", car, hasAnyBike: true });
+    });
+  });
 });
 
 describe("resolveAllActiveVehicles", () => {

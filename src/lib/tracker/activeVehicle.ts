@@ -34,8 +34,21 @@ export type ResolvedActiveVehicle =
 // cookie, and must land exactly where it always has. A preference for
 // a kind the account no longer holds (e.g. its only car was deleted)
 // falls back the same way, rather than resolving to nothing.
-export async function resolveActiveVehicle(email: string): Promise<ResolvedActiveVehicle | null> {
-  const [bikes, cars] = await Promise.all([getBikesForUser(email), getCarsForUser(email)]);
+//
+// preFetched is optional and purely an optimisation: a caller that's
+// already fetched both lists for its own purposes (dashboard/page.tsx
+// needs the full bikes+cars lists regardless of which one ends up
+// active) can pass them in to skip this function's own internal fetch,
+// rather than paying for the same bikes+cars round-trip twice on one
+// page load. Every existing caller that doesn't pass it keeps working
+// unchanged.
+export async function resolveActiveVehicle(
+  email: string,
+  preFetched?: { bikes: BikeDoc[]; cars: CarDoc[] }
+): Promise<ResolvedActiveVehicle | null> {
+  const [bikes, cars] = preFetched
+    ? [preFetched.bikes, preFetched.cars]
+    : await Promise.all([getBikesForUser(email), getCarsForUser(email)]);
   if (bikes.length === 0 && cars.length === 0) return null;
 
   const cookieStore = await cookies();

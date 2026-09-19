@@ -3,7 +3,7 @@ import { getSession } from "@/lib/auth/session";
 import { redirect } from "next/navigation";
 import styles from "./dashboard.module.css";
 import LogoutButton from "./LogoutButton";
-import { getBikesForUser, pickActiveBike, getCurrentRegistration, isBikeReadOnly, canRefreshBikeData, nextBikeDataRefreshAt } from "@/lib/tracker/bike";
+import { getBikesForUser, pickActiveBike, getCurrentRegistration, isBikeReadOnly, canRefreshBikeData, nextBikeDataRefreshAt, type BikeDoc } from "@/lib/tracker/bike";
 import { getServiceRecords } from "@/lib/tracker/serviceRecord";
 import { getFuelLogs, computeActualMPG, computeMPGSeries } from "@/lib/tracker/fuelLog";
 import { getMods } from "@/lib/tracker/mod";
@@ -239,17 +239,24 @@ export default async function DashboardPage(props: { searchParams: Promise<{ add
   const userAccount = await getUserDoc(session.email);
   const pendingDeletion = getPendingDeletionInfo(userAccount);
 
+  // Fetched once, together, and handed to resolveActiveVehicle below via
+  // its preFetched param - both lists are needed regardless of which
+  // kind turns out to be active (existingCars for the add-car-form check
+  // and switcherVehicles below; bikes for the bike-active path's own
+  // Promise.all further down and for a car-active session's
+  // renderCarDashboard call), so fetching them once here instead of
+  // letting resolveActiveVehicle do its own separate internal fetch (and
+  // letting the bike-active path below fetch bikes again, and letting a
+  // car-active renderCarDashboard fetch bikes a third time) removes what
+  // was up to three redundant Cosmos round-trips on the app's highest-
+  // traffic route.
+  const [bikes, existingCars] = await Promise.all([getBikesForUser(session.email), getCarsForUser(session.email)]);
+
   // Resolves which vehicle KIND is active (see activeVehicle.ts) -
   // checked before any bike-specific fetch below, so a car-active
   // session branches off entirely rather than falling through into
-  // logic that assumes a bike exists. Duplicates the getBikesForUser
-  // call made a few lines below (resolveActiveVehicle does its own
-  // internal fetch) - same accepted-duplication reasoning as
-  // getSellerReportCore further down this same file: one page load per
-  // visit for one signed-in person, not a hot path worth extra
-  // complexity to avoid.
-  const activeVehicle = await resolveActiveVehicle(session.email);
-  const existingCars = await getCarsForUser(session.email);
+  // logic that assumes a bike exists.
+  const activeVehicle = await resolveActiveVehicle(session.email, { bikes, cars: existingCars });
 
   // Reached from the homepage's/cars marketing page's "Start logging
   // your car"/"Start logging your motorcycle" buttons - see page.tsx and
@@ -288,7 +295,7 @@ export default async function DashboardPage(props: { searchParams: Promise<{ add
   if (effectiveKind === "car") {
     // Already resolved to "car" the ordinary way - reuse it as-is.
     if (activeVehicle?.kind === "car") {
-      return renderCarDashboard(session.email, activeVehicle.car, existingCars, activeVehicle.hasAnyBike, userAccount, pendingDeletion, activeSection);
+      return renderCarDashboard(session.email, activeVehicle.car, existingCars, bikes, userAccount, pendingDeletion, activeSection);
     }
     // Forced past a cookie that resolved to "bike" (or no cookie at all
     // for an account with both, defaulting to bike) - existingCars.length
@@ -297,17 +304,16 @@ export default async function DashboardPage(props: { searchParams: Promise<{ add
     // "bike" is what got us here, which itself guarantees bikes exist.
     const forcedCar = await pickActiveCar(existingCars);
     if (forcedCar) {
-      return renderCarDashboard(session.email, forcedCar, existingCars, true, userAccount, pendingDeletion, activeSection);
+      return renderCarDashboard(session.email, forcedCar, existingCars, bikes, userAccount, pendingDeletion, activeSection);
     }
   }
 
-  // shareLinks/proStatus/pendingReceiptRequests don't depend on bikes or
-  // each other - batched the same way the car dashboard path already
-  // does for its own equivalent calls, rather than four sequential
-  // round trips on the app's main hot path. pickActiveBike itself still
-  // has to wait for bikes specifically, so it can't join this batch.
-  const [bikes, shareLinks, proStatus, pendingReceiptRequests] = await Promise.all([
-    getBikesForUser(session.email),
+  // shareLinks/proStatus/pendingReceiptRequests don't depend on each
+  // other or on bikes (already fetched above, together with cars) -
+  // batched the same way the car dashboard path already does for its
+  // own equivalent calls, rather than three sequential round trips on
+  // the app's main hot path.
+  const [shareLinks, proStatus, pendingReceiptRequests] = await Promise.all([
     getShareLinksForUser(session.email),
     getProStatus(session.email),
     getPendingReceiptRequestsForOwner(session.email),
@@ -1117,13 +1123,16 @@ async function renderCarDashboard(
   email: string,
   car: CarDoc,
   allCars: CarDoc[],
-  hasAnyBike: boolean,
+  bikes: BikeDoc[],
   userAccount: Awaited<ReturnType<typeof getUserDoc>>,
   pendingDeletion: ReturnType<typeof getPendingDeletionInfo>,
   activeSection: Section
 ) {
-  const [bikes, proStatus, twoFactorEnabled] = await Promise.all([
-    hasAnyBike ? getBikesForUser(email) : Promise.resolve([]),
+  // bikes is the caller's own already-fetched list (DashboardPage fetches
+  // bikes+cars together before deciding which kind is active) - fetching
+  // it again here, even conditionally, would be the exact same redundant
+  // round trip this parameter exists to remove.
+  const [proStatus, twoFactorEnabled] = await Promise.all([
     getProStatus(email),
     isTwoFactorEnabled(email),
   ]);
