@@ -65,12 +65,17 @@ export default async function HomePage() {
           </div>
           <div className="rv-panel-right-col">
             <div className="rv-panel rv-panel-rt">
+              {/* Not `priority` - panel-01 is the real LCP element (confirmed via
+                  PageSpeed Insights), and this panel is hidden entirely on mobile
+                  (.rv-panel-right-col is display:none below 768px) - marking it
+                  priority forced an eager, high-fetchpriority fetch of an image
+                  that mobile visitors never even see, competing with panel-01
+                  for the same early bandwidth. */}
               <Image
                 src="/images/hero/panel-02.webp"
                 alt=""
                 fill
                 style={{ objectFit: 'cover', objectPosition: 'center center' }}
-                priority
               />
               <div className="rv-panel-overlay" />
               <span className="rv-panel-tag">Panel 02</span>

@@ -679,7 +679,7 @@ function AssistantWidgetInner() {
         onClick={() => setOpen((v) => !v)}
         aria-label={open ? 'Close assistant' : 'Open assistant'}
       >
-        {open ? '✕' : <img src="/assistant-icon.png" alt="" width={28} height={28} className={styles.launcherIcon} />}
+        {open ? '✕' : <img src="/assistant-icon.webp" alt="" width={28} height={28} className={styles.launcherIcon} />}
       </button>
     </div>
   );

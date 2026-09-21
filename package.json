@@ -59,5 +59,12 @@
     "playwright": "^1.62.1",
     "typescript": "^5.5.4",
     "vitest": "^4.1.11"
-  }
+  },
+  "browserslist": [
+    "chrome >= 91",
+    "edge >= 91",
+    "firefox >= 90",
+    "safari >= 15.4",
+    "ios_saf >= 15.4"
+  ]
 }
