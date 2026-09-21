@@ -21,32 +21,52 @@ export default function AboutPage() {
         style={{ width: '100%', borderRadius: '12px', marginBottom: '1.5rem' }}
       />
       <p style={{ maxWidth: 'none', margin: '0 0 1.5rem' }}>
-        RoadVerdict is run independently, not by a large company - built to fix a genuinely
-        annoying problem: not knowing whether a motorcycle service quote is fair, not having a
-        real record of what a bike has actually cost to own, and not being able to prove any of
-        it when the time comes to sell.
+        We&apos;re a small team - motorcyclists and drivers, the kind of people who actually
+        enjoy standing in a cold garage on a Sunday sorting out their own bike or car, not just
+        people who happened to pick &quot;vehicles&quot; as a market. Petrolheads, basically.
+        And like most petrolheads, we were sick of the same problem: no way to know if a
+        service quote was fair, no real record of what our own bikes and cars had actually cost
+        us to run, and nothing to show a buyer except a shoebox of receipts when it came time to
+        sell. So we built the thing we wished already existed.
+      </p>
+      <h2 style={{ fontFamily: 'var(--font-display)', fontSize: '1.4rem', margin: '0 0 0.8rem', color: 'var(--asphalt)' }}>
+        How it actually started
+      </h2>
+      <p style={{ maxWidth: 'none', margin: '0 0 1.5rem' }}>
+        RoadVerdict wasn&apos;t a launch. It started as an internal tool for our own small
+        group of friends - a spreadsheet-replacement, really, so we&apos;d each stop losing
+        track of what we&apos;d spent and when the next service was due. We showed it to a few
+        other riders at one of the events we go to, mostly as a &quot;here, this might be
+        useful to you too&quot; - and it picked up faster than any of us expected. People we&apos;d
+        never met were asking for accounts.
       </p>
       <p style={{ maxWidth: 'none', margin: '0 0 1.5rem' }}>
-        It started as a single tool - the <Link href="/quote-checker">Quote Checker</Link>,
-        which checks a quote you&apos;ve been given against real UK motorcycle service and
-        repair prices - alongside a <Link href="/cost-calculator">Cost Calculator</Link> and a{' '}
-        <Link href="/buying-guide">Buying a Used Bike</Link> guide for checking a bike over
-        before you hand any money over. All three are free, no sign-in required.
+        That&apos;s when we decided to actually build it properly: added AI so you can scan a
+        receipt instead of typing it in by hand, added real UK price data so the Quote Checker
+        means something, and opened it up so anyone could sign up and get the same benefit we&apos;d
+        been getting ourselves - not just our group of friends.
       </p>
+      <h2 style={{ fontFamily: 'var(--font-display)', fontSize: '1.4rem', margin: '0 0 0.8rem', color: 'var(--asphalt)' }}>
+        Where it&apos;s at now
+      </h2>
       <p style={{ maxWidth: 'none', margin: '0 0 1.5rem' }}>
-        Since then it&apos;s grown into a proper ownership tracker: log services, fuel,
-        modifications, and insurance/tax/MOT payments; get reminders by mileage, time, or an
-        exact date; scan a receipt and let AI file it for you; and see real reports on what your
-        bike actually costs, not a guess. When you come to sell, a shareable link hands the buyer
-        your bike&apos;s real history instead of a pile of paper receipts. The core of the
-        tracker is free, for as long as you own the bike - deeper reports and analytics,
-        multiple bikes, and an AI-written &quot;Story So Far&quot; are part of RoadVerdict
-        Premium.
+        RoadVerdict is a proper ownership tracker now, for motorcycles and cars both - log
+        services, fuel, modifications, and insurance/tax/MOT payments; get reminders by
+        mileage, time, or an exact date; scan a receipt and let AI file it for you; and see real
+        reports on what your vehicle actually costs, not a guess. Free tools like the{' '}
+        <Link href="/quote-checker">Quote Checker</Link>, <Link href="/cost-calculator">Cost
+        Calculator</Link>, and <Link href="/buying-guide">Buying Guide</Link> need no account at
+        all. When you come to sell, a shareable link hands the buyer your vehicle&apos;s real
+        history instead of a pile of paper receipts. The core tracker stays free for as long as
+        you own the vehicle - deeper reports, multiple vehicles, and an AI-written &quot;Story So
+        Far&quot; are part of <Link href="/pro">RoadVerdict Pro</Link>.
       </p>
       <p style={{ maxWidth: 'none' }}>
-        RoadVerdict is a small, UK-focused, motorcycle-specific project, not a car app with a
-        bike icon bolted on. Questions or feedback:{' '}
-        <a href="mailto:hello@roadverdict.co.uk">hello@roadverdict.co.uk</a>.
+        We&apos;re still small, and we still use this ourselves every time we service our own
+        bikes and cars - it&apos;s not a project we handed off to someone else once it grew.
+        If something&apos;s wrong, or missing, or you just want to tell us what you think:{' '}
+        <a href="mailto:hello@roadverdict.co.uk">hello@roadverdict.co.uk</a> reaches us directly,
+        not a support queue.
       </p>
     </div>
   );
