@@ -28,6 +28,16 @@ export interface UserDoc {
   // src/lib/admin/session.ts), not a per-admin value worth tracking
   // until that changes.
   plan?: { grantedAt: string; expiresAt: string };
+  // Set once a real Stripe Pro subscription checkout completes -
+  // stripeCustomerId is kept even after a cancellation (so a returning
+  // subscriber's checkout reuses the same Stripe Customer instead of
+  // creating a duplicate), stripeSubscriptionId is cleared the moment
+  // the subscription itself ends (see proSubscription.ts's webhook
+  // handlers). Absent entirely for admin-granted Premium (grantPremium()
+  // in userAccount.ts) - plan.expiresAt above is the one field isPro()
+  // actually reads either way.
+  stripeCustomerId?: string;
+  stripeSubscriptionId?: string;
   // Per-user 2FA, distinct from the admin panel's own single shared
   // TOTP secret (src/lib/admin/session.ts) - see src/lib/auth/twoFactor.ts
   // for the enroll/disable/verify logic that reads and writes this.

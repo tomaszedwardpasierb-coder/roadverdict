@@ -23,6 +23,11 @@ import Stripe from "stripe";
 import { getStripe } from "@/lib/payments/stripe";
 import { applyVdiUnlockFromWebhookSession } from "@/lib/payments/vdiCheckout";
 import { applyBuyingGuideVdiPurchaseFromWebhookSession } from "@/lib/payments/buyingGuideVdiCheckout";
+import {
+  applyProSubscriptionFromCheckoutSession,
+  applyProSubscriptionRenewed,
+  applyProSubscriptionCancelled,
+} from "@/lib/payments/proSubscription";
 import type { VehicleKind } from "@/lib/tracker/vdiUnlock";
 
 export const dynamic = "force-dynamic";
@@ -46,20 +51,28 @@ export async function POST(request: NextRequest) {
 
   if (event.type === "checkout.session.completed") {
     const session = event.data.object as Stripe.Checkout.Session;
-    const vehicleKind = session.metadata?.vehicleKind as VehicleKind | undefined;
-    const token = session.metadata?.token;
-    const purchaseId = session.metadata?.purchaseId;
-    if (session.payment_status === "paid" && (vehicleKind === "bike" || vehicleKind === "car")) {
-      if (token) {
-        await applyVdiUnlockFromWebhookSession(token, vehicleKind, {
-          id: session.id,
-          amount_total: session.amount_total,
-          currency: session.currency,
-        });
-      } else if (purchaseId) {
-        await applyBuyingGuideVdiPurchaseFromWebhookSession(purchaseId, { id: session.id });
+    if (session.metadata?.kind === "pro_subscription") {
+      await applyProSubscriptionFromCheckoutSession(session);
+    } else {
+      const vehicleKind = session.metadata?.vehicleKind as VehicleKind | undefined;
+      const token = session.metadata?.token;
+      const purchaseId = session.metadata?.purchaseId;
+      if (session.payment_status === "paid" && (vehicleKind === "bike" || vehicleKind === "car")) {
+        if (token) {
+          await applyVdiUnlockFromWebhookSession(token, vehicleKind, {
+            id: session.id,
+            amount_total: session.amount_total,
+            currency: session.currency,
+          });
+        } else if (purchaseId) {
+          await applyBuyingGuideVdiPurchaseFromWebhookSession(purchaseId, { id: session.id });
+        }
       }
     }
+  } else if (event.type === "customer.subscription.updated") {
+    await applyProSubscriptionRenewed(event.data.object as Stripe.Subscription);
+  } else if (event.type === "customer.subscription.deleted") {
+    await applyProSubscriptionCancelled(event.data.object as Stripe.Subscription);
   }
 
   return NextResponse.json({ received: true });

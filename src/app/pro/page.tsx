@@ -1,6 +1,8 @@
 // Place at: src/app/pro/page.tsx
 import { getSession } from '@/lib/auth/session';
 import { isPro, PRO_MONTHLY_PRICE } from '@/lib/subscriptions';
+import { getUserDoc } from '@/lib/tracker/userDoc';
+import { selfHealProSubscription } from '@/lib/payments/proSubscription';
 import { PlanComparisonCards } from '@/components/PlanComparisonCards';
 import styles from './pro.module.css';
 
@@ -10,9 +12,20 @@ export const metadata = {
   alternates: { canonical: '/pro' },
 };
 
-export default async function ProPage() {
+export default async function ProPage(props: { searchParams: Promise<{ session_id?: string }> }) {
+  const searchParams = await props.searchParams;
   const session = await getSession();
+
+  // Covers the case where the browser returns from Stripe before the
+  // webhook has landed - see selfHealProSubscription's own comment. The
+  // webhook remains the authoritative path either way.
+  if (session && searchParams.session_id) {
+    await selfHealProSubscription(session.email, searchParams.session_id);
+  }
+
   const userIsPro = session ? await isPro(session.email) : false;
+  const userDoc = session ? await getUserDoc(session.email) : null;
+  const hasStripeSubscription = !!userDoc?.stripeSubscriptionId;
 
   return (
     <main className={styles.main}>
@@ -28,7 +41,7 @@ export default async function ProPage() {
         </p>
       </div>
 
-      <PlanComparisonCards userIsPro={userIsPro} />
+      <PlanComparisonCards userIsPro={userIsPro} hasStripeSubscription={hasStripeSubscription} />
 
       <div className={styles.faq}>
         <h2 className={styles.faqHeading}>Common questions</h2>

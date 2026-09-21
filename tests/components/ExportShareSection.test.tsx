@@ -33,7 +33,7 @@ describe("ExportShareSection", () => {
     const link = screen.getByRole("link", { name: "Download CSV" });
     expect(link).toHaveAttribute("href", "/api/tracker/export/csv");
     expect(screen.queryByText(/unlocks every locked feature/)).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Coming soon" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Subscribe monthly/ })).not.toBeInTheDocument();
   });
 
   it("blocks creating a link with no recipient email, without calling the server", async () => {

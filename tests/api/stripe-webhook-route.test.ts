@@ -5,6 +5,9 @@ const mocks = vi.hoisted(() => ({
   constructEvent: vi.fn(),
   applyVdiUnlockFromWebhookSession: vi.fn(),
   applyBuyingGuideVdiPurchaseFromWebhookSession: vi.fn(),
+  applyProSubscriptionFromCheckoutSession: vi.fn(),
+  applyProSubscriptionRenewed: vi.fn(),
+  applyProSubscriptionCancelled: vi.fn(),
 }));
 
 vi.mock("@/lib/payments/stripe", () => ({
@@ -16,6 +19,11 @@ vi.mock("@/lib/payments/vdiCheckout", () => ({
 vi.mock("@/lib/payments/buyingGuideVdiCheckout", () => ({
   applyBuyingGuideVdiPurchaseFromWebhookSession: mocks.applyBuyingGuideVdiPurchaseFromWebhookSession,
 }));
+vi.mock("@/lib/payments/proSubscription", () => ({
+  applyProSubscriptionFromCheckoutSession: mocks.applyProSubscriptionFromCheckoutSession,
+  applyProSubscriptionRenewed: mocks.applyProSubscriptionRenewed,
+  applyProSubscriptionCancelled: mocks.applyProSubscriptionCancelled,
+}));
 
 import { POST } from "@/app/api/stripe/webhook/route";
 
@@ -26,9 +34,7 @@ function request(body: string, signature?: string): NextRequest {
 }
 
 beforeEach(() => {
-  mocks.constructEvent.mockReset();
-  mocks.applyVdiUnlockFromWebhookSession.mockReset();
-  mocks.applyBuyingGuideVdiPurchaseFromWebhookSession.mockReset();
+  Object.values(mocks).forEach((m) => m.mockReset());
   process.env.STRIPE_WEBHOOK_SECRET = "whsec_test";
 });
 
@@ -172,5 +178,58 @@ describe("POST /api/stripe/webhook", () => {
     await POST(request("{}", "sig_ok"));
     expect(mocks.applyVdiUnlockFromWebhookSession).toHaveBeenCalled();
     expect(mocks.applyBuyingGuideVdiPurchaseFromWebhookSession).not.toHaveBeenCalled();
+  });
+
+  // ── Pro subscription (metadata.kind === "pro_subscription", and the two subscription lifecycle events) ──
+
+  it("routes a subscription checkout to applyProSubscriptionFromCheckoutSession, not the one-time purchase paths", async () => {
+    mocks.constructEvent.mockReturnValue({
+      type: "checkout.session.completed",
+      data: { object: { id: "cs_5", payment_status: "paid", metadata: { email: "rider@example.com", kind: "pro_subscription" } } },
+    });
+    const response = await POST(request("{}", "sig_ok"));
+    expect(response.status).toBe(200);
+    expect(mocks.applyProSubscriptionFromCheckoutSession).toHaveBeenCalledWith(
+      expect.objectContaining({ id: "cs_5", metadata: { email: "rider@example.com", kind: "pro_subscription" } })
+    );
+    expect(mocks.applyVdiUnlockFromWebhookSession).not.toHaveBeenCalled();
+    expect(mocks.applyBuyingGuideVdiPurchaseFromWebhookSession).not.toHaveBeenCalled();
+  });
+
+  it("does not require payment_status to be checked for a subscription checkout - that's applyProSubscriptionFromCheckoutSession's own job", async () => {
+    // Unlike the one-time purchases above, a subscription session's
+    // completion is meaningful regardless of payment_status - the
+    // subscription's own active/trialing status is what actually
+    // gates the plan grant, inside proSubscription.ts itself.
+    mocks.constructEvent.mockReturnValue({
+      type: "checkout.session.completed",
+      data: { object: { id: "cs_6", payment_status: "no_payment_required", metadata: { email: "rider@example.com", kind: "pro_subscription" } } },
+    });
+    await POST(request("{}", "sig_ok"));
+    expect(mocks.applyProSubscriptionFromCheckoutSession).toHaveBeenCalled();
+  });
+
+  it("routes customer.subscription.updated to applyProSubscriptionRenewed", async () => {
+    mocks.constructEvent.mockReturnValue({
+      type: "customer.subscription.updated",
+      data: { object: { id: "sub_1", status: "active", metadata: { email: "rider@example.com" } } },
+    });
+    const response = await POST(request("{}", "sig_ok"));
+    expect(response.status).toBe(200);
+    expect(mocks.applyProSubscriptionRenewed).toHaveBeenCalledWith(
+      expect.objectContaining({ id: "sub_1", status: "active" })
+    );
+  });
+
+  it("routes customer.subscription.deleted to applyProSubscriptionCancelled", async () => {
+    mocks.constructEvent.mockReturnValue({
+      type: "customer.subscription.deleted",
+      data: { object: { id: "sub_1", status: "canceled", metadata: { email: "rider@example.com" } } },
+    });
+    const response = await POST(request("{}", "sig_ok"));
+    expect(response.status).toBe(200);
+    expect(mocks.applyProSubscriptionCancelled).toHaveBeenCalledWith(
+      expect.objectContaining({ id: "sub_1", status: "canceled" })
+    );
   });
 });

@@ -6,20 +6,28 @@
 // being gated at that spot.
 import Link from 'next/link';
 import { PRO_FEATURES, PRO_MONTHLY_PRICE, PRO_ANNUAL_PRICE } from '@/lib/subscriptions';
+import { ProSubscribeButtons, ManageBillingButton } from '@/components/ProCheckoutButtons';
 import styles from '@/app/pro/pro.module.css';
 
 interface Props {
   // Whether the signed-in viewer already has Pro - drives the Pro card's
-  // own CTA state (see /pro's own comment on why there's no real
-  // checkout yet).
+  // own CTA state.
   userIsPro: boolean;
+  // Whether that Pro access came from a real Stripe subscription (as
+  // opposed to an admin grant via /tomasz, which has no Stripe Customer
+  // behind it) - only true when this account actually has something to
+  // manage in Stripe's billing portal. Meaningless when userIsPro is
+  // false. Only /pro's own page passes this - every other call site
+  // (ProGate, dashboard's reminder gate) always renders with
+  // userIsPro={false} anyway, so it never matters there.
+  hasStripeSubscription?: boolean;
   // The Free card's "Go to dashboard" link only makes sense on the
   // standalone /pro page - pointless when this is already rendered
   // inside the dashboard itself.
   showFreeCta?: boolean;
 }
 
-export function PlanComparisonCards({ userIsPro, showFreeCta = true }: Props) {
+export function PlanComparisonCards({ userIsPro, hasStripeSubscription = false, showFreeCta = true }: Props) {
   return (
     <div className={styles.plans}>
       <div className={styles.planCard}>
@@ -59,17 +67,16 @@ export function PlanComparisonCards({ userIsPro, showFreeCta = true }: Props) {
             <div className={styles.planCta + ' ' + styles.planCtaPro} style={{ cursor: 'default' }}>
               You&apos;re on Premium
             </div>
-            <p className={styles.planCtaNote}>Your account already has full Premium access.</p>
+            {hasStripeSubscription ? (
+              <div style={{ marginTop: '0.6rem' }}>
+                <ManageBillingButton />
+              </div>
+            ) : (
+              <p className={styles.planCtaNote}>Your account already has full Premium access.</p>
+            )}
           </>
         ) : (
-          <>
-            <button type="button" className={styles.planCta + ' ' + styles.planCtaPro} disabled>
-              Coming soon
-            </button>
-            <p className={styles.planCtaNote}>
-              Pro isn&apos;t available to purchase yet. Your data is safe and your account is ready.
-            </p>
-          </>
+          <ProSubscribeButtons />
         )}
       </div>
 

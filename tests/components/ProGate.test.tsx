@@ -37,7 +37,7 @@ describe("ProGate", () => {
     // The real PlanComparisonCards, not a stub - both plan cards present.
     expect(screen.getByText("Free")).toBeInTheDocument();
     expect(screen.getByText("Most popular")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Coming soon" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Subscribe monthly/ })).toBeInTheDocument();
   });
 
   it("doesn't show the comparison card's own 'Go to dashboard' link, since the gate is already inside the dashboard", () => {
