@@ -3,9 +3,9 @@ import type { MetadataRoute } from 'next';
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: 'RoadVerdict - Motorcycle Cost Tracker',
+    name: 'RoadVerdict - Vehicle Cost Tracker',
     short_name: 'RoadVerdict',
-    description: 'Track your motorcycle running costs and check if a service quote is fair, benchmarked against real UK prices.',
+    description: 'Track your motorcycle or car running costs and check if a service quote is fair, benchmarked against real UK prices.',
     start_url: '/dashboard',
     display: 'standalone',
     background_color: '#e4e2dd',
