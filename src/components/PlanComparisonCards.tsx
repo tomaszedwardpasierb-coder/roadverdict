@@ -5,7 +5,7 @@
 // one Pro subscription unlocks everything below, not just the feature
 // being gated at that spot.
 import Link from 'next/link';
-import { PRO_FEATURES, PRO_MONTHLY_PRICE, PRO_ANNUAL_PRICE } from '@/lib/subscriptions';
+import { PRO_FEATURES, PRO_MONTHLY_PRICE, PRO_ANNUAL_PRICE } from '@/lib/proPlan';
 import { ProSubscribeButtons, ManageBillingButton } from '@/components/ProCheckoutButtons';
 import styles from '@/app/pro/pro.module.css';
 

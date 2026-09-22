@@ -1,4 +1,9 @@
 ﻿// Place at: src/lib/cosmos.ts
+// Hard guardrail: throws a build error naming the exact import chain if
+// any client component ever transitively imports this file again - see
+// proPlan.ts/onboardingSteps.ts's own comments for the leaks this caught
+// before this guard existed (Azure Cosmos SDK shipped to the browser).
+import "server-only";
 import { CosmosClient, Container } from "@azure/cosmos";
 
 let containerInstance: Container | null = null;

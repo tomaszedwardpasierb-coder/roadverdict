@@ -15,7 +15,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { VehicleSpinner } from '@/components/VehicleSpinner';
 import { VaultAuthModal, type VaultPreviousAccess } from './VaultAuthModal';
 import { VaultDocumentPreviewModal } from './VaultDocumentPreviewModal';
-import { VAULT_CATEGORIES, type VaultDocumentCategory } from '@/lib/tracker/vaultDocument';
+import { VAULT_CATEGORIES, type VaultDocumentCategory } from '@/lib/tracker/vaultCategories';
 import { Icon } from './Icon';
 import { NotificationBell } from './NotificationBell';
 import { convertMilesToDisplay, type DistanceUnit } from '@/lib/tracker/unitFormat';

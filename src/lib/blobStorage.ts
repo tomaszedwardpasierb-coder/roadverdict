@@ -1,4 +1,6 @@
 // Place at: src/lib/blobStorage.ts
+// Same guardrail as cosmos.ts - see its comment.
+import "server-only";
 import { BlobServiceClient, ContainerClient } from "@azure/storage-blob";
 
 let containerClientInstance: ContainerClient | null = null;

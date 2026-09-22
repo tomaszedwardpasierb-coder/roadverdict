@@ -4,7 +4,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { VaultAuthModal, type VaultPreviousAccess } from '@/app/dashboard/VaultAuthModal';
-import { VAULT_CATEGORIES, type VaultDocumentCategory } from '@/lib/tracker/vaultDocument';
+import { VAULT_CATEGORIES, type VaultDocumentCategory } from '@/lib/tracker/vaultCategories';
 import { fetchWithTimeout, FetchTimeoutError, UPLOAD_TIMEOUT_MS } from '@/lib/fetchWithTimeout';
 import { VehicleSpinner } from './VehicleSpinner';
 import styles from './AssistantProposedEntryCard.module.css';

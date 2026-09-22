@@ -53,12 +53,17 @@ export default async function HomePage() {
         {/* Comic panel grid */}
         <div className="rv-hero-panels" aria-hidden="true">
           <div className="rv-panel rv-panel-left">
+            {/* quality below default (75) - PageSpeed flagged ~105KB of
+                savings here with negligible visible difference, since a
+                busy comic-style illustration hides compression artifacts
+                far better than a photo would. */}
             <Image
               src="/images/hero/panel-01.webp"
               alt=""
               fill
               style={{ objectFit: 'cover', objectPosition: 'center top' }}
               priority
+              quality={68}
             />
             <div className="rv-panel-overlay" />
             <span className="rv-panel-tag">Panel 01</span>
@@ -235,11 +240,16 @@ export default async function HomePage() {
       {/* ── VERDICT PANEL ────────────────────────────────────────────── */}
       <section className="rv-verdict-strip" aria-labelledby="verdict-cta-heading">
         <div className="rv-verdict-panel-img" aria-hidden="true">
+          {/* Lower quality than panel-01 - this one sits under a much
+              heavier overlay (rv-verdict-img-overlay is 82-96% opaque),
+              so the image itself is barely visible and compression
+              artifacts don't show at all. */}
           <Image
             src="/images/hero/panel-04.webp"
             alt=""
             fill
             style={{ objectFit: 'cover', objectPosition: 'center center' }}
+            quality={50}
           />
           <div className="rv-verdict-img-overlay" />
         </div>

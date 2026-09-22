@@ -14,6 +14,11 @@
 // bike -> subscriptions). Keeping the plain read here breaks that
 // cycle before it exists.
 import { getContainer } from "@/lib/cosmos";
+// Re-exported for any existing importer - see onboardingSteps.ts's own
+// comment for why the real definitions live there now, not here.
+import type { OnboardingStep } from "@/lib/tracker/onboardingSteps";
+export type { OnboardingStep } from "@/lib/tracker/onboardingSteps";
+export { ONBOARDING_STEPS } from "@/lib/tracker/onboardingSteps";
 
 export interface UserDoc {
   id: string;
@@ -112,30 +117,6 @@ export interface UserDoc {
     dismissedChecklistAt?: string;
   };
 }
-
-// One step per real action, not per page visited - each is marked done by
-// the action actually happening server-side (a real entry logged, a real
-// share link created, and so on - see markOnboardingStepComplete in
-// userAccount.ts and its call sites), never by a "yes I did this" click
-// inside a scripted tour.
-export type OnboardingStep =
-  | "logged-first-entry"
-  | "used-ai-assistant"
-  | "compared-vehicles"
-  | "created-share-link"
-  | "viewed-report"
-  | "explored-transfer";
-
-// Display order and copy for OnboardingChecklistCard.tsx - one place so
-// the card's rendering never has to know the step keys' own meaning.
-export const ONBOARDING_STEPS: { step: OnboardingStep; label: string; href: string }[] = [
-  { step: "logged-first-entry", label: "Log your first bit of history", href: "/dashboard?tab=service" },
-  { step: "viewed-report", label: "Check your own report", href: "/dashboard?tab=story" },
-  { step: "created-share-link", label: "See what a buyer would see", href: "/dashboard?tab=shareLinks" },
-  { step: "used-ai-assistant", label: "Ask the AI assistant something", href: "/dashboard" },
-  { step: "compared-vehicles", label: "Compare two vehicles", href: "/garage/compare" },
-  { step: "explored-transfer", label: "See how transferring ownership works", href: "/dashboard?tab=transferOwnership" },
-];
 
 export async function getUserDoc(email: string): Promise<UserDoc | null> {
   const container = getContainer();

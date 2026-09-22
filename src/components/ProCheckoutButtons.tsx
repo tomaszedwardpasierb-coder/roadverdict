@@ -9,7 +9,7 @@
 // pattern rather than introducing Stripe.js/Elements.
 import { useState } from 'react';
 import { VehicleSpinner } from './VehicleSpinner';
-import { PRO_MONTHLY_PRICE, PRO_ANNUAL_PRICE } from '@/lib/subscriptions';
+import { PRO_MONTHLY_PRICE, PRO_ANNUAL_PRICE } from '@/lib/proPlan';
 import styles from '@/app/pro/pro.module.css';
 
 async function redirectToUrl(

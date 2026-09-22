@@ -2,7 +2,7 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
-import type { OnboardingStep } from '@/lib/tracker/userDoc';
+import type { OnboardingStep } from '@/lib/tracker/onboardingSteps';
 
 // Fires once per mount - a hook, not a rendered component, since its
 // callers (StorySoFarTab/CarStorySoFarTab, TransferOwnershipSection/

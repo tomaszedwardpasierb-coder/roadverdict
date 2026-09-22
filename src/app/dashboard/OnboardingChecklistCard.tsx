@@ -5,7 +5,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { VehicleSpinner } from '@/components/VehicleSpinner';
-import { ONBOARDING_STEPS } from '@/lib/tracker/userDoc';
+import { ONBOARDING_STEPS } from '@/lib/tracker/onboardingSteps';
 import styles from './dashboard.module.css';
 
 interface Props {

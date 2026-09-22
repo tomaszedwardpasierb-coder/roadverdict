@@ -12,17 +12,17 @@
 // exists because a receipt's blobName is nested inside another record;
 // a Vault document IS the record).
 //
-// Deliberately does NOT import stripCosmosMetadata from cosmosHelpers.ts,
-// even though it does exactly what's needed below - that file also
-// imports next/headers (for its impersonation-logging cookie read),
-// which is only valid in a server context. VAULT_CATEGORIES/
-// VaultDocumentCategory from this same file are imported directly by
-// VaultTab.tsx, a 'use client' component, so anything this module
-// imports has to be safe in a client bundle too - a local copy of the
-// same one-line stripping logic avoids dragging next/headers along.
+// This file itself is server-only (see cosmos.ts/blobStorage.ts's own
+// "server-only" guards) - VaultTab.tsx ('use client') needs
+// VAULT_CATEGORIES/VaultDocumentCategory, so those two now live in
+// vaultCategories.ts instead, re-exported below for any other importer.
+import "server-only";
 import crypto from "crypto";
 import { getContainer } from "@/lib/cosmos";
 import { getVaultContainer } from "@/lib/blobStorage";
+export type { VaultDocumentCategory } from "@/lib/tracker/vaultCategories";
+export { VAULT_CATEGORIES } from "@/lib/tracker/vaultCategories";
+import type { VaultDocumentCategory } from "@/lib/tracker/vaultCategories";
 
 const COSMOS_SYSTEM_KEYS = ["_rid", "_self", "_etag", "_attachments", "_ts"] as const;
 
@@ -31,60 +31,6 @@ function stripCosmosMetadata<T extends object>(doc: T): T {
   for (const key of COSMOS_SYSTEM_KEYS) delete clean[key];
   return clean as T;
 }
-
-export type VaultDocumentCategory =
-  | "dvlaLegal"
-  | "insurance"
-  | "purchaseFinance"
-  | "licences"
-  | "modifications"
-  | "warranties"
-  | "overseas";
-
-export const VAULT_CATEGORIES: { key: VaultDocumentCategory; label: string; examples: string[] }[] = [
-  {
-    key: "dvlaLegal",
-    label: "DVLA / Legal",
-    examples: [
-      "V5C logbook",
-      "MOT certificate",
-      "SORN confirmation",
-      "Change of keeper confirmation",
-      "Personalised plate assignment / retention certificate",
-      "Age-related registration letter (classic vehicles)",
-    ],
-  },
-  {
-    key: "insurance",
-    label: "Insurance",
-    examples: ["Certificate of insurance", "Policy schedule", "Breakdown cover confirmation", "Track day insurance documents"],
-  },
-  {
-    key: "purchaseFinance",
-    label: "Purchase & Finance",
-    examples: ["Original bill of sale / receipt", "Finance agreement / settlement letter", "Part-exchange paperwork", "HPI / VDI check report"],
-  },
-  {
-    key: "licences",
-    label: "Licences & Entitlements",
-    examples: ["Driving licence (both sides)", "CBT certificate", "DAS / full motorcycle test pass certificate", "Advanced rider qualification (IAM, RoSPA)"],
-  },
-  {
-    key: "modifications",
-    label: "Modifications & Homologation",
-    examples: ["IVA certificate", "Engineer's letter for non-standard modifications", "SVA certificate (older vehicles)", "Recall completion certificate"],
-  },
-  {
-    key: "warranties",
-    label: "Warranties",
-    examples: ["Manufacturer warranty document", "Extended warranty"],
-  },
-  {
-    key: "overseas",
-    label: "Overseas / Touring",
-    examples: ["Carnet de passages", "Green card (international insurance)", "Foreign registration documents (imported vehicles)"],
-  },
-];
 
 export const VAULT_MAX_DOCUMENTS_PER_VEHICLE = 20;
 export const VAULT_MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024; // 10MB
