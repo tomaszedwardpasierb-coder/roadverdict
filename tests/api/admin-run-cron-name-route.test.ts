@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => ({
   checkReminders: vi.fn(),
   backfillBikeId: vi.fn(),
   deleteExpiredShareLinks: vi.fn(),
+  hardDeleteExpiredAccounts: vi.fn(),
   auditMileage: vi.fn(),
   purgeOrphanedReceiptRequests: vi.fn(),
   updateExchangeRates: vi.fn(),
@@ -20,6 +21,7 @@ vi.mock("@/app/api/cron/update-fuel-price/route", () => ({ POST: mocks.updateFue
 vi.mock("@/app/api/cron/check-reminders/route", () => ({ POST: mocks.checkReminders }));
 vi.mock("@/app/api/cron/backfill-bike-id/route", () => ({ POST: mocks.backfillBikeId }));
 vi.mock("@/app/api/cron/delete-expired-share-links/route", () => ({ POST: mocks.deleteExpiredShareLinks }));
+vi.mock("@/app/api/cron/hard-delete-expired-accounts/route", () => ({ POST: mocks.hardDeleteExpiredAccounts }));
 vi.mock("@/app/api/cron/audit-mileage/route", () => ({ POST: mocks.auditMileage }));
 vi.mock("@/app/api/cron/purge-orphaned-receipt-requests/route", () => ({ POST: mocks.purgeOrphanedReceiptRequests }));
 vi.mock("@/app/api/cron/update-exchange-rates/route", () => ({ POST: mocks.updateExchangeRates }));
@@ -132,6 +134,7 @@ describe("POST /api/admin/run-cron/[name]", () => {
     ["check-reminders", "checkReminders"],
     ["backfill-bike-id", "backfillBikeId"],
     ["delete-expired-share-links", "deleteExpiredShareLinks"],
+    ["hard-delete-expired-accounts", "hardDeleteExpiredAccounts"],
     ["audit-mileage", "auditMileage"],
     ["purge-orphaned-receipt-requests", "purgeOrphanedReceiptRequests"],
     ["update-exchange-rates", "updateExchangeRates"],

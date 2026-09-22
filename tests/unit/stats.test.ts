@@ -26,6 +26,7 @@ import {
   getReminderCronStatus,
   getBikeIdBackfillStatus,
   getUserBackfillStatus,
+  getHardDeleteExpiredAccountsStatus,
   getSeedAssistantConfigStatus,
   getMagicLinkRequests,
   getRecentSessions,
@@ -115,10 +116,11 @@ describe("getFuelPriceStatus", () => {
 });
 
 // getReminderCronStatus / getBikeIdBackfillStatus / getUserBackfillStatus /
-// getSeedAssistantConfigStatus all share the same shape: read a fixed
-// cronStatus::* doc from the "system" partition, return it as-is, null if
-// missing, null if the read throws. Table-driven so a copy/paste mistake in
-// any one of the four id/pk constants gets caught.
+// getHardDeleteExpiredAccountsStatus / getSeedAssistantConfigStatus all share
+// the same shape: read a fixed cronStatus::* doc from the "system"
+// partition, return it as-is, null if missing, null if the read throws.
+// Table-driven so a copy/paste mistake in any one of the id/pk constants
+// gets caught.
 describe("cron/backfill status getters", () => {
   beforeEach(resetMocks);
 
@@ -126,6 +128,7 @@ describe("cron/backfill status getters", () => {
     ["getReminderCronStatus", getReminderCronStatus, "cronStatus::reminders"],
     ["getBikeIdBackfillStatus", getBikeIdBackfillStatus, "cronStatus::backfillBikeId"],
     ["getUserBackfillStatus", getUserBackfillStatus, "cronStatus::backfillUsers"],
+    ["getHardDeleteExpiredAccountsStatus", getHardDeleteExpiredAccountsStatus, "cronStatus::hardDeleteExpiredAccounts"],
     ["getSeedAssistantConfigStatus", getSeedAssistantConfigStatus, "cronStatus::seedAssistantConfig"],
   ];
 

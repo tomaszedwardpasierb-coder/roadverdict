@@ -102,6 +102,25 @@ export async function getUserBackfillStatus(): Promise<UserBackfillStatus | null
   }
 }
 
+export interface HardDeleteExpiredAccountsStatus {
+  lastRunAt: string;
+  deleted: number;
+}
+
+// See hard-delete-expired-accounts/route.ts - the other half of the
+// self-serve deletion flow, and the one cron in this app with no manual
+// "Run now" button anywhere until now, despite already writing this
+// exact status doc on every run.
+export async function getHardDeleteExpiredAccountsStatus(): Promise<HardDeleteExpiredAccountsStatus | null> {
+  const container = getContainer();
+  try {
+    const { resource } = await container.item("cronStatus::hardDeleteExpiredAccounts", "system").read<HardDeleteExpiredAccountsStatus>();
+    return resource ?? null;
+  } catch {
+    return null;
+  }
+}
+
 export interface SeedAssistantConfigStatus {
   lastRunAt: string;
 }

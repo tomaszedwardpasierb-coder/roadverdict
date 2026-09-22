@@ -9,6 +9,7 @@ import {
   getCosmosContainerInfo,
   getBikeIdBackfillStatus,
   getUserBackfillStatus,
+  getHardDeleteExpiredAccountsStatus,
   getSeedAssistantConfigStatus,
   browserFamily,
 } from '@/lib/admin/stats';
@@ -209,6 +210,7 @@ export default async function AdminDashboardPage(
     cosmosInfo,
     bikeIdBackfillStatus,
     userBackfillStatus,
+    hardDeleteExpiredAccountsStatus,
     seedAssistantConfigStatus,
     siteStats,
     assistantQuestions,
@@ -228,6 +230,7 @@ export default async function AdminDashboardPage(
     getCosmosContainerInfo(),
     getBikeIdBackfillStatus(),
     getUserBackfillStatus(),
+    getHardDeleteExpiredAccountsStatus(),
     getSeedAssistantConfigStatus(),
     getSiteStatsSafe(windowHours),
     getAssistantQuestionsSafe(),
@@ -425,6 +428,24 @@ export default async function AdminDashboardPage(
           <p className={styles.note}>Permanently removes any shareable report link past its expiry date.</p>
           <div style={{ marginTop: '0.6rem' }}>
             <RunCronButton name="delete-expired-share-links" label="Run now" />
+          </div>
+        </div>
+        <div className={styles.card}>
+          <div className={styles.cardTitle}>Hard-delete expired accounts (daily)</div>
+          <p className={styles.note}>
+            Permanently deletes any account whose 30-day self-serve deletion grace period has passed - the only
+            other caller of the full account-deletion cascade besides the admin panel itself.
+          </p>
+          {hardDeleteExpiredAccountsStatus ? (
+            <p className={styles.note}>
+              Last run {fmtDate(hardDeleteExpiredAccountsStatus.lastRunAt)} &middot; deleted{' '}
+              {hardDeleteExpiredAccountsStatus.deleted}
+            </p>
+          ) : (
+            <p className={styles.warnNote}>No record found - has this ever run successfully?</p>
+          )}
+          <div style={{ marginTop: '0.6rem' }}>
+            <RunCronButton name="hard-delete-expired-accounts" label="Run now" />
           </div>
         </div>
         <div className={styles.card}>

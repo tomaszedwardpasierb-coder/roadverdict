@@ -17,6 +17,7 @@ import { POST as updateFuelPrice } from "@/app/api/cron/update-fuel-price/route"
 import { POST as checkReminders } from "@/app/api/cron/check-reminders/route";
 import { POST as backfillBikeId } from "@/app/api/cron/backfill-bike-id/route";
 import { POST as deleteExpiredShareLinks } from "@/app/api/cron/delete-expired-share-links/route";
+import { POST as hardDeleteExpiredAccounts } from "@/app/api/cron/hard-delete-expired-accounts/route";
 import { POST as auditMileage } from "@/app/api/cron/audit-mileage/route";
 import { POST as purgeOrphanedReceiptRequests } from "@/app/api/cron/purge-orphaned-receipt-requests/route";
 import { POST as updateExchangeRates } from "@/app/api/cron/update-exchange-rates/route";
@@ -36,6 +37,7 @@ const CRON_HANDLERS: Record<string, (req: NextRequest) => Promise<Response>> = {
   "check-reminders": checkReminders,
   "backfill-bike-id": backfillBikeId,
   "delete-expired-share-links": deleteExpiredShareLinks,
+  "hard-delete-expired-accounts": hardDeleteExpiredAccounts,
   "audit-mileage": auditMileage,
   "purge-orphaned-receipt-requests": purgeOrphanedReceiptRequests,
   "update-exchange-rates": updateExchangeRates,
