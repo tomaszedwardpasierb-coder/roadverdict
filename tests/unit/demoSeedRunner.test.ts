@@ -11,6 +11,15 @@ const mocks = vi.hoisted(() => ({
   createBill: vi.fn(),
   createReminder: vi.fn(),
   generateDemoDataset: vi.fn(),
+  getCarsForUser: vi.fn(),
+  createCar: vi.fn(),
+  deleteCar: vi.fn(),
+  createCarServiceRecord: vi.fn(),
+  createCarFuelLog: vi.fn(),
+  createCarMod: vi.fn(),
+  createCarBill: vi.fn(),
+  createCarReminder: vi.fn(),
+  generateDemoCarDataset: vi.fn(),
 }));
 
 vi.mock("@/lib/tracker/bike", () => ({
@@ -31,6 +40,23 @@ vi.mock("@/lib/tracker/demoSeed", async (importOriginal) => {
     generateDemoDataset: mocks.generateDemoDataset,
   };
 });
+vi.mock("@/lib/tracker/car", () => ({
+  getCarsForUser: mocks.getCarsForUser,
+  createCar: mocks.createCar,
+  deleteCar: mocks.deleteCar,
+}));
+vi.mock("@/lib/tracker/carServiceRecord", () => ({ createCarServiceRecord: mocks.createCarServiceRecord }));
+vi.mock("@/lib/tracker/carFuelLog", () => ({ createCarFuelLog: mocks.createCarFuelLog }));
+vi.mock("@/lib/tracker/carMod", () => ({ createCarMod: mocks.createCarMod }));
+vi.mock("@/lib/tracker/carBill", () => ({ createCarBill: mocks.createCarBill }));
+vi.mock("@/lib/tracker/carReminder", () => ({ createCarReminder: mocks.createCarReminder }));
+vi.mock("@/lib/tracker/demoCarSeed", async (importOriginal) => {
+  const real = await importOriginal<typeof import("@/lib/tracker/demoCarSeed")>();
+  return {
+    ...real, // keep constants (DEMO_CAR_MAKE etc.)
+    generateDemoCarDataset: mocks.generateDemoCarDataset,
+  };
+});
 
 import { demoBikeExists, runDemoSeed } from "@/lib/tracker/demoSeedRunner";
 
@@ -45,6 +71,17 @@ const minimalDataset = {
   finalMileage: 6000,
 };
 
+const minimalCarDataset = {
+  fuel: [{ date: "2025-01-01", mileage: 30000, litres: 50, cost: 75, filledToFull: true }],
+  service: [{ jobType: "interim-service", date: "2025-06-01", mileage: 35000, cost: 220 }],
+  mods: [{ category: "dash-cam", name: "Dash cam", date: "2025-03-01", mileage: 33000, cost: 89 }],
+  bills: [
+    { billType: "insurance", date: "2025-01-01", cost: 500 },
+    { billType: "road-tax", date: "2025-01-01", cost: 315 },
+  ],
+  finalMileage: 40000,
+};
+
 beforeEach(() => {
   Object.values(mocks).forEach((m) => m.mockReset());
   mocks.getBikesForUser.mockResolvedValue([]);
@@ -57,6 +94,15 @@ beforeEach(() => {
   mocks.createBill.mockResolvedValue(undefined);
   mocks.createReminder.mockResolvedValue(undefined);
   mocks.generateDemoDataset.mockReturnValue(minimalDataset);
+  mocks.getCarsForUser.mockResolvedValue([]);
+  mocks.createCar.mockResolvedValue({ id: "demo-car-id" });
+  mocks.deleteCar.mockResolvedValue(undefined);
+  mocks.createCarServiceRecord.mockResolvedValue(undefined);
+  mocks.createCarFuelLog.mockResolvedValue(undefined);
+  mocks.createCarMod.mockResolvedValue(undefined);
+  mocks.createCarBill.mockResolvedValue(undefined);
+  mocks.createCarReminder.mockResolvedValue(undefined);
+  mocks.generateDemoCarDataset.mockReturnValue(minimalCarDataset);
 });
 
 describe("demoBikeExists", () => {
@@ -77,6 +123,25 @@ describe("runDemoSeed", () => {
     mocks.getBikesForUser.mockResolvedValue([{ id: "old-bike-1" }, { id: "old-bike-2" }]);
     await runDemoSeed();
     expect(mocks.deleteBike).toHaveBeenCalledTimes(2);
+  });
+
+  it("deletes any existing demo cars before creating a new one", async () => {
+    mocks.getCarsForUser.mockResolvedValue([{ id: "old-car-1" }]);
+    await runDemoSeed();
+    expect(mocks.deleteCar).toHaveBeenCalledTimes(1);
+  });
+
+  it("creates the demo car with the correct make and model", async () => {
+    await runDemoSeed();
+    expect(mocks.createCar).toHaveBeenCalledWith(
+      "demo@roadverdict.co.uk",
+      expect.objectContaining({ make: "BMW", model: "640i Gran Coupe", registration: "PA63 ERB" })
+    );
+  });
+
+  it("sets the car's currentMileage from the car dataset's finalMileage", async () => {
+    await runDemoSeed();
+    expect(mocks.createCar).toHaveBeenCalledWith(expect.any(String), expect.objectContaining({ currentMileage: 40000 }));
   });
 
   it("creates the demo bike with the correct make and model", async () => {
@@ -120,6 +185,42 @@ describe("runDemoSeed", () => {
     expect(mocks.createBill).toHaveBeenCalledTimes(2);
   });
 
+  it("creates one car fuel log per car dataset fuel entry", async () => {
+    await runDemoSeed();
+    expect(mocks.createCarFuelLog).toHaveBeenCalledTimes(1);
+  });
+
+  it("creates one car service record per car dataset service entry", async () => {
+    await runDemoSeed();
+    expect(mocks.createCarServiceRecord).toHaveBeenCalledTimes(1);
+  });
+
+  it("creates one car mod per car dataset mods entry", async () => {
+    await runDemoSeed();
+    expect(mocks.createCarMod).toHaveBeenCalledTimes(1);
+  });
+
+  it("creates one car bill per car dataset bills entry", async () => {
+    await runDemoSeed();
+    expect(mocks.createCarBill).toHaveBeenCalledTimes(2);
+  });
+
+  it("creates a mileage-based interim-service reminder from the car's last service entry", async () => {
+    await runDemoSeed();
+    expect(mocks.createCarReminder).toHaveBeenCalledWith(
+      "demo@roadverdict.co.uk",
+      expect.objectContaining({ carId: "demo-car-id", intervalType: "mileage", sourceKey: "service:interim-service" })
+    );
+  });
+
+  it("creates a months-based insurance reminder from the car's last insurance bill", async () => {
+    await runDemoSeed();
+    expect(mocks.createCarReminder).toHaveBeenCalledWith(
+      "demo@roadverdict.co.uk",
+      expect.objectContaining({ carId: "demo-car-id", intervalType: "months", sourceKey: "bill:insurance" })
+    );
+  });
+
   it("creates a mileage-based service reminder from the last service entry", async () => {
     await runDemoSeed();
     expect(mocks.createReminder).toHaveBeenCalledWith(
@@ -136,9 +237,9 @@ describe("runDemoSeed", () => {
     );
   });
 
-  it("returns correct counts matching the dataset", async () => {
+  it("returns correct counts matching both datasets", async () => {
     const result = await runDemoSeed();
-    expect(result).toEqual({ fuel: 1, service: 1, mods: 1, bills: 2 });
+    expect(result).toEqual({ fuel: 1, service: 1, mods: 1, bills: 2, carFuel: 1, carService: 1, carMods: 1, carBills: 2 });
   });
 
   it("does not create reminders when dataset has no service or insurance entries", async () => {
@@ -149,5 +250,15 @@ describe("runDemoSeed", () => {
     });
     await runDemoSeed();
     expect(mocks.createReminder).not.toHaveBeenCalled();
+  });
+
+  it("does not create car reminders when the car dataset has no service or insurance entries", async () => {
+    mocks.generateDemoCarDataset.mockReturnValue({
+      ...minimalCarDataset,
+      service: [],
+      bills: [{ billType: "road-tax", date: "2025-01-01", cost: 315 }],
+    });
+    await runDemoSeed();
+    expect(mocks.createCarReminder).not.toHaveBeenCalled();
   });
 });

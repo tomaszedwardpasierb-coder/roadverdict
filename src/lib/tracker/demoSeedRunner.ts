@@ -21,12 +21,33 @@ import {
   DEMO_REGISTRATION,
   DEMO_NICKNAME,
 } from "@/lib/tracker/demoSeed";
+import { getCarsForUser, createCar, deleteCar } from "@/lib/tracker/car";
+import { createCarServiceRecord } from "@/lib/tracker/carServiceRecord";
+import { createCarFuelLog } from "@/lib/tracker/carFuelLog";
+import { createCarMod } from "@/lib/tracker/carMod";
+import { createCarBill } from "@/lib/tracker/carBill";
+import { createCarReminder } from "@/lib/tracker/carReminder";
+import {
+  generateDemoCarDataset,
+  DEMO_CAR_MAKE,
+  DEMO_CAR_MODEL,
+  DEMO_CAR_FUEL_TYPE,
+  DEMO_CAR_ENGINE_LITRES,
+  DEMO_CAR_REGION,
+  DEMO_CAR_REGISTRATION,
+  DEMO_CAR_YEAR,
+  DEMO_CAR_NICKNAME,
+} from "@/lib/tracker/demoCarSeed";
 
 export interface SeedCounts {
   fuel: number;
   service: number;
   mods: number;
   bills: number;
+  carFuel: number;
+  carService: number;
+  carMods: number;
+  carBills: number;
 }
 
 export async function demoBikeExists(): Promise<boolean> {
@@ -45,6 +66,10 @@ export async function runDemoSeed(): Promise<SeedCounts> {
   const existingBikes = await getBikesForUser(DEMO_EMAIL);
   for (const bike of existingBikes) {
     await deleteBike(DEMO_EMAIL, bike.id);
+  }
+  const existingCars = await getCarsForUser(DEMO_EMAIL);
+  for (const car of existingCars) {
+    await deleteCar(DEMO_EMAIL, car.id);
   }
 
   const dataset = generateDemoDataset(new Date());
@@ -104,5 +129,70 @@ export async function runDemoSeed(): Promise<SeedCounts> {
     });
   }
 
-  return { fuel: dataset.fuel.length, service: dataset.service.length, mods: dataset.mods.length, bills: dataset.bills.length };
+  // CAR - a second vehicle alongside the bike, showcasing Pro's
+  // side-by-side comparison rather than a single-vehicle demo. Uses
+  // car.ts's createCar directly (no route-layer isPro/vehicle-limit
+  // check to satisfy here), same reasoning as the bike seeding above.
+  const carDataset = generateDemoCarDataset(new Date());
+  const car = await createCar(DEMO_EMAIL, {
+    make: DEMO_CAR_MAKE,
+    model: DEMO_CAR_MODEL,
+    fuelType: DEMO_CAR_FUEL_TYPE,
+    engineLitres: DEMO_CAR_ENGINE_LITRES,
+    year: DEMO_CAR_YEAR,
+    registration: DEMO_CAR_REGISTRATION,
+    currentMileage: carDataset.finalMileage,
+    nickname: DEMO_CAR_NICKNAME,
+    region: DEMO_CAR_REGION,
+    mayHavePriorHistory: true,
+  });
+  const carId = car.id;
+
+  for (const f of carDataset.fuel) {
+    await createCarFuelLog(DEMO_EMAIL, { carId, fuelType: DEMO_CAR_FUEL_TYPE, litres: f.litres, cost: f.cost, mileage: f.mileage, date: f.date, filledToFull: f.filledToFull });
+  }
+  for (const s of carDataset.service) {
+    await createCarServiceRecord(DEMO_EMAIL, { carId, jobType: s.jobType, cost: s.cost, mileage: s.mileage, date: s.date, notes: "" });
+  }
+  for (const m of carDataset.mods) {
+    await createCarMod(DEMO_EMAIL, { carId, category: m.category, name: m.name, cost: m.cost, mileage: m.mileage, date: m.date, notes: "" });
+  }
+  for (const b of carDataset.bills) {
+    await createCarBill(DEMO_EMAIL, { carId, billType: b.billType, cost: b.cost, date: b.date, notes: "" });
+  }
+
+  const lastCarService = carDataset.service[carDataset.service.length - 1];
+  const lastCarInsurance = [...carDataset.bills].reverse().find((b) => b.billType === "insurance");
+  if (lastCarService) {
+    await createCarReminder(DEMO_EMAIL, {
+      carId,
+      name: "Interim service",
+      intervalType: "mileage",
+      intervalValue: 6000,
+      baseMileage: lastCarService.mileage,
+      date: lastCarService.date,
+      sourceKey: `service:${lastCarService.jobType}`,
+    });
+  }
+  if (lastCarInsurance) {
+    await createCarReminder(DEMO_EMAIL, {
+      carId,
+      name: "Insurance renewal",
+      intervalType: "months",
+      intervalValue: 12,
+      date: lastCarInsurance.date,
+      sourceKey: "bill:insurance",
+    });
+  }
+
+  return {
+    fuel: dataset.fuel.length,
+    service: dataset.service.length,
+    mods: dataset.mods.length,
+    bills: dataset.bills.length,
+    carFuel: carDataset.fuel.length,
+    carService: carDataset.service.length,
+    carMods: carDataset.mods.length,
+    carBills: carDataset.bills.length,
+  };
 }
