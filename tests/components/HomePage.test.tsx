@@ -52,7 +52,7 @@ describe("HomePage", () => {
     expect(mockRedirect).not.toHaveBeenCalled();
   });
 
-  it("embeds the WebApplication JSON-LD script with the nonce read from request headers", async () => {
+  it("embeds the WebApplication and Organization JSON-LD under one @graph, with the nonce read from request headers", async () => {
     mockGetSession.mockResolvedValue(null);
     mockHeaders.mockResolvedValue({ get: (key: string) => (key === "x-nonce" ? "test-nonce-123" : null) });
 
@@ -63,9 +63,12 @@ describe("HomePage", () => {
     expect(script).not.toBeNull();
     expect(script?.getAttribute("nonce")).toBe("test-nonce-123");
     const parsed = JSON.parse(script?.textContent ?? "{}");
-    expect(parsed["@type"]).toBe("WebApplication");
-    expect(parsed.name).toBe("RoadVerdict");
-    expect(parsed.offers).toMatchObject({ price: "0", priceCurrency: "GBP" });
+    const webApp = parsed["@graph"].find((node: { "@type": string }) => node["@type"] === "WebApplication");
+    expect(webApp.name).toBe("RoadVerdict");
+    expect(webApp.offers).toMatchObject({ price: "0", priceCurrency: "GBP" });
+    const org = parsed["@graph"].find((node: { "@type": string }) => node["@type"] === "Organization");
+    expect(org.name).toBe("RoadVerdict");
+    expect(org.sameAs).toContain("https://www.instagram.com/RoadVerdict.web");
   });
 
   it("renders all four 'problems' cards", async () => {
