@@ -43,13 +43,14 @@ export async function loginAsDemo(page: Page): Promise<void> {
 // multi-write Cosmos operation (~360 individual round trips by design -
 // see demoSeedRunner.ts's own comment on why it isn't batched), not
 // instant. 30s proved too tight against CI's real Azure Cosmos DB
-// account (not the old local emulator) - ordinary network jitter or a
-// round of RU throttling can push this past that with no actual
-// problem, so this is deliberately generous rather than tuned to the
-// happy-path duration.
+// account (not the old local emulator), then 60s also failed under a
+// heavier CI run (fresh Playwright/Chromium install right before the
+// test) - ordinary network jitter or a round of RU throttling can push
+// this well past either, with no actual problem, so this is deliberately
+// generous rather than tuned to the happy-path duration.
 export async function resetDemoAccount(page: Page): Promise<void> {
   page.once("dialog", (dialog) => dialog.accept());
   await page.getByRole("button", { name: "↺ Reset Demo" }).first().click();
   await expect(page.getByRole("button", { name: "Resetting…" }).first()).toBeVisible();
-  await expect(page.getByRole("button", { name: "↺ Reset Demo" }).first()).toBeVisible({ timeout: 60_000 });
+  await expect(page.getByRole("button", { name: "↺ Reset Demo" }).first()).toBeVisible({ timeout: 120_000 });
 }
