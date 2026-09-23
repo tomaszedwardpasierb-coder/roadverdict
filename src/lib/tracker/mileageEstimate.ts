@@ -156,8 +156,16 @@ export function overallRatePerDay(
     const days = daysBetween(new Date(last.date).getTime(), new Date(first.date).getTime());
     if (days > 0) return { rate: (last.mileage - first.mileage) / days, isBikeSpecific: true, observedWindowDays: days };
   }
+  // >= 1 day, not > 0 - dateAdded can be milliseconds in the past for a
+  // bike added moments ago, and daysBetween returns an unrounded
+  // fraction, so a near-zero window would otherwise divide by
+  // near-zero and produce a spurious "bike-specific" rate (often
+  // exactly 0, since currentMileage - startingMileage is also 0 for a
+  // freshly-added bike) instead of falling through to the flat
+  // UK-wide default below, which is what a window this thin actually
+  // deserves.
   const days = daysBetween(Date.now(), new Date(bike.dateAdded).getTime());
-  if (days > 0) return { rate: (bike.currentMileage - bike.startingMileage) / days, isBikeSpecific: true, observedWindowDays: days };
+  if (days >= 1) return { rate: (bike.currentMileage - bike.startingMileage) / days, isBikeSpecific: true, observedWindowDays: days };
   return { rate: FALLBACK_MILES_PER_YEAR / 365, isBikeSpecific: false, observedWindowDays: 0 };
 }
 
