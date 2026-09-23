@@ -16,23 +16,42 @@ export const dynamic = 'force-dynamic';
 export const metadata: Metadata = {
   title: 'Know What Your Vehicle Really Costs | RoadVerdict',
   description:
-    'Log every service, fill-up, and repair. Check if a quote is fair before you pay. Know exactly what you\'re looking at before you buy. Free for motorcycles and cars.',
+    'Log every service, fill-up, and repair. Check if a quote is fair before you pay. Know what you\'re looking at before you buy. Free for motorcycles and cars.',
   alternates: { canonical: '/' },
 };
 
+// @graph bundles both types under one script tag rather than two -
+// Organization carries the brand identity (name/logo/sameAs) search
+// engines and LLMs use to answer "who is RoadVerdict" queries, which
+// WebApplication alone doesn't cover.
 const jsonLd = {
   '@context': 'https://schema.org',
-  '@type': 'WebApplication',
-  name: 'RoadVerdict',
-  applicationCategory: 'UtilitiesApplication',
-  operatingSystem: 'Any',
-  offers: {
-    '@type': 'Offer',
-    price: '0',
-    priceCurrency: 'GBP',
-  },
-  description:
-    'Vehicle ownership tracker and quote checker for UK drivers and riders. Services, fuel, mods, MOT history, and real UK price benchmarks in one place.',
+  '@graph': [
+    {
+      '@type': 'WebApplication',
+      name: 'RoadVerdict',
+      applicationCategory: 'UtilitiesApplication',
+      operatingSystem: 'Any',
+      offers: {
+        '@type': 'Offer',
+        price: '0',
+        priceCurrency: 'GBP',
+      },
+      description:
+        'Vehicle ownership tracker and quote checker for UK drivers and riders. Services, fuel, mods, MOT history, and real UK price benchmarks in one place.',
+    },
+    {
+      '@type': 'Organization',
+      name: 'RoadVerdict',
+      url: 'https://roadverdict.co.uk',
+      logo: 'https://roadverdict.co.uk/logo-dark.png',
+      sameAs: [
+        'https://www.facebook.com/profile.php?id=61594142271284',
+        'https://www.instagram.com/RoadVerdict.web',
+        'https://www.tiktok.com/@roadverdict',
+      ],
+    },
+  ],
 };
 
 export default async function HomePage() {

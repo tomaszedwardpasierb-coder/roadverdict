@@ -42,7 +42,7 @@ const plexMono = IBM_Plex_Mono({
 // what the site actually does.
 const SITE_TITLE = 'Know What Your Vehicle Really Costs | RoadVerdict';
 const SITE_DESCRIPTION =
-  'Log every service, fill-up, and repair. Check if a quote is fair before you pay. Know exactly what you\'re looking at before you buy. Free for motorcycles and cars.';
+  'Log every service, fill-up, and repair. Check if a quote is fair before you pay. Know what you\'re looking at before you buy. Free for motorcycles and cars.';
 
 export const metadata: Metadata = {
   metadataBase: new URL('https://roadverdict.co.uk'),
