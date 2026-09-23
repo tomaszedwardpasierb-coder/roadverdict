@@ -1,0 +1,14 @@
+
+.tag {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 0.15rem 0.5rem;
+  border-radius: 3px;
+  margin-top: 0.3rem;
+  margin-right: 0.3rem;
+}
+.tagFair { background: #e7f0e7; color: var(--verdict-green); }
+.tagSecondOpinion { background: #f8e2dd; color: var(--verdict-red); }

@@ -25,7 +25,7 @@ import { CarShareLinksSection } from "./CarShareLinksSection";
 import { computeSpendSummary, computeYearSpend, gatherMileagePoints, projectYearEndSpend } from "@/lib/tracker/summary";
 import { slugifyMake, getBikeClassForCC, getModelsForBrand } from "@/lib/motorcycleModels";
 import { BRAND_OPTIONS, type Region } from "@/lib/priceData";
-import { JOB_LABELS } from "@/lib/tracker/jobTypes";
+import { JOB_LABELS, isCleaningJob } from "@/lib/tracker/jobTypes";
 import { BILL_LABELS } from "@/lib/tracker/billTypes";
 import {
   formatDistance,
@@ -133,7 +133,7 @@ import { CAR_LABOUR_LABELS } from "@/lib/tracker/carLabourTypes";
 import { getCarReminders } from "@/lib/tracker/carReminder";
 import { computeCarReminderStatus } from "@/lib/tracker/carReminderStatus";
 import { computeCarSpendSummary, computeCarYearSpend, gatherCarMileagePoints } from "@/lib/tracker/carSummary";
-import { CAR_JOB_LABELS } from "@/lib/tracker/carJobTypes";
+import { CAR_JOB_LABELS, isCleaningCarJob } from "@/lib/tracker/carJobTypes";
 import { CAR_BILL_LABELS } from "@/lib/tracker/carBillTypes";
 // Aliased, not re-imported under its own name - fuelLog.ts (bike-only)
 // already imports the same function from mpgCalc.ts above for the bike
@@ -626,13 +626,15 @@ export default async function DashboardPage(props: { searchParams: Promise<{ add
       </div>
       <p className={styles.subtext}>Every oil change, every brake job - a real maintenance record, not a hazy memory of &quot;I think I did it.&quot;</p>
       <LogServiceForm initialMileage={bike.currentMileage} mileageHistory={mileagePoints} startingMileage={bike.startingMileage} dateAdded={bike.dateAdded} distanceUnit={distanceUnit} currency={currency} rates={rates} bikeYear={bike.year} isCustomBuild={bike.isCustomBuild} />
-      <ExcludeFromReportToggle
-        fieldName="includeCleaningInReport"
-        included={Boolean(bike.includeCleaningInReport)}
-        checkboxLabel="Show valeting/washing costs in my buyer report"
-        confirmMessage="Keeping your bike clean is good practice, but it's cosmetic, not mechanical care - showing it could pad your maintenance total without telling a buyer anything meaningful. Show anyway?"
-        noteText="Off by default - valeting and washing don't reflect the bike's mechanical condition, so they're excluded from your buyer report's cost total and item-by-item breakdown unless you choose to include them."
-      />
+      {records.some((r) => isCleaningJob(r.jobType)) && (
+        <ExcludeFromReportToggle
+          fieldName="includeCleaningInReport"
+          included={Boolean(bike.includeCleaningInReport)}
+          checkboxLabel="Show valeting/washing costs in my buyer report"
+          confirmMessage="Keeping your bike clean is good practice, but it's cosmetic, not mechanical care - showing it could pad your maintenance total without telling a buyer anything meaningful. Show anyway?"
+          noteText="Off by default - valeting and washing don't reflect the bike's mechanical condition, so they're excluded from your buyer report's cost total and item-by-item breakdown unless you choose to include them."
+        />
+      )}
       <h2 className={styles.sectionHeading}>Service history</h2>
       {records.length === 0 ? (
         <div className={styles.card}><p className={ownStyles.cardBody}>No service records logged yet. Log your first one above.</p></div>
@@ -1516,18 +1518,32 @@ async function renderCarDashboard(
       </div>
       <p className={styles.subtext}>Every oil change, every brake job - a real maintenance record, not a hazy memory of &quot;I think I did it.&quot;</p>
       <LogCarServiceForm initialMileage={car.currentMileage} mileageHistory={mileagePoints} startingMileage={car.startingMileage} dateAdded={car.dateAdded} distanceUnit={distanceUnit} currency={currency} rates={rates} carYear={car.year} isCustomBuild={car.isCustomBuild} />
-      <CarExcludeFromReportToggle
-        fieldName="includeCleaningInReport"
-        included={Boolean(car.includeCleaningInReport)}
-        checkboxLabel="Show valeting/washing costs in my buyer report"
-        confirmMessage="Keeping your car clean is good practice, but it's cosmetic, not mechanical care - showing it could pad your maintenance total without telling a buyer anything meaningful. Show anyway?"
-        noteText="Off by default - valeting and washing don't reflect the car's mechanical condition, so they're excluded from your buyer report's cost total and item-by-item breakdown unless you choose to include them."
-      />
+      {records.some((r) => isCleaningCarJob(r.jobType)) && (
+        <CarExcludeFromReportToggle
+          fieldName="includeCleaningInReport"
+          included={Boolean(car.includeCleaningInReport)}
+          checkboxLabel="Show valeting/washing costs in my buyer report"
+          confirmMessage="Keeping your car clean is good practice, but it's cosmetic, not mechanical care - showing it could pad your maintenance total without telling a buyer anything meaningful. Show anyway?"
+          noteText="Off by default - valeting and washing don't reflect the car's mechanical condition, so they're excluded from your buyer report's cost total and item-by-item breakdown unless you choose to include them."
+        />
+      )}
       <h2 className={styles.sectionHeading}>Service history</h2>
       {records.length === 0 ? (
         <div className={styles.card}><p className={ownStyles.cardBody}>No service records logged yet. Log your first one above.</p></div>
       ) : (
-        records.map((r) => <CarServiceHistoryCard key={r.id} record={r} distanceUnit={distanceUnit} currency={currency} rates={rates} includeCleaningInReport={Boolean(car.includeCleaningInReport)} />)
+        records.map((r) => (
+          <CarServiceHistoryCard
+            key={r.id}
+            record={r}
+            distanceUnit={distanceUnit}
+            currency={currency}
+            rates={rates}
+            includeCleaningInReport={Boolean(car.includeCleaningInReport)}
+            carClass={toolInitialCarClass}
+            brandValue={toolInitialCarBrand}
+            region={car.region}
+          />
+        ))
       )}
     </>
   );
