@@ -201,6 +201,34 @@ export default async function HomePage() {
         </div>
       </section>
 
+      {/* ── HOW IT WORKS ─────────────────────────────────────────────── */}
+      <section className="rv-problems" aria-labelledby="how-it-works-heading">
+        <p className="rv-section-eyebrow">Three steps, not thirty</p>
+        <h2 className="rv-section-heading" id="how-it-works-heading">
+          How RoadVerdict actually works.
+        </h2>
+        <p className="rv-section-sub">
+          No manuals, no spreadsheets, no guesswork.
+        </p>
+        <div className="rv-problem-grid">
+          <div className="rv-problem-card">
+            <div className="rv-problem-num" aria-hidden="true">01</div>
+            <h3 className="rv-problem-title">Add your vehicle</h3>
+            <p className="rv-problem-body">Motorcycle or car, one email address, no password to remember. Enter the registration and we pull in the basics where we can find them.</p>
+          </div>
+          <div className="rv-problem-card">
+            <div className="rv-problem-num" aria-hidden="true">02</div>
+            <h3 className="rv-problem-title">Log as you go</h3>
+            <p className="rv-problem-body">Type in a fill-up, a service, an MOT, a repair. Or photograph the receipt and let our AI read the amount, date, and category for you.</p>
+          </div>
+          <div className="rv-problem-card">
+            <div className="rv-problem-num" aria-hidden="true">03</div>
+            <h3 className="rv-problem-title">Get the real verdict</h3>
+            <p className="rv-problem-body">Real UK price benchmarks tell you whether a quote is fair, what your vehicle actually costs to run, and what its history says before you buy or sell.</p>
+          </div>
+        </div>
+      </section>
+
       {/* ── SOLUTIONS ────────────────────────────────────────────────── */}
       <section className="rv-solutions" aria-labelledby="solutions-heading">
         <p className="rv-section-eyebrow">One place for all of it</p>

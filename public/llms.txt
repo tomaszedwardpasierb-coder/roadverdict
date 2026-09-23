@@ -1,0 +1,26 @@
+# RoadVerdict
+
+> RoadVerdict is a free UK vehicle-ownership tracker and quote checker for motorcycle and car owners. Log every service, fill-up, and repair, check whether a garage quote is fair for your vehicle and region, and get a clear buy/negotiate/walk-away verdict before purchasing a used vehicle.
+
+## Tools
+
+- [Quote Checker](https://roadverdict.co.uk/quote-checker): Check whether a service or repair quote is fair for a given vehicle, engine size, and UK region.
+- [Buying Guide](https://roadverdict.co.uk/buying-guide): Enter a number plate or paste a listing to get a verdict on whether to buy, negotiate, or walk away, using MOT history and real price data.
+- [Cost Calculator](https://roadverdict.co.uk/cost-calculator): Calculate the true running cost per mile, month, and year for a motorcycle or car.
+
+## Vehicle types
+
+- [Cars](https://roadverdict.co.uk/cars): RoadVerdict for car owners.
+- [Motorcycles](https://roadverdict.co.uk/motorcycles): RoadVerdict for motorcycle owners.
+
+## Guides
+
+- [Buying a used car](https://roadverdict.co.uk/guides/buying-a-used-car)
+- [Buying a used motorcycle](https://roadverdict.co.uk/guides/buying-a-used-motorcycle)
+- [Cost of owning a car](https://roadverdict.co.uk/guides/cost-of-owning-a-car)
+- [Cost of owning a motorcycle](https://roadverdict.co.uk/guides/cost-of-owning-a-motorcycle)
+
+## About
+
+- [About RoadVerdict](https://roadverdict.co.uk/about)
+- [Privacy policy](https://roadverdict.co.uk/privacy)
