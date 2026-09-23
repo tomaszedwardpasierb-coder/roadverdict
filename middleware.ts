@@ -22,7 +22,24 @@ const STATIC_CSP_DIRECTIVES = [
   'upgrade-insecure-requests',
 ].join('; ');
 
+// Both roadverdict.co.uk and www.roadverdict.co.uk are bound as custom
+// domains on Azure (see the DNS/cert fix that made www work at all), so
+// without this, Google can index the identical site under two hostnames
+// with nothing telling it which is canonical. The sitemap only ever
+// lists the apex, so www needs to redirect there rather than serve its
+// own 200.
+function canonicalHostRedirect(request: NextRequest): NextResponse | null {
+  const host = request.headers.get('host');
+  if (host !== 'www.roadverdict.co.uk') return null;
+  const url = new URL(request.url);
+  url.host = 'roadverdict.co.uk';
+  return NextResponse.redirect(url, 308);
+}
+
 export function middleware(request: NextRequest) {
+  const redirect = canonicalHostRedirect(request);
+  if (redirect) return redirect;
+
   const nonce = crypto.randomUUID();
   const csp = `script-src 'self' 'nonce-${nonce}'; ${STATIC_CSP_DIRECTIVES}`;
 
