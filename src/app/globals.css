@@ -824,53 +824,9 @@ body:has(main [data-admin-shell]) [data-assistant-widget] {
   background: #0e0e0e;
 }
 
-/* Comic panel grid — lives behind the content */
-.rv-hero-panels {
-  position: absolute;
-  inset: 0;
-  display: grid;
-  grid-template-columns: 1.1fr 0.9fr;
-  gap: 3px;
-  background: #0e0e0e;
-}
-.rv-panel {
-  position: relative;
-  overflow: hidden;
-  background: #161616;
-}
-.rv-panel-right-col {
-  display: grid;
-  grid-template-rows: 1fr 1fr;
-  gap: 3px;
-}
-.rv-panel-rt { background: #131313; }
-.rv-panel-rb { background: #1a1208; }
-
-/* Dark overlay on each panel so text stays readable */
-.rv-panel-overlay {
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(135deg, rgba(14,14,14,0.55) 0%, rgba(14,14,14,0.25) 100%);
-  z-index: 1;
-}
-.rv-panel-left .rv-panel-overlay {
-  background: linear-gradient(90deg, rgba(14,14,14,0.85) 0%, rgba(14,14,14,0.3) 60%, rgba(14,14,14,0.1) 100%);
-}
-
-/* Comic-style panel number tag */
-.rv-panel-tag {
-  position: absolute;
-  top: 10px;
-  left: 10px;
-  font-size: 9px;
-  font-weight: 700;
-  letter-spacing: 0.15em;
-  text-transform: uppercase;
-  color: var(--amber);
-  opacity: 0.45;
-  z-index: 2;
-  font-family: var(--font-mono, monospace);
-}
+/* Comic panel grid, its overlay/tag, and the .rv-cta-outline button
+   below all moved to homepage.css - genuinely homepage-exclusive, see
+   that file's own comment. */
 
 /* Hero text content */
 .rv-hero-content {
@@ -946,21 +902,6 @@ body:has(main [data-admin-shell]) [data-assistant-widget] {
   text-decoration: none;
 }
 .rv-cta-secondary:hover { color: #f0ede6; }
-.rv-cta-outline {
-  background: transparent;
-  color: #f0ede6;
-  border: 1.5px solid rgba(240,237,230,0.35);
-  font-size: 14px;
-  font-weight: 700;
-  padding: 0.72rem 1.4rem;
-  border-radius: 6px;
-  text-decoration: none;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  letter-spacing: 0.03em;
-}
-.rv-cta-outline:hover { border-color: rgba(240,237,230,0.6); background: rgba(240,237,230,0.06); }
 .rv-hero-proof {
   display: flex;
   gap: 1.4rem;
@@ -1022,14 +963,14 @@ body:has(main [data-admin-shell]) [data-assistant-widget] {
   margin: 0 0 0.4rem;
   line-height: 1.1;
 }
-.rv-section-heading--light { color: var(--stone); }
 .rv-section-sub {
   text-align: center;
   font-size: 14px;
   color: var(--ink-soft);
   margin: 0 0 2.5rem;
 }
-.rv-section-sub--light { color: rgba(240,237,230,0.5); }
+/* --light variants of both headings above moved to homepage.css - only
+   used against the homepage's own dark verdict/solutions backgrounds. */
 
 .rv-problem-grid {
   display: grid;
@@ -1083,66 +1024,8 @@ body:has(main [data-admin-shell]) [data-assistant-widget] {
   margin: 0;
 }
 
-/* ── Solutions ────────────────────────────────────────────────────── */
-.rv-solutions {
-  background: #0e0e0e;
-  padding: 4rem 2rem;
-}
-.rv-solution-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
-  gap: 1px;
-  max-width: 900px;
-  margin: 0 auto;
-  background: rgba(255,255,255,0.05);
-  border: 1px solid rgba(255,255,255,0.06);
-  border-radius: 10px;
-  overflow: hidden;
-}
-.rv-sol-card {
-  background: #141414;
-  padding: 1.5rem 1.4rem;
-  transition: background 0.15s;
-}
-.rv-sol-card:hover { background: #191919; }
-/* Three of these six cards double as real links to their tool page (see
-   page.tsx) - Next's Link renders an <a>, which needs its own display
-   and color reset here so a linked card looks identical to a plain one,
-   not suddenly underlined/amber-tinted from the global `a` rule. */
-a.rv-sol-card {
-  display: block;
-  color: inherit;
-  text-decoration: none;
-}
-.rv-sol-icon {
-  width: 36px;
-  height: 36px;
-  border-radius: 8px;
-  background: rgba(238,154,46,0.1);
-  border: 1px solid rgba(238,154,46,0.18);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-bottom: 0.9rem;
-}
-.rv-sol-icon svg {
-  width: 17px;
-  height: 17px;
-  stroke: var(--amber);
-}
-.rv-sol-title {
-  font-size: 13px;
-  font-weight: 700;
-  color: #f0ede6;
-  margin: 0 0 0.4rem;
-  letter-spacing: 0.03em;
-}
-.rv-sol-body {
-  font-size: 12px;
-  line-height: 1.55;
-  color: rgba(240,237,230,0.42);
-  margin: 0;
-}
+/* The entire Solutions section (.rv-solutions/.rv-sol-*) is homepage-
+   exclusive - moved to homepage.css. */
 
 /* ── Verdict strip / final CTA ────────────────────────────────────── */
 .rv-verdict-strip {
@@ -1154,16 +1037,8 @@ a.rv-sol-card {
   overflow: hidden;
   background: var(--amber);
 }
-.rv-verdict-panel-img {
-  position: absolute;
-  inset: 0;
-}
-.rv-verdict-img-overlay {
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(135deg, rgba(232,151,12,0.96) 0%, rgba(232,151,12,0.82) 50%, rgba(14,14,14,0.6) 100%);
-  z-index: 1;
-}
+/* .rv-verdict-panel-img/.rv-verdict-img-overlay moved to homepage.css -
+   /cars and /motorcycles' own verdict strip has no background image. */
 .rv-verdict-content {
   position: relative;
   z-index: 2;
@@ -1208,11 +1083,7 @@ a.rv-sol-card {
 /* ── Responsive tweaks ────────────────────────────────────────────── */
 @media (max-width: 640px) {
   .rv-hero { padding: 3rem 1.2rem; height: clamp(420px, 90vw, 520px); }
-  .rv-hero-panels { grid-template-columns: 1fr; }
-  .rv-panel-right-col { display: none; }
-  .rv-panel-left .rv-panel-overlay {
-    background: rgba(14,14,14,0.75);
-  }
+  /* Panel-grid-specific mobile overrides moved to homepage.css. */
   .rv-hero-headline { font-size: 48px; }
   .rv-problems,
   .rv-solutions { padding: 3rem 1.2rem; }
@@ -1244,13 +1115,3 @@ a.rv-sol-card {
   margin-right: -50vw;
 }
 
-.rv-panel-tag { display: none; }
-
-.rv-solution-grid {
-  grid-template-columns: repeat(3, 1fr) !important;
-}
-@media (max-width: 768px) {
-  .rv-solution-grid {
-    grid-template-columns: 1fr !important;
-  }
-}

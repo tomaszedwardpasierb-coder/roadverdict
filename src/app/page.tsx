@@ -9,6 +9,7 @@ import Image from 'next/image';
 import { redirect } from 'next/navigation';
 import { headers } from 'next/headers';
 import { getSession } from '@/lib/auth/session';
+import './homepage.css';
 
 export const dynamic = 'force-dynamic';
 
