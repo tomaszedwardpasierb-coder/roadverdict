@@ -14,6 +14,7 @@ import { classifyReceiptTier, isAutoCommitTier, receiptTierSortWeight } from '@/
 import type { ReviewQueueEntry } from '@/lib/tracker/commitReceiptItem';
 import type { ParsedReceiptItem } from '@/lib/tracker/receiptParse';
 import styles from './dashboard.module.css';
+import ownStyles from './ReviewQueueModal.module.css';
 
 const CATEGORY_ROUTE: Record<ReviewQueueEntry['category'], string> = {
   service: 'services',
@@ -192,11 +193,11 @@ function QueueItemForm({
   return (
     <>
     <form onSubmit={handleSave}>
-      <div className={styles.reviewQueueReceipt}>
+      <div className={ownStyles.reviewQueueReceipt}>
         <AttachmentThumb attachment={entry.attachment} />
         <div>
-          <span className={styles.reviewQueueCategoryBadge}>{CATEGORY_LABEL[entry.category]}</span>
-          <p className={styles.reviewQueueAiDescription}>{entry.aiDescription}</p>
+          <span className={ownStyles.reviewQueueCategoryBadge}>{CATEGORY_LABEL[entry.category]}</span>
+          <p className={ownStyles.reviewQueueAiDescription}>{entry.aiDescription}</p>
         </div>
       </div>
 
@@ -371,12 +372,12 @@ function QueueItemForm({
 
       {error && <p className="error-text" role="alert">{error}</p>}
 
-      <div className={styles.reviewQueueFooterRow}>
+      <div className={ownStyles.reviewQueueFooterRow}>
         <button type="button" className={styles.iconBtn} onClick={onPrev} disabled={!canGoPrev || submitting || finishing}>
           ← Prev
         </button>
         <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center' }}>
-          <button type="button" className={styles.reviewQueueFinishLater} onClick={onFinishLater} disabled={submitting || finishing}>
+          <button type="button" className={ownStyles.reviewQueueFinishLater} onClick={onFinishLater} disabled={submitting || finishing}>
             {finishing ? 'Saving the rest…' : 'Finish later'}
           </button>
           <button type="button" className={styles.iconBtn} onClick={onSkip} disabled={submitting || finishing}>
@@ -877,7 +878,7 @@ export function ReviewQueueModal({
     return (
       <div className={styles.reviewQueueOverlay}>
         <div className={styles.reviewQueueModal}>
-          <div className={styles.reviewQueueDoneWrap}>
+          <div className={ownStyles.reviewQueueDoneWrap}>
             <p className={styles.reviewQueueDoneTitle}>All caught up</p>
             <p className={styles.subtext}>
               {reviewedCount === 0 ? 'Nothing left to review from this scan.' : `${reviewedCount} ${reviewedCount === 1 ? 'entry' : 'entries'} added from this scan.`}
@@ -907,7 +908,7 @@ export function ReviewQueueModal({
     return (
       <div className={styles.reviewQueueOverlay}>
         <div className={styles.reviewQueueModal}>
-          <div className={styles.reviewQueueDoneWrap}>
+          <div className={ownStyles.reviewQueueDoneWrap}>
             <p className={styles.reviewQueueDoneTitle}>Logging clear entries automatically</p>
             <p className={styles.subtext}>
               These already have a date and mileage confirmed, so there&apos;s nothing to review, {autoTierDoneCount} of {autoTierTotal} so far.
@@ -937,15 +938,15 @@ export function ReviewQueueModal({
   return (
     <div className={styles.reviewQueueOverlay}>
       <div className={styles.reviewQueueModal}>
-        <div className={styles.reviewQueueFilmstrip}>
+        <div className={ownStyles.reviewQueueFilmstrip}>
           {items.map((_, i) => (
             <div
               key={i}
-              className={`${styles.reviewQueueFilmstripItem} ${i < index ? styles.reviewQueueFilmstripDone : i === index ? styles.reviewQueueFilmstripActive : ''}`}
+              className={`${ownStyles.reviewQueueFilmstripItem} ${i < index ? styles.reviewQueueFilmstripDone : i === index ? styles.reviewQueueFilmstripActive : ''}`}
             />
           ))}
         </div>
-        <div className={styles.reviewQueueProgress}>
+        <div className={ownStyles.reviewQueueProgress}>
           <span>Reviewing {index + 1} of {items.length}</span>
           <span className="field-note">{Math.round(((index + 1) / items.length) * 100)}%</span>
         </div>
@@ -957,7 +958,7 @@ export function ReviewQueueModal({
         )}
 
         {current === null ? (
-          <div className={styles.reviewQueueDoneWrap}>
+          <div className={ownStyles.reviewQueueDoneWrap}>
             {committing && <p className={styles.subtext}>Saving this entry…</p>}
             {commitError && (
               <>

@@ -9,6 +9,7 @@ import { useChartFilter } from './ChartFilterContext';
 import { FORECAST_WINDOW_LABELS, FORECAST_WINDOW_DAYS, type ForecastWindow } from '@/lib/tracker/costForecast';
 import { VehicleSpinner } from '@/components/VehicleSpinner';
 import styles from './dashboard.module.css';
+import ownStyles from './BudgetWidget.module.css';
 
 interface Props {
   yearSpend: number;
@@ -52,8 +53,8 @@ export function BudgetWidget({ yearSpend, currentYear, initialBudget, currency, 
 
   if (editing) {
     return (
-      <form className={styles.budgetCard} onSubmit={handleSubmit}>
-        <div className={styles.budgetCardTitle}>Annual budget</div>
+      <form className={ownStyles.budgetCard} onSubmit={handleSubmit}>
+        <div className={ownStyles.budgetCardTitle}>Annual budget</div>
         <p className={styles.emptyNote}>
           No budget set for {currentYear} yet - optional, purely for your own tracking.
         </p>
@@ -96,9 +97,9 @@ export function BudgetWidget({ yearSpend, currentYear, initialBudget, currency, 
   const displaySpend = forecastMode ? projectedSpendForWindow : yearSpend;
   const pct = displayBudget > 0 ? Math.min(100, (displaySpend / displayBudget) * 100) : 0;
   const status = displaySpend >= displayBudget ? 'over' : displaySpend >= displayBudget * 0.8 ? 'warning' : 'ok';
-  const statusClass = status === 'over' ? styles.budgetCardOver : status === 'warning' ? styles.budgetCardWarning : '';
+  const statusClass = status === 'over' ? ownStyles.budgetCardOver : status === 'warning' ? ownStyles.budgetCardWarning : '';
   const fillClass =
-    status === 'over' ? styles.budgetBarFillOver : status === 'warning' ? styles.budgetBarFillWarning : styles.budgetBarFillOk;
+    status === 'over' ? ownStyles.budgetBarFillOver : status === 'warning' ? ownStyles.budgetBarFillWarning : ownStyles.budgetBarFillOk;
   const statusText = forecastMode
     ? status === 'over'
       ? `⚠️ Projected to go ${formatCurrency(displaySpend - displayBudget, currency, rates)} over your budget for the ${windowLabel.toLowerCase()}`
@@ -131,19 +132,19 @@ export function BudgetWidget({ yearSpend, currentYear, initialBudget, currency, 
       })();
 
   return (
-    <div className={`${styles.budgetCard} ${statusClass}`}>
-      <div className={styles.budgetCardTitle} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+    <div className={`${ownStyles.budgetCard} ${statusClass}`}>
+      <div className={ownStyles.budgetCardTitle} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
         {forecastMode ? `Future budget (${windowLabel})` : `Annual budget (${currentYear})`}
         {forecastMode && <span className={styles.forecastBadge}>Estimate</span>}
       </div>
-      <div className={styles.budgetCardAmounts}>
+      <div className={ownStyles.budgetCardAmounts}>
         {formatCurrency(displaySpend, currency, rates)} of {formatCurrency(displayBudget, currency, rates)}
       </div>
-      <div className={styles.budgetBar}>
-        <div className={`${styles.budgetBarFill} ${fillClass}`} style={{ width: `${pct}%` }} />
+      <div className={ownStyles.budgetBar}>
+        <div className={`${ownStyles.budgetBarFill} ${fillClass}`} style={{ width: `${pct}%` }} />
       </div>
-      <div className={styles.budgetCardStatus}>{statusText}</div>
-      {projectionText && <div className={styles.budgetProjection}>{projectionText}</div>}
+      <div className={ownStyles.budgetCardStatus}>{statusText}</div>
+      {projectionText && <div className={ownStyles.budgetProjection}>{projectionText}</div>}
       <button type="button" className={styles.iconBtn} style={{ marginTop: '0.6rem' }} onClick={() => setEditing(true)}>
         Change budget
       </button>

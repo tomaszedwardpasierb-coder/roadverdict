@@ -15,6 +15,7 @@ import { useChartFilter } from './ChartFilterContext';
 import { useTabSwitch, viewRecords, type ReviewCategory } from './TabSwitchContext';
 import type { CategoryForecast, ForecastWindow } from '@/lib/tracker/costForecast';
 import styles from './dashboard.module.css';
+import ownStyles from './CategorySpendChart.module.css';
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, PointElement, LineElement, Tooltip, Filler);
 
@@ -244,7 +245,7 @@ export function CategorySpendChart({
           }}
         />
       )}
-      {showingForecast && activeForecast?.basis && <p className={styles.forecastBasis}>{activeForecast.basis}</p>}
+      {showingForecast && activeForecast?.basis && <p className={ownStyles.forecastBasis}>{activeForecast.basis}</p>}
     </div>
   );
 }

@@ -3,6 +3,7 @@
 
 import { useState } from 'react';
 import styles from './dashboard.module.css';
+import ownStyles from './DashboardTabs.module.css';
 
 interface DashboardTabsProps {
   serviceContent: React.ReactNode;
@@ -40,7 +41,7 @@ export function DashboardTabs({ serviceContent, fuelContent, modsContent, billsC
         ))}
       </div>
       {tabs.map((t) => (
-        <div key={t.key} className={styles.contentColumn} style={{ display: active === t.key ? 'block' : 'none' }}>
+        <div key={t.key} className={ownStyles.contentColumn} style={{ display: active === t.key ? 'block' : 'none' }}>
           {t.content}
         </div>
       ))}

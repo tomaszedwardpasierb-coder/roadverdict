@@ -1,0 +1,5 @@
+
+.chartCardTotalLine { font-size: 0.85rem; color: var(--ink-soft); margin-bottom: 0.7rem; }
+.chartCardTotalLine strong { color: var(--asphalt); font-family: var(--font-mono); }
+.categoryLockedNote { display: flex; align-items: center; gap: 0.35rem; margin-top: 0.8rem; font-size: 0.78rem; color: var(--amber-ink); text-decoration: none; }
+.categoryLockedNote:hover { text-decoration: underline; }

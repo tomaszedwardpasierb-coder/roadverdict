@@ -1,0 +1,4 @@
+
+.statCardIconForecast { background: var(--blue-tint); color: var(--blue); }
+.statCardValue { font-family: var(--font-display); font-size: 1.4rem; color: var(--asphalt); line-height: 1.1; }
+.statCardValueForecast { color: var(--blue); }

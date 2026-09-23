@@ -5,7 +5,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useActiveSection } from "@/components/ActiveSectionContext";
 import { VehicleSpinner } from "@/components/VehicleSpinner";
-import styles from "./dashboard.module.css";
+import styles from './LogoutButton.module.css';
 
 export default function LogoutButton() {
   const router = useRouter();

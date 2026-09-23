@@ -5,6 +5,7 @@ import { formatCurrency, type Currency, type ExchangeRates } from '@/lib/tracker
 import { useTabSwitch, viewRecords, type ReviewCategory } from './TabSwitchContext';
 import { Icon } from './Icon';
 import styles from './dashboard.module.css';
+import ownStyles from './RecentActivity.module.css';
 
 // Reuses the exact same tint classes the stat card icons already use -
 // service/bills get the neutral tile, fuel gets green, mods gets amber,
@@ -48,7 +49,7 @@ export function RecentActivity({
     return <p className={styles.emptyNote}>Nothing logged yet - your recent activity will show up here.</p>;
   }
   return (
-    <table className={styles.recentActivityTable}>
+    <table className={ownStyles.recentActivityTable}>
       <thead>
         <tr>
           <th>Date</th>
@@ -63,12 +64,12 @@ export function RecentActivity({
         {items.map((item) => (
           <tr
             key={item.id}
-            className={styles.recentActivityRow}
+            className={ownStyles.recentActivityRow}
             onClick={() => viewRecords(item.reviewCategory, [item.id], switchTo, setHighlightIds)}
           >
             <td>{fmtDate(item.date)}</td>
             <td>
-              <span className={styles.activityIconTile + ' ' + CATEGORY_TINT[item.reviewCategory]}>
+              <span className={ownStyles.activityIconTile + ' ' + CATEGORY_TINT[item.reviewCategory]}>
                 <Icon name={item.reviewCategory} size={13} />
               </span>
               {item.type}

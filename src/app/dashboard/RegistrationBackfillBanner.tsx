@@ -4,7 +4,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { VehicleSpinner } from '@/components/VehicleSpinner';
-import styles from './dashboard.module.css';
+import styles from './RegistrationBackfillBanner.module.css';
 
 export function RegistrationBackfillBanner({ bikeName }: { bikeName: string }) {
   const router = useRouter();

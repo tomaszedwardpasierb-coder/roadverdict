@@ -14,6 +14,7 @@ import { barGradient, BAR_BORDER_RADIUS, lineAreaGradient, lastPointRadius, last
 import { useChartFilter } from './ChartFilterContext';
 import { useTabSwitch, viewRecords } from './TabSwitchContext';
 import styles from './dashboard.module.css';
+import ownStyles from './MpgChart.module.css';
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, BarElement, Tooltip, Legend, Filler);
 
@@ -237,21 +238,21 @@ export function MpgChart({
         />
       )}
       {excludedSpend > 0 && (
-        <p className={styles.mpgExcludedNote}>
+        <p className={ownStyles.mpgExcludedNote}>
           {formatCurrency(excludedSpend, currency, rates)} of fuel spend excluded from this calculation because the
           mileage on those entries hasn&apos;t been verified yet - edit them to confirm the mileage and they&apos;ll
           count from then on.
         </p>
       )}
       {missedFillUpCount > 0 && (
-        <p className={styles.mpgExcludedNote}>
+        <p className={ownStyles.mpgExcludedNote}>
           {missedFillUpCount} {missedFillUpCount === 1 ? 'reading looks' : 'readings look'} far enough outside your
           usual range that a fill-up in between probably wasn&apos;t logged (shown in red above) - hover one for why
           it&apos;s left out of the average.
         </p>
       )}
       {markedAnomalyCount > 0 && (
-        <p className={styles.mpgExcludedNote}>
+        <p className={ownStyles.mpgExcludedNote}>
           {markedAnomalyCount} {markedAnomalyCount === 1 ? 'reading is' : 'readings are'} marked as a known anomaly
           (shown in red above) - kept exactly as logged, just excluded from the average and trend line.
         </p>

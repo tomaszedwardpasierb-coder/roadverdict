@@ -7,7 +7,7 @@ import { describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { ChartTypeToggle } from "@/app/dashboard/ChartTypeToggle";
-import styles from "@/app/dashboard/dashboard.module.css";
+import styles from "@/app/dashboard/ChartTypeToggle.module.css";
 
 describe("ChartTypeToggle", () => {
   it("renders nothing when there's only one available chart kind", () => {

@@ -9,6 +9,7 @@
 import Link from 'next/link';
 import { Icon, type IconName } from './Icon';
 import styles from './dashboard.module.css';
+import ownStyles from './LockedStatCard.module.css';
 
 interface Props {
   icon: IconName;
@@ -18,11 +19,11 @@ interface Props {
 
 export function LockedStatCard({ icon, iconClass, label }: Props) {
   return (
-    <Link href="/pro" className={`${styles.statCard} ${styles.statCardLocked}`}>
+    <Link href="/pro" className={`${styles.statCard} ${ownStyles.statCardLocked}`}>
       <div className={`${styles.statCardIcon} ${iconClass}`}>
         <Icon name={icon} size={16} />
       </div>
-      <div className={styles.statCardLockedValue}>
+      <div className={ownStyles.statCardLockedValue}>
         <Icon name="lock" size={14} />
         <span>Premium</span>
       </div>

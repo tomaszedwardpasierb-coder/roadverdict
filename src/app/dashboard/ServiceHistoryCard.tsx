@@ -20,6 +20,7 @@ import { checkMileageConsistency, type HistoryPoint } from '@/lib/tracker/mileag
 import { MileageWarning } from './MileageWarning';
 import { MileageConflictModal } from './MileageConflictModal';
 import styles from './dashboard.module.css';
+import ownStyles from './ServiceHistoryCard.module.css';
 
 function fmtDate(d: string): string {
   return new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
@@ -121,7 +122,7 @@ export function ServiceHistoryCard({ record, bikeClass, brandValue, region, dist
   const jobLabel = JOB_LABELS[record.jobType] ?? record.jobType;
   const affiliate = AFFILIATE_LINKS[record.jobType];
   const tagClass =
-    verdict?.cls === 'fair' ? styles.tagFair : verdict?.cls === 'high' ? styles.tagHigh : styles.tagSecondOpinion;
+    verdict?.cls === 'fair' ? ownStyles.tagFair : verdict?.cls === 'high' ? styles.tagHigh : ownStyles.tagSecondOpinion;
   const unitLabel = distanceUnitLabel(distanceUnit);
   const symbol = CURRENCY_SYMBOLS[currency];
 
@@ -297,12 +298,12 @@ export function ServiceHistoryCard({ record, bikeClass, brandValue, region, dist
       {record.notes && <div className={styles.jobCardNotes}>{record.notes}</div>}
       {record.attachments?.[0] && <AttachmentThumb attachment={record.attachments[0]} />}
       {verdict && (
-        <span className={`${styles.tag} ${tagClass}`}>
+        <span className={`${ownStyles.tag} ${tagClass}`}>
           {verdict.label} (typical {formatCurrency(verdict.low, currency, rates)}-{formatCurrency(verdict.high, currency, rates)})
         </span>
       )}
       {affiliate && (
-        <div className={styles.affiliateNudge}>
+        <div className={ownStyles.affiliateNudge}>
           Need parts for next time?{' '}
           {affiliate.map((a) => (
             <a key={a.url} href={a.url} target="_blank" rel="noopener">{a.name}</a>

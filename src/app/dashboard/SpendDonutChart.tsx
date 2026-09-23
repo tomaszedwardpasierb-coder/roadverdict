@@ -14,6 +14,7 @@ import { useChartFilter } from './ChartFilterContext';
 import type { ForecastWindow, ForecastCategoryTotals } from '@/lib/tracker/costForecast';
 import { Icon } from './Icon';
 import styles from './dashboard.module.css';
+import ownStyles from './SpendDonutChart.module.css';
 
 ChartJS.register(ArcElement, BarElement, CategoryScale, LinearScale, Tooltip, Legend);
 
@@ -110,7 +111,7 @@ export function SpendDonutChart({ records, mods, fuelLogs, bills, labour, curren
         </div>
       </div>
       {grandTotal > 0 && (
-        <div className={styles.chartCardTotalLine}>
+        <div className={ownStyles.chartCardTotalLine}>
           Total: <strong>{symbol}{Math.round(values.reduce((a, b) => a + b, 0))}</strong>
         </div>
       )}
@@ -238,7 +239,7 @@ export function SpendDonutChart({ records, mods, fuelLogs, bills, labour, curren
               </div>
             </div>
               {!isPro && (
-                <Link href="/pro" className={styles.categoryLockedNote}>
+                <Link href="/pro" className={ownStyles.categoryLockedNote}>
                   <Icon name="lock" size={12} /> Category breakdown - Premium
                 </Link>
               )}

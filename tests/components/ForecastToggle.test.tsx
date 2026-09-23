@@ -12,7 +12,7 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { ForecastToggle } from "@/app/dashboard/ForecastToggle";
 import { ChartFilterProvider, useChartFilter } from "@/app/dashboard/ChartFilterContext";
-import styles from "@/app/dashboard/dashboard.module.css";
+import styles from "@/app/dashboard/ForecastToggle.module.css";
 
 function ForecastObserver() {
   const { forecastMode } = useChartFilter();

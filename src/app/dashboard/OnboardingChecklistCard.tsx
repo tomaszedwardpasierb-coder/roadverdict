@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { VehicleSpinner } from '@/components/VehicleSpinner';
 import { ONBOARDING_STEPS } from '@/lib/tracker/onboardingSteps';
-import styles from './dashboard.module.css';
+import styles from './OnboardingChecklistCard.module.css';
 
 interface Props {
   completedSteps: string[];

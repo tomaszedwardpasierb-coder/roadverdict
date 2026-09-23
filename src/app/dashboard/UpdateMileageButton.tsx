@@ -6,6 +6,7 @@ import { useTrackerFormSubmit } from './useTrackerFormSubmit';
 import { convertMilesToDisplay, convertDisplayToMiles, distanceUnitLabel, type DistanceUnit } from '@/lib/tracker/unitFormat';
 import { VehicleSpinner } from '@/components/VehicleSpinner';
 import styles from './dashboard.module.css';
+import ownStyles from './UpdateMileageButton.module.css';
 
 export function UpdateMileageButton({
   currentMileage,
@@ -36,13 +37,13 @@ export function UpdateMileageButton({
 
   if (editing) {
     return (
-      <form onSubmit={handleSubmit} className={styles.mileageEditForm}>
+      <form onSubmit={handleSubmit} className={ownStyles.mileageEditForm}>
         <input
           type="number"
           min="0"
           value={value}
           onChange={(e) => setValue(e.target.value)}
-          className={styles.mileageEditInput}
+          className={ownStyles.mileageEditInput}
           required
         />
         <span style={{ fontSize: '0.75rem', color: 'var(--ink-soft)' }}>{unitLabel}</span>

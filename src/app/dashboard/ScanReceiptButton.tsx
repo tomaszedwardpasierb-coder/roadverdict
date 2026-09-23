@@ -9,7 +9,7 @@ import type { ParsedReceiptItem } from '@/lib/tracker/receiptParse';
 import { classifyReceiptTier, receiptTierSortWeight } from '@/lib/tracker/receiptTiering';
 import { Icon } from './Icon';
 import { VehicleSpinner } from '@/components/VehicleSpinner';
-import styles from './dashboard.module.css';
+import styles from './ScanReceiptButton.module.css';
 
 interface FileParseOutcome {
   fileName: string;

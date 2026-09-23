@@ -1,0 +1,6 @@
+
+.forecastToggleGroup { display: flex; align-items: center; gap: 0.6rem; background: var(--paper); border: 1.5px solid var(--blue); border-radius: 8px; padding: 0.45rem 0.7rem; margin-bottom: 1rem; flex-wrap: wrap; }
+.forecastToggleBtns { display: flex; gap: 0.3rem; }
+.forecastToggleBtn { font-family: var(--font-mono); font-size: 0.72rem; font-weight: 600; padding: 0.3rem 0.7rem; border: 1px solid var(--border); border-radius: 20px; background: #fff; cursor: pointer; color: var(--ink-soft); }
+.forecastToggleBtnActive { background: var(--blue); color: #fff; border-color: var(--blue); }
+.forecastToggleBtn:hover:not(.forecastToggleBtnActive) { border-color: var(--blue); color: var(--blue); }

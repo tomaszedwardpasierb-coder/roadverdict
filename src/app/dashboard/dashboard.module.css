@@ -4,7 +4,6 @@
   background: var(--stone);
   color: var(--asphalt);
 }
-
 .header {
   display: flex;
   align-items: center;
@@ -12,41 +11,11 @@
   padding: 1.25rem 1.5rem;
   border-bottom: 2px solid var(--asphalt);
 }
-
 .logoImg {
   height: 32px;
   width: auto;
   display: block;
 }
-
-.logoutButton {
-  font-family: var(--font-display);
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  padding: 8px 14px;
-  font-size: 0.85rem;
-  color: var(--asphalt);
-  background: var(--paper);
-  border: 1px solid var(--asphalt);
-  border-radius: 4px;
-  cursor: pointer;
-}
-
-.logoutButton:hover:not(:disabled) {
-  background: var(--amber);
-}
-
-.logoutButton:disabled {
-  opacity: 0.6;
-  cursor: default;
-}
-
-.main {
-  max-width: 1000px;
-  margin: 0 auto;
-  padding: 40px 24px;
-}
-
 .heading {
   font-family: var(--font-display);
   font-size: 26px;
@@ -54,7 +23,6 @@
   margin: 0 0 6px;
   color: var(--asphalt);
 }
-
 .headingBikeTag {
   font-family: var(--font-mono);
   font-size: 0.8rem;
@@ -63,7 +31,6 @@
   margin-left: 0.7rem;
   vertical-align: middle;
 }
-
 .autocompleteList {
   position: absolute;
   top: 100%;
@@ -91,13 +58,11 @@
   cursor: pointer;
 }
 .autocompleteItem:hover { background: var(--paper); }
-
 .subtext {
   font-size: 15px;
   color: var(--ink-soft);
   margin: 0 0 32px;
 }
-
 .card {
   background: var(--paper);
   border: 1px solid var(--line);
@@ -106,13 +71,6 @@
   padding: 20px 22px;
   margin-bottom: 16px;
 }
-
-.cardBody {
-  font-size: 14px;
-  color: var(--ink-soft);
-  margin: 0;
-}
-
 /* Real section heading - replaces the earlier misuse of .cardTitle as a
    bare heading outside any .card, which needed a repeated inline
    margin-top override every time it was used. */
@@ -124,7 +82,6 @@
   margin: 1.5rem 0 0.9rem;
   color: var(--asphalt);
 }
-
 .jobCard {
   background: var(--paper);
   border: 1px solid var(--line);
@@ -139,7 +96,6 @@
 .jobCardCost { font-family: var(--font-mono); font-weight: 500; }
 .jobCardMeta { font-family: var(--font-mono); font-size: 0.8rem; color: var(--ink-soft); margin-top: 0.2rem; }
 .jobCardNotes { font-size: 0.85rem; color: var(--ink-soft); margin-top: 0.4rem; }
-
 .jobCardNeedsReview {
   border-left: 4px solid var(--verdict-red);
   animation: jobCardReviewPulse 1.8s ease-in-out infinite;
@@ -178,9 +134,7 @@
 }
 .mileageConfidenceTag { color: var(--amber-ink); }
 .mileageConfirmedTag { color: var(--ink-soft); font-style: italic; }
-.mpgExcludedNote { font-size: 0.78rem; color: var(--ink-soft); margin-top: 0.5rem; font-style: italic; }
 .currencyConversionNote { font-size: 0.78rem; color: var(--ink-soft); margin-top: 0.3rem; font-style: italic; }
-
 .attachmentThumb {
   display: inline-flex;
   width: 44px;
@@ -200,40 +154,8 @@
   font-weight: 700;
   color: var(--ink-soft);
 }
-.attachmentChip {
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
-  background: var(--paper);
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  padding: 0.5rem 0.6rem;
-}
 .attachmentChip .attachmentThumb { margin-top: 0; flex-shrink: 0; }
-.attachmentFileName { flex: 1; font-size: 0.82rem; color: var(--ink-soft); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.tag {
-  display: inline-block;
-  font-family: var(--font-mono);
-  font-size: 0.72rem;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  padding: 0.15rem 0.5rem;
-  border-radius: 3px;
-  margin-top: 0.3rem;
-  margin-right: 0.3rem;
-}
-.tagFair { background: #e7f0e7; color: var(--verdict-green); }
 .tagHigh { background: #fbeecd; color: var(--amber-ink); }
-.tagSecondOpinion { background: #f8e2dd; color: var(--verdict-red); }
-.affiliateNudge {
-  border: 1px dashed var(--amber-ink);
-  border-radius: 6px;
-  padding: 0.8rem 1rem;
-  margin-top: 0.9rem;
-  font-size: 0.85rem;
-}
-.affiliateNudge a { display: inline-block; margin-right: 0.9rem; font-weight: 500; }
-
 .cardActions { display: flex; gap: 0.5rem; margin-top: 0.6rem; flex-wrap: wrap; }
 .iconBtn {
   background: none;
@@ -247,17 +169,6 @@
 }
 .iconBtn:hover:not(:disabled) { border-color: var(--asphalt); color: var(--asphalt); }
 .iconBtn:disabled { opacity: 0.6; cursor: default; }
-
-.reminderItem { display: flex; justify-content: space-between; align-items: center; gap: 0.8rem; background: var(--paper); border: 1px solid var(--line); border-radius: var(--radius-md); box-shadow: var(--shadow-card); padding: 0.7rem 1rem; margin-bottom: 0.5rem; flex-wrap: wrap; }
-.reminderItemName { font-weight: 500; }
-.reminderItemDetail { font-family: var(--font-mono); font-size: 0.78rem; color: var(--ink-soft); }
-.reminderItemDetailLocked { display: flex; align-items: center; gap: 0.3rem; font-family: var(--font-mono); font-size: 0.78rem; color: var(--amber-dark); }
-.reminderItemActions { display: flex; gap: 0.5rem; align-items: center; }
-.reminderStatus { font-family: var(--font-mono); font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.04em; padding: 0.2rem 0.55rem; border-radius: 3px; }
-.reminderStatusOk { background: #e7f0e7; color: var(--verdict-green); }
-.reminderStatusDueSoon { background: #fbeecd; color: var(--amber-ink); }
-.reminderStatusOverdue { background: #f8e2dd; color: var(--verdict-red); }
-
 /* Tabs - the fix for the endless single-column scroll */
 .tabBar {
   display: flex;
@@ -287,15 +198,9 @@
 .tab:hover:not(.tabActive) {
   color: var(--asphalt);
 }
-
 @media (max-width: 480px) {
   .tab { padding: 0.6rem 0.85rem; font-size: 0.78rem; }
 }
-
-.contentColumn {
-  max-width: 640px;
-}
-
 .statsStrip { display: grid; grid-template-columns: repeat(auto-fit, minmax(115px, 1fr)); gap: 0.7rem; margin-bottom: 1.4rem; }
 .statCard { background: var(--paper); border: 1px solid var(--line); border-radius: var(--radius-md); box-shadow: var(--shadow-card); padding: 0.9rem 0.8rem; text-align: left; }
 .statCardIcon {
@@ -313,43 +218,13 @@
 /* Same blue every other forecast element uses - swapped in on a stat
    card's icon (and value, below) whenever Forecast mode is showing a
    projected figure instead of the card's normal real-data one. */
-.statCardIconForecast { background: var(--blue-tint); color: var(--blue); }
-.statCardValue { font-family: var(--font-display); font-size: 1.4rem; color: var(--asphalt); line-height: 1.1; }
-.statCardValueForecast { color: var(--blue); }
 .statCardLabel { font-family: var(--font-mono); font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.03em; color: var(--ink-soft); margin-top: 0.3rem; }
-
-.statCardLocked {
-  display: block;
-  text-decoration: none;
-  transition: border-color 0.15s, box-shadow 0.15s;
-}
-.statCardLocked:hover { border-color: var(--amber); box-shadow: var(--shadow-pop); }
-.statCardLockedValue {
-  display: flex;
-  align-items: center;
-  gap: 0.35rem;
-  font-family: var(--font-display);
-  font-size: 1rem;
-  color: var(--amber-ink);
-  line-height: 1.1;
-}
-
 .chartsGrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem; margin-bottom: 1.6rem; }
 .chartCard { background: var(--paper); border: 1px solid var(--line); border-radius: var(--radius-lg); box-shadow: var(--shadow-card); padding: 1rem 1.1rem; }
 .chartCardTitle { font-family: var(--font-display); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.7rem; color: var(--asphalt); }
 .chartCardHeader { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.7rem; }
 .chartCardHeader .chartCardTitle { margin-bottom: 0; }
-.chartCardTotalLine { font-size: 0.85rem; color: var(--ink-soft); margin-bottom: 0.7rem; }
-.chartCardTotalLine strong { color: var(--asphalt); font-family: var(--font-mono); }
-.categoryLockedNote { display: flex; align-items: center; gap: 0.35rem; margin-top: 0.8rem; font-size: 0.78rem; color: var(--amber-ink); text-decoration: none; }
-.categoryLockedNote:hover { text-decoration: underline; }
-.chartTypeToggle { display: flex; gap: 0.25rem; }
-.chartTypeToggleBtn { font-family: var(--font-mono); font-size: 0.65rem; padding: 0.2rem 0.5rem; border: 1px solid var(--border); border-radius: 20px; background: #fff; cursor: pointer; color: var(--ink-soft); }
-.chartTypeToggleBtnActive { background: var(--amber); color: var(--amber-ink); border-color: var(--amber); }
-.chartTypeToggleBtn:hover:not(.chartTypeToggleBtnActive) { border-color: var(--asphalt); color: var(--asphalt); }
-
 .emptyNote { font-size: 0.85rem; color: var(--ink-soft); }
-
 .storyIntro { max-width: 560px; padding: 1rem 0; }
 .storyTitle { font-family: var(--font-display); font-size: 1.6rem; margin: 0 0 0.9rem; }
 .storyText { font-size: 0.95rem; line-height: 1.65; color: var(--ink-soft); margin: 0 0 1.4rem; }
@@ -361,7 +236,6 @@
   border-left: 3px solid var(--amber);
   padding-left: 0.8rem;
 }
-
 .pendingRequestsBlock { margin-bottom: 1.5rem; }
 .pendingRequestsTitle {
   font-family: var(--font-display);
@@ -403,7 +277,6 @@
   border: 1px solid var(--border);
   border-radius: 4px;
 }
-
 .requesterLine {
   display: block;
   font-family: var(--font-display);
@@ -425,7 +298,6 @@
 .requestCardCollapsed:hover { background: #f5e6c8; }
 .requestCollapsedTally { font-size: 0.82rem; color: var(--ink-soft); margin: 0; }
 .requestExpandChevron { font-size: 0.8rem; color: var(--ink-soft); flex-shrink: 0; white-space: nowrap; }
-
 .decisionGroupLabel {
   font-family: var(--font-mono);
   font-size: 0.7rem;
@@ -435,7 +307,6 @@
   margin: 0.9rem 0 0.2rem;
 }
 .decidedItemRow { opacity: 0.72; }
-
 .priorDeclineFlag {
   display: block;
   font-size: 0.78rem;
@@ -443,77 +314,7 @@
   color: var(--verdict-red);
   margin-top: 0.2rem;
 }
-
-.rangeTabs { display: flex; gap: 0.3rem; flex-wrap: wrap; margin-bottom: 0.7rem; }
-.globalFilterBar { display: flex; align-items: center; gap: 0.7rem; flex-wrap: wrap; background: var(--paper); border: 1px solid var(--border); border-radius: 8px; padding: 0.6rem 0.9rem; margin-bottom: 1rem; }
-
 .scanReceiptWrap { margin-bottom: 1rem; }
-
-.registrationBanner {
-  background: #fff8ec;
-  border: 1px solid var(--amber);
-  border-radius: 8px;
-  padding: 1rem 1.2rem;
-  margin-bottom: 1.2rem;
-  font-size: 0.88rem;
-  color: var(--ink);
-}
-.registrationBanner p { margin: 0; }
-.registrationBannerTitle {
-  font-family: var(--font-display);
-  font-size: 1rem;
-  color: var(--amber-ink);
-  margin-bottom: 0.5rem !important;
-}
-.registrationBanner input[type="text"] {
-  font-family: var(--font-mono);
-  padding: 0.5rem 0.7rem;
-  border: 1px solid var(--border);
-  border-radius: 4px;
-}
-
-.onboardingCard {
-  background: #fff8ec;
-  border: 1px solid var(--amber);
-  border-radius: 8px;
-  padding: 1rem 1.2rem;
-  margin-bottom: 1.2rem;
-}
-.onboardingHeader { display: flex; justify-content: space-between; align-items: baseline; gap: 0.8rem; flex-wrap: wrap; margin-bottom: 0.7rem; }
-.onboardingTitle { font-family: var(--font-display); font-size: 1rem; color: var(--amber-ink); margin: 0; }
-.onboardingProgress { font-size: 0.78rem; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
-.onboardingHideBtn { background: none; border: none; color: var(--ink-soft); font-size: 0.78rem; text-decoration: underline; cursor: pointer; padding: 0; }
-.onboardingList { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.45rem; }
-.onboardingItem { display: flex; align-items: center; gap: 0.55rem; }
-.onboardingTick {
-  width: 18px;
-  height: 18px;
-  border-radius: 50%;
-  border: 1.5px solid var(--amber);
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 0.65rem;
-}
-.onboardingTickDone { background: var(--green); border-color: var(--green); color: #fff; }
-.onboardingItemLink { font-size: 0.88rem; color: var(--ink); text-decoration: none; }
-.onboardingItemLink:hover { text-decoration: underline; }
-.onboardingItemDone .onboardingItemLink { color: var(--ink-soft); text-decoration: line-through; }
-.onboardingPill {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-  background: none;
-  border: 1px dashed var(--border);
-  border-radius: 99px;
-  padding: 0.3rem 0.8rem;
-  margin-bottom: 1.2rem;
-  font-size: 0.78rem;
-  color: var(--ink-soft);
-  cursor: pointer;
-}
-.onboardingPill:hover { border-color: var(--amber); color: var(--amber-ink); }
 .scanReceiptBtn {
   font-family: var(--font-body);
   font-weight: 700;
@@ -531,14 +332,6 @@
 }
 .scanReceiptBtn:hover { background: var(--amber-dark); }
 .scanReceiptCaption { font-size: 0.8rem; color: var(--ink-soft); margin: 0.4rem 0 0; }
-.scanReceiptTip {
-  font-size: 0.8rem;
-  color: var(--amber-dark);
-  background: var(--amber-tint);
-  border-radius: var(--radius-sm);
-  padding: 0.5rem 0.7rem;
-  margin: 0.6rem 0;
-}
 .scanReceiptPanel {
   margin-top: 0.6rem;
   background: var(--paper);
@@ -551,8 +344,6 @@
 }
 .scanReceiptPanel p { margin: 0 0 0.6rem; }
 .scanReceiptConstruction { color: var(--ink-soft); font-family: var(--font-mono); font-size: 0.78rem; margin-bottom: 0 !important; }
-.scanReceiptSuccess { color: var(--verdict-green); font-size: 0.85rem; margin-top: 0.6rem !important; }
-
 .scanReceiptSummary {
   background: #fff;
   border: 1px solid var(--border);
@@ -563,7 +354,6 @@
   font-style: italic;
   color: var(--ink);
 }
-
 .navPendingBadge {
   display: inline-block;
   width: 9px;
@@ -577,15 +367,6 @@
   0%, 100% { opacity: 0.35; box-shadow: 0 0 0 0 rgba(232, 163, 61, 0.5); }
   50% { opacity: 1; box-shadow: 0 0 0 4px rgba(232, 163, 61, 0.15); }
 }
-.navReadyBadge {
-  display: inline-block;
-  width: 9px;
-  height: 9px;
-  border-radius: 50%;
-  background: var(--verdict-green);
-  margin-left: 0.4rem;
-}
-
 .storyReadinessNote {
   background: var(--amber-tint);
   border-radius: var(--radius-md);
@@ -595,8 +376,6 @@
   margin: 1rem 0 1.5rem;
   max-width: 42rem;
 }
-.globalFilterLabel { font-family: var(--font-mono); font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--ink-soft); }
-
 .lookupResult { display: flex; align-items: baseline; gap: 0.7rem; margin-top: 1.1rem; padding-top: 0.9rem; border-top: 1px solid var(--border); }
 .lookupResultTotal { font-family: var(--font-display); font-size: 1.6rem; color: var(--asphalt); }
 .lookupResultCount { font-size: 0.85rem; color: var(--ink-soft); }
@@ -606,10 +385,6 @@
 .lookupEntryDate { font-family: var(--font-mono); color: var(--ink-soft); flex-shrink: 0; width: 100px; }
 .lookupEntryDesc { flex: 1; }
 .lookupEntryCost { font-weight: 600; flex-shrink: 0; }
-.rangeTab { font-family: var(--font-mono); font-size: 0.7rem; padding: 0.25rem 0.55rem; border: 1px solid var(--border); border-radius: 20px; background: #fff; cursor: pointer; color: var(--ink-soft); }
-.rangeTabActive { background: var(--asphalt); color: var(--stone); border-color: var(--asphalt); }
-.rangeTab:hover:not(.rangeTabActive) { border-color: var(--asphalt); color: var(--asphalt); }
-
 /* Deliberately its own bordered group, not another row of .rangeTab
    pills - switching into Forecast mode needs to read as a genuinely
    different action, not just another filter choice, so accidentally
@@ -617,149 +392,42 @@
    not amber - this app's accent is already amber (see .rangeTabActive),
    so Forecast gets its own colour precisely so it never reads as "just
    another selected filter" at a glance. */
-.forecastToggleGroup { display: flex; align-items: center; gap: 0.6rem; background: var(--paper); border: 1.5px solid var(--blue); border-radius: 8px; padding: 0.45rem 0.7rem; margin-bottom: 1rem; flex-wrap: wrap; }
-.forecastToggleBtns { display: flex; gap: 0.3rem; }
-.forecastToggleBtn { font-family: var(--font-mono); font-size: 0.72rem; font-weight: 600; padding: 0.3rem 0.7rem; border: 1px solid var(--border); border-radius: 20px; background: #fff; cursor: pointer; color: var(--ink-soft); }
-.forecastToggleBtnActive { background: var(--blue); color: #fff; border-color: var(--blue); }
-.forecastToggleBtn:hover:not(.forecastToggleBtnActive) { border-color: var(--blue); color: var(--blue); }
 /* Reused as the active-pill modifier on a plain .rangeTab when it's
    showing a Forecast window (see ChartFilterBar.tsx) - same pill shape
    as a real Range tab, but blue instead of asphalt so it still reads as
    "Forecast", not just another selected filter. */
-.forecastWindowTabActive { background: var(--blue); color: #fff; border-color: var(--blue); }
-
 /* The on-chart signal that a given chart is currently showing a
    projection, not real recorded spend - shown right on the chart itself
    (not just in a tooltip someone has to hover to see), same reasoning as
    the toggle above having its own colour. */
 .forecastBadge { display: inline-flex; align-items: center; gap: 0.3rem; font-family: var(--font-mono); font-size: 0.68rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--blue); background: var(--blue-tint); border-radius: 20px; padding: 0.2rem 0.55rem; }
-.forecastBasis { font-size: 0.78rem; color: var(--ink-soft); margin-top: 0.4rem; }
-
-.budgetCard { background: var(--paper); border: 1px solid var(--line); border-radius: var(--radius-lg); box-shadow: var(--shadow-card); padding: 1rem 1.2rem; margin-bottom: 1.4rem; }
-.budgetCardOver { border-color: var(--verdict-red); }
-.budgetCardWarning { border-color: var(--amber-ink); }
-.budgetCardTitle { font-family: var(--font-display); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.6rem; color: var(--asphalt); }
-.budgetCardAmounts { font-family: var(--font-mono); font-size: 1.05rem; margin-bottom: 0.5rem; }
-.budgetBar { height: 10px; background: var(--stone); border-radius: 5px; overflow: hidden; margin-bottom: 0.5rem; }
-.budgetBarFill { height: 100%; border-radius: 5px; }
-.budgetBarFillOk { background: var(--verdict-green); }
-.budgetBarFillWarning { background: var(--amber); }
-.budgetBarFillOver { background: var(--verdict-red); }
-.budgetCardStatus { font-size: 0.85rem; color: var(--ink-soft); }
 /* Same blue the Forecast toggle/badge use elsewhere (see
    .forecastToggleGroup) - this line is a projection too, just inline in
    the budget card rather than its own chart, so it gets the same
    "this is forward-looking, not what's already happened" colour cue. */
-.budgetProjection { font-size: 0.82rem; color: var(--blue); margin-top: 0.4rem; }
-
 .budgetWarningBanner { background: #f8e2dd; border: 2px solid var(--verdict-red); border-radius: 6px; padding: 0.9rem 1.1rem; margin-bottom: 1.3rem; font-size: 0.9rem; color: #7a251b; }
-
 .dashboardTopBar { display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; flex-wrap: wrap; }
-.mileageEditForm { display: flex; gap: 0.4rem; align-items: center; flex-wrap: wrap; }
-.mileageEditInput { width: 110px; padding: 0.4rem 0.5rem; font-family: var(--font-mono); border: 1px solid var(--border); border-radius: 4px; }
-
 /* --- Sidebar shell layout: replaces the old tab-bar dashboard structure --- */
-.shell {
-  display: flex;
-  min-height: 100vh;
-  background: var(--stone);
-}
-
-.sidebar {
-  width: 260px;
-  flex-shrink: 0;
-  background: var(--asphalt);
-  color: rgba(255, 255, 255, 0.92);
-  border-right: 1px solid rgba(255, 255, 255, 0.08);
-  display: flex;
-  flex-direction: column;
-  padding: 1.5rem 1.2rem;
-  position: sticky;
-  top: 0;
-  height: 100vh;
-  overflow-y: auto;
-}
-
 /* The white-card bridge-fix is no longer needed - logo-dark.png is a
    real asset with the mark and wordmark already rendered correctly for
    a dark background, so it's used directly rather than worked around. */
-.sidebarLogo { margin-bottom: 2rem; text-align: center; }
-.sidebarLogo img { width: 150px; display: block; margin: 0 auto; }
-
-.sidebarNav { display: flex; flex-direction: column; gap: 0.2rem; flex: 1; }
-
-.sidebarNavItem {
-  display: flex; align-items: center; gap: 0.7rem;
-  padding: 0.65rem 0.8rem; border-radius: var(--radius-sm);
-  font-family: var(--font-display); font-size: 0.9rem;
-  color: rgba(255, 255, 255, 0.95); background: none;
-  border: 1.5px solid transparent;
-  text-align: left; cursor: pointer; width: 100%;
-}
-.sidebarNavItem:hover { background: var(--asphalt-2); }
-.sidebarNavItemActive {
-  background: var(--asphalt-2);
-  color: var(--amber);
-  font-weight: 600;
-  border: 1.5px solid var(--amber);
-}
-.sidebarNavItemActive:hover { background: var(--asphalt-2); }
-
 /* width/height removed - was fixed at 26px for the old PNG icons and
    would silently override the new Icon component's own size prop
    (CSS wins over an SVG's size attribute for rendered dimensions),
    so the two need to agree rather than fight. Icon's own default
    (18px) is now the single source of truth; object-fit is a no-op on
    an SVG component and was only ever relevant for the old <img> tags. */
-.navIcon {
-  vertical-align: middle;
-  flex-shrink: 0;
-}
-
 /* Sidebar nav groups (DashboardShell.tsx's NAV_GROUPS) - a collapsible
    category header, sitting alongside the plain .sidebarNavItem buttons
    for Dashboard/Reminders/Security, with its own items indented
    underneath when expanded. */
-.sidebarNavGroup { display: flex; flex-direction: column; }
-.sidebarNavGroupHeader {
-  display: flex; align-items: center; gap: 0.7rem;
-  padding: 0.65rem 0.8rem; border-radius: var(--radius-sm);
-  font-family: var(--font-display); font-size: 0.9rem;
-  color: rgba(255, 255, 255, 0.75); background: none;
-  border: 1.5px solid transparent;
-  text-align: left; cursor: pointer; width: 100%;
-}
-.sidebarNavGroupHeader:hover { background: var(--asphalt-2); }
-.sidebarNavGroupHeader span { flex: 1; }
-.navChevron { margin-left: auto; opacity: 0.6; }
-.sidebarNavGroupItems { display: flex; flex-direction: column; gap: 0.2rem; }
-.sidebarNavItemIndented { padding-left: 1.9rem; }
-.sidebarNavEmptyGroupNote {
-  padding: 0.3rem 0.8rem 0.5rem 1.9rem;
-  font-size: 0.78rem; color: rgba(255, 255, 255, 0.45);
-}
-
 /* Same collapsible-group treatment inside the mobile More sheet - light
    background here (unlike the dark sidebar above), so its own colours
    are set separately rather than shared with .sidebarNavGroupHeader. */
-.mobileMoreSheetGroup { display: flex; flex-direction: column; }
-.mobileMoreSheetGroupHeader {
-  display: flex; align-items: center; gap: 0.5rem; width: 100%;
-  padding: 0.6rem 0; border: none; border-bottom: 1px solid var(--border);
-  background: none; font-size: 0.85rem; color: var(--ink);
-  text-align: left; cursor: pointer;
-}
-.mobileMoreSheetGroupHeader span { flex: 1; }
-
 /* Heading at the top of a bottom-bar group's own shelf (Logbook/
    Insights/Selling) - the group's own bottom-bar icon+label already
    established the context, this is just a small confirmation, not
    interactive like the group headers above. */
-.mobileMoreSheetShelfTitle {
-  font-family: var(--font-mono); font-size: 0.7rem; text-transform: uppercase;
-  letter-spacing: 0.04em; color: var(--ink-soft); margin-bottom: 0.5rem;
-}
-
 .sidebarBikeCard { border-top: 1px solid rgba(255, 255, 255, 0.12); padding-top: 1rem; margin-top: 1rem; font-size: 0.85rem; position: relative; }
 .sidebarBikeLabel { font-family: var(--font-mono); font-size: 0.65rem; text-transform: uppercase; color: rgba(255, 255, 255, 0.5); margin-bottom: 0.3rem; }
 .sidebarBikeName { font-weight: 600; }
@@ -775,19 +443,9 @@
 .bikeSwitcherManageLink:hover { background: var(--stone); }
 .bikeSwitcherManageLinkInline { display: inline-block; font-size: 0.78rem; color: var(--amber-ink); text-decoration: none; }
 .bikeSwitcherManageLinkInline:hover { text-decoration: underline; }
-
-.sidebarUserFooter { border-top: 1px solid rgba(255, 255, 255, 0.12); padding-top: 1rem; margin-top: 1rem; display: flex; align-items: center; gap: 0.6rem; }
 .sidebarUserAvatar { width: 28px; height: 28px; border-radius: 50%; background: var(--amber); color: var(--asphalt); display: flex; align-items: center; justify-content: center; font-size: 0.7rem; font-weight: 600; flex-shrink: 0; }
-.sidebarUserEmail { font-size: 0.75rem; color: rgba(255, 255, 255, 0.55); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-
 .sidebarFooterNote { margin-top: 0.8rem; padding-top: 0.6rem; border-top: 1px solid rgba(255, 255, 255, 0.12); font-size: 0.68rem; line-height: 1.5; color: rgba(255, 255, 255, 0.45); }
 .sidebarFooterNote a { color: rgba(255, 255, 255, 0.65); }
-
-.mobileMoreFooterNote { margin-top: 0.8rem; padding-top: 0.6rem; border-top: 1px solid var(--border); font-size: 0.68rem; line-height: 1.5; color: var(--ink-soft); }
-
-.contentFooterNote { text-align: center; padding: 2.5rem 1rem 1rem; font-size: 0.8rem; color: var(--ink-soft); }
-.contentFooterNote a { color: var(--ink-soft); }
-
 /* Scoped overrides for the shared button styles when they render inside
    the dark sidebar (mileage/refresh/logout/reset buttons) - covers both
    possible class conventions those buttons use (styles.iconBtn is
@@ -824,79 +482,14 @@
   border-color: var(--amber);
   color: var(--amber);
 }
-
 /* Content area - deliberately NO max-width, fills whatever space the sidebar doesn't take.
    position: relative so tabLoadingOverlay below can cover exactly this box, not the viewport. */
-.content { flex: 1; min-width: 0; padding: 2.5rem 3rem 4rem; position: relative; }
-
 /* Shown while a tab switch's navigation is in flight (see DashboardShell.tsx's
    own pendingTab) - covers just the content area, not the sidebar, since the
    sidebar itself stays interactive throughout a same-page ?tab=... transition.
    Same delayed-fade-in idea as NavigationLoadingOverlay.module.css: a switch
    that lands almost instantly (already prefetched, or served from the Router
    Cache) should never flash this at all. */
-.tabLoadingOverlay {
-  position: absolute;
-  inset: 0;
-  z-index: 5;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(23, 24, 27, 0.28);
-  animation: tabLoadingFadeIn 0.4s ease-in 0.15s both;
-}
-.tabLoadingCard {
-  background: var(--paper);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-pop);
-  padding: 1.4rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-@keyframes tabLoadingFadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-@media (prefers-reduced-motion: reduce) {
-  .tabLoadingOverlay { animation: none; }
-}
-
-.mobileBottomNav { display: none; }
-
-@media (max-width: 900px) {
-  .sidebar { display: none; }
-  .content { padding: 1.2rem 1rem 5rem; }
-  .mobileBottomNav {
-    display: flex; position: fixed; bottom: 0; left: 0; right: 0;
-    background: var(--paper); border-top: 1px solid var(--border);
-    justify-content: space-around; padding: 0.6rem 0; z-index: 50;
-  }
-}
-
-.dashboardStatsGrid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 0.8rem; margin-bottom: 1.2rem; }
-.dashboardTwoCol { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem; }
-@media (max-width: 1100px) {
-  .dashboardStatsGrid { grid-template-columns: repeat(2, 1fr); }
-  .dashboardTwoCol { grid-template-columns: 1fr; }
-}
-
-.recentActivityTable { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
-.recentActivityTable th, .recentActivityTable td { text-align: left; padding: 0.5rem 0.6rem; border-bottom: 1px solid var(--border); }
-.recentActivityTable th { font-family: var(--font-mono); font-size: 0.65rem; text-transform: uppercase; color: var(--ink-soft); }
-.recentActivityRow { cursor: pointer; }
-.recentActivityRow:hover { background: var(--stone); }
-.activityIconTile {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 22px;
-  height: 22px;
-  border-radius: var(--radius-sm);
-  vertical-align: middle;
-  margin-right: 0.4rem;
-}
-
 .headerMileagePill {
   display: inline-flex;
   align-items: center;
@@ -912,45 +505,10 @@
   box-shadow: var(--shadow-card);
   flex-shrink: 0;
 }
-
-.reportsGrid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
-@media (max-width: 1100px) { .reportsGrid { grid-template-columns: 1fr; } }
-
 /* --- Fix: shell must own the full viewport, not sit inside the site's
    marketing-page <main> (which still caps width at 900px and centres
    it). position:fixed detaches it from that ancestor entirely and
    visually covers the old site header too. --- */
-.shell {
-  position: fixed;
-  inset: 0;
-  z-index: 30;
-  display: flex;
-  background: var(--stone);
-}
-
-.sidebar {
-  width: 260px;
-  flex-shrink: 0;
-  background: var(--asphalt);
-  border-right: 1px solid rgba(255, 255, 255, 0.08);
-  display: flex;
-  flex-direction: column;
-  padding: 1.5rem 1.2rem;
-  height: 100%;
-  overflow-y: auto;
-}
-
-.content {
-  flex: 1;
-  min-width: 0;
-  height: 100%;
-  overflow-y: auto;
-  padding: 2.5rem 3rem 4rem;
-}
-
-.mobileTopBar { display: none; }
-.mobileMoreSheet { display: none; }
-
 @media (max-width: 900px) {
   .sidebar { display: none; }
   .content { padding: 1rem 1rem 5rem; height: calc(100% - 56px); }
@@ -990,15 +548,9 @@
     display: block; position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 35;
   }
 }
-
 /* Fix: on mobile, .shell must stack vertically (top bar above content) -
    it was still using the default row direction, squeezing content
    sideways instead of showing it below the bike-info bar. */
-@media (max-width: 900px) {
-  .shell { flex-direction: column; }
-  .content { height: auto; flex: 1; }
-}
-
 /* Fix: only the Budget/Donut row needs the fixed equal-height square
    treatment - applying it to every .dashboardTwoCol chart card also
    hit the Mileage/Recent-Activity row, where the activity table
@@ -1014,14 +566,12 @@
   flex: 1;
   min-height: 0;
 }
-
 /* Safety net for every other two-column row: never silently overflow
    onto the next section again - scroll internally instead. */
 .dashboardTwoCol > .chartCard {
   max-height: 460px;
   overflow-y: auto;
 }
-
 /* --- Review queue modal (scan receipt follow-up) --- */
 .reviewQueueOverlay {
   position: fixed;
@@ -1044,36 +594,11 @@
   box-shadow: var(--shadow-pop);
   padding: 1.4rem 1.5rem;
 }
-.reviewQueueFilmstrip {
-  display: flex;
-  gap: 6px;
-  margin-bottom: 0.8rem;
-}
-.reviewQueueFilmstripItem {
-  flex: 1;
-  height: 5px;
-  border-radius: 3px;
-  background: var(--stone);
-}
 .reviewQueueFilmstripItem.reviewQueueFilmstripActive {
   background: var(--amber);
 }
 .reviewQueueFilmstripItem.reviewQueueFilmstripDone {
   background: var(--verdict-green);
-}
-.reviewQueueProgress {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  font-family: var(--font-display);
-  font-size: 0.95rem;
-  margin-bottom: 1rem;
-}
-.reviewQueueReceipt {
-  display: flex;
-  gap: 0.8rem;
-  align-items: flex-start;
-  margin-bottom: 0.9rem;
 }
 .reviewQueueThumb {
   width: 52px;
@@ -1085,23 +610,6 @@
   align-items: center;
   justify-content: center;
   font-size: 1.4rem;
-}
-.reviewQueueCategoryBadge {
-  display: inline-block;
-  font-family: var(--font-mono);
-  font-size: 0.7rem;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  background: var(--stone);
-  color: var(--asphalt);
-  padding: 0.15rem 0.5rem;
-  border-radius: 3px;
-  margin-bottom: 0.3rem;
-}
-.reviewQueueAiDescription {
-  font-size: 0.88rem;
-  color: var(--ink-soft);
-  margin: 0;
 }
 .reviewQueueDuplicateWarning {
   background: #fdeceb;
@@ -1115,36 +623,11 @@
 .reviewQueueDuplicateWarning p {
   margin: 0 0 0.5rem;
 }
-.reviewQueueFooterRow {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-top: 1.2rem;
-  flex-wrap: wrap;
-  gap: 0.6rem;
-}
-.reviewQueueFinishLater {
-  background: none;
-  border: none;
-  font-size: 0.85rem;
-  color: var(--ink-soft);
-  text-decoration: underline;
-  cursor: pointer;
-  padding: 0;
-}
-.reviewQueueDoneWrap {
-  text-align: center;
-  padding: 1.5rem 0;
-}
 .reviewQueueDoneTitle {
   font-family: var(--font-display);
   font-size: 1.2rem;
   margin: 0 0 0.4rem;
 }
-
-
-
-
 /* UK number-plate styling for the add-bike registration input - matches
    the real rear-plate look (yellow, black bold text, black border,
    subtly rounded corners) so it reads unmistakably as "type a plate
@@ -1165,7 +648,6 @@
 .regPlateInput::placeholder {
   color: rgba(0, 0, 0, 0.45);
 }
-
 /* Pro feature gate */
 .proGate {
   border: 2px dashed var(--amber);
@@ -1207,175 +689,10 @@
   max-width: 460px;
   margin: 0;
 }
-
 /* --- AI Receipt Scan Card ------------------------------------------- */
-
-.scanCard {
-  background: var(--paper);
-  border: 1.5px solid var(--line);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-card);
-  padding: 1.4rem 1.5rem;
-  margin-bottom: 1.2rem;
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-}
-
 /* Resume banner */
-.scanResumeBanner {
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
-  background: var(--amber-tint);
-  border: 1px solid var(--amber);
-  border-radius: var(--radius-sm);
-  padding: 0.6rem 0.9rem;
-  font-size: 0.85rem;
-  flex-wrap: wrap;
-}
-.scanResumeBtn {
-  background: var(--amber);
-  color: #000;
-  border: none;
-  border-radius: 6px;
-  padding: 0.3rem 0.8rem;
-  font-weight: 700;
-  font-size: 0.82rem;
-  cursor: pointer;
-  margin-left: auto;
-}
-.scanDiscardBtn {
-  background: none;
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  padding: 0.3rem 0.8rem;
-  font-size: 0.82rem;
-  color: var(--ink-soft);
-  cursor: pointer;
-}
-
 /* Header */
-.scanCardHeader { display: flex; flex-direction: column; gap: 0.3rem; }
-.scanCardTitleRow {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-.scanCardIcon { color: var(--amber); display: flex; }
-.scanCardTitle {
-  font-family: var(--font-display);
-  font-size: 1.2rem;
-  margin: 0;
-  line-height: 1.2;
-}
-.scanAiBadge {
-  background: var(--asphalt);
-  color: var(--amber);
-  font-size: 0.65rem;
-  font-weight: 800;
-  letter-spacing: 0.1em;
-  padding: 0.15rem 0.45rem;
-  border-radius: 4px;
-  font-family: var(--font-mono);
-}
-.scanCardSubtitle {
-  font-size: 0.9rem;
-  color: var(--ink-soft);
-  margin: 0;
-}
-
 /* Three-step flow */
-.scanSteps {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  flex-wrap: wrap;
-}
-.scanStep {
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-  background: var(--stone);
-  border-radius: 6px;
-  padding: 0.35rem 0.7rem;
-  font-size: 0.82rem;
-}
-.scanStepNum {
-  background: var(--amber);
-  color: #000;
-  width: 18px;
-  height: 18px;
-  border-radius: 50%;
-  font-size: 0.72rem;
-  font-weight: 800;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-.scanStepLabel { color: var(--ink); font-weight: 500; }
-.scanStepArrow { color: var(--ink-soft); font-size: 0.85rem; }
-
 /* Upload zone */
-.scanUploadZone {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-.scanUploadLabel {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-  background: var(--amber);
-  color: var(--asphalt);
-  font-weight: 700;
-  font-size: 0.92rem;
-  padding: 0.65rem 1.2rem;
-  border-radius: var(--radius-lg);
-  cursor: pointer;
-  width: fit-content;
-  box-shadow: var(--shadow-card);
-  transition: background 0.15s;
-}
-.scanUploadLabel:hover { background: var(--amber-dark); }
-.scanFileInput {
-  /* Hidden - the label acts as the trigger */
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  opacity: 0;
-  overflow: hidden;
-}
-.scanProgress {
-  font-size: 0.85rem;
-  color: var(--ink-soft);
-  margin: 0;
-}
-
 /* Free plan nudge */
-.scanFreeNote {
-  font-size: 0.82rem;
-  color: var(--ink-soft);
-  margin: 0;
-}
-.scanFreeLink {
-  color: var(--amber-ink);
-  font-weight: 600;
-  text-decoration: none;
-}
-.scanFreeLink:hover { text-decoration: underline; }
-
 /* Outcomes */
-.scanOutcomes { display: flex; flex-direction: column; gap: 0.4rem; }
-.scanSkipNote {
-  font-size: 0.82rem;
-  color: var(--amber-ink);
-  margin: 0;
-}
-.scanFailBlock { margin-top: 0.2rem; }
-.scanFailList {
-  margin: 0.3rem 0 0 1.1rem;
-  font-size: 0.82rem;
-  color: var(--ink-soft);
-}

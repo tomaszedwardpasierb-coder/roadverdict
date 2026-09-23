@@ -9,7 +9,7 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { ChartFilterBar } from "@/app/dashboard/ChartFilterBar";
 import { ChartFilterProvider, useChartFilter } from "@/app/dashboard/ChartFilterContext";
-import styles from "@/app/dashboard/dashboard.module.css";
+import styles from "@/app/dashboard/ChartFilterBar.module.css";
 
 function RangeObserver() {
   const { range, viewBy } = useChartFilter();

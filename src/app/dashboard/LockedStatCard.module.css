@@ -1,0 +1,17 @@
+
+
+.statCardLocked {
+  display: block;
+  text-decoration: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.statCardLocked:hover { border-color: var(--amber); box-shadow: var(--shadow-pop); }
+.statCardLockedValue {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-family: var(--font-display);
+  font-size: 1rem;
+  color: var(--amber-ink);
+  line-height: 1.1;
+}

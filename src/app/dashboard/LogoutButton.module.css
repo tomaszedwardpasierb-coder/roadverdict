@@ -1,0 +1,23 @@
+
+
+.logoutButton {
+  font-family: var(--font-display);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 8px 14px;
+  font-size: 0.85rem;
+  color: var(--asphalt);
+  background: var(--paper);
+  border: 1px solid var(--asphalt);
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.logoutButton:hover:not(:disabled) {
+  background: var(--amber);
+}
+
+.logoutButton:disabled {
+  opacity: 0.6;
+  cursor: default;
+}

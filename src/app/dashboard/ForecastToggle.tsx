@@ -2,7 +2,7 @@
 'use client';
 
 import { useChartFilter } from './ChartFilterContext';
-import styles from './dashboard.module.css';
+import styles from './ForecastToggle.module.css';
 
 // Deliberately its own control, separate from the range/window tabs -
 // see .forecastToggleGroup's own CSS comment for why. Switching into

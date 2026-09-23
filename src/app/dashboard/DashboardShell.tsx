@@ -17,6 +17,7 @@ import { ResetDemoButton } from './ResetDemoButton';
 import { DEMO_EMAIL } from '@/lib/tracker/demoSeed';
 import { Icon, type IconName } from './Icon';
 import styles from './dashboard.module.css';
+import ownStyles from './DashboardShell.module.css';
 import type { Section } from './sections';
 
 // Same safety-net idea as NavigationLoadingOverlay.tsx's own
@@ -229,7 +230,7 @@ function RequestDot() {
 }
 
 function ReadyDot() {
-  return <span className={styles.navReadyBadge} aria-label="Enough logged history for a worthwhile story" />;
+  return <span className={ownStyles.navReadyBadge} aria-label="Enough logged history for a worthwhile story" />;
 }
 
 export function DashboardShell({
@@ -435,9 +436,9 @@ export function DashboardShell({
         onTouchStart={() => prefetchTab(item.key)}
       >
         {pendingTab === item.key ? (
-          <VehicleSpinner kind={vehicleKind} size={18} className={styles.navIcon} />
+          <VehicleSpinner kind={vehicleKind} size={18} className={ownStyles.navIcon} />
         ) : (
-          <Icon name={item.icon} className={styles.navIcon} />
+          <Icon name={item.icon} className={ownStyles.navIcon} />
         )}
         <span>{navLabelFor(item)}</span>
         {itemHasPending(item) && <PendingDot />}
@@ -536,44 +537,44 @@ export function DashboardShell({
 
   return (
     <TabSwitchProvider onSwitchTab={(cat) => goToTab(cat)}>
-      <div className={styles.shell}>
-        <aside className={styles.sidebar}>
-          <div className={styles.sidebarLogo}>
+      <div className={ownStyles.shell}>
+        <aside className={ownStyles.sidebar}>
+          <div className={ownStyles.sidebarLogo}>
             <Link href="/">
               <img src="/logo-dark.png" alt="RoadVerdict" />
             </Link>
           </div>
 
-          <nav className={styles.sidebarNav}>
+          <nav className={ownStyles.sidebarNav}>
             {renderNavButton(
               STANDALONE_ITEMS[0], // Dashboard - always first
-              `${styles.sidebarNavItem} ${active === 'dashboard' ? styles.sidebarNavItemActive : ''}`
+              `${ownStyles.sidebarNavItem} ${active === 'dashboard' ? ownStyles.sidebarNavItemActive : ''}`
             )}
             {NAV_GROUPS.map((group) => {
               const visibleItems = availableFor(vehicleKind, group.items);
               const expanded = isGroupExpanded(group);
               return (
-                <div key={group.groupKey} className={styles.sidebarNavGroup}>
+                <div key={group.groupKey} className={ownStyles.sidebarNavGroup}>
                   <button
                     type="button"
-                    className={styles.sidebarNavGroupHeader}
+                    className={ownStyles.sidebarNavGroupHeader}
                     aria-expanded={expanded}
                     onClick={() => toggleGroup(group.groupKey)}
                   >
-                    <Icon name={group.groupIcon} className={styles.navIcon} />
+                    <Icon name={group.groupIcon} className={ownStyles.navIcon} />
                     <span>{group.groupLabel}</span>
                     {groupHasSignal(visibleItems) && <PendingDot />}
-                    <Icon name={expanded ? 'chevronDown' : 'chevronRight'} className={styles.navChevron} />
+                    <Icon name={expanded ? 'chevronDown' : 'chevronRight'} className={ownStyles.navChevron} />
                   </button>
                   {expanded && (
-                    <div className={styles.sidebarNavGroupItems}>
+                    <div className={ownStyles.sidebarNavGroupItems}>
                       {visibleItems.length === 0 ? (
-                        <p className={styles.sidebarNavEmptyGroupNote}>Not available for cars yet.</p>
+                        <p className={ownStyles.sidebarNavEmptyGroupNote}>Not available for cars yet.</p>
                       ) : (
                         visibleItems.map((item) =>
                           renderNavButton(
                             item,
-                            `${styles.sidebarNavItem} ${styles.sidebarNavItemIndented} ${active === item.key ? styles.sidebarNavItemActive : ''}`
+                            `${ownStyles.sidebarNavItem} ${ownStyles.sidebarNavItemIndented} ${active === item.key ? ownStyles.sidebarNavItemActive : ''}`
                           )
                         )
                       )}
@@ -583,7 +584,7 @@ export function DashboardShell({
               );
             })}
             {STANDALONE_ITEMS.slice(1).map((item) =>
-              renderNavButton(item, `${styles.sidebarNavItem} ${active === item.key ? styles.sidebarNavItemActive : ''}`)
+              renderNavButton(item, `${ownStyles.sidebarNavItem} ${active === item.key ? ownStyles.sidebarNavItemActive : ''}`)
             )}
           </nav>
 
@@ -599,14 +600,14 @@ export function DashboardShell({
             )}
           </div>
 
-          <div className={styles.sidebarUserFooter}>
+          <div className={ownStyles.sidebarUserFooter}>
             {hasAvatar ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img src="/api/account/avatar" alt="Your avatar" width={32} height={32} style={{ borderRadius: '50%', objectFit: 'cover', width: '32px', height: '32px' }} />
             ) : (
               <div className={styles.sidebarUserAvatar}>{(displayName || userEmail).slice(0, 2).toUpperCase()}</div>
             )}
-            <div className={styles.sidebarUserEmail}>{displayName || userEmail}</div>
+            <div className={ownStyles.sidebarUserEmail}>{displayName || userEmail}</div>
             {isPro && (
               <span className={styles.proGateBadge} style={{ marginLeft: '0.4rem' }}>
                 Premium
@@ -615,7 +616,7 @@ export function DashboardShell({
           </div>
           {isPro && proDaysRemaining != null && (
             <div
-              className={styles.sidebarUserEmail}
+              className={ownStyles.sidebarUserEmail}
               style={{ marginTop: '0.2rem', color: proDaysRemaining <= 7 ? 'var(--amber-ink)' : undefined }}
             >
               {proDaysRemaining} day{proDaysRemaining === 1 ? '' : 's'} left
@@ -632,23 +633,23 @@ export function DashboardShell({
           <div style={{ marginTop: '0.8rem', borderTop: '1px solid rgba(255, 255, 255, 0.12)', paddingTop: '0.6rem' }}>
             <button
               type="button"
-              className={`${styles.sidebarNavItem} ${active === 'privacy' ? styles.sidebarNavItemActive : ''}`}
+              className={`${ownStyles.sidebarNavItem} ${active === 'privacy' ? ownStyles.sidebarNavItemActive : ''}`}
               onClick={() => goToTab('privacy')}
               onMouseEnter={() => prefetchTab('privacy')}
               onFocus={() => prefetchTab('privacy')}
               onTouchStart={() => prefetchTab('privacy')}
             >
               {pendingTab === 'privacy' ? (
-                <VehicleSpinner kind={vehicleKind} size={18} className={styles.navIcon} />
+                <VehicleSpinner kind={vehicleKind} size={18} className={ownStyles.navIcon} />
               ) : (
-                <Icon name="privacy" className={styles.navIcon} />
+                <Icon name="privacy" className={ownStyles.navIcon} />
               )}
               <span>Privacy</span>
             </button>
           </div>
         </aside>
 
-        <div className={styles.mobileTopBar}>
+        <div className={ownStyles.mobileTopBar}>
           <div className={styles.mobileTopBarBike}>
             <strong>{vehicleName}</strong>
             <span>
@@ -658,7 +659,7 @@ export function DashboardShell({
           <UpdateMileageButton currentMileage={currentMileage} distanceUnit={distanceUnit} vehicleKind={vehicleKind} />
         </div>
 
-        <div className={styles.content}>
+        <div className={ownStyles.content}>
           {pendingDeletion && (
             <div className={styles.budgetWarningBanner} style={{ marginBottom: '1.3rem' }}>
               ⚠ <strong>Pending deletion</strong> - your account will be permanently deleted in{' '}
@@ -679,8 +680,8 @@ export function DashboardShell({
             </div>
           ))}
           {pendingTab && (
-            <div className={styles.tabLoadingOverlay}>
-              <div className={styles.tabLoadingCard}>
+            <div className={ownStyles.tabLoadingOverlay}>
+              <div className={ownStyles.tabLoadingCard}>
                 <VehicleSpinner kind={vehicleKind} size={40} decorative={false} label="Loading tab" />
               </div>
             </div>
@@ -692,14 +693,14 @@ export function DashboardShell({
               scrollable region - see the sidebarFooterNote/
               mobileMoreFooterNote comments above for why the public
               site's own <footer> can't be scrolled to from in here). */}
-          <div className={styles.contentFooterNote}>
+          <div className={ownStyles.contentFooterNote}>
             RoadVerdict is guidance benchmarked against typical prices, not a professional inspection.{' '}
             <Link href="/privacy">Privacy</Link> · <Link href="/about">About us</Link> ·{' '}
             <a href="mailto:hello@roadverdict.co.uk">hello@roadverdict.co.uk</a>
           </div>
         </div>
 
-        <nav data-mobile-bottom-nav className={styles.mobileBottomNav}>
+        <nav data-mobile-bottom-nav className={ownStyles.mobileBottomNav}>
           <button
             type="button"
             onClick={() => {
@@ -717,9 +718,9 @@ export function DashboardShell({
             }}
           >
             {pendingTab === 'dashboard' ? (
-              <VehicleSpinner kind={vehicleKind} size={18} className={styles.navIcon} />
+              <VehicleSpinner kind={vehicleKind} size={18} className={ownStyles.navIcon} />
             ) : (
-              <Icon name="dashboard" className={styles.navIcon} />
+              <Icon name="dashboard" className={ownStyles.navIcon} />
             )}
             Dashboard
           </button>
@@ -739,7 +740,7 @@ export function DashboardShell({
                   position: 'relative',
                 }}
               >
-                <Icon name={group.groupIcon} className={styles.navIcon} />
+                <Icon name={group.groupIcon} className={ownStyles.navIcon} />
                 {group.groupLabel}
                 {groupHasSignal(visibleItems) && (
                   <span style={{ position: 'absolute', top: 0, right: '30%' }}>
@@ -781,10 +782,10 @@ export function DashboardShell({
           return (
             <>
               <div className={styles.mobileMoreSheetBackdrop} onClick={() => setOpenMobileSheet(null)} />
-              <div className={styles.mobileMoreSheet}>
-                <div className={styles.mobileMoreSheetShelfTitle}>{group.groupLabel}</div>
+              <div className={ownStyles.mobileMoreSheet}>
+                <div className={ownStyles.mobileMoreSheetShelfTitle}>{group.groupLabel}</div>
                 {visibleItems.length === 0 ? (
-                  <p className={styles.sidebarNavEmptyGroupNote}>Not available for cars yet.</p>
+                  <p className={ownStyles.sidebarNavEmptyGroupNote}>Not available for cars yet.</p>
                 ) : (
                   visibleItems.map((item) => renderNavButton(item, styles.mobileMoreSheetItem, () => setOpenMobileSheet(null)))
                 )}
@@ -796,7 +797,7 @@ export function DashboardShell({
         {openMobileSheet === 'more' && (
           <>
             <div className={styles.mobileMoreSheetBackdrop} onClick={() => setOpenMobileSheet(null)} />
-            <div className={styles.mobileMoreSheet}>
+            <div className={ownStyles.mobileMoreSheet}>
               {STANDALONE_ITEMS.filter((item) => item.key !== 'dashboard').map((item) =>
                 renderNavButton(item, styles.mobileMoreSheetItem, () => setOpenMobileSheet(null))
               )}
@@ -804,24 +805,24 @@ export function DashboardShell({
                 const visibleItems = availableFor(vehicleKind, group.items);
                 const expanded = isGroupExpanded(group);
                 return (
-                  <div key={group.groupKey} className={styles.mobileMoreSheetGroup}>
+                  <div key={group.groupKey} className={ownStyles.mobileMoreSheetGroup}>
                     <button
                       type="button"
-                      className={styles.mobileMoreSheetGroupHeader}
+                      className={ownStyles.mobileMoreSheetGroupHeader}
                       aria-expanded={expanded}
                       onClick={() => toggleGroup(group.groupKey)}
                     >
-                      <Icon name={group.groupIcon} className={styles.navIcon} />
+                      <Icon name={group.groupIcon} className={ownStyles.navIcon} />
                       <span>{group.groupLabel}</span>
                       {groupHasSignal(visibleItems) && <PendingDot />}
-                      <Icon name={expanded ? 'chevronDown' : 'chevronRight'} className={styles.navChevron} />
+                      <Icon name={expanded ? 'chevronDown' : 'chevronRight'} className={ownStyles.navChevron} />
                     </button>
                     {expanded && (
                       visibleItems.length === 0 ? (
-                        <p className={styles.sidebarNavEmptyGroupNote}>Not available for cars yet.</p>
+                        <p className={ownStyles.sidebarNavEmptyGroupNote}>Not available for cars yet.</p>
                       ) : (
                         visibleItems.map((item) =>
-                          renderNavButton(item, `${styles.mobileMoreSheetItem} ${styles.sidebarNavItemIndented}`, () => setOpenMobileSheet(null))
+                          renderNavButton(item, `${styles.mobileMoreSheetItem} ${ownStyles.sidebarNavItemIndented}`, () => setOpenMobileSheet(null))
                         )
                       )
                     )}
@@ -843,7 +844,7 @@ export function DashboardShell({
               <div style={{ marginTop: '0.5rem' }}>
                 <LogoutButton />
               </div>
-              <div className={styles.mobileMoreFooterNote}>
+              <div className={ownStyles.mobileMoreFooterNote}>
                 RoadVerdict is guidance benchmarked against typical prices, not a professional inspection.{' '}
                 <Link href="/privacy" onClick={() => setOpenMobileSheet(null)}>Privacy</Link> ·{' '}
                 <Link href="/about" onClick={() => setOpenMobileSheet(null)}>About us</Link> ·{' '}

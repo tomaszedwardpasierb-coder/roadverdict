@@ -12,6 +12,7 @@ import type { ForecastWindow, ForecastMonthPoint } from '@/lib/tracker/costForec
 import { Icon } from './Icon';
 import { LockedStatCard } from './LockedStatCard';
 import styles from './dashboard.module.css';
+import ownStyles from './DashboardStatCards.module.css';
 
 interface CostItem {
   date: string;
@@ -169,10 +170,10 @@ export function DashboardStatCards({
   return (
     <>
       <div className={styles.statCard}>
-        <div className={`${styles.statCardIcon} ${showingForecast ? styles.statCardIconForecast : styles.statCardIconNeutral}`}>
+        <div className={`${styles.statCardIcon} ${showingForecast ? ownStyles.statCardIconForecast : styles.statCardIconNeutral}`}>
           <Icon name="totalSpend" size={16} />
         </div>
-        <div className={`${styles.statCardValue} ${showingForecast ? styles.statCardValueForecast : ''}`}>
+        <div className={`${ownStyles.statCardValue} ${showingForecast ? ownStyles.statCardValueForecast : ''}`}>
           {formatCurrency(showingForecast ? projectedSpend! : totalSpend, currency, rates)}
         </div>
         <div className={styles.statCardLabel}>{showingForecast ? 'Projected spend' : 'Total spend'}</div>
@@ -182,7 +183,7 @@ export function DashboardStatCards({
           <div className={`${styles.statCardIcon} ${styles.statCardIconGreen}`}>
             <Icon name="economy" size={16} />
           </div>
-          <div className={styles.statCardValue}>{actualMpg ? formatFuelEconomy(actualMpg, fuelEconomyUnit) : '-'}</div>
+          <div className={ownStyles.statCardValue}>{actualMpg ? formatFuelEconomy(actualMpg, fuelEconomyUnit) : '-'}</div>
           <div className={styles.statCardLabel}>Actual economy</div>
         </div>
       ) : (
@@ -190,10 +191,10 @@ export function DashboardStatCards({
       )}
       {isPro ? (
         <div className={styles.statCard}>
-          <div className={`${styles.statCardIcon} ${showingForecast ? styles.statCardIconForecast : styles.statCardIconAmber}`}>
+          <div className={`${styles.statCardIcon} ${showingForecast ? ownStyles.statCardIconForecast : styles.statCardIconAmber}`}>
             <Icon name="perMile" size={16} />
           </div>
-          <div className={`${styles.statCardValue} ${showingForecast ? styles.statCardValueForecast : ''}`}>
+          <div className={`${ownStyles.statCardValue} ${showingForecast ? ownStyles.statCardValueForecast : ''}`}>
             {showingForecast
               ? costPerMileForecastDisplay == null
                 ? '-'
@@ -212,20 +213,20 @@ export function DashboardStatCards({
         <LockedStatCard icon="perMile" iconClass={styles.statCardIconAmber} label={`Per ${distanceLabelShort}`} />
       )}
       <div className={styles.statCard}>
-        <div className={`${styles.statCardIcon} ${showingForecast ? styles.statCardIconForecast : styles.statCardIconNeutral}`}>
+        <div className={`${styles.statCardIcon} ${showingForecast ? ownStyles.statCardIconForecast : styles.statCardIconNeutral}`}>
           <Icon name="currentMiles" size={16} />
         </div>
-        <div className={`${styles.statCardValue} ${showingForecast ? styles.statCardValueForecast : ''}`}>
+        <div className={`${ownStyles.statCardValue} ${showingForecast ? ownStyles.statCardValueForecast : ''}`}>
           {Math.round(convertMilesToDisplay(showingForecast ? projectedMileage! : currentMileage, distanceUnit)).toLocaleString()}
         </div>
         <div className={styles.statCardLabel}>{showingForecast ? `Projected ${distanceLabel}` : `Current ${distanceLabel}`}</div>
       </div>
       {isPro ? (
         <div className={styles.statCard}>
-          <div className={`${styles.statCardIcon} ${showingYearProjection ? styles.statCardIconForecast : styles.statCardIconNeutral}`}>
+          <div className={`${styles.statCardIcon} ${showingYearProjection ? ownStyles.statCardIconForecast : styles.statCardIconNeutral}`}>
             <Icon name="spendThisYear" size={16} />
           </div>
-          <div className={`${styles.statCardValue} ${showingYearProjection ? styles.statCardValueForecast : ''}`}>
+          <div className={`${ownStyles.statCardValue} ${showingYearProjection ? ownStyles.statCardValueForecast : ''}`}>
             {formatCurrency(showingYearProjection ? yearEndProjection!.projected : yearSpend, currency, rates)}
           </div>
           <div className={styles.statCardLabel}>{showingYearProjection ? `Projected for ${currentYear}` : 'Spend this year'}</div>

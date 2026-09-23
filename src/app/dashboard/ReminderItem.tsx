@@ -8,6 +8,7 @@ import { reminderDetailLabel } from '@/lib/tracker/reminderStatus';
 import { useTrackerFormSubmit } from './useTrackerFormSubmit';
 import { Icon } from './Icon';
 import styles from './dashboard.module.css';
+import ownStyles from './ReminderItem.module.css';
 
 export function ReminderItem({
   reminder,
@@ -33,7 +34,7 @@ export function ReminderItem({
 
   const statusLabel = status === 'ok' ? 'OK' : status === 'due-soon' ? 'Due soon' : 'Overdue';
   const statusClass =
-    status === 'ok' ? styles.reminderStatusOk : status === 'due-soon' ? styles.reminderStatusDueSoon : styles.reminderStatusOverdue;
+    status === 'ok' ? ownStyles.reminderStatusOk : status === 'due-soon' ? ownStyles.reminderStatusDueSoon : ownStyles.reminderStatusOverdue;
 
   async function handleDone() {
     if (reminder.intervalType === 'date') {
@@ -55,19 +56,19 @@ export function ReminderItem({
   if (hidden) return null;
 
   return (
-    <div className={styles.reminderItem}>
+    <div className={ownStyles.reminderItem}>
       <div>
-        <div className={styles.reminderItemName}>{reminder.name}</div>
+        <div className={ownStyles.reminderItemName}>{reminder.name}</div>
         {isPermanent || isPro ? (
-          <div className={styles.reminderItemDetail}>{reminderDetailLabel(reminder)}</div>
+          <div className={ownStyles.reminderItemDetail}>{reminderDetailLabel(reminder)}</div>
         ) : (
-          <div className={styles.reminderItemDetailLocked}>
+          <div className={ownStyles.reminderItemDetailLocked}>
             <Icon name="lock" size={12} /> Exact due date/mileage - Premium
           </div>
         )}
       </div>
-      <div className={styles.reminderItemActions}>
-        <span className={`${styles.reminderStatus} ${statusClass}`}>{statusLabel}</span>
+      <div className={ownStyles.reminderItemActions}>
+        <span className={`${ownStyles.reminderStatus} ${statusClass}`}>{statusLabel}</span>
         {!isPermanent && (
           <>
             <button type="button" className={styles.iconBtn} onClick={handleDone} disabled={submitting}>

@@ -6,6 +6,7 @@ import type { Attachment } from '@/lib/tracker/cosmosHelpers';
 import { fetchWithTimeout, FetchTimeoutError, UPLOAD_TIMEOUT_MS } from '@/lib/fetchWithTimeout';
 import { AttachmentThumb } from './AttachmentThumb';
 import styles from './dashboard.module.css';
+import ownStyles from './AttachmentUploader.module.css';
 
 interface Props {
   value: Attachment | null;
@@ -86,9 +87,9 @@ export function AttachmentUploader({ value, onChange, idSuffix = '', compareValu
     <div className="field" style={{ marginTop: '0.9rem' }}>
       <label htmlFor={inputId}>Receipt or invoice (optional)</label>
       {value ? (
-        <div className={styles.attachmentChip}>
+        <div className={ownStyles.attachmentChip}>
           <AttachmentThumb attachment={value} />
-          <span className={styles.attachmentFileName}>{value.fileName}</span>
+          <span className={ownStyles.attachmentFileName}>{value.fileName}</span>
           <button
             type="button"
             className={styles.iconBtn}

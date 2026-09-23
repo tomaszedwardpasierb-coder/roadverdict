@@ -1,0 +1,64 @@
+
+.reviewQueueFilmstrip {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 0.8rem;
+}
+.reviewQueueFilmstripItem {
+  flex: 1;
+  height: 5px;
+  border-radius: 3px;
+  background: var(--stone);
+}
+.reviewQueueProgress {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-family: var(--font-display);
+  font-size: 0.95rem;
+  margin-bottom: 1rem;
+}
+.reviewQueueReceipt {
+  display: flex;
+  gap: 0.8rem;
+  align-items: flex-start;
+  margin-bottom: 0.9rem;
+}
+.reviewQueueCategoryBadge {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  background: var(--stone);
+  color: var(--asphalt);
+  padding: 0.15rem 0.5rem;
+  border-radius: 3px;
+  margin-bottom: 0.3rem;
+}
+.reviewQueueAiDescription {
+  font-size: 0.88rem;
+  color: var(--ink-soft);
+  margin: 0;
+}
+.reviewQueueFooterRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 1.2rem;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+.reviewQueueFinishLater {
+  background: none;
+  border: none;
+  font-size: 0.85rem;
+  color: var(--ink-soft);
+  text-decoration: underline;
+  cursor: pointer;
+  padding: 0;
+}
+.reviewQueueDoneWrap {
+  text-align: center;
+  padding: 1.5rem 0;
+}

@@ -5,7 +5,7 @@ import { RANGE_OPTIONS } from '@/lib/tracker/dateRange';
 import { FORECAST_WINDOW_OPTIONS } from '@/lib/tracker/costForecast';
 import { useChartFilter, type ViewBy } from './ChartFilterContext';
 import { ForecastToggle } from './ForecastToggle';
-import styles from './dashboard.module.css';
+import styles from './ChartFilterBar.module.css';
 
 const VIEW_BY_OPTIONS: { value: ViewBy; label: string }[] = [
   { value: 'time', label: 'Time' },

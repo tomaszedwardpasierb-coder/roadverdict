@@ -1,0 +1,17 @@
+
+
+.recentActivityTable { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+.recentActivityTable th, .recentActivityTable td { text-align: left; padding: 0.5rem 0.6rem; border-bottom: 1px solid var(--border); }
+.recentActivityTable th { font-family: var(--font-mono); font-size: 0.65rem; text-transform: uppercase; color: var(--ink-soft); }
+.recentActivityRow { cursor: pointer; }
+.recentActivityRow:hover { background: var(--stone); }
+.activityIconTile {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: var(--radius-sm);
+  vertical-align: middle;
+  margin-right: 0.4rem;
+}

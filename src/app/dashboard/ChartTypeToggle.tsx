@@ -2,7 +2,7 @@
 'use client';
 
 import type { ChartKind } from './useChartTypePreference';
-import styles from './dashboard.module.css';
+import styles from './ChartTypeToggle.module.css';
 
 const LABELS: Record<ChartKind, string> = {
   line: 'Line',

@@ -2,6 +2,7 @@
 import { getSession } from "@/lib/auth/session";
 import { redirect } from "next/navigation";
 import styles from "./dashboard.module.css";
+import ownStyles from './page.module.css';
 import LogoutButton from "./LogoutButton";
 import { getBikesForUser, pickActiveBike, getCurrentRegistration, isBikeReadOnly, canRefreshBikeData, nextBikeDataRefreshAt, type BikeDoc } from "@/lib/tracker/bike";
 import { getServiceRecords } from "@/lib/tracker/serviceRecord";
@@ -266,7 +267,7 @@ export default async function DashboardPage(props: { searchParams: Promise<{ add
   // through instead of re-showing the form.
   if (searchParams.addVehicle === "car" && existingCars.length === 0) {
     return (
-      <main className={styles.main}>
+      <main className={ownStyles.main}>
         <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "1rem" }}>
           <LogoutButton />
         </div>
@@ -327,7 +328,7 @@ export default async function DashboardPage(props: { searchParams: Promise<{ add
 
   if (!bike) {
     return (
-      <main className={styles.main}>
+      <main className={ownStyles.main}>
         <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "1rem" }}>
           <LogoutButton />
         </div>
@@ -340,7 +341,7 @@ export default async function DashboardPage(props: { searchParams: Promise<{ add
 
   if (!bike.region) {
     return (
-      <main className={styles.main}>
+      <main className={ownStyles.main}>
         <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "1rem" }}>
           <LogoutButton />
         </div>
@@ -560,7 +561,7 @@ export default async function DashboardPage(props: { searchParams: Promise<{ add
         <UnitSettings distanceUnit={distanceUnit} fuelEconomyUnit={fuelEconomyUnit} currency={currency} />
       </div>
 
-      <div className={styles.dashboardStatsGrid}>
+      <div className={ownStyles.dashboardStatsGrid}>
         <DashboardStatCards
           records={records}
           mods={mods}
@@ -582,7 +583,7 @@ export default async function DashboardPage(props: { searchParams: Promise<{ add
         />
       </div>
 
-      <div className={`${styles.dashboardTwoCol} ${styles.equalHeightRow}`}>
+      <div className={`${ownStyles.dashboardTwoCol} ${styles.equalHeightRow}`}>
         <BudgetWidget yearSpend={yearSpend} currentYear={currentYear} initialBudget={bike.annualBudget} currency={currency} rates={rates} yearEndProjection={yearEndProjection} spendForecastByWindow={spendForecastByWindow} />
         <div className={styles.chartCard}>
           {summary.grandTotal > 0 ? (
@@ -596,7 +597,7 @@ export default async function DashboardPage(props: { searchParams: Promise<{ add
         </div>
       </div>
 
-      <div className={styles.dashboardTwoCol}>
+      <div className={ownStyles.dashboardTwoCol}>
         <div className={styles.chartCard}>
           {mileagePoints.length > 0 ? (
             <MileageChart points={mileagePoints} distanceUnit={distanceUnit} initialChartType={bike.chartTypes?.["mileage"] === "bar" ? "bar" : "line"} forecast={mileageForecastByWindow} />
@@ -634,7 +635,7 @@ export default async function DashboardPage(props: { searchParams: Promise<{ add
       />
       <h2 className={styles.sectionHeading}>Service history</h2>
       {records.length === 0 ? (
-        <div className={styles.card}><p className={styles.cardBody}>No service records logged yet. Log your first one above.</p></div>
+        <div className={styles.card}><p className={ownStyles.cardBody}>No service records logged yet. Log your first one above.</p></div>
       ) : (
         records.map((r) => (
           <ServiceHistoryCard key={r.id} record={r} bikeClass={bike.bikeClass} brandValue={brandValue} region={bike.region as Region} distanceUnit={distanceUnit} currency={currency} rates={rates} pendingReviewIds={pendingReviewIds} mileageHistory={mileagePoints} currentMileage={bike.currentMileage} includeCleaningInReport={Boolean(bike.includeCleaningInReport)} />
@@ -669,7 +670,7 @@ export default async function DashboardPage(props: { searchParams: Promise<{ add
       )}
       <h2 className={styles.sectionHeading}>Fuel log</h2>
       {fuelLogs.length === 0 ? (
-        <div className={styles.card}><p className={styles.cardBody}>No fuel fill-ups logged yet. Log your first one above.</p></div>
+        <div className={styles.card}><p className={ownStyles.cardBody}>No fuel fill-ups logged yet. Log your first one above.</p></div>
       ) : (
         fuelLogs.map((f) => <FuelLogCard key={f.id} log={f} distanceUnit={distanceUnit} currency={currency} rates={rates} pendingReviewIds={pendingReviewIds} mileageHistory={mileagePoints} currentMileage={bike.currentMileage} />)
       )}
@@ -686,7 +687,7 @@ export default async function DashboardPage(props: { searchParams: Promise<{ add
       <LogModForm initialMileage={bike.currentMileage} mileageHistory={mileagePoints} startingMileage={bike.startingMileage} dateAdded={bike.dateAdded} distanceUnit={distanceUnit} currency={currency} rates={rates} bikeYear={bike.year} isCustomBuild={bike.isCustomBuild} />
       <h2 className={styles.sectionHeading}>History</h2>
       {mods.length === 0 ? (
-        <div className={styles.card}><p className={styles.cardBody}>No modifications or accessories logged yet.</p></div>
+        <div className={styles.card}><p className={ownStyles.cardBody}>No modifications or accessories logged yet.</p></div>
       ) : (
         mods.map((m) => <ModCard key={m.id} mod={m} distanceUnit={distanceUnit} currency={currency} rates={rates} pendingReviewIds={pendingReviewIds} mileageHistory={mileagePoints} currentMileage={bike.currentMileage} />)
       )}
@@ -718,7 +719,7 @@ export default async function DashboardPage(props: { searchParams: Promise<{ add
       />
       <h2 className={styles.sectionHeading}>History</h2>
       {bills.length === 0 ? (
-        <div className={styles.card}><p className={styles.cardBody}>No insurance, tax, MOT, or finance payments logged yet.</p></div>
+        <div className={styles.card}><p className={ownStyles.cardBody}>No insurance, tax, MOT, or finance payments logged yet.</p></div>
       ) : (
         bills.map((b) => (
           <BillCard
@@ -753,7 +754,7 @@ export default async function DashboardPage(props: { searchParams: Promise<{ add
       />
       <h2 className={styles.sectionHeading}>History</h2>
       {fines.length === 0 ? (
-        <div className={styles.card}><p className={styles.cardBody}>No fines logged yet.</p></div>
+        <div className={styles.card}><p className={ownStyles.cardBody}>No fines logged yet.</p></div>
       ) : (
         fines.map((f) => (
           <FineCard key={f.id} fine={f} currency={currency} rates={rates} includeFinesInReport={Boolean(bike.includeFinesInReport)} />
@@ -779,7 +780,7 @@ export default async function DashboardPage(props: { searchParams: Promise<{ add
       />
       <h2 className={styles.sectionHeading}>History</h2>
       {tolls.length === 0 ? (
-        <div className={styles.card}><p className={styles.cardBody}>No tolls logged yet.</p></div>
+        <div className={styles.card}><p className={ownStyles.cardBody}>No tolls logged yet.</p></div>
       ) : (
         tolls.map((t) => (
           <TollCard key={t.id} toll={t} currency={currency} rates={rates} includeTollsInReport={Boolean(bike.includeTollsInReport)} />
@@ -798,7 +799,7 @@ export default async function DashboardPage(props: { searchParams: Promise<{ add
       <LogLabourForm initialMileage={bike.currentMileage} mileageHistory={mileagePoints} startingMileage={bike.startingMileage} dateAdded={bike.dateAdded} distanceUnit={distanceUnit} currency={currency} rates={rates} bikeYear={bike.year} isCustomBuild={bike.isCustomBuild} />
       <h2 className={styles.sectionHeading}>History</h2>
       {labour.length === 0 ? (
-        <div className={styles.card}><p className={styles.cardBody}>No labour logged yet.</p></div>
+        <div className={styles.card}><p className={ownStyles.cardBody}>No labour logged yet.</p></div>
       ) : (
         labour.map((l) => <LabourCard key={l.id} labour={l} distanceUnit={distanceUnit} currency={currency} rates={rates} pendingReviewIds={pendingReviewIds} mileageHistory={mileagePoints} currentMileage={bike.currentMileage} />)
       )}
@@ -824,7 +825,7 @@ export default async function DashboardPage(props: { searchParams: Promise<{ add
         </>
       )}
       {reminders.length === 0 ? (
-        <div className={styles.card}><p className={styles.cardBody}>No reminders set yet. Tick &quot;Remind me&quot; when logging a service or a bill to add one.</p></div>
+        <div className={styles.card}><p className={ownStyles.cardBody}>No reminders set yet. Tick &quot;Remind me&quot; when logging a service or a bill to add one.</p></div>
       ) : (
         reminders.map((r) => <ReminderItem key={r.id} reminder={r} status={computeReminderStatus(r, bike.currentMileage)} isPro={userIsPro} />)
       )}
@@ -841,7 +842,7 @@ export default async function DashboardPage(props: { searchParams: Promise<{ add
       <p className={styles.subtext}>Every chart in one place - see where the money&apos;s really going, and whether your bike&apos;s getting thirstier with age.</p>
       <p className={styles.subtext} style={{ marginBottom: "1rem" }}>Every chart in one place.</p>
       <ChartFilterBar />
-      <div className={styles.reportsGrid}>
+      <div className={ownStyles.reportsGrid}>
         <div className={styles.chartCard}>
           {mpgSeries.length > 0 ? (
             <MpgChart
@@ -1319,7 +1320,7 @@ async function renderCarDashboard(
       <div style={{ marginBottom: "1rem" }}>
         <UnitSettings distanceUnit={distanceUnit} fuelEconomyUnit={fuelEconomyUnit} currency={currency} vehicleKind="car" />
       </div>
-      <div className={styles.dashboardStatsGrid}>
+      <div className={ownStyles.dashboardStatsGrid}>
         <DashboardStatCards
           records={records}
           mods={mods}
@@ -1341,7 +1342,7 @@ async function renderCarDashboard(
         />
       </div>
 
-      <div className={`${styles.dashboardTwoCol} ${styles.equalHeightRow}`}>
+      <div className={`${ownStyles.dashboardTwoCol} ${styles.equalHeightRow}`}>
         <BudgetWidget yearSpend={yearSpend} currentYear={currentYear} initialBudget={car.annualBudget} currency={currency} rates={rates} vehicleKind="car" yearEndProjection={yearEndProjection} spendForecastByWindow={spendForecastByWindow} />
         <div className={styles.chartCard}>
           {summary.grandTotal > 0 ? (
@@ -1355,7 +1356,7 @@ async function renderCarDashboard(
         </div>
       </div>
 
-      <div className={styles.dashboardTwoCol}>
+      <div className={ownStyles.dashboardTwoCol}>
         <div className={styles.chartCard}>
           {mileagePoints.length > 0 ? (
             <MileageChart points={mileagePoints} distanceUnit={distanceUnit} initialChartType={car.chartTypes?.["mileage"] === "bar" ? "bar" : "line"} vehicleKind="car" forecast={mileageForecastByWindow} />
@@ -1386,7 +1387,7 @@ async function renderCarDashboard(
       <p className={styles.subtext}>Every chart in one place - see where the money&apos;s really going, and whether your car&apos;s getting thirstier with age.</p>
       <p className={styles.subtext} style={{ marginBottom: "1rem" }}>Every chart in one place.</p>
       <ChartFilterBar />
-      <div className={styles.reportsGrid}>
+      <div className={ownStyles.reportsGrid}>
         <div className={styles.chartCard}>
           {mpgSeries.length > 0 ? (
             <MpgChart
@@ -1524,7 +1525,7 @@ async function renderCarDashboard(
       />
       <h2 className={styles.sectionHeading}>Service history</h2>
       {records.length === 0 ? (
-        <div className={styles.card}><p className={styles.cardBody}>No service records logged yet. Log your first one above.</p></div>
+        <div className={styles.card}><p className={ownStyles.cardBody}>No service records logged yet. Log your first one above.</p></div>
       ) : (
         records.map((r) => <CarServiceHistoryCard key={r.id} record={r} distanceUnit={distanceUnit} currency={currency} rates={rates} includeCleaningInReport={Boolean(car.includeCleaningInReport)} />)
       )}
@@ -1541,7 +1542,7 @@ async function renderCarDashboard(
       <LogCarFuelForm fuelType={car.fuelType} initialMileage={car.currentMileage} mileageHistory={mileagePoints} startingMileage={car.startingMileage} dateAdded={car.dateAdded} distanceUnit={distanceUnit} currency={currency} rates={rates} carYear={car.year} isCustomBuild={car.isCustomBuild} />
       <h2 className={styles.sectionHeading}>Fuel log</h2>
       {fuelLogs.length === 0 ? (
-        <div className={styles.card}><p className={styles.cardBody}>No fuel fill-ups or charges logged yet. Log your first one above.</p></div>
+        <div className={styles.card}><p className={ownStyles.cardBody}>No fuel fill-ups or charges logged yet. Log your first one above.</p></div>
       ) : (
         fuelLogs.map((f) => <CarFuelLogCard key={f.id} log={f} distanceUnit={distanceUnit} currency={currency} rates={rates} />)
       )}
@@ -1558,7 +1559,7 @@ async function renderCarDashboard(
       <LogCarModForm initialMileage={car.currentMileage} mileageHistory={mileagePoints} startingMileage={car.startingMileage} dateAdded={car.dateAdded} distanceUnit={distanceUnit} currency={currency} rates={rates} carYear={car.year} isCustomBuild={car.isCustomBuild} />
       <h2 className={styles.sectionHeading}>History</h2>
       {mods.length === 0 ? (
-        <div className={styles.card}><p className={styles.cardBody}>No modifications or accessories logged yet.</p></div>
+        <div className={styles.card}><p className={ownStyles.cardBody}>No modifications or accessories logged yet.</p></div>
       ) : (
         mods.map((m) => <CarModCard key={m.id} mod={m} distanceUnit={distanceUnit} currency={currency} rates={rates} />)
       )}
@@ -1590,7 +1591,7 @@ async function renderCarDashboard(
       />
       <h2 className={styles.sectionHeading}>History</h2>
       {bills.length === 0 ? (
-        <div className={styles.card}><p className={styles.cardBody}>No insurance, tax, MOT, ULEZ/CAZ, congestion charge, or finance payments logged yet.</p></div>
+        <div className={styles.card}><p className={ownStyles.cardBody}>No insurance, tax, MOT, ULEZ/CAZ, congestion charge, or finance payments logged yet.</p></div>
       ) : (
         bills.map((b) => (
           <CarBillCard
@@ -1623,7 +1624,7 @@ async function renderCarDashboard(
       />
       <h2 className={styles.sectionHeading}>History</h2>
       {fines.length === 0 ? (
-        <div className={styles.card}><p className={styles.cardBody}>No fines logged yet.</p></div>
+        <div className={styles.card}><p className={ownStyles.cardBody}>No fines logged yet.</p></div>
       ) : (
         fines.map((f) => (
           <CarFineCard key={f.id} fine={f} currency={currency} rates={rates} includeFinesInReport={Boolean(car.includeFinesInReport)} />
@@ -1649,7 +1650,7 @@ async function renderCarDashboard(
       />
       <h2 className={styles.sectionHeading}>History</h2>
       {tolls.length === 0 ? (
-        <div className={styles.card}><p className={styles.cardBody}>No tolls logged yet.</p></div>
+        <div className={styles.card}><p className={ownStyles.cardBody}>No tolls logged yet.</p></div>
       ) : (
         tolls.map((t) => (
           <CarTollCard key={t.id} toll={t} currency={currency} rates={rates} includeTollsInReport={Boolean(car.includeTollsInReport)} />
@@ -1668,7 +1669,7 @@ async function renderCarDashboard(
       <LogCarLabourForm initialMileage={car.currentMileage} mileageHistory={mileagePoints} startingMileage={car.startingMileage} dateAdded={car.dateAdded} distanceUnit={distanceUnit} currency={currency} rates={rates} carYear={car.year} isCustomBuild={car.isCustomBuild} />
       <h2 className={styles.sectionHeading}>History</h2>
       {labour.length === 0 ? (
-        <div className={styles.card}><p className={styles.cardBody}>No labour logged yet.</p></div>
+        <div className={styles.card}><p className={ownStyles.cardBody}>No labour logged yet.</p></div>
       ) : (
         labour.map((l) => <CarLabourCard key={l.id} labour={l} distanceUnit={distanceUnit} currency={currency} rates={rates} pendingReviewIds={pendingReviewIds} mileageHistory={mileagePoints} currentMileage={car.currentMileage} />)
       )}
@@ -1691,7 +1692,7 @@ async function renderCarDashboard(
         </>
       )}
       {reminders.length === 0 ? (
-        <div className={styles.card}><p className={styles.cardBody}>No reminders set yet. Tick &quot;Remind me&quot; when logging a service or a bill to add one.</p></div>
+        <div className={styles.card}><p className={ownStyles.cardBody}>No reminders set yet. Tick &quot;Remind me&quot; when logging a service or a bill to add one.</p></div>
       ) : (
         reminders.map((r) => <CarReminderItem key={r.id} reminder={r} status={computeCarReminderStatus(r, car.currentMileage)} isPro={userIsPro} />)
       )}

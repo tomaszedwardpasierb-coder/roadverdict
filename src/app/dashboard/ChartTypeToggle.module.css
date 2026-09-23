@@ -1,0 +1,5 @@
+
+.chartTypeToggle { display: flex; gap: 0.25rem; }
+.chartTypeToggleBtn { font-family: var(--font-mono); font-size: 0.65rem; padding: 0.2rem 0.5rem; border: 1px solid var(--border); border-radius: 20px; background: #fff; cursor: pointer; color: var(--ink-soft); }
+.chartTypeToggleBtnActive { background: var(--amber); color: var(--amber-ink); border-color: var(--amber); }
+.chartTypeToggleBtn:hover:not(.chartTypeToggleBtnActive) { border-color: var(--asphalt); color: var(--asphalt); }
