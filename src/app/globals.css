@@ -950,7 +950,10 @@ body:has(main [data-admin-shell]) [data-assistant-widget] {
   font-weight: 700;
   letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: var(--amber);
+  /* --amber (#EE9A2E) on the stone/white section backgrounds is only 2.0-2.3:1;
+     this darker amber is 4.84:1 on stone, clearing WCAG AA for 11px text.
+     Sections with a dark background use --light below to keep the brighter one. */
+  color: #9A5A0D;
   text-align: center;
   margin: 0 0 0.4rem;
 }
@@ -1004,7 +1007,10 @@ body:has(main [data-admin-shell]) [data-assistant-widget] {
 .rv-problem-num {
   font-family: var(--font-display);
   font-size: 34px;
-  color: rgba(28,29,32,0.07);
+  /* Was alpha 0.07 (1.15:1) - Lighthouse flags it even though it's
+     decorative. 0.5 is 3.27:1 on the white card, clearing the 3:1 WCAG AA
+     bar for large text. */
+  color: rgba(28,29,32,0.5);
   line-height: 1;
   margin-bottom: 0.3rem;
   letter-spacing: 0.02em;

@@ -77,6 +77,9 @@
 
 .rv-section-heading--light { color: var(--stone); }
 .rv-section-sub--light { color: rgba(240,237,230,0.5); }
+/* The base eyebrow colour is a darker amber for light backgrounds; on this
+   dark section the brighter brand amber is the accessible one (~9:1). */
+.rv-section-eyebrow.rv-section-eyebrow--light { color: var(--amber); }
 
 /* ── Solutions ────────────────────────────────────────────────────── */
 .rv-solutions {
@@ -135,7 +138,9 @@ a.rv-sol-card {
 .rv-sol-body {
   font-size: 12px;
   line-height: 1.55;
-  color: rgba(240,237,230,0.42);
+  /* Was alpha 0.42 (3.7:1); 0.62 is 6.7:1 on #0e0e0e, clearing WCAG AA
+     for 12px text while still reading softer than the card title. */
+  color: rgba(240,237,230,0.62);
   margin: 0;
 }
 

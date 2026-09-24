@@ -78,6 +78,10 @@ export default function HomePage() {
               fill
               style={{ objectFit: 'cover', objectPosition: 'center top' }}
               priority
+              // `priority` alone gives eager loading + a preload link but no
+              // fetchpriority hint - Lighthouse's "LCP request discovery"
+              // flagged it as not priority-hinted.
+              fetchPriority="high"
               quality={68}
             />
             <div className="rv-panel-overlay" />
@@ -226,7 +230,7 @@ export default function HomePage() {
 
       {/* ── SOLUTIONS ────────────────────────────────────────────────── */}
       <section className="rv-solutions" aria-labelledby="solutions-heading">
-        <p className="rv-section-eyebrow">One place for all of it</p>
+        <p className="rv-section-eyebrow rv-section-eyebrow--light">One place for all of it</p>
         <h2 className="rv-section-heading rv-section-heading--light" id="solutions-heading">
           Built for vehicle owners, not spreadsheets.
         </h2>
