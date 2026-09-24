@@ -34,7 +34,14 @@ function canonicalHostRedirect(request: NextRequest): NextResponse | null {
   const host = request.headers.get('host');
   if (host !== 'www.roadverdict.co.uk') return null;
   const url = new URL(request.url);
-  url.host = 'roadverdict.co.uk';
+  // Behind Azure's proxy request.url carries the app's internal port
+  // (:8080) even though the Host header is the public name, and assigning
+  // url.host leaves an existing port untouched - so without clearing it
+  // explicitly the redirect pointed at https://roadverdict.co.uk:8080/.
+  // https is forced because the site is https-only.
+  url.protocol = 'https:';
+  url.hostname = 'roadverdict.co.uk';
+  url.port = '';
   return NextResponse.redirect(url, 308);
 }
 

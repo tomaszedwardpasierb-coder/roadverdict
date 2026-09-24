@@ -62,10 +62,19 @@ describe("middleware", () => {
     }
   });
 
-  it("redirects www.roadverdict.co.uk to the apex domain, preserving the path", () => {
-    const response = middleware(request("/motorcycles", "www.roadverdict.co.uk"));
+  it("redirects www.roadverdict.co.uk to the https apex domain, preserving the path and query", () => {
+    const response = middleware(request("/motorcycles?ref=x", "www.roadverdict.co.uk"));
     expect(response.status).toBe(308);
-    expect(response.headers.get("location")).toBe("http://roadverdict.co.uk/motorcycles");
+    expect(response.headers.get("location")).toBe("https://roadverdict.co.uk/motorcycles?ref=x");
+  });
+
+  // Behind Azure's proxy the Host header is the public name but request.url
+  // carries the app's internal port - the redirect must not inherit it.
+  it("drops the internal port from request.url when redirecting www to the apex", () => {
+    const req = new NextRequest("https://www.roadverdict.co.uk:8080/quote-checker", { headers: { host: "www.roadverdict.co.uk" } });
+    const response = middleware(req);
+    expect(response.status).toBe(308);
+    expect(response.headers.get("location")).toBe("https://roadverdict.co.uk/quote-checker");
   });
 
   it("does not redirect the apex domain itself", () => {
