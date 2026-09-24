@@ -134,8 +134,16 @@ function QueueItemForm({
     entry.category === 'fuel' && entry.precedingFuelMileage !== undefined && filledToFull && litres
       ? checkFullTankPlausibility(Number(litres) || 0, Number(mileage) || 0, [{ mileage: entry.precedingFuelMileage }])
       : null;
+  // Car entries never carry a tankCapacityLitres (CarDoc has no such
+  // field, see the ADR) - checkLitresPlausibility's fallback default is
+  // sized for a motorcycle tank (~16L) and its message literally says
+  // "this bike's tank", so running it for a car would wrongly flag a
+  // normal fill-up and misname the vehicle. Same reasoning the manual
+  // car-fuel route already applies by never calling this at all.
   const liveLitresCheck =
-    entry.category === 'fuel' && litres ? checkLitresPlausibility(Number(litres) || 0, entry.tankCapacityLitres) : null;
+    entry.category === 'fuel' && litres && vehicleKind !== 'car'
+      ? checkLitresPlausibility(Number(litres) || 0, entry.tankCapacityLitres)
+      : null;
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
@@ -459,7 +467,7 @@ function QueueItemForm({
 // at all, since bills never need mileage estimation - checking the
 // category first, rather than a blind property access, keeps this safe
 // across the whole union.
-function isDirty(entry: ReviewQueueEntry, original: ParsedReceiptItem): boolean {
+function isDirty(entry: ReviewQueueEntry, original: ParsedReceiptItem, vehicleKind: 'bike' | 'car'): boolean {
   if (entry.duplicate) return true;
   if (entry.plateMismatch || entry.vehicleMismatch) return true;
   if (original.forceReview) return true;
@@ -474,7 +482,7 @@ function isDirty(entry: ReviewQueueEntry, original: ParsedReceiptItem): boolean 
   // this same queue. Without this check, a tier-4 item (fuel, printed
   // mileage) with an OCR-misread litres figure would auto-commit
   // silently, since nothing else about it looks wrong.
-  if (entry.category === 'fuel' && checkLitresPlausibility(entry.litres, entry.tankCapacityLitres).implausible) return true;
+  if (entry.category === 'fuel' && vehicleKind !== 'car' && checkLitresPlausibility(entry.litres, entry.tankCapacityLitres).implausible) return true;
   return false;
 }
 
@@ -520,11 +528,16 @@ async function markEntryReviewed(entry: ReviewQueueEntry, vehicleKind: 'bike' | 
 // already-auto-committed, clean item, which would show the "logging
 // automatically" message again for something that finished a moment
 // ago. Skips backward past any contiguous run of those instead.
-function findPrevInteractiveIndex(items: ParsedReceiptItem[], committed: (ReviewQueueEntry | null)[], from: number): number {
+function findPrevInteractiveIndex(
+  items: ParsedReceiptItem[],
+  committed: (ReviewQueueEntry | null)[],
+  from: number,
+  vehicleKind: 'bike' | 'car'
+): number {
   for (let i = from - 1; i >= 0; i--) {
     const tier = classifyReceiptTier(items[i]);
     const entry = committed[i];
-    if (!isAutoCommitTier(tier) || (entry && isDirty(entry, items[i]))) return i;
+    if (!isAutoCommitTier(tier) || (entry && isDirty(entry, items[i], vehicleKind))) return i;
   }
   return 0;
 }
@@ -644,7 +657,7 @@ export function ReviewQueueModal({
           // Save/Skip click that would just be clicking through data
           // that was never actually in question.
           const tier = classifyReceiptTier(items[index]);
-          if (isAutoCommitTier(tier) && !isDirty(data.entry, items[index])) {
+          if (isAutoCommitTier(tier) && !isDirty(data.entry, items[index], vehicleKind)) {
             void markEntryReviewed(data.entry, vehicleKind);
             setIndex((i) => i + 1);
           }
@@ -900,7 +913,7 @@ export function ReviewQueueModal({
   // review step for an item that's about to be skipped a moment later
   // regardless of timing.
   const currentTier = classifyReceiptTier(items[index]);
-  const currentIsAutoTier = !forcedOutOfAuto.has(index) && isAutoCommitTier(currentTier) && !(current && isDirty(current, items[index]));
+  const currentIsAutoTier = !forcedOutOfAuto.has(index) && isAutoCommitTier(currentTier) && !(current && isDirty(current, items[index], vehicleKind));
 
   if (currentIsAutoTier) {
     const autoTierTotal = items.filter((it) => isAutoCommitTier(classifyReceiptTier(it))).length;
@@ -1005,7 +1018,7 @@ export function ReviewQueueModal({
             onSaved={handleEntrySaved}
             onSkip={goNext}
             onDeleteDuplicate={handleDeleteDuplicate}
-            onPrev={() => setIndex((i) => findPrevInteractiveIndex(items, committed, i))}
+            onPrev={() => setIndex((i) => findPrevInteractiveIndex(items, committed, i, vehicleKind))}
             onFinishLater={handleFinishLater}
             canGoPrev={index > 0}
             finishing={finishing}

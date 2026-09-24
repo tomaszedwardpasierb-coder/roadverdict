@@ -218,6 +218,27 @@ describe("ReviewQueueModal", () => {
     expect(screen.queryByText("Logging clear entries automatically")).not.toBeInTheDocument();
   });
 
+  it("vehicleKind='car': a large fuel fill-up auto-commits cleanly instead of being wrongly forced into review as an implausible bike-tank reading", async () => {
+    const item = makeItem({ category: "fuel", mileageOnReceipt: 8000, litres: 50.3, description: "Big fill" });
+    const fetchMock = createFetchMock({
+      commitItem: (i) =>
+        i.description === "Big fill"
+          ? { entry: { id: "car-fuel-2", category: "fuel", aiDescription: "Big fill AI", duplicate: null, litres: 50.3, cost: 74.93, mileage: 8000, mileageNeedsManualEntry: false, plateMismatch: null, vehicleMismatch: null, date: "2024-01-01", filledToFull: true, attachment: makeAttachment() } }
+          : undefined,
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<ReviewQueueModal parsedItems={[item]} onFinished={vi.fn()} vehicleKind="car" />);
+
+    // Before the fix, checkLitresPlausibility ran unconditionally against
+    // a bike-sized default tank capacity, so this exact fill (well past
+    // any real car's tank too, but the point is it should never even be
+    // CHECKED against a bike default) would have been forced into manual
+    // review with a "this bike's tank" message instead of auto-committing.
+    expect(await screen.findByText("All caught up")).toBeInTheDocument();
+    expect(screen.queryByText(/tank can hold/)).not.toBeInTheDocument();
+  });
+
   it("tier-2 items make mileage optional, and saving PATCHes the record's own category route with real form state", async () => {
     const item = makeItem({ category: "mods", description: "Chain lube" });
     const fetchMock = createFetchMock({
