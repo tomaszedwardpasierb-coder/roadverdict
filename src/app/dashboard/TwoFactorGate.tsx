@@ -43,7 +43,12 @@ export function TwoFactorGate({ twoFactorEnabled, children }: Props) {
     <div className={styles.proGate}>
       <div className={styles.proGateBadge}>2FA required</div>
       <h3 className={styles.proGateTitle}>The Vault requires two-factor authentication</h3>
-      <p className={styles.proGateDesc}>Enable 2FA in Settings to unlock secure document storage.</p>
+      <p className={styles.proGateDesc}>
+        The Vault is a private place to keep the paperwork behind each vehicle - V5C, insurance and MOT
+        certificates, purchase and finance documents - so it&apos;s all in one spot when you need it or come to sell.
+        It&apos;s protected by two-factor authentication and locks itself after 10 minutes of inactivity.
+      </p>
+      <p className={styles.proGateDesc}>Enable 2FA in Settings to unlock it.</p>
       <button type="button" className="submit-button" onClick={handleGoToSettings} disabled={navigating}>
         {navigating && <VehicleSpinner kind={vehicleKind ?? 'bike'} size={20} />}
         {navigating ? 'Opening Settings…' : 'Go to Settings'}

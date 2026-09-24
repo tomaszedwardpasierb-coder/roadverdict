@@ -24,6 +24,19 @@ describe("TwoFactorGate", () => {
     expect(screen.getByText("The Vault requires two-factor authentication")).toBeInTheDocument();
   });
 
+  // Nobody should have to enable 2FA blind - the prompt has to say what the
+  // Vault is for before asking for the effort.
+  it("explains what the Vault is for before asking the visitor to enable 2FA", () => {
+    render(
+      <TwoFactorGate twoFactorEnabled={false}>
+        <div>Real Vault content</div>
+      </TwoFactorGate>
+    );
+    expect(screen.getByText(/private place to keep the paperwork behind each vehicle/i)).toBeInTheDocument();
+    expect(screen.getByText(/V5C, insurance and MOT certificates/i)).toBeInTheDocument();
+    expect(screen.getByText(/locks itself after 10 minutes of inactivity/i)).toBeInTheDocument();
+  });
+
   describe("clicking Go to Settings", () => {
     let originalLocation: Location;
 
