@@ -1043,8 +1043,6 @@ body:has(main [data-admin-shell]) [data-assistant-widget] {
   overflow: hidden;
   background: var(--amber);
 }
-/* .rv-verdict-panel-img/.rv-verdict-img-overlay moved to homepage.css -
-   /cars and /motorcycles' own verdict strip has no background image. */
 .rv-verdict-content {
   position: relative;
   z-index: 2;
@@ -1086,54 +1084,54 @@ body:has(main [data-admin-shell]) [data-assistant-widget] {
   flex-wrap: wrap;
 }
 
-/* ── Hub pages (/cars, /motorcycles): illustration beside the hero text ─
-   Desktop: text left, image right, vertically centred. Below 1100px
-   the column would be too narrow to show the scene, so it stacks instead -
-   image on top, text below - and the hero drops its fixed height. */
-/* min-height, not the base rule's fixed height: the text column here is narrower,
-   so it can run taller than the fixed height and get clipped. */
+/* ── Hub pages (/cars, /motorcycles): full-bleed hero illustration ─────
+   The picture fills the whole hero behind the text, like the homepage.
+   Text sits on the RIGHT: the man (the artwork's subject) is left of centre,
+   so left-aligned text would cover him. The gradient darkens only the
+   vehicles on the right, under the text. Height follows the picture's own
+   proportions so the whole scene shows, capped so it can't get absurd on
+   ultrawide screens. Text sits in a centred 1280px column. */
 .rv-hero.rv-hero--figure {
-  gap: 3rem;
+  justify-content: flex-end;
   height: auto;
-  min-height: clamp(480px, 30vw, 680px);
+  min-height: clamp(460px, calc(100vw * 672 / 1584), 760px);
+  padding-left: max(2rem, calc((100vw - 1280px) / 2));
+  padding-right: max(2rem, calc((100vw - 1280px) / 2));
 }
-.rv-hero--figure .rv-hero-content { flex: 0 0 min(440px, 42%); }
+.rv-hero--figure .rv-hero-content { max-width: 440px; }
 .rv-hero-figure {
-  position: relative;
-  z-index: 1;
-  flex: 1 1 0;
-  min-width: 0;
-  /* Frame keeps the image's own 1584:672 proportions, so the whole scene (cars
-     AND motorcycles) is always visible instead of being cropped to fit the
-     hero's height. */
-  align-self: center;
-  aspect-ratio: 1584 / 672;
-  max-width: 1100px;
-  margin-left: auto;
-  border-radius: 12px;
-  overflow: hidden;
-  border: 1px solid rgba(240, 237, 230, 0.12);
-  background: #161616;
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background: #0e0e0e;
 }
-@media (max-width: 1100px) {
-  .rv-hero.rv-hero--figure {
-    flex-direction: column;
-    align-items: stretch;
-    justify-content: flex-start;
-    gap: 1.5rem;
-    min-height: 0;
-    padding: 1.5rem 1.2rem 2.5rem;
-  }
-  .rv-hero--figure .rv-hero-content { flex: 0 0 auto; max-width: none; }
-  .rv-hero-figure {
-    order: -1;
-    flex: 0 0 auto;
-    align-self: auto;
-    width: 100%;
-    max-width: none;
-    margin-left: 0;
-    aspect-ratio: 1584 / 672;
-  }
+.rv-hero-figure-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background: linear-gradient(270deg, rgba(14,14,14,0.94) 0%, rgba(14,14,14,0.86) 30%, rgba(14,14,14,0.45) 50%, rgba(14,14,14,0.05) 68%, rgba(14,14,14,0) 100%);
+}
+/* Narrow screens: the text spans most of the width, so darken the whole
+   picture evenly and go back to left-aligned text, like the homepage does
+   on mobile. */
+@media (max-width: 900px) {
+  .rv-hero.rv-hero--figure { justify-content: flex-start; min-height: 0; }
+  .rv-hero--figure .rv-hero-content { max-width: none; }
+  .rv-hero-figure-overlay { background: rgba(14,14,14,0.78); }
+}
+
+/* Verdict strip background image - shared by the homepage and both hubs,
+   so it lives here rather than in homepage.css (which only the homepage
+   loads). */
+.rv-verdict-panel-img {
+  position: absolute;
+  inset: 0;
+}
+.rv-verdict-img-overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, rgba(232,151,12,0.96) 0%, rgba(232,151,12,0.82) 50%, rgba(14,14,14,0.6) 100%);
+  z-index: 1;
 }
 
 /* ── Responsive tweaks ────────────────────────────────────────────── */

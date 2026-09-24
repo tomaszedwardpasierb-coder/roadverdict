@@ -143,21 +143,21 @@ export default function CarsPage() {
             </li>
           </ul>
         </div>
-        {/* Hero illustration. Alt text is descriptive on purpose (image search
-            and accessibility); priority + fetchPriority because on desktop this
-            is the LCP element. The comic art hides compression well, and
-            next/image serves it as AVIF/WebP at the width each screen needs. */}
+        {/* Full-width hero illustration behind the text, like the homepage.
+            Alt text is descriptive on purpose (image search and accessibility);
+            priority + fetchPriority because this is the LCP element. */}
         <div className="rv-hero-figure">
           <Image
             src="/images/hero/garage-owner-cars-motorcycles.webp"
             alt="A car owner relaxing in a garage with a coffee, checking his vehicle's service history on the RoadVerdict app, surrounded by classic and modern cars and motorcycles"
             fill
-            sizes="(max-width: 900px) 100vw, 60vw"
+            sizes="100vw"
             priority
             fetchPriority="high"
             quality={70}
-            style={{ objectFit: 'cover', objectPosition: '30% center' }}
+            style={{ objectFit: 'cover', objectPosition: 'center 15%' }}
           />
+          <div className="rv-hero-figure-overlay" />
         </div>
       </section>
 
@@ -212,6 +212,19 @@ export default function CarsPage() {
 
       {/* ── VERDICT PANEL ────────────────────────────────────────────── */}
       <section className="rv-verdict-strip" aria-labelledby="verdict-cta-heading">
+        {/* Same background image as the homepage's verdict strip; it sits under
+            a heavy amber overlay, so a low quality setting doesn't show. */}
+        <div className="rv-verdict-panel-img" aria-hidden="true">
+          <Image
+            src="/images/hero/panel-04.webp"
+            alt=""
+            fill
+            sizes="100vw"
+            style={{ objectFit: 'cover', objectPosition: 'center center' }}
+            quality={50}
+          />
+          <div className="rv-verdict-img-overlay" />
+        </div>
         <div className="rv-verdict-content">
           <h2 className="rv-verdict-heading" id="verdict-cta-heading">
             The verdict is in.

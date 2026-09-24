@@ -144,18 +144,8 @@ a.rv-sol-card {
   margin: 0;
 }
 
-/* ── Verdict panel image (homepage's own version has a background
-   photo; /cars and /motorcycles' verdict strip doesn't) ──────────── */
-.rv-verdict-panel-img {
-  position: absolute;
-  inset: 0;
-}
-.rv-verdict-img-overlay {
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(135deg, rgba(232,151,12,0.96) 0%, rgba(232,151,12,0.82) 50%, rgba(14,14,14,0.6) 100%);
-  z-index: 1;
-}
+/* .rv-verdict-panel-img / .rv-verdict-img-overlay live in globals.css -
+   the hub pages use them too. */
 
 /* ── Responsive tweaks ────────────────────────────────────────────── */
 @media (max-width: 640px) {
