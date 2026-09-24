@@ -3,9 +3,7 @@ import type { Metadata, Viewport } from 'next';
 import { Big_Shoulders, Inter, IBM_Plex_Mono } from 'next/font/google';
 import Image from 'next/image';
 import Link from 'next/link';
-import { cookies } from 'next/headers';
-import { getAdminSession } from '@/lib/admin/session';
-import { ImpersonationBanner } from './ImpersonationBanner';
+import { ImpersonationBannerLoader } from './ImpersonationBannerLoader';
 import { AssistantWidgetLoader } from '@/components/AssistantWidgetLoader';
 import { ActiveSectionProvider } from '@/components/ActiveSectionContext';
 import { NavigationLoadingOverlay } from '@/components/NavigationLoadingOverlay';
@@ -83,19 +81,18 @@ export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
 };
-export default async function RootLayout({ children }: { children: React.ReactNode }) {
-  const cookieStore = await cookies();
-  const impersonatingEmail = cookieStore.get('impersonating_as')?.value ?? null;
-  // Only trust/show this if a real admin session is ALSO currently
-  // valid - the impersonation cookie alone is never sufficient on its
-  // own to display or act on anything.
-  const isAdmin = impersonatingEmail ? await getAdminSession() : false;
-  const showImpersonationBanner = isAdmin && !!impersonatingEmail;
+// Deliberately NOT async and reads no cookies/headers: any dynamic API
+// here would opt every route in the app out of static rendering, since a
+// layout's dynamism applies to everything under it. The impersonation
+// banner (which needs the impersonating_as cookie and an admin session
+// check) is a client component that asks /api/admin/impersonation-status
+// instead - see ImpersonationBannerLoader.
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className={`${bigShouldersDisplay.variable} ${inter.variable} ${plexMono.variable}`}>
       <body>
         <ActiveSectionProvider>
-          {showImpersonationBanner && <ImpersonationBanner email={impersonatingEmail!} />}
+          <ImpersonationBannerLoader />
           <header className="site-header">
             <Link href="/" className="site-header__logo">
               <Image

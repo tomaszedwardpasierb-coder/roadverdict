@@ -14,12 +14,8 @@
 // a way this page shouldn't duplicate.
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { headers } from 'next/headers';
-import { getSession } from '@/lib/auth/session';
-import { getBikesForUser } from '@/lib/tracker/bike';
+import { ViewerCtaLink, ViewerSwitchKindLink } from '@/components/viewer/ViewerCta';
 import { buildBreadcrumbJsonLd } from '@/lib/seo/breadcrumbs';
-
-export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = {
   title: 'Know what your motorcycle really costs',
@@ -89,39 +85,21 @@ const FEATURES = [
   },
 ] as const;
 
-export default async function MotorcyclesPage() {
-  const nonce = (await headers()).get('x-nonce') ?? undefined;
-
-  // Same defensive wrapping as every other public marketing/tool page: a
-  // Cosmos problem should degrade this to "treat as anonymous," not take
-  // down a public, no-account-needed page for every visitor.
-  let session: Awaited<ReturnType<typeof getSession>> = null;
-  try {
-    session = await getSession();
-  } catch (err) {
-    console.error('Motorcycles page: getSession() failed, continuing as anonymous:', err);
-  }
-  const hasBike = session ? (await getBikesForUser(session.email).catch(() => [])).length > 0 : false;
-
-  const ctaHref = !session ? `/login?redirect=${encodeURIComponent('/dashboard?addVehicle=bike')}` : '/dashboard?addVehicle=bike';
-  const ctaLabel = !session ? 'Start tracking your bike free' : hasBike ? 'Go to your dashboard' : 'Add your bike';
-  // Mirrors /cars/page.tsx's own secondaryHref reasoning - a signed-in
-  // visitor here who also has a car needs this to force the car view,
-  // not land on plain "/" and bounce back to whichever kind their
-  // activeVehicleKind cookie happened to remember.
-  const secondaryHref = !session ? '/cars' : '/dashboard?addVehicle=car';
-
+// Static on purpose - see middleware.ts's CACHEABLE_PUBLIC_PATHS. The
+// signed-in variants of the CTAs (label and destination) are resolved
+// client-side by ViewerCtaLink; the server-rendered HTML is the signed-out
+// version every anonymous visitor and search crawler sees. The JSON-LD
+// blocks need no CSP nonce: they're data, never executed.
+export default function MotorcyclesPage() {
   return (
     <>
       <script
         type="application/ld+json"
-        nonce={nonce}
         // eslint-disable-next-line react/no-danger
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
       <script
         type="application/ld+json"
-        nonce={nonce}
         // eslint-disable-next-line react/no-danger
         dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }}
       />
@@ -144,11 +122,10 @@ export default async function MotorcyclesPage() {
             Reminders fire before your MOT or insurance lapses, not after.
           </p>
           <div className="rv-hero-actions">
-            <Link href={ctaHref} className="rv-cta-primary">
-              {ctaLabel}
+            <ViewerCtaLink kind="bike" className="rv-cta-primary">
               <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M2 7h10M8 3l4 4-4 4"/></svg>
-            </Link>
-            <Link href={secondaryHref} className="rv-cta-secondary">Drive a car instead?</Link>
+            </ViewerCtaLink>
+            <ViewerSwitchKindLink target="car" className="rv-cta-secondary">Drive a car instead?</ViewerSwitchKindLink>
           </div>
           <ul className="rv-hero-proof" aria-label="Key facts">
             <li className="rv-proof-item">
@@ -225,9 +202,7 @@ export default async function MotorcyclesPage() {
           <p className="rv-verdict-p">
             Free to start. No password. Everything you log is yours - export it any time.
           </p>
-          <Link href={ctaHref} className="rv-cta-dark">
-            {ctaLabel}
-          </Link>
+          <ViewerCtaLink kind="bike" className="rv-cta-dark" />
         </div>
       </section>
     </>

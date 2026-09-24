@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
+import { AUTH_MARKER_COOKIE, IMPERSONATION_MARKER_COOKIE } from '@/lib/viewer';
+import { usesStrictNonceCsp } from '@/lib/cspRoutes';
 
 // Per-request nonce, strict CSP. Deploy this in report-only mode first if you add any
 // third-party script later (analytics, affiliate pixels) — see the SEO/security guide.
@@ -36,9 +38,56 @@ function canonicalHostRedirect(request: NextRequest): NextResponse | null {
   return NextResponse.redirect(url, 308);
 }
 
+// The session and impersonation cookies are httpOnly, so client code can't
+// see them - and the public pages are now static, so the server can't
+// tailor them per visitor either. These non-secret marker cookies mirror
+// only "does that cookie exist", letting client code skip the network
+// request entirely for the anonymous majority instead of every visitor
+// paying for a lookup that will just say "not signed in". Kept in sync
+// here because this runs on every request, including ones a static page
+// is served from, with no per-route wiring to forget.
+function syncMarkerCookie(request: NextRequest, response: NextResponse, sourceCookie: string, markerCookie: string) {
+  const sourcePresent = request.cookies.has(sourceCookie);
+  const markerPresent = request.cookies.get(markerCookie)?.value === '1';
+  if (sourcePresent && !markerPresent) {
+    response.cookies.set(markerCookie, '1', { path: '/', sameSite: 'lax', secure: true, maxAge: 60 * 60 * 24 * 30 });
+  } else if (!sourcePresent && request.cookies.has(markerCookie)) {
+    response.cookies.delete(markerCookie);
+  }
+}
+
+function withMarkers(request: NextRequest, response: NextResponse): NextResponse {
+  syncMarkerCookie(request, response, 'session', AUTH_MARKER_COOKIE);
+  syncMarkerCookie(request, response, 'impersonating_as', IMPERSONATION_MARKER_COOKIE);
+  return response;
+}
+
 export function middleware(request: NextRequest) {
   const redirect = canonicalHostRedirect(request);
   if (redirect) return redirect;
+
+  const { pathname } = request.nextUrl;
+
+  // Signed-in visitors used to be bounced from the homepage to the
+  // dashboard by the page itself, via a server-side session check - which
+  // is exactly what kept the homepage from being static. Cookie presence
+  // is enough to decide here: /dashboard does the real validation and
+  // sends anyone with a stale cookie on to /login.
+  if (pathname === '/' && request.cookies.has('session')) {
+    return withMarkers(request, NextResponse.redirect(new URL('/dashboard', request.url)));
+  }
+
+  // See src/lib/cspRoutes.ts for why prerendered public pages can't use a
+  // nonce and which routes keep the strict policy. The default here is the
+  // relaxed one on purpose: it's the safe failure direction (a missing
+  // classification costs a weaker script-src, not a page that never
+  // hydrates), and tests/unit/cspRoutes.test.ts fails on any top-level
+  // route nobody has classified.
+  if (!usesStrictNonceCsp(pathname)) {
+    const response = NextResponse.next();
+    response.headers.set('Content-Security-Policy', `script-src 'self' 'unsafe-inline'; ${STATIC_CSP_DIRECTIVES}`);
+    return withMarkers(request, response);
+  }
 
   const nonce = crypto.randomUUID();
   const csp = `script-src 'self' 'nonce-${nonce}'; ${STATIC_CSP_DIRECTIVES}`;
@@ -48,7 +97,7 @@ export function middleware(request: NextRequest) {
 
   const response = NextResponse.next({ request: { headers: requestHeaders } });
   response.headers.set('Content-Security-Policy', csp);
-  return response;
+  return withMarkers(request, response);
 }
 
 export const config = {

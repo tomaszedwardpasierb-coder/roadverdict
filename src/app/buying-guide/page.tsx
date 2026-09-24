@@ -1,12 +1,8 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { headers } from 'next/headers';
-import { BuyingGuideForm } from '@/components/BuyingGuideForm';
+import { BuyingGuideFormForViewer } from '@/components/viewer/ViewerForms';
 import { RelatedTools } from '@/components/RelatedTools';
-import { getSession } from '@/lib/auth/session';
 import { buildBreadcrumbJsonLd } from '@/lib/seo/breadcrumbs';
-
-export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = {
   title: 'What to check before you buy a used motorcycle',
@@ -61,32 +57,21 @@ const faqJsonLd = {
 
 const breadcrumbJsonLd = buildBreadcrumbJsonLd('Buying Guide', '/buying-guide');
 
-export default async function BuyingGuidePage() {
-  const nonce = (await headers()).get('x-nonce') ?? undefined;
-
-  // Same defensive wrapping as Cost Calculator and Quote Checker: this
-  // page previously had no Cosmos dependency, and getContainer() throws
-  // unconditionally if Cosmos config is ever missing - a problem there
-  // should degrade to "treat as anonymous", not take down a public,
-  // no-account-needed tool for every visitor.
-  let session: Awaited<ReturnType<typeof getSession>> = null;
-  try {
-    session = await getSession();
-  } catch (err) {
-    console.error("Buying guide: getSession() failed, continuing as anonymous:", err);
-  }
-
+// Static on purpose - see middleware.ts's CACHEABLE_PUBLIC_PATHS. A signed-in
+// visitor's signed-in state and own-vehicle prefill are resolved client-side
+// by the ...ForViewer form wrapper; the server-rendered HTML is the
+// anonymous version every visitor and search crawler gets. The JSON-LD
+// blocks need no CSP nonce: they're data, never executed.
+export default function BuyingGuidePage() {
   return (
     <>
       <script
         type="application/ld+json"
-        nonce={nonce}
         // eslint-disable-next-line react/no-danger
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
       <script
         type="application/ld+json"
-        nonce={nonce}
         // eslint-disable-next-line react/no-danger
         dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }}
       />
@@ -94,7 +79,7 @@ export default async function BuyingGuidePage() {
         <h1>What should you check before buying it?</h1>
         <p>A buyer checklist weighted by how old the bike actually is - not a generic list.</p>
       </div>
-      <BuyingGuideForm signedIn={!!session} />
+      <BuyingGuideFormForViewer />
       <p className="disclaimer">
         General inspection guidance, not a substitute for a professional pre-purchase check -
         especially on anything safety-critical like brakes or frame condition.
@@ -122,7 +107,6 @@ export default async function BuyingGuidePage() {
       </section>
       <script
         type="application/ld+json"
-        nonce={nonce}
         // eslint-disable-next-line react/no-danger
         dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }}
       />

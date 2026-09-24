@@ -16,12 +16,8 @@
 // available for cars.
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { headers } from 'next/headers';
-import { getSession } from '@/lib/auth/session';
-import { getCarsForUser } from '@/lib/tracker/car';
+import { ViewerCtaLink, ViewerSwitchKindLink } from '@/components/viewer/ViewerCta';
 import { buildBreadcrumbJsonLd } from '@/lib/seo/breadcrumbs';
-
-export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = {
   title: 'Know what your car really costs',
@@ -85,46 +81,24 @@ const FEATURES = [
   },
 ] as const;
 
-export default async function CarsPage() {
-  const nonce = (await headers()).get('x-nonce') ?? undefined;
-
-  // Same defensive wrapping as the existing public tool pages: a Cosmos
-  // problem should degrade this to "treat as anonymous," not take down a
-  // public, no-account-needed marketing page for every visitor.
-  let session: Awaited<ReturnType<typeof getSession>> = null;
-  try {
-    session = await getSession();
-  } catch (err) {
-    console.error('Cars page: getSession() failed, continuing as anonymous:', err);
-  }
-  const hasCar = session ? (await getCarsForUser(session.email).catch(() => [])).length > 0 : false;
-
-  // addVehicle=car is kept even for a returning car owner (hasCar true) -
-  // dashboard/page.tsx forces the car view with it, so someone with both
-  // a bike and a car lands on their car, not whichever kind their
-  // activeVehicleKind cookie happened to remember from a previous visit.
-  const ctaHref = !session ? `/login?redirect=${encodeURIComponent('/dashboard?addVehicle=car')}` : '/dashboard?addVehicle=car';
-  const ctaLabel = !session ? 'Start tracking your car free' : hasCar ? 'Go to your dashboard' : 'Add your car';
-  // Same reasoning as ctaHref above, mirrored for the opposite kind - a
-  // signed-in visitor here (e.g. one who also has a bike) needs this to
-  // force the bike view, not just land on plain "/" and bounce straight
-  // back to /dashboard showing whatever kind their cookie remembers.
-  // Signed-out points at /motorcycles specifically, not plain "/" - now
-  // that a real motorcycle hub exists, it's a much more relevant landing
-  // spot than the homepage for someone who followed this exact link.
-  const secondaryHref = !session ? '/motorcycles' : '/dashboard?addVehicle=bike';
-
+// Static on purpose - see middleware.ts's CACHEABLE_PUBLIC_PATHS. The
+// signed-in variants of the CTAs (label and destination) are resolved
+// client-side by ViewerCtaLink / ViewerSwitchKindLink; the server-rendered
+// HTML is the signed-out version every anonymous visitor and search
+// crawler sees. Signed-out, the switch link points at /motorcycles
+// specifically, not plain "/" - now that a real motorcycle hub exists,
+// it's a much more relevant landing spot than the homepage. The JSON-LD
+// blocks need no CSP nonce: they're data, never executed.
+export default function CarsPage() {
   return (
     <>
       <script
         type="application/ld+json"
-        nonce={nonce}
         // eslint-disable-next-line react/no-danger
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
       <script
         type="application/ld+json"
-        nonce={nonce}
         // eslint-disable-next-line react/no-danger
         dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }}
       />
@@ -147,11 +121,10 @@ export default async function CarsPage() {
             Reminders fire before your MOT or insurance lapses, not after.
           </p>
           <div className="rv-hero-actions">
-            <Link href={ctaHref} className="rv-cta-primary">
-              {ctaLabel}
+            <ViewerCtaLink kind="car" className="rv-cta-primary">
               <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M2 7h10M8 3l4 4-4 4"/></svg>
-            </Link>
-            <Link href={secondaryHref} className="rv-cta-secondary">Ride a motorcycle instead?</Link>
+            </ViewerCtaLink>
+            <ViewerSwitchKindLink target="bike" className="rv-cta-secondary">Ride a motorcycle instead?</ViewerSwitchKindLink>
           </div>
           <ul className="rv-hero-proof" aria-label="Key facts">
             <li className="rv-proof-item">
@@ -228,9 +201,7 @@ export default async function CarsPage() {
           <p className="rv-verdict-p">
             Free to start. No password. Everything you log is yours - export it any time.
           </p>
-          <Link href={ctaHref} className="rv-cta-dark">
-            {ctaLabel}
-          </Link>
+          <ViewerCtaLink kind="car" className="rv-cta-dark" />
         </div>
       </section>
     </>

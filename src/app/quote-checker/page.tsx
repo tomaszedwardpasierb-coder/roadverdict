@@ -3,16 +3,9 @@
 // Formerly the homepage (/) - moved here when /track's content was
 // promoted to the site root. See src/app/page.tsx.
 import type { Metadata } from 'next';
-import { headers } from 'next/headers';
-import { QuoteForm } from '@/components/QuoteForm';
-import { getSession } from '@/lib/auth/session';
-import { getPrimaryBike } from '@/lib/tracker/bike';
-import { BRAND_OPTIONS } from '@/lib/priceData';
-import { getBikeClassForCC, slugifyMake } from '@/lib/motorcycleModels';
+import { QuoteFormForViewer } from '@/components/viewer/ViewerForms';
 import { RelatedTools } from '@/components/RelatedTools';
 import { buildBreadcrumbJsonLd } from '@/lib/seo/breadcrumbs';
-
-export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = {
   title: 'Is your motorcycle service quote fair?',
@@ -72,41 +65,21 @@ const faqJsonLd = {
 
 const breadcrumbJsonLd = buildBreadcrumbJsonLd('Quote Checker', '/quote-checker');
 
-export default async function QuoteCheckerPage() {
-  const nonce = (await headers()).get('x-nonce') ?? undefined;
-
-  // Same defensive wrapping as Cost Calculator: this page previously
-  // had no Cosmos dependency, and getContainer() throws unconditionally
-  // if Cosmos config is ever missing - a problem there should degrade
-  // to "treat as anonymous", not take down a public, no-account-needed
-  // tool for every visitor.
-  let session: Awaited<ReturnType<typeof getSession>> = null;
-  try {
-    session = await getSession();
-  } catch (err) {
-    console.error("Quote checker: getSession() failed, continuing as anonymous:", err);
-  }
-  const bike = session ? await getPrimaryBike(session.email).catch(() => null) : null;
-
-  let initialBrand: string | undefined;
-  let initialBikeClass: 'small' | 'medium' | 'large' | undefined;
-  if (bike) {
-    const slug = slugifyMake(bike.make);
-    initialBrand = BRAND_OPTIONS.some((b) => b.value === slug) ? slug : 'other';
-    initialBikeClass = getBikeClassForCC(bike.engineCC);
-  }
-
+// Static on purpose - see middleware.ts's CACHEABLE_PUBLIC_PATHS. A signed-in
+// visitor's signed-in state and own-vehicle prefill are resolved client-side
+// by the ...ForViewer form wrapper; the server-rendered HTML is the
+// anonymous version every visitor and search crawler gets. The JSON-LD
+// blocks need no CSP nonce: they're data, never executed.
+export default function QuoteCheckerPage() {
   return (
     <>
       <script
         type="application/ld+json"
-        nonce={nonce}
         // eslint-disable-next-line react/no-danger
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
       <script
         type="application/ld+json"
-        nonce={nonce}
         // eslint-disable-next-line react/no-danger
         dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }}
       />
@@ -114,7 +87,7 @@ export default async function QuoteCheckerPage() {
         <h1>Is your motorcycle service quote fair?</h1>
         <p>Three quick questions. One honest answer, benchmarked against typical UK prices.</p>
       </div>
-      <QuoteForm signedIn={!!session} initialBrand={initialBrand} initialBikeClass={initialBikeClass} />
+      <QuoteFormForViewer />
       <p className="disclaimer">
         RoadVerdict compares your quote against typical price ranges for the same job on a
         similar bike. It&apos;s guidance, not a professional inspection or a guarantee any
@@ -140,7 +113,6 @@ export default async function QuoteCheckerPage() {
       </section>
       <script
         type="application/ld+json"
-        nonce={nonce}
         // eslint-disable-next-line react/no-danger
         dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }}
       />

@@ -6,12 +6,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import Image from 'next/image';
-import { redirect } from 'next/navigation';
-import { headers } from 'next/headers';
-import { getSession } from '@/lib/auth/session';
 import './homepage.css';
-
-export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = {
   title: 'Know What Your Vehicle Really Costs | RoadVerdict',
@@ -54,16 +49,16 @@ const jsonLd = {
   ],
 };
 
-export default async function HomePage() {
-  const session = await getSession();
-  if (session) redirect('/dashboard');
-  const nonce = (await headers()).get('x-nonce') ?? undefined;
-
+// Static on purpose. Signed-in visitors are redirected to /dashboard by
+// middleware (which checks the session cookie's presence), not by this
+// page - a server-side session check here would force a full server render
+// per visitor, which is exactly what a traffic spike can't afford. The
+// JSON-LD block needs no CSP nonce: it's a data block, never executed.
+export default function HomePage() {
   return (
     <>
       <script
         type="application/ld+json"
-        nonce={nonce}
         // eslint-disable-next-line react/no-danger
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
