@@ -87,7 +87,7 @@ export function AttachmentUploader({ value, onChange, idSuffix = '', compareValu
     <div className="field" style={{ marginTop: '0.9rem' }}>
       <label htmlFor={inputId}>Receipt or invoice (optional)</label>
       {value ? (
-        <div className={ownStyles.attachmentChip}>
+        <div className={`${ownStyles.attachmentChip} ${styles.attachmentChip}`}>
           <AttachmentThumb attachment={value} />
           <span className={ownStyles.attachmentFileName}>{value.fileName}</span>
           <button

@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useActiveSection } from "@/components/ActiveSectionContext";
 import { VehicleSpinner } from "@/components/VehicleSpinner";
 import styles from './LogoutButton.module.css';
+import dashboardStyles from './dashboard.module.css';
 
 export default function LogoutButton() {
   const router = useRouter();
@@ -23,7 +24,9 @@ export default function LogoutButton() {
       type="button"
       onClick={handleLogout}
       disabled={loading}
-      className={styles.logoutButton}
+      // dashboardStyles.logoutButton is only a hook for dashboard.module.css's
+      // `.sidebar .logoutButton` dark-sidebar override.
+      className={`${styles.logoutButton} ${dashboardStyles.logoutButton}`}
     >
       {loading && <VehicleSpinner kind={vehicleKind ?? "bike"} size={20} />}
       {loading ? "Signing out..." : "Sign out"}

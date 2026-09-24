@@ -538,7 +538,9 @@ export function DashboardShell({
   return (
     <TabSwitchProvider onSwitchTab={(cat) => goToTab(cat)}>
       <div className={ownStyles.shell}>
-        <aside className={ownStyles.sidebar}>
+        {/* styles.sidebar is only a hook: dashboard.module.css's `.sidebar .iconBtn`
+            / `.sidebar .logoutButton` rules restyle buttons for the dark sidebar. */}
+        <aside className={`${ownStyles.sidebar} ${styles.sidebar}`}>
           <div className={ownStyles.sidebarLogo}>
             <Link href="/">
               <img src="/logo-dark.png" alt="RoadVerdict" />

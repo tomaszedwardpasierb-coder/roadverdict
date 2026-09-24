@@ -955,7 +955,7 @@ export function ReviewQueueModal({
           {items.map((_, i) => (
             <div
               key={i}
-              className={`${ownStyles.reviewQueueFilmstripItem} ${i < index ? styles.reviewQueueFilmstripDone : i === index ? styles.reviewQueueFilmstripActive : ''}`}
+              className={`${ownStyles.reviewQueueFilmstripItem} ${styles.reviewQueueFilmstripItem} ${i < index ? styles.reviewQueueFilmstripDone : i === index ? styles.reviewQueueFilmstripActive : ''}`}
             />
           ))}
         </div>

@@ -148,6 +148,30 @@
 }
 .mobileTopBar { display: none; }
 .mobileMoreSheet { display: none; }
+/* Must come after the unconditional .shell/.sidebar/.content block above,
+   which would otherwise put the desktop sidebar back on phones. */
+@media (max-width: 900px) {
+  .sidebar { display: none; }
+  .content { padding: 1rem 1rem 5rem; height: calc(100% - 56px); }
+
+  .mobileTopBar {
+    display: flex; align-items: center; justify-content: space-between;
+    height: 56px; padding: 0 1rem; background: var(--paper);
+    border-bottom: 1px solid var(--border); flex-shrink: 0;
+  }
+
+  .mobileMoreSheet {
+    display: block; position: fixed; bottom: 0; left: 0; right: 0;
+    background: var(--paper); border-top: 1px solid var(--border);
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0; padding: 1rem 1.2rem 1.6rem;
+    /* Above .mobileBottomNav's 50, or the nav bar covers the sheet's last
+       item (Sign Out). */
+    z-index: 55; box-shadow: var(--shadow-pop);
+    /* Capped and scrollable: the sheet can be taller than a phone screen. */
+    max-height: 80vh;
+    overflow-y: auto;
+  }
+}
 @media (max-width: 900px) {
   .shell { flex-direction: column; }
   .content { height: auto; flex: 1; }

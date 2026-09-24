@@ -53,7 +53,7 @@ export function BudgetWidget({ yearSpend, currentYear, initialBudget, currency, 
 
   if (editing) {
     return (
-      <form className={ownStyles.budgetCard} onSubmit={handleSubmit}>
+      <form className={`${ownStyles.budgetCard} ${styles.budgetCard}`} onSubmit={handleSubmit}>
         <div className={ownStyles.budgetCardTitle}>Annual budget</div>
         <p className={styles.emptyNote}>
           No budget set for {currentYear} yet - optional, purely for your own tracking.
@@ -132,7 +132,7 @@ export function BudgetWidget({ yearSpend, currentYear, initialBudget, currency, 
       })();
 
   return (
-    <div className={`${ownStyles.budgetCard} ${statusClass}`}>
+    <div className={`${ownStyles.budgetCard} ${styles.budgetCard} ${statusClass}`}>
       <div className={ownStyles.budgetCardTitle} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
         {forecastMode ? `Future budget (${windowLabel})` : `Annual budget (${currentYear})`}
         {forecastMode && <span className={styles.forecastBadge}>Estimate</span>}

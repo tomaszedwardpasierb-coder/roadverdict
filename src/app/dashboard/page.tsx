@@ -583,7 +583,7 @@ export default async function DashboardPage(props: { searchParams: Promise<{ add
         />
       </div>
 
-      <div className={`${ownStyles.dashboardTwoCol} ${styles.equalHeightRow}`}>
+      <div className={`${ownStyles.dashboardTwoCol} ${styles.dashboardTwoCol} ${styles.equalHeightRow}`}>
         <BudgetWidget yearSpend={yearSpend} currentYear={currentYear} initialBudget={bike.annualBudget} currency={currency} rates={rates} yearEndProjection={yearEndProjection} spendForecastByWindow={spendForecastByWindow} />
         <div className={styles.chartCard}>
           {summary.grandTotal > 0 ? (
@@ -597,7 +597,7 @@ export default async function DashboardPage(props: { searchParams: Promise<{ add
         </div>
       </div>
 
-      <div className={ownStyles.dashboardTwoCol}>
+      <div className={`${ownStyles.dashboardTwoCol} ${styles.dashboardTwoCol}`}>
         <div className={styles.chartCard}>
           {mileagePoints.length > 0 ? (
             <MileageChart points={mileagePoints} distanceUnit={distanceUnit} initialChartType={bike.chartTypes?.["mileage"] === "bar" ? "bar" : "line"} forecast={mileageForecastByWindow} />
@@ -1344,7 +1344,7 @@ async function renderCarDashboard(
         />
       </div>
 
-      <div className={`${ownStyles.dashboardTwoCol} ${styles.equalHeightRow}`}>
+      <div className={`${ownStyles.dashboardTwoCol} ${styles.dashboardTwoCol} ${styles.equalHeightRow}`}>
         <BudgetWidget yearSpend={yearSpend} currentYear={currentYear} initialBudget={car.annualBudget} currency={currency} rates={rates} vehicleKind="car" yearEndProjection={yearEndProjection} spendForecastByWindow={spendForecastByWindow} />
         <div className={styles.chartCard}>
           {summary.grandTotal > 0 ? (
@@ -1358,7 +1358,7 @@ async function renderCarDashboard(
         </div>
       </div>
 
-      <div className={ownStyles.dashboardTwoCol}>
+      <div className={`${ownStyles.dashboardTwoCol} ${styles.dashboardTwoCol}`}>
         <div className={styles.chartCard}>
           {mileagePoints.length > 0 ? (
             <MileageChart points={mileagePoints} distanceUnit={distanceUnit} initialChartType={car.chartTypes?.["mileage"] === "bar" ? "bar" : "line"} vehicleKind="car" forecast={mileageForecastByWindow} />

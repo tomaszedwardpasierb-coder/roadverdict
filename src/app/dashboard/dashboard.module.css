@@ -505,40 +505,14 @@
   box-shadow: var(--shadow-card);
   flex-shrink: 0;
 }
-/* --- Fix: shell must own the full viewport, not sit inside the site's
-   marketing-page <main> (which still caps width at 900px and centres
-   it). position:fixed detaches it from that ancestor entirely and
-   visually covers the old site header too. --- */
+/* The shell-level mobile rules (.sidebar, .content, .mobileTopBar,
+   .mobileMoreSheet) live in DashboardShell.module.css, which is the module
+   DashboardShell applies those classes from. */
 @media (max-width: 900px) {
-  .sidebar { display: none; }
-  .content { padding: 1rem 1rem 5rem; height: calc(100% - 56px); }
-
-  .mobileTopBar {
-    display: flex; align-items: center; justify-content: space-between;
-    height: 56px; padding: 0 1rem; background: var(--paper);
-    border-bottom: 1px solid var(--border); flex-shrink: 0;
-  }
   .mobileTopBarBike { font-size: 0.85rem; }
   .mobileTopBarBike strong { display: block; font-family: var(--font-display); }
   .mobileTopBarBike span { color: var(--ink-soft); font-size: 0.75rem; }
 
-  .mobileMoreSheet {
-    display: block; position: fixed; bottom: 0; left: 0; right: 0;
-    background: var(--paper); border-top: 1px solid var(--border);
-    border-radius: var(--radius-lg) var(--radius-lg) 0 0; padding: 1rem 1.2rem 1.6rem;
-    /* Was 40, below .mobileBottomNav's 50 - the nav bar was rendering
-       on top of whatever sat at the bottom of this sheet's content,
-       which is exactly why Sign Out (the last item) was invisible and
-       unclickable even though it was genuinely present in the DOM. */
-    z-index: 55; box-shadow: var(--shadow-pop);
-    /* Capped and scrollable rather than growing to fit its content -
-       this sheet now holds nine nav items plus the whole account
-       section, comfortably taller than some phone screens, and an
-       uncapped fixed-position element with more content than fits
-       just pushes its top off-screen instead of scrolling. */
-    max-height: 80vh;
-    overflow-y: auto;
-  }
   .mobileMoreSheetItem {
     display: block; width: 100%; text-align: left; background: none; border: none;
     padding: 0.7rem 0; font-family: var(--font-display); font-size: 0.95rem;
