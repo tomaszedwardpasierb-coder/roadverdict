@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { NextRequest } from "next/server";
-import { middleware } from "../../middleware";
+import { middleware } from "../../src/middleware";
 
-function request(path = "/dashboard"): NextRequest {
-  return new NextRequest(`http://localhost${path}`);
+function request(path = "/dashboard", host = "localhost"): NextRequest {
+  return new NextRequest(`http://${host}${path}`, { headers: { host } });
 }
 
 describe("middleware", () => {
@@ -39,5 +39,16 @@ describe("middleware", () => {
     const first = middleware(request()).headers.get("Content-Security-Policy");
     const second = middleware(request()).headers.get("Content-Security-Policy");
     expect(first).not.toEqual(second);
+  });
+
+  it("redirects www.roadverdict.co.uk to the apex domain, preserving the path", () => {
+    const response = middleware(request("/motorcycles", "www.roadverdict.co.uk"));
+    expect(response.status).toBe(308);
+    expect(response.headers.get("location")).toBe("http://roadverdict.co.uk/motorcycles");
+  });
+
+  it("does not redirect the apex domain itself", () => {
+    const response = middleware(request("/motorcycles", "roadverdict.co.uk"));
+    expect(response.status).not.toBe(308);
   });
 });
