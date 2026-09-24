@@ -14,6 +14,7 @@
 // a way this page shouldn't duplicate.
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import Image from 'next/image';
 import { ViewerCtaLink, ViewerSwitchKindLink } from '@/components/viewer/ViewerCta';
 import { buildBreadcrumbJsonLd } from '@/lib/seo/breadcrumbs';
 
@@ -29,6 +30,7 @@ const jsonLd = {
   '@type': 'WebApplication',
   name: 'RoadVerdict for motorcycles',
   applicationCategory: 'UtilitiesApplication',
+  image: 'https://roadverdict.co.uk/images/hero/garage-owner-cars-motorcycles.webp',
   operatingSystem: 'Any',
   offers: {
     '@type': 'Offer',
@@ -105,7 +107,7 @@ export default function MotorcyclesPage() {
       />
 
       {/* ── HERO ─────────────────────────────────────────────────────── */}
-      <section className="rv-hero" aria-label="Hero">
+      <section className="rv-hero rv-hero--figure" aria-label="Hero">
         <div className="rv-hero-content">
           <div className="rv-hero-eyebrow">
             <span className="rv-eyebrow-dot" aria-hidden="true" />
@@ -141,6 +143,22 @@ export default function MotorcyclesPage() {
               AI reads your receipts
             </li>
           </ul>
+        </div>
+        {/* Hero illustration. Alt text is descriptive on purpose (image search
+            and accessibility); priority + fetchPriority because on desktop this
+            is the LCP element. The comic art hides compression well, and
+            next/image serves it as AVIF/WebP at the width each screen needs. */}
+        <div className="rv-hero-figure">
+          <Image
+            src="/images/hero/garage-owner-cars-motorcycles.webp"
+            alt="A rider relaxing in a garage with a coffee, checking his bike's service history on the RoadVerdict app, surrounded by motorcycles, classic cars and modern cars"
+            fill
+            sizes="(max-width: 900px) 100vw, 60vw"
+            priority
+            fetchPriority="high"
+            quality={70}
+            style={{ objectFit: 'cover', objectPosition: '30% center' }}
+          />
         </div>
       </section>
 

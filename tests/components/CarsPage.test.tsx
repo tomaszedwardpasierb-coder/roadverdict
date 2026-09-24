@@ -59,6 +59,23 @@ describe("CarsPage", () => {
     expect(parsed.offers).toMatchObject({ price: "0", priceCurrency: "GBP" });
   });
 
+  it("shows the shared hero illustration with descriptive alt text (for image search and screen readers), priority-loaded as the LCP element", () => {
+    render(<CarsPage />);
+
+    const img = screen.getByRole("img", { name: /car owner relaxing in a garage.*service history.*RoadVerdict/i });
+    expect(img.getAttribute("src")).toContain(encodeURIComponent("/images/hero/garage-owner-cars-motorcycles.webp"));
+    expect(img).toHaveAttribute("fetchpriority", "high");
+    expect(img).not.toHaveAttribute("loading", "lazy");
+  });
+
+  it("lists the hero image in its WebApplication structured data", () => {
+    const { container } = render(<CarsPage />);
+
+    const scripts = Array.from(container.querySelectorAll('script[type="application/ld+json"]'));
+    const webApp = scripts.map((s) => JSON.parse(s.textContent ?? "{}")).find((j) => j["@type"] === "WebApplication");
+    expect(webApp.image).toBe("https://roadverdict.co.uk/images/hero/garage-owner-cars-motorcycles.webp");
+  });
+
   it("renders all five feature cards", () => {
     render(<CarsPage />);
 

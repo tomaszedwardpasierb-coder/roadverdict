@@ -2,10 +2,10 @@
 //
 // Public, signed-out marketing landing page for car support - the /cars
 // namespace from RoadVerdict_Car_Plan_v3.md's Phase 4. Reuses the
-// homepage's rv-* design system (same dark hero, same amber accent) but
-// deliberately without the homepage's comic-panel photography, since
-// there's no car-specific hero imagery to show - a text-led hero is
-// honest about that rather than reusing motorcycle photos on a car page.
+// homepage's rv-* design system (same dark hero, same amber accent). The
+// hero pairs the text with one shared illustration of a garage holding both
+// cars and motorcycles (also used on /motorcycles) rather than the
+// homepage's motorcycle-only comic panels.
 //
 // Links to /cars/quote-checker, /cars/cost-calculator, and
 // /cars/buying-guide - the car equivalents of the motorcycle tools,
@@ -16,6 +16,7 @@
 // available for cars.
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import Image from 'next/image';
 import { ViewerCtaLink, ViewerSwitchKindLink } from '@/components/viewer/ViewerCta';
 import { buildBreadcrumbJsonLd } from '@/lib/seo/breadcrumbs';
 
@@ -31,6 +32,7 @@ const jsonLd = {
   '@type': 'WebApplication',
   name: 'RoadVerdict for cars',
   applicationCategory: 'UtilitiesApplication',
+  image: 'https://roadverdict.co.uk/images/hero/garage-owner-cars-motorcycles.webp',
   operatingSystem: 'Any',
   offers: {
     '@type': 'Offer',
@@ -104,7 +106,7 @@ export default function CarsPage() {
       />
 
       {/* ── HERO ─────────────────────────────────────────────────────── */}
-      <section className="rv-hero" aria-label="Hero">
+      <section className="rv-hero rv-hero--figure" aria-label="Hero">
         <div className="rv-hero-content">
           <div className="rv-hero-eyebrow">
             <span className="rv-eyebrow-dot" aria-hidden="true" />
@@ -140,6 +142,22 @@ export default function CarsPage() {
               AI reads your receipts
             </li>
           </ul>
+        </div>
+        {/* Hero illustration. Alt text is descriptive on purpose (image search
+            and accessibility); priority + fetchPriority because on desktop this
+            is the LCP element. The comic art hides compression well, and
+            next/image serves it as AVIF/WebP at the width each screen needs. */}
+        <div className="rv-hero-figure">
+          <Image
+            src="/images/hero/garage-owner-cars-motorcycles.webp"
+            alt="A car owner relaxing in a garage with a coffee, checking his vehicle's service history on the RoadVerdict app, surrounded by classic and modern cars and motorcycles"
+            fill
+            sizes="(max-width: 900px) 100vw, 60vw"
+            priority
+            fetchPriority="high"
+            quality={70}
+            style={{ objectFit: 'cover', objectPosition: '30% center' }}
+          />
         </div>
       </section>
 

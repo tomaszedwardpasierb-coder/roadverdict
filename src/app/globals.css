@@ -1086,6 +1086,56 @@ body:has(main [data-admin-shell]) [data-assistant-widget] {
   flex-wrap: wrap;
 }
 
+/* ── Hub pages (/cars, /motorcycles): illustration beside the hero text ─
+   Desktop: text left, image right, vertically centred. Below 1100px
+   the column would be too narrow to show the scene, so it stacks instead -
+   image on top, text below - and the hero drops its fixed height. */
+/* min-height, not the base rule's fixed height: the text column here is narrower,
+   so it can run taller than the fixed height and get clipped. */
+.rv-hero.rv-hero--figure {
+  gap: 3rem;
+  height: auto;
+  min-height: clamp(480px, 30vw, 680px);
+}
+.rv-hero--figure .rv-hero-content { flex: 0 0 min(440px, 42%); }
+.rv-hero-figure {
+  position: relative;
+  z-index: 1;
+  flex: 1 1 0;
+  min-width: 0;
+  /* Frame keeps the image's own 1584:672 proportions, so the whole scene (cars
+     AND motorcycles) is always visible instead of being cropped to fit the
+     hero's height. */
+  align-self: center;
+  aspect-ratio: 1584 / 672;
+  max-width: 1100px;
+  margin-left: auto;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid rgba(240, 237, 230, 0.12);
+  background: #161616;
+}
+@media (max-width: 1100px) {
+  .rv-hero.rv-hero--figure {
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: flex-start;
+    gap: 1.5rem;
+    min-height: 0;
+    padding: 1.5rem 1.2rem 2.5rem;
+  }
+  .rv-hero--figure .rv-hero-content { flex: 0 0 auto; max-width: none; }
+  .rv-hero-figure {
+    order: -1;
+    flex: 0 0 auto;
+    align-self: auto;
+    width: 100%;
+    max-width: none;
+    margin-left: 0;
+    aspect-ratio: 1584 / 672;
+  }
+}
+
 /* ── Responsive tweaks ────────────────────────────────────────────── */
 @media (max-width: 640px) {
   .rv-hero { padding: 3rem 1.2rem; height: clamp(420px, 90vw, 520px); }
