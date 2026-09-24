@@ -28,6 +28,24 @@ const nextConfig = {
   // final bundle was already tree-shaken correctly either way).
   experimental: {
     optimizePackageImports: ['lucide-react', 'react-icons'],
+    // Puts each page's CSS in its own HTML instead of separate stylesheet
+    // requests. Lighthouse showed three render-blocking stylesheets on the
+    // homepage (~300 ms on slow 4G); the public pages are static now, so the
+    // inlined CSS is just part of HTML that's prerendered once. Tradeoff: no
+    // separate stylesheet caching across pages, so repeat page loads carry
+    // the CSS again.
+    // inlineCss: true,
+  },
+  images: {
+    // AVIF first, WebP as the fallback. The hero image is ~28 KiB as AVIF
+    // vs ~64 KiB as WebP q68 (both at 828w, what a 2x phone requests).
+    formats: ['image/avif', 'image/webp'],
+    // Optimized images are otherwise revalidated every 60s by default, which
+    // under load means repeatedly re-encoding the same variants (AVIF costs
+    // more CPU than WebP) on a single small instance. The cache lives in
+    // .next and is replaced on every deploy, so a long TTL can't outlive a
+    // change to a source image.
+    minimumCacheTTL: 60 * 60 * 24 * 30,
   },
   async headers() {
     return [

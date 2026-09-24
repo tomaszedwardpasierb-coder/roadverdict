@@ -27,11 +27,17 @@ const inter = Inter({
   variable: '--font-body',
   display: 'swap',
 });
+// preload: false - Plex Mono isn't used above the fold, and its two static
+// weight files were being preloaded at high priority ahead of the hero
+// image, competing for the same early bandwidth on slow connections.
+// (Big Shoulders and Inter are variable fonts - one file covers every
+// weight - so there's nothing to trim there.)
 const plexMono = IBM_Plex_Mono({
   subsets: ['latin'],
   weight: ['400', '500'],
   variable: '--font-mono',
   display: 'swap',
+  preload: false,
 });
 // Vehicle-neutral on purpose - this is the fallback every page without its
 // own metadata falls back to, and cars are a fully shipped, equally-weighted

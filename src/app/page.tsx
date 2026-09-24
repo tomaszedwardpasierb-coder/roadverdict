@@ -82,6 +82,9 @@ export default function HomePage() {
               // fetchpriority hint - Lighthouse's "LCP request discovery"
               // flagged it as not priority-hinted.
               fetchPriority="high"
+              // Kept at 68: Next encodes AVIF a notch below the quality prop, and 50
+              // visibly smeared the faces/chrome. With AVIF enabled (next.config.mjs)
+              // 68 is ~28 KiB at 828w vs ~64 KiB as WebP q68 - same visual quality.
               quality={68}
             />
             <div className="rv-panel-overlay" />
