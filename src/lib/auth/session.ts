@@ -1,14 +1,32 @@
 // Place at: src/lib/auth/session.ts
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { getContainer } from "@/lib/cosmos";
 import { hashToken, decodeEmail, generateToken, encodeEmail } from "@/lib/auth/crypto";
 import { isAccountBlocked } from "@/lib/tracker/userDoc";
 import { getAssistantConfig } from "@/lib/tracker/assistantConfig";
 
+// The Android app can't hold an httpOnly cookie the way a browser does, so
+// it sends the very same `${encodedEmail}.${sessionRaw}` value as a bearer
+// token instead - one session format, one lookup, whichever way it
+// arrives. The cookie wins when both are present, so nothing about how a
+// browser signs in changes.
+export function parseBearerToken(authorization: string | null | undefined): string | null {
+  if (!authorization) return null;
+  const match = /^Bearer\s+(\S+)$/i.exec(authorization.trim());
+  return match ? match[1] : null;
+}
+
+export async function getSessionToken(): Promise<string | null> {
+  const cookieStore = await cookies();
+  const fromCookie = cookieStore.get("session")?.value;
+  if (fromCookie) return fromCookie;
+  const headerStore = await headers();
+  return parseBearerToken(headerStore.get("authorization"));
+}
+
 export async function getSession(): Promise<{ email: string } | null> {
   const container = getContainer();
-  const cookieStore = await cookies();
-  const raw = cookieStore.get("session")?.value;
+  const raw = await getSessionToken();
   if (!raw) return null;
 
   const [encodedEmail, sessionRaw] = raw.split(".");
@@ -27,6 +45,7 @@ export async function getSession(): Promise<{ email: string } | null> {
     // through, so blocking takes effect immediately, not just on the
     // account's next login attempt.
     if (await isAccountBlocked(email)) return null;
+    if (resource.client === "app") await renewAppSession(sessionHash, email, resource.expiresAt);
     return { email };
   } catch {
     return null;
@@ -35,10 +54,45 @@ export async function getSession(): Promise<{ email: string } | null> {
 
 export const SESSION_TTL_SECONDS = 30 * 24 * 60 * 60;
 
+// Phone sessions last longer and slide: someone who opens the app at
+// least once every 90 days never has to sign in again, while a lost or
+// abandoned phone's session still dies on its own. Renewal is written at
+// most once a day per session rather than on every request - a single
+// app screen fires several API calls, and each renewal is a Cosmos write.
+export const APP_SESSION_TTL_SECONDS = 90 * 24 * 60 * 60;
+const APP_SESSION_RENEW_AFTER_SECONDS = 24 * 60 * 60;
+
+async function renewAppSession(sessionHash: string, email: string, expiresAt: string): Promise<void> {
+  const remainingSeconds = (new Date(expiresAt).getTime() - Date.now()) / 1000;
+  if (remainingSeconds > APP_SESSION_TTL_SECONDS - APP_SESSION_RENEW_AFTER_SECONDS) return;
+  try {
+    await getContainer()
+      .item(sessionHash, email)
+      .patch([
+        { op: "set", path: "/expiresAt", value: new Date(Date.now() + APP_SESSION_TTL_SECONDS * 1000).toISOString() },
+        // Cosmos counts ttl from the document's last write, so re-setting
+        // it alongside expiresAt keeps the two in step.
+        { op: "set", path: "/ttl", value: APP_SESSION_TTL_SECONDS },
+      ]);
+  } catch (err) {
+    // The request itself is still validly signed in - a failed renewal
+    // only means this session expires on its old date unless a later
+    // request renews it.
+    console.error(`renewAppSession: failed to renew app session for ${email}:`, err);
+  }
+}
+
 // Shared by the real magic-link verify route and the demo-account
 // bypass - both need to end up with an identical, equally-real session,
 // not two slightly different implementations of "logged in".
-export async function createSessionForEmail(email: string, ip: string, userAgent: string): Promise<{ cookieValue: string; maxAge: number }> {
+export async function createSessionForEmail(
+  email: string,
+  ip: string,
+  userAgent: string,
+  options: { client?: "web" | "app" } = {}
+): Promise<{ cookieValue: string; maxAge: number }> {
+  const isApp = options.client === "app";
+  const ttlSeconds = isApp ? APP_SESSION_TTL_SECONDS : SESSION_TTL_SECONDS;
   const container = getContainer();
 
   // .item(id, pk).read() on a non-existent item resolves successfully
@@ -81,7 +135,7 @@ export async function createSessionForEmail(email: string, ip: string, userAgent
 
   const { raw: sessionRaw, hash: sessionHash } = generateToken();
   const now = new Date();
-  const expiresAt = new Date(now.getTime() + SESSION_TTL_SECONDS * 1000);
+  const expiresAt = new Date(now.getTime() + ttlSeconds * 1000);
 
   await container.items.create({
     id: sessionHash,
@@ -89,10 +143,11 @@ export async function createSessionForEmail(email: string, ip: string, userAgent
     type: "session",
     createdAt: now.toISOString(),
     expiresAt: expiresAt.toISOString(),
-    ttl: SESSION_TTL_SECONDS,
+    ttl: ttlSeconds,
     ip,
     userAgent,
+    ...(isApp ? { client: "app" } : {}),
   });
 
-  return { cookieValue: `${encodeEmail(email)}.${sessionRaw}`, maxAge: SESSION_TTL_SECONDS };
+  return { cookieValue: `${encodeEmail(email)}.${sessionRaw}`, maxAge: ttlSeconds };
 }

@@ -287,7 +287,7 @@ export async function deleteAccount(email: string): Promise<void> {
     "user", "session", "magicLink", "notification", "pendingScanBatch",
     "bikeTransferRequest", "receiptRequest", "carTransferRequest", "carReceiptRequest",
     "totpEnrollmentPending", "totpPendingLogin", "totpAttempt", "trackerWriteAttempt",
-    "vaultSession", "vaultUploadLock",
+    "vaultSession", "vaultUploadLock", "appLoginCode", "appLoginCodeAttempt",
   ];
   await Promise.all(
     pointDeleteTypes.map(async (type) => {

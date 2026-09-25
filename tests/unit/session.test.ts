@@ -4,18 +4,23 @@ const mocks = vi.hoisted(() => ({
   read: vi.fn(),
   itemsCreate: vi.fn(),
   cookieGet: vi.fn(),
+  headerGet: vi.fn(),
+  patch: vi.fn(),
   getAssistantConfig: vi.fn(),
 }));
 
 const mockContainer = {
-  item: vi.fn((_id?: string, _pk?: string) => ({ read: mocks.read })),
+  item: vi.fn((_id?: string, _pk?: string) => ({ read: mocks.read, patch: mocks.patch })),
   items: {
     create: mocks.itemsCreate,
   },
 };
 
 vi.mock("@/lib/cosmos", () => ({ getContainer: () => mockContainer }));
-vi.mock("next/headers", () => ({ cookies: vi.fn(async () => ({ get: mocks.cookieGet })) }));
+vi.mock("next/headers", () => ({
+  cookies: vi.fn(async () => ({ get: mocks.cookieGet })),
+  headers: vi.fn(async () => ({ get: mocks.headerGet })),
+}));
 // Mocked directly, separate from the raw container mock above - kept
 // decoupled from the same `mocks.read` every other `.item(...).read()`
 // call in this file shares, so per-test onboarding-auto-enable behaviour
@@ -27,13 +32,17 @@ vi.mock("@/lib/tracker/assistantConfig", () => ({ getAssistantConfig: mocks.getA
 // so these tests verify the genuine cookie-encodes-to-what-getSession-
 // decodes relationship, not a stand-in for it.
 
-import { getSession, createSessionForEmail, SESSION_TTL_SECONDS } from "@/lib/auth/session";
+import { getSession, createSessionForEmail, parseBearerToken, SESSION_TTL_SECONDS, APP_SESSION_TTL_SECONDS } from "@/lib/auth/session";
 import { hashToken, decodeEmail, encodeEmail } from "@/lib/auth/crypto";
 
 function resetAllMocks() {
   mocks.read.mockReset();
   mocks.itemsCreate.mockReset();
   mocks.cookieGet.mockReset();
+  mocks.headerGet.mockReset();
+  mocks.headerGet.mockReturnValue(null);
+  mocks.patch.mockReset();
+  mocks.patch.mockResolvedValue({});
   mockContainer.item.mockClear();
   mocks.getAssistantConfig.mockReset();
   // Off by default, matching the real assistantConfig.
@@ -113,8 +122,97 @@ describe("getSession", () => {
       read: vi.fn(async () => {
         throw new Error("cosmos unavailable");
       }),
+      patch: mocks.patch,
     });
     expect(await getSession()).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------
+// Bearer tokens and app sessions (the Android app)
+// ---------------------------------------------------------------------
+
+describe("parseBearerToken", () => {
+  it("extracts the token from a Bearer header, case-insensitively", () => {
+    expect(parseBearerToken("Bearer abc.def")).toBe("abc.def");
+    expect(parseBearerToken("bearer abc.def")).toBe("abc.def");
+  });
+
+  it("returns null for a missing header or any other scheme", () => {
+    expect(parseBearerToken(null)).toBeNull();
+    expect(parseBearerToken(undefined)).toBeNull();
+    expect(parseBearerToken("Basic dXNlcjpwYXNz")).toBeNull();
+    expect(parseBearerToken("Bearer")).toBeNull();
+    expect(parseBearerToken("Bearer a b")).toBeNull();
+  });
+});
+
+describe("getSession from a bearer token", () => {
+  beforeEach(resetAllMocks);
+
+  it("accepts the same session value as a bearer token when there is no cookie", async () => {
+    mocks.cookieGet.mockReturnValue(undefined);
+    mocks.headerGet.mockImplementation((name: string) =>
+      name === "authorization" ? `Bearer ${encodeEmail("rider@example.com")}.raw-app-token` : null
+    );
+    mocks.read.mockResolvedValue({ resource: { type: "session", expiresAt: "2099-01-01T00:00:00.000Z" } });
+
+    expect(await getSession()).toEqual({ email: "rider@example.com" });
+    expect(mockContainer.item).toHaveBeenCalledWith(hashToken("raw-app-token"), "rider@example.com");
+  });
+
+  it("prefers the cookie when a request carries both", async () => {
+    mocks.cookieGet.mockReturnValue({ value: `${encodeEmail("cookie@example.com")}.cookie-token` });
+    mocks.headerGet.mockReturnValue(`Bearer ${encodeEmail("bearer@example.com")}.bearer-token`);
+    mocks.read.mockResolvedValue({ resource: { type: "session", expiresAt: "2099-01-01T00:00:00.000Z" } });
+
+    expect(await getSession()).toEqual({ email: "cookie@example.com" });
+    expect(mockContainer.item).toHaveBeenCalledWith(hashToken("cookie-token"), "cookie@example.com");
+  });
+
+  it("slides an app session forward once it is more than a day old", async () => {
+    mocks.cookieGet.mockReturnValue(undefined);
+    mocks.headerGet.mockReturnValue(`Bearer ${encodeEmail("rider@example.com")}.raw-app-token`);
+    const twoDaysUsed = new Date(Date.now() + (APP_SESSION_TTL_SECONDS - 2 * 24 * 60 * 60) * 1000).toISOString();
+    mocks.read.mockResolvedValue({ resource: { type: "session", client: "app", expiresAt: twoDaysUsed } });
+
+    expect(await getSession()).toEqual({ email: "rider@example.com" });
+
+    expect(mocks.patch).toHaveBeenCalledTimes(1);
+    const ops = mocks.patch.mock.calls[0][0] as { op: string; path: string; value: unknown }[];
+    const newExpiry = new Date(ops.find((o) => o.path === "/expiresAt")!.value as string).getTime();
+    expect(newExpiry).toBeGreaterThan(Date.now() + (APP_SESSION_TTL_SECONDS - 60) * 1000);
+    expect(ops.find((o) => o.path === "/ttl")!.value).toBe(APP_SESSION_TTL_SECONDS);
+  });
+
+  it("doesn't write a renewal for an app session renewed within the last day", async () => {
+    mocks.cookieGet.mockReturnValue(undefined);
+    mocks.headerGet.mockReturnValue(`Bearer ${encodeEmail("rider@example.com")}.raw-app-token`);
+    const fresh = new Date(Date.now() + (APP_SESSION_TTL_SECONDS - 60 * 60) * 1000).toISOString();
+    mocks.read.mockResolvedValue({ resource: { type: "session", client: "app", expiresAt: fresh } });
+
+    expect(await getSession()).toEqual({ email: "rider@example.com" });
+    expect(mocks.patch).not.toHaveBeenCalled();
+  });
+
+  it("never slides a web session, however old", async () => {
+    mocks.cookieGet.mockReturnValue({ value: `${encodeEmail("user@example.com")}.raw-session-value` });
+    const nearlyExpired = new Date(Date.now() + 60 * 60 * 1000).toISOString();
+    mocks.read.mockResolvedValue({ resource: { type: "session", expiresAt: nearlyExpired } });
+
+    expect(await getSession()).toEqual({ email: "user@example.com" });
+    expect(mocks.patch).not.toHaveBeenCalled();
+  });
+
+  it("still signs the request in when the renewal write fails", async () => {
+    const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    mocks.cookieGet.mockReturnValue(undefined);
+    mocks.headerGet.mockReturnValue(`Bearer ${encodeEmail("rider@example.com")}.raw-app-token`);
+    mocks.read.mockResolvedValue({ resource: { type: "session", client: "app", expiresAt: new Date(Date.now() + 1000 * 60 * 60).toISOString() } });
+    mocks.patch.mockRejectedValue(new Error("cosmos unavailable"));
+
+    expect(await getSession()).toEqual({ email: "rider@example.com" });
+    consoleErrorSpy.mockRestore();
   });
 });
 
@@ -191,6 +289,7 @@ describe("createSessionForEmail", () => {
       read: vi.fn(async () => {
         throw new Error("cosmos unavailable");
       }),
+      patch: mocks.patch,
     });
 
     const result = await createSessionForEmail("user@example.com", "1.2.3.4", "test-agent");
@@ -279,5 +378,21 @@ describe("createSessionForEmail", () => {
     });
 
     expect(await getSession()).toEqual({ email: "user@example.com" });
+  });
+  it("creates a 90-day app session, marked as such, when asked for one", async () => {
+    mocks.read.mockResolvedValue({ resource: { id: "rider@example.com" } });
+
+    const result = await createSessionForEmail("rider@example.com", "1.2.3.4", "okhttp/4.12", { client: "app" });
+
+    const sessionCreateCall = mocks.itemsCreate.mock.calls.find((call) => call[0].type === "session");
+    expect(sessionCreateCall![0]).toMatchObject({ client: "app", ttl: APP_SESSION_TTL_SECONDS });
+    expect(result.maxAge).toBe(APP_SESSION_TTL_SECONDS);
+  });
+
+  it("doesn't mark a web session as an app session", async () => {
+    mocks.read.mockResolvedValue({ resource: { id: "user@example.com" } });
+    await createSessionForEmail("user@example.com", "1.2.3.4", "test-agent");
+    const sessionCreateCall = mocks.itemsCreate.mock.calls.find((call) => call[0].type === "session");
+    expect(sessionCreateCall![0].client).toBeUndefined();
   });
 });

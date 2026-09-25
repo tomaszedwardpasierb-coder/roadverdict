@@ -128,6 +128,27 @@ export async function sendMagicLinkEmail(email: string, link: string) {
     html,
   });
 }
+// The app's sign-in code. The code sits in the subject line too, so most
+// phones show it in the notification without the email being opened.
+export async function sendAppLoginCodeEmail(email: string, code: string) {
+  const resend = getResend();
+  const html = renderEmailLayout({
+    preheader: `Your RoadVerdict code is ${code} - expires in 10 minutes.`,
+    heading: "Your sign-in code",
+    bodyHtml: `
+      <p style="margin:0 0 8px;">Type this code into the RoadVerdict app to sign in. It expires in 10 minutes and can only be used once.</p>
+      <p style="margin:16px 0 20px;font-family:'Courier New',monospace;font-size:32px;font-weight:700;letter-spacing:8px;color:#17181B;">${escapeHtml(code)}</p>
+      <p style="margin:0;color:#54555A;font-size:13px;">If you didn't request this, you can safely ignore this email - no one can sign in without the code.</p>
+    `,
+  });
+  await resend.emails.send({
+    from: FROM,
+    to: email,
+    subject: `${code} is your RoadVerdict sign-in code`,
+    html,
+  });
+}
+
 export async function sendReminderEmail(email: string, reminderName: string, detail: string) {
   const resend = getResend();
   const appUrl = process.env.APP_URL ?? "https://roadverdict.co.uk";

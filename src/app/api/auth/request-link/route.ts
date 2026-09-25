@@ -8,6 +8,7 @@ import { getSafeRedirectPath } from "@/lib/auth/safeRedirect";
 import { demoBikeExists, runDemoSeed } from "@/lib/tracker/demoSeedRunner";
 import { isAccountBlocked } from "@/lib/tracker/userDoc";
 import { getAdminSession } from "@/lib/admin/session";
+import { getClientIp, isIpRateLimited, recordIpAttempt } from "@/lib/auth/signInRateLimit";
 
 const RATE_LIMIT_MS = 60_000;
 const MAGIC_LINK_TTL_SECONDS = 15 * 60;
@@ -33,64 +34,11 @@ async function isRateLimited(container: ReturnType<typeof getContainer>, email: 
   return resources.length > 0;
 }
 
-// The per-email cooldown above only ever throttles requests for the
-// SAME target email - it does nothing to stop a script from requesting
-// a link for a large number of DISTINCT emails (using this app's own
-// transactional mailer as a spam/email-bombing relay), since each one
-// individually stays under that limit. A per-IP ceiling closes that gap,
-// same one-document-per-attempt, Cosmos-ttl-expired pattern
-// twoFactor.ts's checkTotpRateLimit/recordTotpAttempt already use for an
-// analogous "many attempts, one identity" budget. Generous on purpose -
-// a shared office/cafe IP legitimately requesting several real accounts'
-// links shouldn't be blocked, but a scripted burst against thousands of
-// addresses will hit this fast.
-const IP_RATE_LIMIT_WINDOW_SECONDS = 15 * 60;
-const IP_RATE_LIMIT_MAX_ATTEMPTS = 20;
-
-function ipAttemptPrefix(ip: string): string {
-  return `magic-link-ip-attempt:${ip}:`;
-}
-
-async function isIpRateLimited(container: ReturnType<typeof getContainer>, ip: string): Promise<boolean> {
-  // Can't rate-limit an identity we can't actually distinguish - fails
-  // open here rather than accidentally throttling every "unknown-ip"
-  // request as if it were the same one caller.
-  if (ip === "unknown") return false;
-  const { resources } = await container.items
-    .query<{ id: string }>(
-      {
-        query: "SELECT c.id FROM c WHERE c.type = 'magicLinkIpAttempt' AND STARTSWITH(c.id, @prefix)",
-        parameters: [{ name: "@prefix", value: ipAttemptPrefix(ip) }],
-      },
-      { partitionKey: `ip:${ip}` }
-    )
-    .fetchAll();
-  return resources.length >= IP_RATE_LIMIT_MAX_ATTEMPTS;
-}
-
-async function recordIpAttempt(container: ReturnType<typeof getContainer>, ip: string): Promise<void> {
-  if (ip === "unknown") return;
-  const suffix = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-  await container.items.create({
-    id: `${ipAttemptPrefix(ip)}${suffix}`,
-    pk: `ip:${ip}`,
-    type: "magicLinkIpAttempt",
-    createdAt: new Date().toISOString(),
-    ttl: IP_RATE_LIMIT_WINDOW_SECONDS,
-  });
-}
-
 // Exact, hardcoded, case-normalised match only - deliberately not a
 // pattern, a prefix check, or anything derived from user input. This is
 // the one email address in the entire app that skips real verification,
 // so it has to be impossible to accidentally widen.
 const DEMO_EMAIL = "demo@roadverdict.co.uk";
-
-function getClientIp(req: NextRequest): string {
-  const forwarded = req.headers.get("x-forwarded-for");
-  if (forwarded) return forwarded.split(",")[0].trim();
-  return "unknown";
-}
 
 export async function POST(req: NextRequest) {
   const container = getContainer();
@@ -120,7 +68,7 @@ export async function POST(req: NextRequest) {
 
   // Handled before the IP ceiling below on purpose - the demo bypass
   // sends no real email, so it isn't exposed to the spam-relay threat
-  // that ceiling exists for (see its own comment). Checking IP first
+  // that ceiling exists for (see signInRateLimit.ts). Checking IP first
   // meant every authenticated-e2e CI run's own demo logins - three per
   // pipeline attempt, repeated across a busy day of pushes - counted
   // against the exact same 20-per-15-minutes budget real traffic shares,
@@ -163,10 +111,10 @@ export async function POST(req: NextRequest) {
     return response;
   }
 
-  if (await isIpRateLimited(container, ip)) {
+  if (await isIpRateLimited(ip)) {
     return NextResponse.json({ error: "Too many attempts. Please wait and try again." }, { status: 429 });
   }
-  await recordIpAttempt(container, ip);
+  await recordIpAttempt(ip);
 
   if (await isRateLimited(container, normalizedEmail)) {
     return NextResponse.json(

@@ -2,10 +2,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getContainer } from "@/lib/cosmos";
 import { hashToken, decodeEmail } from "@/lib/auth/crypto";
+import { parseBearerToken } from "@/lib/auth/session";
 
 export async function POST(req: NextRequest) {
   const container = getContainer();
-  const raw = req.cookies.get("session")?.value;
+  // The app signs out with the bearer token it has been sending all
+  // along (see getSession) - the browser with its cookie.
+  const raw = req.cookies.get("session")?.value ?? parseBearerToken(req.headers.get("authorization"));
 
   if (raw) {
     const [encodedEmail, sessionRaw] = raw.split(".");

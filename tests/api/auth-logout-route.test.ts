@@ -46,6 +46,20 @@ describe("POST /api/auth/logout", () => {
     expect(cookie?.expires).toEqual(new Date(0));
   });
 
+  it("deletes the app's session when it signs out with a bearer token instead of a cookie", async () => {
+    const email = "rider@example.com";
+    const request = new NextRequest("http://localhost/api/auth/logout", {
+      method: "POST",
+      headers: { authorization: `Bearer ${encodeEmail(email)}.raw-app-token` },
+    });
+
+    const response = await POST(request);
+
+    expect(mocks.item).toHaveBeenCalledWith(hashToken("raw-app-token"), email);
+    expect(mocks.itemDelete).toHaveBeenCalledTimes(1);
+    expect(response.status).toBe(200);
+  });
+
   it("still succeeds with no session cookie at all, and never touches the database", async () => {
     const response = await POST(req());
 
