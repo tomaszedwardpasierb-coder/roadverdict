@@ -21,11 +21,18 @@ const bigShouldersDisplay = Big_Shoulders({
   variable: '--font-display',
   display: 'swap',
 });
+// 'optional', not 'swap': with swap, text first drew in the fallback and then
+// re-wrapped when Inter arrived (a paragraph gaining a line at one width, the
+// hero checklist wrapping at another), shifting everything below it - Lighthouse
+// measured CLS 0.12-0.14 on /cars and /motorcycles and 0.05 on the homepage.
+// Inter is preloaded, so it normally arrives within optional's short block
+// period anyway; when it doesn't, that page view keeps the metric-matched
+// fallback instead of reflowing, and later pages use the cached font.
 const inter = Inter({
   subsets: ['latin'],
   weight: ['400', '500', '600', '700'],
   variable: '--font-body',
-  display: 'swap',
+  display: 'optional',
 });
 // preload: false - Plex Mono isn't used above the fold, and its two static
 // weight files were being preloaded at high priority ahead of the hero
