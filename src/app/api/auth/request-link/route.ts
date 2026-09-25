@@ -7,6 +7,7 @@ import { createSessionForEmail } from "@/lib/auth/session";
 import { getSafeRedirectPath } from "@/lib/auth/safeRedirect";
 import { demoBikeExists, runDemoSeed } from "@/lib/tracker/demoSeedRunner";
 import { isAccountBlocked } from "@/lib/tracker/userDoc";
+import { getAdminSession } from "@/lib/admin/session";
 
 const RATE_LIMIT_MS = 60_000;
 const MAGIC_LINK_TTL_SECONDS = 15 * 60;
@@ -118,8 +119,7 @@ export async function POST(req: NextRequest) {
   }
 
   // Handled before the IP ceiling below on purpose - the demo bypass
-  // sends no real email and always grants the same one deliberately
-  // public sandbox account, so it isn't exposed to the spam-relay threat
+  // sends no real email, so it isn't exposed to the spam-relay threat
   // that ceiling exists for (see its own comment). Checking IP first
   // meant every authenticated-e2e CI run's own demo logins - three per
   // pipeline attempt, repeated across a busy day of pushes - counted
@@ -130,7 +130,14 @@ export async function POST(req: NextRequest) {
   // /dashboard, which is indistinguishable from a slow login to
   // Playwright's waitForURL - it just times out with nothing to show for
   // why.
-  if (normalizedEmail === DEMO_EMAIL) {
+  //
+  // The bypass only opens for someone already signed in to the admin panel
+  // (or where DEMO_LOGIN_OPEN=true - set only for CI's end-to-end tests,
+  // which run against a separate test database). Anyone else typing the
+  // demo address falls through to the ordinary email flow below and gets
+  // the same "check your email" response any address gets - see the
+  // DEMO_EMAIL check just before the magic link is created.
+  if (normalizedEmail === DEMO_EMAIL && (process.env.DEMO_LOGIN_OPEN === "true" || (await getAdminSession()))) {
     const alreadySeeded = await demoBikeExists();
     if (!alreadySeeded) {
       try {
@@ -166,6 +173,14 @@ export async function POST(req: NextRequest) {
       { error: "Please wait a moment before requesting another link" },
       { status: 429 }
     );
+  }
+
+  // A non-admin asking for the demo account: same rate limits and same reply
+  // as a real address, so nothing reveals the account is special - but no
+  // link is created (it would grant the demo session) and no email is sent
+  // (the mailbox doesn't exist).
+  if (normalizedEmail === DEMO_EMAIL) {
+    return NextResponse.json({ ok: true });
   }
 
   const { raw, hash } = generateToken();

@@ -126,6 +126,10 @@ jobs:
         env:
           APP_URL: http://localhost:3000
           COSMOS_CONNECTION_STRING: ${{ secrets.COSMOS_TEST_CONNECTION_STRING }}
+          # Production only lets the demo account sign in for an active admin
+          # session; this test server (separate test database) keeps it open
+          # so the E2E journeys can sign in through the real login form.
+          DEMO_LOGIN_OPEN: "true"
       - name: Authenticated E2E tests
         run: npx playwright test tests/e2e/authenticated-demo-journey.spec.ts
         env:

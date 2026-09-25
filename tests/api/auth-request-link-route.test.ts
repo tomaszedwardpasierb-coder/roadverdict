@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   demoBikeExists: vi.fn(),
   runDemoSeed: vi.fn(),
   isAccountBlocked: vi.fn(),
+  getAdminSession: vi.fn(),
 }));
 
 vi.mock("@/lib/cosmos", () => ({
@@ -21,6 +22,7 @@ vi.mock("@/lib/tracker/demoSeedRunner", () => ({
   runDemoSeed: mocks.runDemoSeed,
 }));
 vi.mock("@/lib/tracker/userDoc", () => ({ isAccountBlocked: mocks.isAccountBlocked }));
+vi.mock("@/lib/admin/session", () => ({ getAdminSession: mocks.getAdminSession }));
 // generateToken/encodeEmail (auth/crypto) and getSafeRedirectPath
 // (auth/safeRedirect) are deliberately NOT mocked - both are pure,
 // deterministic helpers, so exercising the real implementation is both
@@ -46,6 +48,9 @@ describe("POST /api/auth/request-link", () => {
     mocks.demoBikeExists.mockResolvedValue(true);
     mocks.runDemoSeed.mockResolvedValue({ fuel: 0, service: 0, mods: 0, bills: 0 });
     mocks.isAccountBlocked.mockResolvedValue(false);
+    // Locked by default, like production: no admin session, no DEMO_LOGIN_OPEN.
+    mocks.getAdminSession.mockResolvedValue(false);
+    delete process.env.DEMO_LOGIN_OPEN;
   });
 
   it("rejects a request with no email at all", async () => {
@@ -83,7 +88,8 @@ describe("POST /api/auth/request-link", () => {
     expect(mocks.createSessionForEmail).not.toHaveBeenCalled();
   });
 
-  it("sends no email and creates no magic-link document for the demo account", async () => {
+  it("sends no email and creates no magic-link document for the demo account (admin signed in)", async () => {
+    mocks.getAdminSession.mockResolvedValue(true);
     mocks.demoBikeExists.mockResolvedValue(true);
 
     const response = await POST(req(JSON.stringify({ email: "demo@roadverdict.co.uk" })));
@@ -104,18 +110,21 @@ describe("POST /api/auth/request-link", () => {
   });
 
   it("matches the demo account case-insensitively and after trimming whitespace", async () => {
+    mocks.getAdminSession.mockResolvedValue(true);
     const response = await POST(req(JSON.stringify({ email: "  Demo@RoadVerdict.co.uk  " })));
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toMatchObject({ demo: true });
   });
 
   it("seeds the demo dataset on first login but not on a subsequent one", async () => {
+    mocks.getAdminSession.mockResolvedValue(true);
     mocks.demoBikeExists.mockResolvedValue(false);
     await POST(req(JSON.stringify({ email: "demo@roadverdict.co.uk" })));
     expect(mocks.runDemoSeed).toHaveBeenCalledTimes(1);
   });
 
   it("still signs the demo user in even if seeding throws", async () => {
+    mocks.getAdminSession.mockResolvedValue(true);
     mocks.demoBikeExists.mockResolvedValue(false);
     mocks.runDemoSeed.mockRejectedValue(new Error("cosmos write failed"));
 
@@ -124,6 +133,71 @@ describe("POST /api/auth/request-link", () => {
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toMatchObject({ ok: true, demo: true });
     expect(mocks.createSessionForEmail).toHaveBeenCalled();
+  });
+
+  describe("demo account is locked to the site owner", () => {
+    it("without an admin session, answers exactly like any other address - no session, no link, no email", async () => {
+      const response = await POST(req(JSON.stringify({ email: "demo@roadverdict.co.uk" }), { "x-forwarded-for": "203.0.113.9" }));
+
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toEqual({ ok: true });
+      expect(response.cookies.get("session")).toBeUndefined();
+      expect(mocks.createSessionForEmail).not.toHaveBeenCalled();
+      expect(mocks.sendMagicLinkEmail).not.toHaveBeenCalled();
+      expect(mocks.itemsCreate).not.toHaveBeenCalledWith(expect.objectContaining({ type: "magicLink" }));
+      expect(mocks.runDemoSeed).not.toHaveBeenCalled();
+    });
+
+    it("without an admin session, is still subject to the normal per-IP throttle", async () => {
+      mocks.itemsQuery.mockImplementation((queryObj: { query: string }) => {
+        if (queryObj.query.includes("magicLinkIpAttempt")) {
+          return { fetchAll: () => Promise.resolve({ resources: Array.from({ length: 20 }, (_, i) => ({ id: `attempt-${i}` })) }) };
+        }
+        return { fetchAll: () => Promise.resolve({ resources: [] }) };
+      });
+
+      const response = await POST(req(JSON.stringify({ email: "demo@roadverdict.co.uk" }), { "x-forwarded-for": "203.0.113.9" }));
+
+      expect(response.status).toBe(429);
+      expect(mocks.createSessionForEmail).not.toHaveBeenCalled();
+    });
+
+    it("signs straight in when the request carries a valid admin session", async () => {
+      mocks.getAdminSession.mockResolvedValue(true);
+
+      const response = await POST(req(JSON.stringify({ email: "demo@roadverdict.co.uk" })));
+
+      await expect(response.json()).resolves.toMatchObject({ ok: true, demo: true });
+      expect(response.cookies.get("session")?.value).toBe("session-cookie-value");
+    });
+
+    it("signs straight in without an admin session when DEMO_LOGIN_OPEN=true (CI's test server only)", async () => {
+      process.env.DEMO_LOGIN_OPEN = "true";
+
+      const response = await POST(req(JSON.stringify({ email: "demo@roadverdict.co.uk" })));
+
+      await expect(response.json()).resolves.toMatchObject({ ok: true, demo: true });
+      expect(mocks.getAdminSession).not.toHaveBeenCalled();
+    });
+
+    it("treats any DEMO_LOGIN_OPEN value other than exactly 'true' as locked", async () => {
+      process.env.DEMO_LOGIN_OPEN = "1";
+
+      const response = await POST(req(JSON.stringify({ email: "demo@roadverdict.co.uk" })));
+
+      await expect(response.json()).resolves.toEqual({ ok: true });
+      expect(mocks.createSessionForEmail).not.toHaveBeenCalled();
+    });
+
+    it("a blocked demo account stays blocked even for the admin", async () => {
+      mocks.isAccountBlocked.mockResolvedValue(true);
+      mocks.getAdminSession.mockResolvedValue(true);
+
+      const response = await POST(req(JSON.stringify({ email: "demo@roadverdict.co.uk" })));
+
+      expect(response.status).toBe(403);
+      expect(mocks.createSessionForEmail).not.toHaveBeenCalled();
+    });
   });
 
   it("creates a single-use magic-link document and emails a link for a real address", async () => {
@@ -258,6 +332,7 @@ describe("POST /api/auth/request-link", () => {
     });
 
     it("never applies the IP throttle to the demo account, which sends no email and isn't the spam-relay threat it guards against", async () => {
+      mocks.getAdminSession.mockResolvedValue(true);
       mocks.itemsQuery.mockImplementation((queryObj: { query: string }) => {
         if (queryObj.query.includes("magicLinkIpAttempt")) {
           return { fetchAll: () => Promise.resolve({ resources: Array.from({ length: 20 }, (_, i) => ({ id: `attempt-${i}` })) }) };
