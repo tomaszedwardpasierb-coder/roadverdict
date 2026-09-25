@@ -23,7 +23,7 @@
 // DashboardShell's own point of view - it stays mounted, just re-rendered
 // with a new prop).
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 const mockRouter = vi.hoisted(() => ({ push: vi.fn(), refresh: vi.fn(), prefetch: vi.fn() }));
@@ -167,12 +167,59 @@ describe("DashboardShell", () => {
   // renderNavButton), so they get no automatic Next.js hover-prefetch either.
   // This is the explicit stand-in: warm the Router Cache on hover so a tab
   // switch doesn't always pay the full round trip.
-  it("hovering a sidebar nav item prefetches that tab's URL", async () => {
+  it("resting the pointer on a sidebar nav item prefetches that tab's URL", async () => {
     const user = userEvent.setup();
     render(<DashboardShell {...baseProps()} />);
     await user.hover(screen.getAllByRole("button", { name: "Fuel" })[0]);
 
-    expect(mockRouter.prefetch).toHaveBeenCalledWith("/dashboard?tab=fuel");
+    await waitFor(() => expect(mockRouter.prefetch).toHaveBeenCalledWith("/dashboard?tab=fuel"));
+  });
+
+  // Every prefetch is a full server render, and the server renders them one
+  // at a time - a sweep that prefetched everything it crossed made the tab
+  // actually clicked wait behind all of them (~7.8s instead of ~0.8s).
+  it("sweeping the pointer across several nav items without resting prefetches none of them", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+      render(<DashboardShell {...baseProps()} />);
+      for (const name of ["Service", "Fuel", "Parts & Accessories", "Labour"]) {
+        await user.hover(screen.getAllByRole("button", { name })[0]);
+        await user.unhover(screen.getAllByRole("button", { name })[0]);
+      }
+      vi.advanceTimersByTime(1000);
+      expect(mockRouter.prefetch).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("only the item the pointer finally rests on is prefetched", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+      render(<DashboardShell {...baseProps()} />);
+      await user.hover(screen.getAllByRole("button", { name: "Service" })[0]);
+      await user.hover(screen.getAllByRole("button", { name: "Labour" })[0]);
+      vi.advanceTimersByTime(1000);
+      expect(mockRouter.prefetch).toHaveBeenCalledTimes(1);
+      expect(mockRouter.prefetch).toHaveBeenCalledWith("/dashboard?tab=labour");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("never prefetches the tab that's already showing", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+      render(<DashboardShell {...baseProps({ activeSection: "fuel" })} />);
+      await user.hover(screen.getAllByRole("button", { name: "Fuel" })[0]);
+      vi.advanceTimersByTime(1000);
+      expect(mockRouter.prefetch).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   // A tab switch has no visual feedback of its own otherwise - see

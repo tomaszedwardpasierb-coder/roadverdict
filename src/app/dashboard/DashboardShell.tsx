@@ -25,6 +25,7 @@ import type { Section } from './sections';
 // activeSection prop actually changing (see goToTab/its cleanup effect
 // below), but this stops it sticking forever if that never happens.
 const PENDING_TAB_SAFETY_TIMEOUT_MS = 12_000;
+const PREFETCH_INTENT_DELAY_MS = 150;
 
 // Real-user click-to-visible timing for a tab switch, reported to
 // Application Insights via /api/rum/tab-switch (see that route's own
@@ -333,8 +334,29 @@ export function DashboardShell({
   // this session, or one whose prefetch had time to land, opens close to
   // instantly instead of paying the full round trip on every click.
   function prefetchTab(key: Section) {
+    if (key === active) return;
     router.prefetch(`/dashboard?tab=${key}`);
   }
+  // Hover/focus only prefetches once the pointer (or keyboard focus) has
+  // rested on an item for a moment. Every prefetch is a full server render of
+  // the dashboard, and the server renders them one at a time: sweeping the
+  // mouse down the sidebar used to fire one per item passed, measured at six
+  // renders taking ~7.8s each instead of ~0.8s alone - with the tab actually
+  // clicked stuck behind them. One pending timer at a time, so a sweep ends
+  // up prefetching nothing.
+  const prefetchIntentRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  function schedulePrefetch(key: Section) {
+    if (prefetchIntentRef.current) clearTimeout(prefetchIntentRef.current);
+    prefetchIntentRef.current = setTimeout(() => {
+      prefetchIntentRef.current = null;
+      prefetchTab(key);
+    }, PREFETCH_INTENT_DELAY_MS);
+  }
+  function cancelScheduledPrefetch() {
+    if (prefetchIntentRef.current) clearTimeout(prefetchIntentRef.current);
+    prefetchIntentRef.current = null;
+  }
+  useEffect(() => cancelScheduledPrefetch, []);
   useEffect(() => {
     setPendingTab(null);
     if (pendingTabTimeoutRef.current) clearTimeout(pendingTabTimeoutRef.current);
@@ -431,8 +453,10 @@ export function DashboardShell({
           goToTab(item.key);
           onSelect?.();
         }}
-        onMouseEnter={() => prefetchTab(item.key)}
-        onFocus={() => prefetchTab(item.key)}
+        onMouseEnter={() => schedulePrefetch(item.key)}
+        onMouseLeave={cancelScheduledPrefetch}
+        onFocus={() => schedulePrefetch(item.key)}
+        onBlur={cancelScheduledPrefetch}
         onTouchStart={() => prefetchTab(item.key)}
       >
         {pendingTab === item.key ? (
@@ -637,8 +661,10 @@ export function DashboardShell({
               type="button"
               className={`${ownStyles.sidebarNavItem} ${active === 'privacy' ? ownStyles.sidebarNavItemActive : ''}`}
               onClick={() => goToTab('privacy')}
-              onMouseEnter={() => prefetchTab('privacy')}
-              onFocus={() => prefetchTab('privacy')}
+              onMouseEnter={() => schedulePrefetch('privacy')}
+              onMouseLeave={cancelScheduledPrefetch}
+              onFocus={() => schedulePrefetch('privacy')}
+              onBlur={cancelScheduledPrefetch}
               onTouchStart={() => prefetchTab('privacy')}
             >
               {pendingTab === 'privacy' ? (
@@ -709,8 +735,10 @@ export function DashboardShell({
               goToTab('dashboard');
               setOpenMobileSheet(null);
             }}
-            onMouseEnter={() => prefetchTab('dashboard')}
-            onFocus={() => prefetchTab('dashboard')}
+            onMouseEnter={() => schedulePrefetch('dashboard')}
+            onMouseLeave={cancelScheduledPrefetch}
+            onFocus={() => schedulePrefetch('dashboard')}
+            onBlur={cancelScheduledPrefetch}
             onTouchStart={() => prefetchTab('dashboard')}
             style={{
               display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.2rem',
