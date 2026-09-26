@@ -1,6 +1,6 @@
 import { DateTimePickerAndroid } from '@react-native-community/datetimepicker';
 import { router } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { KeyboardAvoidingView, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -36,11 +36,33 @@ export default function AddFuelScreen() {
   const { token, signOut } = useAuth();
   const [amount, setAmount] = useState('');
   const [cost, setCost] = useState('');
-  const [mileage, setMileage] = useState('');
+  const [mileage, setMileage] = useState(() => (selected ? String(selected.units.currentMileageDisplay) : ''));
+  // Once the person types their own mileage, a date change stops
+  // overwriting it - the same rule as the web forms.
+  const [mileageTouched, setMileageTouched] = useState(false);
+  const [estimateNote, setEstimateNote] = useState<string | null>(null);
   const [date, setDate] = useState(() => new Date());
   const [full, setFull] = useState(true);
   const [saving, setSaving] = useState(false);
   const [problem, setProblem] = useState<{ message: string; canOverride: boolean } | null>(null);
+
+  const isoDate = toIsoDay(date);
+  useEffect(() => {
+    if (!selected || mileageTouched) return;
+    let cancelled = false;
+    apiFetch<{ mileageDisplay: number | null; note: string | null }>(
+      `/api/app/mileage-estimate?kind=${selected.kind}&id=${encodeURIComponent(selected.id)}&date=${isoDate}`,
+      { token }
+    ).then((result) => {
+      if (cancelled || !result.ok) return;
+      if (result.data.mileageDisplay != null) setMileage(String(result.data.mileageDisplay));
+      else setMileage('');
+      setEstimateNote(result.data.note);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [selected, isoDate, mileageTouched, token]);
 
   if (!selected) return null;
   const vehicle = selected;
@@ -135,10 +157,14 @@ export default function AddFuelScreen() {
             <Field
               label={`Mileage (${distanceUnit})`}
               value={mileage}
-              onChangeText={setMileage}
+              onChangeText={(text) => {
+                setMileage(text);
+                setMileageTouched(true);
+                setEstimateNote(null);
+              }}
               placeholder={String(units.currentMileageDisplay)}
               keyboardType="number-pad"
-              hint={`Last recorded: ${units.currentMileageDisplay.toLocaleString('en-GB')} ${distanceUnit}`}
+              hint={estimateNote ?? `Last recorded: ${units.currentMileageDisplay.toLocaleString('en-GB')} ${distanceUnit}`}
             />
 
             <View style={styles.field}>

@@ -55,7 +55,7 @@ vi.mock("@/lib/tracker/carReminder", () => ({ getCarReminders: mocks.car.reminde
 vi.mock("@/lib/tracker/currencyRates", () => ({ getExchangeRates: mocks.getExchangeRates }));
 vi.mock("@/lib/subscriptions", () => ({ getProStatus: mocks.getProStatus }));
 
-import { getHomeData, getGarage, getLogbook } from "@/lib/app/homeData";
+import { getHomeData, getGarage, getLogbook, getMileageEstimate } from "@/lib/app/homeData";
 
 const email = "rider@example.com";
 const NOW = new Date("2026-09-25T12:00:00Z");
@@ -235,5 +235,42 @@ describe("vehicle units for the app's forms", () => {
     });
     expect(vehicles[0].units.kmPerMile).toBeCloseTo(1.60934);
     expect(vehicles[1]).toMatchObject({ fuelType: "electric", units: { currency: "GBP", rateFromGbp: 1, distanceUnit: "mi", currentMileageDisplay: 100 } });
+  });
+});
+
+describe("getMileageEstimate", () => {
+  const owned = { ...bike, startingMileage: 30000, currentMileage: 36000, dateAdded: "2026-01-01" };
+
+  beforeEach(() => mocks.getBike.mockResolvedValue(owned));
+
+  it("uses the current mileage for today, with no note", async () => {
+    expect(await getMileageEstimate(email, "bike", "bike-1", "2026-09-25")).toEqual({ mileageDisplay: 36000, note: null });
+  });
+
+  it("interpolates a past date between two logged entries", async () => {
+    mocks.bike.fuel.mockResolvedValue([
+      { id: "f1", date: "2026-09-01", cost: 10, litres: 10, filledToFull: false, mileage: 35000 },
+      { id: "f2", date: "2026-09-21", cost: 10, litres: 10, filledToFull: false, mileage: 35200 },
+    ]);
+
+    const estimate = (await getMileageEstimate(email, "bike", "bike-1", "2026-09-11"))!;
+
+    expect(estimate.mileageDisplay).toBe(35100);
+    expect(estimate.note).toMatch(/interpolated between logged records/);
+  });
+
+  it("gives the estimate in the vehicle's own unit", async () => {
+    mocks.getBike.mockResolvedValue({ ...owned, distanceUnit: "km" });
+    expect((await getMileageEstimate(email, "bike", "bike-1", "2026-09-25"))!.mileageDisplay).toBe(57936);
+  });
+
+  it("returns null for a vehicle that isn't on this account", async () => {
+    mocks.getBike.mockResolvedValue(null);
+    expect(await getMileageEstimate(email, "bike", "not-mine", "2026-09-01")).toBeNull();
+  });
+
+  it("never writes due instalments - an estimate is read-only", async () => {
+    await getMileageEstimate(email, "bike", "bike-1", "2026-09-01");
+    expect(mocks.materializeAllDueForBike).not.toHaveBeenCalled();
   });
 });

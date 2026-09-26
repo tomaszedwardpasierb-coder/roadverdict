@@ -69,13 +69,21 @@ export function VehicleProvider({ children }: { children: ReactNode }) {
       .catch(() => setSavedChoice(null));
   }, []);
 
-  const vehicles = useMemo(() => garage.data?.vehicles ?? [], [garage.data]);
+  // Vehicles still owned first; transferred (read-only) ones after.
+  const vehicles = useMemo(() => [...(garage.data?.vehicles ?? [])].sort((a, b) => Number(a.readOnly) - Number(b.readOnly)), [garage.data]);
 
   const selected = useMemo(() => {
     if (vehicles.length === 0) return null;
     const byKey = (key: string | null | undefined) => vehicles.find((v) => `${v.kind}:${v.id}` === key);
+    const saved = byKey(savedChoice);
+    if (saved) return saved;
+    // With no choice made yet, start on a vehicle the person still owns:
+    // the website's default is simply the oldest, which may be one
+    // they've since sold (read-only).
     const fallback = garage.data?.defaultVehicle;
-    return byKey(savedChoice) ?? (fallback ? byKey(`${fallback.kind}:${fallback.id}`) : undefined) ?? vehicles[0];
+    const suggested = fallback ? byKey(`${fallback.kind}:${fallback.id}`) : undefined;
+    if (suggested && !suggested.readOnly) return suggested;
+    return vehicles.find((v) => !v.readOnly) ?? suggested ?? vehicles[0];
   }, [vehicles, savedChoice, garage.data]);
 
   const select = useCallback((vehicle: GarageVehicle) => {

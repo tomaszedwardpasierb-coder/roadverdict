@@ -194,7 +194,7 @@ function VehicleSwitcher({
               <View style={styles.rowMain}>
                 <Text style={styles.rowTitle}>{v.name}</Text>
                 <Text style={styles.rowMeta}>
-                  {[v.name !== v.makeModel ? v.makeModel : null, v.registration, v.kind === 'bike' ? 'Motorcycle' : 'Car'].filter(Boolean).join(' · ')}
+                  {[v.name !== v.makeModel ? v.makeModel : null, v.registration, v.kind === 'bike' ? 'Motorcycle' : 'Car', v.readOnly ? 'Transferred' : null].filter(Boolean).join(' · ')}
                 </Text>
               </View>
               {isSelected ? <Icon name="check" size={22} color={Brand.amberInk} /> : null}

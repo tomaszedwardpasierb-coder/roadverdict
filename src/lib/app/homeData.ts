@@ -51,6 +51,9 @@ import { formatCurrency, CURRENCY_SYMBOLS, type Currency, type ExchangeRates } f
 import { getExchangeRates } from "@/lib/tracker/currencyRates";
 import { convertMilesToDisplay, KM_PER_MILE, type DistanceUnit } from "@/lib/tracker/unitFormat";
 import { getProStatus } from "@/lib/subscriptions";
+import { gatherMileagePoints } from "@/lib/tracker/summary";
+import { gatherCarMileagePoints } from "@/lib/tracker/carSummary";
+import { estimateMileage } from "@/lib/tracker/mileageEstimate";
 
 // What the app needs to enter new records the way the web's own forms
 // do: every cost is stored in GBP and every distance in miles, so the
@@ -363,5 +366,56 @@ export async function getLogbook(email: string, kind: VehicleKind, id: string): 
     vehicle: bundle.summary,
     entries: [...bundle.entries].sort(newestFirst).map((e) => toLogEntry(bundle, e)),
     counts,
+  };
+}
+
+export type MileageEstimate = {
+  // In the vehicle's own unit, ready to pre-fill the form. null when
+  // there isn't enough history near the date to suggest anything.
+  mileageDisplay: number | null;
+  note: string | null;
+};
+
+// The app's version of the web forms' useEstimatedMileage: the same
+// estimateMileage maths over the same logged points, run here because
+// that code lives with the web app. Read-only - unlike Home and Logbook
+// it doesn't write due instalments first; a bill's mileage is optional
+// anyway, and an estimate is only ever a suggestion the person checks.
+export async function getMileageEstimate(email: string, kind: VehicleKind, id: string, date: string): Promise<MileageEstimate | null> {
+  const vehicle = kind === "bike" ? await getBike(email, id) : await getCarById(email, id);
+  if (!vehicle) return null;
+  const unit: DistanceUnit = vehicle.distanceUnit ?? "mi";
+  const display = (miles: number) => Math.round(convertMilesToDisplay(miles, unit));
+
+  // Today (or later) needs no estimate - the current mileage is the
+  // answer. Same rule, and the same reason, as useEstimatedMileage.
+  if (date >= new Date().toISOString().slice(0, 10)) {
+    return { mileageDisplay: display(vehicle.currentMileage), note: null };
+  }
+
+  const points =
+    kind === "bike"
+      ? gatherMileagePoints(
+          ...(await Promise.all([getServiceRecords(email, id), getMods(email, id), getFuelLogs(email, id), getBills(email, id), getLabour(email, id)]))
+        )
+      : gatherCarMileagePoints(
+          ...(await Promise.all([getCarServiceRecords(email, id), getCarMods(email, id), getCarFuelLogs(email, id), getCarBills(email, id), getCarLabour(email, id)]))
+        );
+
+  const result = estimateMileage(date, points, {
+    startingMileage: vehicle.startingMileage,
+    currentMileage: vehicle.currentMileage,
+    dateAdded: vehicle.dateAdded,
+  });
+  if (result.requiresManualEntry) {
+    return {
+      mileageDisplay: null,
+      note: result.warning ?? "Not enough logged history near this date to estimate mileage confidently - please enter it yourself.",
+    };
+  }
+  const how = result.confidence === "interpolated" ? "interpolated between logged records" : `estimated from this ${kind}'s logged pace`;
+  return {
+    mileageDisplay: display(result.mileage),
+    note: `Mileage ${how} for this date${result.warning ? ` - ${result.warning}` : ""}. Please check and adjust if needed.`,
   };
 }

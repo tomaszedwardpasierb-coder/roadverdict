@@ -6,14 +6,16 @@ const mocks = vi.hoisted(() => ({
   getGarage: vi.fn(),
   getHomeData: vi.fn(),
   getLogbook: vi.fn(),
+  getMileageEstimate: vi.fn(),
 }));
 
 vi.mock("@/lib/auth/session", () => ({ getSession: mocks.getSession }));
-vi.mock("@/lib/app/homeData", () => ({ getGarage: mocks.getGarage, getHomeData: mocks.getHomeData, getLogbook: mocks.getLogbook }));
+vi.mock("@/lib/app/homeData", () => ({ getGarage: mocks.getGarage, getHomeData: mocks.getHomeData, getLogbook: mocks.getLogbook, getMileageEstimate: mocks.getMileageEstimate }));
 
 import { GET as getGarageRoute } from "@/app/api/app/garage/route";
 import { GET as getHomeRoute } from "@/app/api/app/home/route";
 import { GET as getLogbookRoute } from "@/app/api/app/logbook/route";
+import { GET as getEstimateRoute } from "@/app/api/app/mileage-estimate/route";
 
 function homeReq(query: string): NextRequest {
   return new NextRequest(`http://localhost/api/app/home${query}`);
@@ -90,5 +92,32 @@ describe("GET /api/app/logbook", () => {
 
     mocks.getLogbook.mockResolvedValue(null);
     expect((await getLogbookRoute(logbookReq("?kind=bike&id=not-mine"))).status).toBe(404);
+  });
+});
+
+describe("GET /api/app/mileage-estimate", () => {
+  const estimateReq = (query: string) => new NextRequest(`http://localhost/api/app/mileage-estimate${query}`);
+
+  it("refuses anyone not signed in", async () => {
+    mocks.getSession.mockResolvedValue(null);
+    expect((await getEstimateRoute(estimateReq("?kind=bike&id=b1&date=2026-09-01"))).status).toBe(401);
+    expect(mocks.getMileageEstimate).not.toHaveBeenCalled();
+  });
+
+  it("needs kind, id and a YYYY-MM-DD date", async () => {
+    expect((await getEstimateRoute(estimateReq("?kind=bike&id=b1"))).status).toBe(400);
+    expect((await getEstimateRoute(estimateReq("?kind=bike&id=b1&date=1/9/2026"))).status).toBe(400);
+    expect((await getEstimateRoute(estimateReq("?kind=boat&id=b1&date=2026-09-01"))).status).toBe(400);
+    expect(mocks.getMileageEstimate).not.toHaveBeenCalled();
+  });
+
+  it("estimates for the signed-in account's vehicle, and 404s otherwise", async () => {
+    mocks.getMileageEstimate.mockResolvedValue({ mileageDisplay: 35100, note: "x" });
+    const res = await getEstimateRoute(estimateReq("?kind=car&id=c1&date=2026-09-01"));
+    expect(res.status).toBe(200);
+    expect(mocks.getMileageEstimate).toHaveBeenCalledWith("rider@example.com", "car", "c1", "2026-09-01");
+
+    mocks.getMileageEstimate.mockResolvedValue(null);
+    expect((await getEstimateRoute(estimateReq("?kind=car&id=nope&date=2026-09-01"))).status).toBe(404);
   });
 });
