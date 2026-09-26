@@ -270,10 +270,6 @@ jobs:
             echo "Setting changed - waiting for the SCM container restart it triggers to settle before deploying."
             sleep 45
           fi
-      - name: Stamp the package with this commit
-        # Read back by the wait step below - see its comment. A plain
-        # file in public/ is served as-is, no rebuild needed.
-        run: echo "$GITHUB_SHA" > public/deploy-version.txt
       - name: 'Deploy to Azure Web App'
         id: deploy-to-webapp
         uses: azure/webapps-deploy@v3
@@ -283,23 +279,31 @@ jobs:
           package: .
       - name: Wait for the new build to be the one serving
         # Waiting for "/" to answer wasn't enough: straight after the
-        # upload the OLD instance is still up and answers at once, then
-        # Azure swaps to the new one mid-smoke-test - which is what
-        # false-alarmed this job on 2026-09-26 (and why a brand-new route
-        # 404'd for ~90s after a deploy). Instead this waits until the
-        # live site hands back this exact commit's stamp, i.e. the new
-        # instance is the one answering. Up to 5 minutes; a normal
-        # deploy returns far sooner.
+        # upload the OLD app is still up and answers at once, then Azure
+        # switches traffic to the new one mid-smoke-test - which is what
+        # false-alarmed this job on 2026-09-26. A version file in public/
+        # wasn't enough either: it's read from disk, so the old process
+        # served the new file for minutes before the switch. This asks the
+        # running app which commit it was built from (/api/build-info is
+        # baked in at build time) and waits for three answers in a row
+        # from this commit, riding out the minutes when old and new both
+        # answer. Up to 6 minutes; a normal deploy returns far sooner.
         run: |
-          for i in $(seq 1 60); do
-            LIVE=$(curl -s --max-time 10 "https://roadverdict.co.uk/deploy-version.txt?t=$i" | tr -d '[:space:]')
+          streak=0
+          for i in $(seq 1 72); do
+            LIVE=$(curl -s --max-time 10 "https://roadverdict.co.uk/api/build-info?t=$i" | tr -d '[:space:]')
             if [ "$LIVE" = "$GITHUB_SHA" ]; then
-              echo "Live site is serving $GITHUB_SHA."
-              exit 0
+              streak=$((streak + 1))
+              if [ "$streak" -ge 3 ]; then
+                echo "The live app is running $GITHUB_SHA."
+                exit 0
+              fi
+            else
+              streak=0
             fi
             sleep 5
           done
-          echo "Live site still isn't serving $GITHUB_SHA after 5 minutes - proceeding anyway; the smoke test below will report the real state." >&2
+          echo "The live app still isn't consistently running $GITHUB_SHA after 6 minutes - proceeding anyway; the smoke test below will report the real state." >&2
       - name: Install Playwright browser
         run: npx playwright install --with-deps chromium
       - name: Post-deploy smoke test

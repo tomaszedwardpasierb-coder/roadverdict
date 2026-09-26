@@ -1,6 +1,10 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  // The commit this build was made from, for /api/build-info (the deploy
+  // workflow reads it back to know the new build is live). GITHUB_SHA is
+  // set in GitHub Actions; local builds report 'local'.
+  env: { BUILD_COMMIT: process.env.GITHUB_SHA ?? 'local' },
   poweredByHeader: false, // don't advertise the framework in response headers
   // instrumentationHook was needed on Next.js 14 for src/instrumentation.ts
   // to run at all - it's stable and on by default since Next.js 15, and
