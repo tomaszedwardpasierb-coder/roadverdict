@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { AUTH_MARKER_COOKIE, IMPERSONATION_MARKER_COOKIE } from '@/lib/viewer';
 import { usesStrictNonceCsp } from '@/lib/cspRoutes';
+import { buildRobotsTxt } from '@/lib/seo/robotsPolicy';
 
 // Per-request nonce, strict CSP. Deploy this in report-only mode first if you add any
 // third-party script later (analytics, affiliate pixels) — see the SEO/security guide.
@@ -81,6 +82,15 @@ export function middleware(request: NextRequest) {
   if (redirect) return redirect;
 
   const { pathname } = request.nextUrl;
+
+  // Answered here, before Next.js looks at the filesystem, so a stale
+  // robots.txt left on the server by an old deploy can't replace the real
+  // policy - see lib/seo/robotsPolicy.ts.
+  if (pathname === '/robots.txt') {
+    return new NextResponse(buildRobotsTxt(), {
+      headers: { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'public, max-age=3600' },
+    });
+  }
 
   // Signed-in visitors used to be bounced from the homepage to the
   // dashboard by the page itself, via a server-side session check - which

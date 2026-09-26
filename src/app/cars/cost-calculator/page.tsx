@@ -1,16 +1,17 @@
 // Place at: src/app/cars/cost-calculator/page.tsx
 import type { Metadata } from 'next';
+import { pageMetadata } from '@/lib/seo/pageMetadata';
 import Link from 'next/link';
 import { CarCostCalculatorFormForViewer } from '@/components/viewer/ViewerForms';
 import { CarRelatedTools } from '@/components/CarRelatedTools';
 import { buildBreadcrumbJsonLd } from '@/lib/seo/breadcrumbs';
 
-export const metadata: Metadata = {
-  title: 'True cost of owning your car',
+export const metadata: Metadata = pageMetadata({
+  title: 'Car Running Cost Calculator UK',
   description:
-    'Work out the true annual cost of owning your car - servicing, tyres, MOT, road tax, and fuel - benchmarked against typical UK prices.',
-  alternates: { canonical: '/cars/cost-calculator' },
-};
+    'Work out what your car really costs to run each year - servicing, tyres, MOT, road tax and fuel - benchmarked against typical UK prices. Free.',
+  path: '/cars/cost-calculator',
+});
 
 const jsonLd = {
   '@context': 'https://schema.org',

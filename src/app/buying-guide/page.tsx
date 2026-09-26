@@ -1,15 +1,16 @@
 import type { Metadata } from 'next';
+import { pageMetadata } from '@/lib/seo/pageMetadata';
 import Link from 'next/link';
 import { BuyingGuideFormForViewer } from '@/components/viewer/ViewerForms';
 import { RelatedTools } from '@/components/RelatedTools';
 import { buildBreadcrumbJsonLd } from '@/lib/seo/breadcrumbs';
 
-export const metadata: Metadata = {
-  title: 'What to check before you buy a used motorcycle',
+export const metadata: Metadata = pageMetadata({
+  title: 'Used Motorcycle Buying Guide & Free Bike Check (UK)',
   description:
-    'Get a buyer checklist for a used motorcycle - inspection points and questions to ask the seller, weighted by how old the bike is.',
-  alternates: { canonical: '/buying-guide' },
-};
+    "Buying a used motorcycle? Enter the registration for a free buyer checklist, full MOT history and valuation - weighted by the bike's age. No account needed.",
+  path: '/buying-guide',
+});
 
 const jsonLd = {
   '@context': 'https://schema.org',

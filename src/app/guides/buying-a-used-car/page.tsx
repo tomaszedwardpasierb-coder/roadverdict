@@ -1,14 +1,15 @@
 // Place at: src/app/guides/buying-a-used-car/page.tsx
 import type { Metadata } from 'next';
+import { pageMetadata } from '@/lib/seo/pageMetadata';
 import Link from 'next/link';
 import { buildBreadcrumbJsonLd } from '@/lib/seo/breadcrumbs';
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: 'What to Check Before Buying a Used Car',
   description:
     'A real UK buyer checklist: paperwork, mechanical checks, and the questions to ask before you hand over any money for a used car.',
-  alternates: { canonical: '/guides/buying-a-used-car' },
-};
+  path: '/guides/buying-a-used-car',
+});
 
 const breadcrumbJsonLd = buildBreadcrumbJsonLd('Buying a Used Car', '/guides/buying-a-used-car');
 

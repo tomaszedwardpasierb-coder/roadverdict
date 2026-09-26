@@ -1,14 +1,15 @@
 // Place at: src/app/guides/buying-a-used-motorcycle/page.tsx
 import type { Metadata } from 'next';
+import { pageMetadata } from '@/lib/seo/pageMetadata';
 import Link from 'next/link';
 import { buildBreadcrumbJsonLd } from '@/lib/seo/breadcrumbs';
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: 'What to Check Before Buying a Used Motorcycle',
   description:
     'A real UK buyer checklist: paperwork, mechanical checks, and the questions to ask before you hand over any money for a used motorcycle.',
-  alternates: { canonical: '/guides/buying-a-used-motorcycle' },
-};
+  path: '/guides/buying-a-used-motorcycle',
+});
 
 const breadcrumbJsonLd = buildBreadcrumbJsonLd('Buying a Used Motorcycle', '/guides/buying-a-used-motorcycle');
 

@@ -1,12 +1,15 @@
 ﻿// Place at: src/app/about/page.tsx
 import type { Metadata } from 'next';
+import { pageMetadata } from '@/lib/seo/pageMetadata';
 import Link from 'next/link';
 
-export const metadata: Metadata = {
-  title: 'About',
-  description: 'Who runs RoadVerdict and why it exists.',
-  alternates: { canonical: '/about' },
-};
+export const metadata: Metadata = pageMetadata({
+  title: 'About RoadVerdict',
+  description:
+    'Who runs RoadVerdict and why it exists.',
+  path: '/about',
+  absoluteTitle: true,
+});
 
 export default function AboutPage() {
   return (

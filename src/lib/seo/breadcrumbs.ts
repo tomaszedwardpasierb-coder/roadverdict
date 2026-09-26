@@ -24,3 +24,19 @@ export function buildBreadcrumbJsonLd(pageName: string, path: string) {
     ],
   };
 }
+
+// Deeper pages (the price guides sit at Home -> Cars -> Car price guides ->
+// Full service) need the whole trail, not just Home -> this page. Each
+// crumb's path is site-relative; Home is always added first.
+export function buildBreadcrumbTrailJsonLd(trail: { name: string; path: string }[]) {
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: [{ name: 'Home', path: '/' }, ...trail].map((crumb, i) => ({
+      '@type': 'ListItem',
+      position: i + 1,
+      name: crumb.name,
+      item: `https://roadverdict.co.uk${crumb.path === '/' ? '/' : crumb.path}`,
+    })),
+  };
+}

@@ -1,15 +1,16 @@
 // Place at: src/app/cars/quote-checker/page.tsx
 import type { Metadata } from 'next';
+import { pageMetadata } from '@/lib/seo/pageMetadata';
 import { CarQuoteFormForViewer } from '@/components/viewer/ViewerForms';
 import { CarRelatedTools } from '@/components/CarRelatedTools';
 import { buildBreadcrumbJsonLd } from '@/lib/seo/breadcrumbs';
 
-export const metadata: Metadata = {
-  title: 'Is your car service quote fair?',
+export const metadata: Metadata = pageMetadata({
+  title: 'Car Service & Repair Quote Checker UK - Is It Fair?',
   description:
-    'Enter your car, the job, and what you were quoted. Get an instant fair, high, or worth-a-second-opinion verdict benchmarked against typical UK prices.',
-  alternates: { canonical: '/cars/quote-checker' },
-};
+    'Free UK car quote checker: enter your car, the job and what you were quoted, and get a fair, high or worth-a-second-opinion verdict against sourced UK prices.',
+  path: '/cars/quote-checker',
+});
 
 const jsonLd = {
   '@context': 'https://schema.org',

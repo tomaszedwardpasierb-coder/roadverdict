@@ -1,15 +1,16 @@
 import type { Metadata } from 'next';
+import { pageMetadata } from '@/lib/seo/pageMetadata';
 import Link from 'next/link';
 import { CostCalculatorFormForViewer } from '@/components/viewer/ViewerForms';
 import { RelatedTools } from '@/components/RelatedTools';
 import { buildBreadcrumbJsonLd } from '@/lib/seo/breadcrumbs';
 
-export const metadata: Metadata = {
-  title: 'True cost of owning your motorcycle',
+export const metadata: Metadata = pageMetadata({
+  title: 'Motorcycle Running Cost Calculator UK',
   description:
-    'Work out the true annual cost of owning your motorcycle - servicing, tyres, MOT, road tax, and fuel - benchmarked against typical UK prices.',
-  alternates: { canonical: '/cost-calculator' },
-};
+    'Work out what your motorcycle really costs to run each year - servicing, tyres, MOT, road tax and fuel - benchmarked against typical UK prices. Free.',
+  path: '/cost-calculator',
+});
 
 const jsonLd = {
   '@context': 'https://schema.org',

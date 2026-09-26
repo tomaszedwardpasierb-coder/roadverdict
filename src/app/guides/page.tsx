@@ -8,15 +8,17 @@
 // that motorcycles are a first-class vehicle type, not a footnote, and a
 // shared "vehicle" guide would undercut that same claim right here.
 import type { Metadata } from 'next';
+import { pageMetadata } from '@/lib/seo/pageMetadata';
 import Link from 'next/link';
 import { buildBreadcrumbJsonLd } from '@/lib/seo/breadcrumbs';
+import { PRICE_GUIDES, formatPounds, overallRange, priceGuideHubPath, priceGuidePath } from '@/lib/seo/priceGuides';
 
-export const metadata: Metadata = {
-  title: 'Guides - Buying and Owning a Motorcycle or Car',
+export const metadata: Metadata = pageMetadata({
+  title: 'Motorcycle & Car Guides and Price Guides (UK)',
   description:
-    'Free, UK-specific guides on buying a used motorcycle or car, and what either actually costs to own - written for each vehicle type specifically.',
-  alternates: { canonical: '/guides' },
-};
+    'Free, UK-specific guides on buying a used motorcycle or car and what either costs to own, plus sourced price guides for servicing, tyres, brakes and the MOT.',
+  path: '/guides',
+});
 
 const breadcrumbJsonLd = buildBreadcrumbJsonLd('Guides', '/guides');
 
@@ -76,6 +78,42 @@ export default function GuidesPage() {
           </Link>
         ))}
       </div>
+
+      {(['motorcycle', 'car'] as const).map((vehicle) => (
+        <section key={vehicle} aria-labelledby={`prices-${vehicle}`} style={{ marginTop: '2.5rem' }}>
+          <h2 id={`prices-${vehicle}`} style={{ fontFamily: 'var(--font-display)', margin: '0 0 0.4rem' }}>
+            {vehicle === 'car' ? 'Car' : 'Motorcycle'} price guides
+          </h2>
+          <p style={{ maxWidth: 'none', margin: '0 0 1rem' }}>
+            What common {vehicle} jobs typically cost in the UK, from named sources.{' '}
+            <Link href={priceGuideHubPath(vehicle)}>All {vehicle} price guides</Link>
+          </p>
+          <div style={{ display: 'grid', gap: '0.75rem', gridTemplateColumns: 'repeat(auto-fill, minmax(14rem, 1fr))' }}>
+            {PRICE_GUIDES[vehicle].map((g) => {
+              const range = overallRange(g);
+              return (
+                <Link
+                  key={g.slug}
+                  href={priceGuidePath(g)}
+                  style={{
+                    display: 'block',
+                    padding: '0.9rem 1.1rem',
+                    border: '1px solid var(--border)',
+                    borderRadius: 'var(--radius-md)',
+                    textDecoration: 'none',
+                    color: 'inherit',
+                  }}
+                >
+                  <strong style={{ display: 'block', marginBottom: '0.25rem' }}>{g.name}</strong>
+                  <span style={{ color: 'var(--ink-soft)', fontSize: '0.9rem' }}>
+                    {g.kind === 'mot' ? `Up to ${formatPounds(range.high)}` : `${formatPounds(range.low)} - ${formatPounds(range.high)}`}
+                  </span>
+                </Link>
+              );
+            })}
+          </div>
+        </section>
+      ))}
     </div>
   );
 }

@@ -32,3 +32,16 @@ test("public cars landing page is reachable", async ({ page }) => {
   await expect(page).toHaveTitle(/RoadVerdict/i);
   await expect(page.getByRole("heading").first()).toBeVisible();
 });
+
+// A stale robots.txt left on the server by an old deploy once replaced the
+// real policy in production (see src/lib/seo/robotsPolicy.ts) - this makes
+// sure the live one still keeps crawlers off the private, token-bearing
+// pages after every deploy.
+test("live robots.txt keeps crawlers off private pages", async ({ request }) => {
+  const response = await request.get("/robots.txt");
+  expect(response.status()).toBe(200);
+  const body = await response.text();
+  for (const path of ["/report/", "/car-report/", "/bike-transfer/", "/car-transfer/", "/tomasz"]) {
+    expect(body).toContain(`Disallow: ${path}`);
+  }
+});

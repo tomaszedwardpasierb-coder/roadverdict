@@ -3,16 +3,17 @@
 // Formerly the homepage (/) - moved here when /track's content was
 // promoted to the site root. See src/app/page.tsx.
 import type { Metadata } from 'next';
+import { pageMetadata } from '@/lib/seo/pageMetadata';
 import { QuoteFormForViewer } from '@/components/viewer/ViewerForms';
 import { RelatedTools } from '@/components/RelatedTools';
 import { buildBreadcrumbJsonLd } from '@/lib/seo/breadcrumbs';
 
-export const metadata: Metadata = {
-  title: 'Is your motorcycle service quote fair?',
+export const metadata: Metadata = pageMetadata({
+  title: 'Motorcycle Service Quote Checker UK - Is It Fair?',
   description:
-    'Enter your bike, the job, and what you were quoted. Get an instant fair, high, or worth-a-second-opinion verdict benchmarked against typical UK prices.',
-  alternates: { canonical: '/quote-checker' },
-};
+    'Free UK motorcycle quote checker: enter your bike, the job and what you were quoted, and get a fair, high or worth-a-second-opinion verdict against sourced UK prices.',
+  path: '/quote-checker',
+});
 
 const jsonLd = {
   '@context': 'https://schema.org',

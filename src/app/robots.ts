@@ -1,33 +1,16 @@
 // Place at: src/app/robots.ts
 //
-// The single source of truth for robots.txt - a static public/robots.txt
-// used to exist alongside this file, and Next.js silently served that one
-// instead of this route (confirmed live: production's actual robots.txt
-// was the stale static file, missing /report/, /car-report/, /tomasz,
-// /garage, and the transfer/token pages entirely - this dynamic file was
-// dead code the whole time it existed). Deleted that file rather than
-// keeping two lists that can drift - this is the only one now.
-import type { MetadataRoute } from "next";
+// The rules themselves live in lib/seo/robotsPolicy.ts, shared with the
+// middleware - which is what actually answers /robots.txt in production,
+// because a stale static robots.txt left on the server by an old deploy
+// otherwise wins over this route (see robotsPolicy.ts). This file keeps
+// the same policy for local development and as Next's own metadata route.
+import type { MetadataRoute } from 'next';
+import { ROBOTS_DISALLOW, SITEMAP_URL } from '@/lib/seo/robotsPolicy';
 
 export default function robots(): MetadataRoute.Robots {
   return {
-    rules: [
-      {
-        userAgent: "*",
-        disallow: [
-          "/login",
-          "/dashboard",
-          "/garage",
-          "/tomasz",
-          "/report/",
-          "/car-report/",
-          "/bike-transfer/",
-          "/car-transfer/",
-          "/privacy-draft",
-          "/api/",
-        ],
-      },
-    ],
-    sitemap: "https://roadverdict.co.uk/sitemap.xml",
+    rules: [{ userAgent: '*', disallow: [...ROBOTS_DISALLOW] }],
+    sitemap: SITEMAP_URL,
   };
 }

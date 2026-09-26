@@ -617,6 +617,11 @@ main {
   flex-wrap: wrap;
   gap: 0.75rem;
 }
+.rv-related-tools__switch {
+  margin: 0.9rem 0 0;
+  font-size: 0.95rem;
+  color: var(--ink-soft);
+}
 .rv-related-tools__link {
   display: flex;
   flex-direction: column;
@@ -651,6 +656,59 @@ main {
 
 .site-footer a {
   color: var(--ink-soft);
+}
+
+/* Site directory above the small print - see SiteFooterLinks.tsx. Left
+   aligned and in columns, unlike the centred small print below it; two
+   columns on a phone, up to six on a wide screen. */
+.site-footer__dir {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1.5rem 1rem;
+  max-width: 72rem;
+  margin: 0 auto 2rem;
+  padding: 0 0 1.75rem;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+}
+@media (min-width: 640px) {
+  .site-footer__dir {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+@media (min-width: 1024px) {
+  .site-footer__dir {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+}
+.site-footer__heading {
+  margin: 0 0 0.5rem;
+  font-family: var(--font-display);
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--ink);
+}
+.site-footer__heading a {
+  color: var(--ink);
+  text-decoration: none;
+}
+.site-footer__col ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.site-footer__col li {
+  margin: 0 0 0.35rem;
+  line-height: 1.4;
+}
+.site-footer__col li a {
+  text-decoration: none;
+}
+.site-footer__col li a:hover {
+  text-decoration: underline;
+}
+body:has([data-dashboard-shell]) .site-footer__dir {
+  display: none;
 }
 
 .site-footer__social {
@@ -1169,3 +1227,47 @@ body:has(main [data-admin-shell]) [data-assistant-widget] {
   margin-right: -50vw;
 }
 
+/* Homepage vehicle chooser under the tools grid (dark section). */
+.rv-vehicle-pick {
+  max-width: 72rem;
+  margin: 2.5rem auto 0;
+  text-align: center;
+}
+.rv-vehicle-pick__label {
+  margin: 0 0 0.9rem;
+  font-size: 0.95rem;
+  color: #c9c6bd;
+}
+.rv-vehicle-pick__row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.75rem;
+}
+.rv-vehicle-pick__link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 48px;
+  padding: 0 1.4rem;
+  border: 1px solid rgba(243, 241, 236, 0.35);
+  border-radius: 999px;
+  color: #f3f1ec;
+  font-family: var(--font-display);
+  font-size: 1.1rem;
+  font-weight: 700;
+  text-decoration: none;
+  transition: border-color 0.15s, color 0.15s;
+}
+.rv-vehicle-pick__link:hover {
+  border-color: var(--amber);
+  color: var(--amber);
+}
+.rv-vehicle-pick__prices {
+  margin: 1rem 0 0;
+  font-size: 0.92rem;
+  color: #c9c6bd;
+}
+.rv-vehicle-pick__prices a {
+  color: #f3f1ec;
+}

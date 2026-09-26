@@ -9,6 +9,7 @@ import { ActiveSectionProvider } from '@/components/ActiveSectionContext';
 import { NavigationLoadingOverlay } from '@/components/NavigationLoadingOverlay';
 import { SocialLinks } from '@/components/SocialLinks';
 import { WebAnalytics } from '@/components/WebAnalytics';
+import { SiteFooterLinks } from '@/components/SiteFooterLinks';
 import { SiteHeaderNav } from './SiteHeaderNav';
 import './globals.css';
 // Google's own catalog folded the old "Big Shoulders Display" static cut
@@ -70,10 +71,13 @@ export const metadata: Metadata = {
   // supplies it automatically; a page/segment with its own opengraph-image.tsx
   // (quote-checker, cost-calculator, buying-guide) overrides it for free,
   // without needing to repeat a manual image URL at every level.
+  //
+  // No og:url here: a page that doesn't set its own share tags used to
+  // inherit this one's url, and so told Facebook it was the homepage.
+  // Public pages set their own via lib/seo/pageMetadata.ts.
   openGraph: {
     title: SITE_TITLE,
     description: SITE_DESCRIPTION,
-    url: 'https://roadverdict.co.uk',
     siteName: 'RoadVerdict',
     locale: 'en_GB',
     type: 'website',
@@ -122,6 +126,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           </header>
           <main>{children}</main>
           <footer className="site-footer">
+            <SiteFooterLinks />
             <p>
               RoadVerdict is guidance benchmarked against typical prices, not a professional
               inspection. <Link href="/privacy">Privacy</Link> · <Link href="/about">About us</Link> ·{' '}

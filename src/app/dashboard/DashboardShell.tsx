@@ -561,7 +561,9 @@ export function DashboardShell({
 
   return (
     <TabSwitchProvider onSwitchTab={(cat) => goToTab(cat)}>
-      <div className={ownStyles.shell}>
+      {/* data-dashboard-shell lets globals.css hide the footer's public-site
+          directory here - signed-in pages aren't where people browse it. */}
+      <div className={ownStyles.shell} data-dashboard-shell>
         {/* styles.sidebar is only a hook: dashboard.module.css's `.sidebar .iconBtn`
             / `.sidebar .logoutButton` rules restyle buttons for the dark sidebar. */}
         <aside className={`${ownStyles.sidebar} ${styles.sidebar}`}>

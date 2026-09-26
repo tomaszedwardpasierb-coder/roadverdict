@@ -15,17 +15,18 @@
 // motorcycle price data only and would overclaim if presented as
 // available for cars.
 import type { Metadata } from 'next';
+import { pageMetadata } from '@/lib/seo/pageMetadata';
 import Link from 'next/link';
 import Image from 'next/image';
 import { ViewerCtaLink, ViewerSwitchKindLink } from '@/components/viewer/ViewerCta';
 import { buildBreadcrumbJsonLd } from '@/lib/seo/breadcrumbs';
 
-export const metadata: Metadata = {
-  title: 'Know what your car really costs',
+export const metadata: Metadata = pageMetadata({
+  title: 'Car Costs UK: Quote Checker & Price Guides',
   description:
-    'Log every service, fuel fill, and bill for your car - petrol, diesel, hybrid, or electric. Scan receipts with AI and get reminders before your MOT or insurance lapses. Free to start.',
-  alternates: { canonical: '/cars' },
-};
+    'Check a car service quote, see what common jobs cost, work out running costs, and log every service and bill with AI receipt scanning. Free to start.',
+  path: '/cars',
+});
 
 const jsonLd = {
   '@context': 'https://schema.org',
@@ -206,6 +207,10 @@ export default function CarsPage() {
           <Link href="/cars/buying-guide" className="rv-related-tools__link">
             <strong>Buying Guide</strong>
             <span>What to check before you buy</span>
+          </Link>
+          <Link href="/cars/costs" className="rv-related-tools__link">
+            <strong>Price Guides</strong>
+            <span>What common car jobs cost</span>
           </Link>
         </div>
       </section>

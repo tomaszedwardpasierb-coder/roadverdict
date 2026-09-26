@@ -112,3 +112,22 @@ describe("middleware", () => {
     expect(response.cookies.get("rv_imp")?.value).toBe("1");
   });
 });
+
+describe("robots.txt", () => {
+  it("is answered by the middleware itself, so a stale file on the server can't replace it", async () => {
+    const response = middleware(request("/robots.txt"));
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-type")).toContain("text/plain");
+    const body = await response.text();
+    for (const path of ["/report/", "/car-report/", "/bike-transfer/", "/car-transfer/", "/tomasz", "/dashboard", "/api/"]) {
+      expect(body).toContain(`Disallow: ${path}`);
+    }
+    expect(body).toContain("Sitemap: https://roadverdict.co.uk/sitemap.xml");
+    expect(body).not.toMatch(/^Allow: \/$/m);
+  });
+
+  it("still sends www to the apex domain first", () => {
+    const response = middleware(request("/robots.txt", "www.roadverdict.co.uk"));
+    expect(response.status).toBe(308);
+  });
+});

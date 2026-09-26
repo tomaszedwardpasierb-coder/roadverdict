@@ -1,16 +1,17 @@
 // Place at: src/app/cars/buying-guide/page.tsx
 import type { Metadata } from 'next';
+import { pageMetadata } from '@/lib/seo/pageMetadata';
 import Link from 'next/link';
 import { CarBuyingGuideFormForViewer } from '@/components/viewer/ViewerForms';
 import { CarRelatedTools } from '@/components/CarRelatedTools';
 import { buildBreadcrumbJsonLd } from '@/lib/seo/breadcrumbs';
 
-export const metadata: Metadata = {
-  title: 'What to check before you buy a used car',
+export const metadata: Metadata = pageMetadata({
+  title: 'Used Car Buying Guide & Free Car Check (UK)',
   description:
-    'Get a buyer checklist for a used car - inspection points and questions to ask the seller, weighted by how old the car is.',
-  alternates: { canonical: '/cars/buying-guide' },
-};
+    "Buying a used car? Enter the registration for a free buyer checklist, full MOT history and valuation - weighted by the car's age. No account needed.",
+  path: '/cars/buying-guide',
+});
 
 const jsonLd = {
   '@context': 'https://schema.org',

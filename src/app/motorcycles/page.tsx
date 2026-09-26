@@ -13,17 +13,18 @@
 // homepage's own comic-panel hero, which is already motorcycle-branded in
 // a way this page shouldn't duplicate.
 import type { Metadata } from 'next';
+import { pageMetadata } from '@/lib/seo/pageMetadata';
 import Link from 'next/link';
 import Image from 'next/image';
 import { ViewerCtaLink, ViewerSwitchKindLink } from '@/components/viewer/ViewerCta';
 import { buildBreadcrumbJsonLd } from '@/lib/seo/breadcrumbs';
 
-export const metadata: Metadata = {
-  title: 'Know what your motorcycle really costs',
+export const metadata: Metadata = pageMetadata({
+  title: 'Motorcycle Costs UK: Quote Checker & Price Guides',
   description:
-    'Log every service, fuel fill, and bill for your motorcycle. Scan receipts with AI and get reminders before your MOT or insurance lapses. Free to start.',
-  alternates: { canonical: '/motorcycles' },
-};
+    'Check a motorcycle service quote, see what common jobs cost, work out running costs, and log every service and bill with AI receipt scanning. Free to start.',
+  path: '/motorcycles',
+});
 
 const jsonLd = {
   '@context': 'https://schema.org',
@@ -207,6 +208,10 @@ export default function MotorcyclesPage() {
           <Link href="/buying-guide" className="rv-related-tools__link">
             <strong>Buying Guide</strong>
             <span>What to check before you buy</span>
+          </Link>
+          <Link href="/motorcycles/costs" className="rv-related-tools__link">
+            <strong>Price Guides</strong>
+            <span>What common motorcycle jobs cost</span>
           </Link>
         </div>
       </section>

@@ -1,4 +1,6 @@
 // Place at: src/app/pro/page.tsx
+import type { Metadata } from 'next';
+import { pageMetadata } from '@/lib/seo/pageMetadata';
 import { getSession } from '@/lib/auth/session';
 import { isPro, PRO_MONTHLY_PRICE } from '@/lib/subscriptions';
 import { getUserDoc } from '@/lib/tracker/userDoc';
@@ -6,11 +8,13 @@ import { selfHealProSubscription } from '@/lib/payments/proSubscription';
 import { PlanComparisonCards } from '@/components/PlanComparisonCards';
 import styles from './pro.module.css';
 
-export const metadata = {
-  title: 'RoadVerdict Pro',
-  description: 'Upgrade to RoadVerdict Pro for multi-bike tracking, AI summaries, CSV export, and more.',
-  alternates: { canonical: '/pro' },
-};
+export const metadata: Metadata = pageMetadata({
+  title: 'RoadVerdict Pro: Plans and Pricing',
+  description:
+    'RoadVerdict Pro adds a second vehicle, full reports, exact reminder dates and emails, the encrypted Vault, AI summaries and a free vehicle-history report every 4 weeks.',
+  path: '/pro',
+  absoluteTitle: true,
+});
 
 export default async function ProPage(props: { searchParams: Promise<{ session_id?: string }> }) {
   const searchParams = await props.searchParams;

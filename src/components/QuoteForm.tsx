@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, type FormEvent, type ReactNode } from 'react';
+import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
 import {
   BIKE_CLASS_LABELS,
   BRAND_OPTIONS,
@@ -57,6 +57,19 @@ export function QuoteForm({ signedIn, initialBrand, initialBikeClass }: Props) {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<ApiResponse | null>(null);
+
+  // Deep links from the price guides (e.g. ?job=brake-pads-front&size=large)
+  // pre-select the job and size. Read after mount rather than during render:
+  // the quote checker is a static page, so the server-rendered form can't
+  // know the query string, and reading it in render would mismatch on
+  // hydration.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const job = params.get('job');
+    if (job && (JOB_TYPES as string[]).includes(job)) setJobType(job as JobType);
+    const size = params.get('size');
+    if (size && (BIKE_CLASSES as string[]).includes(size)) setBikeClass(size as BikeClass);
+  }, []);
 
   // Same registration-search mechanism as Cost Calculator, deliberately
   // kept identical rather than reimplemented - same endpoint, same

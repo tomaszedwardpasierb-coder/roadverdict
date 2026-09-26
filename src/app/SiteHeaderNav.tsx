@@ -6,16 +6,28 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Menu, X } from 'lucide-react';
 
-const NAV_ITEMS = [
-  { href: '/quote-checker', label: 'Quote Checker' },
-  { href: '/cost-calculator', label: 'Cost Calculator' },
-  { href: '/buying-guide', label: 'Buying Guide' },
-  { href: '/guides', label: 'Guides' },
-  { href: '/pro', label: 'Pro' },
-];
+// Vehicle-first: Motorcycles and Cars each lead to a hub with that
+// vehicle's own tools and price guides. The nav used to link only to the
+// motorcycle tools - on every page - so car owners landed on the wrong
+// tool, and the car pages had almost no internal links for search engines
+// to follow (they sat in Google's "Discovered - not indexed" list).
+//
+// "Quote checker" follows the page you're on: from anywhere under /cars
+// it opens the car one, otherwise the motorcycle one, which links across.
+function navItems(pathname: string) {
+  const onCarPage = pathname === '/cars' || pathname.startsWith('/cars/');
+  return [
+    { href: '/motorcycles', label: 'Motorcycles' },
+    { href: '/cars', label: 'Cars' },
+    { href: onCarPage ? '/cars/quote-checker' : '/quote-checker', label: 'Quote Checker' },
+    { href: '/guides', label: 'Guides & Prices' },
+    { href: '/pro', label: 'Pro' },
+  ];
+}
 
 export function SiteHeaderNav() {
   const pathname = usePathname();
+  const NAV_ITEMS = navItems(pathname ?? '/');
   // layout.tsx persists across navigation (that's the whole point of a
   // layout), so this component never remounts between pages - closing
   // explicitly on link click is required, not just tidy, or the menu

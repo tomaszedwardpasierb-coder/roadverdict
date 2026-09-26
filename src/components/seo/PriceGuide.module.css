@@ -1,0 +1,235 @@
+.page {
+  max-width: 46rem;
+  /* min-width: 0 so a wide table scrolls inside its own box instead of
+     widening the whole page when the parent lays out as flex. */
+  min-width: 0;
+  width: 100%;
+  box-sizing: border-box;
+  margin: 0 auto;
+  padding: 1.5rem 1rem 3rem;
+  color: var(--ink);
+}
+
+.crumbs {
+  font-size: 0.85rem;
+  color: var(--ink-soft);
+  margin-bottom: 1rem;
+}
+.crumbs ol {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin: 0;
+  padding: 0;
+}
+.crumbs li + li::before {
+  content: '›';
+  margin-right: 0.35rem;
+  color: var(--slate);
+}
+.crumbs a {
+  color: var(--ink-soft);
+}
+
+.eyebrow {
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #9a5a0d;
+  margin: 0 0 0.4rem;
+}
+
+.page h1 {
+  font-family: var(--font-display);
+  font-size: clamp(2rem, 5vw, 2.6rem);
+  line-height: 1.1;
+  margin: 0 0 1rem;
+  color: var(--asphalt);
+}
+
+.page h2 {
+  font-family: var(--font-display);
+  font-size: 1.6rem;
+  line-height: 1.2;
+  margin: 2.25rem 0 0.75rem;
+  color: var(--asphalt);
+}
+
+.page h3 {
+  font-size: 1.05rem;
+  margin: 1.25rem 0 0.35rem;
+}
+
+.page p,
+.page li {
+  font-size: 1.02rem;
+  line-height: 1.65;
+  color: var(--ink);
+}
+
+.page ul {
+  padding-left: 1.2rem;
+  margin: 0.5rem 0 0;
+}
+.page li + li {
+  margin-top: 0.35rem;
+}
+
+.answer {
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--amber);
+  background: var(--paper);
+  border-radius: var(--radius-md);
+  padding: 1rem 1.1rem;
+  margin: 0 0 1.25rem;
+}
+.answerFigure {
+  font-family: var(--font-display);
+  font-size: 2rem;
+  line-height: 1.1;
+  color: var(--asphalt);
+  margin: 0.15rem 0 0.25rem;
+}
+.answer p {
+  margin: 0;
+  font-size: 0.95rem;
+  color: var(--ink-soft);
+}
+
+.tableWrap {
+  overflow-x: auto;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--paper);
+}
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.97rem;
+}
+.table th,
+.table td {
+  text-align: left;
+  padding: 0.7rem 0.6rem;
+  border-bottom: 1px solid var(--line-soft);
+  vertical-align: top;
+}
+.table th {
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  background: var(--stone);
+}
+.table tr:last-child td {
+  border-bottom: none;
+}
+.price {
+  font-weight: 700;
+  white-space: nowrap;
+}
+.confidence {
+  display: inline-block;
+  font-size: 0.82rem;
+  font-weight: 700;
+  line-height: 1.3;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+}
+.confidence_higher {
+  background: var(--green-tint);
+  color: #1a6b4a;
+}
+.confidence_medium {
+  background: var(--amber-tint);
+  color: #7a4508;
+}
+.confidence_lower {
+  background: var(--line-soft);
+  color: #3a3c42;
+}
+.sizeLinks {
+  margin: 0.6rem 0 0;
+  font-size: 0.95rem !important;
+}
+
+.sources {
+  font-size: 0.9rem;
+  color: var(--ink-soft);
+  margin-top: 0.75rem;
+}
+.sources p,
+.sources li {
+  font-size: 0.9rem;
+  color: var(--ink-soft);
+}
+
+.cta {
+  margin: 2rem 0;
+  padding: 1.25rem;
+  border-radius: var(--radius-lg);
+  background: var(--asphalt);
+  color: #fff;
+}
+.cta p {
+  color: #d8d5cc;
+  margin: 0 0 1rem;
+}
+.ctaTitle {
+  font-family: var(--font-display);
+  font-size: 1.5rem;
+  line-height: 1.2;
+  margin: 0 0 0.4rem;
+  color: #fff;
+}
+
+.faq h3 {
+  margin-top: 1.1rem;
+}
+.faq p {
+  margin: 0;
+}
+
+.related {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr));
+  margin-top: 0.75rem;
+}
+.card {
+  display: block;
+  padding: 1rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--paper);
+  color: var(--ink);
+  text-decoration: none;
+}
+.card:hover {
+  border-color: var(--amber);
+}
+.cardTitle {
+  display: block;
+  font-weight: 700;
+  margin-bottom: 0.25rem;
+}
+.cardMeta {
+  display: block;
+  font-size: 0.9rem;
+  color: var(--ink-soft);
+}
+.cardPrice {
+  display: block;
+  font-weight: 700;
+  color: var(--asphalt);
+  margin-top: 0.4rem;
+}
+
+.smallPrint {
+  margin-top: 2.5rem;
+  font-size: 0.85rem !important;
+  color: var(--ink-soft) !important;
+}

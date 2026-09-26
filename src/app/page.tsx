@@ -4,16 +4,18 @@
 // former /track content, promoted to the homepage. /track itself now
 // just redirects here permanently; see src/app/track/page.tsx.
 import type { Metadata } from 'next';
+import { pageMetadata } from '@/lib/seo/pageMetadata';
 import Link from 'next/link';
 import Image from 'next/image';
 import './homepage.css';
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: 'Know What Your Vehicle Really Costs | RoadVerdict',
   description:
     'Log every service, fill-up, and repair. Check if a quote is fair before you pay. Know what you\'re looking at before you buy. Free for motorcycles and cars.',
-  alternates: { canonical: '/' },
-};
+  path: '/',
+  absoluteTitle: true,
+});
 
 // @graph bundles both types under one script tag rather than two -
 // Organization carries the brand identity (name/logo/sameAs) search
@@ -285,6 +287,24 @@ export default function HomePage() {
             <p className="rv-sol-body">MOT, insurance, service intervals. Reminders fire at the right time - not when it&apos;s already overdue.</p>
           </div>
         </div>
+        {/* The homepage used to link only to the motorcycle tools - the car
+            pages and both vehicle hubs weren't linked from it at all, which
+            left them in Google's "Discovered - not indexed" list. */}
+        <nav className="rv-vehicle-pick" aria-label="Choose your vehicle">
+          <p className="rv-vehicle-pick__label">Free tools and price guides for</p>
+          <div className="rv-vehicle-pick__row">
+            <Link href="/motorcycles" className="rv-vehicle-pick__link">
+              Motorcycles <span aria-hidden="true">→</span>
+            </Link>
+            <Link href="/cars" className="rv-vehicle-pick__link">
+              Cars <span aria-hidden="true">→</span>
+            </Link>
+          </div>
+          <p className="rv-vehicle-pick__prices">
+            What common jobs cost: <Link href="/motorcycles/costs">motorcycle prices</Link> ·{' '}
+            <Link href="/cars/costs">car prices</Link>
+          </p>
+        </nav>
       </section>
 
       {/* ── VERDICT PANEL ────────────────────────────────────────────── */}

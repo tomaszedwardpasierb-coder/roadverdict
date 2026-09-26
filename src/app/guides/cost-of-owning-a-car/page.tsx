@@ -1,14 +1,15 @@
 // Place at: src/app/guides/cost-of-owning-a-car/page.tsx
 import type { Metadata } from 'next';
+import { pageMetadata } from '@/lib/seo/pageMetadata';
 import Link from 'next/link';
 import { buildBreadcrumbJsonLd } from '@/lib/seo/breadcrumbs';
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: 'The Real Cost of Owning a Car in the UK',
   description:
     'What a car actually costs beyond the purchase price - fuel, insurance, tax, servicing, tyres, and depreciation, and how to get a real number for a specific car.',
-  alternates: { canonical: '/guides/cost-of-owning-a-car' },
-};
+  path: '/guides/cost-of-owning-a-car',
+});
 
 const breadcrumbJsonLd = buildBreadcrumbJsonLd('Cost of Owning a Car', '/guides/cost-of-owning-a-car');
 

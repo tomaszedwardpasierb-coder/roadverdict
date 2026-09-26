@@ -66,10 +66,14 @@ describe("copy audit - car-only dashboard components never say bike/motorcycle",
   // motorcycle plate is entered in the car form, pointing the user at the
   // bike dashboard instead - the mirror of AddBikeForm's own four-wheeled
   // rejection. Same category as the ADR's approved cross-signpost copy.
+  // CarRelatedTools' "Got a motorcycle instead?" is the same kind of
+  // signpost: a link from a car tool to the matching motorcycle tool, for
+  // someone who landed on the wrong one.
   const ALLOWLIST = [
     "That looks like a motorcycle, not a car - you can track it from your bike dashboard instead.",
     "That looks like a motorcycle, not a car - check your quote from the motorcycle quote checker instead.",
     "That looks like a motorcycle, not a car - try the motorcycle cost calculator instead.",
+    "Got a motorcycle instead?",
   ];
 
   const CAR_ONLY_FILES = [

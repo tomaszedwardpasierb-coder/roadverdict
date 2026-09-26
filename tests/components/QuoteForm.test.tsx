@@ -22,6 +22,22 @@ describe("QuoteForm", () => {
     vi.unstubAllGlobals();
   });
 
+  it("pre-selects the job and engine size from a price guide's link", async () => {
+    window.history.replaceState({}, "", "/quote-checker?job=chain-and-sprockets&size=large");
+    render(<QuoteForm signedIn={false} />);
+    await waitFor(() => expect(screen.getByLabelText("What needs doing")).toHaveValue("chain-and-sprockets"));
+    expect(screen.getByLabelText("Engine size")).toHaveValue("large");
+    window.history.replaceState({}, "", "/");
+  });
+
+  it("ignores a job or size in the link that the form doesn't offer", async () => {
+    window.history.replaceState({}, "", "/quote-checker?job=cambelt&size=huge");
+    render(<QuoteForm signedIn={false} />);
+    await waitFor(() => expect(screen.getByLabelText("What needs doing")).toHaveValue("full-service"));
+    expect(screen.getByLabelText("Engine size")).toHaveValue("medium");
+    window.history.replaceState({}, "", "/");
+  });
+
   it("renders all four steps with their default selections", () => {
     render(<QuoteForm signedIn={false} />);
     expect(screen.getByText("Step 1 of 4")).toBeInTheDocument();
