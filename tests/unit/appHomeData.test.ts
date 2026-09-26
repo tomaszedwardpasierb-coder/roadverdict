@@ -9,10 +9,10 @@ const mocks = vi.hoisted(() => ({
   materializeAllDueForBike: vi.fn(),
   materializeAllDueForCar: vi.fn(),
   bike: {
-    records: vi.fn(), fuel: vi.fn(), mods: vi.fn(), bills: vi.fn(), labour: vi.fn(), reminders: vi.fn(),
+    records: vi.fn(), fuel: vi.fn(), mods: vi.fn(), bills: vi.fn(), labour: vi.fn(), fines: vi.fn(), tolls: vi.fn(), reminders: vi.fn(),
   },
   car: {
-    records: vi.fn(), fuel: vi.fn(), mods: vi.fn(), bills: vi.fn(), labour: vi.fn(), reminders: vi.fn(),
+    records: vi.fn(), fuel: vi.fn(), mods: vi.fn(), bills: vi.fn(), labour: vi.fn(), fines: vi.fn(), tolls: vi.fn(), reminders: vi.fn(),
   },
   getExchangeRates: vi.fn(),
   getProStatus: vi.fn(),
@@ -38,6 +38,8 @@ vi.mock("@/lib/tracker/fuelLog", () => ({ getFuelLogs: mocks.bike.fuel }));
 vi.mock("@/lib/tracker/mod", () => ({ getMods: mocks.bike.mods }));
 vi.mock("@/lib/tracker/bill", () => ({ getBills: mocks.bike.bills }));
 vi.mock("@/lib/tracker/labour", () => ({ getLabour: mocks.bike.labour }));
+vi.mock("@/lib/tracker/fine", () => ({ getFines: mocks.bike.fines }));
+vi.mock("@/lib/tracker/toll", () => ({ getTolls: mocks.bike.tolls }));
 vi.mock("@/lib/tracker/reminder", async () => {
   const status = await import("@/lib/tracker/reminderStatus");
   return { getReminders: mocks.bike.reminders, computeReminderStatus: status.computeReminderStatus, reminderDetailLabel: status.reminderDetailLabel };
@@ -47,11 +49,13 @@ vi.mock("@/lib/tracker/carFuelLog", () => ({ getCarFuelLogs: mocks.car.fuel }));
 vi.mock("@/lib/tracker/carMod", () => ({ getCarMods: mocks.car.mods }));
 vi.mock("@/lib/tracker/carBill", () => ({ getCarBills: mocks.car.bills }));
 vi.mock("@/lib/tracker/carLabour", () => ({ getCarLabour: mocks.car.labour }));
+vi.mock("@/lib/tracker/carFine", () => ({ getCarFines: mocks.car.fines }));
+vi.mock("@/lib/tracker/carToll", () => ({ getCarTolls: mocks.car.tolls }));
 vi.mock("@/lib/tracker/carReminder", () => ({ getCarReminders: mocks.car.reminders }));
 vi.mock("@/lib/tracker/currencyRates", () => ({ getExchangeRates: mocks.getExchangeRates }));
 vi.mock("@/lib/subscriptions", () => ({ getProStatus: mocks.getProStatus }));
 
-import { getHomeData, getGarage } from "@/lib/app/homeData";
+import { getHomeData, getGarage, getLogbook } from "@/lib/app/homeData";
 
 const email = "rider@example.com";
 const NOW = new Date("2026-09-25T12:00:00Z");
@@ -177,5 +181,59 @@ describe("getGarage", () => {
     mocks.getCarsForUser.mockResolvedValue([]);
     mocks.resolveActiveVehicle.mockResolvedValue(null);
     expect(await getGarage(email)).toEqual({ vehicles: [], defaultVehicle: null });
+  });
+});
+
+describe("getLogbook", () => {
+  it("returns null for a vehicle that isn't on this account", async () => {
+    mocks.getBike.mockResolvedValue(null);
+    expect(await getLogbook(email, "bike", "not-mine")).toBeNull();
+  });
+
+  it("lists every category newest first, with counts for the filter chips", async () => {
+    mocks.bike.fuel.mockResolvedValue([{ id: "f1", date: "2026-09-23", cost: 19.8, litres: 12.4, filledToFull: true, mileage: 35621 }]);
+    mocks.bike.fines.mockResolvedValue([{ id: "fi1", date: "2026-09-24", cost: 70, fineType: "parking" }]);
+    mocks.bike.tolls.mockResolvedValue([{ id: "t1", date: "2026-08-01", cost: 7.5, tollType: "bridge" }]);
+    mocks.bike.mods.mockResolvedValue([{ id: "m1", date: "2026-09-02", cost: 149, name: "Chain kit", mileage: 35102, needsReview: true, attachments: [{}, {}] }]);
+
+    const log = (await getLogbook(email, "bike", "bike-1"))!;
+
+    expect(log.entries.map((e) => [e.category, e.id])).toEqual([
+      ["fines", "fi1"],
+      ["fuel", "f1"],
+      ["mods", "m1"],
+      ["tolls", "t1"],
+    ]);
+    expect(log.counts).toEqual({ fuel: 1, service: 0, mods: 1, bills: 0, labour: 0, fines: 1, tolls: 1 });
+    expect(log.entries.find((e) => e.id === "m1")).toMatchObject({ needsReview: true, attachmentCount: 2, costLabel: "£149.00" });
+    expect(log.entries.find((e) => e.id === "fi1")).toMatchObject({ needsReview: false, attachmentCount: 0, mileageLabel: null });
+  });
+
+  it("keeps fines and tolls out of Home's spend and recent list, like the web", async () => {
+    mocks.bike.fines.mockResolvedValue([{ id: "fi1", date: "2026-09-24", cost: 70, fineType: "parking" }]);
+    mocks.bike.tolls.mockResolvedValue([{ id: "t1", date: "2026-09-20", cost: 7.5, tollType: "bridge" }]);
+
+    const home = (await getHomeData(email, "bike", "bike-1", NOW))!;
+
+    expect(home.spend.monthTotalLabel).toBe("£0.00");
+    expect(home.recent).toEqual([]);
+  });
+});
+
+describe("vehicle units for the app's forms", () => {
+  it("gives the rate and km factor the app needs to convert input like the web forms do", async () => {
+    mocks.getExchangeRates.mockResolvedValue({ base: "GBP", rates: { EUR: 1.2 }, fetchedAt: "2026-09-25" });
+    mocks.getBikesForUser.mockResolvedValue([{ ...bike, currency: "EUR", distanceUnit: "km" }]);
+    mocks.getCarsForUser.mockResolvedValue([{ id: "car-1", make: "BMW", model: "i4", currentMileage: 100, fuelType: "electric" }]);
+    mocks.resolveActiveVehicle.mockResolvedValue(null);
+
+    const { vehicles } = await getGarage(email);
+
+    expect(vehicles[0]).toMatchObject({
+      fuelType: null,
+      units: { distanceUnit: "km", currency: "EUR", currencySymbol: "€", rateFromGbp: 1.2, currentMileageDisplay: 57326 },
+    });
+    expect(vehicles[0].units.kmPerMile).toBeCloseTo(1.60934);
+    expect(vehicles[1]).toMatchObject({ fuelType: "electric", units: { currency: "GBP", rateFromGbp: 1, distanceUnit: "mi", currentMileageDisplay: 100 } });
   });
 });

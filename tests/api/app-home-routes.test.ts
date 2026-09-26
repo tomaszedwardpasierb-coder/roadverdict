@@ -5,13 +5,15 @@ const mocks = vi.hoisted(() => ({
   getSession: vi.fn(),
   getGarage: vi.fn(),
   getHomeData: vi.fn(),
+  getLogbook: vi.fn(),
 }));
 
 vi.mock("@/lib/auth/session", () => ({ getSession: mocks.getSession }));
-vi.mock("@/lib/app/homeData", () => ({ getGarage: mocks.getGarage, getHomeData: mocks.getHomeData }));
+vi.mock("@/lib/app/homeData", () => ({ getGarage: mocks.getGarage, getHomeData: mocks.getHomeData, getLogbook: mocks.getLogbook }));
 
 import { GET as getGarageRoute } from "@/app/api/app/garage/route";
 import { GET as getHomeRoute } from "@/app/api/app/home/route";
+import { GET as getLogbookRoute } from "@/app/api/app/logbook/route";
 
 function homeReq(query: string): NextRequest {
   return new NextRequest(`http://localhost/api/app/home${query}`);
@@ -62,5 +64,31 @@ describe("GET /api/app/home", () => {
   it("answers 404 for a vehicle not on this account", async () => {
     mocks.getHomeData.mockResolvedValue(null);
     expect((await getHomeRoute(homeReq("?kind=bike&id=not-mine"))).status).toBe(404);
+  });
+});
+
+describe("GET /api/app/logbook", () => {
+  const logbookReq = (query: string) => new NextRequest(`http://localhost/api/app/logbook${query}`);
+
+  it("refuses anyone not signed in", async () => {
+    mocks.getSession.mockResolvedValue(null);
+    expect((await getLogbookRoute(logbookReq("?kind=bike&id=b1"))).status).toBe(401);
+    expect(mocks.getLogbook).not.toHaveBeenCalled();
+  });
+
+  it("needs a valid kind and an id", async () => {
+    expect((await getLogbookRoute(logbookReq("?kind=van&id=b1"))).status).toBe(400);
+    expect((await getLogbookRoute(logbookReq("?id=b1"))).status).toBe(400);
+  });
+
+  it("looks the vehicle up in the signed-in account only, and 404s otherwise", async () => {
+    mocks.getLogbook.mockResolvedValue({ entries: [] });
+    const res = await getLogbookRoute(logbookReq("?kind=bike&id=b1"));
+    expect(res.status).toBe(200);
+    expect(res.headers.get("cache-control")).toBe("private, no-store");
+    expect(mocks.getLogbook).toHaveBeenCalledWith("rider@example.com", "bike", "b1");
+
+    mocks.getLogbook.mockResolvedValue(null);
+    expect((await getLogbookRoute(logbookReq("?kind=bike&id=not-mine"))).status).toBe(404);
   });
 });

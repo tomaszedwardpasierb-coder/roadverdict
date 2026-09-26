@@ -1,5 +1,6 @@
 // Place at: src/lib/tracker/bike.ts
 import { cookies } from "next/headers";
+import { readAppVehicleHeader, APP_BIKE_HEADER } from "./appVehicleHeader";
 import { getContainer } from "@/lib/cosmos";
 import { stripCosmosMetadata } from "@/lib/tracker/cosmosHelpers";
 import { isPro } from "@/lib/subscriptions";
@@ -362,7 +363,8 @@ export async function findBikeByRegistrationAcrossAccounts(
 export async function pickActiveBike(bikes: BikeDoc[]): Promise<BikeDoc | null> {
   if (bikes.length === 0) return null;
   const cookieStore = await cookies();
-  const activeId = cookieStore.get(ACTIVE_BIKE_COOKIE)?.value;
+  // The app names its vehicle in a header instead (see appVehicleHeader.ts).
+  const activeId = cookieStore.get(ACTIVE_BIKE_COOKIE)?.value ?? (await readAppVehicleHeader(APP_BIKE_HEADER));
   if (activeId) {
     const match = bikes.find((b) => b.id === activeId);
     if (match) return match;

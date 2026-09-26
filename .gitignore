@@ -25,3 +25,4 @@ coverage/
 test-results/
 playwright-report/
 tsconfig.tsbuildinfo
+public/deploy-version.txt

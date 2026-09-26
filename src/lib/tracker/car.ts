@@ -11,6 +11,7 @@
 // safe; carrying them now with nothing to write or read them is dead
 // weight.
 import { cookies } from "next/headers";
+import { readAppVehicleHeader, APP_CAR_HEADER } from "./appVehicleHeader";
 import { getContainer } from "@/lib/cosmos";
 import { stripCosmosMetadata, type TrackerDocBase } from "@/lib/tracker/cosmosHelpers";
 import type { Region } from "@/lib/priceData";
@@ -201,7 +202,8 @@ export async function findCarByRegistrationAcrossAccounts(
 export async function pickActiveCar(cars: CarDoc[]): Promise<CarDoc | null> {
   if (cars.length === 0) return null;
   const cookieStore = await cookies();
-  const activeId = cookieStore.get(ACTIVE_CAR_COOKIE)?.value;
+  // The app names its vehicle in a header instead (see appVehicleHeader.ts).
+  const activeId = cookieStore.get(ACTIVE_CAR_COOKIE)?.value ?? (await readAppVehicleHeader(APP_CAR_HEADER));
   if (activeId) {
     const match = cars.find((c) => c.id === activeId);
     if (match) return match;
