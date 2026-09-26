@@ -12,8 +12,15 @@ import { usesStrictNonceCsp } from '@/lib/cspRoutes';
 // on every single one adds up for no reason. CSP directive order doesn't
 // change how a browser applies them, so script-src can be spliced in
 // anywhere relative to this string.
+// Cloudflare Web Analytics - cookieless visit counting (see
+// src/components/WebAnalytics.tsx). Its script loads from one host and
+// reports to another.
+const ANALYTICS_SCRIPT_HOST = 'https://static.cloudflareinsights.com';
+const ANALYTICS_REPORT_HOST = 'https://cloudflareinsights.com';
+
 const STATIC_CSP_DIRECTIVES = [
   "default-src 'self'",
+  `connect-src 'self' ${ANALYTICS_REPORT_HOST}`,
   "style-src 'self' 'unsafe-inline'", // Next.js injects some inline styles; tighten with nonce once confirmed safe to remove
   "img-src 'self' data:",
   "font-src 'self' data:",
@@ -92,12 +99,12 @@ export function middleware(request: NextRequest) {
   // route nobody has classified.
   if (!usesStrictNonceCsp(pathname)) {
     const response = NextResponse.next();
-    response.headers.set('Content-Security-Policy', `script-src 'self' 'unsafe-inline'; ${STATIC_CSP_DIRECTIVES}`);
+    response.headers.set('Content-Security-Policy', `script-src 'self' 'unsafe-inline' ${ANALYTICS_SCRIPT_HOST}; ${STATIC_CSP_DIRECTIVES}`);
     return withMarkers(request, response);
   }
 
   const nonce = crypto.randomUUID();
-  const csp = `script-src 'self' 'nonce-${nonce}'; ${STATIC_CSP_DIRECTIVES}`;
+  const csp = `script-src 'self' 'nonce-${nonce}' ${ANALYTICS_SCRIPT_HOST}; ${STATIC_CSP_DIRECTIVES}`;
 
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set('x-nonce', nonce);

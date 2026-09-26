@@ -360,6 +360,13 @@ export function PrivacyContent() {
           usage. This is aggregate technical data, not linked to your name or email.
         </p>
         <p>
+          We count visits with Cloudflare Web Analytics, which sets no cookies and
+          builds no profile of you: it records which page was viewed, the site you came
+          from, your country and your type of device, as anonymous totals. It
+          isn&apos;t loaded on shared vehicle reports or ownership-transfer links, so those
+          private addresses are never sent to it.
+        </p>
+        <p>
           Separately, we record browser/device information and sign-in timestamps
           against specific accounts, mainly to help you and us spot suspicious access -
           for example, the Vault&apos;s own access log shows you your last few sign-ins.
@@ -409,6 +416,7 @@ export function PrivacyContent() {
           <li><strong>Stripe</strong> - payment processing for Pro subscriptions and one-time report purchases. Card details are handled entirely by Stripe and never reach our own servers.</li>
           <li><strong>Resend</strong> - sends magic-link and reminder emails, built on infrastructure that may process data outside the UK; where that happens, it&apos;s covered by standard contractual clauses or an equivalent safeguard recognised under UK GDPR.</li>
           <li><strong>ip-api.com</strong> - free public geolocation lookup, aggregate visitor analytics only.</li>
+          <li><strong>Cloudflare</strong> - cookieless visit counting (Web Analytics): pages viewed, referring site, country and device type, as anonymous totals.</li>
         </ul>
         <p>
           Fonts on this site are bundled and served from our own domain at build time

@@ -8,6 +8,7 @@ import { AssistantWidgetLoader } from '@/components/AssistantWidgetLoader';
 import { ActiveSectionProvider } from '@/components/ActiveSectionContext';
 import { NavigationLoadingOverlay } from '@/components/NavigationLoadingOverlay';
 import { SocialLinks } from '@/components/SocialLinks';
+import { WebAnalytics } from '@/components/WebAnalytics';
 import { SiteHeaderNav } from './SiteHeaderNav';
 import './globals.css';
 // Google's own catalog folded the old "Big Shoulders Display" static cut
@@ -130,6 +131,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           </footer>
           <AssistantWidgetLoader />
           <NavigationLoadingOverlay />
+          <WebAnalytics />
         </ActiveSectionProvider>
       </body>
     </html>
