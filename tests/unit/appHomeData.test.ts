@@ -55,7 +55,7 @@ vi.mock("@/lib/tracker/carReminder", () => ({ getCarReminders: mocks.car.reminde
 vi.mock("@/lib/tracker/currencyRates", () => ({ getExchangeRates: mocks.getExchangeRates }));
 vi.mock("@/lib/subscriptions", () => ({ getProStatus: mocks.getProStatus }));
 
-import { getHomeData, getGarage, getLogbook, getMileageEstimate } from "@/lib/app/homeData";
+import { getHomeData, getGarage, getLogbook, getMileageEstimate, getReminderList } from "@/lib/app/homeData";
 
 const email = "rider@example.com";
 const NOW = new Date("2026-09-25T12:00:00Z");
@@ -272,5 +272,40 @@ describe("getMileageEstimate", () => {
   it("never writes due instalments - an estimate is read-only", async () => {
     await getMileageEstimate(email, "bike", "bike-1", "2026-09-01");
     expect(mocks.materializeAllDueForBike).not.toHaveBeenCalled();
+  });
+});
+
+describe("getReminderList", () => {
+  it("lists every reminder, most urgent first, flagging SORN and one-off date reminders", async () => {
+    mocks.bike.reminders.mockResolvedValue([
+      { id: "r-tax", name: "Road tax", intervalType: "date", exactDate: inDays(90), date: "2026-01-01" },
+      { id: "r-mot", name: "MOT", intervalType: "date", exactDate: inDays(10), date: "2026-01-01" },
+      { id: "r-sorn", name: "Vehicle is SORN (not taxed)", intervalType: "permanent", date: "2026-01-01" },
+      { id: "r-oil", name: "Oil change", intervalType: "mileage", intervalValue: 4000, baseMileage: 34000, date: "2026-01-01" },
+    ]);
+
+    const list = (await getReminderList(email, "bike", "bike-1"))!;
+
+    expect(list.reminders.map((r) => [r.id, r.status])).toEqual([
+      ["r-sorn", "overdue"],
+      ["r-mot", "due-soon"],
+      ["r-oil", "ok"],
+      ["r-tax", "ok"],
+    ]);
+    expect(list.reminders.find((r) => r.id === "r-sorn")).toMatchObject({ permanent: true, oneOff: false, detail: expect.stringContaining("taxed again") });
+    expect(list.reminders.find((r) => r.id === "r-mot")).toMatchObject({ permanent: false, oneOff: true, detail: null });
+    expect(list.isPro).toBe(false);
+  });
+
+  it("shows exact due details to Pro accounts", async () => {
+    mocks.getProStatus.mockResolvedValue({ isPro: true });
+    mocks.bike.reminders.mockResolvedValue([{ id: "r-mot", name: "MOT", intervalType: "date", exactDate: inDays(10), date: "2026-01-01" }]);
+    const list = (await getReminderList(email, "bike", "bike-1"))!;
+    expect(list.reminders[0].detail).toMatch(/^due /);
+  });
+
+  it("returns null for a vehicle that isn't on this account", async () => {
+    mocks.getBike.mockResolvedValue(null);
+    expect(await getReminderList(email, "bike", "not-mine")).toBeNull();
   });
 });

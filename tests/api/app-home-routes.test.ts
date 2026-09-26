@@ -7,15 +7,17 @@ const mocks = vi.hoisted(() => ({
   getHomeData: vi.fn(),
   getLogbook: vi.fn(),
   getMileageEstimate: vi.fn(),
+  getReminderList: vi.fn(),
 }));
 
 vi.mock("@/lib/auth/session", () => ({ getSession: mocks.getSession }));
-vi.mock("@/lib/app/homeData", () => ({ getGarage: mocks.getGarage, getHomeData: mocks.getHomeData, getLogbook: mocks.getLogbook, getMileageEstimate: mocks.getMileageEstimate }));
+vi.mock("@/lib/app/homeData", () => ({ getGarage: mocks.getGarage, getHomeData: mocks.getHomeData, getLogbook: mocks.getLogbook, getMileageEstimate: mocks.getMileageEstimate, getReminderList: mocks.getReminderList }));
 
 import { GET as getGarageRoute } from "@/app/api/app/garage/route";
 import { GET as getHomeRoute } from "@/app/api/app/home/route";
 import { GET as getLogbookRoute } from "@/app/api/app/logbook/route";
 import { GET as getEstimateRoute } from "@/app/api/app/mileage-estimate/route";
+import { GET as getRemindersRoute } from "@/app/api/app/reminders/route";
 
 function homeReq(query: string): NextRequest {
   return new NextRequest(`http://localhost/api/app/home${query}`);
@@ -119,5 +121,30 @@ describe("GET /api/app/mileage-estimate", () => {
 
     mocks.getMileageEstimate.mockResolvedValue(null);
     expect((await getEstimateRoute(estimateReq("?kind=car&id=nope&date=2026-09-01"))).status).toBe(404);
+  });
+});
+
+describe("GET /api/app/reminders", () => {
+  const remindersReq = (query: string) => new NextRequest(`http://localhost/api/app/reminders${query}`);
+
+  it("refuses anyone not signed in", async () => {
+    mocks.getSession.mockResolvedValue(null);
+    expect((await getRemindersRoute(remindersReq("?kind=bike&id=b1"))).status).toBe(401);
+    expect(mocks.getReminderList).not.toHaveBeenCalled();
+  });
+
+  it("needs a valid kind and an id", async () => {
+    expect((await getRemindersRoute(remindersReq("?kind=van&id=b1"))).status).toBe(400);
+    expect((await getRemindersRoute(remindersReq("?kind=bike"))).status).toBe(400);
+  });
+
+  it("lists the signed-in account's own reminders, and 404s otherwise", async () => {
+    mocks.getReminderList.mockResolvedValue({ reminders: [] });
+    const res = await getRemindersRoute(remindersReq("?kind=car&id=c1"));
+    expect(res.status).toBe(200);
+    expect(mocks.getReminderList).toHaveBeenCalledWith("rider@example.com", "car", "c1");
+
+    mocks.getReminderList.mockResolvedValue(null);
+    expect((await getRemindersRoute(remindersReq("?kind=car&id=nope"))).status).toBe(404);
   });
 });

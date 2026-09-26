@@ -419,3 +419,47 @@ export async function getMileageEstimate(email: string, kind: VehicleKind, id: s
     note: `Mileage ${how} for this date${result.warning ? ` - ${result.warning}` : ""}. Please check and adjust if needed.`,
   };
 }
+
+export type ReminderListItem = {
+  id: string;
+  name: string;
+  status: ReminderStatus;
+  // null when the exact due date/mileage is Premium-only for this account.
+  detail: string | null;
+  // A SORN reminder: clears itself once the vehicle is taxed again, so
+  // it can't be marked done or deleted by hand (the API refuses both).
+  permanent: boolean;
+  // An exact-date reminder doesn't repeat - "done" clears it.
+  oneOff: boolean;
+};
+
+export type ReminderList = { vehicle: GarageVehicle; isPro: boolean; reminders: ReminderListItem[] };
+
+// The Reminders tab: every reminder for one vehicle, most urgent first,
+// with the same status maths and Premium gate as the web's ReminderItem.
+export async function getReminderList(email: string, kind: VehicleKind, id: string): Promise<ReminderList | null> {
+  const [vehicle, rates, pro] = await Promise.all([
+    kind === "bike" ? getBike(email, id) : getCarById(email, id),
+    getExchangeRates(),
+    getProStatus(email),
+  ]);
+  if (!vehicle) return null;
+
+  const raw =
+    kind === "bike"
+      ? (await getReminders(email, id)).map((r) => ({ r, status: computeReminderStatus(r, vehicle.currentMileage), detail: reminderDetailLabel(r) }))
+      : (await getCarReminders(email, id)).map((r) => ({ r, status: computeCarReminderStatus(r, vehicle.currentMileage), detail: carReminderDetailLabel(r) }));
+
+  const reminders = raw
+    .map(({ r, status, detail }) => {
+      const permanent = r.intervalType === "permanent";
+      return { id: r.id, name: r.name, status, detail: permanent || pro.isPro ? detail || null : null, permanent, oneOff: r.intervalType === "date" };
+    })
+    .sort((a, b) => STATUS_ORDER[a.status] - STATUS_ORDER[b.status] || a.name.localeCompare(b.name));
+
+  return {
+    vehicle: kind === "bike" ? bikeSummary(vehicle as BikeDoc, rates) : carSummary(vehicle as CarDoc, rates),
+    isPro: pro.isPro,
+    reminders,
+  };
+}
