@@ -41,7 +41,8 @@
           "cameraPermission": "RoadVerdict uses the camera to photograph receipts, so the details can be read and logged for you.",
           "photosPermission": "RoadVerdict opens your photos so you can choose a receipt to scan."
         }
-      ]
+      ],
+      "expo-sharing"
     ],
     "experiments": {
       "typedRoutes": true,

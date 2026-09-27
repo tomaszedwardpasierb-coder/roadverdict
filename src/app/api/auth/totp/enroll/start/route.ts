@@ -28,5 +28,8 @@ export async function POST() {
   // inline settings card, still comfortably scannable.
   const qrDataUrl = await QRCode.toDataURL(otpauthUri, { margin: 1, width: 150 });
 
-  return NextResponse.json({ qrDataUrl, manualEntryKey: secret });
+  // otpauthUri is for the Android app: on a phone there's no second screen
+  // to scan a QR code from, so it hands this link straight to the
+  // authenticator app instead. The web page ignores it.
+  return NextResponse.json({ qrDataUrl, manualEntryKey: secret, otpauthUri });
 }

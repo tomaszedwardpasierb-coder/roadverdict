@@ -9,8 +9,9 @@
 // due dates. Amounts and distances go out preformatted in the vehicle's
 // own currency and unit, so the app never has to re-implement the
 // conversion.
-import { getBikesForUser, getBike, getCurrentRegistration, isBikeReadOnly, type BikeDoc } from "@/lib/tracker/bike";
+import { countActiveBikes, getBikesForUser, getBike, getCurrentRegistration, isBikeReadOnly, type BikeDoc } from "@/lib/tracker/bike";
 import {
+  countActiveCars,
   getCarsForUser,
   getCarById,
   getCurrentRegistration as getCarCurrentRegistration,
@@ -47,13 +48,15 @@ import { CAR_BILL_LABELS } from "@/lib/tracker/carBillTypes";
 import { CAR_LABOUR_LABELS } from "@/lib/tracker/carLabourTypes";
 import { CAR_FINE_LABELS } from "@/lib/tracker/carFineTypes";
 import { CAR_TOLL_LABELS } from "@/lib/tracker/carTollTypes";
-import { formatCurrency, CURRENCY_SYMBOLS, type Currency, type ExchangeRates } from "@/lib/tracker/currency";
+import { convertGbpToDisplay, formatCurrency, CURRENCY_SYMBOLS, type Currency, type ExchangeRates } from "@/lib/tracker/currency";
+import type { Attachment } from "@/lib/tracker/cosmosHelpers";
 import { getExchangeRates } from "@/lib/tracker/currencyRates";
-import { convertMilesToDisplay, KM_PER_MILE, type DistanceUnit } from "@/lib/tracker/unitFormat";
+import { convertMilesToDisplay, KM_PER_MILE, type DistanceUnit, type FuelEconomyUnit } from "@/lib/tracker/unitFormat";
 import { getProStatus } from "@/lib/subscriptions";
 import { gatherMileagePoints } from "@/lib/tracker/summary";
 import { gatherCarMileagePoints } from "@/lib/tracker/carSummary";
 import { estimateMileage } from "@/lib/tracker/mileageEstimate";
+import { MAX_FREE_VEHICLES, MAX_PRO_VEHICLES } from "@/lib/tracker/vehicleLimit";
 
 // What the app needs to enter new records the way the web's own forms
 // do: every cost is stored in GBP and every distance in miles, so the
@@ -61,6 +64,8 @@ import { estimateMileage } from "@/lib/tracker/mileageEstimate";
 // divide a cost by rateFromGbp, and a km reading by KM_PER_MILE.
 export type VehicleUnits = {
   distanceUnit: DistanceUnit;
+  // For the app's Settings - it shows no fuel economy figures itself yet.
+  fuelEconomyUnit: FuelEconomyUnit;
   currency: Currency;
   currencySymbol: string;
   rateFromGbp: number;
@@ -135,13 +140,17 @@ function vehicleName(v: { nickname?: string; make: string; model: string }): { n
   return { name: v.nickname || makeModel, makeModel };
 }
 
-function vehicleUnits(v: { distanceUnit?: DistanceUnit; currency?: Currency; currentMileage: number }, rates: ExchangeRates | null): VehicleUnits {
+function vehicleUnits(
+  v: { distanceUnit?: DistanceUnit; fuelEconomyUnit?: FuelEconomyUnit; currency?: Currency; currentMileage: number },
+  rates: ExchangeRates | null
+): VehicleUnits {
   const distanceUnit = v.distanceUnit ?? "mi";
   const currency = v.currency ?? "GBP";
   // Same fallback as convertDisplayToGbp: GBP, or no rates loaded, means 1.
   const rate = currency !== "GBP" ? rates?.rates[currency] : undefined;
   return {
     distanceUnit,
+    fuelEconomyUnit: v.fuelEconomyUnit ?? "mpg",
     currency,
     currencySymbol: CURRENCY_SYMBOLS[currency],
     rateFromGbp: rate || 1,
@@ -174,14 +183,27 @@ function carSummary(car: CarDoc, rates: ExchangeRates | null): GarageVehicle {
   };
 }
 
-export async function getGarage(email: string): Promise<{ vehicles: GarageVehicle[]; defaultVehicle: { kind: VehicleKind; id: string } | null }> {
-  const [bikes, cars, rates] = await Promise.all([getBikesForUser(email), getCarsForUser(email), getExchangeRates()]);
+export type Garage = {
+  vehicles: GarageVehicle[];
+  defaultVehicle: { kind: VehicleKind; id: string } | null;
+  // The same cap the add-a-bike and add-a-car routes enforce - vehicles
+  // still owned, bikes and cars together - so the app can say so before
+  // anyone fills in a form the server would then turn down.
+  vehicleLimit: { limit: number; active: number };
+};
+
+export async function getGarage(email: string): Promise<Garage> {
+  const [bikes, cars, rates, pro] = await Promise.all([getBikesForUser(email), getCarsForUser(email), getExchangeRates(), getProStatus(email)]);
   // Same choice the web dashboard would make for a first visit (no
   // cookies): the app only uses this until the person picks a vehicle
   // themselves, which it then remembers on the phone.
   const active = await resolveActiveVehicle(email, { bikes, cars });
   const defaultVehicle = active ? { kind: active.kind, id: active.kind === "bike" ? active.bike.id : active.car.id } : null;
-  return { vehicles: [...bikes.map((b) => bikeSummary(b, rates)), ...cars.map((c) => carSummary(c, rates))], defaultVehicle };
+  return {
+    vehicles: [...bikes.map((b) => bikeSummary(b, rates)), ...cars.map((c) => carSummary(c, rates))],
+    defaultVehicle,
+    vehicleLimit: { limit: pro.isPro ? MAX_PRO_VEHICLES : MAX_FREE_VEHICLES, active: countActiveBikes(bikes) + countActiveCars(cars) },
+  };
 }
 
 function formatMileage(miles: number, unit: DistanceUnit): string {
@@ -201,6 +223,74 @@ type RawEntry = {
 };
 
 type RawReminder = { id: string; name: string; status: ReminderStatus; detail: string; permanent: boolean };
+
+// A record of any category, as far as the app reads one. Every tracker
+// doc type fits this shape; the category-specific fields are simply
+// absent on the others. `category` here is a part's or labour job's own
+// type - not the logbook category an entry is filed under.
+type AnyRecord = {
+  id: string;
+  date: string;
+  cost: number;
+  mileage?: number;
+  notes?: string;
+  needsReview?: boolean;
+  attachments?: Attachment[];
+  mileageConfidence?: "interpolated" | "estimated" | "confirmed";
+  jobType?: string;
+  category?: string;
+  name?: string;
+  billType?: string;
+  fineType?: string;
+  tollType?: string;
+  litres?: number;
+  kwh?: number;
+  filledToFull?: boolean;
+  fuelType?: string;
+  seriesId?: string;
+};
+
+const TYPE_LABEL: Record<EntryCategory, string> = {
+  service: "Service",
+  fuel: "Fuel",
+  mods: "Part",
+  bills: "Bill",
+  labour: "Labour",
+  fines: "Fine",
+  tolls: "Toll",
+};
+
+const LABELS = {
+  bike: { job: JOB_LABELS, bill: BILL_LABELS, labour: LABOUR_LABELS, fine: FINE_LABELS, toll: TOLL_LABELS },
+  car: { job: CAR_JOB_LABELS, bill: CAR_BILL_LABELS, labour: CAR_LABOUR_LABELS, fine: CAR_FINE_LABELS, toll: CAR_TOLL_LABELS },
+};
+
+// The one line an entry is listed under, the same wording the web uses.
+function describeEntry(kind: VehicleKind, category: EntryCategory, r: AnyRecord): string {
+  const labels = LABELS[kind];
+  const label = (map: Record<string, string>, key: string | undefined) => (key ? (map[key] ?? key) : "");
+  switch (category) {
+    case "service":
+      return label(labels.job, r.jobType);
+    case "fuel":
+      if (kind === "car" && r.fuelType === "electric") return `${(r.kwh ?? 0).toFixed(1)} kWh`;
+      return `${(r.litres ?? 0).toFixed(1)} L${r.filledToFull ? " (full)" : ""}`;
+    case "mods":
+      return r.name ?? "";
+    case "bills":
+      return label(labels.bill, r.billType);
+    case "labour":
+      return label(labels.labour, r.category);
+    case "fines":
+      return label(labels.fine, r.fineType);
+    case "tolls":
+      return label(labels.toll, r.tollType);
+  }
+}
+
+function asEntry(kind: VehicleKind, category: EntryCategory) {
+  return (r: AnyRecord) => ({ ...r, category, type: TYPE_LABEL[category], description: describeEntry(kind, category, r) });
+}
 
 type VehicleBundle = {
   summary: GarageVehicle;
@@ -238,13 +328,13 @@ async function loadVehicle(email: string, kind: VehicleKind, id: string): Promis
       currency: bike.currency ?? "GBP",
       rates,
       entries: [
-        ...records.map((r) => ({ ...r, category: "service" as const, type: "Service", description: JOB_LABELS[r.jobType] ?? r.jobType })),
-        ...fuelLogs.map((f) => ({ ...f, category: "fuel" as const, type: "Fuel", description: `${f.litres.toFixed(1)} L${f.filledToFull ? " (full)" : ""}` })),
-        ...mods.map((m) => ({ ...m, category: "mods" as const, type: "Part", description: m.name })),
-        ...bills.map((b) => ({ ...b, category: "bills" as const, type: "Bill", description: BILL_LABELS[b.billType] ?? b.billType })),
-        ...labour.map((l) => ({ ...l, category: "labour" as const, type: "Labour", description: LABOUR_LABELS[l.category] ?? l.category })),
-        ...fines.map((f) => ({ ...f, category: "fines" as const, type: "Fine", description: FINE_LABELS[f.fineType] ?? f.fineType })),
-        ...tolls.map((t) => ({ ...t, category: "tolls" as const, type: "Toll", description: TOLL_LABELS[t.tollType] ?? t.tollType })),
+        ...records.map(asEntry("bike", "service")),
+        ...fuelLogs.map(asEntry("bike", "fuel")),
+        ...mods.map(asEntry("bike", "mods")),
+        ...bills.map(asEntry("bike", "bills")),
+        ...labour.map(asEntry("bike", "labour")),
+        ...fines.map(asEntry("bike", "fines")),
+        ...tolls.map(asEntry("bike", "tolls")),
       ],
       loadReminders: async () =>
         (await getReminders(email, bike.id)).map((r) => ({
@@ -277,18 +367,13 @@ async function loadVehicle(email: string, kind: VehicleKind, id: string): Promis
     currency: car.currency ?? "GBP",
     rates,
     entries: [
-      ...records.map((r) => ({ ...r, category: "service" as const, type: "Service", description: CAR_JOB_LABELS[r.jobType] ?? r.jobType })),
-      ...fuelLogs.map((f) => ({
-        ...f,
-        category: "fuel" as const,
-        type: "Fuel",
-        description: f.fuelType === "electric" ? `${(f.kwh ?? 0).toFixed(1)} kWh` : `${(f.litres ?? 0).toFixed(1)} L${f.filledToFull ? " (full)" : ""}`,
-      })),
-      ...mods.map((m) => ({ ...m, category: "mods" as const, type: "Part", description: m.name })),
-      ...bills.map((b) => ({ ...b, category: "bills" as const, type: "Bill", description: CAR_BILL_LABELS[b.billType] ?? b.billType })),
-      ...labour.map((l) => ({ ...l, category: "labour" as const, type: "Labour", description: CAR_LABOUR_LABELS[l.category] ?? l.category })),
-      ...fines.map((f) => ({ ...f, category: "fines" as const, type: "Fine", description: CAR_FINE_LABELS[f.fineType] ?? f.fineType })),
-      ...tolls.map((t) => ({ ...t, category: "tolls" as const, type: "Toll", description: CAR_TOLL_LABELS[t.tollType] ?? t.tollType })),
+      ...records.map(asEntry("car", "service")),
+      ...fuelLogs.map(asEntry("car", "fuel")),
+      ...mods.map(asEntry("car", "mods")),
+      ...bills.map(asEntry("car", "bills")),
+      ...labour.map(asEntry("car", "labour")),
+      ...fines.map(asEntry("car", "fines")),
+      ...tolls.map(asEntry("car", "tolls")),
     ],
     loadReminders: async () =>
       (await getCarReminders(email, car.id)).map((r) => ({
@@ -305,15 +390,17 @@ function newestFirst(a: { date: string }, b: { date: string }): number {
   return new Date(b.date).getTime() - new Date(a.date).getTime();
 }
 
-function toLogEntry(bundle: VehicleBundle, e: RawEntry): LogEntry {
+type Formatting = { currency: Currency; rates: ExchangeRates | null; distanceUnit: DistanceUnit };
+
+function toLogEntry(fmt: Formatting, e: RawEntry): LogEntry {
   return {
     id: e.id,
     category: e.category,
     type: e.type,
     description: e.description,
     date: e.date,
-    costLabel: formatCurrency(e.cost, bundle.currency, bundle.rates),
-    mileageLabel: e.mileage != null ? formatMileage(e.mileage, bundle.distanceUnit) : null,
+    costLabel: formatCurrency(e.cost, fmt.currency, fmt.rates),
+    mileageLabel: e.mileage != null ? formatMileage(e.mileage, fmt.distanceUnit) : null,
     needsReview: !!e.needsReview,
     attachmentCount: e.attachments?.length ?? 0,
   };
@@ -366,6 +453,104 @@ export async function getLogbook(email: string, kind: VehicleKind, id: string): 
     vehicle: bundle.summary,
     entries: [...bundle.entries].sort(newestFirst).map((e) => toLogEntry(bundle, e)),
     counts,
+  };
+}
+
+// One entry in full, for the app's entry screen and its edit forms.
+export type EntryDetail = {
+  vehicle: GarageVehicle;
+  entry: LogEntry & {
+    // The chosen type exactly as the logging forms send it back (the
+    // job, part type, bill, fine or toll key) - null for fuel.
+    typeKey: string | null;
+    // Parts only - what the part is.
+    name: string | null;
+    notes: string;
+    // As stored (GBP, miles). The app sends these straight back for a
+    // field the person didn't change, so an edit can't shift a number by
+    // re-converting it at today's exchange rate.
+    costGbp: number;
+    mileageMiles: number | null;
+    // The same two, in the vehicle's own currency and unit, for the form.
+    costDisplay: number;
+    mileageDisplay: number | null;
+    // The receipt scanner guessed this mileage rather than reading it.
+    mileageEstimated: boolean;
+    fuel: { amount: number; unit: "L" | "kWh"; filledToFull: boolean } | null;
+    // A bill written by an instalment plan.
+    instalmentPlan: boolean;
+    // Each receipt's path on this site - the same signed-in route the web
+    // shows attachments from.
+    attachments: { fileName: string; fileType: Attachment["fileType"]; path: string }[];
+  };
+};
+
+type RecordLoader = (email: string, vehicleId: string) => Promise<AnyRecord[]>;
+
+const RECORD_LOADERS: Record<VehicleKind, Record<EntryCategory, RecordLoader>> = {
+  bike: { service: getServiceRecords, fuel: getFuelLogs, mods: getMods, bills: getBills, labour: getLabour, fines: getFines, tolls: getTolls },
+  car: {
+    service: getCarServiceRecords,
+    fuel: getCarFuelLogs,
+    mods: getCarMods,
+    bills: getCarBills,
+    labour: getCarLabour,
+    fines: getCarFines,
+    tolls: getCarTolls,
+  },
+};
+
+const TYPE_KEY_FIELD: Partial<Record<EntryCategory, "jobType" | "category" | "billType" | "fineType" | "tollType">> = {
+  service: "jobType",
+  mods: "category",
+  labour: "category",
+  bills: "billType",
+  fines: "fineType",
+  tolls: "tollType",
+};
+
+// Looked up among the named vehicle's own records of that category, so an
+// entry belonging to another vehicle - or anyone else - isn't found. A
+// read only: unlike the logbook, it never writes due instalments.
+export async function getEntryDetail(
+  email: string,
+  kind: VehicleKind,
+  vehicleId: string,
+  category: EntryCategory,
+  entryId: string
+): Promise<EntryDetail | null> {
+  const [vehicleDoc, rates] = await Promise.all([kind === "bike" ? getBike(email, vehicleId) : getCarById(email, vehicleId), getExchangeRates()]);
+  if (!vehicleDoc) return null;
+  const summary = kind === "bike" ? bikeSummary(vehicleDoc as BikeDoc, rates) : carSummary(vehicleDoc as CarDoc, rates);
+  const record = (await RECORD_LOADERS[kind][category](email, vehicleDoc.id)).find((r) => r.id === entryId);
+  if (!record) return null;
+
+  const { currency, distanceUnit } = summary.units;
+  const field = TYPE_KEY_FIELD[category];
+  const electric = kind === "car" && record.fuelType === "electric";
+  return {
+    vehicle: summary,
+    entry: {
+      ...toLogEntry({ currency, rates, distanceUnit }, asEntry(kind, category)(record)),
+      typeKey: field ? (record[field] ?? null) : null,
+      name: category === "mods" ? (record.name ?? null) : null,
+      notes: record.notes ?? "",
+      costGbp: record.cost,
+      mileageMiles: record.mileage ?? null,
+      costDisplay: Math.round(convertGbpToDisplay(record.cost, currency, rates) * 100) / 100,
+      mileageDisplay: record.mileage != null ? Math.round(convertMilesToDisplay(record.mileage, distanceUnit)) : null,
+      mileageEstimated: record.mileageConfidence === "estimated" || record.mileageConfidence === "interpolated",
+      fuel:
+        category === "fuel"
+          ? { amount: (electric ? record.kwh : record.litres) ?? 0, unit: electric ? "kWh" : "L", filledToFull: !electric && !!record.filledToFull }
+          : null,
+      instalmentPlan: !!record.seriesId,
+      attachments: (record.attachments ?? []).map((a) => ({
+        fileName: a.fileName,
+        fileType: a.fileType,
+        path: `/api/tracker/attachment/${encodeURIComponent(a.blobName)}`,
+      })),
+    },
   };
 }
 

@@ -60,6 +60,10 @@ describe("POST /api/auth/totp/enroll/start", () => {
 
     expect(mocks.startEnrollment).toHaveBeenCalledWith("rider@example.com");
     expect(mocks.toDataURL).toHaveBeenCalledWith("otpauth://totp/RoadVerdict:rider%40example.com?secret=JBSWY3DPEHPK3PXP", expect.any(Object));
-    expect(data).toEqual({ qrDataUrl: "data:image/png;base64,fake", manualEntryKey: "JBSWY3DPEHPK3PXP" });
+    expect(data).toEqual({
+      qrDataUrl: "data:image/png;base64,fake",
+      manualEntryKey: "JBSWY3DPEHPK3PXP",
+      otpauthUri: "otpauth://totp/RoadVerdict:rider%40example.com?secret=JBSWY3DPEHPK3PXP",
+    });
   });
 });

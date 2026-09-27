@@ -9,6 +9,7 @@ export type VehicleKind = 'bike' | 'car';
 // the person typed exactly as the website's own forms do.
 export type VehicleUnits = {
   distanceUnit: 'mi' | 'km';
+  fuelEconomyUnit: 'mpg' | 'l100km';
   currency: string;
   currencySymbol: string;
   rateFromGbp: number;
@@ -41,12 +42,21 @@ export function toStoredGbp(display: number, units: VehicleUnits): number {
   return Math.round((display / units.rateFromGbp) * 100) / 100;
 }
 
-type Garage = { vehicles: GarageVehicle[]; defaultVehicle: { kind: VehicleKind; id: string } | null };
+type Garage = {
+  vehicles: GarageVehicle[];
+  defaultVehicle: { kind: VehicleKind; id: string } | null;
+  // The add-a-vehicle routes' own cap: vehicles still owned, bikes and
+  // cars together.
+  vehicleLimit: { limit: number; active: number };
+};
 
 type VehicleContextValue = {
   vehicles: GarageVehicle[];
   selected: GarageVehicle | null;
-  select: (vehicle: GarageVehicle) => void;
+  // Takes just the kind and id, so a vehicle added a moment ago can be
+  // chosen before the garage has reloaded with it.
+  select: (vehicle: { kind: VehicleKind; id: string }) => void;
+  vehicleLimit: Garage['vehicleLimit'] | null;
   loading: boolean;
   error: string | null;
   retry: () => void;
@@ -89,7 +99,7 @@ export function VehicleProvider({ children }: { children: ReactNode }) {
     return vehicles.find((v) => !v.readOnly) ?? suggested ?? vehicles[0];
   }, [vehicles, savedChoice, garage.data]);
 
-  const select = useCallback((vehicle: GarageVehicle) => {
+  const select = useCallback((vehicle: { kind: VehicleKind; id: string }) => {
     const key = `${vehicle.kind}:${vehicle.id}`;
     setSavedChoice(key);
     SecureStore.setItemAsync(SELECTED_KEY, key).catch(() => {});
@@ -100,12 +110,13 @@ export function VehicleProvider({ children }: { children: ReactNode }) {
       vehicles,
       selected,
       select,
+      vehicleLimit: garage.data?.vehicleLimit ?? null,
       loading: garage.loading || savedChoice === undefined,
       error: garage.error,
       retry: garage.retry,
       refresh: garage.refresh,
     }),
-    [vehicles, selected, select, garage.loading, garage.error, garage.retry, garage.refresh, savedChoice]
+    [vehicles, selected, select, garage.data, garage.loading, garage.error, garage.retry, garage.refresh, savedChoice]
   );
 
   return <VehicleContext.Provider value={value}>{children}</VehicleContext.Provider>;

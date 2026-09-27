@@ -1,139 +1,116 @@
 // One screen for every logbook entry type except fuel (which has its own):
 // services and repairs, parts, labour, bills, fines and tolls. Each posts
 // to the website's own route for that type - the same fields its web form
-// sends - with the app naming its vehicle in a header.
+// sends - with the app naming its vehicle in a header. Opened from an
+// entry with its id, the same form edits that entry through the route's
+// PATCH instead.
 import { DateTimePickerAndroid } from '@react-native-community/datetimepicker';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { KeyboardAvoidingView, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { EntryLoader } from '@/components/entry-loader';
 import { Icon } from '@/components/icon';
 import { OptionPicker } from '@/components/option-picker';
 import { ErrorState, LoadingState } from '@/components/screen';
 import { Brand } from '@/constants/brand';
 import { apiFetch } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
+import { ENTRY_ROUTES, recordPath, TYPED_FIELDS, type Entry, type TypedCategory } from '@/lib/entries';
 import { useFormOptions, type ReminderDefault, type VehicleFormOptions } from '@/lib/form-options';
-import { dayLabel, parseMileage, parseNumber, toIsoDay, useEstimatedMileage } from '@/lib/mileage';
+import { dayLabel, fromIsoDay, parseMileage, parseNumber, toIsoDay, useEstimatedMileage } from '@/lib/mileage';
 import { toStoredGbp, toStoredMiles, useVehicle, vehicleHeaders } from '@/lib/vehicle';
 
-type EntryType = 'service' | 'mods' | 'labour' | 'bills' | 'fines' | 'tolls';
-
-const CONFIG: Record<
-  EntryType,
-  {
-    title: string;
-    typeLabel: string;
-    typePlaceholder: string;
-    field: string;
-    hasMileage: boolean;
-    hasName?: boolean;
-    route: { bike: string; car: string };
-  }
-> = {
-  service: {
-    title: 'Service or repair',
-    typeLabel: 'What was done?',
-    typePlaceholder: 'Choose the job',
-    field: 'jobType',
-    hasMileage: true,
-    route: { bike: '/api/tracker/services', car: '/api/cars/car-services' },
-  },
-  mods: {
-    title: 'Part or accessory',
-    typeLabel: 'Type of part',
-    typePlaceholder: 'Choose the type',
-    field: 'category',
-    hasMileage: true,
-    hasName: true,
-    route: { bike: '/api/tracker/mods', car: '/api/cars/car-mods' },
-  },
-  labour: {
-    title: 'Labour',
-    typeLabel: 'What was the work?',
-    typePlaceholder: 'Choose the job',
-    field: 'category',
-    hasMileage: true,
-    route: { bike: '/api/tracker/labour', car: '/api/cars/car-labour' },
-  },
-  bills: {
-    title: 'Insurance, tax, MOT or finance',
-    typeLabel: 'What was it for?',
-    typePlaceholder: 'Choose the type',
-    field: 'billType',
-    hasMileage: false,
-    route: { bike: '/api/tracker/bills', car: '/api/cars/car-bills' },
-  },
-  fines: {
-    title: 'Fine',
-    typeLabel: 'Type of fine',
-    typePlaceholder: 'Choose the type',
-    field: 'fineType',
-    hasMileage: false,
-    route: { bike: '/api/tracker/fines', car: '/api/cars/car-fines' },
-  },
-  tolls: {
-    title: 'Toll or charge',
-    typeLabel: 'Type of charge',
-    typePlaceholder: 'Choose the type',
-    field: 'tollType',
-    hasMileage: false,
-    route: { bike: '/api/tracker/tolls', car: '/api/cars/car-tolls' },
-  },
+const CONFIG: Record<TypedCategory, { title: string; typeLabel: string; typePlaceholder: string }> = {
+  service: { title: 'Service or repair', typeLabel: 'What was done?', typePlaceholder: 'Choose the job' },
+  mods: { title: 'Part or accessory', typeLabel: 'Type of part', typePlaceholder: 'Choose the type' },
+  labour: { title: 'Labour', typeLabel: 'What was the work?', typePlaceholder: 'Choose the job' },
+  bills: { title: 'Insurance, tax, MOT or finance', typeLabel: 'What was it for?', typePlaceholder: 'Choose the type' },
+  fines: { title: 'Fine', typeLabel: 'Type of fine', typePlaceholder: 'Choose the type' },
+  tolls: { title: 'Toll or charge', typeLabel: 'Type of charge', typePlaceholder: 'Choose the type' },
 };
 
-function isEntryType(value: unknown): value is EntryType {
+function isEntryType(value: unknown): value is TypedCategory {
   return typeof value === 'string' && value in CONFIG;
 }
 
+function editTitle(type: TypedCategory): string {
+  const title = CONFIG[type].title;
+  return `Edit ${title.charAt(0).toLowerCase()}${title.slice(1)}`;
+}
+
 export default function AddEntryScreen() {
-  const params = useLocalSearchParams<{ type: string }>();
-  const type: EntryType = isEntryType(params.type) ? params.type : 'service';
+  const params = useLocalSearchParams<{ type: string; entryId?: string }>();
+  const type: TypedCategory = isEntryType(params.type) ? params.type : 'service';
+  if (!params.entryId) return <EntryForm type={type} />;
+  return (
+    <EntryLoader category={type} entryId={params.entryId} title={editTitle(type)}>
+      {(entry) => <EntryForm type={type} existing={entry} />}
+    </EntryLoader>
+  );
+}
+
+function EntryForm({ type, existing }: { type: TypedCategory; existing?: Entry }) {
   const config = CONFIG[type];
+  const fields = TYPED_FIELDS[type];
   const { selected, refresh } = useVehicle();
   const { token, signOut } = useAuth();
   const form = useFormOptions(selected?.kind);
-  const [kind, setKind] = useState<string | null>(null);
-  const [name, setName] = useState('');
-  const [cost, setCost] = useState('');
-  const [date, setDate] = useState(() => new Date());
-  const [notes, setNotes] = useState('');
+  // What an edit starts from - also how an untouched field is spotted,
+  // so its stored value goes back as it was rather than re-converted.
+  const [initial] = useState(() => ({
+    cost: existing ? existing.costDisplay.toFixed(2) : '',
+    mileage: existing?.mileageDisplay != null ? String(existing.mileageDisplay) : undefined,
+  }));
+  const [kind, setKind] = useState<string | null>(existing?.typeKey ?? null);
+  const [name, setName] = useState(existing?.name ?? '');
+  const [cost, setCost] = useState(initial.cost);
+  const [date, setDate] = useState(() => (existing ? fromIsoDay(existing.date) : new Date()));
+  const [notes, setNotes] = useState(existing?.notes ?? '');
   const [remind, setRemind] = useState(true);
   const [saving, setSaving] = useState(false);
   const [problem, setProblem] = useState<{ message: string; canOverride: boolean } | null>(null);
-  const { mileage, setMileage, note: estimateNote } = useEstimatedMileage(selected, date, token);
+  const { mileage, setMileage, note: estimateNote } = useEstimatedMileage(selected, date, token, initial.mileage);
 
   if (!selected) return null;
   const vehicle = selected;
   const { units } = vehicle;
   const distanceUnit = units.distanceUnit === 'km' ? 'km' : 'mi';
 
-  const options = form.options ? (form.options[type] as VehicleFormOptions[EntryType]) : null;
-  // Only services and bills carry "remind me again" defaults.
+  const options = form.options ? (form.options[type] as VehicleFormOptions[TypedCategory]) : null;
+  // Only services and bills carry "remind me again" defaults - and only
+  // when logging: an edit leaves reminders alone (the web's edit would
+  // replace the job's current reminder, even from an old entry).
   const reminderDefaults: Record<string, ReminderDefault> | null =
-    options && 'reminderDefaults' in options ? (options as { reminderDefaults: Record<string, ReminderDefault> }).reminderDefaults : null;
+    !existing && options && 'reminderDefaults' in options ? (options as { reminderDefaults: Record<string, ReminderDefault> }).reminderDefaults : null;
   const reminderDefault = kind && reminderDefaults ? reminderDefaults[kind] : undefined;
 
   const costN = parseNumber(cost);
   const mileageN = parseMileage(mileage);
-  const valid = !!kind && costN > 0 && (!config.hasMileage || mileageN > 0) && (!config.hasName || name.trim().length > 0);
+  const valid = !!kind && costN > 0 && (!fields.hasMileage || mileageN > 0) && (!fields.hasName || name.trim().length > 0);
 
   async function save(acknowledgeMileage: boolean) {
     if (!valid || saving) return;
     setSaving(true);
     setProblem(null);
-    const result = await apiFetch(config.route[vehicle.kind], {
-      method: 'POST',
+    const same = {
+      cost: existing && cost === initial.cost,
+      mileage: existing && existing.mileageMiles != null && mileage === initial.mileage,
+      date: existing && toIsoDay(date) === existing.date.slice(0, 10),
+    };
+    const storedMileage = existing && same.mileage ? existing.mileageMiles : Math.round(toStoredMiles(mileageN, units));
+    const result = await apiFetch(existing ? recordPath(vehicle, type, existing.id) : ENTRY_ROUTES[type][vehicle.kind], {
+      method: existing ? 'PATCH' : 'POST',
       token,
       headers: vehicleHeaders(vehicle),
       body: {
-        [config.field]: kind,
-        ...(config.hasName ? { name: name.trim() } : {}),
-        cost: toStoredGbp(costN, units),
-        date: toIsoDay(date),
+        [fields.field]: kind,
+        ...(fields.hasName ? { name: name.trim() } : {}),
+        cost: existing && same.cost ? existing.costGbp : toStoredGbp(costN, units),
+        date: existing && same.date ? existing.date : toIsoDay(date),
         notes: notes.trim(),
-        ...(config.hasMileage ? { mileage: Math.round(toStoredMiles(mileageN, units)), mileageAcknowledged: acknowledgeMileage } : {}),
+        ...(fields.hasMileage ? { mileage: storedMileage, mileageAcknowledged: acknowledgeMileage } : {}),
         // The same "remind me when it's due again" the web forms offer,
         // with the same default interval for the chosen job or bill.
         ...(reminderDefault && remind ? { reminder: { intervalType: reminderDefault.type, intervalValue: reminderDefault.value } } : {}),
@@ -151,7 +128,7 @@ export default function AddEntryScreen() {
     }
     // 409 is the website's mileage check (out of order with your other
     // entries); a warning can be confirmed, a hard block can't.
-    setProblem({ message: result.error, canOverride: result.status === 409 && config.hasMileage && !acknowledgeMileage });
+    setProblem({ message: result.error, canOverride: result.status === 409 && fields.hasMileage && !acknowledgeMileage });
   }
 
   function pickDate() {
@@ -173,7 +150,7 @@ export default function AddEntryScreen() {
         </Pressable>
         <View style={styles.flex}>
           <Text style={styles.title} accessibilityRole="header" numberOfLines={2}>
-            {config.title}
+            {existing ? editTitle(type) : config.title}
           </Text>
           <Text style={styles.subtitle} numberOfLines={1}>
             {vehicle.name}
@@ -198,7 +175,7 @@ export default function AddEntryScreen() {
               onChange={setKind}
             />
 
-            {config.hasName ? (
+            {fields.hasName ? (
               <Field label="What is it?" value={name} onChangeText={setName} placeholder="e.g. Akrapovic slip-on can" keyboardType="default" />
             ) : null}
 
@@ -214,7 +191,7 @@ export default function AddEntryScreen() {
               </View>
             </View>
 
-            {config.hasMileage ? (
+            {fields.hasMileage ? (
               <Field
                 label={`Mileage (${distanceUnit})`}
                 value={mileage}
@@ -274,7 +251,7 @@ export default function AddEntryScreen() {
               accessibilityRole="button"
               accessibilityState={{ disabled: !valid || saving, busy: saving }}
               style={({ pressed }) => [styles.save, (!valid || saving) && styles.saveDisabled, pressed && valid && { opacity: 0.85 }]}>
-              <Text style={styles.saveLabel}>{saving ? 'Saving…' : 'Save'}</Text>
+              <Text style={styles.saveLabel}>{saving ? 'Saving…' : existing ? 'Save changes' : 'Save'}</Text>
             </Pressable>
           </View>
         </KeyboardAvoidingView>

@@ -6,6 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { EntryRow, type EntryCategory, type LogEntry } from '@/components/entry-row';
 import { ErrorState, LoadingState } from '@/components/screen';
 import { Brand } from '@/constants/brand';
+import { openEntry } from '@/lib/entries';
 import { useApi } from '@/lib/use-api';
 import { useVehicle } from '@/lib/vehicle';
 
@@ -98,7 +99,7 @@ export default function LogbookScreen() {
           renderSectionHeader={({ section }) => <Text style={styles.month}>{section.title}</Text>}
           renderItem={({ item, index, section }) => (
             <View style={[styles.cardSlice, index === 0 && styles.cardTop, index === section.data.length - 1 && styles.cardBottom]}>
-              <EntryRow entry={item} divider={index > 0} />
+              <EntryRow entry={item} divider={index > 0} onPress={() => openEntry(item)} />
             </View>
           )}
           ListEmptyComponent={

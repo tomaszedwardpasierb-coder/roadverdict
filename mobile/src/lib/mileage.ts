@@ -9,13 +9,23 @@ export function toIsoDay(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
+// A stored day ("2026-09-01", or a full timestamp) as that calendar day
+// on the phone - new Date("2026-09-01") would be UTC midnight, which is
+// the day before anywhere west of Greenwich.
+export function fromIsoDay(iso: string): Date {
+  const [y, m, d] = iso.slice(0, 10).split('-').map(Number);
+  return y && m && d ? new Date(y, m - 1, d) : new Date(iso);
+}
+
 // The mileage field every logging form shares, with the web forms' rules
 // (useEstimatedMileage): it starts on the current mileage, re-estimates
 // for a past date from the vehicle's logged history, and stops
-// overwriting the moment the person types their own figure.
-export function useEstimatedMileage(vehicle: GarageVehicle | null, date: Date, token: string | null) {
-  const [mileage, setMileageState] = useState(() => (vehicle ? String(vehicle.units.currentMileageDisplay) : ''));
-  const [touched, setTouched] = useState(false);
+// overwriting the moment the person types their own figure. Editing an
+// entry passes its own mileage as `initial`, which is never estimated
+// over.
+export function useEstimatedMileage(vehicle: GarageVehicle | null, date: Date, token: string | null, initial?: string) {
+  const [mileage, setMileageState] = useState(() => initial ?? (vehicle ? String(vehicle.units.currentMileageDisplay) : ''));
+  const [touched, setTouched] = useState(initial !== undefined);
   const [note, setNote] = useState<string | null>(null);
   const isoDate = toIsoDay(date);
 

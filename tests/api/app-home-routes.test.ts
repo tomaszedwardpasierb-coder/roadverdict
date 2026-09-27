@@ -8,16 +8,26 @@ const mocks = vi.hoisted(() => ({
   getLogbook: vi.fn(),
   getMileageEstimate: vi.fn(),
   getReminderList: vi.fn(),
+  getEntryDetail: vi.fn(),
 }));
 
 vi.mock("@/lib/auth/session", () => ({ getSession: mocks.getSession }));
-vi.mock("@/lib/app/homeData", () => ({ getGarage: mocks.getGarage, getHomeData: mocks.getHomeData, getLogbook: mocks.getLogbook, getMileageEstimate: mocks.getMileageEstimate, getReminderList: mocks.getReminderList }));
+vi.mock("@/lib/app/homeData", () => ({
+  getGarage: mocks.getGarage,
+  getHomeData: mocks.getHomeData,
+  getLogbook: mocks.getLogbook,
+  getMileageEstimate: mocks.getMileageEstimate,
+  getReminderList: mocks.getReminderList,
+  getEntryDetail: mocks.getEntryDetail,
+  ENTRY_CATEGORIES: ["fuel", "service", "mods", "bills", "labour", "fines", "tolls"],
+}));
 
 import { GET as getGarageRoute } from "@/app/api/app/garage/route";
 import { GET as getHomeRoute } from "@/app/api/app/home/route";
 import { GET as getLogbookRoute } from "@/app/api/app/logbook/route";
 import { GET as getEstimateRoute } from "@/app/api/app/mileage-estimate/route";
 import { GET as getRemindersRoute } from "@/app/api/app/reminders/route";
+import { GET as getEntryRoute } from "@/app/api/app/entry/route";
 
 function homeReq(query: string): NextRequest {
   return new NextRequest(`http://localhost/api/app/home${query}`);
@@ -146,5 +156,37 @@ describe("GET /api/app/reminders", () => {
 
     mocks.getReminderList.mockResolvedValue(null);
     expect((await getRemindersRoute(remindersReq("?kind=car&id=nope"))).status).toBe(404);
+  });
+});
+
+describe("GET /api/app/entry", () => {
+  const entryReq = (query: string) => new NextRequest(`http://localhost/api/app/entry${query}`);
+  const full = "?kind=bike&id=b1&category=fuel&entryId=rider%40example.com%3A%3Afuel%3A%3A1";
+
+  it("refuses anyone not signed in", async () => {
+    mocks.getSession.mockResolvedValue(null);
+    expect((await getEntryRoute(entryReq(full))).status).toBe(401);
+    expect(mocks.getEntryDetail).not.toHaveBeenCalled();
+  });
+
+  it("needs a valid kind, a vehicle id, a known category and an entry id", async () => {
+    expect((await getEntryRoute(entryReq("?kind=boat&id=b1&category=fuel&entryId=e1"))).status).toBe(400);
+    expect((await getEntryRoute(entryReq("?kind=bike&category=fuel&entryId=e1"))).status).toBe(400);
+    expect((await getEntryRoute(entryReq("?kind=bike&id=b1&category=vault&entryId=e1"))).status).toBe(400);
+    expect((await getEntryRoute(entryReq("?kind=bike&id=b1&category=fuel"))).status).toBe(400);
+    expect(mocks.getEntryDetail).not.toHaveBeenCalled();
+  });
+
+  it("answers 404 for an entry that isn't this account's", async () => {
+    mocks.getEntryDetail.mockResolvedValue(null);
+    expect((await getEntryRoute(entryReq(full))).status).toBe(404);
+  });
+
+  it("returns the signed-in account's own entry, never cached", async () => {
+    mocks.getEntryDetail.mockResolvedValue({ vehicle: {}, entry: { id: "e1" } });
+    const res = await getEntryRoute(entryReq(full));
+    expect(res.status).toBe(200);
+    expect(res.headers.get("cache-control")).toBe("private, no-store");
+    expect(mocks.getEntryDetail).toHaveBeenCalledWith("rider@example.com", "bike", "b1", "fuel", "rider@example.com::fuel::1");
   });
 });

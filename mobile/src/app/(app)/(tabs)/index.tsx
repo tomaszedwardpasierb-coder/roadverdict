@@ -7,6 +7,7 @@ import { EntryRow, type LogEntry } from '@/components/entry-row';
 import { Icon, type IconName } from '@/components/icon';
 import { Card, ErrorState, LoadingState, SectionHeader, StatusPill } from '@/components/screen';
 import { Brand } from '@/constants/brand';
+import { openEntry } from '@/lib/entries';
 import { useApi } from '@/lib/use-api';
 import { useVehicle, type GarageVehicle } from '@/lib/vehicle';
 
@@ -32,9 +33,13 @@ export default function HomeScreen() {
       <SafeAreaView style={styles.safe} edges={['top']}>
         <View style={styles.empty}>
           <Text style={styles.emptyTitle}>Add your first vehicle</Text>
-          <Text style={styles.emptyBody}>
-            Adding a bike or car in the app is coming soon. For now, add it on roadverdict.co.uk and it will appear here.
-          </Text>
+          <Text style={styles.emptyBody}>Start with the registration - we&apos;ll look up the rest, and bring in its MOT history.</Text>
+          <Pressable
+            onPress={() => router.push('/add-vehicle')}
+            accessibilityRole="button"
+            style={({ pressed }) => [styles.emptyButton, pressed && { opacity: 0.85 }]}>
+            <Text style={styles.emptyButtonLabel}>Add a vehicle</Text>
+          </Pressable>
         </View>
       </SafeAreaView>
     );
@@ -46,9 +51,8 @@ export default function HomeScreen() {
       <View style={styles.header}>
         <Pressable
           onPress={() => setSwitcherOpen(true)}
-          disabled={garage.vehicles.length < 2}
           accessibilityRole="button"
-          accessibilityLabel={`${selected.name}. ${garage.vehicles.length > 1 ? 'Switch vehicle' : ''}`}
+          accessibilityLabel={`${selected.name}. ${garage.vehicles.length > 1 ? 'Switch or add a vehicle' : 'Add a vehicle'}`}
           style={styles.switcher}>
           <View style={styles.switcherText}>
             <Text style={styles.vehicleName} numberOfLines={1}>
@@ -58,7 +62,7 @@ export default function HomeScreen() {
               {[selected.registration, data?.vehicle.mileageLabel].filter(Boolean).join(' · ')}
             </Text>
           </View>
-          {garage.vehicles.length > 1 ? <Icon name="chevronDown" size={22} color={Brand.ink} /> : null}
+          <Icon name="chevronDown" size={22} color={Brand.ink} />
         </Pressable>
       </View>
 
@@ -128,7 +132,7 @@ export default function HomeScreen() {
                 <Text style={styles.rowMeta}>Nothing logged yet. Tap ⊕ to add your first entry.</Text>
               </View>
             ) : (
-              data.recent.map((item, i) => <EntryRow key={`${item.category}-${item.id}`} entry={item} divider={i > 0} />)
+              data.recent.map((item, i) => <EntryRow key={`${item.category}-${item.id}`} entry={item} divider={i > 0} onPress={() => openEntry(item)} />)
             )}
           </Card>
         </ScrollView>
@@ -142,6 +146,10 @@ export default function HomeScreen() {
         onSelect={(v) => {
           garage.select(v);
           setSwitcherOpen(false);
+        }}
+        onAdd={() => {
+          setSwitcherOpen(false);
+          router.push('/add-vehicle');
         }}
       />
     </SafeAreaView>
@@ -168,12 +176,14 @@ function VehicleSwitcher({
   vehicles,
   selected,
   onSelect,
+  onAdd,
 }: {
   open: boolean;
   onClose: () => void;
   vehicles: GarageVehicle[];
   selected: GarageVehicle;
   onSelect: (v: GarageVehicle) => void;
+  onAdd: () => void;
 }) {
   return (
     <Modal visible={open} transparent animationType="fade" onRequestClose={onClose}>
@@ -201,6 +211,10 @@ function VehicleSwitcher({
             </Pressable>
           );
         })}
+        <Pressable onPress={onAdd} accessibilityRole="button" style={({ pressed }) => [styles.sheetRow, styles.sheetAdd, pressed && { opacity: 0.85 }]}>
+          <Icon name="plus" size={22} color={Brand.amberInk} />
+          <Text style={styles.rowTitle}>Add a vehicle</Text>
+        </Pressable>
       </SafeAreaView>
     </Modal>
   );
@@ -242,9 +256,12 @@ const styles = StyleSheet.create({
   empty: { flex: 1, justifyContent: 'center', padding: 24, gap: 12 },
   emptyTitle: { fontSize: 28, fontWeight: '800', color: Brand.ink },
   emptyBody: { fontSize: 16, lineHeight: 24, color: Brand.muted },
+  emptyButton: { alignSelf: 'flex-start', height: 52, paddingHorizontal: 22, borderRadius: 12, backgroundColor: Brand.amber, justifyContent: 'center', marginTop: 4 },
+  emptyButtonLabel: { fontSize: 17, fontWeight: '700', color: Brand.asphalt },
   backdrop: { flex: 1, backgroundColor: 'rgba(23,24,27,0.55)' },
   sheet: { backgroundColor: Brand.paperRaised, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20, gap: 8 },
   sheetTitle: { fontSize: 22, fontWeight: '800', color: Brand.ink, marginBottom: 4 },
   sheetRow: { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 64, paddingHorizontal: 14, borderRadius: 12, borderWidth: 1, borderColor: Brand.line },
   sheetRowSelected: { borderColor: Brand.amber, backgroundColor: '#FBF4E8' },
+  sheetAdd: { borderStyle: 'dashed', borderColor: '#C9C4B8' },
 });

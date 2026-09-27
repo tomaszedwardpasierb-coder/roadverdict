@@ -23,12 +23,14 @@ vi.mock("@/lib/tracker/bike", () => ({
   getBikesForUser: mocks.getBikesForUser,
   getCurrentRegistration: (b: { registration?: string }) => b.registration,
   isBikeReadOnly: (b: { transferredAt?: string }) => !!b.transferredAt,
+  countActiveBikes: (bikes: { transferredAt?: string }[]) => bikes.filter((b) => !b.transferredAt).length,
 }));
 vi.mock("@/lib/tracker/car", () => ({
   getCarById: mocks.getCarById,
   getCarsForUser: mocks.getCarsForUser,
   getCurrentRegistration: (c: { registration?: string }) => c.registration,
   isCarReadOnly: (c: { transferredAt?: string }) => !!c.transferredAt,
+  countActiveCars: (cars: { transferredAt?: string }[]) => cars.filter((c) => !c.transferredAt).length,
 }));
 vi.mock("@/lib/tracker/activeVehicle", () => ({ resolveActiveVehicle: mocks.resolveActiveVehicle }));
 vi.mock("@/lib/tracker/billSeries", () => ({ materializeAllDueForBike: mocks.materializeAllDueForBike }));
@@ -55,7 +57,7 @@ vi.mock("@/lib/tracker/carReminder", () => ({ getCarReminders: mocks.car.reminde
 vi.mock("@/lib/tracker/currencyRates", () => ({ getExchangeRates: mocks.getExchangeRates }));
 vi.mock("@/lib/subscriptions", () => ({ getProStatus: mocks.getProStatus }));
 
-import { getHomeData, getGarage, getLogbook, getMileageEstimate, getReminderList } from "@/lib/app/homeData";
+import { getEntryDetail, getHomeData, getGarage, getLogbook, getMileageEstimate, getReminderList } from "@/lib/app/homeData";
 
 const email = "rider@example.com";
 const NOW = new Date("2026-09-25T12:00:00Z");
@@ -180,7 +182,22 @@ describe("getGarage", () => {
     mocks.getBikesForUser.mockResolvedValue([]);
     mocks.getCarsForUser.mockResolvedValue([]);
     mocks.resolveActiveVehicle.mockResolvedValue(null);
-    expect(await getGarage(email)).toEqual({ vehicles: [], defaultVehicle: null });
+    expect(await getGarage(email)).toEqual({ vehicles: [], defaultVehicle: null, vehicleLimit: { limit: 1, active: 0 } });
+  });
+
+  it("gives the free plan's vehicle limit, counting only vehicles still owned, bikes and cars together", async () => {
+    mocks.getBikesForUser.mockResolvedValue([bike, { ...bike, id: "bike-2", transferredAt: "2026-05-01" }]);
+    mocks.getCarsForUser.mockResolvedValue([]);
+    mocks.resolveActiveVehicle.mockResolvedValue(null);
+    expect((await getGarage(email)).vehicleLimit).toEqual({ limit: 1, active: 1 });
+  });
+
+  it("gives Pro its higher limit", async () => {
+    mocks.getProStatus.mockResolvedValue({ isPro: true });
+    mocks.getBikesForUser.mockResolvedValue([bike]);
+    mocks.getCarsForUser.mockResolvedValue([{ id: "car-1", make: "BMW", model: "i4", currentMileage: 100 }]);
+    mocks.resolveActiveVehicle.mockResolvedValue(null);
+    expect((await getGarage(email)).vehicleLimit).toEqual({ limit: 2, active: 2 });
   });
 });
 
@@ -217,6 +234,93 @@ describe("getLogbook", () => {
 
     expect(home.spend.monthTotalLabel).toBe("£0.00");
     expect(home.recent).toEqual([]);
+  });
+});
+
+describe("getEntryDetail", () => {
+  it("returns null for a vehicle that isn't on this account", async () => {
+    mocks.getBike.mockResolvedValue(null);
+    expect(await getEntryDetail(email, "bike", "not-mine", "fuel", "f1")).toBeNull();
+    expect(mocks.bike.fuel).not.toHaveBeenCalled();
+  });
+
+  it("only finds an entry among that vehicle's own records of that category", async () => {
+    mocks.bike.fuel.mockResolvedValue([{ id: "f1", date: "2026-09-23", cost: 19.8, litres: 12.4, filledToFull: true, mileage: 35621 }]);
+    expect(await getEntryDetail(email, "bike", "bike-1", "fuel", "someone-elses")).toBeNull();
+    expect(await getEntryDetail(email, "bike", "bike-1", "service", "f1")).toBeNull();
+    expect(mocks.bike.fuel).toHaveBeenCalledWith(email, "bike-1");
+  });
+
+  it("gives a service in full: the job key for the form, stored and display values, and receipts", async () => {
+    mocks.getExchangeRates.mockResolvedValue({ base: "GBP", rates: { EUR: 1.2 }, fetchedAt: "2026-09-25" });
+    mocks.getBike.mockResolvedValue({ ...bike, currency: "EUR", distanceUnit: "km" });
+    mocks.bike.records.mockResolvedValue([
+      {
+        id: "rider@example.com::service::1",
+        date: "2026-09-01",
+        cost: 100,
+        jobType: "full-service",
+        mileage: 35000,
+        notes: "Main dealer",
+        needsReview: true,
+        mileageConfidence: "estimated",
+        attachments: [{ blobName: "rider/abc 1.jpg", fileName: "receipt.jpg", fileType: "image/jpeg", uploadedAt: "2026-09-01" }],
+      },
+    ]);
+
+    const detail = (await getEntryDetail(email, "bike", "bike-1", "service", "rider@example.com::service::1"))!;
+
+    expect(detail.vehicle).toMatchObject({ kind: "bike", id: "bike-1" });
+    expect(detail.entry).toMatchObject({
+      category: "service",
+      type: "Service",
+      description: "Full service",
+      typeKey: "full-service",
+      name: null,
+      notes: "Main dealer",
+      costGbp: 100,
+      costDisplay: 120,
+      mileageMiles: 35000,
+      mileageDisplay: 56327,
+      mileageEstimated: true,
+      needsReview: true,
+      fuel: null,
+      instalmentPlan: false,
+    });
+    expect(detail.entry.attachments).toEqual([
+      { fileName: "receipt.jpg", fileType: "image/jpeg", path: "/api/tracker/attachment/rider%2Fabc%201.jpg" },
+    ]);
+  });
+
+  it("gives a part's own type as its form key, not the logbook category", async () => {
+    mocks.bike.mods.mockResolvedValue([{ id: "m1", date: "2026-09-02", cost: 149, category: "exhaust", name: "Slip-on can", mileage: 35102, notes: "" }]);
+    const detail = (await getEntryDetail(email, "bike", "bike-1", "mods", "m1"))!;
+    expect(detail.entry).toMatchObject({ category: "mods", typeKey: "exhaust", name: "Slip-on can", description: "Slip-on can" });
+  });
+
+  it("gives a bike's fill-up in litres, with whether the tank was filled", async () => {
+    mocks.bike.fuel.mockResolvedValue([{ id: "f1", date: "2026-09-23", cost: 19.8, litres: 12.4, filledToFull: true, mileage: 35621 }]);
+    const detail = (await getEntryDetail(email, "bike", "bike-1", "fuel", "f1"))!;
+    expect(detail.entry).toMatchObject({ typeKey: null, mileageEstimated: false, fuel: { amount: 12.4, unit: "L", filledToFull: true } });
+  });
+
+  it("describes an electric car's charge in kWh, never as a full tank", async () => {
+    mocks.getCarById.mockResolvedValue({ id: "car-1", make: "BMW", model: "i4", currentMileage: 100, fuelType: "electric" });
+    mocks.car.fuel.mockResolvedValue([{ id: "c1", date: "2026-09-20", cost: 12.5, fuelType: "electric", kwh: 40.5, filledToFull: true, mileage: 90 }]);
+    const detail = (await getEntryDetail(email, "car", "car-1", "fuel", "c1"))!;
+    expect(detail.vehicle).toMatchObject({ kind: "car", id: "car-1" });
+    expect(detail.entry).toMatchObject({ description: "40.5 kWh", fuel: { amount: 40.5, unit: "kWh", filledToFull: false } });
+  });
+
+  it("flags a bill written by an instalment plan", async () => {
+    mocks.bike.bills.mockResolvedValue([{ id: "b1", date: "2026-09-01", cost: 45, billType: "insurance", notes: "", seriesId: "s1" }]);
+    const detail = (await getEntryDetail(email, "bike", "bike-1", "bills", "b1"))!;
+    expect(detail.entry).toMatchObject({ typeKey: "insurance", instalmentPlan: true, mileageMiles: null, mileageDisplay: null, attachments: [] });
+  });
+
+  it("is a read only - it never writes due instalments", async () => {
+    await getEntryDetail(email, "bike", "bike-1", "bills", "b1");
+    expect(mocks.materializeAllDueForBike).not.toHaveBeenCalled();
   });
 });
 

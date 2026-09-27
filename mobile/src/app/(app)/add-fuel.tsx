@@ -1,31 +1,53 @@
+// Logs a fill-up or charge - or, opened from an entry with its id,
+// edits that one through the same website route's PATCH.
 import { DateTimePickerAndroid } from '@react-native-community/datetimepicker';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { KeyboardAvoidingView, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { EntryLoader } from '@/components/entry-loader';
 import { Icon } from '@/components/icon';
 import { Brand } from '@/constants/brand';
 import { apiFetch } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
-import { dayLabel, parseMileage, parseNumber, toIsoDay, useEstimatedMileage } from '@/lib/mileage';
+import { ENTRY_ROUTES, recordPath, type Entry } from '@/lib/entries';
+import { dayLabel, fromIsoDay, parseMileage, parseNumber, toIsoDay, useEstimatedMileage } from '@/lib/mileage';
 import { toStoredGbp, toStoredMiles, useVehicle, vehicleHeaders } from '@/lib/vehicle';
 
 export default function AddFuelScreen() {
+  const { entryId } = useLocalSearchParams<{ entryId?: string }>();
+  if (!entryId) return <FuelForm />;
+  return (
+    <EntryLoader category="fuel" entryId={entryId} title="Edit fill-up">
+      {(entry) => <FuelForm existing={entry} />}
+    </EntryLoader>
+  );
+}
+
+function FuelForm({ existing }: { existing?: Entry }) {
   const { selected, refresh } = useVehicle();
   const { token, signOut } = useAuth();
-  const [amount, setAmount] = useState('');
-  const [cost, setCost] = useState('');
-  const [date, setDate] = useState(() => new Date());
-  const [full, setFull] = useState(true);
+  // What an edit starts from - also how an untouched field is spotted,
+  // so its stored value goes back as it was rather than re-converted.
+  const [initial] = useState(() => ({
+    amount: existing?.fuel ? String(existing.fuel.amount) : '',
+    cost: existing ? existing.costDisplay.toFixed(2) : '',
+    mileage: existing?.mileageDisplay != null ? String(existing.mileageDisplay) : undefined,
+  }));
+  const [amount, setAmount] = useState(initial.amount);
+  const [cost, setCost] = useState(initial.cost);
+  const [date, setDate] = useState(() => (existing ? fromIsoDay(existing.date) : new Date()));
+  const [full, setFull] = useState(existing?.fuel ? existing.fuel.filledToFull : true);
   const [saving, setSaving] = useState(false);
   const [problem, setProblem] = useState<{ message: string; canOverride: boolean } | null>(null);
-  const { mileage, setMileage, note: estimateNote } = useEstimatedMileage(selected, date, token);
+  const { mileage, setMileage, note: estimateNote } = useEstimatedMileage(selected, date, token, initial.mileage);
 
   if (!selected) return null;
   const vehicle = selected;
   const { units } = vehicle;
-  const electric = vehicle.fuelType === 'electric';
+  // An existing entry keeps its own kind: a charge stays a charge.
+  const electric = existing?.fuel ? existing.fuel.unit === 'kWh' : vehicle.fuelType === 'electric';
   const amountUnit = electric ? 'kWh' : 'L';
   const distanceUnit = units.distanceUnit === 'km' ? 'km' : 'mi';
 
@@ -39,15 +61,20 @@ export default function AddFuelScreen() {
     if (!valid || saving) return;
     setSaving(true);
     setProblem(null);
-    const result = await apiFetch(vehicle.kind === 'bike' ? '/api/tracker/fuel' : '/api/cars/car-fuel', {
-      method: 'POST',
+    const same = {
+      cost: existing && cost === initial.cost,
+      mileage: existing && existing.mileageMiles != null && mileage === initial.mileage,
+      date: existing && toIsoDay(date) === existing.date.slice(0, 10),
+    };
+    const result = await apiFetch(existing ? recordPath(vehicle, 'fuel', existing.id) : ENTRY_ROUTES.fuel[vehicle.kind], {
+      method: existing ? 'PATCH' : 'POST',
       token,
       headers: vehicleHeaders(vehicle),
       body: {
         ...(electric ? { kwh: amountN } : { litres: amountN }),
-        cost: toStoredGbp(costN, units),
-        mileage: toStoredMiles(mileageN, units),
-        date: toIsoDay(date),
+        cost: existing && same.cost ? existing.costGbp : toStoredGbp(costN, units),
+        mileage: existing && same.mileage ? existing.mileageMiles : toStoredMiles(mileageN, units),
+        date: existing && same.date ? existing.date : toIsoDay(date),
         filledToFull: electric ? false : full,
         mileageAcknowledged: acknowledgeMileage,
       },
@@ -88,7 +115,7 @@ export default function AddFuelScreen() {
         </Pressable>
         <View style={styles.headerText}>
           <Text style={styles.title} accessibilityRole="header">
-            {electric ? 'Log a charge' : 'Log fuel'}
+            {existing ? (electric ? 'Edit charge' : 'Edit fill-up') : electric ? 'Log a charge' : 'Log fuel'}
           </Text>
           <Text style={styles.subtitle} numberOfLines={1}>
             {vehicle.name}
@@ -104,7 +131,7 @@ export default function AddFuelScreen() {
         <KeyboardAvoidingView style={styles.flex} behavior="height">
           <ScrollView contentContainerStyle={styles.form} keyboardShouldPersistTaps="handled">
             <View style={styles.pair}>
-              <Field label={electric ? 'kWh' : 'Litres'} value={amount} onChangeText={setAmount} placeholder={electric ? '40.5' : '12.4'} autoFocus />
+              <Field label={electric ? 'kWh' : 'Litres'} value={amount} onChangeText={setAmount} placeholder={electric ? '40.5' : '12.4'} autoFocus={!existing} />
               <Field label={`Cost (${units.currencySymbol})`} value={cost} onChangeText={setCost} placeholder="19.80" />
             </View>
             <Text style={styles.hint} accessibilityLiveRegion="polite">
@@ -165,7 +192,7 @@ export default function AddFuelScreen() {
               accessibilityRole="button"
               accessibilityState={{ disabled: !valid || saving, busy: saving }}
               style={({ pressed }) => [styles.save, (!valid || saving) && styles.saveDisabled, pressed && valid && { opacity: 0.85 }]}>
-              <Text style={styles.saveLabel}>{saving ? 'Saving…' : electric ? 'Save charge' : 'Save fill-up'}</Text>
+              <Text style={styles.saveLabel}>{saving ? 'Saving…' : existing ? 'Save changes' : electric ? 'Save charge' : 'Save fill-up'}</Text>
             </Pressable>
           </View>
         </KeyboardAvoidingView>

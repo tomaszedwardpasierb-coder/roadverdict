@@ -1,3 +1,5 @@
+import { router } from 'expo-router';
+import * as WebBrowser from 'expo-web-browser';
 import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -5,16 +7,26 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Icon } from '@/components/icon';
 import { Card, SectionHeader } from '@/components/screen';
 import { Brand } from '@/constants/brand';
+import { API_BASE_URL } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 
 // Everything outside the four main tabs. Rows that aren't built yet say
 // "Soon" instead of opening an empty screen.
-const SECTIONS: { title: string; rows: { label: string; later?: boolean }[] }[] = [
+type Row = { label: string; later?: boolean; open?: () => void };
+
+const SECTIONS: { title: string; rows: Row[] }[] = [
+  { title: 'Garage', rows: [{ label: 'Add a vehicle', open: () => router.push('/add-vehicle') }] },
   { title: 'Tools', rows: [{ label: 'Quote checker' }, { label: 'Cost calculator' }, { label: 'Buying guide & plate check' }] },
   { title: 'Insights', rows: [{ label: 'Reports & charts' }, { label: 'The story so far' }] },
   { title: 'Selling', rows: [{ label: 'Shareable links' }, { label: 'Transfer ownership' }] },
   { title: 'Documents', rows: [{ label: 'The Vault', later: true }] },
-  { title: 'Account', rows: [{ label: 'Settings' }, { label: 'Privacy' }] },
+  {
+    title: 'Account',
+    rows: [
+      { label: 'Settings', open: () => router.push('/settings') },
+      { label: 'Privacy policy', open: () => WebBrowser.openBrowserAsync(`${API_BASE_URL}/privacy`) },
+    ],
+  },
 ];
 
 export default function MoreScreen() {
@@ -44,14 +56,25 @@ export default function MoreScreen() {
           <View key={section.title} style={styles.section}>
             <SectionHeader title={section.title} />
             <Card>
-              {section.rows.map((row, i) => (
-                <View key={row.label} style={[styles.row, i > 0 && styles.divider]}>
-                  <Text style={[styles.rowTitle, styles.flex, styles.dim]}>{row.label}</Text>
-                  <View style={styles.pill}>
-                    <Text style={styles.pillText}>{row.later ? 'Later' : 'Soon'}</Text>
+              {section.rows.map((row, i) =>
+                row.open ? (
+                  <Pressable
+                    key={row.label}
+                    onPress={row.open}
+                    accessibilityRole="button"
+                    style={({ pressed }) => [styles.row, i > 0 && styles.divider, pressed && { opacity: 0.85 }]}>
+                    <Text style={[styles.rowTitle, styles.flex]}>{row.label}</Text>
+                    <Icon name="chevronRight" size={20} color={Brand.muted} />
+                  </Pressable>
+                ) : (
+                  <View key={row.label} style={[styles.row, i > 0 && styles.divider]}>
+                    <Text style={[styles.rowTitle, styles.flex, styles.dim]}>{row.label}</Text>
+                    <View style={styles.pill}>
+                      <Text style={styles.pillText}>{row.later ? 'Later' : 'Soon'}</Text>
+                    </View>
                   </View>
-                </View>
-              ))}
+                )
+              )}
             </Card>
           </View>
         ))}
