@@ -50,6 +50,9 @@ type VehicleContextValue = {
   loading: boolean;
   error: string | null;
   retry: () => void;
+  // Reload the garage quietly - after a save that may have moved a
+  // vehicle's current mileage.
+  refresh: () => void;
 };
 
 // The website remembers the selected vehicle in a cookie; the app keeps
@@ -100,8 +103,9 @@ export function VehicleProvider({ children }: { children: ReactNode }) {
       loading: garage.loading || savedChoice === undefined,
       error: garage.error,
       retry: garage.retry,
+      refresh: garage.refresh,
     }),
-    [vehicles, selected, select, garage.loading, garage.error, garage.retry, savedChoice]
+    [vehicles, selected, select, garage.loading, garage.error, garage.retry, garage.refresh, savedChoice]
   );
 
   return <VehicleContext.Provider value={value}>{children}</VehicleContext.Provider>;

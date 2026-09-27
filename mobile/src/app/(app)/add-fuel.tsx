@@ -1,6 +1,6 @@
 import { DateTimePickerAndroid } from '@react-native-community/datetimepicker';
 import { router } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { KeyboardAvoidingView, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -8,61 +8,19 @@ import { Icon } from '@/components/icon';
 import { Brand } from '@/constants/brand';
 import { apiFetch } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
+import { dayLabel, parseMileage, parseNumber, toIsoDay, useEstimatedMileage } from '@/lib/mileage';
 import { toStoredGbp, toStoredMiles, useVehicle, vehicleHeaders } from '@/lib/vehicle';
 
-// Accepts "12,4" as well as "12.4" - phone keyboards in many locales
-// only offer a comma.
-function parseNumber(text: string): number {
-  const n = Number(text.replace(',', '.').trim());
-  return Number.isFinite(n) ? n : NaN;
-}
-
-// The date as the website's own <input type="date"> sends it: the
-// person's local calendar day, not a UTC timestamp.
-function toIsoDay(d: Date): string {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-}
-
-function dayLabel(d: Date): string {
-  const today = new Date();
-  const yesterday = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 1);
-  if (toIsoDay(d) === toIsoDay(today)) return `Today, ${d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}`;
-  if (toIsoDay(d) === toIsoDay(yesterday)) return `Yesterday, ${d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}`;
-  return d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
-}
-
 export default function AddFuelScreen() {
-  const { selected } = useVehicle();
+  const { selected, refresh } = useVehicle();
   const { token, signOut } = useAuth();
   const [amount, setAmount] = useState('');
   const [cost, setCost] = useState('');
-  const [mileage, setMileage] = useState(() => (selected ? String(selected.units.currentMileageDisplay) : ''));
-  // Once the person types their own mileage, a date change stops
-  // overwriting it - the same rule as the web forms.
-  const [mileageTouched, setMileageTouched] = useState(false);
-  const [estimateNote, setEstimateNote] = useState<string | null>(null);
   const [date, setDate] = useState(() => new Date());
   const [full, setFull] = useState(true);
   const [saving, setSaving] = useState(false);
   const [problem, setProblem] = useState<{ message: string; canOverride: boolean } | null>(null);
-
-  const isoDate = toIsoDay(date);
-  useEffect(() => {
-    if (!selected || mileageTouched) return;
-    let cancelled = false;
-    apiFetch<{ mileageDisplay: number | null; note: string | null }>(
-      `/api/app/mileage-estimate?kind=${selected.kind}&id=${encodeURIComponent(selected.id)}&date=${isoDate}`,
-      { token }
-    ).then((result) => {
-      if (cancelled || !result.ok) return;
-      if (result.data.mileageDisplay != null) setMileage(String(result.data.mileageDisplay));
-      else setMileage('');
-      setEstimateNote(result.data.note);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [selected, isoDate, mileageTouched, token]);
+  const { mileage, setMileage, note: estimateNote } = useEstimatedMileage(selected, date, token);
 
   if (!selected) return null;
   const vehicle = selected;
@@ -73,7 +31,7 @@ export default function AddFuelScreen() {
 
   const amountN = parseNumber(amount);
   const costN = parseNumber(cost);
-  const mileageN = parseNumber(mileage.replace(/[,\s]/g, ''));
+  const mileageN = parseMileage(mileage);
   const valid = amountN > 0 && costN > 0 && mileageN > 0;
   const unitPrice = amountN > 0 && costN > 0 ? costN / amountN : null;
 
@@ -96,6 +54,7 @@ export default function AddFuelScreen() {
     });
     setSaving(false);
     if (result.ok) {
+      refresh();
       router.back();
       return;
     }
@@ -157,11 +116,7 @@ export default function AddFuelScreen() {
             <Field
               label={`Mileage (${distanceUnit})`}
               value={mileage}
-              onChangeText={(text) => {
-                setMileage(text);
-                setMileageTouched(true);
-                setEstimateNote(null);
-              }}
+              onChangeText={setMileage}
               placeholder={String(units.currentMileageDisplay)}
               keyboardType="number-pad"
               hint={estimateNote ?? `Last recorded: ${units.currentMileageDisplay.toLocaleString('en-GB')} ${distanceUnit}`}

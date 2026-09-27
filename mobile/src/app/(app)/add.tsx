@@ -26,7 +26,7 @@ export default function AddSheet() {
           </Pressable>
         </View>
 
-        <Pressable onPress={() => pick('Scan a receipt')} accessibilityRole="button" style={({ pressed }) => [styles.scan, pressed && styles.pressed]}>
+        <Pressable onPress={() => router.replace('/scan')} accessibilityRole="button" style={({ pressed }) => [styles.scan, pressed && styles.pressed]}>
           <View style={styles.scanIcon}>
             <Icon name="camera" size={26} color={Brand.asphalt} />
           </View>
@@ -38,15 +38,27 @@ export default function AddSheet() {
 
         <View style={styles.grid}>
           <Tile icon="fuel" label="Fuel" onPress={() => router.replace('/add-fuel')} />
-          <Tile icon="wrench" label="Service or repair" onPress={() => pick('Service or repair')} />
-          <Tile icon="gauge" label="Mileage" onPress={() => pick('Update mileage')} />
+          <Tile icon="wrench" label="Service or repair" onPress={() => router.replace({ pathname: '/add-entry', params: { type: 'service' } })} />
+          <Tile icon="gauge" label="Mileage" onPress={() => router.replace('/update-mileage')} />
           <Tile icon="quote" label="Check a quote" onPress={() => pick('Check a quote')} />
         </View>
 
         <Text style={styles.otherTitle}>Something else</Text>
         <View style={styles.chips}>
-          {['Parts', 'Insurance, tax, MOT', 'Labour', 'Fine', 'Toll'].map((label) => (
-            <Pressable key={label} onPress={() => pick(label)} accessibilityRole="button" style={({ pressed }) => [styles.chip, pressed && styles.pressed]}>
+          {(
+            [
+              ['Parts', 'mods'],
+              ['Insurance, tax, MOT', 'bills'],
+              ['Labour', 'labour'],
+              ['Fine', 'fines'],
+              ['Toll', 'tolls'],
+            ] as const
+          ).map(([label, type]) => (
+            <Pressable
+              key={label}
+              onPress={() => router.replace({ pathname: '/add-entry', params: { type } })}
+              accessibilityRole="button"
+              style={({ pressed }) => [styles.chip, pressed && styles.pressed]}>
               <Text style={styles.chipLabel}>{label}</Text>
             </Pressable>
           ))}

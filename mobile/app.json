@@ -34,7 +34,14 @@
         }
       ],
       "expo-secure-store",
-      "@react-native-community/datetimepicker"
+      "@react-native-community/datetimepicker",
+      [
+        "expo-image-picker",
+        {
+          "cameraPermission": "RoadVerdict uses the camera to photograph receipts, so the details can be read and logged for you.",
+          "photosPermission": "RoadVerdict opens your photos so you can choose a receipt to scan."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,
