@@ -1,17 +1,12 @@
 import { router } from 'expo-router';
-import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Icon, type IconName } from '@/components/icon';
 import { Brand } from '@/constants/brand';
 
-// The ⊕ sheet. Each option opens its own form as those are built; until
-// then an option says so here rather than doing nothing.
+// The ⊕ sheet: every way of adding to the logbook, plus checking a quote.
 export default function AddSheet() {
-  const [soon, setSoon] = useState<string | null>(null);
-  const pick = (label: string) => setSoon(label);
-
   return (
     <View style={styles.root}>
       <Pressable style={styles.backdrop} onPress={() => router.back()} accessibilityLabel="Close" />
@@ -40,7 +35,7 @@ export default function AddSheet() {
           <Tile icon="fuel" label="Fuel" onPress={() => router.replace('/add-fuel')} />
           <Tile icon="wrench" label="Service or repair" onPress={() => router.replace({ pathname: '/add-entry', params: { type: 'service' } })} />
           <Tile icon="gauge" label="Mileage" onPress={() => router.replace('/update-mileage')} />
-          <Tile icon="quote" label="Check a quote" onPress={() => pick('Check a quote')} />
+          <Tile icon="quote" label="Check a quote" onPress={() => router.replace('/quote')} />
         </View>
 
         <Text style={styles.otherTitle}>Something else</Text>
@@ -63,12 +58,6 @@ export default function AddSheet() {
             </Pressable>
           ))}
         </View>
-
-        {soon ? (
-          <Text style={styles.soon} accessibilityLiveRegion="polite">
-            {soon} is coming in the next app build. You can add it on roadverdict.co.uk for now.
-          </Text>
-        ) : null}
       </SafeAreaView>
     </View>
   );
@@ -104,5 +93,4 @@ const styles = StyleSheet.create({
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   chip: { minHeight: 44, paddingHorizontal: 16, justifyContent: 'center', borderRadius: 999, borderWidth: 1, borderColor: Brand.line },
   chipLabel: { fontSize: 15, fontWeight: '600', color: Brand.ink },
-  soon: { fontSize: 14, lineHeight: 20, color: '#7A4508', backgroundColor: '#FBEACC', borderRadius: 12, padding: 12 },
 });

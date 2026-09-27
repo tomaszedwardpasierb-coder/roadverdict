@@ -10,20 +10,12 @@ import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/session";
 import { getBikesForUser, pickActiveBike } from "@/lib/tracker/bike";
 import { getCarsForUser, pickActiveCar } from "@/lib/tracker/car";
-import { BRAND_OPTIONS } from "@/lib/priceData";
-import { getBikeClassForCC, getModelsForBrand, slugifyMake } from "@/lib/motorcycleModels";
-import { CAR_BRAND_OPTIONS, slugifyCarMake, type CarBenchmarkClass } from "@/lib/carPriceData";
+import { bikeQuoteDefaults, carQuoteDefaults } from "@/lib/tracker/quoteDefaults";
 import { ANONYMOUS_VIEWER, type ViewerInfo } from "@/lib/viewer";
 
 export const dynamic = "force-dynamic";
 
 const NO_STORE = { "Cache-Control": "private, no-store" };
-
-function carClassFromEngineLitres(engineLitres: number): CarBenchmarkClass {
-  if (engineLitres <= 1.2) return "small";
-  if (engineLitres <= 2.0) return "medium";
-  return "large";
-}
 
 export async function GET() {
   // Same defensive posture the pages had: a Cosmos problem degrades to
@@ -48,24 +40,10 @@ export async function GET() {
     hasCar: cars.length > 0,
   };
 
-  if (bikeDoc) {
-    const slug = slugifyMake(bikeDoc.make);
-    const brand = BRAND_OPTIONS.some((b) => b.value === slug) ? slug : "other";
-    const modelLower = bikeDoc.model.toLowerCase();
-    const matched = getModelsForBrand(brand).find(
-      (m) => m.model.toLowerCase().includes(modelLower) || modelLower.includes(m.model.toLowerCase())
-    );
-    viewer.bike = { brand, bikeClass: getBikeClassForCC(bikeDoc.engineCC), model: matched?.model };
-  }
-
-  if (carDoc) {
-    const slug = slugifyCarMake(carDoc.make);
-    viewer.car = {
-      brand: CAR_BRAND_OPTIONS.some((b) => b.value === slug) ? slug : "other",
-      carClass:
-        carDoc.fuelType !== "electric" && carDoc.engineLitres ? carClassFromEngineLitres(carDoc.engineLitres) : undefined,
-    };
-  }
+  // The quote forms' starting point - see lib/tracker/quoteDefaults.ts,
+  // which the Android app's quote screen shares.
+  if (bikeDoc) viewer.bike = bikeQuoteDefaults(bikeDoc);
+  if (carDoc) viewer.car = carQuoteDefaults(carDoc);
 
   return NextResponse.json(viewer, { headers: NO_STORE });
 }

@@ -113,7 +113,7 @@ export default function HomeScreen() {
           <View style={styles.actions}>
             <QuickAction icon="camera" label="Scan receipt" primary href="/scan" />
             <QuickAction icon="fuel" label="Log fuel" href="/add-fuel" />
-            <QuickAction icon="quote" label="Check a quote" />
+            <QuickAction icon="quote" label="Check a quote" href="/quote" />
             <QuickAction icon="gauge" label="Update mileage" href="/update-mileage" />
           </View>
 
@@ -156,9 +156,7 @@ export default function HomeScreen() {
   );
 }
 
-// Quick actions without their own screen yet go through the add sheet,
-// which says what's still to come.
-function QuickAction({ icon, label, primary, href = '/add' }: { icon: IconName; label: string; primary?: boolean; href?: '/add' | '/add-fuel' | '/scan' | '/update-mileage' }) {
+function QuickAction({ icon, label, primary, href }: { icon: IconName; label: string; primary?: boolean; href: '/add-fuel' | '/scan' | '/update-mileage' | '/quote' }) {
   return (
     <Pressable
       onPress={() => router.push(href)}
