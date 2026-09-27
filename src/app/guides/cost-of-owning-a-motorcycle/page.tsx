@@ -3,6 +3,8 @@ import type { Metadata } from 'next';
 import { pageMetadata } from '@/lib/seo/pageMetadata';
 import Link from 'next/link';
 import { buildBreadcrumbJsonLd } from '@/lib/seo/breadcrumbs';
+import { AffiliateLine } from '@/components/AffiliateLine';
+import { sportsbikeshopLinks } from '@/lib/affiliates';
 
 export const metadata: Metadata = pageMetadata({
   title: 'The Real Cost of Owning a Motorcycle in the UK',
@@ -110,6 +112,7 @@ export default function CostOfOwningAMotorcyclePage() {
         replacing after any real impact regardless of visible damage, and kit generally wears out
         with regular use the same way any other protective equipment does.
       </p>
+      <AffiliateLine lead="Kitting out?" links={sportsbikeshopLinks(['helmets', 'jackets'], 'guides')} />
 
       <h2>Depreciation</h2>
       <p style={{ maxWidth: 'none' }}>

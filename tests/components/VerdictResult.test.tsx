@@ -63,4 +63,18 @@ describe("VerdictResult", () => {
     render(<VerdictResult {...baseProps} quotedPrice={349.6} communityStats={null} advice={null} />);
     expect(screen.getByText(/You were quoted £350\./)).toBeInTheDocument();
   });
+  it("offers the quoted job's parts at Sportsbikeshop, labelled, whatever the verdict", () => {
+    render(<VerdictResult {...baseProps} verdict="fair" jobType="brake-pads-front" communityStats={null} advice={null} />);
+    const pads = screen.getByRole("link", { name: "Brake pads at Sportsbikeshop (opens in a new tab)" });
+    expect(pads.getAttribute("href")).toMatch(/#\/28990,0,0$/);
+    expect(pads).toHaveAttribute("rel", "sponsored nofollow noopener");
+    expect(screen.getByRole("link", { name: "Affiliate link" })).toHaveAttribute("href", "/privacy#affiliate-links");
+  });
+
+  it("shows no parts line without a job type, or for a job with nothing to buy", () => {
+    const { rerender } = render(<VerdictResult {...baseProps} communityStats={null} advice={null} />);
+    expect(screen.queryByRole("link", { name: "Affiliate link" })).not.toBeInTheDocument();
+    rerender(<VerdictResult {...baseProps} jobType="valve-clearance" communityStats={null} advice={null} />);
+    expect(screen.queryByRole("link", { name: "Affiliate link" })).not.toBeInTheDocument();
+  });
 });

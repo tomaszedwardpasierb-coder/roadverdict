@@ -57,7 +57,7 @@ export function PrivacyContent() {
   return (
     <div className={styles.wrapper}>
       <h1 className={styles.title}>Privacy Policy</h1>
-      <span className={styles.updated}>Last updated: 21 September 2026</span>
+      <span className={styles.updated}>Last updated: 27 September 2026</span>
       <p className={styles.intro}>
         RoadVerdict is a small, independently run UK site. This page explains, in plain
         terms, what we collect, why, how long we keep it, who we share it with, and how
@@ -385,11 +385,15 @@ export function PrivacyContent() {
       <section id="affiliate-links" className={styles.section}>
         <h2>Affiliate links</h2>
         <p>
-          Some pages, including the tracker when you log tyres or a chain-and-sprockets
-          job, include links to retailers we have an affiliate relationship with, such as
-          moto-tyres.co.uk and GhostBikes.com. If you buy something after clicking
-          through, we may earn a small commission - this never changes the price you pay,
-          and we receive no information about what you actually purchase.
+          Some motorcycle pages include a short link to Sportsbikeshop, a retailer we have
+          an affiliate relationship with, always labelled as an affiliate link: our
+          motorcycle price guides, the quote checker&apos;s result for jobs where you could
+          buy the parts yourself, a couple of our guides, and the tracker when you log a
+          job such as tyres, brake pads or a service. The link carries only our affiliate
+          number - nothing about you or your vehicle. If you buy something after clicking
+          through, we may earn a small commission - this never changes the price you pay
+          or any verdict we give. Any tracking of that purchase happens on
+          Sportsbikeshop&apos;s own site, under their privacy policy.
         </p>
       </section>
 

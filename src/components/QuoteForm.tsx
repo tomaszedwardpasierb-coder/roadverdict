@@ -330,6 +330,7 @@ export function QuoteForm({ signedIn, initialBrand, initialBikeClass }: Props) {
           regionLabel={result.regionLabel}
           communityStats={result.communityStats}
           advice={result.advice}
+          jobType={jobType}
         />
       )}
     </>

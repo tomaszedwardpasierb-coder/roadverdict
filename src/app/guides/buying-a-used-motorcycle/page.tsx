@@ -3,6 +3,8 @@ import type { Metadata } from 'next';
 import { pageMetadata } from '@/lib/seo/pageMetadata';
 import Link from 'next/link';
 import { buildBreadcrumbJsonLd } from '@/lib/seo/breadcrumbs';
+import { AffiliateLine } from '@/components/AffiliateLine';
+import { sportsbikeshopLinks } from '@/lib/affiliates';
 
 export const metadata: Metadata = pageMetadata({
   title: 'What to Check Before Buying a Used Motorcycle',
@@ -153,6 +155,7 @@ export default function BuyingAUsedMotorcyclePage() {
         <Link href="/buying-guide">Independent Vehicle Check</Link> if anything above made you
         want the deeper certainty before you pay.
       </p>
+      <AffiliateLine lead="Bought it? Keep it yours:" links={sportsbikeshopLinks(['disc-locks', 'security-chains'], 'guides')} />
 
       <p className="disclaimer" style={{ maxWidth: 'none' }}>
         General buying guidance, not a substitute for a professional pre-purchase inspection -

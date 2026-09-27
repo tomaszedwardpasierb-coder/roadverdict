@@ -5,7 +5,8 @@
 // wired into car-services/[id]/route.ts - a conflict simply surfaces as
 // the server's own error message on save, same as a first-time log would
 // show via MileageWarning), no affiliate-parts nudge (CAR_JOB_LABELS has
-// no AFFILIATE_LINKS equivalent yet). View/edit toggle + delete, same as
+// no car affiliate links yet - lib/affiliates.ts is motorcycle-only).
+// View/edit toggle + delete, same as
 // every other tracker card in spirit. Price-benchmark verdict and
 // receipt-attachment support (view + edit) mirror ServiceHistoryCard.tsx
 // in full now that car pricing data exists (see carPriceData.ts).

@@ -20,6 +20,8 @@ import {
   quoteCheckerHref,
   type PriceGuide,
 } from '@/lib/seo/priceGuides';
+import { AffiliateLine } from '@/components/AffiliateLine';
+import { sportsbikeshopLinksForJob } from '@/lib/affiliates';
 import styles from './PriceGuide.module.css';
 
 function capitalise(text: string): string {
@@ -168,6 +170,13 @@ export function PriceGuidePage({ guide }: { guide: PriceGuide }) {
               Check my quote
             </Link>
           </section>
+          {guide.vehicle === 'motorcycle' ? (
+            // Few riders fit their own tyres - they buy them and pay a fitter.
+            <AffiliateLine
+              lead={guide.job === 'tyres-pair' ? 'Buying your own?' : 'Doing it yourself?'}
+              links={sportsbikeshopLinksForJob(guide.job, 'priceGuides')}
+            />
+          ) : null}
         </>
       ) : (
         <>

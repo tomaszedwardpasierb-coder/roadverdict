@@ -1,3 +1,5 @@
+import { AffiliateLine } from '@/components/AffiliateLine';
+import { sportsbikeshopLinksForJob } from '@/lib/affiliates';
 import { VERDICT_LABELS, VERDICT_SUMMARIES, type Verdict } from '@/lib/verdict';
 
 interface VerdictResultProps {
@@ -8,6 +10,8 @@ interface VerdictResultProps {
   regionLabel: string;
   communityStats: { sampleSize: number; low: number; high: number } | null;
   advice: { explanation: string; questionsToAsk: string[] } | null;
+  // The job that was quoted, for the "buy the parts yourself" line.
+  jobType?: string;
 }
 
 export function VerdictResult({
@@ -18,6 +22,7 @@ export function VerdictResult({
   regionLabel,
   communityStats,
   advice,
+  jobType,
 }: VerdictResultProps) {
   return (
     <div className="verdict-wrap" aria-live="polite">
@@ -56,6 +61,8 @@ export function VerdictResult({
           )}
         </div>
       )}
+      {/* Shown whatever the verdict says, so it's never steering. */}
+      <AffiliateLine lead="Prefer to buy the parts yourself?" links={sportsbikeshopLinksForJob(jobType, 'quoteChecker')} />
     </div>
   );
 }

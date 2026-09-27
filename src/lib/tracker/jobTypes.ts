@@ -56,24 +56,8 @@ export function isCleaningJob(jobType: string): boolean {
   return CLEANING_JOB_TYPES.includes(jobType);
 }
 
-export const AFFILIATE_LINKS: Record<string, { name: string; url: string }[]> = {
-  "tyres-pair": [
-    { name: "moto-tyres.co.uk", url: "https://www.moto-tyres.co.uk" },
-    { name: "mytyres.co.uk", url: "https://www.mytyres.co.uk" },
-  ],
-  "tyres-front": [
-    { name: "moto-tyres.co.uk", url: "https://www.moto-tyres.co.uk" },
-    { name: "mytyres.co.uk", url: "https://www.mytyres.co.uk" },
-  ],
-  "tyres-rear": [
-    { name: "moto-tyres.co.uk", url: "https://www.moto-tyres.co.uk" },
-    { name: "mytyres.co.uk", url: "https://www.mytyres.co.uk" },
-  ],
-  "chain-and-sprockets": [
-    { name: "GhostBikes.com", url: "https://www.ghostbikes.com" },
-    { name: "The Green Spark Plug Co", url: "https://www.greensparkplug.co.uk" },
-  ],
-};
+// Parts links for logged jobs moved to src/lib/affiliates.ts (Sportsbikeshop,
+// with a real affiliate ID - the retailer links that used to live here had none).
 
 // Default reminder interval offered when logging each job - typical
 // starting points from general motorcycle maintenance guides, NOT

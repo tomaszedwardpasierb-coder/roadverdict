@@ -3,7 +3,9 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { VehicleSpinner } from '@/components/VehicleSpinner';
-import { JOB_GROUPS, JOB_LABELS, JOB_REMINDER_DEFAULTS, AFFILIATE_LINKS, isBenchmarkedJob, isCleaningJob } from '@/lib/tracker/jobTypes';
+import { JOB_GROUPS, JOB_LABELS, JOB_REMINDER_DEFAULTS, isBenchmarkedJob, isCleaningJob } from '@/lib/tracker/jobTypes';
+import { AffiliateLine } from '@/components/AffiliateLine';
+import { sportsbikeshopLinksForJob } from '@/lib/affiliates';
 import { getAdjustedBenchmark, type BikeClass, type Region } from '@/lib/priceData';
 import type { ServiceRecordDoc } from '@/lib/tracker/serviceRecord';
 import { useTrackerFormSubmit } from './useTrackerFormSubmit';
@@ -120,7 +122,7 @@ export function ServiceHistoryCard({ record, bikeClass, brandValue, region, dist
 
   const verdict = computeVerdict(record.jobType, bikeClass, brandValue, region, record.cost);
   const jobLabel = JOB_LABELS[record.jobType] ?? record.jobType;
-  const affiliate = AFFILIATE_LINKS[record.jobType];
+  const affiliateLinks = sportsbikeshopLinksForJob(record.jobType, 'tracker');
   const tagClass =
     verdict?.cls === 'fair' ? ownStyles.tagFair : verdict?.cls === 'high' ? styles.tagHigh : ownStyles.tagSecondOpinion;
   const unitLabel = distanceUnitLabel(distanceUnit);
@@ -302,14 +304,7 @@ export function ServiceHistoryCard({ record, bikeClass, brandValue, region, dist
           {verdict.label} (typical {formatCurrency(verdict.low, currency, rates)}-{formatCurrency(verdict.high, currency, rates)})
         </span>
       )}
-      {affiliate && (
-        <div className={ownStyles.affiliateNudge}>
-          Need parts for next time?{' '}
-          {affiliate.map((a) => (
-            <a key={a.url} href={a.url} target="_blank" rel="noopener">{a.name}</a>
-          ))}
-        </div>
-      )}
+      <AffiliateLine lead="Need parts for next time?" links={affiliateLinks} />
       <div className={styles.cardActions}>
         <button type="button" className={styles.iconBtn} onClick={() => setIsEditing(true)}>Edit</button>
         <button type="button" className={styles.iconBtn} onClick={handleDelete} disabled={submitting}>

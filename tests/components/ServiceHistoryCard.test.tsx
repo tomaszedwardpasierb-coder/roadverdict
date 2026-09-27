@@ -80,7 +80,7 @@ describe("ServiceHistoryCard", () => {
     ).toBeInTheDocument();
   });
 
-  it("classifies an over-benchmark tyre cost as 'High' and shows the real affiliate tyre links", () => {
+  it("classifies an over-benchmark tyre cost as 'High' and shows the labelled Sportsbikeshop tyres link", () => {
     const bench = getAdjustedBenchmark("tyres-pair", "medium", "honda", "rest-england-wales");
     const record = { ...baseRecord, jobType: "tyres-pair", cost: bench.high + 10 };
     render(<ServiceHistoryCard {...defaultProps} record={record} />);
@@ -88,8 +88,16 @@ describe("ServiceHistoryCard", () => {
     expect(
       screen.getByText(`High (typical ${formatCurrency(bench.low, "GBP", null)}-${formatCurrency(bench.high, "GBP", null)})`)
     ).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "moto-tyres.co.uk" })).toHaveAttribute("href", "https://www.moto-tyres.co.uk");
-    expect(screen.getByRole("link", { name: "mytyres.co.uk" })).toHaveAttribute("href", "https://www.mytyres.co.uk");
+    const tyres = screen.getByRole("link", { name: "Tyres at Sportsbikeshop (opens in a new tab)" });
+    expect(tyres.getAttribute("href")).toMatch(/^https:\/\/www\.sportsbikeshop\.co\.uk\/.+#\/28990,0,0$/);
+    expect(tyres).toHaveAttribute("rel", "sponsored nofollow noopener");
+    expect(screen.getByRole("link", { name: "Affiliate link" })).toHaveAttribute("href", "/privacy#affiliate-links");
+  });
+
+  it("shows no parts line for a job with nothing to buy", () => {
+    const record = { ...baseRecord, jobType: "valve-clearance" };
+    render(<ServiceHistoryCard {...defaultProps} record={record} />);
+    expect(screen.queryByRole("link", { name: "Affiliate link" })).not.toBeInTheDocument();
   });
 
   it("classifies a cost well past the high-multiple threshold as 'Second opinion'", () => {
