@@ -159,7 +159,7 @@ function vehicleUnits(
   };
 }
 
-function bikeSummary(bike: BikeDoc, rates: ExchangeRates | null): GarageVehicle {
+export function bikeSummary(bike: BikeDoc, rates: ExchangeRates | null): GarageVehicle {
   return {
     kind: "bike",
     id: bike.id,
@@ -171,7 +171,7 @@ function bikeSummary(bike: BikeDoc, rates: ExchangeRates | null): GarageVehicle 
   };
 }
 
-function carSummary(car: CarDoc, rates: ExchangeRates | null): GarageVehicle {
+export function carSummary(car: CarDoc, rates: ExchangeRates | null): GarageVehicle {
   return {
     kind: "car",
     id: car.id,

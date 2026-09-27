@@ -1,6 +1,7 @@
 // Place at: src/app/api/cars/car-story-so-far/route.ts
 // Car mirror of api/tracker/story-so-far/route.ts.
 import { NextResponse } from "next/server";
+import { STORY_COOLDOWN_MS } from "@/lib/tracker/storyCooldown";
 import { getSession } from "@/lib/auth/session";
 import { getPrimaryCar, updateCarStoryCache } from "@/lib/tracker/car";
 import { getCarFuelLogs } from "@/lib/tracker/carFuelLog";
@@ -12,7 +13,7 @@ import { generateCarStoryProse } from "@/lib/tracker/carStoryProse";
 
 export const dynamic = "force-dynamic";
 
-const COOLDOWN_MS = 7 * 24 * 60 * 60 * 1000;
+const COOLDOWN_MS = STORY_COOLDOWN_MS;
 
 export async function GET() {
   const session = await getSession();

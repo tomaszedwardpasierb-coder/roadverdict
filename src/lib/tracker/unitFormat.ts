@@ -36,6 +36,12 @@ export function formatFuelEconomy(mpg: number, unit: FuelEconomyUnit): string {
   return `${mpg.toFixed(1)} mpg`;
 }
 
+// The number formatFuelEconomy shows, for charts: MPG as it is, or the
+// same conversion to litres per 100 km.
+export function fuelEconomyInUnit(mpg: number, unit: FuelEconomyUnit): number {
+  return unit === "l100km" ? (LITRES_PER_UK_GALLON * 100) / (mpg * KM_PER_MILE) : mpg;
+}
+
 export function formatCostPerDistance(pencePerMile: number, unit: DistanceUnit): string {
   const value = unit === "km" ? pencePerMile / KM_PER_MILE : pencePerMile;
   return `${value.toFixed(1)}p`;

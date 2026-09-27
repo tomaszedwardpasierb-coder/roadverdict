@@ -41,15 +41,19 @@ export function useApi<T>(path: string | null) {
     load('initial');
   }, [path, load]);
 
-  const isFirstFocus = useRef(true);
+  // Runs on every focus, and again whenever `load` changes while the
+  // screen is in view. On the first focus, and when the path has just
+  // changed, the effect above is already loading it - only a return to
+  // the screen needs a reload of its own.
+  const focusedPath = useRef<string | null | undefined>(undefined);
   useFocusEffect(
     useCallback(() => {
-      if (isFirstFocus.current) {
-        isFirstFocus.current = false;
+      if (focusedPath.current !== path) {
+        focusedPath.current = path;
         return;
       }
       load('silent');
-    }, [load])
+    }, [load, path])
   );
 
   const refresh = useCallback(() => load('refresh'), [load]);

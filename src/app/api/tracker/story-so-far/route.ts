@@ -1,5 +1,6 @@
 // Place at: src/app/api/tracker/story-so-far/route.ts
 import { NextResponse } from "next/server";
+import { STORY_COOLDOWN_MS } from "@/lib/tracker/storyCooldown";
 import { getSession } from "@/lib/auth/session";
 import { getPrimaryBike, updateBikeStoryCache } from "@/lib/tracker/bike";
 import { getFuelLogs } from "@/lib/tracker/fuelLog";
@@ -14,7 +15,7 @@ export const dynamic = "force-dynamic";
 // already-generated story is free and instant; getting a genuinely
 // fresh one before a week is up isn't available at any cost, by
 // design, not just a soft warning.
-const COOLDOWN_MS = 7 * 24 * 60 * 60 * 1000;
+const COOLDOWN_MS = STORY_COOLDOWN_MS;
 
 export async function GET() {
   const session = await getSession();
