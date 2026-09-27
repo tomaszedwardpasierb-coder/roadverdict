@@ -26,6 +26,7 @@ const PAGES: { path: string; lastModified: string; priority: number }[] = [
   { path: '/guides/cost-of-owning-a-car', lastModified: '2026-09-15', priority: 0.7 },
   { path: '/pro', lastModified: '2026-09-27', priority: 0.5 },
   { path: '/about', lastModified: '2026-09-21', priority: 0.4 },
+  { path: '/videos', lastModified: '2026-09-28', priority: 0.4 },
   { path: '/privacy', lastModified: '2026-09-26', priority: 0.2 },
 ];
 

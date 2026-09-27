@@ -93,6 +93,9 @@ export function SiteFooterLinks() {
             <Link href="/pro">Pro</Link>
           </li>
           <li>
+            <Link href="/videos">Videos</Link>
+          </li>
+          <li>
             <Link href="/privacy">Privacy</Link>
           </li>
         </ul>

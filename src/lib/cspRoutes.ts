@@ -45,6 +45,7 @@ export const PUBLIC_STATIC_SEGMENTS = [
   'buying-guide',
   'guides',
   'track',
+  'videos',
 ] as const;
 
 export function usesStrictNonceCsp(pathname: string): boolean {
