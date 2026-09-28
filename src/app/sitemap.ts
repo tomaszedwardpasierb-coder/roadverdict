@@ -19,6 +19,7 @@ const PAGES: { path: string; lastModified: string; priority: number }[] = [
   { path: '/cars/cost-calculator', lastModified: '2026-09-27', priority: 0.8 },
   { path: '/buying-guide', lastModified: '2026-09-27', priority: 0.9 },
   { path: '/cars/buying-guide', lastModified: '2026-09-27', priority: 0.9 },
+  { path: '/mpg-calculator', lastModified: '2026-09-28', priority: 0.8 },
   { path: '/guides', lastModified: '2026-09-27', priority: 0.7 },
   { path: '/guides/buying-a-used-motorcycle', lastModified: '2026-09-15', priority: 0.7 },
   { path: '/guides/buying-a-used-car', lastModified: '2026-09-15', priority: 0.7 },

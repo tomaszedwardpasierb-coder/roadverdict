@@ -43,6 +43,7 @@ export const PUBLIC_STATIC_SEGMENTS = [
   'quote-checker',
   'cost-calculator',
   'buying-guide',
+  'mpg-calculator',
   'guides',
   'track',
   'videos',

@@ -18,6 +18,7 @@ const VEHICLE_COLUMNS: { vehicle: GuideVehicle; heading: string; hub: string; to
     tools: [
       { href: '/quote-checker', label: 'Quote checker' },
       { href: '/cost-calculator', label: 'Cost calculator' },
+      { href: '/mpg-calculator', label: 'MPG calculator' },
       { href: '/buying-guide', label: 'Buying guide & plate check' },
     ],
   },
@@ -28,6 +29,7 @@ const VEHICLE_COLUMNS: { vehicle: GuideVehicle; heading: string; hub: string; to
     tools: [
       { href: '/cars/quote-checker', label: 'Quote checker' },
       { href: '/cars/cost-calculator', label: 'Cost calculator' },
+      { href: '/mpg-calculator', label: 'MPG calculator' },
       { href: '/cars/buying-guide', label: 'Buying guide & plate check' },
     ],
   },

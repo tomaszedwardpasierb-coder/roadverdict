@@ -14,12 +14,14 @@ import { Menu, X } from 'lucide-react';
 //
 // "Quote checker" follows the page you're on: from anywhere under /cars
 // it opens the car one, otherwise the motorcycle one, which links across.
+// The MPG calculator is one page for both.
 function navItems(pathname: string) {
   const onCarPage = pathname === '/cars' || pathname.startsWith('/cars/');
   return [
     { href: '/motorcycles', label: 'Motorcycles' },
     { href: '/cars', label: 'Cars' },
     { href: onCarPage ? '/cars/quote-checker' : '/quote-checker', label: 'Quote Checker' },
+    { href: '/mpg-calculator', label: 'MPG Calculator' },
     { href: '/guides', label: 'Guides & Prices' },
     { href: '/pro', label: 'Pro' },
   ];

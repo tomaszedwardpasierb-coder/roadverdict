@@ -6,7 +6,8 @@ import ownStyles from './page.module.css';
 import LogoutButton from "./LogoutButton";
 import { getBikesForUser, pickActiveBike, getCurrentRegistration, isBikeReadOnly, canRefreshBikeData, nextBikeDataRefreshAt, type BikeDoc } from "@/lib/tracker/bike";
 import { getServiceRecords } from "@/lib/tracker/serviceRecord";
-import { getFuelLogs, computeActualMPG, computeMPGSeries } from "@/lib/tracker/fuelLog";
+import { getFuelLogs, computeMPGSeries } from "@/lib/tracker/fuelLog";
+import { fuelEconomySummary } from "@/lib/tracker/fuelEconomySummary";
 import { getMods } from "@/lib/tracker/mod";
 import { getBills } from "@/lib/tracker/bill";
 import { getFines } from "@/lib/tracker/fine";
@@ -29,7 +30,6 @@ import { JOB_LABELS, isCleaningJob } from "@/lib/tracker/jobTypes";
 import { BILL_LABELS } from "@/lib/tracker/billTypes";
 import {
   formatDistance,
-  formatFuelEconomy,
   formatCostPerDistance,
   convertMilesToDisplay,
   type DistanceUnit,
@@ -48,6 +48,7 @@ import { LogFineForm } from "./LogFineForm";
 import { LogTollForm } from "./LogTollForm";
 import { ServiceHistoryCard } from "./ServiceHistoryCard";
 import { FuelLogCard } from "./FuelLogCard";
+import { FuelEconomyPanel } from "./FuelEconomyPanel";
 import { ModCard } from "./ModCard";
 import { BillCard } from "./BillCard";
 import { FineCard } from "./FineCard";
@@ -388,7 +389,6 @@ export default async function DashboardPage(props: { searchParams: Promise<{ add
     bills: bills.filter((b) => b.needsReview).map((b) => b.id),
     labour: labour.filter((l) => l.needsReview).map((l) => l.id),
   };
-  const actualMpg = computeActualMPG(fuelLogs, bike.dvlaData?.officialCombinedMpg);
   const mpgSeries = computeMPGSeries(fuelLogs, bike.dvlaData?.officialCombinedMpg);
   const mileagePoints = gatherMileagePoints(records, mods, fuelLogs, bills, labour);
   // Computed for all three forecast windows up front, not just the
@@ -654,22 +654,15 @@ export default async function DashboardPage(props: { searchParams: Promise<{ add
       </div>
       <p className={styles.subtext}>Log a fill-up in seconds, and watch your actual mpg emerge - not the manufacturer&apos;s claim, yours.</p>
       <LogFuelForm initialMileage={bike.currentMileage} mileageHistory={mileagePoints} startingMileage={bike.startingMileage} dateAdded={bike.dateAdded} distanceUnit={distanceUnit} currency={currency} rates={rates} bikeYear={bike.year} isCustomBuild={bike.isCustomBuild} />
-      {actualMpg ? (
-        <p className={styles.subtext} style={{ marginBottom: "0.9rem" }}>
-          Your actual average from logged fill-ups: <strong>{formatFuelEconomy(actualMpg, fuelEconomyUnit)}</strong>{" "}
-          {bike.dvlaData?.officialCombinedMpg ? (
-            <>(the manufacturer&apos;s official combined figure for this exact bike is{" "}
-            {fuelEconomyUnit === "l100km"
-              ? `${(282.481 / bike.dvlaData.officialCombinedMpg).toFixed(1)} L/100km`
-              : `${bike.dvlaData.officialCombinedMpg} mpg`}{" "}
-            - this is your own real-world average, riding your own roads).</>
-          ) : (
-            <>(the Cost Calculator assumes 57 mpg generally - this is specific to your bike and riding).</>
-          )}
-        </p>
-      ) : (
-        <p className={styles.subtext} style={{ marginBottom: "0.9rem" }}>Log at least two consecutive full-tank fill-ups to see your bike&apos;s real fuel economy here.</p>
-      )}
+      <FuelEconomyPanel
+        vehicleKind="bike"
+        summary={fuelEconomySummary(mpgSeries, fuelLogs, currency, rates)}
+        officialMpg={bike.dvlaData?.officialCombinedMpg ?? null}
+        fuelEconomyUnit={fuelEconomyUnit}
+        distanceUnit={distanceUnit}
+        currency={currency}
+        preferredFuel="petrol"
+      />
       <h2 className={styles.sectionHeading}>Fuel log</h2>
       {fuelLogs.length === 0 ? (
         <div className={styles.card}><p className={ownStyles.cardBody}>No fuel fill-ups logged yet. Log your first one above.</p></div>
@@ -1556,6 +1549,18 @@ async function renderCarDashboard(
       </div>
       <p className={styles.subtext}>Log a fill-up or charge in seconds.</p>
       <LogCarFuelForm fuelType={car.fuelType} initialMileage={car.currentMileage} mileageHistory={mileagePoints} startingMileage={car.startingMileage} dateAdded={car.dateAdded} distanceUnit={distanceUnit} currency={currency} rates={rates} carYear={car.year} isCustomBuild={car.isCustomBuild} />
+      {/* MPG means nothing for a fully electric car - its Fuel tab is charges. */}
+      {car.fuelType !== "electric" ? (
+        <FuelEconomyPanel
+          vehicleKind="car"
+          summary={fuelEconomySummary(mpgSeries, fuelLogs, currency, rates)}
+          officialMpg={car.dvlaData?.officialCombinedMpg ?? null}
+          fuelEconomyUnit={fuelEconomyUnit}
+          distanceUnit={distanceUnit}
+          currency={currency}
+          preferredFuel={car.fuelType === "diesel" ? "diesel" : "petrol"}
+        />
+      ) : null}
       <h2 className={styles.sectionHeading}>Fuel log</h2>
       {fuelLogs.length === 0 ? (
         <div className={styles.card}><p className={ownStyles.cardBody}>No fuel fill-ups or charges logged yet. Log your first one above.</p></div>

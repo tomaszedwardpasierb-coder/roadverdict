@@ -152,7 +152,7 @@ a {
 .site-header__menuBtn { display: none; }
 .site-header__mobileMenu { display: none; }
 
-@media (max-width: 480px) {
+@media (max-width: 760px) {
   .site-header {
     padding: 1rem;
   }
@@ -616,6 +616,16 @@ main {
   display: flex;
   flex-wrap: wrap;
   gap: 0.75rem;
+}
+/* Four cards (the tool pages' "Also free") sit two by two rather than
+   three and a lone full-width one; one per row on a phone. */
+.rv-related-tools__row--pairs .rv-related-tools__link {
+  flex-basis: 40%;
+}
+@media (max-width: 560px) {
+  .rv-related-tools__row--pairs .rv-related-tools__link {
+    flex-basis: 100%;
+  }
 }
 .rv-related-tools__switch {
   margin: 0.9rem 0 0;

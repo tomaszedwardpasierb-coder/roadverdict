@@ -1,0 +1,88 @@
+.content {
+  display: grid;
+  gap: 2.25rem;
+  margin-top: 3rem;
+}
+
+.content h2 {
+  margin: 0 0 0.6rem;
+  font-family: var(--font-display);
+  font-size: clamp(1.5rem, 3.5vw, 1.9rem);
+  letter-spacing: 0.02em;
+  color: var(--asphalt);
+}
+
+.content p {
+  max-width: 68ch;
+  margin: 0 0 0.8rem;
+  line-height: 1.65;
+}
+
+.steps {
+  display: grid;
+  gap: 0.5rem;
+  max-width: 68ch;
+  margin: 0 0 0.8rem;
+  padding-left: 1.3rem;
+  line-height: 1.6;
+}
+
+.table {
+  margin-top: 0.4rem;
+  border-collapse: collapse;
+  font-family: var(--font-mono);
+  font-size: 0.95rem;
+  background: var(--paper);
+  border: 1px solid var(--border);
+}
+
+.table th,
+.table td {
+  padding: 0.5rem 1.2rem;
+  text-align: right;
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.table th {
+  font-family: var(--font-display);
+  font-size: 0.8rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--asphalt);
+  background: var(--stone);
+}
+
+.table tr:last-child td {
+  border-bottom: none;
+}
+
+.cta {
+  margin-top: 3rem;
+}
+
+.cta h2 {
+  margin-bottom: 0.6rem;
+  font-family: var(--font-display);
+  font-size: clamp(1.5rem, 3.5vw, 1.9rem);
+  letter-spacing: 0.02em;
+  color: var(--asphalt);
+}
+
+.cta p {
+  max-width: 56ch;
+  margin: 0 auto;
+  line-height: 1.6;
+  color: var(--ink-soft);
+}
+
+.ctaButtons {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.75rem;
+  margin-top: 1.4rem;
+}
+
+.ctaButtons a {
+  text-decoration: none;
+}

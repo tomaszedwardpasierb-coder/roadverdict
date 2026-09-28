@@ -32,6 +32,9 @@ export interface FuelPriceRecord {
 const CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes
 let petrolCache: { price: number; fetchedAt: number } | null = null;
 let dieselCache: { price: number; fetchedAt: number } | null = null;
+// getCurrentUkFuelPrices' own cache, below - cleared by both save
+// functions so a cron run shows up there straight away too.
+let ukPricesCache: { value: UkFuelPrices; fetchedAt: number } | null = null;
 
 export async function getCurrentPetrolPricePenceLitre(): Promise<number> {
   if (petrolCache && Date.now() - petrolCache.fetchedAt < CACHE_TTL_MS) {
@@ -69,6 +72,7 @@ export async function saveCurrentPetrolPrice(
   };
   await container.items.upsert(record);
   petrolCache = { price: pricePenceLitre, fetchedAt: Date.now() };
+  ukPricesCache = null;
 }
 
 // Diesel equivalent, for the car cost calculator (motorcycles are
@@ -120,4 +124,48 @@ export async function saveCurrentDieselPrice(
   };
   await container.items.upsert(record);
   dieselCache = { price: pricePenceLitre, fetchedAt: Date.now() };
+  ukPricesCache = null;
+}
+
+// For the MPG calculator's "this week's UK average": both prices with
+// the DESNZ week each is for, since a price shown to someone should say
+// when it's from. The same fallbacks as the getters above when a record
+// can't be read, dated to when those fallbacks were sourced - and, like
+// them, a fallback isn't cached, so the next call tries the store again.
+const FALLBACK_WEEK_COMMENCING = "13/07/2026";
+
+export interface UkFuelPrice {
+  pencePerLitre: number;
+  weekCommencing: string; // as published by DESNZ, e.g. "13/07/2026"
+}
+
+export interface UkFuelPrices {
+  petrol: UkFuelPrice;
+  diesel: UkFuelPrice;
+}
+
+async function readUkFuelPrice(docId: string, fallbackPence: number): Promise<{ price: UkFuelPrice; stored: boolean }> {
+  try {
+    const container = getContainer();
+    const { resource } = await container.item(docId, FUEL_PRICE_PK).read<FuelPriceRecord>();
+    if (resource && typeof resource.pricePenceLitre === "number") {
+      return { price: { pencePerLitre: resource.pricePenceLitre, weekCommencing: resource.weekCommencing || FALLBACK_WEEK_COMMENCING }, stored: true };
+    }
+  } catch {
+    // Same as the getters above - fall back rather than throw.
+  }
+  return { price: { pencePerLitre: fallbackPence, weekCommencing: FALLBACK_WEEK_COMMENCING }, stored: false };
+}
+
+export async function getCurrentUkFuelPrices(): Promise<UkFuelPrices> {
+  if (ukPricesCache && Date.now() - ukPricesCache.fetchedAt < CACHE_TTL_MS) {
+    return ukPricesCache.value;
+  }
+  const [petrol, diesel] = await Promise.all([
+    readUkFuelPrice(FUEL_PRICE_DOC_ID, FALLBACK_PETROL_PRICE_PENCE_PER_LITRE),
+    readUkFuelPrice(DIESEL_PRICE_DOC_ID, FALLBACK_DIESEL_PRICE_PENCE_PER_LITRE),
+  ]);
+  const value: UkFuelPrices = { petrol: petrol.price, diesel: diesel.price };
+  if (petrol.stored && diesel.stored) ukPricesCache = { value, fetchedAt: Date.now() };
+  return value;
 }

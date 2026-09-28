@@ -75,7 +75,7 @@ describe("pageMetadata", () => {
       "page.tsx", "motorcycles/page.tsx", "cars/page.tsx", "quote-checker/page.tsx", "cars/quote-checker/page.tsx",
       "cost-calculator/page.tsx", "cars/cost-calculator/page.tsx", "buying-guide/page.tsx", "cars/buying-guide/page.tsx",
       "guides/page.tsx", "guides/buying-a-used-car/page.tsx", "guides/buying-a-used-motorcycle/page.tsx",
-      "guides/cost-of-owning-a-car/page.tsx", "guides/cost-of-owning-a-motorcycle/page.tsx", "pro/page.tsx",
+      "guides/cost-of-owning-a-car/page.tsx", "guides/cost-of-owning-a-motorcycle/page.tsx", "mpg-calculator/page.tsx", "pro/page.tsx",
       "about/page.tsx", "privacy/page.tsx", "cars/costs/page.tsx", "motorcycles/costs/page.tsx",
       "cars/costs/[slug]/page.tsx", "motorcycles/costs/[slug]/page.tsx",
     ];

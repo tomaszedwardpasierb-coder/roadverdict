@@ -12,6 +12,11 @@ export interface MpgSegment {
   mpg: number;
   date: string;
   fuelLogId: string;
+  // The tank itself: miles since the previous full fill-up, and every
+  // litre put in over them (partial top-ups included) - what mpg was
+  // worked out from, for anything that wants to show its working.
+  miles?: number;
+  litres?: number;
   likelyMissedFillUps: boolean;
   // Only meaningful when likelyMissedFillUps is true. Two genuinely
   // different problems get the same exclude-from-average treatment, but
@@ -141,7 +146,7 @@ function isUnusuallyLargeGap(candidateMiles: number, baselineGaps: number[]): bo
 // verified full-tank fill-up simply starts a fresh chain.
 export function computeMPGSeries(fuelLogs: MpgCalcInput[], manufacturerMpg?: number): MpgSegment[] {
   const sorted = [...fuelLogs].sort((a, b) => a.mileage - b.mileage);
-  const raw: { mileage: number; mpg: number; date: string; fuelLogId: string; miles: number; mileageAnomaly: boolean }[] = [];
+  const raw: { mileage: number; mpg: number; date: string; fuelLogId: string; miles: number; litres: number; mileageAnomaly: boolean }[] = [];
   let litresSinceLastFull = 0;
   let lastFullMileage: number | null = null;
   for (const log of sorted) {
@@ -157,7 +162,7 @@ export function computeMPGSeries(fuelLogs: MpgCalcInput[], manufacturerMpg?: num
         const miles = log.mileage - lastFullMileage;
         if (miles > 0 && litresSinceLastFull > 0) {
           const gallons = litresSinceLastFull / 4.546;
-          raw.push({ mileage: log.mileage, mpg: miles / gallons, date: log.date, fuelLogId: log.id, miles, mileageAnomaly: Boolean(log.mileageAnomaly) });
+          raw.push({ mileage: log.mileage, mpg: miles / gallons, date: log.date, fuelLogId: log.id, miles, litres: litresSinceLastFull, mileageAnomaly: Boolean(log.mileageAnomaly) });
         }
       }
       lastFullMileage = log.mileage;
@@ -205,7 +210,7 @@ export function computeMPGSeries(fuelLogs: MpgCalcInput[], manufacturerMpg?: num
     // from - it's specifically this one segment's mpg that shouldn't
     // count toward the average or trend line.
     if (seg.mileageAnomaly) {
-      result.push({ mileage: seg.mileage, mpg: seg.mpg, date: seg.date, fuelLogId: seg.fuelLogId, likelyMissedFillUps: true, exclusionReason: "marked-anomaly" });
+      result.push({ mileage: seg.mileage, mpg: seg.mpg, date: seg.date, fuelLogId: seg.fuelLogId, miles: seg.miles, litres: seg.litres, likelyMissedFillUps: true, exclusionReason: "marked-anomaly" });
       continue;
     }
 
@@ -216,7 +221,7 @@ export function computeMPGSeries(fuelLogs: MpgCalcInput[], manufacturerMpg?: num
       validGapsSoFar.length = 0;
       consecutiveValueAnomalies = 0;
       consecutiveLifetimeAnomalies = 0;
-      result.push({ mileage: seg.mileage, mpg: seg.mpg, date: seg.date, fuelLogId: seg.fuelLogId, likelyMissedFillUps: true, exclusionReason: "unusual-gap" });
+      result.push({ mileage: seg.mileage, mpg: seg.mpg, date: seg.date, fuelLogId: seg.fuelLogId, miles: seg.miles, litres: seg.litres, likelyMissedFillUps: true, exclusionReason: "unusual-gap" });
       continue;
     }
 
@@ -285,6 +290,8 @@ export function computeMPGSeries(fuelLogs: MpgCalcInput[], manufacturerMpg?: num
       mpg: seg.mpg,
       date: seg.date,
       fuelLogId: seg.fuelLogId,
+      miles: seg.miles,
+      litres: seg.litres,
       likelyMissedFillUps: valueFlagged,
       exclusionReason,
     });

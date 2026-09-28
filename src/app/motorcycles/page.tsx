@@ -205,6 +205,10 @@ export default function MotorcyclesPage() {
             <strong>Cost Calculator</strong>
             <span>What does it actually cost you a year?</span>
           </Link>
+          <Link href="/mpg-calculator" className="rv-related-tools__link">
+            <strong>MPG Calculator</strong>
+            <span>Your real fuel economy, per tank</span>
+          </Link>
           <Link href="/buying-guide" className="rv-related-tools__link">
             <strong>Buying Guide</strong>
             <span>What to check before you buy</span>

@@ -21,6 +21,15 @@ describe("computeMPGSeries", () => {
     expect(result[0].likelyMissedFillUps).toBe(false);
   });
 
+  it("keeps each tank's miles and litres, partial top-ups included", () => {
+    const result = computeMPGSeries([
+      fill({ id: "fuel-1", mileage: 1000 }),
+      fill({ id: "fuel-top-up", mileage: 1060, litres: 4, filledToFull: false, date: "2025-01-15" }),
+      fill({ id: "fuel-2", mileage: 1100, litres: 6, date: "2025-02-01" }),
+    ]);
+    expect(result[0]).toMatchObject({ miles: 100, litres: 10 });
+  });
+
   it("does not bridge an unverified mileage entry", () => {
     const result = computeMPGSeries([
       fill({ id: "fuel-1", mileage: 1000 }),

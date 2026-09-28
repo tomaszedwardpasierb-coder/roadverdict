@@ -119,3 +119,39 @@ describe("saveCurrentPetrolPrice", () => {
     expect(mocks.read).not.toHaveBeenCalled();
   });
 });
+
+describe("getCurrentUkFuelPrices", () => {
+  it("returns both stored prices with the DESNZ week each is for", async () => {
+    mocks.read
+      .mockResolvedValueOnce({ resource: { pricePenceLitre: 133.19, weekCommencing: "22/09/2026" } })
+      .mockResolvedValueOnce({ resource: { pricePenceLitre: 139.46, weekCommencing: "22/09/2026" } });
+    const { getCurrentUkFuelPrices } = await import("@/lib/fuelPrice");
+    expect(await getCurrentUkFuelPrices()).toEqual({
+      petrol: { pencePerLitre: 133.19, weekCommencing: "22/09/2026" },
+      diesel: { pencePerLitre: 139.46, weekCommencing: "22/09/2026" },
+    });
+    expect(mocks.item).toHaveBeenCalledWith("fuelPrice", "system");
+    expect(mocks.item).toHaveBeenCalledWith("dieselPrice", "system");
+  });
+
+  it("falls back to the sourced fallbacks, dated, and doesn't cache them", async () => {
+    mocks.read.mockRejectedValue(new Error("Cosmos unavailable"));
+    const { getCurrentUkFuelPrices } = await import("@/lib/fuelPrice");
+    const prices = await getCurrentUkFuelPrices();
+    expect(prices.petrol).toEqual({ pencePerLitre: 150.53, weekCommencing: "13/07/2026" });
+    expect(prices.diesel).toEqual({ pencePerLitre: 157.82, weekCommencing: "13/07/2026" });
+    await getCurrentUkFuelPrices();
+    expect(mocks.read).toHaveBeenCalledTimes(4);
+  });
+
+  it("caches a good read, and a weekly save clears it", async () => {
+    mocks.read.mockResolvedValue({ resource: { pricePenceLitre: 133.19, weekCommencing: "22/09/2026" } });
+    const { getCurrentUkFuelPrices } = await import("@/lib/fuelPrice");
+    await getCurrentUkFuelPrices();
+    await getCurrentUkFuelPrices();
+    expect(mocks.read).toHaveBeenCalledTimes(2);
+    await saveCurrentPetrolPrice(135, "29/09/2026");
+    await getCurrentUkFuelPrices();
+    expect(mocks.read).toHaveBeenCalledTimes(4);
+  });
+});

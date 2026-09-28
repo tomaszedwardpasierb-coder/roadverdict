@@ -16,13 +16,17 @@ export function CarRelatedTools({ current }: { current: (typeof TOOLS)[number]['
   return (
     <nav className="rv-related-tools" aria-label="Other free tools for cars">
       <p className="rv-related-tools__eyebrow">Also free</p>
-      <div className="rv-related-tools__row">
+      <div className="rv-related-tools__row rv-related-tools__row--pairs">
         {others.map((t) => (
           <Link key={t.href} href={t.href} className="rv-related-tools__link">
             <strong>{t.label}</strong>
             <span>{t.blurb}</span>
           </Link>
         ))}
+        <Link href="/mpg-calculator" className="rv-related-tools__link">
+          <strong>MPG Calculator</strong>
+          <span>Your real fuel economy, per tank</span>
+        </Link>
         <Link href="/cars/costs" className="rv-related-tools__link">
           <strong>Price guides</strong>
           <span>What common car jobs cost</span>
