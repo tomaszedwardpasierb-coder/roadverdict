@@ -9,6 +9,7 @@ import { Card, SectionHeader } from '@/components/screen';
 import { Brand } from '@/constants/brand';
 import { API_BASE_URL } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
+import { versionLabel } from '@/lib/version';
 
 // Everything outside the four main tabs. Rows that aren't built yet say
 // "Soon" instead of opening an empty screen.
@@ -90,12 +91,15 @@ export default function MoreScreen() {
           <Icon name="close" size={18} color={Brand.danger} />
           <Text style={styles.signOutLabel}>{signingOut ? 'Signing out…' : 'Sign out'}</Text>
         </Pressable>
+
+        <Text style={styles.version}>{versionLabel()}</Text>
       </ScrollView>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  version: { fontSize: 12, color: Brand.muted, textAlign: 'center', marginTop: 4 },
   safe: { flex: 1, backgroundColor: Brand.paper },
   content: { paddingHorizontal: 20, paddingTop: 12, paddingBottom: 32, gap: 12 },
   title: { fontSize: 30, fontWeight: '800', color: Brand.ink },

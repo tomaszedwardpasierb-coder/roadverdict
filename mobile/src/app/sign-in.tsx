@@ -5,6 +5,7 @@ import { StyleSheet, Text, TextInput, View } from 'react-native';
 import { AuthScreen, ErrorMessage, PrimaryButton, authInputStyle } from '@/components/auth-ui';
 import { Brand } from '@/constants/brand';
 import { apiFetch } from '@/lib/api';
+import { versionLabel } from '@/lib/version';
 
 export default function SignInScreen() {
   const [email, setEmail] = useState('');
@@ -52,6 +53,7 @@ export default function SignInScreen() {
       <ErrorMessage message={error} />
       <PrimaryButton label="Send code" onPress={sendCode} busy={busy} disabled={!looksValid} />
       <Text style={styles.note}>New to RoadVerdict? The same code creates your account.</Text>
+      <Text style={styles.version}>{versionLabel()}</Text>
     </AuthScreen>
   );
 }
@@ -60,4 +62,5 @@ const styles = StyleSheet.create({
   field: { gap: 8 },
   label: { color: '#FFFFFF', fontSize: 15, fontWeight: '600' },
   note: { color: Brand.mutedOnDark, fontSize: 14, lineHeight: 20, textAlign: 'center', marginTop: 8 },
+  version: { color: Brand.mutedOnDark, fontSize: 12, textAlign: 'center', marginTop: 24, opacity: 0.8 },
 });
