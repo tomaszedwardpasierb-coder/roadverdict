@@ -6,7 +6,9 @@ import * as Updates from 'expo-updates';
 // the app starts), so a tester can say exactly what they're on.
 export function versionLabel(): string {
   const version = `Version ${Constants.expoConfig?.version ?? ''}`.trim();
-  if (!Updates.isEnabled) return `${version} (development)`;
+  // Expo Go loads a development bundle much like an update, so it would
+  // otherwise claim to be one.
+  if (__DEV__ || !Updates.isEnabled) return `${version} (development)`;
   if (Updates.isEmbeddedLaunch || !Updates.createdAt) return version;
   const at = Updates.createdAt.toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
   return `${version} · update of ${at}`;

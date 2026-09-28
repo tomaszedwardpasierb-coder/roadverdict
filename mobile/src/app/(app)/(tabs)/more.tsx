@@ -19,7 +19,7 @@ const SECTIONS: { title: string; rows: Row[] }[] = [
   { title: 'Garage', rows: [{ label: 'Add a vehicle', open: () => router.push('/add-vehicle') }] },
   { title: 'Tools', rows: [{ label: 'Quote checker', open: () => router.push('/quote') }, { label: 'Cost calculator', open: () => router.push('/costs') }, { label: 'Buying guide & plate check', open: () => router.push('/buying') }] },
   { title: 'Insights', rows: [{ label: 'Reports & charts', open: () => router.push('/reports') }, { label: 'The story so far', open: () => router.push('/story') }] },
-  { title: 'Selling', rows: [{ label: 'Shareable links' }, { label: 'Transfer ownership' }] },
+  { title: 'Selling', rows: [{ label: 'Shareable links', open: () => router.push('/share-links') }, { label: 'Transfer ownership', open: () => router.push('/transfer') }] },
   { title: 'Documents', rows: [{ label: 'The Vault', later: true }] },
   {
     title: 'Account',

@@ -22,6 +22,7 @@ const PATHS = {
   close: ['M18 6 6 18', 'M6 6l12 12'],
   lock: ['M5 11h14v10H5z', 'M8 11V7a4 4 0 0 1 8 0v4'],
   check: ['M20 6 9 17l-5-5'],
+  share: ['M21 5a3 3 0 1 1-6 0 3 3 0 0 1 6 0z', 'M9 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0z', 'M21 19a3 3 0 1 1-6 0 3 3 0 0 1 6 0z', 'm8.6 13.5 6.8 4', 'm15.4 6.5-6.8 4'],
 } as const;
 
 export type IconName = keyof typeof PATHS;
