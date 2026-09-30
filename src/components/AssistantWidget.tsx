@@ -12,6 +12,7 @@ import { AssistantProposedVaultDocumentCard, type ProposedVaultDocument } from '
 import { AssistantProposedFeedbackCard, type ProposedFeedback } from './AssistantProposedFeedbackCard';
 import { AttachmentThumb } from '@/app/dashboard/AttachmentThumb';
 import type { Attachment } from '@/lib/tracker/cosmosHelpers';
+import type { MpgCalculatorAssistantContext } from '@/lib/fuelEconomy';
 import { fetchWithTimeout, FetchTimeoutError, UPLOAD_TIMEOUT_MS } from '@/lib/fetchWithTimeout';
 import { VehicleSpinner } from './VehicleSpinner';
 import styles from './AssistantWidget.module.css';
@@ -159,6 +160,8 @@ async function attemptSend(
   reportToken: string | null,
   dashboardTab: string | null,
   compareContext: CompareContext | null,
+  mpgCalculatorPage: boolean,
+  mpgCalculator: MpgCalculatorAssistantContext | null,
   attachment: Attachment | null
 ): Promise<SendResult> {
   let status: number | null = null;
@@ -189,6 +192,7 @@ async function attemptSend(
               ...(compareContext.to ? { compareTo: compareContext.to } : {}),
             }
           : {}),
+        ...(mpgCalculatorPage ? { mpgCalculatorPage: true, mpgCalculator } : {}),
         ...(attachment ? { attachment } : {}),
       }),
     });
@@ -221,7 +225,8 @@ function AssistantWidgetInner() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const reportToken = extractReportToken(pathname ?? '');
-  const { activeSection: dashboardTab, vehicleKind } = useActiveSection();
+  const { activeSection: dashboardTab, vehicleKind, mpgCalculator } = useActiveSection();
+  const mpgCalculatorPage = pathname === '/mpg-calculator';
   // Read fresh from the URL on every render rather than stored in state -
   // this only ever needs to reflect whatever's currently on screen, the
   // same "just a hint, server re-validates it" role reportToken already
@@ -433,7 +438,7 @@ function AssistantWidgetInner() {
     }
   }
 
-  async function sendWithRetry(payload: Message[], reportToken: string | null, dashboardTab: string | null, compareContext: CompareContext | null) {
+  async function sendWithRetry(payload: Message[], reportToken: string | null, dashboardTab: string | null, compareContext: CompareContext | null, mpgCalculatorPage: boolean, mpgCalculator: MpgCalculatorAssistantContext | null) {
     setSending(true);
     setError(null);
     setLastFailedMessages(null);
@@ -443,14 +448,14 @@ function AssistantWidgetInner() {
     // added, whether this is a fresh send or a retry of one that failed.
     const attachment = payload[payload.length - 1]?.attachment ?? null;
 
-    let result = await attemptSend(payload, reportToken, dashboardTab, compareContext, attachment);
+    let result = await attemptSend(payload, reportToken, dashboardTab, compareContext, mpgCalculatorPage, mpgCalculator, attachment);
     let attempts = 1;
     // Retries silently, still inside the same "sending" state - the
     // person just sees the normal typing indicator for slightly longer
     // if this happens, never a flash of an error that then recovers.
     while (!result.ok && result.retryable && attempts <= MAX_AUTO_RETRIES) {
       await sleep(RETRY_DELAY_MS);
-      result = await attemptSend(payload, reportToken, dashboardTab, compareContext, attachment);
+      result = await attemptSend(payload, reportToken, dashboardTab, compareContext, mpgCalculatorPage, mpgCalculator, attachment);
       attempts++;
     }
 
@@ -500,7 +505,7 @@ function AssistantWidgetInner() {
     setInput('');
     setPendingAttachment(null);
     setAttachmentError(null);
-    await sendWithRetry(nextMessages, reportToken, dashboardTab, compareContext);
+    await sendWithRetry(nextMessages, reportToken, dashboardTab, compareContext, mpgCalculatorPage, mpgCalculator);
   }
 
   // Runs after every render, keeping the ref the voice auto-send timer
@@ -526,12 +531,12 @@ function AssistantWidgetInner() {
     const text = "That's logged. If there's anything else from what I just asked you to log, draft the next one now.";
     const nextMessages: Message[] = [...messages, { role: 'user', content: text }];
     setMessages(nextMessages);
-    await sendWithRetry(nextMessages, reportToken, dashboardTab, compareContext);
+    await sendWithRetry(nextMessages, reportToken, dashboardTab, compareContext, mpgCalculatorPage, mpgCalculator);
   }
 
   function handleRetry() {
     if (!lastFailedMessages || sending) return;
-    void sendWithRetry(lastFailedMessages, reportToken, dashboardTab, compareContext);
+    void sendWithRetry(lastFailedMessages, reportToken, dashboardTab, compareContext, mpgCalculatorPage, mpgCalculator);
   }
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {

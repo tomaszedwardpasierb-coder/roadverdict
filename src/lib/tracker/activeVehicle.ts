@@ -13,6 +13,7 @@
 import { cookies } from "next/headers";
 import { getBikesForUser, pickActiveBike, isBikeReadOnly, type BikeDoc } from "./bike";
 import { getCarsForUser, pickActiveCar, isCarReadOnly, type CarDoc } from "./car";
+import { APP_BIKE_HEADER, APP_CAR_HEADER, readAppVehicleHeader } from "./appVehicleHeader";
 
 export type VehicleKind = "bike" | "car";
 export const ACTIVE_VEHICLE_KIND_COOKIE = "activeVehicleKind";
@@ -52,7 +53,12 @@ export async function resolveActiveVehicle(
   if (bikes.length === 0 && cars.length === 0) return null;
 
   const cookieStore = await cookies();
-  const preferredKind = cookieStore.get(ACTIVE_VEHICLE_KIND_COOKIE)?.value;
+  // The Android app has no cookie jar; it names its vehicle in a header
+  // instead (see appVehicleHeader.ts). Read only when the cookie is
+  // absent, so nothing about how the website decides changes.
+  const preferredKind =
+    cookieStore.get(ACTIVE_VEHICLE_KIND_COOKIE)?.value ??
+    ((await readAppVehicleHeader(APP_CAR_HEADER)) && !(await readAppVehicleHeader(APP_BIKE_HEADER)) ? "car" : undefined);
 
   if (preferredKind === "car" && cars.length > 0) {
     const car = await pickActiveCar(cars);

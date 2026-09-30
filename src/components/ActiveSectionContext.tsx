@@ -19,12 +19,15 @@
 'use client';
 
 import { createContext, useContext, useState, type ReactNode } from 'react';
+import type { MpgCalculatorAssistantContext } from '@/lib/fuelEconomy';
 
 interface ContextValue {
   activeSection: string | null;
   setActiveSection: (section: string | null) => void;
   vehicleKind: 'bike' | 'car' | null;
   setVehicleKind: (kind: 'bike' | 'car' | null) => void;
+  mpgCalculator: MpgCalculatorAssistantContext | null;
+  setMpgCalculator: (context: MpgCalculatorAssistantContext | null) => void;
 }
 
 const ActiveSectionContext = createContext<ContextValue | null>(null);
@@ -32,8 +35,9 @@ const ActiveSectionContext = createContext<ContextValue | null>(null);
 export function ActiveSectionProvider({ children }: { children: ReactNode }) {
   const [activeSection, setActiveSection] = useState<string | null>(null);
   const [vehicleKind, setVehicleKind] = useState<'bike' | 'car' | null>(null);
+  const [mpgCalculator, setMpgCalculator] = useState<MpgCalculatorAssistantContext | null>(null);
   return (
-    <ActiveSectionContext.Provider value={{ activeSection, setActiveSection, vehicleKind, setVehicleKind }}>
+    <ActiveSectionContext.Provider value={{ activeSection, setActiveSection, vehicleKind, setVehicleKind, mpgCalculator, setMpgCalculator }}>
       {children}
     </ActiveSectionContext.Provider>
   );
@@ -41,6 +45,13 @@ export function ActiveSectionProvider({ children }: { children: ReactNode }) {
 
 export function useActiveSection(): ContextValue {
   const ctx = useContext(ActiveSectionContext);
-  if (!ctx) return { activeSection: null, setActiveSection: () => {}, vehicleKind: null, setVehicleKind: () => {} };
+  if (!ctx) return {
+    activeSection: null,
+    setActiveSection: () => {},
+    vehicleKind: null,
+    setVehicleKind: () => {},
+    mpgCalculator: null,
+    setMpgCalculator: () => {},
+  };
   return ctx;
 }

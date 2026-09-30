@@ -6,12 +6,22 @@
 // matches what the fuel log itself shows for it. Pure and client-safe:
 // nothing here may import Cosmos or anything server-only.
 import { KM_PER_MILE, LITRES_PER_UK_GALLON } from "@/lib/tracker/unitFormat";
+import type { Currency } from "@/lib/tracker/currency";
 
 export const LITRES_PER_US_GALLON = 3.785411784;
 
 // MPG goes with miles, L/100km with kilometres - the calculator's toggle
 // switches both, the way each system is actually used.
 export type EconomyUnit = "mpg" | "l100km";
+
+export interface MpgCalculatorAssistantContext {
+  unit: EconomyUnit;
+  distance: number | null;
+  litres: number | null;
+  currency: Currency;
+  pricePerLitre: number | null;
+  priceSource: "saved" | "manual" | "uk-petrol-average" | "uk-diesel-average" | "none";
+}
 
 export type TankEconomy = {
   mpg: number;

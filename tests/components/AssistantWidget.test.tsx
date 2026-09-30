@@ -22,6 +22,7 @@ vi.mock("next/navigation", () => ({
 
 import { AssistantWidget } from "@/components/AssistantWidget";
 import { ActiveSectionProvider, useActiveSection } from "@/components/ActiveSectionContext";
+import type { MpgCalculatorAssistantContext } from "@/lib/fuelEconomy";
 
 // jsdom implements no version of the Web Speech API at all - this stands
 // in for a real browser's SpeechRecognition, giving tests a handle on the
@@ -61,6 +62,12 @@ function SetActiveSection({ section }: { section: string }) {
 function SetVehicleKind({ kind }: { kind: "bike" | "car" }) {
   const { setVehicleKind } = useActiveSection();
   useEffect(() => setVehicleKind(kind), [kind, setVehicleKind]);
+  return null;
+}
+
+function SetMpgCalculator({ context }: { context: MpgCalculatorAssistantContext }) {
+  const { setMpgCalculator } = useActiveSection();
+  useEffect(() => setMpgCalculator(context), [context, setMpgCalculator]);
   return null;
 }
 
@@ -201,6 +208,37 @@ describe("AssistantWidget", () => {
     await screen.findByText("Shareable Links let you send a buyer your bike's history.");
     const body = JSON.parse((fetch as ReturnType<typeof vi.fn>).mock.calls[0][1].body);
     expect(body.dashboardTab).toBe("shareLinks");
+  });
+
+  it("sends live MPG calculator context only while on the calculator page", async () => {
+    mockPathname.current = "/mpg-calculator";
+    (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ reply: "That's 45.5 UK MPG." }),
+    });
+
+    const context: MpgCalculatorAssistantContext = {
+      unit: "mpg",
+      distance: 400,
+      litres: 40,
+      currency: "GBP",
+      pricePerLitre: 1.45,
+      priceSource: "manual",
+    };
+    const user = userEvent.setup();
+    render(
+      <ActiveSectionProvider>
+        <SetMpgCalculator context={context} />
+        <AssistantWidget />
+      </ActiveSectionProvider>
+    );
+    await openWidgetAndSend(user, "What does my result mean?");
+
+    await screen.findByText("That's 45.5 UK MPG.");
+    const body = JSON.parse((fetch as ReturnType<typeof vi.fn>).mock.calls[0][1].body);
+    expect(body.mpgCalculatorPage).toBe(true);
+    expect(body.mpgCalculator).toEqual(context);
   });
 
   it("on /garage/compare, includes the currently-selected vehicle ids and date filter in the request body", async () => {

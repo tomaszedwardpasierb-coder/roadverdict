@@ -10,6 +10,7 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import { convertDistance, fuelCostPerDistance, tankEconomy, type EconomyUnit } from '@/lib/fuelEconomy';
 import { CURRENCY_SYMBOLS, type Currency } from '@/lib/tracker/currency';
+import { useActiveSection } from './ActiveSectionContext';
 import styles from './MpgCalculator.module.css';
 
 type Fuel = 'petrol' | 'diesel';
@@ -53,6 +54,7 @@ export function MpgCalculator({
   preferredFuel = 'petrol',
 }: MpgCalculatorProps) {
   const id = useId();
+  const { setMpgCalculator } = useActiveSection();
   // UK pumps price in pence, so a pound owner types pence.
   const inPence = currency === 'GBP';
   const symbol = CURRENCY_SYMBOLS[currency];
@@ -112,8 +114,32 @@ export function MpgCalculator({
   const priceValue = parse(price);
   const perLitre = Number.isFinite(priceValue) && priceValue > 0 ? (inPence ? priceValue / 100 : priceValue) : null;
   const perDistance = economy && perLitre ? fuelCostPerDistance(perLitre, economy, unit) : null;
+  const distanceValue = parse(distance);
+  const litresValue = parse(litres);
+  const distanceForContext = Number.isFinite(distanceValue) && distanceValue > 0 ? distanceValue : null;
+  const litresForContext = Number.isFinite(litresValue) && litresValue > 0 ? litresValue : null;
+  const priceSource = priceFrom
+    ? 'saved'
+    : averageUsed
+      ? `uk-${averageUsed}-average` as const
+      : perLitre !== null
+        ? 'manual'
+        : 'none';
   const money = (value: number) => `${symbol}${value.toFixed(2)}`;
   const miles = unit === 'mpg';
+
+  useEffect(() => {
+    if (variant !== 'page') return;
+    setMpgCalculator({
+      unit,
+      distance: distanceForContext,
+      litres: litresForContext,
+      currency,
+      pricePerLitre: perLitre,
+      priceSource,
+    });
+    return () => setMpgCalculator(null);
+  }, [variant, setMpgCalculator, unit, distanceForContext, litresForContext, currency, perLitre, priceSource]);
 
   return (
     <div className={`${styles.calc} ${variant === 'page' ? styles.ticketCalc : ''}`}>

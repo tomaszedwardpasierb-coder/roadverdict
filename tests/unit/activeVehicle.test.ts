@@ -2,13 +2,14 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   cookies: vi.fn(),
+  headers: vi.fn(),
   getBikesForUser: vi.fn(),
   pickActiveBike: vi.fn(),
   getCarsForUser: vi.fn(),
   pickActiveCar: vi.fn(),
 }));
 
-vi.mock("next/headers", () => ({ cookies: mocks.cookies }));
+vi.mock("next/headers", () => ({ cookies: mocks.cookies, headers: mocks.headers }));
 vi.mock("@/lib/tracker/bike", () => ({
   getBikesForUser: mocks.getBikesForUser,
   pickActiveBike: mocks.pickActiveBike,
@@ -30,8 +31,13 @@ function cookieStoreWithKind(kind?: string) {
   return { get: (name: string) => (name === ACTIVE_VEHICLE_KIND_COOKIE && kind ? { value: kind } : undefined) };
 }
 
+function appHeaders(values: Record<string, string>) {
+  return { get: (name: string) => values[name] ?? null };
+}
+
 beforeEach(() => {
   Object.values(mocks).forEach((m) => m.mockReset());
+  mocks.headers.mockResolvedValue(appHeaders({}));
 });
 
 describe("resolveActiveVehicle", () => {
@@ -157,5 +163,34 @@ describe("resolveAllActiveVehicles", () => {
       { kind: "bike", bike },
       { kind: "car", car },
     ]);
+  });
+});
+
+describe("resolveActiveVehicle for the Android app (no cookies, a vehicle header)", () => {
+  it("resolves the car the app names, even on an account that also has a bike", async () => {
+    mocks.getBikesForUser.mockResolvedValue([bike]);
+    mocks.getCarsForUser.mockResolvedValue([car]);
+    mocks.cookies.mockResolvedValue(cookieStoreWithKind());
+    mocks.headers.mockResolvedValue(appHeaders({ "x-rv-car-id": "car-1" }));
+    mocks.pickActiveCar.mockResolvedValue(car);
+    expect(await resolveActiveVehicle(email)).toEqual({ kind: "car", car, hasAnyBike: true });
+  });
+
+  it("keeps the bike when the app names a bike", async () => {
+    mocks.getBikesForUser.mockResolvedValue([bike]);
+    mocks.getCarsForUser.mockResolvedValue([car]);
+    mocks.cookies.mockResolvedValue(cookieStoreWithKind());
+    mocks.headers.mockResolvedValue(appHeaders({ "x-rv-bike-id": "bike-1" }));
+    mocks.pickActiveBike.mockResolvedValue(bike);
+    expect(await resolveActiveVehicle(email)).toMatchObject({ kind: "bike", bike });
+  });
+
+  it("never overrides the website's own kind cookie", async () => {
+    mocks.getBikesForUser.mockResolvedValue([bike]);
+    mocks.getCarsForUser.mockResolvedValue([car]);
+    mocks.cookies.mockResolvedValue(cookieStoreWithKind("bike"));
+    mocks.headers.mockResolvedValue(appHeaders({ "x-rv-car-id": "car-1" }));
+    mocks.pickActiveBike.mockResolvedValue(bike);
+    expect(await resolveActiveVehicle(email)).toMatchObject({ kind: "bike" });
   });
 });

@@ -1,8 +1,17 @@
 // Place at: tests/components/MpgCalculator.test.tsx
+import { useEffect } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MpgCalculator } from "@/components/MpgCalculator";
+import { ActiveSectionProvider, useActiveSection } from "@/components/ActiveSectionContext";
+import type { MpgCalculatorAssistantContext } from "@/lib/fuelEconomy";
+
+function ObserveMpgCalculator({ onChange }: { onChange: (value: MpgCalculatorAssistantContext | null) => void }) {
+  const { mpgCalculator } = useActiveSection();
+  useEffect(() => onChange(mpgCalculator), [mpgCalculator, onChange]);
+  return null;
+}
 
 const UK_PRICES = {
   petrol: { pencePerLitre: 133.19, weekCommencing: "22/09/2026" },
@@ -68,5 +77,28 @@ describe("MpgCalculator", () => {
     render(<MpgCalculator variant="embedded" currency="EUR" />);
     expect(screen.getByLabelText("Price per litre (€)")).toBeInTheDocument();
     expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("publishes the live page calculator values for the assistant", async () => {
+    const onChange = vi.fn();
+    const user = userEvent.setup();
+    render(
+      <ActiveSectionProvider>
+        <MpgCalculator />
+        <ObserveMpgCalculator onChange={onChange} />
+      </ActiveSectionProvider>
+    );
+
+    await user.type(screen.getByLabelText("Miles driven"), "400");
+    await user.type(screen.getByLabelText("Litres used"), "40");
+    await waitFor(() => {
+      expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({
+        unit: "mpg",
+        distance: 400,
+        litres: 40,
+        currency: "GBP",
+        pricePerLitre: expect.any(Number),
+      }));
+    });
   });
 });

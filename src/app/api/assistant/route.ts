@@ -51,6 +51,8 @@ import { getCarsForUser, isCarReadOnly } from "@/lib/tracker/car";
 import { isPro } from "@/lib/subscriptions";
 import { isTwoFactorEnabled } from "@/lib/auth/twoFactor";
 import { MIN_COMPARE_VEHICLES, MAX_COMPARE_VEHICLES } from "@/lib/tracker/vehicleComparison";
+import { fuelCostPerDistance, tankEconomy, type MpgCalculatorAssistantContext } from "@/lib/fuelEconomy";
+import { ALL_CURRENCIES, CURRENCY_SYMBOLS } from "@/lib/tracker/currency";
 
 export const dynamic = "force-dynamic";
 
@@ -63,6 +65,51 @@ const GEMINI_MODEL = "gemini-3.5-flash-lite";
 const MAX_MESSAGES = 20; // conversation-length guard, not a hard product limit
 const MAX_MESSAGE_LENGTH = 2000;
 const MAX_TOOL_ROUNDS = 4; // safety cap against a runaway tool-call loop
+const MPG_PRICE_SOURCES = ["saved", "manual", "uk-petrol-average", "uk-diesel-average", "none"] as const;
+
+function parseMpgCalculatorContext(value: unknown): MpgCalculatorAssistantContext | null {
+  if (!value || typeof value !== "object") return null;
+  const context = value as Record<string, unknown>;
+  if (context.unit !== "mpg" && context.unit !== "l100km") return null;
+  if (!ALL_CURRENCIES.includes(context.currency as (typeof ALL_CURRENCIES)[number])) return null;
+  if (!MPG_PRICE_SOURCES.includes(context.priceSource as (typeof MPG_PRICE_SOURCES)[number])) return null;
+
+  const validPositiveNumber = (candidate: unknown, maximum: number) =>
+    typeof candidate === "number" && Number.isFinite(candidate) && candidate > 0 && candidate <= maximum;
+  const distance = context.distance === null || validPositiveNumber(context.distance, 10_000_000) ? context.distance : null;
+  const litres = context.litres === null || validPositiveNumber(context.litres, 100_000) ? context.litres : null;
+  const pricePerLitre = context.pricePerLitre === null || validPositiveNumber(context.pricePerLitre, 1_000) ? context.pricePerLitre : null;
+
+  return {
+    unit: context.unit,
+    distance: distance as number | null,
+    litres: litres as number | null,
+    currency: context.currency as MpgCalculatorAssistantContext["currency"],
+    pricePerLitre: pricePerLitre as number | null,
+    priceSource: context.priceSource as MpgCalculatorAssistantContext["priceSource"],
+  };
+}
+
+function describeMpgCalculatorContext(context: MpgCalculatorAssistantContext | null): string {
+  if (!context) return "No valid calculator values have been entered yet.";
+
+  const distanceLabel = context.unit === "mpg" ? "miles" : "kilometres";
+  const inputs = `Distance: ${context.distance === null ? "not entered" : `${context.distance} ${distanceLabel}`}; litres: ${context.litres === null ? "not entered" : `${context.litres} L`}.`;
+  if (context.distance === null || context.litres === null) return inputs;
+  const economy = tankEconomy(context.distance, context.unit, context.litres);
+  if (!economy) return inputs;
+
+  const economyLine = `Calculated from these inputs: ${economy.mpg.toFixed(1)} UK mpg; ${economy.l100km.toFixed(1)} L/100km; ${economy.usMpg.toFixed(1)} US mpg.`;
+  if (context.pricePerLitre === null) return `${inputs} ${economyLine} No fuel price is set, so cost is not calculated.`;
+
+  const perDistance = fuelCostPerDistance(context.pricePerLitre, economy, context.unit);
+  const symbol = CURRENCY_SYMBOLS[context.currency];
+  const costPerDistance = context.unit === "mpg" && context.currency === "GBP"
+    ? `${(perDistance * 100).toFixed(1)}p per mile`
+    : `${symbol}${perDistance.toFixed(2)} per ${context.unit === "mpg" ? "mile" : "100 km"}`;
+  const tankCost = `${symbol}${(context.pricePerLitre * context.litres).toFixed(2)}`;
+  return `${inputs} ${economyLine} Fuel price: ${symbol}${context.pricePerLitre.toFixed(3)} per litre (${context.priceSource}). Cost: ${costPerDistance}; this tank: ${tankCost}.`;
+}
 
 interface ChatMessage {
   role: "user" | "assistant";
@@ -138,7 +185,7 @@ const TAB_GROUP_LABELS: Record<string, string> = {
 const NO_CAR_KB_FALLBACK =
   "No car-specific knowledge base has been written yet for RoadVerdict's car support. Be honest that detailed car guidance isn't set up yet rather than guessing, and never use motorcycle-specific facts, terminology, or figures as if they applied to a car.";
 
-function buildSystemInstruction(config: AssistantConfigDoc, signedIn: boolean, privacyPolicyText: string | null, reportOpen: boolean, dashboardTabLabel: string | null, dashboardTabGroupLabel: string | null, compareVehicleNames: string[] | null, logEntryAccess: "available" | "upsell" | "none", activeVehicleKind: "bike" | "car" | null, displayName: string | null, carKnowledgeBase?: string, vaultChatAccess?: "available" | "unavailable", hasAttachment?: boolean): string {
+function buildSystemInstruction(config: AssistantConfigDoc, signedIn: boolean, privacyPolicyText: string | null, reportOpen: boolean, dashboardTabLabel: string | null, dashboardTabGroupLabel: string | null, compareVehicleNames: string[] | null, logEntryAccess: "available" | "upsell" | "none", activeVehicleKind: "bike" | "car" | null, displayName: string | null, carKnowledgeBase?: string, vaultChatAccess?: "available" | "unavailable", hasAttachment?: boolean, mpgCalculatorPage?: boolean, mpgCalculatorContext?: string, fromAndroidApp?: boolean): string {
   // A car-active session's knowledge base is a completely separate
   // document (see the ADR: one shared assistant, two knowledge bases) -
   // swapped in here instead of config.knowledgeBase (motorcycle-only)
@@ -207,6 +254,12 @@ function buildSystemInstruction(config: AssistantConfigDoc, signedIn: boolean, p
     );
   }
 
+  if (mpgCalculatorPage) {
+    parts.push(
+      `\n\n---\n\nCURRENT PAGE: the visitor is on RoadVerdict's MPG calculator. UK MPG uses an imperial gallon (4.546 litres); do not confuse it with US MPG, which uses a smaller gallon. The calculator also shows L/100km and US MPG conversions. For a real-world tank figure, the user fills to the brim, resets the trip, drives normally, then fills to the brim again; use the distance since reset and litres needed for that refill. UK MPG is miles divided by (litres / 4.546); L/100km is litres used per 100 kilometres. Fuel cost is based on the entered price per litre. Explain the calculator and its fields when asked; if the visitor says "this" or asks what a displayed number means, assume they mean this calculator. Treat the live values below as the values currently shown in the calculator, and do not guess missing inputs or claim to know the visitor's vehicle or driving history.\n\nCURRENT CALCULATOR VALUES: ${mpgCalculatorContext ?? "No valid calculator values have been entered yet."}`
+    );
+  }
+
   if (logEntryAccess === "available") {
     parts.push(
       "\n\n---\n\nLOGGING VIA CHAT (Pro feature, active now): if the signed-in user describes something they want to log - a consumable, a small maintenance item, an insurance/road-tax/MOT/finance payment (plus ULEZ/CAZ or Congestion Charge for a car), a modification/accessory (including general things like wax, polish, or cleaning products), a fuel fill-up or EV charging session, labour/workshop time, a fine/penalty, or a toll/parking charge - use the proposeLogEntry tool to draft it, rather than telling them to go find the right form themselves. Only call it when they're clearly asking you to add/log something, never speculatively. This never saves anything by itself - it hands back a draft that appears on screen for them to review, edit, and confirm with their own click. Don't worry about picking the exact right sub-category yourself (e.g. the precise accessory type) - a reasonable guess is fine, since the draft card lets them correct it before confirming. Available identically for both bike and car accounts."
@@ -222,7 +275,17 @@ function buildSystemInstruction(config: AssistantConfigDoc, signedIn: boolean, p
     );
   } else if (logEntryAccess === "upsell") {
     parts.push(
-      "\n\n---\n\nLOGGING VIA CHAT: adding or logging a new entry, editing an existing one, changing a setting, or creating a share link by describing it in chat is a Pro feature, not available on this account. If asked to do any of those, say so plainly, and mention they can still do it themselves from the dashboard in a few seconds, or upgrade to Pro to have the assistant do it for them next time. Never attempt to draft or describe any of this as if it were actually happening when it isn't available."
+      fromAndroidApp
+        ? "\n\n---\n\nLOGGING VIA CHAT: adding or logging a new entry, editing an existing one, changing a setting, or creating a share link by describing it in chat isn't available on this account. If asked to do any of those, say so plainly, and mention they can do it themselves in the app in a few seconds - the + button for entries, More for settings and shareable links. Never attempt to draft or describe any of this as if it were actually happening when it isn't available."
+        : "\n\n---\n\nLOGGING VIA CHAT: adding or logging a new entry, editing an existing one, changing a setting, or creating a share link by describing it in chat is a Pro feature, not available on this account. If asked to do any of those, say so plainly, and mention they can still do it themselves from the dashboard in a few seconds, or upgrade to Pro to have the assistant do it for them next time. Never attempt to draft or describe any of this as if it were actually happening when it isn't available."
+    );
+  }
+
+  // The Android app sells nothing: upgrades happen on the website only, and
+  // Google Play's payment rules don't let the app steer anyone there.
+  if (fromAndroidApp) {
+    parts.push(
+      "\n\n---\n\nWHERE THIS CHAT IS: the RoadVerdict Android app. Never suggest upgrading, subscribing or buying anything, never mention RoadVerdict Pro's price or how to get it, and never point to a website to purchase. If something they ask for isn't available on their account, just say so plainly, without mentioning a plan."
     );
   }
 
@@ -310,7 +373,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Assistant is not configured." }, { status: 503 });
   }
 
-  let body: { messages?: ChatMessage[]; reportToken?: string; dashboardTab?: string; compareVehicleIds?: string[]; compareFrom?: string; compareTo?: string; attachment?: unknown };
+  let body: { messages?: ChatMessage[]; reportToken?: string; dashboardTab?: string; compareVehicleIds?: string[]; compareFrom?: string; compareTo?: string; attachment?: unknown; mpgCalculatorPage?: unknown; mpgCalculator?: unknown; client?: unknown };
   try {
     body = await req.json();
   } catch {
@@ -326,6 +389,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Message too long." }, { status: 400 });
     }
   }
+
+  // Only ever narrows what the assistant offers, so it needs no proof.
+  const fromAndroidApp = body.client === "android";
+  const mpgCalculatorPage = body.mpgCalculatorPage === true;
+  const mpgCalculatorContext = mpgCalculatorPage
+    ? describeMpgCalculatorContext(parseMpgCalculatorContext(body.mpgCalculator))
+    : undefined;
 
   // Whatever the person attached to THIS turn's own message - already
   // uploaded via the same /api/tracker/upload-attachment endpoint the
@@ -582,7 +652,7 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  const systemInstruction = buildSystemInstruction(config, signedIn, privacyPolicyText, !!reportToken, dashboardTabLabel, dashboardTabGroupLabel, compareVehicleNames, logEntryAccess, activeVehicleKind, displayName, carKnowledgeBase, vaultChatAccess, !!attachment);
+  const systemInstruction = buildSystemInstruction(config, signedIn, privacyPolicyText, !!reportToken, dashboardTabLabel, dashboardTabGroupLabel, compareVehicleNames, logEntryAccess, activeVehicleKind, displayName, carKnowledgeBase, vaultChatAccess, !!attachment, mpgCalculatorPage, mpgCalculatorContext, fromAndroidApp);
 
   const contents: GeminiContent[] = toGeminiContents(messages);
   const toolDeclarations = [
