@@ -64,6 +64,14 @@ export default function HomeScreen() {
           </View>
           <Icon name="chevronDown" size={22} color={Brand.ink} />
         </Pressable>
+        <Pressable
+          onPress={() => router.push('/assistant')}
+          accessibilityRole="button"
+          accessibilityLabel="Ask the AI assistant"
+          style={({ pressed }) => [styles.ask, pressed && { opacity: 0.85 }]}>
+          <Icon name="sparkle" size={18} color={Brand.asphalt} />
+          <Text style={styles.askLabel}>Ask</Text>
+        </Pressable>
       </View>
 
       {home.loading && !data ? (
@@ -220,8 +228,10 @@ function VehicleSwitcher({
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: Brand.paper },
-  header: { paddingHorizontal: 20, paddingTop: 12, paddingBottom: 8 },
-  switcher: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 52 },
+  header: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 20, paddingTop: 12, paddingBottom: 8 },
+  switcher: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 52 },
+  ask: { flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 44, paddingHorizontal: 14, borderRadius: 999, backgroundColor: Brand.amber },
+  askLabel: { fontSize: 15, fontWeight: '700', color: Brand.asphalt },
   switcherText: { flexShrink: 1 },
   vehicleName: { fontSize: 28, fontWeight: '800', color: Brand.ink },
   vehicleMeta: { fontSize: 13, color: Brand.muted, marginTop: 2 },

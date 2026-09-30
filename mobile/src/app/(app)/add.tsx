@@ -31,6 +31,19 @@ export default function AddSheet() {
           </View>
         </Pressable>
 
+        <Pressable
+          onPress={() => router.replace({ pathname: '/assistant', params: { mode: 'log' } })}
+          accessibilityRole="button"
+          style={({ pressed }) => [styles.say, pressed && styles.pressed]}>
+          <View style={styles.sayIcon}>
+            <Icon name="mic" size={24} color={Brand.ink} />
+          </View>
+          <View style={styles.flex}>
+            <Text style={styles.sayTitle}>Just say it</Text>
+            <Text style={styles.scanBody}>Tell the assistant what you did - it drafts the entry</Text>
+          </View>
+        </Pressable>
+
         <View style={styles.grid}>
           <Tile icon="fuel" label="Fuel" onPress={() => router.replace('/add-fuel')} />
           <Tile icon="wrench" label="Service or repair" onPress={() => router.replace({ pathname: '/add-entry', params: { type: 'service' } })} />
@@ -86,6 +99,9 @@ const styles = StyleSheet.create({
   scanIcon: { width: 48, height: 48, borderRadius: 14, backgroundColor: Brand.amber, alignItems: 'center', justifyContent: 'center' },
   scanTitle: { color: '#FFFFFF', fontSize: 17, fontWeight: '700' },
   scanBody: { color: Brand.mutedOnDark, fontSize: 13, marginTop: 2 },
+  say: { flexDirection: 'row', alignItems: 'center', gap: 14, marginTop: 10, padding: 14, borderRadius: 16, borderWidth: 1.5, borderColor: Brand.line, backgroundColor: Brand.paperRaised },
+  sayIcon: { width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center', backgroundColor: Brand.paper, borderWidth: 1.5, borderColor: Brand.line },
+  sayTitle: { fontSize: 17, fontWeight: '700', color: Brand.ink },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   tile: { width: '48%', flexGrow: 1, minHeight: 84, padding: 14, gap: 8, borderRadius: 16, borderWidth: 1, borderColor: Brand.line, backgroundColor: '#FBF9F5' },
   tileLabel: { fontSize: 16, fontWeight: '600', color: Brand.ink },
