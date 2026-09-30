@@ -4,6 +4,9 @@ import { hashToken } from "@/lib/auth/crypto";
 
 const mocks = vi.hoisted(() => ({
   upsert: vi.fn(),
+  create: vi.fn(),
+  query: vi.fn(),
+  fetchAll: vi.fn(),
   read: vi.fn(),
   deleteFn: vi.fn(),
   cookieGet: vi.fn(),
@@ -11,7 +14,11 @@ const mocks = vi.hoisted(() => ({
 
 const mockContainer = {
   item: vi.fn((_id?: string, _pk?: string) => ({ read: mocks.read, delete: mocks.deleteFn })),
-  items: { upsert: mocks.upsert },
+  items: {
+    upsert: mocks.upsert,
+    create: mocks.create,
+    query: mocks.query,
+  },
 };
 
 vi.mock("@/lib/cosmos", () => ({ getContainer: () => mockContainer }));
@@ -25,6 +32,8 @@ import {
   verifyAdminPassword,
   createPendingTotp,
   consumePendingTotp,
+  checkAdminLoginRateLimit,
+  recordAdminLoginAttempt,
   createAdminSession,
   getAdminSession,
   deleteAdminSession,
@@ -36,10 +45,14 @@ function resetMocks() {
   Object.values(mocks).forEach((m) => m.mockReset());
   mockContainer.item.mockClear();
   mocks.upsert.mockResolvedValue(undefined);
+  mocks.create.mockResolvedValue(undefined);
+  mocks.query.mockReturnValue({ fetchAll: mocks.fetchAll });
+  mocks.fetchAll.mockResolvedValue({ resources: [] });
   mocks.deleteFn.mockResolvedValue(undefined);
 }
 
 afterEach(() => {
+  vi.restoreAllMocks();
   if (ORIGINAL_HASH === undefined) delete process.env.ADMIN_PASSWORD_HASH;
   else process.env.ADMIN_PASSWORD_HASH = ORIGINAL_HASH;
 });
@@ -131,6 +144,36 @@ describe("consumePendingTotp", () => {
       delete: mocks.deleteFn,
     });
     expect(await consumePendingTotp("raw-token")).toBe(false);
+  });
+});
+
+describe("admin login rate limit", () => {
+  beforeEach(resetMocks);
+
+  it("counts only attempts from the current rate-limit window", async () => {
+    const now = Date.now();
+    vi.spyOn(Date, "now").mockReturnValue(now);
+    mocks.fetchAll.mockResolvedValue({ resources: [{ id: "recent-attempt" }] });
+
+    await expect(checkAdminLoginRateLimit("totp")).resolves.toEqual({ allowed: true });
+
+    const [query, options] = mocks.query.mock.calls[0];
+    expect(query.query).toContain("c.createdAt >= @cutoff");
+    expect(query.parameters).toEqual([
+      { name: "@prefix", value: "admin-login-attempt:totp:" },
+      { name: "@cutoff", value: new Date(now - 15 * 60 * 1000).toISOString() },
+    ]);
+    expect(options).toEqual({ partitionKey: "admin" });
+  });
+
+  it("records attempts with a 15-minute Cosmos ttl", async () => {
+    await recordAdminLoginAttempt("totp");
+
+    expect(mocks.create).toHaveBeenCalledWith(expect.objectContaining({
+      pk: "admin",
+      type: "adminLoginAttempt",
+      ttl: 15 * 60,
+    }));
   });
 });
 

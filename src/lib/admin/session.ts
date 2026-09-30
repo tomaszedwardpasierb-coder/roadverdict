@@ -82,11 +82,15 @@ function loginAttemptIdPrefix(kind: LoginAttemptKind): string {
 
 export async function checkAdminLoginRateLimit(kind: LoginAttemptKind): Promise<{ allowed: boolean }> {
   const container = getContainer();
+  const cutoff = new Date(Date.now() - LOGIN_RATE_LIMIT_WINDOW_SECONDS * 1000).toISOString();
   const { resources } = await container.items
     .query<{ id: string }>(
       {
-        query: "SELECT c.id FROM c WHERE c.type = 'adminLoginAttempt' AND STARTSWITH(c.id, @prefix)",
-        parameters: [{ name: "@prefix", value: loginAttemptIdPrefix(kind) }],
+        query: "SELECT c.id FROM c WHERE c.type = 'adminLoginAttempt' AND STARTSWITH(c.id, @prefix) AND c.createdAt >= @cutoff",
+        parameters: [
+          { name: "@prefix", value: loginAttemptIdPrefix(kind) },
+          { name: "@cutoff", value: cutoff },
+        ],
       },
       { partitionKey: ADMIN_PK }
     )
