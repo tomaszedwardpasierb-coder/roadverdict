@@ -1141,6 +1141,13 @@ describe("POST /api/assistant - chat attachments", () => {
     expect(callBody.systemInstruction.parts[0].text).not.toContain("YOU CAN SEE THE ATTACHED FILE");
   });
 
+  it("always knows the MPG calculator exists, whatever the stored knowledge base says", async () => {
+    await POST(request({ messages: [{ role: "user", content: "Is there a fuel calculator?" }] }));
+    const instruction = JSON.parse(mocks.fetch.mock.calls[0][1].body).systemInstruction.parts[0].text;
+    expect(instruction).toContain("RoadVerdict has an MPG calculator");
+    expect(instruction).toContain("roadverdict.co.uk/mpg-calculator");
+  });
+
   it("mentions no attachment in the system instruction when none was sent", async () => {
     mocks.getSession.mockResolvedValue({ email: "rider@example.com" });
 

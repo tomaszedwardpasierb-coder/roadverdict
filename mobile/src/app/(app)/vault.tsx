@@ -3,6 +3,8 @@
 // opened, exactly as on the website. Locks by itself after 10 quiet
 // minutes, whenever the app is left, or with "Lock now".
 import * as DocumentPicker from 'expo-document-picker';
+import { Directory, File } from 'expo-file-system';
+import * as IntentLauncher from 'expo-intent-launcher';
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import { router } from 'expo-router';
@@ -16,7 +18,7 @@ import { Icon, type IconName } from '@/components/icon';
 import { ProLock } from '@/components/pro-lock';
 import { Card, ErrorState, LoadingState } from '@/components/screen';
 import { Brand } from '@/constants/brand';
-import { API_BASE_URL, apiFetch, emailFromToken } from '@/lib/api';
+import { apiFetch, emailFromToken } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import {
   declineQuickUnlock,
@@ -38,7 +40,6 @@ import {
   uploadVaultDocument,
   useVaultUnlocked,
   vaultFetch,
-  vaultHeaders,
   VAULT_CATEGORIES,
   whileVaultOpen,
   type PreviousAccess,
@@ -345,7 +346,8 @@ function Documents({ vehicle, previous, offerQuickUnlock }: { vehicle: GarageVeh
   const [documents, setDocuments] = useState<VaultDocument[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
-  const [viewing, setViewing] = useState<VaultDocument | null>(null);
+  const [viewing, setViewing] = useState<{ doc: VaultDocument; uri: string } | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
@@ -362,19 +364,69 @@ function Documents({ vehicle, previous, offerQuickUnlock }: { vehicle: GarageVeh
     load();
   }, [load]);
 
+  // Fetched into the Vault's own cache folder first (emptied whenever it
+  // locks): a photo then shows full screen here, a PDF opens in whichever
+  // PDF app the phone has - read-only, with permission just for that file.
   async function openDocument(doc: VaultDocument) {
-    if (doc.fileType !== 'application/pdf') {
-      setViewing(doc);
-      return;
-    }
     setBusyId(doc.id);
+    setNotice(null);
     const file = await fetchVaultFile(token, doc, 'preview');
     setBusyId(null);
     if (!file.ok) {
       if (!file.locked) setError(file.error);
       return;
     }
-    await whileVaultOpen(() => Sharing.shareAsync(file.uri, { mimeType: doc.fileType, dialogTitle: doc.label || doc.fileName }));
+    if (doc.fileType !== 'application/pdf') {
+      setViewing({ doc, uri: file.uri });
+      return;
+    }
+    await whileVaultOpen(async () => {
+      try {
+        await IntentLauncher.startActivityAsync('android.intent.action.VIEW', {
+          data: new File(file.uri).contentUri,
+          type: 'application/pdf',
+          flags: 1, // FLAG_GRANT_READ_URI_PERMISSION
+        });
+      } catch {
+        // No PDF app on the phone - offer the apps that can take it.
+        await Sharing.shareAsync(file.uri, { mimeType: doc.fileType, dialogTitle: doc.label || doc.fileName });
+      }
+    });
+  }
+
+  function withStampChoice(title: string, action: (watermark: boolean) => void) {
+    Alert.alert(title, 'Copies can be stamped with your email and the time, so one that goes astray can be traced back.', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Without the stamp', onPress: () => action(false) },
+      { text: 'Stamped copy', onPress: () => action(true) },
+    ]);
+  }
+
+  // A copy kept on the phone, in a folder the owner picks (e.g. Downloads).
+  function saveCopy(doc: VaultDocument) {
+    withStampChoice('Save to phone', async (watermark) => {
+      setBusyId(doc.id);
+      setNotice(null);
+      const file = await fetchVaultFile(token, doc, 'download', watermark);
+      if (!file.ok) {
+        setBusyId(null);
+        if (!file.locked) setError(file.error);
+        return;
+      }
+      try {
+        const saved = await whileVaultOpen(async () => {
+          const folder = await Directory.pickDirectoryAsync();
+          const name = doc.fileName.replace(/[\\/:*?"<>|]+/g, '_') || 'document';
+          folder.createFile(name, doc.fileType).write(await new File(file.uri).bytes());
+          return folder.name;
+        });
+        setNotice(`Saved to ${saved}.`);
+      } catch {
+        // Cancelled the folder picker, or the folder couldn't be written to.
+      } finally {
+        setBusyId(null);
+      }
+    });
   }
 
   function shareCopy(doc: VaultDocument) {
@@ -388,11 +440,7 @@ function Documents({ vehicle, previous, offerQuickUnlock }: { vehicle: GarageVeh
       }
       await whileVaultOpen(() => Sharing.shareAsync(file.uri, { mimeType: doc.fileType, dialogTitle: doc.label || doc.fileName }));
     };
-    Alert.alert('Share a copy', 'Copies are stamped with your email and the time, so a copy that goes astray can be traced back.', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Without the stamp', onPress: () => send(false) },
-      { text: 'Stamped copy', onPress: () => send(true) },
-    ]);
+    withStampChoice('Share a copy', send);
   }
 
   function confirmDelete(doc: VaultDocument) {
@@ -438,6 +486,7 @@ function Documents({ vehicle, previous, offerQuickUnlock }: { vehicle: GarageVeh
             {error}
           </Text>
         ) : null}
+        {notice ? <Text style={styles.success}>{notice}</Text> : null}
         {offerQuickUnlock ? <QuickUnlockOffer /> : null}
 
         <Pressable
@@ -473,6 +522,8 @@ function Documents({ vehicle, previous, offerQuickUnlock }: { vehicle: GarageVeh
                     {busyId === doc.id ? <ActivityIndicator color={Brand.amberInk} /> : null}
                   </Pressable>
                   <View style={styles.docActions}>
+                    <SmallButton icon="chevronRight" label="Open" onPress={() => openDocument(doc)} disabled={busyId !== null} />
+                    <SmallButton icon="chevronDown" label="Save to phone" onPress={() => saveCopy(doc)} disabled={busyId !== null} />
                     <SmallButton icon="share" label="Share a copy" onPress={() => shareCopy(doc)} disabled={busyId !== null} />
                     <SmallButton icon="close" label="Delete" danger onPress={() => confirmDelete(doc)} disabled={busyId !== null} />
                   </View>
@@ -484,7 +535,7 @@ function Documents({ vehicle, previous, offerQuickUnlock }: { vehicle: GarageVeh
       </ScrollView>
 
       <AddDocument vehicle={vehicle} visible={adding} onClose={() => setAdding(false)} onAdded={load} />
-      <ImageViewer doc={viewing} onClose={() => setViewing(null)} />
+      <ImageViewer viewing={viewing} onClose={() => setViewing(null)} />
     </>
   );
 }
@@ -504,8 +555,8 @@ function SmallButton({ icon, label, danger, disabled, onPress }: { icon: IconNam
 
 // Photos open full screen here; they're never saved to the phone - held in
 // memory only, like receipts.
-function ImageViewer({ doc, onClose }: { doc: VaultDocument | null; onClose: () => void }) {
-  const { token } = useAuth();
+function ImageViewer({ viewing, onClose }: { viewing: { doc: VaultDocument; uri: string } | null; onClose: () => void }) {
+  const doc = viewing?.doc ?? null;
   return (
     <Modal visible={doc !== null} animationType="fade" onRequestClose={onClose}>
       <SafeAreaView style={styles.viewer} edges={['top', 'bottom']}>
@@ -517,13 +568,13 @@ function ImageViewer({ doc, onClose }: { doc: VaultDocument | null; onClose: () 
             <Icon name="close" size={26} color="#FFFFFF" />
           </Pressable>
         </View>
-        {doc ? (
+        {viewing ? (
           <Image
-            source={{ uri: `${API_BASE_URL}/api/vault/documents/${encodeURIComponent(doc.id)}/preview`, headers: vaultHeaders(token) }}
+            source={{ uri: viewing.uri }}
             cachePolicy="none"
             contentFit="contain"
             style={styles.flex}
-            alt={doc.label || doc.fileName}
+            alt={viewing.doc.label || viewing.doc.fileName}
           />
         ) : null}
       </SafeAreaView>

@@ -69,6 +69,9 @@ function EntryForm({ type, existing }: { type: TypedCategory; existing?: Entry }
   const [date, setDate] = useState(() => (existing ? fromIsoDay(existing.date) : new Date()));
   const [notes, setNotes] = useState(existing?.notes ?? '');
   const [remind, setRemind] = useState(true);
+  // Road tax is paid for 6 or 12 months at a time, so its reminder can be
+  // either; every other default stays as the website sets it.
+  const [roadTaxMonths, setRoadTaxMonths] = useState<6 | 12>(12);
   const [saving, setSaving] = useState(false);
   const [problem, setProblem] = useState<{ message: string; canOverride: boolean } | null>(null);
   const { mileage, setMileage, note: estimateNote } = useEstimatedMileage(selected, date, token, initial.mileage);
@@ -84,7 +87,9 @@ function EntryForm({ type, existing }: { type: TypedCategory; existing?: Entry }
   // replace the job's current reminder, even from an old entry).
   const reminderDefaults: Record<string, ReminderDefault> | null =
     !existing && options && 'reminderDefaults' in options ? (options as { reminderDefaults: Record<string, ReminderDefault> }).reminderDefaults : null;
-  const reminderDefault = kind && reminderDefaults ? reminderDefaults[kind] : undefined;
+  const defaultReminder = kind && reminderDefaults ? reminderDefaults[kind] : undefined;
+  const isRoadTax = kind === 'road-tax' && defaultReminder?.type === 'months';
+  const reminderDefault = defaultReminder && isRoadTax ? { ...defaultReminder, value: roadTaxMonths } : defaultReminder;
 
   const costN = parseNumber(cost);
   const mileageN = parseMileage(mileage);
@@ -222,6 +227,20 @@ function EntryForm({ type, existing }: { type: TypedCategory; existing?: Entry }
                 />
               </View>
             ) : null}
+            {isRoadTax && remind ? (
+              <View style={styles.periodRow} accessibilityRole="radiogroup" accessibilityLabel="Taxed for">
+                {([6, 12] as const).map((months) => (
+                  <Pressable
+                    key={months}
+                    onPress={() => setRoadTaxMonths(months)}
+                    accessibilityRole="radio"
+                    accessibilityState={{ selected: roadTaxMonths === months }}
+                    style={[styles.period, roadTaxMonths === months && styles.periodOn]}>
+                    <Text style={[styles.periodLabel, roadTaxMonths === months && styles.periodLabelOn]}>Taxed for {months} months</Text>
+                  </Pressable>
+                ))}
+              </View>
+            ) : null}
 
             <Field
               label="Notes (optional)"
@@ -337,6 +356,11 @@ const styles = StyleSheet.create({
     backgroundColor: Brand.paperRaised,
   },
   toggleTitle: { fontSize: 16, fontWeight: '600', color: Brand.ink },
+  periodRow: { flexDirection: 'row', gap: 8 },
+  period: { flex: 1, minHeight: 44, paddingHorizontal: 10, borderRadius: 12, borderWidth: 1.5, borderColor: Brand.line, backgroundColor: Brand.paperRaised, alignItems: 'center', justifyContent: 'center' },
+  periodOn: { borderColor: Brand.amber, backgroundColor: '#FBF4E8' },
+  periodLabel: { fontSize: 15, fontWeight: '600', color: Brand.ink },
+  periodLabelOn: { color: '#7A4508' },
   problem: { gap: 10, padding: 14, borderRadius: 12, backgroundColor: '#F8E6E3' },
   problemText: { fontSize: 15, lineHeight: 22, color: Brand.danger },
   override: { minHeight: 44, justifyContent: 'center' },

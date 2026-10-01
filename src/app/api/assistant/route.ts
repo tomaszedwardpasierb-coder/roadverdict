@@ -67,6 +67,12 @@ const MAX_MESSAGES = 20; // conversation-length guard, not a hard product limit
 const MAX_MESSAGE_LENGTH = 2000;
 const MAX_TOOL_ROUNDS = 4; // safety cap against a runaway tool-call loop
 
+// Features newer than the knowledge base, which lives in the database
+// (edited from /tomasz) - kept here so the assistant never denies a
+// feature that exists. Fold into the knowledge base when it's next edited.
+const CURRENT_FEATURE_FACTS =
+  "\n\n---\n\nCURRENT ROADVERDICT FEATURES (always true, whatever the knowledge base above says or leaves out): RoadVerdict has an MPG calculator - the public page roadverdict.co.uk/mpg-calculator works out any single tank from the distance and the litres, in UK mpg or litres per 100 km (with US mpg alongside), plus fuel cost per mile or per 100 km at a price per litre, offering this week's official UK average petrol and diesel prices. Signed in, the dashboard's Fuel tab has a Fuel economy card - the owner's real average from their own consecutive full-tank fill-ups, their last full tank, and fuel cost per mile at their last fill-up's price - with a 'Work out a tank' button opening the same calculator, started from that last tank. In the Android app it's under More, then Tools, then MPG calculator. The automatic average still needs two consecutive full-tank fill-ups logged; the calculator works out any tank straight away, without logging anything.";
+
 // Appended to the system instruction only when the attached photo or PDF
 // is actually included for the AI to read (see loadAttachmentForAi).
 const ATTACHMENT_READING_RULES =
@@ -663,7 +669,7 @@ export async function POST(req: NextRequest) {
   // this account uploaded or already has on a record (chatAttachment.ts).
   const attachmentForAi = attachment && signedIn && session ? await loadAttachmentForAi(session.email, attachment.blobName) : null;
 
-  const systemInstruction = buildSystemInstruction(config, signedIn, privacyPolicyText, !!reportToken, dashboardTabLabel, dashboardTabGroupLabel, compareVehicleNames, logEntryAccess, activeVehicleKind, displayName, carKnowledgeBase, vaultChatAccess, !!attachment, mpgCalculatorPage, mpgCalculatorContext, fromAndroidApp) + (attachmentForAi ? ATTACHMENT_READING_RULES : "");
+  const systemInstruction = buildSystemInstruction(config, signedIn, privacyPolicyText, !!reportToken, dashboardTabLabel, dashboardTabGroupLabel, compareVehicleNames, logEntryAccess, activeVehicleKind, displayName, carKnowledgeBase, vaultChatAccess, !!attachment, mpgCalculatorPage, mpgCalculatorContext, fromAndroidApp) + CURRENT_FEATURE_FACTS + (attachmentForAi ? ATTACHMENT_READING_RULES : "");
 
   const contents: GeminiContent[] = toGeminiContents(messages);
   if (attachmentForAi) {
