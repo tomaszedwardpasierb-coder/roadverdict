@@ -3,7 +3,6 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, t
 
 import { apiFetch, emailFromToken } from '@/lib/api';
 import { unregisterPush } from '@/lib/push';
-import { untrustThisPhone } from '@/lib/trusted-device';
 import { forgetVault } from '@/lib/vault';
 
 const TOKEN_KEY = 'rv.session';
@@ -65,10 +64,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signOut = useCallback(async () => {
     const current = token;
-    // Nothing of this account stays on the phone: the Vault locks, its
-    // fingerprint/PIN trust goes, and its notifications stop coming here.
+    // The Vault locks and this account's notifications stop coming here.
+    // The phone stays trusted for fingerprint/PIN, but only for this same
+    // account (see trusted-device.ts) - signing back in is quick, and
+    // anyone else signing in here starts from their own code.
     forgetVault();
-    await Promise.all([untrustThisPhone(current).catch(() => {}), unregisterPush(current).catch(() => {})]);
+    await unregisterPush(current).catch(() => {});
     await SecureStore.deleteItemAsync(TOKEN_KEY).catch(() => {});
     setToken(null);
     setStatus('signedOut');

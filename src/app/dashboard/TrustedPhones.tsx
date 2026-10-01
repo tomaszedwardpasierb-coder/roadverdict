@@ -32,7 +32,7 @@ export function TrustedPhones() {
   }, []);
 
   async function remove(phone: TrustedPhone) {
-    if (!confirm(`Stop "${phone.name}" opening the Vault with a fingerprint or PIN? It will need an authenticator code there instead.`)) return;
+    if (!confirm(`Stop "${phone.name}" using a fingerprint or PIN for the Vault and sign-in? It will need an authenticator code instead.`)) return;
     setRemoving(phone.id);
     setError(null);
     try {
@@ -52,7 +52,7 @@ export function TrustedPhones() {
     <div style={{ marginTop: '1.2rem' }}>
       <h3 className={styles.chartCardTitle}>Trusted phones</h3>
       <p className={styles.subtext} style={{ marginBottom: '0.6rem' }}>
-        These phones open the Vault with a fingerprint, face or phone PIN instead of an authenticator code. Remove one you’ve lost or sold.
+        These phones open the Vault and confirm app sign-ins with a fingerprint, face or phone PIN instead of an authenticator code. Remove one you’ve lost or sold.
       </p>
       <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
         {phones.map((phone) => (

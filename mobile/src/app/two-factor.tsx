@@ -1,13 +1,14 @@
 import { router, useLocalSearchParams } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { AuthScreen, ErrorMessage, PrimaryButton, TextButton, authInputStyle } from '@/components/auth-ui';
 import { CodeInput } from '@/components/code-input';
 import { Icon } from '@/components/icon';
 import { Brand } from '@/constants/brand';
-import { apiFetch } from '@/lib/api';
+import { apiFetch, emailFromToken } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
+import { isThisPhoneTrusted, signInWithThisPhone } from '@/lib/trusted-device';
 
 export default function TwoFactorScreen() {
   const { pendingToken } = useLocalSearchParams<{ pendingToken: string }>();
@@ -18,6 +19,41 @@ export default function TwoFactorScreen() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [expired, setExpired] = useState(false);
+  // A phone this account trusts confirms the sign-in with its fingerprint,
+  // face or PIN instead (see trusted-device.ts); the code stays one tap away.
+  const [phoneTrusted, setPhoneTrusted] = useState(false);
+  const [useCode, setUseCode] = useState(false);
+
+  async function confirmWithPhone() {
+    if (busy || !pendingToken) return;
+    setBusy(true);
+    setError(null);
+    const result = await signInWithThisPhone(pendingToken);
+    if (result.ok) {
+      await signIn(result.token);
+      return;
+    }
+    setBusy(false);
+    if (result.reason === 'not-trusted') setPhoneTrusted(false);
+    if (result.reason !== 'cancelled' && result.error) setError(result.error);
+    if (result.status === 401 && result.reason === 'error') setExpired(true);
+    setUseCode(true);
+  }
+
+  useEffect(() => {
+    if (!pendingToken) return;
+    let cancelled = false;
+    isThisPhoneTrusted(emailFromToken(pendingToken)).then((yes) => {
+      if (cancelled || !yes) return;
+      setPhoneTrusted(true);
+      confirmWithPhone();
+    });
+    return () => {
+      cancelled = true;
+    };
+    // Once, on arriving here.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingToken]);
 
   async function verify(value: string) {
     if (!value.trim() || busy) return;
@@ -37,6 +73,20 @@ export default function TwoFactorScreen() {
       return;
     }
     await signIn(result.data.token);
+  }
+
+  if (phoneTrusted && !useCode && !expired) {
+    return (
+      <AuthScreen title="One more step" subtitle="This phone is trusted - confirm it’s you with your fingerprint, face or phone PIN.">
+        <View style={styles.done} accessibilityRole="text">
+          <Icon name="check" size={18} color={Brand.amber} strokeWidth={2.6} />
+          <Text style={styles.doneText}>Email code accepted</Text>
+        </View>
+        <ErrorMessage message={error} />
+        <PrimaryButton label="Confirm it’s me" onPress={confirmWithPhone} busy={busy} />
+        <TextButton label="Use a code instead" onPress={() => setUseCode(true)} />
+      </AuthScreen>
+    );
   }
 
   return (

@@ -25,3 +25,8 @@ coverage/
 test-results/
 playwright-report/
 tsconfig.tsbuildinfo
+
+# The Android app's Firebase config: EAS builds read it from disk (it is not
+# in .easignore); kept out of this public repository anyway. Here rather
+# than in mobile/.gitignore, which is part of the app's native fingerprint.
+mobile/google-services.json

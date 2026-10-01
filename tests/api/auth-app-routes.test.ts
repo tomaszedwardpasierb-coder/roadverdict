@@ -18,6 +18,7 @@ const mocks = vi.hoisted(() => ({
   checkTotpRateLimit: vi.fn(),
   recordTotpAttempt: vi.fn(),
   createSessionForEmail: vi.fn(),
+  verifyTrustedDevice: vi.fn(),
 }));
 
 vi.mock("@/lib/tracker/userDoc", () => ({ isAccountBlocked: mocks.isAccountBlocked }));
@@ -43,6 +44,7 @@ vi.mock("@/lib/auth/twoFactor", () => ({
   recordTotpAttempt: mocks.recordTotpAttempt,
 }));
 vi.mock("@/lib/auth/session", () => ({ createSessionForEmail: mocks.createSessionForEmail }));
+vi.mock("@/lib/auth/trustedDevice", () => ({ verifyTrustedDevice: mocks.verifyTrustedDevice }));
 
 import { POST as requestCode } from "@/app/api/auth/app/request-code/route";
 import { POST as verifyCode } from "@/app/api/auth/app/verify-code/route";
@@ -188,6 +190,31 @@ describe("POST /api/auth/app/verify-2fa", () => {
     expect(mocks.verifyLoginCode).toHaveBeenCalledWith("rider@example.com", "123456");
     expect(mocks.consumePendingLogin).toHaveBeenCalledWith("rider@example.com", "pending-raw");
     expect(mocks.createSessionForEmail).toHaveBeenCalledWith("rider@example.com", "1.2.3.4", "unknown", { client: "app" });
+  });
+
+  it("accepts a trusted phone (after its fingerprint/PIN check) in place of the authenticator code", async () => {
+    mocks.verifyTrustedDevice.mockResolvedValue(true);
+    const res = await verify2fa(req(path, { pendingToken, deviceId: "dev-1", secret: "s3cret" }));
+    expect(res.status).toBe(200);
+    expect(mocks.verifyTrustedDevice).toHaveBeenCalledWith("rider@example.com", "dev-1", "s3cret");
+    expect(mocks.verifyLoginCode).not.toHaveBeenCalled();
+    expect(mocks.consumePendingLogin).toHaveBeenCalledWith("rider@example.com", "pending-raw");
+  });
+
+  it("refuses a phone that isn't trusted for this account, counting the attempt", async () => {
+    mocks.verifyTrustedDevice.mockResolvedValue(false);
+    const res = await verify2fa(req(path, { pendingToken, deviceId: "dev-1", secret: "wrong" }));
+    expect(res.status).toBe(401);
+    expect((await res.json()).code).toBe("device_not_trusted");
+    expect(mocks.recordTotpAttempt).toHaveBeenCalledWith("rider@example.com", "login");
+    expect(mocks.createSessionForEmail).not.toHaveBeenCalled();
+  });
+
+  it("still needs the emailed code first - no pending login, no phone check", async () => {
+    mocks.isPendingLoginValid.mockResolvedValue(false);
+    const res = await verify2fa(req(path, { pendingToken, deviceId: "dev-1", secret: "s3cret" }));
+    expect(res.status).toBe(401);
+    expect(mocks.verifyTrustedDevice).not.toHaveBeenCalled();
   });
 
   it("checks the pending login before looking at any code", async () => {

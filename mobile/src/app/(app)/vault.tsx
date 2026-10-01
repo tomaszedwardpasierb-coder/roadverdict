@@ -16,7 +16,7 @@ import { Icon, type IconName } from '@/components/icon';
 import { ProLock } from '@/components/pro-lock';
 import { Card, ErrorState, LoadingState } from '@/components/screen';
 import { Brand } from '@/constants/brand';
-import { API_BASE_URL, apiFetch } from '@/lib/api';
+import { API_BASE_URL, apiFetch, emailFromToken } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import {
   declineQuickUnlock,
@@ -167,7 +167,7 @@ function Unlock({ onUnlocked }: { onUnlocked: (previous: PreviousAccess | null, 
   // A trusted phone asks for the fingerprint, face or PIN straight away.
   useEffect(() => {
     let cancelled = false;
-    isThisPhoneTrusted().then((yes) => {
+    isThisPhoneTrusted(token ? emailFromToken(token) : null).then((yes) => {
       if (cancelled) return;
       setTrusted(yes);
       if (yes) openWithPhone();
@@ -294,8 +294,8 @@ function QuickUnlockOffer() {
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
 
   useEffect(() => {
-    shouldOfferQuickUnlock().then(setShow);
-  }, []);
+    shouldOfferQuickUnlock(token ? emailFromToken(token) : null).then(setShow);
+  }, [token]);
 
   if (message) return <Text style={message.ok ? styles.success : styles.error}>{message.text}</Text>;
   if (!show) return null;
@@ -307,7 +307,7 @@ function QuickUnlockOffer() {
     setShow(false);
     setMessage(
       result.ok
-        ? { ok: true, text: 'Done - next time, open the Vault with your fingerprint or PIN. You can stop this in Settings on the website.' }
+        ? { ok: true, text: 'Done - next time, open the Vault and sign in with your fingerprint or PIN. You can stop this in Settings on the website.' }
         : { ok: false, text: result.error }
     );
   }
@@ -316,7 +316,7 @@ function QuickUnlockOffer() {
     <Card style={styles.card}>
       <Text style={styles.cardTitle}>Open it with your fingerprint next time?</Text>
       <Text style={styles.text}>
-        Trust this phone and the Vault opens with your fingerprint, face or phone PIN instead of a code from your authenticator app.
+        Trust this phone and the Vault opens - and signing in is confirmed - with your fingerprint, face or phone PIN instead of a code from your authenticator app.
       </Text>
       <View style={styles.row}>
         <Pressable
