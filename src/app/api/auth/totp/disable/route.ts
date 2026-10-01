@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/session";
 import { disableTwoFactor, checkTotpRateLimit, recordTotpAttempt } from "@/lib/auth/twoFactor";
+import { removeAllTrustedDevices } from "@/lib/auth/trustedDevice";
 
 export const dynamic = "force-dynamic";
 
@@ -33,5 +34,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: result.error }, { status: 400 });
   }
 
+  // A phone trusted for the Vault rests on two-factor being on - without
+  // it, switching two-factor back on later would quietly revive old phones.
+  await removeAllTrustedDevices(session.email).catch((err) => console.error("Removing trusted phones failed:", err));
   return NextResponse.json({ ok: true });
 }

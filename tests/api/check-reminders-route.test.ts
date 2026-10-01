@@ -14,6 +14,7 @@ const mocks = vi.hoisted(() => ({
   getCarById: vi.fn(),
   sendReminderEmail: vi.fn(),
   createReminderNotification: vi.fn(),
+  sendPushToUser: vi.fn(),
   upsert: vi.fn(),
   isPro: vi.fn(),
 }));
@@ -46,6 +47,7 @@ vi.mock("@/lib/tracker/carReminder", () => ({
 vi.mock("@/lib/tracker/car", () => ({ getCarById: mocks.getCarById }));
 vi.mock("@/lib/resend", () => ({ sendReminderEmail: mocks.sendReminderEmail }));
 vi.mock("@/lib/tracker/notification", () => ({ createReminderNotification: mocks.createReminderNotification }));
+vi.mock("@/lib/push/sendPush", () => ({ sendPushToUser: mocks.sendPushToUser }));
 vi.mock("@/lib/cosmos", () => ({
   getContainer: () => ({ items: { upsert: mocks.upsert } }),
 }));
@@ -127,6 +129,7 @@ describe("POST /api/cron/check-reminders", () => {
     mocks.markCarReminderOverdueBellNotified.mockResolvedValue(undefined);
     mocks.sendReminderEmail.mockResolvedValue(undefined);
     mocks.createReminderNotification.mockResolvedValue(undefined);
+    mocks.sendPushToUser.mockResolvedValue(0);
     mocks.upsert.mockResolvedValue(undefined);
     mocks.getBike.mockResolvedValue(bike);
     mocks.getCarById.mockResolvedValue(car);
@@ -302,6 +305,16 @@ describe("POST /api/cron/check-reminders", () => {
       });
       expect(mocks.markReminderDueSoonBellNotified).toHaveBeenCalledWith("rider@example.com", "r6");
       expect(mocks.markReminderOverdueBellNotified).not.toHaveBeenCalled();
+    });
+
+    it("sends the same notice to the owner's phones, opening Reminders when tapped", async () => {
+      mocks.getAllReminders.mockResolvedValue([dueSoonDateReminder()]);
+      await POST(request({ authorization: "Bearer top-secret" }));
+      expect(mocks.sendPushToUser).toHaveBeenCalledWith("rider@example.com", {
+        title: "MOT",
+        body: expect.stringContaining("Due soon for"),
+        url: "/reminders",
+      });
     });
 
     it("names the vehicle by nickname when set, otherwise make/model", async () => {

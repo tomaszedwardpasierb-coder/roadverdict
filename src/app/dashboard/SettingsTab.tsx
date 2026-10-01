@@ -9,6 +9,7 @@
 import { useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { TwoFactorSettings } from './TwoFactorSettings';
+import { TrustedPhones } from './TrustedPhones';
 import { DeleteAccountModal } from './DeleteAccountModal';
 import styles from './dashboard.module.css';
 
@@ -268,6 +269,7 @@ export function SettingsTab({ email, displayName: initialDisplayName, hasAvatar:
         <h2 className={styles.chartCardTitle}>Security</h2>
         <p className={styles.subtext} style={{ marginBottom: '0.8rem' }}>Manage how you sign in to your account.</p>
         <TwoFactorSettings initiallyEnabled={initiallyEnabled} />
+        <TrustedPhones />
       </section>
 
       <hr className="ticket__divider" style={{ margin: '1.6rem 0' }} />

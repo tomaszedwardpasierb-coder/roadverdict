@@ -21,11 +21,21 @@ import { computeCarReminderStatus, carReminderDetailLabel } from "@/lib/tracker/
 import { getCarById } from "@/lib/tracker/car";
 import { sendReminderEmail } from "@/lib/resend";
 import { createReminderNotification } from "@/lib/tracker/notification";
+import { sendPushToUser } from "@/lib/push/sendPush";
 import { getContainer } from "@/lib/cosmos";
 import { isPro } from "@/lib/subscriptions";
 import { runInBatches } from "@/lib/concurrency";
 
 export const dynamic = "force-dynamic";
+
+// The dashboard bell, and the same thing as a push notification on any
+// phone the owner has the app signed in on - a tap opens Reminders. The
+// push is best-effort (sendPushToUser never throws), so a phone that can't
+// be reached never stops the bell or the rest of the run.
+async function notifyReminder(email: string, data: { title: string; body: string }): Promise<void> {
+  await createReminderNotification(email, data);
+  await sendPushToUser(email, { ...data, url: "/reminders" });
+}
 
 // How many reminders this checks/emails at once - was a plain sequential
 // for-loop (one reminder's read/notify/email/mark fully finished, Resend
@@ -71,7 +81,7 @@ async function checkReminder(reminder: ReminderDoc): Promise<ReminderCheckOutcom
     // dueSoonBellNotifiedAt/overdueBellNotifiedAt, so each only ever
     // fires once per reminder occurrence.
     if (status === "due-soon" && !reminder.dueSoonBellNotifiedAt) {
-      await createReminderNotification(email, {
+      await notifyReminder(email, {
         title: reminder.name,
         body: `Due soon for ${vehicleName} - ${reminderDetailLabel(reminder)}`,
       });
@@ -81,7 +91,7 @@ async function checkReminder(reminder: ReminderDoc): Promise<ReminderCheckOutcom
 
     if (status === "overdue") {
       if (!reminder.overdueBellNotifiedAt) {
-        await createReminderNotification(email, {
+        await notifyReminder(email, {
           title: reminder.name,
           body: `Overdue for ${vehicleName} - ${reminderDetailLabel(reminder)}`,
         });
@@ -129,7 +139,7 @@ async function checkCarReminder(reminder: CarReminderDoc): Promise<ReminderCheck
     const vehicleName = car.nickname || `${car.make} ${car.model}`;
 
     if (status === "due-soon" && !reminder.dueSoonBellNotifiedAt) {
-      await createReminderNotification(email, {
+      await notifyReminder(email, {
         title: reminder.name,
         body: `Due soon for ${vehicleName} - ${carReminderDetailLabel(reminder)}`,
       });
@@ -139,7 +149,7 @@ async function checkCarReminder(reminder: CarReminderDoc): Promise<ReminderCheck
 
     if (status === "overdue") {
       if (!reminder.overdueBellNotifiedAt) {
-        await createReminderNotification(email, {
+        await notifyReminder(email, {
           title: reminder.name,
           body: `Overdue for ${vehicleName} - ${carReminderDetailLabel(reminder)}`,
         });
