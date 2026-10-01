@@ -14,7 +14,10 @@ const mocks = vi.hoisted(() => ({
   lookupCountry: vi.fn(),
 }));
 
-vi.mock("@/lib/auth/session", () => ({ getSession: mocks.getSession }));
+vi.mock("@/lib/auth/session", () => ({
+  getSession: mocks.getSession,
+  parseBearerToken: (value: string | null | undefined) => (value && /^Bearer\s+\S+$/i.test(value.trim()) ? value.trim().split(/\s+/)[1] : null),
+}));
 vi.mock("@/lib/subscriptions", () => ({ isPro: mocks.isPro }));
 vi.mock("@/lib/auth/twoFactor", () => ({
   isTwoFactorEnabled: mocks.isTwoFactorEnabled,
@@ -109,5 +112,28 @@ describe("POST /api/vault/reauth", () => {
     expect(setCookie?.value).toBe("cookie-value");
 
     expect(mocks.recordVaultAccess).toHaveBeenCalledWith(EMAIL, { browser: "Chrome", country: "United Kingdom" });
+  });
+
+  it("gives the Android app its unlock token (it has no cookie jar), recorded as the app", async () => {
+    const res = await POST(req({ code: "123456" }, { authorization: "Bearer app-session-token", "user-agent": "okhttp/4.12.0" }));
+    expect(res.status).toBe(200);
+    const data = await res.json();
+    expect(data.vaultToken).toBe("cookie-value");
+    expect(data.expiresInSeconds).toBe(600);
+    expect(mocks.recordVaultAccess).toHaveBeenCalledWith(EMAIL, expect.objectContaining({ browser: "RoadVerdict Android app" }));
+  });
+
+  it("never puts the unlock token in the website's reply - its cookie stays out of the page's reach", async () => {
+    const res = await POST(req({ code: "123456" }));
+    const data = await res.json();
+    expect(data.vaultToken).toBeUndefined();
+    expect(res.cookies.get("vault_session")?.value).toBe("cookie-value");
+  });
+
+  it("gives the app nothing when the code is wrong", async () => {
+    mocks.verifyLoginCode.mockResolvedValue(false);
+    const res = await POST(req({ code: "000000" }, { authorization: "Bearer app-session-token" }));
+    expect(res.status).toBe(401);
+    expect((await res.json()).vaultToken).toBeUndefined();
   });
 });

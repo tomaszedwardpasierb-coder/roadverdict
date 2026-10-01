@@ -28,6 +28,12 @@ const VAULT_SESSION_TTL_MS = 10 * 60 * 1000;
 export const VAULT_SESSION_COOKIE_NAME = "vault_session";
 export const VAULT_SESSION_MAX_AGE_SECONDS = Math.ceil(VAULT_SESSION_TTL_MS / 1000);
 
+// The Android app has no cookie jar: /api/vault/reauth hands it the same
+// value it would have set as the cookie, and the app sends it back in this
+// header. Read only when the cookie is absent, so nothing about how the
+// website unlocks changes - and it's checked exactly like the cookie.
+export const APP_VAULT_HEADER = "x-rv-vault";
+
 export async function createVaultSession(email: string): Promise<{ cookieValue: string; maxAge: number }> {
   const container = getContainer();
   const { raw, hash } = generateToken();
@@ -90,7 +96,7 @@ export async function clearVaultSession(email: string, raw: string): Promise<voi
 // session) rather than a bare boolean, so callers don't have to
 // re-parse the cookie a second time.
 export async function resolveVaultUnlock(request: NextRequest, email: string): Promise<string | null> {
-  const cookieValue = request.cookies.get(VAULT_SESSION_COOKIE_NAME)?.value;
+  const cookieValue = request.cookies.get(VAULT_SESSION_COOKIE_NAME)?.value ?? request.headers.get(APP_VAULT_HEADER) ?? undefined;
   if (!cookieValue) return null;
   const [encodedEmail, raw] = cookieValue.split(".");
   if (!encodedEmail || !raw) return null;

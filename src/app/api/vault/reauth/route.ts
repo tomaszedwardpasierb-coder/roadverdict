@@ -6,7 +6,7 @@
 // UI already gated on, since a route must never trust that the client
 // only got here through the "correct" screen.
 import { NextRequest, NextResponse } from "next/server";
-import { getSession } from "@/lib/auth/session";
+import { getSession, parseBearerToken } from "@/lib/auth/session";
 import { isPro } from "@/lib/subscriptions";
 import { isTwoFactorEnabled, verifyLoginCode, checkTotpRateLimit, recordTotpAttempt } from "@/lib/auth/twoFactor";
 import { createVaultSession, VAULT_SESSION_COOKIE_NAME } from "@/lib/tracker/vaultSession";
@@ -53,7 +53,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Incorrect code." }, { status: 401 });
   }
 
-  const browser = detectBrowser(request.headers.get("user-agent") ?? "");
+  // Only the Android app signs its requests with a bearer token - the
+  // website uses its session cookie - so this is how the app is told apart.
+  const fromApp = parseBearerToken(request.headers.get("authorization")) !== null;
+  const browser = fromApp ? "RoadVerdict Android app" : detectBrowser(request.headers.get("user-agent") ?? "");
   const country = await lookupCountry(getClientIp(request));
 
   const [{ cookieValue, maxAge }, previousAccess] = await Promise.all([
@@ -61,7 +64,10 @@ export async function POST(request: NextRequest) {
     recordVaultAccess(session.email, { browser, country }),
   ]);
 
-  const response = NextResponse.json({ ok: true, previousAccess });
+  // The app has no cookie jar, so it gets the unlock token itself, to send
+  // back in the X-RV-Vault header (see vaultSession.ts). The website never
+  // does - its cookie stays httpOnly, out of reach of the page's scripts.
+  const response = NextResponse.json(fromApp ? { ok: true, previousAccess, vaultToken: cookieValue, expiresInSeconds: maxAge } : { ok: true, previousAccess });
   response.cookies.set(VAULT_SESSION_COOKIE_NAME, cookieValue, {
     httpOnly: true,
     secure: true,

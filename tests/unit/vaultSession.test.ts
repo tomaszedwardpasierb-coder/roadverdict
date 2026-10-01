@@ -125,8 +125,11 @@ describe("clearVaultSession", () => {
   });
 });
 
-function fakeRequest(cookieValue: string | undefined): NextRequest {
-  return { cookies: { get: () => (cookieValue !== undefined ? { value: cookieValue } : undefined) } } as unknown as NextRequest;
+function fakeRequest(cookieValue: string | undefined, appHeader?: string): NextRequest {
+  return {
+    cookies: { get: () => (cookieValue !== undefined ? { value: cookieValue } : undefined) },
+    headers: { get: (name: string) => (name === "x-rv-vault" && appHeader !== undefined ? appHeader : null) },
+  } as unknown as NextRequest;
 }
 
 describe("resolveVaultUnlock", () => {
@@ -157,5 +160,31 @@ describe("resolveVaultUnlock", () => {
 
   it("does not throw on cookie name reference (sanity check for the constant)", () => {
     expect(VAULT_SESSION_COOKIE_NAME).toBe("vault_session");
+  });
+});
+
+describe("resolveVaultUnlock for the Android app (X-RV-Vault header)", () => {
+  it("accepts the unlock token in the header when there's no cookie", async () => {
+    resetMocks();
+    mocks.read.mockResolvedValue({ resource: { type: "vaultSession", expiresAt: new Date(Date.now() + 60_000).toISOString() } });
+    expect(await resolveVaultUnlock(fakeRequest(undefined, `${encodeEmail(EMAIL)}.apptoken`), EMAIL)).toBe("apptoken");
+  });
+
+  it("checks the header exactly like the cookie - someone else's token is refused", async () => {
+    resetMocks();
+    mocks.read.mockResolvedValue({ resource: { type: "vaultSession", expiresAt: new Date(Date.now() + 60_000).toISOString() } });
+    expect(await resolveVaultUnlock(fakeRequest(undefined, `${encodeEmail("someone-else@example.com")}.apptoken`), EMAIL)).toBeNull();
+  });
+
+  it("refuses an expired token in the header", async () => {
+    resetMocks();
+    mocks.read.mockResolvedValue({ resource: { type: "vaultSession", expiresAt: new Date(Date.now() - 1_000).toISOString() } });
+    expect(await resolveVaultUnlock(fakeRequest(undefined, `${encodeEmail(EMAIL)}.apptoken`), EMAIL)).toBeNull();
+  });
+
+  it("uses the website's cookie, not the header, when both are present", async () => {
+    resetMocks();
+    mocks.read.mockResolvedValue({ resource: { type: "vaultSession", expiresAt: new Date(Date.now() + 60_000).toISOString() } });
+    expect(await resolveVaultUnlock(fakeRequest(`${encodeEmail(EMAIL)}.cookietoken`, `${encodeEmail(EMAIL)}.apptoken`), EMAIL)).toBe("cookietoken");
   });
 });

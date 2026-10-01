@@ -4,11 +4,13 @@ const mocks = vi.hoisted(() => ({
   getSession: vi.fn(),
   getUserDoc: vi.fn(),
   isTwoFactorEnabled: vi.fn(),
+  isPro: vi.fn(),
 }));
 
 vi.mock("@/lib/auth/session", () => ({ getSession: mocks.getSession }));
 vi.mock("@/lib/tracker/userDoc", () => ({ getUserDoc: mocks.getUserDoc }));
 vi.mock("@/lib/auth/twoFactor", () => ({ isTwoFactorEnabled: mocks.isTwoFactorEnabled }));
+vi.mock("@/lib/subscriptions", () => ({ isPro: mocks.isPro }));
 
 import { GET } from "@/app/api/app/account/route";
 
@@ -16,6 +18,7 @@ beforeEach(() => {
   Object.values(mocks).forEach((m) => m.mockReset());
   mocks.getSession.mockResolvedValue({ email: "rider@example.com" });
   mocks.isTwoFactorEnabled.mockResolvedValue(false);
+  mocks.isPro.mockResolvedValue(false);
 });
 
 describe("GET /api/app/account", () => {
@@ -32,14 +35,14 @@ describe("GET /api/app/account", () => {
     const res = await GET();
     expect(res.status).toBe(200);
     expect(res.headers.get("cache-control")).toBe("private, no-store");
-    expect(await res.json()).toEqual({ email: "rider@example.com", displayName: "Alex", twoFactorEnabled: true, pendingDeletion: null });
+    expect(await res.json()).toEqual({ email: "rider@example.com", displayName: "Alex", twoFactorEnabled: true, isPro: false, pendingDeletion: null });
     expect(mocks.getUserDoc).toHaveBeenCalledWith("rider@example.com");
     expect(mocks.isTwoFactorEnabled).toHaveBeenCalledWith("rider@example.com");
   });
 
   it("works for an account with no user document yet", async () => {
     mocks.getUserDoc.mockResolvedValue(null);
-    expect(await (await GET()).json()).toEqual({ email: "rider@example.com", displayName: "", twoFactorEnabled: false, pendingDeletion: null });
+    expect(await (await GET()).json()).toEqual({ email: "rider@example.com", displayName: "", twoFactorEnabled: false, isPro: false, pendingDeletion: null });
   });
 
   it("says when a requested deletion will happen", async () => {
@@ -48,5 +51,13 @@ describe("GET /api/app/account", () => {
     const { pendingDeletion } = await (await GET()).json();
     expect(pendingDeletion.daysRemaining).toBe(10);
     expect(pendingDeletion.deleteAfterLabel).toMatch(/\d{1,2} \w+ \d{4}/);
+  });
+
+  it("says whether the account is Pro, and treats a failed check as not Pro", async () => {
+    mocks.getUserDoc.mockResolvedValue({});
+    mocks.isPro.mockResolvedValue(true);
+    expect((await (await GET()).json()).isPro).toBe(true);
+    mocks.isPro.mockRejectedValue(new Error("Stripe down"));
+    expect((await (await GET()).json()).isPro).toBe(false);
   });
 });
