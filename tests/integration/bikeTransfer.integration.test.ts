@@ -17,8 +17,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 // here is proving transferBike's own cap check queries the recipient's
 // real documents correctly, not re-litigating isPro() itself (already
 // covered in tests/unit/bikeTransfer.test.ts, mocked the same way).
-const mocks = vi.hoisted(() => ({ getVehicleLimit: vi.fn(async () => 1) }));
-vi.mock("@/lib/subscriptions", () => ({ getVehicleLimit: mocks.getVehicleLimit }));
+// createBike() still checks isPro() for its own bike-only cap; the
+// transfer's combined cap reads getVehicleLimit().
+const mocks = vi.hoisted(() => ({ isPro: vi.fn(async () => false), getVehicleLimit: vi.fn(async () => 1) }));
+vi.mock("@/lib/subscriptions", () => ({ isPro: mocks.isPro, getVehicleLimit: mocks.getVehicleLimit }));
 
 import { transferBike } from "@/lib/tracker/bikeTransfer";
 import { createBike, getBike } from "@/lib/tracker/bike";
@@ -47,6 +49,7 @@ describe("bikeTransfer.ts against a real Cosmos container (emulator)", () => {
 
   beforeEach(() => {
     pks = [];
+    mocks.isPro.mockReset().mockResolvedValue(false);
     mocks.getVehicleLimit.mockReset().mockResolvedValue(1);
   });
 
