@@ -2,7 +2,7 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { getSession } from "@/lib/auth/session";
-import { isPro } from "@/lib/subscriptions";
+import { isPro, getVehicleLimit } from "@/lib/subscriptions";
 import { getBikesForUser, getCurrentRegistration, countActiveBikes, isBikeReadOnly } from "@/lib/tracker/bike";
 import { getCarsForUser, getCurrentRegistration as getCarCurrentRegistration, countActiveCars, isCarReadOnly } from "@/lib/tracker/car";
 import { resolveActiveVehicle } from "@/lib/tracker/activeVehicle";
@@ -13,12 +13,19 @@ import styles from "./garage.module.css";
 import { BikeCard } from "./BikeCard";
 import { CarCard } from "./CarCard";
 import { AddAnotherVehicleSection } from "./AddAnotherVehicleSection";
+import { AddExtraVehicleButton, ExtraVehiclesSummary } from "./ExtraVehicles";
+import { getExtraVehiclesStatus, selfHealExtraVehicles } from "@/lib/payments/extraVehicles";
 
 export const dynamic = "force-dynamic";
 
-export default async function GaragePage() {
+export default async function GaragePage(props: { searchParams: Promise<{ session_id?: string }> }) {
   const session = await getSession();
   if (!session) redirect("/login");
+
+  // Back from buying an extra vehicle, possibly before Stripe's webhook
+  // has landed - see selfHealExtraVehicles.
+  const { session_id: checkoutSessionId } = await props.searchParams;
+  if (checkoutSessionId) await selfHealExtraVehicles(session.email, checkoutSessionId);
 
   const [bikes, cars, activeVehicle] = await Promise.all([
     getBikesForUser(session.email),
@@ -30,7 +37,7 @@ export default async function GaragePage() {
   // dashboard page, no need to duplicate it here.
   if (bikes.length === 0 && cars.length === 0) redirect("/dashboard");
 
-  const userIsPro = await isPro(session.email);
+  const [userIsPro, vehicleLimit, extraVehicles] = await Promise.all([isPro(session.email), getVehicleLimit(session.email), getExtraVehiclesStatus(session.email)]);
   const activeBikeCount = countActiveBikes(bikes);
   const activeCarCount = countActiveCars(cars);
   const vehicleCount = activeBikeCount + activeCarCount;
@@ -45,8 +52,8 @@ export default async function GaragePage() {
 
       <h1 className={dashboardStyles.heading}>Your garage</h1>
       <p className={dashboardStyles.subtext} style={{ marginBottom: "1.3rem" }}>
-        {userIsPro
-          ? `${vehicleCount} vehicle${vehicleCount === 1 ? "" : "s"} tracked - no limit on Pro.`
+        {vehicleLimit > MAX_FREE_VEHICLES
+          ? `${vehicleCount} of ${vehicleLimit} vehicles used.`
           : `${vehicleCount} of ${MAX_FREE_VEHICLES} free vehicles used.`}
       </p>
 
@@ -91,7 +98,11 @@ export default async function GaragePage() {
         ))}
       </div>
 
-      <AddAnotherVehicleSection vehicleCount={vehicleCount} maxFreeVehicles={MAX_FREE_VEHICLES} isPro={userIsPro} key={`${bikes.length}-${cars.length}`} />
+      <AddAnotherVehicleSection vehicleCount={vehicleCount} maxFreeVehicles={MAX_FREE_VEHICLES} isPro={userIsPro} limit={vehicleLimit}
+        fullAction={extraVehicles.canAdd ? <AddExtraVehicleButton paid={extraVehicles.paid} /> : null}
+        key={`${bikes.length}-${cars.length}`}
+      />
+      {extraVehicles.paid > 0 ? <ExtraVehiclesSummary paid={extraVehicles.paid} /> : null}
     </main>
   );
 }

@@ -11,6 +11,7 @@ import { getAttachmentContainer } from "@/lib/blobStorage";
 import { getUserDoc, type UserDoc, type OnboardingStep } from "@/lib/tracker/userDoc";
 import { getBikesForUser, deleteBike } from "@/lib/tracker/bike";
 import { getCarsForUser, deleteCar } from "@/lib/tracker/car";
+import { MAX_GRANTED_VEHICLES } from "@/lib/tracker/vehicleLimit";
 
 export const MAX_GRANT_YEARS = 3;
 
@@ -88,6 +89,22 @@ export async function revokePremium(email: string): Promise<void> {
   const user = await getUserDoc(email);
   if (!user) throw new Error(`No account found for ${email}.`);
   delete user.plan;
+  await container.items.upsert(user);
+}
+
+// The admin's per-account vehicle allowance (see UserDoc.vehicleAllowance).
+// null clears it, back to the plan's own cap. Anything else must be a
+// whole number from 2 to MAX_GRANTED_VEHICLES - 1 is already every plan's
+// floor, so it would change nothing.
+export async function setVehicleAllowance(email: string, allowance: number | null): Promise<void> {
+  if (allowance !== null && (!Number.isInteger(allowance) || allowance < 2 || allowance > MAX_GRANTED_VEHICLES)) {
+    throw new Error(`The allowance must be a whole number from 2 to ${MAX_GRANTED_VEHICLES}.`);
+  }
+  const container = getContainer();
+  const user = await getUserDoc(email);
+  if (!user) throw new Error(`No account found for ${email}.`);
+  if (allowance === null) delete user.vehicleAllowance;
+  else user.vehicleAllowance = allowance;
   await container.items.upsert(user);
 }
 

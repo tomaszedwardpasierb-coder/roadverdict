@@ -16,6 +16,7 @@ const mocks = vi.hoisted(() => ({
   },
   getExchangeRates: vi.fn(),
   getProStatus: vi.fn(),
+  getVehicleLimit: vi.fn(),
 }));
 
 vi.mock("@/lib/tracker/bike", () => ({
@@ -55,7 +56,7 @@ vi.mock("@/lib/tracker/carFine", () => ({ getCarFines: mocks.car.fines }));
 vi.mock("@/lib/tracker/carToll", () => ({ getCarTolls: mocks.car.tolls }));
 vi.mock("@/lib/tracker/carReminder", () => ({ getCarReminders: mocks.car.reminders }));
 vi.mock("@/lib/tracker/currencyRates", () => ({ getExchangeRates: mocks.getExchangeRates }));
-vi.mock("@/lib/subscriptions", () => ({ getProStatus: mocks.getProStatus }));
+vi.mock("@/lib/subscriptions", () => ({ getProStatus: mocks.getProStatus, getVehicleLimit: mocks.getVehicleLimit }));
 
 import { getEntryDetail, getHomeData, getGarage, getLogbook, getMileageEstimate, getReminderList } from "@/lib/app/homeData";
 
@@ -77,6 +78,7 @@ beforeEach(() => {
   mocks.materializeAllDueForCar.mockReset().mockResolvedValue(undefined);
   mocks.getExchangeRates.mockReset().mockResolvedValue(null);
   mocks.getProStatus.mockReset().mockResolvedValue({ isPro: false });
+  mocks.getVehicleLimit.mockReset().mockResolvedValue(1);
 });
 
 describe("getHomeData", () => {
@@ -192,8 +194,8 @@ describe("getGarage", () => {
     expect((await getGarage(email)).vehicleLimit).toEqual({ limit: 1, active: 1 });
   });
 
-  it("gives Pro its higher limit", async () => {
-    mocks.getProStatus.mockResolvedValue({ isPro: true });
+  it("gives the account's own limit - Pro's, or one raised from /tomasz", async () => {
+    mocks.getVehicleLimit.mockResolvedValue(2);
     mocks.getBikesForUser.mockResolvedValue([bike]);
     mocks.getCarsForUser.mockResolvedValue([{ id: "car-1", make: "BMW", model: "i4", currentMileage: 100 }]);
     mocks.resolveActiveVehicle.mockResolvedValue(null);

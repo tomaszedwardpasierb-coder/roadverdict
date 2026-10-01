@@ -28,7 +28,7 @@ const mocks = vi.hoisted(() => ({
   computeCarSellerReportRowsAndMetrics: vi.fn(),
   computeSellerVerdict: vi.fn(),
   upsert: vi.fn(),
-  isPro: vi.fn(),
+  getVehicleLimit: vi.fn(),
 }));
 
 vi.mock("@/lib/cosmos", () => ({
@@ -46,7 +46,7 @@ vi.mock("@/lib/tracker/bike", () => ({
   getBikesForUser: mocks.getBikesForUser,
   countActiveBikes: mocks.countActiveBikes,
 }));
-vi.mock("@/lib/tracker/vehicleLimit", () => ({ MAX_FREE_VEHICLES: 1, MAX_PRO_VEHICLES: 2 }));
+vi.mock("@/lib/tracker/vehicleLimit", () => ({ MAX_FREE_VEHICLES: 1, MAX_PRO_VEHICLES: 2, MAX_GRANTED_VEHICLES: 4 }));
 vi.mock("@/lib/tracker/reportAccess", () => ({ normalizePlate: mocks.normalizePlate }));
 vi.mock("@/lib/tracker/carReportAccess", () => ({ allKnownCarPlates: mocks.allKnownCarPlates }));
 vi.mock("@/lib/tracker/carServiceRecord", () => ({ getCarServiceRecords: mocks.getCarServiceRecords }));
@@ -66,7 +66,7 @@ vi.mock("@/lib/tracker/carSellerReportData", () => ({
 vi.mock("@/lib/tracker/sellerReportVerdict", () => ({
   computeSellerVerdict: mocks.computeSellerVerdict,
 }));
-vi.mock("@/lib/subscriptions", () => ({ isPro: mocks.isPro }));
+vi.mock("@/lib/subscriptions", () => ({ getVehicleLimit: mocks.getVehicleLimit }));
 
 import { transferCar } from "@/lib/tracker/carTransfer";
 
@@ -96,6 +96,7 @@ const oldCar = {
 
 beforeEach(() => {
   Object.values(mocks).forEach((m) => m.mockReset());
+  mocks.getVehicleLimit.mockResolvedValue(1); // the free plan's cap
   mocks.getCarById.mockResolvedValue({ ...oldCar });
   mocks.getCarsForUser.mockResolvedValue([]);
   mocks.getBikesForUser.mockResolvedValue([]);
@@ -214,14 +215,14 @@ describe("transferCar", () => {
 
   it("lets a transfer through past the recipient's free cap when the recipient is Pro but still under Pro's own cap", async () => {
     mocks.countActiveCars.mockReturnValue(1); // MAX_FREE_VEHICLES = 1, MAX_PRO_VEHICLES = 2
-    mocks.isPro.mockResolvedValue(true);
+    mocks.getVehicleLimit.mockResolvedValue(2);
     const result = await transferCar(fromEmail, carId, toEmail, false);
     expect(result.ok).toBe(true);
   });
 
   it("still blocks a transfer once the recipient is Pro but already at Pro's own cap", async () => {
     mocks.countActiveCars.mockReturnValue(2); // MAX_PRO_VEHICLES = 2
-    mocks.isPro.mockResolvedValue(true);
+    mocks.getVehicleLimit.mockResolvedValue(2);
     const result = await transferCar(fromEmail, carId, toEmail, false);
     expect(result).toMatchObject({ ok: false, reason: "recipient_limit_reached", limit: 2 });
   });

@@ -17,8 +17,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 // here is proving transferBike's own cap check queries the recipient's
 // real documents correctly, not re-litigating isPro() itself (already
 // covered in tests/unit/bikeTransfer.test.ts, mocked the same way).
-const mocks = vi.hoisted(() => ({ isPro: vi.fn(async () => false) }));
-vi.mock("@/lib/subscriptions", () => ({ isPro: mocks.isPro }));
+const mocks = vi.hoisted(() => ({ getVehicleLimit: vi.fn(async () => 1) }));
+vi.mock("@/lib/subscriptions", () => ({ getVehicleLimit: mocks.getVehicleLimit }));
 
 import { transferBike } from "@/lib/tracker/bikeTransfer";
 import { createBike, getBike } from "@/lib/tracker/bike";
@@ -47,7 +47,7 @@ describe("bikeTransfer.ts against a real Cosmos container (emulator)", () => {
 
   beforeEach(() => {
     pks = [];
-    mocks.isPro.mockReset().mockResolvedValue(false);
+    mocks.getVehicleLimit.mockReset().mockResolvedValue(1);
   });
 
   afterEach(async () => {
@@ -169,7 +169,7 @@ describe("bikeTransfer.ts against a real Cosmos container (emulator)", () => {
       await createBike(toEmail, newBikeData({ registration: `PROCAP${i}-${Date.now()}` }));
     }
 
-    mocks.isPro.mockResolvedValue(true);
+    mocks.getVehicleLimit.mockResolvedValue(2);
     const result = await transferBike(fromEmail, bike.id, toEmail, false);
     expect(result.ok).toBe(true);
   });

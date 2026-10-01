@@ -7,7 +7,7 @@
 // the kind-picker step in front of them.
 'use client';
 
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { AddBikeForm } from '@/app/dashboard/AddBikeForm';
 import { AddCarForm } from '@/app/dashboard/AddCarForm';
 import styles from './garage.module.css';
@@ -18,12 +18,29 @@ interface Props {
   vehicleCount: number;
   maxFreeVehicles: number;
   isPro?: boolean;
+  // The account's real cap (plan plus any allowance set from /tomasz).
+  // Without it a Pro account is never shown as full here - the server
+  // still refuses the add either way.
+  limit?: number;
+  // Shown under the "garage full" notice - e.g. the button that buys
+  // another vehicle (ExtraVehicles.tsx).
+  fullAction?: ReactNode;
 }
 
-export function AddAnotherVehicleSection({ vehicleCount, maxFreeVehicles, isPro = false }: Props) {
+export function AddAnotherVehicleSection({ vehicleCount, maxFreeVehicles, isPro = false, limit, fullAction }: Props) {
   const [kind, setKind] = useState<Kind | null>(null);
   const [asking, setAsking] = useState(false);
-  const atCap = !isPro && vehicleCount >= maxFreeVehicles;
+  const raised = limit !== undefined && limit > maxFreeVehicles;
+  const atCap = limit !== undefined ? vehicleCount >= limit : !isPro && vehicleCount >= maxFreeVehicles;
+
+  if (atCap && (isPro || raised)) {
+    return (
+      <div className={styles.capNotice}>
+        Your account can track {limit} vehicles at a time - bikes and cars together. Vehicles you&apos;ve transferred to a new owner don&apos;t count.
+        {fullAction}
+      </div>
+    );
+  }
 
   if (atCap) {
     return (

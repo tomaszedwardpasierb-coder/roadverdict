@@ -28,6 +28,14 @@ import {
   applyProSubscriptionRenewed,
   applyProSubscriptionCancelled,
 } from "@/lib/payments/proSubscription";
+import {
+  EXTRA_VEHICLES_KIND,
+  isExtraVehiclesSubscription,
+  applyExtraVehiclesFromCheckoutSession,
+  applyExtraVehiclesUpdated,
+  applyExtraVehiclesCancelled,
+  followProSubscription,
+} from "@/lib/payments/extraVehicles";
 import type { VehicleKind } from "@/lib/tracker/vdiUnlock";
 
 export const dynamic = "force-dynamic";
@@ -53,6 +61,8 @@ export async function POST(request: NextRequest) {
     const session = event.data.object as Stripe.Checkout.Session;
     if (session.metadata?.kind === "pro_subscription") {
       await applyProSubscriptionFromCheckoutSession(session);
+    } else if (session.metadata?.kind === EXTRA_VEHICLES_KIND) {
+      await applyExtraVehiclesFromCheckoutSession(session);
     } else {
       const vehicleKind = session.metadata?.vehicleKind as VehicleKind | undefined;
       const token = session.metadata?.token;
@@ -69,10 +79,18 @@ export async function POST(request: NextRequest) {
         }
       }
     }
-  } else if (event.type === "customer.subscription.updated") {
-    await applyProSubscriptionRenewed(event.data.object as Stripe.Subscription);
-  } else if (event.type === "customer.subscription.deleted") {
-    await applyProSubscriptionCancelled(event.data.object as Stripe.Subscription);
+  } else if (event.type === "customer.subscription.updated" || event.type === "customer.subscription.deleted") {
+    // Two kinds of subscription share these events: Pro itself, and the
+    // extra vehicles bought on top of it (extraVehicles.ts) - an extra
+    // vehicles event must never touch the account's Pro plan.
+    const subscription = event.data.object as Stripe.Subscription;
+    const deleted = event.type === "customer.subscription.deleted";
+    if (isExtraVehiclesSubscription(subscription)) {
+      await (deleted ? applyExtraVehiclesCancelled(subscription) : applyExtraVehiclesUpdated(subscription));
+    } else {
+      await (deleted ? applyProSubscriptionCancelled(subscription) : applyProSubscriptionRenewed(subscription));
+      await followProSubscription(subscription, deleted);
+    }
   }
 
   return NextResponse.json({ received: true });

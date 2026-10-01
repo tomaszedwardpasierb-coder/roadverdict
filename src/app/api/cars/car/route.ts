@@ -23,8 +23,8 @@ import {
   type CarFuelType,
 } from "@/lib/tracker/car";
 import { getBikesForUser, countActiveBikes, type ChartKind } from "@/lib/tracker/bike";
-import { isPro } from "@/lib/subscriptions";
-import { MAX_FREE_VEHICLES, MAX_PRO_VEHICLES } from "@/lib/tracker/vehicleLimit";
+import { getVehicleLimit } from "@/lib/subscriptions";
+import { MAX_FREE_VEHICLES } from "@/lib/tracker/vehicleLimit";
 import { fetchDvlaDataFromVdg } from "@/lib/tracker/dvlaDataFetch";
 import { fetchVehicleTaxDetailsFromVdg } from "@/lib/tracker/vehicleTaxFetch";
 import { syncCarSornReminder } from "@/lib/tracker/carReminder";
@@ -88,8 +88,8 @@ export async function POST(request: NextRequest) {
   // at the route layer rather than inside car.ts, and for why Pro gets
   // its own higher (not unlimited) cap.
   {
-    const userIsPro = await isPro(session.email);
-    const limit = userIsPro ? MAX_PRO_VEHICLES : MAX_FREE_VEHICLES;
+    // The plan's cap, lifted by any allowance set from /tomasz.
+    const limit = await getVehicleLimit(session.email);
     const [existingBikes, existingCars] = await Promise.all([
       getBikesForUser(session.email),
       getCarsForUser(session.email),
@@ -98,8 +98,8 @@ export async function POST(request: NextRequest) {
     if (combinedCount >= limit) {
       return NextResponse.json(
         {
-          error: userIsPro
-            ? `Pro accounts can track up to ${limit} vehicles total (bikes and cars combined).`
+          error: limit > MAX_FREE_VEHICLES
+            ? `Your account can track up to ${limit} vehicles total (bikes and cars combined).`
             : `Free accounts can track up to ${limit} vehicle${limit === 1 ? "" : "s"} total (bikes and cars combined). Upgrade to add more.`,
           reason: "limit_reached",
         },

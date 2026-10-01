@@ -52,11 +52,10 @@ import { convertGbpToDisplay, formatCurrency, CURRENCY_SYMBOLS, type Currency, t
 import type { Attachment } from "@/lib/tracker/cosmosHelpers";
 import { getExchangeRates } from "@/lib/tracker/currencyRates";
 import { convertMilesToDisplay, KM_PER_MILE, type DistanceUnit, type FuelEconomyUnit } from "@/lib/tracker/unitFormat";
-import { getProStatus } from "@/lib/subscriptions";
+import { getProStatus, getVehicleLimit } from "@/lib/subscriptions";
 import { gatherMileagePoints } from "@/lib/tracker/summary";
 import { gatherCarMileagePoints } from "@/lib/tracker/carSummary";
 import { estimateMileage } from "@/lib/tracker/mileageEstimate";
-import { MAX_FREE_VEHICLES, MAX_PRO_VEHICLES } from "@/lib/tracker/vehicleLimit";
 
 // What the app needs to enter new records the way the web's own forms
 // do: every cost is stored in GBP and every distance in miles, so the
@@ -193,7 +192,7 @@ export type Garage = {
 };
 
 export async function getGarage(email: string): Promise<Garage> {
-  const [bikes, cars, rates, pro] = await Promise.all([getBikesForUser(email), getCarsForUser(email), getExchangeRates(), getProStatus(email)]);
+  const [bikes, cars, rates, limit] = await Promise.all([getBikesForUser(email), getCarsForUser(email), getExchangeRates(), getVehicleLimit(email)]);
   // Same choice the web dashboard would make for a first visit (no
   // cookies): the app only uses this until the person picks a vehicle
   // themselves, which it then remembers on the phone.
@@ -202,7 +201,7 @@ export async function getGarage(email: string): Promise<Garage> {
   return {
     vehicles: [...bikes.map((b) => bikeSummary(b, rates)), ...cars.map((c) => carSummary(c, rates))],
     defaultVehicle,
-    vehicleLimit: { limit: pro.isPro ? MAX_PRO_VEHICLES : MAX_FREE_VEHICLES, active: countActiveBikes(bikes) + countActiveCars(cars) },
+    vehicleLimit: { limit, active: countActiveBikes(bikes) + countActiveCars(cars) },
   };
 }
 

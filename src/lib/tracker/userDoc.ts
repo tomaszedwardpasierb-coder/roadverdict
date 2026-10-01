@@ -33,6 +33,16 @@ export interface UserDoc {
   // src/lib/admin/session.ts), not a per-admin value worth tracking
   // until that changes.
   plan?: { grantedAt: string; expiresAt: string };
+  // Total vehicles this account may track, set from /tomasz for an owner
+  // paying for extra ones - see vehicleLimitFor() in vehicleLimit.ts,
+  // which only ever lets it raise the plan's own cap, up to 4. Absent =
+  // the plan's cap.
+  vehicleAllowance?: number;
+  // Extra vehicles bought on top of Pro (£1.99/month each), on their own
+  // Stripe subscription, separate from Pro's - see extraVehicles.ts.
+  // paidUntil tracks that subscription's current_period_end, the same
+  // way plan.expiresAt tracks Pro's; they only count while Pro is active.
+  extraVehicles?: { subscriptionId: string; quantity: number; paidUntil: string };
   // Set once a real Stripe Pro subscription checkout completes -
   // stripeCustomerId is kept even after a cancellation (so a returning
   // subscriber's checkout reuses the same Stripe Customer instead of

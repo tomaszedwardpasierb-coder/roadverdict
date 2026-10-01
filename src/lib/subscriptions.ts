@@ -13,7 +13,8 @@
 //     const sub = await getSubscriptionForUser(email); // your Stripe check
 //     return sub?.status === 'active' || (existing admin-grant check);
 //   }
-import { getUserDoc } from "@/lib/tracker/userDoc";
+import { getUserDoc, type UserDoc } from "@/lib/tracker/userDoc";
+import { MAX_FREE_VEHICLES, vehicleLimitFor } from "@/lib/tracker/vehicleLimit";
 // Re-exported for any existing server-side importer - see proPlan.ts's
 // own comment for why the real definitions live there now, not here.
 export { PRO_MONTHLY_PRICE, PRO_ANNUAL_PRICE, PRO_ANNUAL_MONTHLY_EQUIV, PRO_FEATURES } from "@/lib/proPlan";
@@ -54,3 +55,25 @@ export async function isPro(email: string): Promise<boolean> {
   return (await getProStatus(email)).isPro;
 }
 
+
+// Extra vehicles this account currently pays for - 0 once the extra
+// vehicles subscription's paid period has run out.
+export function paidExtraVehicles(user: UserDoc | null | undefined): number {
+  const extra = user?.extraVehicles;
+  if (!extra || new Date(extra.paidUntil).getTime() <= Date.now()) return 0;
+  return extra.quantity;
+}
+
+// How many vehicles (bikes and cars together) this account may track:
+// its plan's cap, lifted by any admin-set allowance - see
+// vehicleLimitFor(). One read of the user doc for both. Fails closed to
+// the free cap, the same direction getProStatus() fails in.
+export async function getVehicleLimit(email: string): Promise<number> {
+  try {
+    const user = await getUserDoc(email);
+    const pro = !!user?.plan && new Date(user.plan.expiresAt).getTime() > Date.now();
+    return vehicleLimitFor(pro, user?.vehicleAllowance, paidExtraVehicles(user));
+  } catch {
+    return MAX_FREE_VEHICLES;
+  }
+}

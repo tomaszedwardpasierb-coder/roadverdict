@@ -35,6 +35,7 @@ import { SendNotificationForm } from './SendNotificationForm';
 import { ClearNotificationsForm } from './ClearNotificationsForm';
 import { BlockAccountButton } from './BlockAccountButton';
 import { GrantPremiumForm } from './GrantPremiumForm';
+import { VehicleAllowanceForm } from './VehicleAllowanceForm';
 import { DeleteAccountButton } from './DeleteAccountButton';
 import { ResetStoryCooldownButton } from './ResetStoryCooldownButton';
 import { RevokeSessionsButton } from './RevokeSessionsButton';
@@ -589,6 +590,7 @@ export default async function AdminDashboardPage(
               <th>Created</th>
               <th>Status</th>
               <th>Premium</th>
+              <th>Vehicles</th>
               <th>Story cooldown</th>
               <th>Sessions</th>
               <th>Onboarding</th>
@@ -605,6 +607,7 @@ export default async function AdminDashboardPage(
                   <BlockAccountButton email={u.email} blocked={!!u.blocked} />
                 </td>
                 <td><GrantPremiumForm email={u.email} plan={u.plan ?? null} /></td>
+                <td><VehicleAllowanceForm email={u.email} allowance={u.vehicleAllowance ?? null} /></td>
                 <td><ResetStoryCooldownButton email={u.email} /></td>
                 <td><RevokeSessionsButton email={u.email} /></td>
                 <td><EnableOnboardingButton email={u.email} enabled={!!u.onboarding} /></td>

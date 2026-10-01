@@ -20,8 +20,7 @@
 // inner, bike-only safety net (MAX_FREE_BIKES) for a direct call, but
 // that's unrelated to this check.
 import { getContainer } from "@/lib/cosmos";
-import { isPro } from "@/lib/subscriptions";
-import { MAX_FREE_VEHICLES, MAX_PRO_VEHICLES } from "@/lib/tracker/vehicleLimit";
+import { getVehicleLimit } from "@/lib/subscriptions";
 import { getBikesForUser, countActiveBikes } from "@/lib/tracker/bike";
 import { getCarsForUser, generateCarId, countActiveCars, getCurrentRegistration, copyCarTrackerDoc, type CarDoc } from "@/lib/tracker/car";
 import { getDocWithEtag, replaceIfUnchanged } from "@/lib/tracker/atomicUpdate";
@@ -97,7 +96,7 @@ export async function transferCar(
   }
 
   {
-    const recipientLimit = (await isPro(toEmail)) ? MAX_PRO_VEHICLES : MAX_FREE_VEHICLES;
+    const recipientLimit = await getVehicleLimit(toEmail);
     if (countActiveBikes(recipientBikes) + countActiveCars(recipientCars) >= recipientLimit) {
       return { ok: false, reason: "recipient_limit_reached", limit: recipientLimit };
     }

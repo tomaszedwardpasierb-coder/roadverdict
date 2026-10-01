@@ -46,6 +46,18 @@ describe("AddAnotherVehicleSection", () => {
     expect(screen.getByRole("button", { name: "+ Add another vehicle" })).toBeInTheDocument();
   });
 
+  it("with the account's real limit, shows a full Pro garage as full, without an upgrade pitch", () => {
+    render(<AddAnotherVehicleSection vehicleCount={2} maxFreeVehicles={1} isPro limit={2} />);
+    expect(screen.getByText(/Your account can track 2 vehicles at a time/)).toBeInTheDocument();
+    expect(screen.queryByText(/Upgrade to Pro/)).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "+ Add another vehicle" })).not.toBeInTheDocument();
+  });
+
+  it("lets an account with a raised limit keep adding up to it", () => {
+    render(<AddAnotherVehicleSection vehicleCount={3} maxFreeVehicles={1} isPro limit={4} />);
+    expect(screen.getByRole("button", { name: "+ Add another vehicle" })).toBeInTheDocument();
+  });
+
   it("under the cap, shows the add button instead of the kind picker or either form", () => {
     render(<AddAnotherVehicleSection vehicleCount={0} maxFreeVehicles={1} />);
     expect(screen.getByRole("button", { name: "+ Add another vehicle" })).toBeInTheDocument();

@@ -8,6 +8,10 @@ const mocks = vi.hoisted(() => ({
   applyProSubscriptionFromCheckoutSession: vi.fn(),
   applyProSubscriptionRenewed: vi.fn(),
   applyProSubscriptionCancelled: vi.fn(),
+  applyExtraVehiclesFromCheckoutSession: vi.fn(),
+  applyExtraVehiclesUpdated: vi.fn(),
+  applyExtraVehiclesCancelled: vi.fn(),
+  followProSubscription: vi.fn(),
 }));
 
 vi.mock("@/lib/payments/stripe", () => ({
@@ -23,6 +27,15 @@ vi.mock("@/lib/payments/proSubscription", () => ({
   applyProSubscriptionFromCheckoutSession: mocks.applyProSubscriptionFromCheckoutSession,
   applyProSubscriptionRenewed: mocks.applyProSubscriptionRenewed,
   applyProSubscriptionCancelled: mocks.applyProSubscriptionCancelled,
+}));
+
+vi.mock("@/lib/payments/extraVehicles", () => ({
+  EXTRA_VEHICLES_KIND: "extra_vehicles",
+  isExtraVehiclesSubscription: (s: { metadata?: { kind?: string } }) => s.metadata?.kind === "extra_vehicles",
+  applyExtraVehiclesFromCheckoutSession: mocks.applyExtraVehiclesFromCheckoutSession,
+  applyExtraVehiclesUpdated: mocks.applyExtraVehiclesUpdated,
+  applyExtraVehiclesCancelled: mocks.applyExtraVehiclesCancelled,
+  followProSubscription: mocks.followProSubscription,
 }));
 
 import { POST } from "@/app/api/stripe/webhook/route";
@@ -231,5 +244,40 @@ describe("POST /api/stripe/webhook", () => {
     expect(mocks.applyProSubscriptionCancelled).toHaveBeenCalledWith(
       expect.objectContaining({ id: "sub_1", status: "canceled" })
     );
+  });
+});
+
+describe("extra vehicles events", () => {
+  it("routes an extra vehicles checkout to its own handler", async () => {
+    const session = { metadata: { kind: "extra_vehicles", email: "a@example.com" } };
+    mocks.constructEvent.mockReturnValue({ type: "checkout.session.completed", data: { object: session } });
+    await POST(request("{}", "sig"));
+    expect(mocks.applyExtraVehiclesFromCheckoutSession).toHaveBeenCalledWith(session);
+    expect(mocks.applyProSubscriptionFromCheckoutSession).not.toHaveBeenCalled();
+  });
+
+  it("never lets an extra vehicles subscription update or deletion touch Pro", async () => {
+    const sub = { id: "sub_extra", metadata: { kind: "extra_vehicles", email: "a@example.com" } };
+    mocks.constructEvent.mockReturnValue({ type: "customer.subscription.updated", data: { object: sub } });
+    await POST(request("{}", "sig"));
+    mocks.constructEvent.mockReturnValue({ type: "customer.subscription.deleted", data: { object: sub } });
+    await POST(request("{}", "sig"));
+    expect(mocks.applyExtraVehiclesUpdated).toHaveBeenCalledWith(sub);
+    expect(mocks.applyExtraVehiclesCancelled).toHaveBeenCalledWith(sub);
+    expect(mocks.applyProSubscriptionRenewed).not.toHaveBeenCalled();
+    expect(mocks.applyProSubscriptionCancelled).not.toHaveBeenCalled();
+    expect(mocks.followProSubscription).not.toHaveBeenCalled();
+  });
+
+  it("keeps extra vehicles in step with every Pro update and deletion", async () => {
+    const sub = { id: "sub_pro", metadata: { email: "a@example.com" } };
+    mocks.constructEvent.mockReturnValue({ type: "customer.subscription.updated", data: { object: sub } });
+    await POST(request("{}", "sig"));
+    expect(mocks.applyProSubscriptionRenewed).toHaveBeenCalledWith(sub);
+    expect(mocks.followProSubscription).toHaveBeenCalledWith(sub, false);
+    mocks.constructEvent.mockReturnValue({ type: "customer.subscription.deleted", data: { object: sub } });
+    await POST(request("{}", "sig"));
+    expect(mocks.applyProSubscriptionCancelled).toHaveBeenCalledWith(sub);
+    expect(mocks.followProSubscription).toHaveBeenCalledWith(sub, true);
   });
 });

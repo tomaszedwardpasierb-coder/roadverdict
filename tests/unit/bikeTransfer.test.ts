@@ -22,7 +22,7 @@ const mocks = vi.hoisted(() => ({
   computeSellerReportRowsAndMetrics: vi.fn(),
   computeSellerVerdict: vi.fn(),
   upsert: vi.fn(),
-  isPro: vi.fn(),
+  getVehicleLimit: vi.fn(),
 }));
 
 vi.mock("@/lib/cosmos", () => ({
@@ -39,7 +39,7 @@ vi.mock("@/lib/tracker/car", () => ({
   getCarsForUser: mocks.getCarsForUser,
   countActiveCars: mocks.countActiveCars,
 }));
-vi.mock("@/lib/tracker/vehicleLimit", () => ({ MAX_FREE_VEHICLES: 1, MAX_PRO_VEHICLES: 2 }));
+vi.mock("@/lib/tracker/vehicleLimit", () => ({ MAX_FREE_VEHICLES: 1, MAX_PRO_VEHICLES: 2, MAX_GRANTED_VEHICLES: 4 }));
 vi.mock("@/lib/tracker/serviceRecord", () => ({ getServiceRecords: mocks.getServiceRecords }));
 vi.mock("@/lib/tracker/mod", () => ({ getMods: mocks.getMods }));
 vi.mock("@/lib/tracker/bill", () => ({ getBills: mocks.getBills }));
@@ -58,7 +58,7 @@ vi.mock("@/lib/tracker/sellerReportData", () => ({
 vi.mock("@/lib/tracker/sellerReportVerdict", () => ({
   computeSellerVerdict: mocks.computeSellerVerdict,
 }));
-vi.mock("@/lib/subscriptions", () => ({ isPro: mocks.isPro }));
+vi.mock("@/lib/subscriptions", () => ({ getVehicleLimit: mocks.getVehicleLimit }));
 
 import { transferBike } from "@/lib/tracker/bikeTransfer";
 
@@ -88,6 +88,7 @@ const oldBike = {
 
 beforeEach(() => {
   Object.values(mocks).forEach((m) => m.mockReset());
+  mocks.getVehicleLimit.mockResolvedValue(1); // the free plan's cap
   mocks.getBike.mockResolvedValue({ ...oldBike });
   mocks.getBikesForUser.mockResolvedValue([]);
   mocks.countActiveBikes.mockReturnValue(0);
@@ -213,14 +214,14 @@ describe("transferBike", () => {
   // still accept one more, since Pro's own limit hasn't been reached yet.
   it("lets a transfer through past the recipient's free combined vehicle cap when the recipient is Pro but still under Pro's own cap", async () => {
     mocks.countActiveBikes.mockReturnValue(1); // MAX_FREE_VEHICLES = 1, MAX_PRO_VEHICLES = 2
-    mocks.isPro.mockResolvedValue(true);
+    mocks.getVehicleLimit.mockResolvedValue(2);
     const result = await transferBike(fromEmail, bikeId, toEmail, false);
     expect(result.ok).toBe(true);
   });
 
   it("still blocks a transfer once the recipient is Pro but already at Pro's own cap", async () => {
     mocks.countActiveBikes.mockReturnValue(2); // MAX_PRO_VEHICLES = 2
-    mocks.isPro.mockResolvedValue(true);
+    mocks.getVehicleLimit.mockResolvedValue(2);
     const result = await transferBike(fromEmail, bikeId, toEmail, false);
     expect(result).toMatchObject({ ok: false, reason: "recipient_limit_reached", limit: 2 });
   });

@@ -7,7 +7,7 @@ const mocks = vi.hoisted(() => ({
   getPrimaryBike: vi.fn(),
   getBikesForUser: vi.fn(),
   getCarsForUser: vi.fn(),
-  isPro: vi.fn(),
+  getVehicleLimit: vi.fn(),
   updateBikeMileage: vi.fn(),
   updateBikeRegion: vi.fn(),
   updateBikeBudget: vi.fn(),
@@ -59,7 +59,7 @@ vi.mock("@/lib/tracker/car", async () => {
   const actual = await vi.importActual<typeof import("@/lib/tracker/car")>("@/lib/tracker/car");
   return { getCarsForUser: mocks.getCarsForUser, countActiveCars: actual.countActiveCars };
 });
-vi.mock("@/lib/subscriptions", () => ({ isPro: mocks.isPro }));
+vi.mock("@/lib/subscriptions", () => ({ getVehicleLimit: mocks.getVehicleLimit }));
 vi.mock("@/lib/tracker/dvlaDataFetch", () => ({ fetchDvlaDataFromVdg: mocks.fetchDvlaDataFromVdg }));
 vi.mock("@/lib/tracker/vehicleTaxFetch", () => ({ fetchVehicleTaxDetailsFromVdg: mocks.fetchVehicleTaxDetailsFromVdg }));
 vi.mock("@/lib/tracker/reminder", () => ({ syncSornReminder: mocks.syncSornReminder }));
@@ -102,7 +102,7 @@ describe("POST /api/tracker/bike", () => {
     // tracked and no Pro subscription never trips the new outer guard,
     // so every existing test below (written before that guard existed)
     // keeps exercising createBike's own mocked behaviour unchanged.
-    mocks.isPro.mockResolvedValue(false);
+    mocks.getVehicleLimit.mockResolvedValue(1);
     mocks.getBikesForUser.mockResolvedValue([]);
     mocks.getCarsForUser.mockResolvedValue([]);
   });
@@ -216,7 +216,7 @@ describe("POST /api/tracker/bike", () => {
 
   it("allows a Pro account past the free cap, up to Pro's own higher cap", async () => {
     mocks.getSession.mockResolvedValue({ email: "owner@example.com" });
-    mocks.isPro.mockResolvedValue(true);
+    mocks.getVehicleLimit.mockResolvedValue(2);
     mocks.getBikesForUser.mockResolvedValue([{ id: "bike-1", transferredTo: undefined }]);
     mocks.getCarsForUser.mockResolvedValue([]);
 
@@ -231,7 +231,7 @@ describe("POST /api/tracker/bike", () => {
   // its own, so Pro being uncapped multiplied that cost indefinitely.
   it("still blocks a Pro account once it's already at Pro's own combined cap", async () => {
     mocks.getSession.mockResolvedValue({ email: "owner@example.com" });
-    mocks.isPro.mockResolvedValue(true);
+    mocks.getVehicleLimit.mockResolvedValue(2);
     mocks.getBikesForUser.mockResolvedValue([{ id: "bike-1", transferredTo: undefined }]);
     mocks.getCarsForUser.mockResolvedValue([{ id: "car-1", transferredTo: undefined }]);
 

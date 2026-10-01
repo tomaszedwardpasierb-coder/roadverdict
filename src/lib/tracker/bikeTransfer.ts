@@ -23,11 +23,10 @@
 // transfer, regardless of includeRecords, since their bike is
 // read-only from this point on either way.
 import { getContainer } from "@/lib/cosmos";
-import { isPro } from "@/lib/subscriptions";
+import { getVehicleLimit } from "@/lib/subscriptions";
 import { getBikesForUser, generateBikeId, countActiveBikes, getCurrentRegistration, type BikeDoc } from "@/lib/tracker/bike";
 import { getDocWithEtag, replaceIfUnchanged } from "@/lib/tracker/atomicUpdate";
 import { getCarsForUser, countActiveCars } from "@/lib/tracker/car";
-import { MAX_FREE_VEHICLES, MAX_PRO_VEHICLES } from "@/lib/tracker/vehicleLimit";
 import { normalizePlate, allKnownPlates } from "@/lib/tracker/reportAccess";
 import { getServiceRecords } from "@/lib/tracker/serviceRecord";
 import { getMods } from "@/lib/tracker/mod";
@@ -132,7 +131,7 @@ export async function transferBike(
   // already has doesn't cost them an active slot, so it shouldn't block
   // them from accepting a genuinely new one either.
   {
-    const recipientLimit = (await isPro(toEmail)) ? MAX_PRO_VEHICLES : MAX_FREE_VEHICLES;
+    const recipientLimit = await getVehicleLimit(toEmail);
     if (countActiveBikes(recipientBikes) + countActiveCars(recipientCars) >= recipientLimit) {
       return { ok: false, reason: "recipient_limit_reached", limit: recipientLimit };
     }

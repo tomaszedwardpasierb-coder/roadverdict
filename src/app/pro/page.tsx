@@ -3,6 +3,7 @@ import type { Metadata } from 'next';
 import { pageMetadata } from '@/lib/seo/pageMetadata';
 import { getSession } from '@/lib/auth/session';
 import { isPro, PRO_MONTHLY_PRICE } from '@/lib/subscriptions';
+import { EXTRA_VEHICLE_MONTHLY_PRICE } from '@/lib/proPlan';
 import { getUserDoc } from '@/lib/tracker/userDoc';
 import { selfHealProSubscription } from '@/lib/payments/proSubscription';
 import { PlanComparisonCards } from '@/components/PlanComparisonCards';
@@ -60,6 +61,13 @@ export default async function ProPage(props: { searchParams: Promise<{ session_i
         <div className={styles.faqItem}>
           <strong>What happens to my second bike if I cancel Pro?</strong>
           <p>It becomes read-only - you can still view your history, just not add new entries until you resubscribe or remove a bike.</p>
+        </div>
+        <div className={styles.faqItem}>
+          <strong>Can I track more than two vehicles?</strong>
+          <p>
+            Yes - up to four. Each vehicle past Pro&apos;s two is {EXTRA_VEHICLE_MONTHLY_PRICE}/month, added from your garage once
+            it&apos;s full. Extra vehicles end when Pro does.
+          </p>
         </div>
         <div className={styles.faqItem}>
           <strong>Is there a trial?</strong>
