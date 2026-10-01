@@ -28,7 +28,7 @@ export type AssistantReply = {
   proposedShareLink?: ProposedShareLink;
   proposedSettingsChange?: ProposedSettingsChange;
   proposedFeedback?: ProposedFeedback;
-  // Not in the app yet - the reply points to the website instead.
+  // Added in the Vault screen itself, where the file is picked.
   proposedVaultDocument?: unknown;
 };
 

@@ -14,12 +14,15 @@ export function CodeInput({
   onComplete,
   hasError,
   accessibilityLabel,
+  light,
 }: {
   value: string;
   onChange: (value: string) => void;
   onComplete: (value: string) => void;
   hasError?: boolean;
   accessibilityLabel: string;
+  // For the signed-in (light) screens; the sign-in screens are dark.
+  light?: boolean;
 }) {
   const inputRef = useRef<TextInput>(null);
 
@@ -37,9 +40,9 @@ export function CodeInput({
         return (
           <View
             key={i}
-            style={[styles.box, active && styles.boxActive, hasError && styles.boxError]}
+            style={[styles.box, light && styles.boxLight, active && styles.boxActive, hasError && (light ? styles.boxErrorLight : styles.boxError)]}
             importantForAccessibility="no-hide-descendants">
-            <Text style={styles.digit}>{filled ? value[i] : ''}</Text>
+            <Text style={[styles.digit, light && styles.digitLight]}>{filled ? value[i] : ''}</Text>
           </View>
         );
       })}
@@ -75,5 +78,8 @@ const styles = StyleSheet.create({
   boxActive: { borderColor: Brand.amber },
   boxError: { borderColor: Brand.dangerOnDark },
   digit: { color: '#FFFFFF', fontSize: 26, fontWeight: '700' },
+  boxLight: { borderColor: Brand.line, backgroundColor: Brand.paperRaised },
+  boxErrorLight: { borderColor: Brand.danger },
+  digitLight: { color: Brand.ink },
   hiddenInput: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, opacity: 0.01, color: 'transparent' },
 });

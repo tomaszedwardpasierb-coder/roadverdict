@@ -241,7 +241,7 @@ export function VaultDraftNote() {
   return (
     <View style={styles.card}>
       <Text style={styles.cardTitle}>The Vault</Text>
-      <Text style={styles.note}>Storing documents in the Vault isn’t in the app yet - you can do it on roadverdict.co.uk.</Text>
+      <Text style={styles.note}>Add it in the Vault itself - More, then The Vault - where you pick the file and it's stored encrypted.</Text>
     </View>
   );
 }
