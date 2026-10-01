@@ -3,8 +3,8 @@
 // opened, exactly as on the website. Locks by itself after 10 quiet
 // minutes, whenever the app is left, or with "Lock now".
 import * as DocumentPicker from 'expo-document-picker';
+import { requireOptionalNativeModule } from 'expo';
 import { Directory, File } from 'expo-file-system';
-import * as IntentLauncher from 'expo-intent-launcher';
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import { router } from 'expo-router';
@@ -49,6 +49,13 @@ import {
 import { useVehicle, type GarageVehicle } from '@/lib/vehicle';
 
 type Account = { twoFactorEnabled: boolean; isPro: boolean };
+
+// expo-intent-launcher's native side, looked up rather than imported: it
+// arrived in build 7, and build 6 (no such module) still gets this screen
+// over the air - there a PDF falls back to the share sheet.
+const intentLauncher = requireOptionalNativeModule<{
+  startActivity(action: string, params: { data?: string; type?: string; flags?: number }): Promise<unknown>;
+}>('ExpoIntentLauncher');
 
 export default function VaultScreen() {
   const { selected } = useVehicle();
@@ -382,7 +389,8 @@ function Documents({ vehicle, previous, offerQuickUnlock }: { vehicle: GarageVeh
     }
     await whileVaultOpen(async () => {
       try {
-        await IntentLauncher.startActivityAsync('android.intent.action.VIEW', {
+        if (!intentLauncher) throw new Error('No intent launcher in this build');
+        await intentLauncher.startActivity('android.intent.action.VIEW', {
           data: new File(file.uri).contentUri,
           type: 'application/pdf',
           flags: 1, // FLAG_GRANT_READ_URI_PERMISSION
