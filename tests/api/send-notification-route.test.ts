@@ -5,9 +5,11 @@ const mocks = vi.hoisted(() => ({
   getAdminSession: vi.fn(),
   createBroadcastNotifications: vi.fn(),
   getAllUserEmails: vi.fn(),
+  sendPushToUser: vi.fn(),
 }));
 
 vi.mock("@/lib/admin/session", () => ({ getAdminSession: mocks.getAdminSession }));
+vi.mock("@/lib/push/sendPush", () => ({ sendPushToUser: mocks.sendPushToUser }));
 vi.mock("@/lib/tracker/notification", () => ({
   createBroadcastNotifications: mocks.createBroadcastNotifications,
   getAllUserEmails: mocks.getAllUserEmails,
@@ -32,6 +34,7 @@ describe("POST /api/tomasz/send-notification", () => {
     Object.values(mocks).forEach((m) => m.mockReset());
     mocks.getAllUserEmails.mockResolvedValue(["a@example.com", "b@example.com"]);
     mocks.createBroadcastNotifications.mockResolvedValue(undefined);
+    mocks.sendPushToUser.mockResolvedValue(1);
   });
 
   it("rejects a non-admin request outright, without ever sending anything", async () => {
@@ -144,6 +147,21 @@ describe("POST /api/tomasz/send-notification", () => {
     mocks.getAdminSession.mockResolvedValue(true);
     const response = await POST(request(JSON.stringify(validBody)));
     expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toEqual({ ok: true, sentCount: 2 });
+    await expect(response.json()).resolves.toEqual({ ok: true, sentCount: 2, phoneCount: 2 });
+  });
+
+  it("sends the message to every recipient's phones too, opening the app's notifications", async () => {
+    mocks.getAdminSession.mockResolvedValue(true);
+    await POST(request(JSON.stringify(validBody)));
+    expect(mocks.sendPushToUser).toHaveBeenCalledTimes(2);
+    expect(mocks.sendPushToUser).toHaveBeenCalledWith("a@example.com", expect.objectContaining({ url: "/notifications" }));
+  });
+
+  it("still succeeds when a phone can't be reached", async () => {
+    mocks.getAdminSession.mockResolvedValue(true);
+    mocks.sendPushToUser.mockRejectedValueOnce(new Error("offline")).mockResolvedValueOnce(1);
+    const response = await POST(request(JSON.stringify(validBody)));
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ ok: true, sentCount: 2, phoneCount: 1 });
   });
 });

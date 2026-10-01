@@ -9,6 +9,7 @@ import { Card, ErrorState, LoadingState, SectionHeader, StatusPill } from '@/com
 import { Brand } from '@/constants/brand';
 import { openEntry } from '@/lib/entries';
 import { useApi } from '@/lib/use-api';
+import type { NotificationList } from '@/app/(app)/notifications';
 import { useVehicle, type GarageVehicle } from '@/lib/vehicle';
 
 type HomeData = {
@@ -24,6 +25,8 @@ export default function HomeScreen() {
   const garage = useVehicle();
   const [switcherOpen, setSwitcherOpen] = useState(false);
   const selected = garage.selected;
+  // The website's bell, here too - a dot while anything is unread.
+  const bell = useApi<NotificationList>('/api/tracker/notifications');
   const home = useApi<HomeData>(selected ? `/api/app/home?kind=${selected.kind}&id=${encodeURIComponent(selected.id)}` : null);
 
   if (garage.loading) return <LoadingState />;
@@ -63,6 +66,15 @@ export default function HomeScreen() {
             </Text>
           </View>
           <Icon name="chevronDown" size={22} color={Brand.ink} />
+        </Pressable>
+        <Pressable
+          onPress={() => router.push('/notifications')}
+          accessibilityRole="button"
+          accessibilityLabel={bell.data?.unreadCount ? `Notifications, ${bell.data.unreadCount} new` : 'Notifications'}
+          hitSlop={4}
+          style={({ pressed }) => [styles.bell, pressed && { opacity: 0.85 }]}>
+          <Icon name="bell" size={22} color={Brand.ink} />
+          {bell.data?.unreadCount ? <View style={styles.bellDot} /> : null}
         </Pressable>
         <Pressable
           onPress={() => router.push('/assistant')}
@@ -232,6 +244,8 @@ const styles = StyleSheet.create({
   switcher: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 52 },
   ask: { flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 44, paddingHorizontal: 14, borderRadius: 999, backgroundColor: Brand.amber },
   askLabel: { fontSize: 15, fontWeight: '700', color: Brand.asphalt },
+  bell: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: Brand.line },
+  bellDot: { position: 'absolute', top: 9, right: 10, width: 10, height: 10, borderRadius: 5, backgroundColor: Brand.danger, borderWidth: 1.5, borderColor: Brand.paper },
   switcherText: { flexShrink: 1 },
   vehicleName: { fontSize: 28, fontWeight: '800', color: Brand.ink },
   vehicleMeta: { fontSize: 13, color: Brand.muted, marginTop: 2 },

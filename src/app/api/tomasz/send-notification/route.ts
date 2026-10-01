@@ -3,6 +3,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAdminSession } from "@/lib/admin/session";
 import { createBroadcastNotifications, getAllUserEmails } from "@/lib/tracker/notification";
 import { getSafeRedirectPath } from "@/lib/auth/safeRedirect";
+import { sendPushToUser } from "@/lib/push/sendPush";
+import { runInBatches } from "@/lib/concurrency";
 
 export const dynamic = "force-dynamic";
 
@@ -60,5 +62,14 @@ export async function POST(request: NextRequest) {
     linkTo: safeLinkTo ?? undefined,
   });
 
-  return NextResponse.json({ ok: true, sentCount: recipientEmails.length });
+  // The same message on every phone they have the app on. A tap opens the
+  // app's notifications screen, where the item's own link (a website page)
+  // opens - the link itself is a website path, not an app screen. Batched,
+  // and best-effort: sendPushToUser never throws.
+  const pushed = await runInBatches(recipientEmails, 20, (email) =>
+    sendPushToUser(email, { title: title.trim(), body: message.trim(), url: "/notifications" })
+  );
+  const phoneCount = pushed.reduce((sum, r) => sum + (r.status === "fulfilled" ? r.value : 0), 0);
+
+  return NextResponse.json({ ok: true, sentCount: recipientEmails.length, phoneCount });
 }
