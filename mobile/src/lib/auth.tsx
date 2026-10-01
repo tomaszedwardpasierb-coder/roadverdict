@@ -2,6 +2,9 @@ import * as SecureStore from 'expo-secure-store';
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 
 import { apiFetch, emailFromToken } from '@/lib/api';
+import { unregisterPush } from '@/lib/push';
+import { untrustThisPhone } from '@/lib/trusted-device';
+import { forgetVault } from '@/lib/vault';
 
 const TOKEN_KEY = 'rv.session';
 
@@ -62,6 +65,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signOut = useCallback(async () => {
     const current = token;
+    // Nothing of this account stays on the phone: the Vault locks, its
+    // fingerprint/PIN trust goes, and its notifications stop coming here.
+    forgetVault();
+    await Promise.all([untrustThisPhone(current).catch(() => {}), unregisterPush(current).catch(() => {})]);
     await SecureStore.deleteItemAsync(TOKEN_KEY).catch(() => {});
     setToken(null);
     setStatus('signedOut');

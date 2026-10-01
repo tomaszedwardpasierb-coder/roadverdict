@@ -20,6 +20,14 @@ try {
 const QUIET_ERRORS = new Set(['aborted', 'no-speech', 'speech-timeout']);
 const NEEDS_MICROPHONE = 'RoadVerdict needs the microphone to hear you. You can allow it in your phone’s settings.';
 
+// Asks for the microphone up front (the first time the app opens) - the
+// same permission tapping the microphone would ask for. Without the
+// native module (Expo Go) there's nothing to ask for.
+export async function requestMicrophone(): Promise<void> {
+  if (!speech) return;
+  await speech.ExpoSpeechRecognitionModule.requestPermissionsAsync().catch(() => {});
+}
+
 export function useDictation(text: string, setText: (value: string) => void) {
   const [listening, setListening] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);

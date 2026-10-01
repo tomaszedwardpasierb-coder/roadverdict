@@ -12,6 +12,7 @@
     },
     "android": {
       "package": "uk.co.roadverdict.app",
+      "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "backgroundColor": "#17181B",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -47,11 +48,18 @@
         {
           "cameraPermission": "RoadVerdict uses the camera to photograph receipts, so the details can be read and logged for you.",
           "photosPermission": "RoadVerdict opens your photos so you can choose a receipt to scan.",
-          "microphonePermission": false
+          "microphonePermission": "RoadVerdict uses the microphone so you can speak to the assistant instead of typing."
         }
       ],
       "expo-sharing",
-      "expo-speech-recognition"
+      "expo-speech-recognition",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/android-icon-monochrome.png",
+          "color": "#EE9A2E"
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

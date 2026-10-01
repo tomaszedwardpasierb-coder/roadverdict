@@ -18,6 +18,13 @@ import { Card, ErrorState, LoadingState } from '@/components/screen';
 import { Brand } from '@/constants/brand';
 import { API_BASE_URL, apiFetch } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
+import {
+  declineQuickUnlock,
+  isThisPhoneTrusted,
+  shouldOfferQuickUnlock,
+  trustThisPhone,
+  unlockWithThisPhone,
+} from '@/lib/trusted-device';
 import { useApi } from '@/lib/use-api';
 import {
   categoryLabel,
@@ -47,6 +54,7 @@ export default function VaultScreen() {
   const account = useApi<Account>('/api/app/account');
   const unlocked = useVaultUnlocked();
   const [previous, setPrevious] = useState<PreviousAccess | null>(null);
+  const [openedWithCode, setOpenedWithCode] = useState(false);
 
   // Lock the screen at the moment the server's quiet window runs out.
   useEffect(() => {
@@ -69,8 +77,16 @@ export default function VaultScreen() {
       </View>
     );
   else if (account.data && !account.data.twoFactorEnabled) body = <TwoFactorNeeded />;
-  else if (!unlocked) body = <Unlock onUnlocked={setPrevious} />;
-  else body = <Documents vehicle={selected} previous={previous} />;
+  else if (!unlocked)
+    body = (
+      <Unlock
+        onUnlocked={(prev, withCode) => {
+          setPrevious(prev);
+          setOpenedWithCode(withCode);
+        }}
+      />
+    );
+  else body = <Documents vehicle={selected} previous={previous} offerQuickUnlock={openedWithCode} />;
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
@@ -122,13 +138,46 @@ function TwoFactorNeeded() {
   );
 }
 
-function Unlock({ onUnlocked }: { onUnlocked: (previous: PreviousAccess | null) => void }) {
+function Unlock({ onUnlocked }: { onUnlocked: (previous: PreviousAccess | null, withCode: boolean) => void }) {
   const { token, signOut } = useAuth();
   const [code, setCode] = useState('');
   const [backup, setBackup] = useState('');
   const [useBackup, setUseBackup] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // null while checking; true shows the fingerprint/PIN option first.
+  const [trusted, setTrusted] = useState<boolean | null>(null);
+  const [showCode, setShowCode] = useState(false);
+
+  const openWithPhone = useCallback(async () => {
+    setBusy(true);
+    setError(null);
+    const result = await unlockWithThisPhone(token);
+    setBusy(false);
+    if (result.ok) {
+      onUnlocked(result.previousAccess, false);
+      return;
+    }
+    if (result.status === 401 && result.reason === 'error') return signOut();
+    if (result.reason === 'not-trusted') setTrusted(false);
+    if (result.reason !== 'cancelled' && result.error) setError(result.error);
+    setShowCode(true);
+  }, [token, onUnlocked, signOut]);
+
+  // A trusted phone asks for the fingerprint, face or PIN straight away.
+  useEffect(() => {
+    let cancelled = false;
+    isThisPhoneTrusted().then((yes) => {
+      if (cancelled) return;
+      setTrusted(yes);
+      if (yes) openWithPhone();
+    });
+    return () => {
+      cancelled = true;
+    };
+    // Once, on opening - not again whenever the callback changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   async function open(value: string) {
     if (!value.trim() || busy) return;
@@ -150,8 +199,33 @@ function Unlock({ onUnlocked }: { onUnlocked: (previous: PreviousAccess | null) 
       setError('The Vault couldn’t be opened. Try again.');
       return;
     }
-    onUnlocked(result.data.previousAccess ?? null);
+    onUnlocked(result.data.previousAccess ?? null, true);
     setVaultToken(result.data.vaultToken);
+  }
+
+  if (trusted === null) return <LoadingState />;
+
+  if (trusted && !showCode) {
+    return (
+      <View style={styles.pad}>
+        <View style={styles.lockIcon}>
+          <Icon name="lock" size={28} color={Brand.asphalt} />
+        </View>
+        <Text style={styles.unlockTitle}>Open with your fingerprint or PIN</Text>
+        <Text style={styles.textCentered}>This phone is trusted to open the Vault without an authenticator code.</Text>
+        <Pressable
+          onPress={openWithPhone}
+          disabled={busy}
+          accessibilityRole="button"
+          accessibilityState={{ busy, disabled: busy }}
+          style={({ pressed }) => [styles.primary, busy && styles.dim, pressed && { opacity: 0.85 }]}>
+          {busy ? <ActivityIndicator color={Brand.asphalt} /> : <Text style={styles.primaryLabel}>Open the Vault</Text>}
+        </Pressable>
+        <Pressable onPress={() => setShowCode(true)} accessibilityRole="button" hitSlop={6} style={styles.textButton}>
+          <Text style={styles.textButtonLabel}>Use a code instead</Text>
+        </Pressable>
+      </View>
+    );
   }
 
   return (
@@ -213,7 +287,60 @@ function Unlock({ onUnlocked }: { onUnlocked: (previous: PreviousAccess | null) 
   );
 }
 
-function Documents({ vehicle, previous }: { vehicle: GarageVehicle; previous: PreviousAccess | null }) {
+function QuickUnlockOffer() {
+  const { token } = useAuth();
+  const [show, setShow] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
+
+  useEffect(() => {
+    shouldOfferQuickUnlock().then(setShow);
+  }, []);
+
+  if (message) return <Text style={message.ok ? styles.success : styles.error}>{message.text}</Text>;
+  if (!show) return null;
+
+  async function yes() {
+    setBusy(true);
+    const result = await whileVaultOpen(() => trustThisPhone(token));
+    setBusy(false);
+    setShow(false);
+    setMessage(
+      result.ok
+        ? { ok: true, text: 'Done - next time, open the Vault with your fingerprint or PIN. You can stop this in Settings on the website.' }
+        : { ok: false, text: result.error }
+    );
+  }
+
+  return (
+    <Card style={styles.card}>
+      <Text style={styles.cardTitle}>Open it with your fingerprint next time?</Text>
+      <Text style={styles.text}>
+        Trust this phone and the Vault opens with your fingerprint, face or phone PIN instead of a code from your authenticator app.
+      </Text>
+      <View style={styles.row}>
+        <Pressable
+          onPress={yes}
+          disabled={busy}
+          accessibilityRole="button"
+          style={({ pressed }) => [styles.primary, styles.flex, busy && styles.dim, pressed && { opacity: 0.85 }]}>
+          {busy ? <ActivityIndicator color={Brand.asphalt} /> : <Text style={styles.primaryLabel}>Yes, trust it</Text>}
+        </Pressable>
+        <Pressable
+          onPress={() => {
+            declineQuickUnlock();
+            setShow(false);
+          }}
+          accessibilityRole="button"
+          style={({ pressed }) => [styles.secondary, styles.flex, pressed && { opacity: 0.85 }]}>
+          <Text style={styles.secondaryLabel}>Not now</Text>
+        </Pressable>
+      </View>
+    </Card>
+  );
+}
+
+function Documents({ vehicle, previous, offerQuickUnlock }: { vehicle: GarageVehicle; previous: PreviousAccess | null; offerQuickUnlock: boolean }) {
   const { token, signOut } = useAuth();
   const [documents, setDocuments] = useState<VaultDocument[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -311,6 +438,7 @@ function Documents({ vehicle, previous }: { vehicle: GarageVehicle; previous: Pr
             {error}
           </Text>
         ) : null}
+        {offerQuickUnlock ? <QuickUnlockOffer /> : null}
 
         <Pressable
           onPress={() => setAdding(true)}
@@ -575,6 +703,9 @@ const styles = StyleSheet.create({
   },
   primary: { height: 56, borderRadius: 12, backgroundColor: Brand.amber, alignItems: 'center', justifyContent: 'center' },
   primaryLabel: { fontSize: 17, fontWeight: '700', color: Brand.asphalt },
+  secondary: { height: 56, borderRadius: 12, borderWidth: 1.5, borderColor: Brand.line, backgroundColor: Brand.paperRaised, alignItems: 'center', justifyContent: 'center' },
+  secondaryLabel: { fontSize: 16, fontWeight: '600', color: Brand.ink },
+  success: { fontSize: 15, lineHeight: 22, color: '#1A6B4A' },
   row: { flexDirection: 'row', gap: 8 },
   dim: { opacity: 0.5 },
   textButton: { alignSelf: 'center', minHeight: 44, justifyContent: 'center' },

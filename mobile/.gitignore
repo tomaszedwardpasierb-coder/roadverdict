@@ -41,3 +41,7 @@ example
 # generated native folders
 /ios
 /android
+
+# Firebase app config: EAS builds read it from disk (it is not in
+# .easignore); kept out of this public repository anyway.
+google-services.json
