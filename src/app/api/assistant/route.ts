@@ -53,6 +53,7 @@ import { isTwoFactorEnabled } from "@/lib/auth/twoFactor";
 import { MIN_COMPARE_VEHICLES, MAX_COMPARE_VEHICLES } from "@/lib/tracker/vehicleComparison";
 import { fuelCostPerDistance, tankEconomy, type MpgCalculatorAssistantContext } from "@/lib/fuelEconomy";
 import { ALL_CURRENCIES, CURRENCY_SYMBOLS } from "@/lib/tracker/currency";
+import { loadAttachmentForAi } from "@/lib/tracker/chatAttachment";
 
 export const dynamic = "force-dynamic";
 
@@ -65,6 +66,11 @@ const GEMINI_MODEL = "gemini-3.5-flash-lite";
 const MAX_MESSAGES = 20; // conversation-length guard, not a hard product limit
 const MAX_MESSAGE_LENGTH = 2000;
 const MAX_TOOL_ROUNDS = 4; // safety cap against a runaway tool-call loop
+
+// Appended to the system instruction only when the attached photo or PDF
+// is actually included for the AI to read (see loadAttachmentForAi).
+const ATTACHMENT_READING_RULES =
+  "\n\n---\n\nYOU CAN SEE THE ATTACHED FILE: the photo or PDF is included with the user's latest message - read it directly; never say you can't see images or files. If it's a receipt or invoice, decide line by line what is for the vehicle (fuel, oil and other fluids, screenwash, parts, accessories, tyres, servicing, repairs, labour, MOT, insurance, tax, parking, tolls, fines, cleaning products for the vehicle) and what isn't (groceries, snacks, drinks, cigarettes, lottery, household or personal items). Only ever draft entries for the vehicle lines, with their own amounts - never the receipt total when it includes other things. If nothing on it is for the vehicle (for example a grocery receipt), say so plainly and draft nothing - never log it as 'other'. If several different vehicle items are on one receipt, draft the most important one first and say which others you'll draft next once that one is saved. If it isn't a receipt (a part, a dashboard warning light, damage), describe what you see and help with that.";
 const MPG_PRICE_SOURCES = ["saved", "manual", "uk-petrol-average", "uk-diesel-average", "none"] as const;
 
 function parseMpgCalculatorContext(value: unknown): MpgCalculatorAssistantContext | null {
@@ -125,6 +131,7 @@ interface ChatMessage {
 // https://ai.google.dev/gemini-api/docs/thought-signatures
 interface GeminiPart {
   text?: string;
+  inline_data?: { mime_type: string; data: string };
   functionCall?: { name: string; args: Record<string, unknown> };
   functionResponse?: { name: string; response: unknown };
   thoughtSignature?: string;
@@ -652,9 +659,17 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  const systemInstruction = buildSystemInstruction(config, signedIn, privacyPolicyText, !!reportToken, dashboardTabLabel, dashboardTabGroupLabel, compareVehicleNames, logEntryAccess, activeVehicleKind, displayName, carKnowledgeBase, vaultChatAccess, !!attachment, mpgCalculatorPage, mpgCalculatorContext, fromAndroidApp);
+  // The attached photo or PDF itself, for the AI to read - only ever one
+  // this account uploaded or already has on a record (chatAttachment.ts).
+  const attachmentForAi = attachment && signedIn && session ? await loadAttachmentForAi(session.email, attachment.blobName) : null;
+
+  const systemInstruction = buildSystemInstruction(config, signedIn, privacyPolicyText, !!reportToken, dashboardTabLabel, dashboardTabGroupLabel, compareVehicleNames, logEntryAccess, activeVehicleKind, displayName, carKnowledgeBase, vaultChatAccess, !!attachment, mpgCalculatorPage, mpgCalculatorContext, fromAndroidApp) + (attachmentForAi ? ATTACHMENT_READING_RULES : "");
 
   const contents: GeminiContent[] = toGeminiContents(messages);
+  if (attachmentForAi) {
+    const last = contents[contents.length - 1];
+    if (last?.role === "user") last.parts.push({ inline_data: { mime_type: attachmentForAi.mimeType, data: attachmentForAi.base64 } });
+  }
   const toolDeclarations = [
     ...(signedIn ? ASSISTANT_TOOL_DECLARATIONS : []),
     // No Pro gate, unlike the write tools further down - matches the

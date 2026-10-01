@@ -22,6 +22,10 @@ type Turn = { role: 'user'; content: string; photoUri?: string } | ({ role: 'ass
 
 const MAX_LENGTH = 2000; // the server's own per-message limit
 
+// What the website's chat sends once a drafted entry is saved, so the
+// assistant drafts the next vehicle item from the same receipt, if any.
+const NEXT_ENTRY = "That's logged. If there's anything else from what I just asked you to log, draft the next one now.";
+
 // Opened from the ⊕ sheet, it's there to log something; otherwise to ask.
 const PROMPTS = {
   ask: ['What should I budget for this year?', 'When is my next service due?', 'Is my fuel economy normal?'],
@@ -161,7 +165,7 @@ export default function AssistantScreen() {
                 <View style={[styles.bubble, styles.theirs]}>
                   <Text style={styles.theirsText}>{turn.content}</Text>
                 </View>
-                {turn.proposedEntry ? <EntryDraft entry={turn.proposedEntry} /> : null}
+                {turn.proposedEntry ? <EntryDraft entry={turn.proposedEntry} onSaved={() => send(NEXT_ENTRY)} /> : null}
                 {turn.proposedShareLink ? <ShareLinkDraft link={turn.proposedShareLink} /> : null}
                 {turn.proposedSettingsChange ? <SettingsDraft change={turn.proposedSettingsChange} /> : null}
                 {turn.proposedFeedback ? <FeedbackDraft feedback={turn.proposedFeedback} /> : null}

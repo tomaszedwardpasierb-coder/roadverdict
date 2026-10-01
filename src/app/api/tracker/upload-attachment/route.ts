@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { randomBytes } from "crypto";
 import { getSession } from "@/lib/auth/session";
+import { ATTACHMENT_OWNER_METADATA, attachmentOwnerHash } from "@/lib/tracker/chatAttachment";
 import { getAttachmentContainer, BLOB_UPLOAD_TIMEOUT_MS } from "@/lib/blobStorage";
 import { matchesDeclaredFileType, type SniffableFileType } from "@/lib/tracker/fileSignature";
 import type { Attachment } from "@/lib/tracker/cosmosHelpers";
@@ -64,6 +65,10 @@ export async function POST(request: NextRequest) {
     const blockBlobClient = container.getBlockBlobClient(blobName);
     await blockBlobClient.uploadData(bytes, {
       blobHTTPHeaders: { blobContentType: file.type },
+      // Who uploaded it, as a hash - so the assistant can show a file
+      // attached in chat to the AI before it's on any record (see
+      // chatAttachment.ts). Never the email itself.
+      metadata: { [ATTACHMENT_OWNER_METADATA]: attachmentOwnerHash(session.email) },
       abortSignal: AbortSignal.timeout(BLOB_UPLOAD_TIMEOUT_MS),
     });
 

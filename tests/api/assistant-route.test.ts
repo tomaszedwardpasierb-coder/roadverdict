@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   getSession: vi.fn(),
+  loadAttachmentForAi: vi.fn(),
   getLivePrivacyPolicyText: vi.fn(),
   getAssistantConfig: vi.fn(),
   runAssistantTool: vi.fn(),
@@ -52,6 +53,7 @@ vi.mock("@/lib/tracker/geminiUsageLog", () => ({ logGeminiUsage: mocks.logGemini
 vi.mock("@/lib/tracker/bike", () => ({ getBikesForUser: mocks.getBikesForUser, isBikeReadOnly: mocks.isBikeReadOnly }));
 vi.mock("@/lib/tracker/car", () => ({ getCarsForUser: mocks.getCarsForUser, isCarReadOnly: mocks.isCarReadOnly }));
 vi.mock("@/lib/subscriptions", () => ({ isPro: mocks.isPro }));
+vi.mock("@/lib/tracker/chatAttachment", () => ({ loadAttachmentForAi: mocks.loadAttachmentForAi }));
 vi.mock("@/lib/auth/twoFactor", () => ({ isTwoFactorEnabled: mocks.isTwoFactorEnabled }));
 vi.mock("@/lib/tracker/assistantAnonUsage", () => ({
   canSendAnonAssistantMessage: mocks.canSendAnonAssistantMessage,
@@ -1115,6 +1117,28 @@ describe("POST /api/assistant - chat attachments", () => {
 
     const callBody = JSON.parse(mocks.fetch.mock.calls[0][1].body);
     expect(callBody.systemInstruction.parts[0].text).toContain("THE USER HAS JUST ATTACHED A FILE");
+  });
+
+  it("shows the AI the photo itself, with the rules for reading a receipt", async () => {
+    mocks.getSession.mockResolvedValue({ email: "rider@example.com" });
+    mocks.loadAttachmentForAi.mockResolvedValue({ mimeType: "image/jpeg", base64: "QUJD" });
+    await POST(request({ messages: [{ role: "user", content: "Log this receipt" }], attachment: realAttachment }));
+    expect(mocks.loadAttachmentForAi).toHaveBeenCalledWith("rider@example.com", "abc123.jpg");
+    const callBody = JSON.parse(mocks.fetch.mock.calls[0][1].body);
+    const lastTurn = callBody.contents[callBody.contents.length - 1];
+    expect(lastTurn.parts).toContainEqual({ inline_data: { mime_type: "image/jpeg", data: "QUJD" } });
+    const instruction = callBody.systemInstruction.parts[0].text;
+    expect(instruction).toContain("YOU CAN SEE THE ATTACHED FILE");
+    expect(instruction).toContain("never log it as 'other'");
+  });
+
+  it("never claims to see a file it couldn't load (someone else's, or unreadable)", async () => {
+    mocks.getSession.mockResolvedValue({ email: "rider@example.com" });
+    mocks.loadAttachmentForAi.mockResolvedValue(null);
+    await POST(request({ messages: [{ role: "user", content: "Log this receipt" }], attachment: realAttachment }));
+    const callBody = JSON.parse(mocks.fetch.mock.calls[0][1].body);
+    expect(JSON.stringify(callBody.contents)).not.toContain("inline_data");
+    expect(callBody.systemInstruction.parts[0].text).not.toContain("YOU CAN SEE THE ATTACHED FILE");
   });
 
   it("mentions no attachment in the system instruction when none was sent", async () => {

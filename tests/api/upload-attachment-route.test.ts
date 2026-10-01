@@ -128,8 +128,18 @@ describe("POST /api/tracker/upload-attachment", () => {
     expect(Buffer.from(uploadedBuffer)).toEqual(Buffer.from(expectedBytes));
     expect(options).toEqual({
       blobHTTPHeaders: { blobContentType: "image/jpeg" },
+      metadata: { ownerhash: expect.stringMatching(/^[0-9a-f]{64}$/) },
       abortSignal: expect.any(AbortSignal),
     });
+  });
+
+  it("stamps the upload with a hash of its uploader - never the email itself", async () => {
+    mocks.getSession.mockResolvedValue({ email: "owner@example.com" });
+    await POST(requestWithFile(validFile("image/jpeg", "a.jpg")));
+    const [, options] = mocks.uploadData.mock.calls[0];
+    const { attachmentOwnerHash } = await import("@/lib/tracker/chatAttachment");
+    expect(options.metadata.ownerhash).toBe(attachmentOwnerHash("owner@example.com"));
+    expect(JSON.stringify(options)).not.toContain("owner@example.com");
   });
 
   it("returns an attachment with a generated blobName, the original fileName, fileType, and an uploadedAt timestamp", async () => {

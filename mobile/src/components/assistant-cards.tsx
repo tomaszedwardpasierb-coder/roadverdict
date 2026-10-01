@@ -109,7 +109,7 @@ function day(iso: string): string {
   return /^\d{4}-\d{2}-\d{2}$/.test(iso) ? formatDay(`${iso}T12:00:00Z`) : iso;
 }
 
-export function EntryDraft({ entry }: { entry: ProposedEntry }) {
+export function EntryDraft({ entry, onSaved }: { entry: ProposedEntry; onSaved?: () => void }) {
   const { selected, refresh } = useVehicle();
   const { busy, error, send } = useConfirm();
   const [done, setDone] = useState<string | null>(null);
@@ -133,6 +133,7 @@ export function EntryDraft({ entry }: { entry: ProposedEntry }) {
     if (saved === null) return;
     setDone(entry.entryId ? 'Updated in your logbook' : 'Saved to your logbook');
     refresh();
+    onSaved?.();
   }
 
   return (
