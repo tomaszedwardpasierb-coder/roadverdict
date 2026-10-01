@@ -2,6 +2,7 @@ import * as SecureStore from 'expo-secure-store';
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 
 import { apiFetch, emailFromToken } from '@/lib/api';
+import { markJustSignedIn } from '@/lib/app-lock';
 import { unregisterPush } from '@/lib/push';
 import { forgetVault } from '@/lib/vault';
 
@@ -57,6 +58,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signIn = useCallback(async (newToken: string) => {
+    await markJustSignedIn();
     await SecureStore.setItemAsync(TOKEN_KEY, newToken);
     setToken(newToken);
     setStatus('signedIn');

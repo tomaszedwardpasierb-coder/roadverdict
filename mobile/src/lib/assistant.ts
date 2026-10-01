@@ -1,3 +1,7 @@
+import { File } from 'expo-file-system';
+
+import { API_BASE_URL, type ApiResult } from '@/lib/api';
+
 // The website's AI assistant (/api/assistant), for the app: the chat
 // itself, and the drafts it can hand back for the owner to confirm. Every
 // confirm goes through the same route the website's own draft card uses,
@@ -134,4 +138,31 @@ export function settingsLines(change: ProposedSettingsChange): { label: string; 
     label: SETTING_LABELS[key] ?? key,
     value: typeof value === 'boolean' ? (value ? 'Shown' : 'Hidden') : key === 'annualBudget' ? `£${Number(value).toLocaleString('en-GB')}` : String(value),
   }));
+}
+
+// A photo for the assistant to read: uploaded first, through the same
+// route the website's chat uses, and its reference sent with the message.
+// Any entry the assistant then drafts carries it as the receipt.
+export type ChatAttachment = { blobName: string; fileName: string; fileType: string; uploadedAt: string };
+
+export async function uploadChatPhoto(uri: string, token: string | null): Promise<ApiResult<{ attachment: ChatAttachment }>> {
+  const file = new File(uri);
+  if (file.type !== 'image/jpeg' && file.type !== 'image/png') {
+    return { ok: false, status: 0, error: 'That photo format isn’t supported - please choose a JPEG or PNG photo.' };
+  }
+  const form = new FormData();
+  form.append('file', file);
+  let response: Response;
+  try {
+    response = await fetch(`${API_BASE_URL}/api/tracker/upload-attachment`, {
+      method: 'POST',
+      headers: { Accept: 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+      body: form,
+    });
+  } catch {
+    return { ok: false, status: 0, error: 'Can’t reach RoadVerdict. Check your connection and try again.' };
+  }
+  const data = (await response.json().catch(() => null)) as { attachment?: ChatAttachment; error?: string } | null;
+  if (!response.ok || !data?.attachment) return { ok: false, status: response.status, error: data?.error ?? 'The photo couldn’t be added. Try again.' };
+  return { ok: true, status: response.status, data: { attachment: data.attachment } };
 }

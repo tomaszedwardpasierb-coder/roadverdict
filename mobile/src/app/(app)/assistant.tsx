@@ -2,21 +2,23 @@
 // anything about running costs, prices and your own history, or (on Pro)
 // tell it what you did and it drafts the entry for you to confirm. Type,
 // or tap the microphone and say it.
+import { Image } from 'expo-image';
+import * as ImagePicker from 'expo-image-picker';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useRef, useState } from 'react';
-import { ActivityIndicator, KeyboardAvoidingView, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, KeyboardAvoidingView, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { EntryDraft, FeedbackDraft, SettingsDraft, ShareLinkDraft, VaultDraftNote } from '@/components/assistant-cards';
 import { Icon } from '@/components/icon';
 import { Brand } from '@/constants/brand';
-import { MAX_TURNS, type AssistantReply, type ChatMessage } from '@/lib/assistant';
+import { MAX_TURNS, uploadChatPhoto, type AssistantReply, type ChatAttachment, type ChatMessage } from '@/lib/assistant';
 import { apiFetch } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { useDictation } from '@/lib/use-dictation';
 import { useVehicle, vehicleHeaders } from '@/lib/vehicle';
 
-type Turn = { role: 'user'; content: string } | ({ role: 'assistant'; content: string } & Omit<AssistantReply, 'reply'>);
+type Turn = { role: 'user'; content: string; photoUri?: string } | ({ role: 'assistant'; content: string } & Omit<AssistantReply, 'reply'>);
 
 const MAX_LENGTH = 2000; // the server's own per-message limit
 
@@ -35,17 +37,51 @@ export default function AssistantScreen() {
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const dictation = useDictation(draft, setDraft);
+  // A photo waiting to go with the next message - uploaded as soon as it's
+  // picked, so sending doesn't wait on it.
+  const [photo, setPhoto] = useState<{ uri: string; attachment: ChatAttachment | null } | null>(null);
+  const [photoError, setPhotoError] = useState<string | null>(null);
+
+  async function addPhoto(source: 'camera' | 'library') {
+    setPhotoError(null);
+    if (source === 'camera') {
+      const permission = await ImagePicker.requestCameraPermissionsAsync();
+      if (!permission.granted) return setPhotoError('Camera access is off. Allow it in your phone’s settings, or choose a photo instead.');
+    }
+    const options: ImagePicker.ImagePickerOptions = { mediaTypes: ['images'], quality: 0.7 };
+    const result = source === 'camera' ? await ImagePicker.launchCameraAsync(options) : await ImagePicker.launchImageLibraryAsync(options);
+    const asset = result.canceled ? null : result.assets[0];
+    if (!asset) return;
+    setPhoto({ uri: asset.uri, attachment: null });
+    const uploaded = await uploadChatPhoto(asset.uri, token);
+    if (!uploaded.ok) {
+      setPhoto(null);
+      if (uploaded.status === 401) return signOut();
+      return setPhotoError(uploaded.error);
+    }
+    setPhoto({ uri: asset.uri, attachment: uploaded.data.attachment });
+  }
+
+  function choosePhoto() {
+    Alert.alert('Add a photo', 'A receipt, a part, a dashboard warning light - the assistant reads it.', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Choose a photo', onPress: () => addPhoto('library') },
+      { text: 'Take a photo', onPress: () => addPhoto('camera') },
+    ]);
+  }
   const scroll = useRef<ScrollView>(null);
 
   const prompts = mode === 'log' ? PROMPTS.log : PROMPTS.ask;
 
   async function send(text: string) {
-    const content = text.trim().slice(0, MAX_LENGTH);
-    if (!content || sending) return;
+    const sendingPhoto = photo?.attachment ? photo : null;
+    const content = (text.trim() || (sendingPhoto ? 'What can you tell me from this photo?' : '')).slice(0, MAX_LENGTH);
+    if (!content || sending || (photo && !photo.attachment)) return;
     if (dictation.listening) dictation.stop();
-    const next: Turn[] = [...turns, { role: 'user', content }];
+    const next: Turn[] = [...turns, { role: 'user', content, ...(sendingPhoto ? { photoUri: sendingPhoto.uri } : {}) }];
     setTurns(next);
     setDraft('');
+    setPhoto(null);
     setError(null);
     setSending(true);
     const messages: ChatMessage[] = next.slice(-MAX_TURNS).map((t) => ({ role: t.role, content: t.content }));
@@ -53,7 +89,7 @@ export default function AssistantScreen() {
       method: 'POST',
       token,
       // Tells the server this is the app, so it never suggests buying Pro here.
-      body: { messages, client: 'android' },
+      body: { messages, client: 'android', ...(sendingPhoto ? { attachment: sendingPhoto.attachment } : {}) },
       headers: selected ? vehicleHeaders(selected) : undefined,
     });
     setSending(false);
@@ -117,6 +153,7 @@ export default function AssistantScreen() {
           {turns.map((turn, i) =>
             turn.role === 'user' ? (
               <View key={i} style={[styles.bubble, styles.mine]}>
+                {turn.photoUri ? <Image source={{ uri: turn.photoUri }} style={styles.sentPhoto} contentFit="cover" alt="Your photo" /> : null}
                 <Text style={styles.mineText}>{turn.content}</Text>
               </View>
             ) : (
@@ -148,8 +185,27 @@ export default function AssistantScreen() {
 
         <View style={styles.composer}>
           {dictation.problem ? <Text style={styles.problem}>{dictation.problem}</Text> : null}
+          {photoError ? <Text style={styles.problem}>{photoError}</Text> : null}
+          {photo ? (
+            <View style={styles.pending}>
+              <Image source={{ uri: photo.uri }} style={styles.pendingPhoto} contentFit="cover" alt="Photo to send" />
+              <Text style={styles.pendingText}>{photo.attachment ? 'Photo ready to send' : 'Adding the photo…'}</Text>
+              {!photo.attachment ? <ActivityIndicator color={Brand.muted} /> : null}
+              <Pressable onPress={() => setPhoto(null)} accessibilityRole="button" accessibilityLabel="Remove the photo" hitSlop={8}>
+                <Icon name="close" size={20} color={Brand.muted} />
+              </Pressable>
+            </View>
+          ) : null}
           {dictation.listening ? <Text style={styles.listening}>Listening… tap stop when you’re done</Text> : null}
           <View style={styles.inputRow}>
+            <Pressable
+              onPress={choosePhoto}
+              disabled={!!photo || sending}
+              accessibilityRole="button"
+              accessibilityLabel="Add a photo"
+              style={({ pressed }) => [styles.roundButton, styles.mic, (!!photo || sending) && styles.dim, pressed && { opacity: 0.85 }]}>
+              <Icon name="camera" size={21} color={Brand.ink} />
+            </Pressable>
             <TextInput
               value={draft}
               onChangeText={setDraft}
@@ -171,10 +227,10 @@ export default function AssistantScreen() {
             ) : null}
             <Pressable
               onPress={() => send(draft)}
-              disabled={!draft.trim() || sending}
+              disabled={(!draft.trim() && !photo?.attachment) || sending || (!!photo && !photo.attachment)}
               accessibilityRole="button"
               accessibilityLabel="Send"
-              style={({ pressed }) => [styles.roundButton, styles.sendButton, (!draft.trim() || sending) && styles.dim, pressed && { opacity: 0.85 }]}>
+              style={({ pressed }) => [styles.roundButton, styles.sendButton, ((!draft.trim() && !photo?.attachment) || sending) && styles.dim, pressed && { opacity: 0.85 }]}>
               <Icon name="send" size={20} color={Brand.asphalt} />
             </Pressable>
           </View>
@@ -231,4 +287,8 @@ const styles = StyleSheet.create({
   stopSquare: { width: 16, height: 16, borderRadius: 3, backgroundColor: Brand.danger },
   sendButton: { backgroundColor: Brand.amber },
   dim: { opacity: 0.5 },
+  sentPhoto: { width: 180, height: 180, borderRadius: 10, marginBottom: 6 },
+  pending: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 8, borderRadius: 12, borderWidth: 1, borderColor: Brand.line, backgroundColor: Brand.paperRaised },
+  pendingPhoto: { width: 44, height: 44, borderRadius: 8 },
+  pendingText: { flex: 1, fontSize: 14, color: Brand.ink },
 });

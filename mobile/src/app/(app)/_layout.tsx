@@ -2,8 +2,11 @@ import * as ImagePicker from 'expo-image-picker';
 import { Stack } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
 import { useEffect } from 'react';
+import { View } from 'react-native';
 
+import { AppLockScreen } from '@/components/app-lock';
 import { Brand } from '@/constants/brand';
+import { AppLockProvider, useAppLock } from '@/lib/app-lock';
 import { useAuth } from '@/lib/auth';
 import { listenForTaps, registerForPush } from '@/lib/push';
 import { requestMicrophone } from '@/lib/use-dictation';
@@ -33,8 +36,18 @@ async function firstOpenPermissions(token: string | null) {
 }
 
 // Signed-in part of the app: the five tabs, with the ⊕ add sheet
-// presented over whichever tab it was opened from.
+// presented over whichever tab it was opened from - behind the app lock,
+// when it's on.
 export default function AppLayout() {
+  return (
+    <AppLockProvider>
+      <SignedIn />
+    </AppLockProvider>
+  );
+}
+
+function SignedIn() {
+  const { locked } = useAppLock();
   const { token } = useAuth();
 
   useEffect(() => {
@@ -42,6 +55,10 @@ export default function AppLayout() {
   }, [token]);
 
   useEffect(() => listenForTaps(), []);
+
+  // Until the saved lock setting is read, show nothing - never a flash of
+  // the account before the lock goes up.
+  if (locked === null) return <View style={{ flex: 1, backgroundColor: Brand.asphalt }} />;
 
   return (
     <VehicleProvider>
@@ -52,6 +69,7 @@ export default function AppLayout() {
           options={{ presentation: 'transparentModal', animation: 'fade', contentStyle: { backgroundColor: 'transparent' } }}
         />
       </Stack>
+      {locked ? <AppLockScreen /> : null}
     </VehicleProvider>
   );
 }

@@ -11,6 +11,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Icon } from '@/components/icon';
 import { OptionPicker } from '@/components/option-picker';
 import { Card, ErrorState, LoadingState, SectionHeader } from '@/components/screen';
+import { AppLockSetting } from '@/components/app-lock-setting';
 import { PushTest } from '@/components/push-test';
 import { TwoFactorSection } from '@/components/two-factor';
 import { Brand } from '@/constants/brand';
@@ -59,6 +60,9 @@ export default function SettingsScreen() {
 
             <SectionHeader title="Security" />
             <TwoFactorSection enabled={account.data.twoFactorEnabled} onChanged={account.refresh} />
+
+            <SectionHeader title="App lock" />
+            <AppLockSetting />
 
             <SectionHeader title="Notifications" />
             <PushTest />
