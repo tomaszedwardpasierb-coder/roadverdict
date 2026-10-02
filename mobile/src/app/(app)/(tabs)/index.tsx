@@ -171,6 +171,10 @@ export default function HomeScreen() {
           setSwitcherOpen(false);
           router.push('/add-vehicle');
         }}
+        onCompare={() => {
+          setSwitcherOpen(false);
+          router.push('/compare');
+        }}
       />
     </SafeAreaView>
   );
@@ -195,6 +199,7 @@ function VehicleSwitcher({
   selected,
   onSelect,
   onAdd,
+  onCompare,
 }: {
   open: boolean;
   onClose: () => void;
@@ -202,6 +207,7 @@ function VehicleSwitcher({
   selected: GarageVehicle;
   onSelect: (v: GarageVehicle) => void;
   onAdd: () => void;
+  onCompare: () => void;
 }) {
   return (
     <Modal visible={open} transparent animationType="fade" onRequestClose={onClose}>
@@ -233,6 +239,12 @@ function VehicleSwitcher({
           <Icon name="plus" size={22} color={Brand.amberInk} />
           <Text style={styles.rowTitle}>Add a vehicle</Text>
         </Pressable>
+        {vehicles.filter((v) => !v.readOnly).length >= 2 ? (
+          <Pressable onPress={onCompare} accessibilityRole="button" style={({ pressed }) => [styles.sheetRow, pressed && { opacity: 0.85 }]}>
+            <Icon name="gauge" size={22} color={Brand.amberInk} />
+            <Text style={styles.rowTitle}>Compare vehicles</Text>
+          </Pressable>
+        ) : null}
       </SafeAreaView>
     </Modal>
   );

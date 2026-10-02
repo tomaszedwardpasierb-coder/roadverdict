@@ -16,7 +16,7 @@ import { versionLabel } from '@/lib/version';
 type Row = { label: string; later?: boolean; open?: () => void };
 
 const SECTIONS: { title: string; rows: Row[] }[] = [
-  { title: 'Garage', rows: [{ label: 'Add a vehicle', open: () => router.push('/add-vehicle') }] },
+  { title: 'Garage', rows: [{ label: 'Add a vehicle', open: () => router.push('/add-vehicle') }, { label: 'Compare vehicles', open: () => router.push('/compare') }] },
   { title: 'Tools', rows: [{ label: 'AI assistant', open: () => router.push('/assistant') }, { label: 'Quote checker', open: () => router.push('/quote') }, { label: 'Cost calculator', open: () => router.push('/costs') }, { label: 'MPG calculator', open: () => router.push('/fuel-economy') }, { label: 'Buying guide & plate check', open: () => router.push('/buying') }] },
   { title: 'Insights', rows: [{ label: 'Reports & charts', open: () => router.push('/reports') }, { label: 'The story so far', open: () => router.push('/story') }] },
   { title: 'Selling', rows: [{ label: 'Shareable links', open: () => router.push('/share-links') }, { label: 'Transfer ownership', open: () => router.push('/transfer') }] },
