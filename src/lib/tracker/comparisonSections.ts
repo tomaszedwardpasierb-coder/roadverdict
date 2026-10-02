@@ -29,7 +29,7 @@ export function periodLabel(period: ComparisonPeriod | null): string {
 // nearest whole unit (a lump cost like £320 has no reason to show
 // pence), so this is its own small formatter rather than reusing that
 // one for a case it was never meant to handle.
-function formatCostPerDistanceUnit(costPerMileGbp: number, currency: Currency, rates: ExchangeRates | null, distanceUnit: DistanceUnit): string {
+export function formatCostPerDistanceUnit(costPerMileGbp: number, currency: Currency, rates: ExchangeRates | null, distanceUnit: DistanceUnit): string {
   const perUnitGbp = distanceUnit === "km" ? costPerMileGbp / KM_PER_MILE : costPerMileGbp;
   const displayValue = convertGbpToDisplay(perUnitGbp, currency, rates);
   return `${CURRENCY_SYMBOLS[currency]}${displayValue.toFixed(2)}/${distanceUnit}`;

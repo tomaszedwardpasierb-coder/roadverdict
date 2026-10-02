@@ -73,8 +73,8 @@ describe("getAppComparison", () => {
   it("compares a bike and a car in the order asked, with the cheaper one winning cost per mile", async () => {
     const data = await getAppComparison(email, ["c1", "b1"]);
     expect(data.comparison?.names).toEqual(["BMW i4", "Blue - Yamaha MT-07"]);
-    expect(mocks.buildBikeComparison).toHaveBeenCalledWith(email, ["b1"]);
-    expect(mocks.buildCarComparison).toHaveBeenCalledWith(email, ["c1"]);
+    expect(mocks.buildBikeComparison).toHaveBeenCalledWith(email, ["b1"], undefined);
+    expect(mocks.buildCarComparison).toHaveBeenCalledWith(email, ["c1"], undefined);
     const costRow = data.comparison!.sections[0].rows[0];
     expect(costRow.label).toContain("Cost per mile");
     expect(costRow.winnerIndex).toBe(0);

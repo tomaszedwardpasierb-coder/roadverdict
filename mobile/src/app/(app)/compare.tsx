@@ -4,13 +4,15 @@
 // as the website). Pro only; a free account gets the plain Pro lock.
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Icon } from '@/components/icon';
 import { ProLock } from '@/components/pro-lock';
 import { Card, ErrorState, LoadingState } from '@/components/screen';
 import { Brand } from '@/constants/brand';
+import { apiFetch } from '@/lib/api';
+import { useAuth } from '@/lib/auth';
 import { useApi } from '@/lib/use-api';
 
 type CompareVehicle = { kind: 'bike' | 'car'; id: string; name: string };
@@ -114,7 +116,7 @@ export default function CompareScreen() {
                 style={({ pressed }) => [styles.primary, (!canCompare || api.loading) && styles.dim, pressed && { opacity: 0.85 }]}>
                 <Text style={styles.primaryLabel}>{api.loading ? 'Comparing…' : showingCurrent ? 'Compared' : 'Compare'}</Text>
               </Pressable>
-              {data.comparison ? <ComparisonView comparison={data.comparison} /> : null}
+              {data.comparison ? <ComparisonView comparison={data.comparison} ids={compared} key={compared.join(',')} /> : null}
             </>
           )}
         </ScrollView>
@@ -125,9 +127,10 @@ export default function CompareScreen() {
 
 // Each row stacks one line per vehicle, so the numbers stay readable on a
 // phone instead of squeezing into a wide table.
-function ComparisonView({ comparison }: { comparison: Comparison }) {
+function ComparisonView({ comparison, ids }: { comparison: Comparison; ids: string[] }) {
   return (
     <View style={styles.results}>
+      <AiSummary ids={ids} />
       {comparison.verdict ? (
         <Card style={styles.verdict}>
           <Text style={styles.verdictText}>{comparison.verdict}</Text>
@@ -166,7 +169,98 @@ function ComparisonView({ comparison }: { comparison: Comparison }) {
   );
 }
 
+type Summary = { summary: string; points: string[]; generatedAt: string };
+
+// The AI-written read of the comparison (the website shows the same one -
+// see /api/compare/summary). A saved one shows straight away; otherwise
+// it's written only when asked, so opening this screen never costs an AI
+// call by itself.
+function AiSummary({ ids }: { ids: string[] }) {
+  const { token } = useAuth();
+  const [summary, setSummary] = useState<Summary | null>(null);
+  const [checking, setChecking] = useState(true);
+  const [writing, setWriting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    apiFetch<{ summary: Summary | null }>('/api/compare/summary', { method: 'POST', body: { ids, generate: false }, token }).then((result) => {
+      if (cancelled) return;
+      if (result.ok) setSummary(result.data.summary);
+      setChecking(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [ids, token]);
+
+  async function write() {
+    setWriting(true);
+    setError(null);
+    const result = await apiFetch<{ summary: Summary | null }>('/api/compare/summary', { method: 'POST', body: { ids, generate: true }, token });
+    setWriting(false);
+    if (result.ok) setSummary(result.data.summary);
+    else setError(result.error);
+  }
+
+  if (checking) return null;
+
+  if (summary) {
+    return (
+      <Card style={styles.card}>
+        <View style={styles.summaryHead}>
+          <Icon name="sparkle" size={18} color={Brand.amberInk} />
+          <Text style={styles.cardTitle}>Summary</Text>
+        </View>
+        <Text style={styles.body}>{summary.summary}</Text>
+        {summary.points.map((point) => (
+          <View key={point} style={styles.point}>
+            <Text style={styles.body}>•</Text>
+            <Text style={[styles.body, styles.flex]}>{point}</Text>
+          </View>
+        ))}
+        <Text style={styles.note}>Written by AI from the figures below.</Text>
+      </Card>
+    );
+  }
+
+  return (
+    <View style={styles.writeWrap}>
+      <Pressable
+        onPress={write}
+        disabled={writing}
+        accessibilityRole="button"
+        style={({ pressed }) => [styles.secondary, writing && styles.dim, pressed && { opacity: 0.85 }]}>
+        {writing ? <ActivityIndicator color={Brand.amberInk} /> : <Icon name="sparkle" size={18} color={Brand.amberInk} />}
+        <Text style={styles.secondaryLabel}>{writing ? 'Writing…' : 'Write a summary'}</Text>
+      </Pressable>
+      <Text style={styles.note}>A short AI-written read of these figures: what’s cheaper to run, what’s used most, and why.</Text>
+      {error ? (
+        <Text style={styles.error} accessibilityRole="alert">
+          {error}
+        </Text>
+      ) : null}
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
+  summaryHead: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  point: { flexDirection: 'row', gap: 8 },
+  writeWrap: { gap: 6 },
+  secondary: {
+    minHeight: 52,
+    flexDirection: 'row',
+    gap: 8,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderColor: Brand.amberInk,
+    backgroundColor: Brand.paperRaised,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  secondaryLabel: { fontSize: 16, fontWeight: '700', color: Brand.amberInk },
+  error: { fontSize: 14, color: Brand.danger },
   safe: { flex: 1, backgroundColor: Brand.paper },
   flex: { flex: 1 },
   header: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingTop: 8 },

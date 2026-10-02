@@ -198,11 +198,12 @@ describe("deleteAccount", () => {
     // bikeTransferRequest, receiptRequest, carTransferRequest,
     // carReceiptRequest, totpEnrollmentPending, totpPendingLogin,
     // totpAttempt, trackerWriteAttempt, vaultSession, vaultUploadLock,
-    // appLoginCode, appLoginCodeAttempt (17, one query + one delete
-    // each) - plus assistantQuestion and vdiPurchase, the two
-    // cross-partition-by-email-field types, whose query also happens to
-    // match the same "c.type = @type" mock condition above (19 total).
-    expect(mocks.itemDelete).toHaveBeenCalledTimes(19);
+    // appLoginCode, appLoginCodeAttempt, comparisonSummary (18, one
+    // query + one delete each) - plus assistantQuestion and vdiPurchase,
+    // the two cross-partition-by-email-field types, whose query also
+    // happens to match the same "c.type = @type" mock condition above
+    // (20 total).
+    expect(mocks.itemDelete).toHaveBeenCalledTimes(20);
   });
 
   // Regression test: carTransferRequest/carReceiptRequest are

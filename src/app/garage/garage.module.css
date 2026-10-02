@@ -182,3 +182,22 @@
   text-transform: uppercase;
   color: var(--verdict-green);
 }
+
+.compareSummary {
+  background: var(--stone);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.9rem 1.1rem;
+  margin-bottom: 0.8rem;
+}
+
+.compareSummary p {
+  margin: 0 0 0.5rem;
+  line-height: 1.55;
+}
+
+.compareSummary ul {
+  margin: 0 0 0.5rem 1.1rem;
+  padding: 0;
+  line-height: 1.5;
+}

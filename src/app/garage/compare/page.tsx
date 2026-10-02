@@ -17,6 +17,7 @@ import { ProGate } from "@/app/dashboard/ProGate";
 import garageStyles from "../garage.module.css";
 import { ComparisonPicker } from "./ComparisonPicker";
 import { ComparisonTable } from "./ComparisonTable";
+import { ComparisonSummaryCard } from "./ComparisonSummaryCard";
 
 export const dynamic = "force-dynamic";
 
@@ -147,6 +148,7 @@ export default async function ComparePage(
             )}
             {showComparison && entries.length >= MIN_COMPARE && primaryVehicle && (
               <div style={{ marginTop: "1.3rem" }}>
+                <ComparisonSummaryCard ids={requestedIds} from={from} to={to} key={[...requestedIds, from, to].join("|")} />
                 <ComparisonTable
                   entries={entries}
                   currency={primaryVehicle.currency ?? "GBP"}
