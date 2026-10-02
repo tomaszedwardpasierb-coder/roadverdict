@@ -63,17 +63,14 @@ describe("DELETE /api/tracker/bike/[bikeId]", () => {
     expect(mocks.deleteBike).toHaveBeenCalledWith("owner@example.com", ownBikeId);
   });
 
-  it("blocks deletion of a transferred (read-only) bike", async () => {
+  it("deletes a transferred (read-only) bike too - it's this owner's own historical copy", async () => {
     mocks.getSession.mockResolvedValue({ email: "owner@example.com" });
-    mocks.isBikeReadOnly.mockReturnValue(true);
+    mocks.getBikesForUser.mockResolvedValue([{ id: ownBikeId, transferredTo: { newBikeId: "x", newOwnerEmail: "new@example.com", transferredAt: "2026-01-01" } }]);
 
     const response = await DELETE(request(), { params: Promise.resolve({ bikeId: ownBikeId }) });
 
-    expect(response.status).toBe(403);
-    await expect(response.json()).resolves.toEqual({
-      error: "This bike has been transferred and is now read-only.",
-    });
-    expect(mocks.deleteBike).not.toHaveBeenCalled();
+    expect(response.status).toBe(200);
+    expect(mocks.deleteBike).toHaveBeenCalledWith("owner@example.com", ownBikeId);
   });
 
   it("deletes the bike and returns ok when it belongs to the account and isn't read-only", async () => {

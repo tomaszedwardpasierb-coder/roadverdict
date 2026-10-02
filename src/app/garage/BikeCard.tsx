@@ -65,7 +65,9 @@ export function BikeCard({ bikeId, name, year, isCustomBuild, currentMileage, is
   async function handleDelete() {
     if (
       !confirm(
-        `Delete "${name}"? This permanently deletes this bike AND every service, fuel, mods, bills, and reminder entry logged against it. This cannot be undone.`
+        transferredToEmail
+          ? `Delete your read-only copy of "${name}"? Its history disappears from your garage for good. ${transferredToEmail} keeps their own copy, with everything that was transferred.`
+          : `Delete "${name}"? This permanently deletes this bike AND every service, fuel, mods, bills, and reminder entry logged against it. This cannot be undone.`
       )
     ) {
       return;
@@ -156,21 +158,18 @@ export function BikeCard({ bikeId, name, year, isCustomBuild, currentMileage, is
           {loading && <VehicleSpinner kind="bike" size={20} />}
           {loading ? 'Switching…' : 'View dashboard'}
         </button>
-        {/* Change registration and Delete both reject a read-only bike
-            server-side unconditionally, so there's no point showing
-            either here - it would just fail with no clear reason why,
-            which is very likely what actually happened before this. */}
+        {/* Change registration rejects a read-only bike server-side, so
+            it's hidden here. Delete works on one - it removes only this
+            owner's historical copy (see the DELETE route). */}
         {!transferredToEmail && currentRegistration && (
           <button type="button" className={styles.deleteBtn} onClick={() => setShowChangeForm((s) => !s)} disabled={loading || deleting}>
             {showChangeForm ? 'Cancel' : 'Change registration'}
           </button>
         )}
-        {!transferredToEmail && (
-          <button type="button" className={styles.deleteBtn} onClick={handleDelete} disabled={loading || deleting}>
-            {deleting && <VehicleSpinner kind="bike" size={20} />}
-            {deleting ? 'Deleting…' : 'Delete'}
-          </button>
-        )}
+        <button type="button" className={styles.deleteBtn} onClick={handleDelete} disabled={loading || deleting}>
+          {deleting && <VehicleSpinner kind="bike" size={20} />}
+          {deleting ? 'Deleting…' : 'Delete'}
+        </button>
       </div>
       {deleteError && <p className="error-text" role="alert" style={{ marginTop: '0.5rem' }}>{deleteError}</p>}
 

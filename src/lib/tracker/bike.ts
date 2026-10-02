@@ -9,7 +9,7 @@ import type { DistanceUnit, FuelEconomyUnit } from "@/lib/tracker/unitFormat";
 import type { Currency } from "@/lib/tracker/currency";
 import type { BikeIdentity, CategorySpend } from "@/lib/tracker/storyFacts";
 import { REFRESH_DATA_COOLDOWN_MS } from "@/lib/tracker/refreshDataCooldown";
-import { deleteAttachmentBlobsBestEffort } from "@/lib/blobStorage";
+import { deleteAttachmentBlobsNoLongerReferenced } from "@/lib/tracker/sharedAttachments";
 import { deleteVaultDocumentsForVehicle } from "@/lib/tracker/vaultDocument";
 
 // Free-tier cap - Pro accounts (see isPro() below) skip it entirely.
@@ -650,7 +650,7 @@ export async function addRegistrationChange(
 // a bike can have had several links created over its life and every one
 // needs to go), every Vault document and its underlying blob
 // (deleteVaultDocumentsForVehicle), and every attachment blob referenced
-// by a deleted record (deleteAttachmentBlobsBestEffort) - none of which
+// by a deleted record (deleteAttachmentBlobsNoLongerReferenced) - none of which
 // this function used to touch at all, leaving real files (receipts,
 // V5C/insurance/licence scans) orphaned in storage after "deletion".
 export async function deleteBike(email: string, bikeId: string): Promise<void> {
@@ -705,7 +705,9 @@ export async function deleteBike(email: string, bikeId: string): Promise<void> {
     )
   );
 
-  await Promise.all([deleteAttachmentBlobsBestEffort(blobNames), deleteVaultDocumentsForVehicle(email, bikeId)]);
+  // Only files no other record still uses - a transferred vehicle's
+  // records share theirs with the other owner's copy.
+  await Promise.all([deleteAttachmentBlobsNoLongerReferenced(blobNames), deleteVaultDocumentsForVehicle(email, bikeId)]);
 
   await container.item(bikeId, email).delete();
 }

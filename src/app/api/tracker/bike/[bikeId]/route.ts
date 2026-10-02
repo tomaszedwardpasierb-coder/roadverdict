@@ -1,7 +1,7 @@
 // Place at: src/app/api/tracker/bike/[bikeId]/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/session";
-import { getBikesForUser, deleteBike, isBikeReadOnly, BIKE_READ_ONLY_MESSAGE } from "@/lib/tracker/bike";
+import { getBikesForUser, deleteBike } from "@/lib/tracker/bike";
 import { logImpersonationActivityForCurrentRequest } from "@/lib/admin/impersonation";
 
 export const dynamic = "force-dynamic";
@@ -22,11 +22,11 @@ export async function DELETE(request: NextRequest, props: { params: Promise<{ bi
   if (!bike) {
     return NextResponse.json({ error: "Bike not found on this account." }, { status: 404 });
   }
-  // A transferred bike is read-only - deleting it would leave the new
-  // owner's copy pointing back at nothing, breaking the ownership chain.
-  if (isBikeReadOnly(bike)) {
-    return NextResponse.json({ error: BIKE_READ_ONLY_MESSAGE }, { status: 403 });
-  }
+  // A transferred (read-only) bike can be deleted too - it's this
+  // owner's own historical copy. The new owner's copy never reads it
+  // (transferredFrom keeps its own frozen summary), and deleteBike only
+  // removes receipt files no other record still uses, so the new owner's
+  // copied records keep theirs.
 
   await deleteBike(session.email, bikeId);
   void logImpersonationActivityForCurrentRequest("bike", bikeId, "delete");

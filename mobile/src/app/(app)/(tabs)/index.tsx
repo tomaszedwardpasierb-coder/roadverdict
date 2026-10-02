@@ -1,12 +1,14 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { Modal, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Modal, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { EntryRow, type LogEntry } from '@/components/entry-row';
 import { Icon, type IconName } from '@/components/icon';
 import { Card, ErrorState, LoadingState, SectionHeader, StatusPill } from '@/components/screen';
 import { Brand } from '@/constants/brand';
+import { apiFetch } from '@/lib/api';
+import { useAuth } from '@/lib/auth';
 import { openEntry } from '@/lib/entries';
 import { useApi } from '@/lib/use-api';
 import type { NotificationList } from '@/app/(app)/notifications';
@@ -175,6 +177,7 @@ export default function HomeScreen() {
           setSwitcherOpen(false);
           router.push('/compare');
         }}
+        onDeleted={garage.refresh}
       />
     </SafeAreaView>
   );
@@ -200,6 +203,7 @@ function VehicleSwitcher({
   onSelect,
   onAdd,
   onCompare,
+  onDeleted,
 }: {
   open: boolean;
   onClose: () => void;
@@ -208,7 +212,36 @@ function VehicleSwitcher({
   onSelect: (v: GarageVehicle) => void;
   onAdd: () => void;
   onCompare: () => void;
+  onDeleted: () => void;
 }) {
+  const { token } = useAuth();
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  // The website garage's Delete: the vehicle and everything logged against
+  // it. A transferred (read-only) one is only this owner's historical copy -
+  // the new owner keeps theirs, receipts included.
+  function confirmDelete(v: GarageVehicle) {
+    const message = v.readOnly
+      ? `Delete your read-only copy of ${v.name}? Its history disappears from your garage for good. The new owner keeps their own copy, with everything that was transferred.`
+      : `This permanently deletes ${v.name} and every service, fuel, parts, bill and reminder entry logged against it, with its receipts and Vault documents. This can't be undone.`;
+    Alert.alert(`Delete ${v.name}?`, message, [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Delete', style: 'destructive', onPress: () => remove(v) },
+    ]);
+  }
+
+  async function remove(v: GarageVehicle) {
+    setDeletingId(v.id);
+    const path = v.kind === 'bike' ? `/api/tracker/bike/${encodeURIComponent(v.id)}` : `/api/cars/car/${encodeURIComponent(v.id)}`;
+    const result = await apiFetch<{ ok: true }>(path, { method: 'DELETE', token });
+    setDeletingId(null);
+    if (!result.ok) {
+      Alert.alert('Couldn’t delete it', result.error);
+      return;
+    }
+    onDeleted();
+  }
+
   return (
     <Modal visible={open} transparent animationType="fade" onRequestClose={onClose}>
       <Pressable style={styles.backdrop} onPress={onClose} accessibilityLabel="Close" />
@@ -232,6 +265,19 @@ function VehicleSwitcher({
                 </Text>
               </View>
               {isSelected ? <Icon name="check" size={22} color={Brand.amberInk} /> : null}
+              {deletingId === v.id ? (
+                <ActivityIndicator color={Brand.danger} style={styles.sheetDelete} />
+              ) : (
+                <Pressable
+                  onPress={() => confirmDelete(v)}
+                  disabled={deletingId !== null}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Delete ${v.name}`}
+                  hitSlop={6}
+                  style={({ pressed }) => [styles.sheetDelete, pressed && { opacity: 0.6 }]}>
+                  <Icon name="trash" size={20} color={Brand.danger} />
+                </Pressable>
+              )}
             </Pressable>
           );
         })}
@@ -296,6 +342,7 @@ const styles = StyleSheet.create({
   sheet: { backgroundColor: Brand.paperRaised, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20, gap: 8 },
   sheetTitle: { fontSize: 22, fontWeight: '800', color: Brand.ink, marginBottom: 4 },
   sheetRow: { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 64, paddingHorizontal: 14, borderRadius: 12, borderWidth: 1, borderColor: Brand.line },
+  sheetDelete: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   sheetRowSelected: { borderColor: Brand.amber, backgroundColor: '#FBF4E8' },
   sheetAdd: { borderStyle: 'dashed', borderColor: '#C9C4B8' },
 });

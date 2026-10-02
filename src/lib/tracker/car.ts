@@ -19,7 +19,7 @@ import type { DistanceUnit, FuelEconomyUnit } from "@/lib/tracker/unitFormat";
 import type { Currency } from "@/lib/tracker/currency";
 import type { ChartKind, DvlaVehicleData, RegistrationChangeEntry, RegistrationChangeReason } from "@/lib/tracker/bike";
 import { REFRESH_DATA_COOLDOWN_MS } from "@/lib/tracker/refreshDataCooldown";
-import { deleteAttachmentBlobsBestEffort } from "@/lib/blobStorage";
+import { deleteAttachmentBlobsNoLongerReferenced } from "@/lib/tracker/sharedAttachments";
 import { deleteVaultDocumentsForVehicle } from "@/lib/tracker/vaultDocument";
 
 export type CarFuelType = "petrol" | "diesel" | "hybrid" | "phev" | "electric";
@@ -484,7 +484,9 @@ export async function deleteCar(email: string, carId: string): Promise<void> {
     )
   );
 
-  await Promise.all([deleteAttachmentBlobsBestEffort(blobNames), deleteVaultDocumentsForVehicle(email, carId)]);
+  // Only files no other record still uses - a transferred vehicle's
+  // records share theirs with the other owner's copy.
+  await Promise.all([deleteAttachmentBlobsNoLongerReferenced(blobNames), deleteVaultDocumentsForVehicle(email, carId)]);
 
   await container.item(carId, email).delete();
 }

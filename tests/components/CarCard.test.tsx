@@ -83,11 +83,11 @@ describe("CarCard", () => {
     expect(mockRouter.push).not.toHaveBeenCalled();
   });
 
-  it("a transferred (read-only) car shows the read-only badge and hides Delete and Change registration", () => {
+  it("a transferred (read-only) car shows the read-only badge, hides Change registration and still offers Delete", () => {
     render(<CarCard {...baseProps} transferredToEmail="newowner@example.com" currentRegistration="AB12CDE" />);
 
     expect(screen.getByText("Read-only - transferred to newowner@example.com")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Delete" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Delete" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Change registration" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "View dashboard" })).toBeInTheDocument();
   });

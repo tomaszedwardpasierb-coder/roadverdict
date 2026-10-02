@@ -1,7 +1,7 @@
 // Place at: src/app/api/cars/car/[carId]/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/session";
-import { getCarsForUser, deleteCar, isCarReadOnly, CAR_READ_ONLY_MESSAGE } from "@/lib/tracker/car";
+import { getCarsForUser, deleteCar } from "@/lib/tracker/car";
 import { logImpersonationActivityForCurrentRequest } from "@/lib/admin/impersonation";
 
 export const dynamic = "force-dynamic";
@@ -22,9 +22,8 @@ export async function DELETE(request: NextRequest, props: { params: Promise<{ ca
   if (!car) {
     return NextResponse.json({ error: "Car not found on this account." }, { status: 404 });
   }
-  if (isCarReadOnly(car)) {
-    return NextResponse.json({ error: CAR_READ_ONLY_MESSAGE }, { status: 403 });
-  }
+  // A transferred (read-only) car can be deleted too - see the bike
+  // route's DELETE for why that's safe for the new owner's copy.
 
   await deleteCar(session.email, carId);
   void logImpersonationActivityForCurrentRequest("car", carId, "delete");
