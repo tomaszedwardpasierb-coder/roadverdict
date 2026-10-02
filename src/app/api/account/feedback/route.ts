@@ -2,13 +2,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/session";
 import { sendFeedbackEmail } from "@/lib/resend";
-import { createFeedback, type FeedbackKind } from "@/lib/tracker/feedback";
+import { createFeedback, type FeedbackDoc, type FeedbackKind } from "@/lib/tracker/feedback";
 import type { Attachment } from "@/lib/tracker/cosmosHelpers";
 
 export const dynamic = "force-dynamic";
 
 const MAX_MESSAGE_LENGTH = 4000;
-const VALID_TYPES = ["feature", "bug", "other"] as const;
+// ai_report: someone reporting AI-written text from the app's "Report" link -
+// the message carries which feature it came from and the text itself.
+const VALID_TYPES = ["feature", "bug", "other", "ai_report"] as const;
 const MAX_ATTACHMENTS = 3;
 const ALLOWED_ATTACHMENT_TYPES = new Set(["image/jpeg", "image/png"]);
 
@@ -62,7 +64,7 @@ export async function POST(request: NextRequest) {
     }
     validAttachments = attachments;
   }
-  const validSource: "settings" | "assistant" = source === "assistant" ? "assistant" : "settings";
+  const validSource: FeedbackDoc["source"] = type === "ai_report" ? "report" : source === "assistant" ? "assistant" : "settings";
 
   // The durable record is now the source of truth - a submission that
   // fails to save here genuinely failed, unlike the email below, which
@@ -75,7 +77,7 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    await sendFeedbackEmail(session.email, type as "feature" | "bug" | "other", trimmed);
+    await sendFeedbackEmail(session.email, type as FeedbackKind, trimmed);
   } catch (err) {
     console.error("feedback: failed to send notification email (feedback was still saved):", err);
   }

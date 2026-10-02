@@ -3,7 +3,9 @@
 // Feature requests and bug reports, raised either through the manual
 // "Feature request / report a bug" form (SettingsTab.tsx) or by the AI
 // assistant on the user's behalf (see assistantTools.ts's
-// toolProposeFeedback). Single fixed partition, not each user's own -
+// toolProposeFeedback) - and reports of AI-written text (the app's
+// "Report" link beside every AI answer and summary, which Google Play's
+// AI-generated content policy requires). Single fixed partition, not each user's own -
 // same reasoning as assistantQuestionLog.ts: this is read back as one
 // admin list across everyone, not queried per-user the way the rest of
 // this container's documents are.
@@ -20,7 +22,7 @@ import type { Attachment } from "./cosmosHelpers";
 const FEEDBACK_TYPE = "feedback";
 const FEEDBACK_PARTITION_KEY = "feedback-log";
 
-export type FeedbackKind = "feature" | "bug" | "other";
+export type FeedbackKind = "feature" | "bug" | "other" | "ai_report";
 export type FeedbackStatus = "new" | "reviewed" | "resolved";
 
 export interface FeedbackDoc {
@@ -38,7 +40,7 @@ export interface FeedbackDoc {
   attachments?: Attachment[];
   // Which surface it was raised from - purely informational, shown in
   // the admin view, never used to gate anything.
-  source: "settings" | "assistant";
+  source: "settings" | "assistant" | "report";
 }
 
 export async function createFeedback(
@@ -46,7 +48,7 @@ export async function createFeedback(
   feedbackType: FeedbackKind,
   message: string,
   attachments: Attachment[] | undefined,
-  source: "settings" | "assistant"
+  source: FeedbackDoc["source"]
 ): Promise<FeedbackDoc> {
   const container = getContainer();
   const doc: FeedbackDoc = {

@@ -10,11 +10,9 @@
 // this container's documents are.
 //
 // This links a real identity (email) to what someone typed, which is
-// personal data. It isn't described in the privacy policy yet -
-// neither the live one nor the more comprehensive draft, both of which
-// predate this file - and it needs to be before this is genuinely
-// accurate. See the privacy-draft work elsewhere in this project for
-// the pattern to follow when adding it.
+// personal data. The privacy policy describes it under "The AI
+// assistant" (legitimate interests, kept until the account is deleted -
+// deleteAccount removes an account's questions).
 import { getContainer } from "@/lib/cosmos";
 
 const LOG_TYPE = "assistantQuestion";

@@ -684,9 +684,9 @@ export async function sendAccountDeletedEmail(email: string) {
 // fromEmail/message are both raw, user-supplied - never trust either as
 // safe HTML, same rule escapeHtml's own comment states for buyerMessage
 // above.
-export async function sendFeedbackEmail(fromEmail: string, type: "feature" | "bug" | "other", message: string) {
+export async function sendFeedbackEmail(fromEmail: string, type: "feature" | "bug" | "other" | "ai_report", message: string) {
   const resend = getResend();
-  const typeLabel = type === "feature" ? "Feature request" : type === "bug" ? "Bug report" : "Feedback";
+  const typeLabel = type === "feature" ? "Feature request" : type === "bug" ? "Bug report" : type === "ai_report" ? "Reported AI content" : "Feedback";
   const html = renderEmailLayout({
     preheader: `${typeLabel} from ${fromEmail}`,
     heading: typeLabel,

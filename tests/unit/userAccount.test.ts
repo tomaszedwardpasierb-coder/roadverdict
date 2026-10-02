@@ -198,12 +198,12 @@ describe("deleteAccount", () => {
     // bikeTransferRequest, receiptRequest, carTransferRequest,
     // carReceiptRequest, totpEnrollmentPending, totpPendingLogin,
     // totpAttempt, trackerWriteAttempt, vaultSession, vaultUploadLock,
-    // appLoginCode, appLoginCodeAttempt, comparisonSummary (18, one
-    // query + one delete each) - plus assistantQuestion and vdiPurchase,
-    // the two cross-partition-by-email-field types, whose query also
-    // happens to match the same "c.type = @type" mock condition above
-    // (20 total).
-    expect(mocks.itemDelete).toHaveBeenCalledTimes(20);
+    // appLoginCode, appLoginCodeAttempt, comparisonSummary, pushToken,
+    // trustedDevice (20, one query + one delete each) - plus
+    // assistantQuestion, vdiPurchase and feedback, the cross-partition-by-
+    // email-field types, whose query also happens to match the same
+    // "c.type = @type" mock condition above (23 total).
+    expect(mocks.itemDelete).toHaveBeenCalledTimes(23);
   });
 
   // Regression test: carTransferRequest/carReceiptRequest are
@@ -222,6 +222,19 @@ describe("deleteAccount", () => {
 
     expect(queriedTypes).toContain("carTransferRequest");
     expect(queriedTypes).toContain("carReceiptRequest");
+  });
+
+  it("removes the account's phones (push tokens, trusted phones) and its feedback and AI reports", async () => {
+    const queriedTypes: string[] = [];
+    mocks.query.mockImplementation((q: { query: string; parameters?: { name: string; value: string }[] }) => {
+      const type = q.parameters?.find((p) => p.name === "@type")?.value;
+      if (type) queriedTypes.push(type);
+      return Promise.resolve({ resources: [] });
+    });
+
+    await deleteAccount(email);
+
+    expect(queriedTypes).toEqual(expect.arrayContaining(["pushToken", "trustedDevice", "feedback"]));
   });
 
   it("best-effort cleans up assistantQuestion entries via the cross-partition email query, without failing the whole deletion if that lookup throws", async () => {

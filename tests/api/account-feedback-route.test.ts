@@ -61,6 +61,14 @@ describe("POST /api/account/feedback", () => {
     expect(mocks.sendFeedbackEmail).toHaveBeenCalledWith("rider@example.com", "bug", "The mileage field is blank");
   });
 
+  it("takes a report of AI-written text from the app's Report link, filed as a report", async () => {
+    const message = ["Assistant reply:", "", "Something offensive"].join("\n");
+    const response = await POST(request(JSON.stringify({ type: "ai_report", message, source: "assistant" })));
+    expect(response.status).toBe(200);
+    expect(mocks.createFeedback).toHaveBeenCalledWith("rider@example.com", "ai_report", message, undefined, "report");
+    expect(mocks.sendFeedbackEmail).toHaveBeenCalledWith("rider@example.com", "ai_report", message);
+  });
+
   it("defaults source to 'settings' but honours 'assistant' when given", async () => {
     await POST(request(JSON.stringify({ type: "feature", message: "Add dark mode", source: "assistant" })));
     expect(mocks.createFeedback).toHaveBeenCalledWith("rider@example.com", "feature", "Add dark mode", undefined, "assistant");

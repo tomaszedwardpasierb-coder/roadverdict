@@ -20,6 +20,7 @@ const TYPE_LABELS: Record<FeedbackDoc['feedbackType'], string> = {
   feature: 'Feature request',
   bug: 'Bug report',
   other: 'Other',
+  ai_report: 'Reported AI content',
 };
 
 function StatusSelect({ id, status }: { id: string; status: FeedbackStatus }) {

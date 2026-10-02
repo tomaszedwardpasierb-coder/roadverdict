@@ -274,8 +274,8 @@ async function deleteAvatarBlobBestEffort(email: string, avatarBlobName: string 
 // - the account's own avatar blob (deleteAvatarBlobBestEffort)
 // - every other document type keyed by this email as partition key,
 //   point-deleted directly below
-// - assistantQuestion and vdiPurchase entries mentioning this email -
-//   the two doc types NOT partitioned by email (see
+// - assistantQuestion, vdiPurchase and feedback entries mentioning this
+//   email - the doc types NOT partitioned by email (see
 //   deleteCrossPartitionDocsByEmailField above)
 export async function deleteAccount(email: string): Promise<void> {
   const container = getContainer();
@@ -305,6 +305,9 @@ export async function deleteAccount(email: string): Promise<void> {
     "bikeTransferRequest", "receiptRequest", "carTransferRequest", "carReceiptRequest",
     "totpEnrollmentPending", "totpPendingLogin", "totpAttempt", "trackerWriteAttempt",
     "vaultSession", "vaultUploadLock", "appLoginCode", "appLoginCodeAttempt", "comparisonSummary",
+    // The phones signed in to the account: their push tokens and any
+    // trusted-phone records - both device identifiers, so they go too.
+    "pushToken", "trustedDevice",
   ];
   await Promise.all(
     pointDeleteTypes.map(async (type) => {
@@ -321,5 +324,8 @@ export async function deleteAccount(email: string): Promise<void> {
   await Promise.all([
     deleteCrossPartitionDocsByEmailField(container, "assistantQuestion", email),
     deleteCrossPartitionDocsByEmailField(container, "vdiPurchase", email),
+    // Feedback, bug reports and reports of AI-written text carry the
+    // sender's email (feedback.ts) - deleted with the account like the rest.
+    deleteCrossPartitionDocsByEmailField(container, "feedback", email),
   ]);
 }
