@@ -1,4 +1,3 @@
-import { DateTimePickerAndroid } from '@react-native-community/datetimepicker';
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import { router } from 'expo-router';
@@ -6,6 +5,7 @@ import { useState } from 'react';
 import { ActivityIndicator, KeyboardAvoidingView, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { DatePressable } from '@/components/date-pressable';
 import { Icon } from '@/components/icon';
 import { Brand } from '@/constants/brand';
 import { useAuth } from '@/lib/auth';
@@ -294,17 +294,6 @@ function ReviewCard({
     setError(result.error);
   }
 
-  function pickDate() {
-    DateTimePickerAndroid.open({
-      value: new Date(`${date}T12:00:00`),
-      mode: 'date',
-      maximumDate: new Date(),
-      onValueChange: (_e, picked) => {
-        if (picked) setDate(toIsoDay(picked));
-      },
-    });
-  }
-
   return (
     <View style={styles.card}>
       <Text style={styles.cardEyebrow}>{CATEGORY_LABEL[entry.category]} · check this one</Text>
@@ -317,9 +306,13 @@ function ReviewCard({
 
       <View style={styles.field}>
         <Text style={styles.label}>Date</Text>
-        <Pressable onPress={pickDate} accessibilityRole="button" accessibilityHint="Opens a calendar" style={styles.input}>
+        <DatePressable
+          value={new Date(`${date}T12:00:00`)}
+          onChange={(picked) => setDate(toIsoDay(picked))}
+          maximumDate={new Date()}
+          style={styles.input}>
           <Text style={styles.inputText}>{formatDay(date)}</Text>
-        </Pressable>
+        </DatePressable>
       </View>
       <View style={styles.pair}>
         <View style={[styles.field, styles.flex]}>

@@ -1,9 +1,9 @@
-import { DateTimePickerAndroid } from '@react-native-community/datetimepicker';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { Alert, KeyboardAvoidingView, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { DatePressable } from '@/components/date-pressable';
 import { Icon } from '@/components/icon';
 import { MissingHint } from '@/components/screen';
 import { Brand } from '@/constants/brand';
@@ -95,17 +95,6 @@ export default function AddReminderScreen() {
     ]);
   }
 
-  function pickDate() {
-    DateTimePickerAndroid.open({
-      value: date ?? new Date(),
-      mode: 'date',
-      minimumDate: new Date(),
-      onValueChange: (_event, picked) => {
-        if (picked) setDate(picked);
-      },
-    });
-  }
-
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
       <View style={styles.header}>
@@ -167,12 +156,12 @@ export default function AddReminderScreen() {
           </View>
 
           {type === 'date' ? (
-            <Pressable onPress={pickDate} accessibilityRole="button" accessibilityHint="Opens a calendar" style={styles.dateButton}>
+            <DatePressable value={date ?? new Date()} onChange={setDate} minimumDate={new Date()} style={styles.dateButton}>
               <Text style={[styles.dateText, !date && styles.placeholder]}>
                 {date ? date.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'long', year: 'numeric' }) : 'Pick a date'}
               </Text>
               <Icon name="chevronDown" size={20} color={Brand.muted} />
-            </Pressable>
+            </DatePressable>
           ) : (
             <View style={styles.field}>
               <TextInput

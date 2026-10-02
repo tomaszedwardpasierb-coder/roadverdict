@@ -1,12 +1,12 @@
 // Logs a fill-up or charge - or, opened from an entry with its id,
 // edits that one through the same website route's PATCH.
-import { DateTimePickerAndroid } from '@react-native-community/datetimepicker';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { KeyboardAvoidingView, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { EntryLoader } from '@/components/entry-loader';
+import { DatePressable } from '@/components/date-pressable';
 import { Icon } from '@/components/icon';
 import { MissingHint } from '@/components/screen';
 import { Brand } from '@/constants/brand';
@@ -97,17 +97,6 @@ function FuelForm({ existing }: { existing?: Entry }) {
     setProblem({ message: result.error, canOverride: result.status === 409 && !acknowledgeMileage });
   }
 
-  function pickDate() {
-    DateTimePickerAndroid.open({
-      value: date,
-      mode: 'date',
-      maximumDate: new Date(),
-      onValueChange: (_event, picked) => {
-        if (picked) setDate(picked);
-      },
-    });
-  }
-
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
       <View style={styles.header}>
@@ -152,10 +141,10 @@ function FuelForm({ existing }: { existing?: Entry }) {
 
             <View style={styles.field}>
               <Text style={styles.label}>Date</Text>
-              <Pressable onPress={pickDate} accessibilityRole="button" accessibilityHint="Opens a calendar" style={styles.dateButton}>
+              <DatePressable value={date} onChange={setDate} maximumDate={new Date()} style={styles.dateButton}>
                 <Text style={styles.dateText}>{dayLabel(date)}</Text>
                 <Icon name="chevronDown" size={20} color={Brand.muted} />
-              </Pressable>
+              </DatePressable>
             </View>
 
             {!electric ? (

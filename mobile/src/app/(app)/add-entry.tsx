@@ -4,7 +4,6 @@
 // sends - with the app naming its vehicle in a header. Opened from an
 // entry with its id, the same form edits that entry through the route's
 // PATCH instead.
-import { DateTimePickerAndroid } from '@react-native-community/datetimepicker';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { Image } from 'expo-image';
@@ -13,6 +12,7 @@ import { ActivityIndicator, Alert, KeyboardAvoidingView, Pressable, ScrollView, 
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { EntryLoader } from '@/components/entry-loader';
+import { DatePressable } from '@/components/date-pressable';
 import { Icon } from '@/components/icon';
 import { OptionPicker } from '@/components/option-picker';
 import { ErrorState, LoadingState, MissingHint } from '@/components/screen';
@@ -175,17 +175,6 @@ function EntryForm({ type, existing }: { type: TypedCategory; existing?: Entry }
     setProblem({ message: result.error, canOverride: result.status === 409 && fields.hasMileage && !acknowledgeMileage });
   }
 
-  function pickDate() {
-    DateTimePickerAndroid.open({
-      value: date,
-      mode: 'date',
-      maximumDate: new Date(),
-      onValueChange: (_event, picked) => {
-        if (picked) setDate(picked);
-      },
-    });
-  }
-
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
       <View style={styles.header}>
@@ -227,11 +216,11 @@ function EntryForm({ type, existing }: { type: TypedCategory; existing?: Entry }
               <Field label={`Cost (${units.currencySymbol})`} value={cost} onChangeText={setCost} placeholder="e.g. 45.00" />
               <View style={[styles.field, styles.flex]}>
                 <Text style={styles.label}>Date</Text>
-                <Pressable onPress={pickDate} accessibilityRole="button" accessibilityHint="Opens a calendar" style={styles.dateButton}>
+                <DatePressable value={date} onChange={setDate} maximumDate={new Date()} style={styles.dateButton}>
                   <Text style={styles.dateText} numberOfLines={1}>
                     {dayLabel(date)}
                   </Text>
-                </Pressable>
+                </DatePressable>
               </View>
             </View>
 
