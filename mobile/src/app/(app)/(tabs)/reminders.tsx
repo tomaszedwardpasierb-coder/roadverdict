@@ -47,7 +47,7 @@ export default function RemindersScreen() {
   // Same confirmations as the web's ReminderItem.
   function markDone(reminder: Reminder) {
     if (reminder.oneOff) {
-      Alert.alert('Clear this reminder?', "It's for an exact date, so it doesn't repeat - marking it done removes it.", [
+      Alert.alert('Clear this reminder?', "It's for an exact date, so it doesn't repeat – marking it done removes it.", [
         { text: 'Cancel', style: 'cancel' },
         { text: 'Clear it', onPress: () => act(reminder, 'DELETE') },
       ]);
@@ -87,7 +87,7 @@ export default function RemindersScreen() {
             accessibilityRole="button"
             accessibilityLabel="Add a reminder"
             style={({ pressed }) => [styles.add, pressed && styles.pressed]}>
-            <Icon name="plus" size={18} color="#FFFFFF" strokeWidth={2.6} />
+            <Icon name="plus" size={18} color={Brand.asphalt} strokeWidth={2.6} />
             <Text style={styles.addLabel}>Add</Text>
           </Pressable>
         ) : null}
@@ -187,8 +187,8 @@ const styles = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 20, paddingTop: 12, paddingBottom: 8 },
   title: { fontSize: 30, fontWeight: '800', color: Brand.ink },
   subtitle: { fontSize: 13, color: Brand.muted },
-  add: { flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 44, paddingHorizontal: 16, borderRadius: 22, backgroundColor: Brand.asphalt },
-  addLabel: { color: '#FFFFFF', fontSize: 15, fontWeight: '600' },
+  add: { flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 44, paddingHorizontal: 16, borderRadius: 22, backgroundColor: Brand.amber },
+  addLabel: { color: Brand.asphalt, fontSize: 15, fontWeight: '700' },
   content: { paddingHorizontal: 20, paddingBottom: 32, gap: 12 },
   note: { flexDirection: 'row', gap: 8, padding: 12, borderRadius: 12, backgroundColor: '#FBEACC' },
   noteText: { flex: 1, fontSize: 13, lineHeight: 19, color: '#7A4508' },

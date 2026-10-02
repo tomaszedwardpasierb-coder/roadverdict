@@ -13,22 +13,24 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { EntryLoader } from '@/components/entry-loader';
 import { Icon } from '@/components/icon';
 import { OptionPicker } from '@/components/option-picker';
-import { ErrorState, LoadingState } from '@/components/screen';
+import { ErrorState, LoadingState, MissingHint } from '@/components/screen';
 import { Brand } from '@/constants/brand';
 import { apiFetch } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { ENTRY_ROUTES, recordPath, TYPED_FIELDS, type Entry, type TypedCategory } from '@/lib/entries';
 import { useFormOptions, type ReminderDefault, type VehicleFormOptions } from '@/lib/form-options';
-import { dayLabel, fromIsoDay, parseMileage, parseNumber, toIsoDay, useEstimatedMileage } from '@/lib/mileage';
+import { dayLabel, fromIsoDay, groupNumber, parseMileage, parseNumber, toIsoDay, useEstimatedMileage } from '@/lib/mileage';
 import { toStoredGbp, toStoredMiles, useVehicle, vehicleHeaders } from '@/lib/vehicle';
 
-const CONFIG: Record<TypedCategory, { title: string; typeLabel: string; typePlaceholder: string }> = {
-  service: { title: 'Service or repair', typeLabel: 'What was done?', typePlaceholder: 'Choose the job' },
-  mods: { title: 'Part or accessory', typeLabel: 'Type of part', typePlaceholder: 'Choose the type' },
-  labour: { title: 'Labour', typeLabel: 'What was the work?', typePlaceholder: 'Choose the job' },
-  bills: { title: 'Insurance, tax, MOT or finance', typeLabel: 'What was it for?', typePlaceholder: 'Choose the type' },
-  fines: { title: 'Fine', typeLabel: 'Type of fine', typePlaceholder: 'Choose the type' },
-  tolls: { title: 'Toll or charge', typeLabel: 'Type of charge', typePlaceholder: 'Choose the type' },
+// `hint` is a short line under the title saying what the form covers, where
+// the title alone is too brief ("Bill" covers insurance, tax, MOT and finance).
+const CONFIG: Record<TypedCategory, { title: string; hint?: string; typeLabel: string; typePlaceholder: string; notesPlaceholder: string }> = {
+  service: { title: 'Service or repair', typeLabel: 'What was done?', typePlaceholder: 'Choose the job', notesPlaceholder: 'e.g. which garage did it' },
+  mods: { title: 'Part or accessory', typeLabel: 'Type of part', typePlaceholder: 'Choose the type', notesPlaceholder: 'e.g. where you bought it' },
+  labour: { title: 'Labour', typeLabel: 'What was the work?', typePlaceholder: 'Choose the job', notesPlaceholder: 'e.g. which garage did it' },
+  bills: { title: 'Bill', hint: 'Insurance, tax, MOT or finance', typeLabel: 'What was it for?', typePlaceholder: 'Choose the type', notesPlaceholder: 'e.g. policy number, provider' },
+  fines: { title: 'Fine', typeLabel: 'Type of fine', typePlaceholder: 'Choose the type', notesPlaceholder: 'e.g. PCN number, issuing council' },
+  tolls: { title: 'Toll or charge', typeLabel: 'Type of charge', typePlaceholder: 'Choose the type', notesPlaceholder: 'e.g. Dartford Crossing' },
 };
 
 function isEntryType(value: unknown): value is TypedCategory {
@@ -61,7 +63,7 @@ function EntryForm({ type, existing }: { type: TypedCategory; existing?: Entry }
   // so its stored value goes back as it was rather than re-converted.
   const [initial] = useState(() => ({
     cost: existing ? existing.costDisplay.toFixed(2) : '',
-    mileage: existing?.mileageDisplay != null ? String(existing.mileageDisplay) : undefined,
+    mileage: existing?.mileageDisplay != null ? groupNumber(existing.mileageDisplay) : undefined,
   }));
   const [kind, setKind] = useState<string | null>(existing?.typeKey ?? null);
   const [name, setName] = useState(existing?.name ?? '');
@@ -158,7 +160,7 @@ function EntryForm({ type, existing }: { type: TypedCategory; existing?: Entry }
             {existing ? editTitle(type) : config.title}
           </Text>
           <Text style={styles.subtitle} numberOfLines={1}>
-            {vehicle.name}
+            {config.hint ? `${config.hint} · ${vehicle.name}` : vehicle.name}
           </Text>
         </View>
       </View>
@@ -185,7 +187,7 @@ function EntryForm({ type, existing }: { type: TypedCategory; existing?: Entry }
             ) : null}
 
             <View style={styles.pair}>
-              <Field label={`Cost (${units.currencySymbol})`} value={cost} onChangeText={setCost} placeholder="0.00" />
+              <Field label={`Cost (${units.currencySymbol})`} value={cost} onChangeText={setCost} placeholder="e.g. 45.00" />
               <View style={[styles.field, styles.flex]}>
                 <Text style={styles.label}>Date</Text>
                 <Pressable onPress={pickDate} accessibilityRole="button" accessibilityHint="Opens a calendar" style={styles.dateButton}>
@@ -201,7 +203,7 @@ function EntryForm({ type, existing }: { type: TypedCategory; existing?: Entry }
                 label={`Mileage (${distanceUnit})`}
                 value={mileage}
                 onChangeText={setMileage}
-                placeholder={String(units.currentMileageDisplay)}
+                placeholder={`e.g. ${groupNumber(units.currentMileageDisplay)}`}
                 keyboardType="number-pad"
                 hint={estimateNote ?? `Last recorded: ${units.currentMileageDisplay.toLocaleString('en-GB')} ${distanceUnit}`}
               />
@@ -215,7 +217,7 @@ function EntryForm({ type, existing }: { type: TypedCategory; existing?: Entry }
                     {reminderDefault.type === 'months'
                       ? `In ${reminderDefault.value} months`
                       : `In ${reminderDefault.value.toLocaleString('en-GB')} miles`}
-                    {reminderDefault.note ? ` - ${reminderDefault.note}` : ''}
+                    {reminderDefault.note ? ` – ${reminderDefault.note}` : ''}
                   </Text>
                 </View>
                 <Switch
@@ -246,7 +248,7 @@ function EntryForm({ type, existing }: { type: TypedCategory; existing?: Entry }
               label="Notes (optional)"
               value={notes}
               onChangeText={setNotes}
-              placeholder={type === 'bills' ? 'e.g. policy number, provider' : 'e.g. which garage did it'}
+              placeholder={config.notesPlaceholder}
               keyboardType="default"
               multiline
             />
@@ -264,6 +266,7 @@ function EntryForm({ type, existing }: { type: TypedCategory; existing?: Entry }
           </ScrollView>
 
           <View style={styles.footer}>
+            <MissingHint missing={[!kind && 'choose what it was', fields.hasName && !name.trim() && 'say what it is', !(costN > 0) && 'enter the cost', fields.hasMileage && !(mileageN > 0) && 'enter the mileage']} />
             <Pressable
               onPress={() => save(false)}
               disabled={!valid || saving}

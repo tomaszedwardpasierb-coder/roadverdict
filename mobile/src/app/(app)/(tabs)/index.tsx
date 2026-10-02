@@ -108,7 +108,7 @@ export default function HomeScreen() {
               <View style={styles.row}>
                 <Icon name="check" size={22} color="#1A6B4A" />
                 <Text style={styles.rowTitle}>
-                  {data.reminderCounts.ok > 0 ? "Nothing due - you're all caught up" : 'No reminders set yet'}
+                  {data.reminderCounts.ok > 0 ? "Nothing due – you're all caught up" : 'No reminders set yet'}
                 </Text>
               </View>
             ) : (
@@ -135,17 +135,27 @@ export default function HomeScreen() {
           <View style={styles.actions}>
             <QuickAction icon="camera" label="Scan receipt" primary href="/scan" />
             <QuickAction icon="fuel" label="Log fuel" href="/add-fuel" />
-            <QuickAction icon="quote" label="Check a quote" href="/quote" />
+            <QuickAction icon="quote" label="Quote checker" href="/quote" />
             <QuickAction icon="gauge" label="Update mileage" href="/update-mileage" />
           </View>
 
-          <SectionHeader title={`Spent in ${data.spend.monthName}`} />
-          <Card style={styles.spend}>
-            <Text style={styles.spendTotal}>{data.spend.monthTotalLabel}</Text>
-            <Text style={styles.rowMeta}>
-              {data.spend.yearTotalLabel} so far in {data.spend.year}
-            </Text>
-          </Card>
+          {/* This month and this year side by side - early in a month the
+              month alone is usually a big, uninformative £0.00. */}
+          <SectionHeader title="Spending" />
+          <View style={styles.spendRow}>
+            <Card style={styles.spend}>
+              <Text style={styles.spendLabel}>{data.spend.monthName}</Text>
+              <Text style={styles.spendTotal} adjustsFontSizeToFit numberOfLines={1}>
+                {data.spend.monthTotalLabel}
+              </Text>
+            </Card>
+            <Card style={styles.spend}>
+              <Text style={styles.spendLabel}>{data.spend.year} so far</Text>
+              <Text style={styles.spendTotal} adjustsFontSizeToFit numberOfLines={1}>
+                {data.spend.yearTotalLabel}
+              </Text>
+            </Card>
+          </View>
 
           <SectionHeader title="Recent" action={data.recent.length > 0 ? { label: 'See all', onPress: () => router.navigate('/logbook') } : undefined} />
           <Card>
@@ -220,6 +230,15 @@ function VehicleSwitcher({
   // The website garage's Delete: the vehicle and everything logged against
   // it. A transferred (read-only) one is only this owner's historical copy -
   // the new owner keeps theirs, receipts included.
+  // Deleting sits behind a menu, never one tap from the row you choose a
+  // vehicle with - then a confirmation that names the vehicle.
+  function openMenu(v: GarageVehicle) {
+    Alert.alert(v.name, undefined, [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Delete vehicle…', style: 'destructive', onPress: () => confirmDelete(v) },
+    ]);
+  }
+
   function confirmDelete(v: GarageVehicle) {
     const message = v.readOnly
       ? `Delete your read-only copy of ${v.name}? Its history disappears from your garage for good. The new owner keeps their own copy, with everything that was transferred.`
@@ -269,13 +288,13 @@ function VehicleSwitcher({
                 <ActivityIndicator color={Brand.danger} style={styles.sheetDelete} />
               ) : (
                 <Pressable
-                  onPress={() => confirmDelete(v)}
+                  onPress={() => openMenu(v)}
                   disabled={deletingId !== null}
                   accessibilityRole="button"
-                  accessibilityLabel={`Delete ${v.name}`}
+                  accessibilityLabel={`More options for ${v.name}`}
                   hitSlop={6}
                   style={({ pressed }) => [styles.sheetDelete, pressed && { opacity: 0.6 }]}>
-                  <Icon name="trash" size={20} color={Brand.danger} />
+                  <Icon name="dots" size={22} color={Brand.muted} strokeWidth={3} />
                 </Pressable>
               )}
             </Pressable>
@@ -287,7 +306,7 @@ function VehicleSwitcher({
         </Pressable>
         {vehicles.filter((v) => !v.readOnly).length >= 2 ? (
           <Pressable onPress={onCompare} accessibilityRole="button" style={({ pressed }) => [styles.sheetRow, pressed && { opacity: 0.85 }]}>
-            <Icon name="gauge" size={22} color={Brand.amberInk} />
+            <Icon name="compare" size={22} color={Brand.amberInk} />
             <Text style={styles.rowTitle}>Compare vehicles</Text>
           </Pressable>
         ) : null}
@@ -331,8 +350,10 @@ const styles = StyleSheet.create({
   actionPrimary: { backgroundColor: Brand.asphalt, borderColor: Brand.asphalt },
   actionLabel: { fontSize: 15, fontWeight: '600', color: Brand.ink },
   actionLabelPrimary: { color: '#FFFFFF' },
-  spend: { padding: 16, gap: 4 },
-  spendTotal: { fontSize: 32, fontWeight: '800', color: Brand.ink },
+  spendRow: { flexDirection: 'row', gap: 10 },
+  spend: { flex: 1, padding: 16, gap: 4 },
+  spendLabel: { fontSize: 13, color: Brand.muted },
+  spendTotal: { fontSize: 26, fontWeight: '800', color: Brand.ink },
   empty: { flex: 1, justifyContent: 'center', padding: 24, gap: 12 },
   emptyTitle: { fontSize: 28, fontWeight: '800', color: Brand.ink },
   emptyBody: { fontSize: 16, lineHeight: 24, color: Brand.muted },

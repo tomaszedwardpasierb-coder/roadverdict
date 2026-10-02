@@ -187,7 +187,7 @@ function PlateCheck({ kind, onFound }: { kind: VehicleKind; onFound: (lookup: Lo
       {lookup?.requiresPayment ? (
         <Text style={styles.text}>
           You&apos;ve used your free {noun} check for this period
-          {lookup.nextFreeLookupAt ? ` - your next free one is available ${day(lookup.nextFreeLookupAt)}` : ''}.
+          {lookup.nextFreeLookupAt ? ` – your next free one is available ${day(lookup.nextFreeLookupAt)}` : ''}.
         </Text>
       ) : lookup ? (
         <View style={styles.found}>
@@ -235,7 +235,7 @@ function PlateCheck({ kind, onFound }: { kind: VehicleKind; onFound: (lookup: Lo
             lookup.motTests.map((t, i) => (
               <View key={i} style={[styles.test, { borderLeftColor: t.passed ? '#1A6B4A' : Brand.danger }]}>
                 <Text style={styles.testTitle}>
-                  {day(t.testDate)} - {t.passed ? 'Passed' : 'Failed'}
+                  {day(t.testDate)} – {t.passed ? 'Passed' : 'Failed'}
                 </Text>
                 <Text style={styles.hint}>
                   {t.mileage != null

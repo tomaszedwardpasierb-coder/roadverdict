@@ -17,7 +17,7 @@ import { Brand } from '@/constants/brand';
 import { apiFetch } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import type { OptionGroup } from '@/lib/form-options';
-import { parseMileage, parseNumber } from '@/lib/mileage';
+import { groupNumber, parseMileage, parseNumber } from '@/lib/mileage';
 import { matchMake, matchModel, mapDvlaFuelType, useVehicleOptions, type CarFuelType, type VehicleOptions } from '@/lib/vehicle-options';
 import { useVehicle, type VehicleKind } from '@/lib/vehicle';
 
@@ -123,7 +123,7 @@ export default function AddVehicleScreen() {
         <Card style={styles.panel}>
           <Text style={styles.panelTitle}>Your garage is full</Text>
           <Text style={styles.panelText}>
-            Your account can track {limit.limit === 1 ? 'one vehicle' : `${limit.limit} vehicles`} at a time - bikes and cars together.
+            Your account can track {limit.limit === 1 ? 'one vehicle' : `${limit.limit} vehicles`} at a time – bikes and cars together.
             Vehicles you&apos;ve transferred to a new owner don&apos;t count.
           </Text>
         </Card>
@@ -325,13 +325,13 @@ function startingPoint(kind: VehicleKind, lookup: Lookup | null, options: Vehicl
     notes.push(`Matched to ${make} ${model.model}.`);
   } else if (make) {
     Object.assign(start, { make, model: OTHER, customModel: lookup.model ?? '', customCc: cc ? String(cc) : '' });
-    notes.push(`“${lookup.model}” isn’t in our ${make} list, so it’s filled in below as it is - check it over.`);
+    notes.push(`“${lookup.model}” isn’t in our ${make} list, so it’s filled in below as it is – check it over.`);
   } else {
     Object.assign(start, { make: OTHER, customMake: lookup.make ?? '', model: OTHER, customModel: lookup.model ?? '', customCc: cc ? String(cc) : '' });
-    notes.push(`Found “${lookup.make} ${lookup.model}”, which isn’t in our list - it’s filled in below as it is, so check it over.`);
+    notes.push(`Found “${lookup.make} ${lookup.model}”, which isn’t in our list – it’s filled in below as it is, so check it over.`);
   }
-  if (kind === 'car' && start.fuelType === 'hybrid') notes.push('DVLA doesn’t tell a hybrid from a plug-in hybrid - change the fuel type if it’s a plug-in.');
-  if (lookup.plateInRetention) notes.push('This plate is in retention, so these details are from the last vehicle it was on - make sure they’re right.');
+  if (kind === 'car' && start.fuelType === 'hybrid') notes.push('DVLA doesn’t tell a hybrid from a plug-in hybrid – change the fuel type if it’s a plug-in.');
+  if (lookup.plateInRetention) notes.push('This plate is in retention, so these details are from the last vehicle it was on – make sure they’re right.');
   return { ...start, note: notes.join(' ') };
 }
 
@@ -389,7 +389,7 @@ function DetailsForm({
     ).then((r) => {
       if (cancelled || !r.ok || r.data.latestTrustedMileage == null) return;
       setFloor({ miles: r.data.latestTrustedMileage, date: r.data.latestTestDate });
-      setMileage(String(r.data.latestTrustedMileage));
+      setMileage(groupNumber(r.data.latestTrustedMileage));
     });
     return () => {
       cancelled = true;
@@ -434,7 +434,7 @@ function DetailsForm({
     if (needsYear && !(Number.isInteger(y) && y >= 1900 && y <= thisYear + 1)) return 'Enter the year it was made.';
     const miles = parseMileage(mileage);
     if (!(miles >= 0) || mileage.trim() === '') return 'Enter the current mileage.';
-    if (floor && miles < floor.miles) return `The current mileage has to be at least ${floor.miles.toLocaleString('en-GB')} miles - that’s what its last MOT recorded.`;
+    if (floor && miles < floor.miles) return `The current mileage has to be at least ${floor.miles.toLocaleString('en-GB')} miles – that’s what its last MOT recorded.`;
     if (floor && !mileageConfirmed) return 'Confirm the current mileage before adding it.';
     return null;
   }
@@ -544,7 +544,7 @@ function DetailsForm({
             />
           </View>
         ) : null}
-        {needsYear ? <Field label="Year" value={year} onChangeText={edit(setYear)} placeholder={String(thisYear)} keyboardType="number-pad" /> : null}
+        {needsYear ? <Field label="Year" value={year} onChangeText={edit(setYear)} placeholder={`e.g. ${thisYear - 5}`} keyboardType="number-pad" /> : null}
 
         <Field
           label="Current mileage (miles)"
@@ -557,7 +557,7 @@ function DetailsForm({
           keyboardType="number-pad"
           hint={
             floor
-              ? `Its last MOT${floor.date ? ` (${new Date(floor.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })})` : ''} recorded ${floor.miles.toLocaleString('en-GB')} miles - the current reading can’t be lower.`
+              ? `Its last MOT${floor.date ? ` (${new Date(floor.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })})` : ''} recorded ${floor.miles.toLocaleString('en-GB')} miles – the current reading can’t be lower.`
               : undefined
           }
         />

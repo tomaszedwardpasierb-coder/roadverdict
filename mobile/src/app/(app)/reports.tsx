@@ -153,7 +153,7 @@ function ReportsBody({ data, kind }: { data: Reports; kind: 'bike' | 'car' }) {
       {!data.isPro ? (
         <ProLock
           feature="Reports"
-          description={`Every chart in one place - fuel economy, running costs, and category spend trends over the life of your ${kind === 'bike' ? 'bike' : 'car'}.`}
+          description={`Every chart in one place – fuel economy, running costs, and category spend trends over the life of your ${kind === 'bike' ? 'bike' : 'car'}.`}
         />
       ) : (
         <>

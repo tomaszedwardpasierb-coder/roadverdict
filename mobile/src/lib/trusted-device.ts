@@ -114,7 +114,7 @@ export async function unlockWithThisPhone(token: string | null): Promise<PhoneUn
     // The device-unlock route's own wording for a phone it no longer trusts.
     if (result.status === 401 && result.error === "This phone isn't trusted any more.") {
       await forgetThisPhone();
-      return { ok: false, reason: 'not-trusted', error: 'This phone isn’t trusted any more - enter your code instead.' };
+      return { ok: false, reason: 'not-trusted', error: 'This phone isn’t trusted any more – enter your code instead.' };
     }
     return { ok: false, reason: 'error', error: result.error, status: result.status };
   }
@@ -137,7 +137,7 @@ export async function signInWithThisPhone(pendingToken: string): Promise<PhoneSi
   if (!result.ok) {
     if (result.status === 401 && result.error === "This phone isn't trusted any more.") {
       await forgetThisPhone();
-      return { ok: false, reason: 'not-trusted', error: 'This phone isn’t trusted any more - enter your code instead.' };
+      return { ok: false, reason: 'not-trusted', error: 'This phone isn’t trusted any more – enter your code instead.' };
     }
     return { ok: false, reason: 'error', error: result.error, status: result.status };
   }

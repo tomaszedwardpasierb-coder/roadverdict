@@ -12,7 +12,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Icon } from '@/components/icon';
 import { OptionPicker } from '@/components/option-picker';
-import { Card, ErrorState, LoadingState } from '@/components/screen';
+import { Card, ErrorState, LoadingState, MissingHint } from '@/components/screen';
 import { Brand } from '@/constants/brand';
 import { API_BASE_URL, apiFetch } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
@@ -42,7 +42,7 @@ export default function QuoteScreen() {
         </Pressable>
         <View style={styles.flex}>
           <Text style={styles.title} accessibilityRole="header">
-            Check a quote
+            Quote checker
           </Text>
           {selected ? (
             <Text style={styles.subtitle} numberOfLines={1}>
@@ -114,7 +114,7 @@ function QuoteForm({ vehicle, data }: { vehicle: GarageVehicle; data: ToolsScree
             value={price}
             onChangeText={setPrice}
             keyboardType="decimal-pad"
-            placeholder="180"
+            placeholder="e.g. 180"
             placeholderTextColor="#A7A49C"
             accessibilityLabelledBy="price-label"
             style={styles.input}
@@ -146,6 +146,7 @@ function QuoteForm({ vehicle, data }: { vehicle: GarageVehicle; data: ToolsScree
             {problem}
           </Text>
         ) : null}
+        <MissingHint verb="check it" missing={[!job && 'choose the job', !(priceN > 0) && 'enter what you were quoted']} />
         <Pressable
           onPress={check}
           disabled={!valid || checking}

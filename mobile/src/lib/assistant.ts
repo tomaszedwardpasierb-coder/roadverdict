@@ -148,7 +148,7 @@ export type ChatAttachment = { blobName: string; fileName: string; fileType: str
 export async function uploadChatPhoto(uri: string, token: string | null): Promise<ApiResult<{ attachment: ChatAttachment }>> {
   const file = new File(uri);
   if (file.type !== 'image/jpeg' && file.type !== 'image/png') {
-    return { ok: false, status: 0, error: 'That photo format isn’t supported - please choose a JPEG or PNG photo.' };
+    return { ok: false, status: 0, error: 'That photo format isn’t supported – please choose a JPEG or PNG photo.' };
   }
   const form = new FormData();
   form.append('file', file);

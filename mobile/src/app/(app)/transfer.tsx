@@ -73,7 +73,7 @@ export default function TransferScreen() {
                 setOutcome(result);
                 refreshGarage();
               } else {
-                setNotice({ ok: true, text: `Declined. Nothing has changed - this ${noun} is still fully yours.` });
+                setNotice({ ok: true, text: `Declined. Nothing has changed – this ${noun} is still fully yours.` });
               }
               requests.refresh();
             }}

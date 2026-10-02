@@ -5,6 +5,7 @@ import { KeyboardAvoidingView, Pressable, ScrollView, StyleSheet, Text, TextInpu
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Icon } from '@/components/icon';
+import { MissingHint } from '@/components/screen';
 import { Brand } from '@/constants/brand';
 import { apiFetch } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
@@ -149,7 +150,7 @@ export default function AddReminderScreen() {
                 onChangeText={(t) => setValue(t.replace(/\D/g, ''))}
                 keyboardType="number-pad"
                 accessibilityLabel={type === 'months' ? 'Every how many months' : 'Every how many miles'}
-                placeholder={type === 'months' ? '12' : '4000'}
+                placeholder={type === 'months' ? 'e.g. 12' : 'e.g. 4,000'}
                 placeholderTextColor="#A7A49C"
                 style={styles.input}
               />
@@ -167,6 +168,7 @@ export default function AddReminderScreen() {
         </ScrollView>
 
         <View style={styles.footer}>
+          <MissingHint missing={[!name.trim() && 'say what it’s for', type === 'date' ? date == null && 'pick a date' : !(Number.isInteger(interval) && interval > 0) && 'enter how often']} />
           <Pressable
             onPress={save}
             disabled={!valid || saving}

@@ -67,7 +67,7 @@ export default function AssistantScreen() {
   }
 
   function choosePhoto() {
-    Alert.alert('Add a photo', 'A receipt, a part, a dashboard warning light - the assistant reads it.', [
+    Alert.alert('Add a photo', 'A receipt, a part, a dashboard warning light – the assistant reads it.', [
       { text: 'Cancel', style: 'cancel' },
       { text: 'Choose a photo', onPress: () => addPhoto('library') },
       { text: 'Take a photo', onPress: () => addPhoto('camera') },
@@ -117,7 +117,7 @@ export default function AssistantScreen() {
         </Pressable>
         <View style={styles.flex}>
           <Text style={styles.title} accessibilityRole="header">
-            Assistant
+            AI assistant
           </Text>
           {selected ? (
             <Text style={styles.subtitle} numberOfLines={1}>
@@ -141,7 +141,7 @@ export default function AssistantScreen() {
               <Text style={styles.introTitle}>{mode === 'log' ? 'Tell it what you did' : 'Ask about your vehicle'}</Text>
               <Text style={styles.introText}>
                 {mode === 'log'
-                  ? 'Say or type it in your own words - it drafts the entry, and nothing is saved until you tap to confirm.'
+                  ? 'Say or type it in your own words – it drafts the entry, and nothing is saved until you tap to confirm.'
                   : 'Running costs, what jobs should cost, your own history and what’s coming up. Type, or tap the microphone and just say it.'}
               </Text>
               <View style={styles.prompts}>

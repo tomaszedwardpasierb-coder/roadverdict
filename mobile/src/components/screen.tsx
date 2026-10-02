@@ -33,6 +33,16 @@ export function StatusPill({ status }: { status: 'ok' | 'due-soon' | 'overdue' }
   );
 }
 
+// "To save, choose the job and enter the cost." - shown above a form's
+// main button while it can't be pressed yet, so a faded button is never
+// left unexplained. Nothing when nothing is missing.
+export function MissingHint({ verb = 'save', missing }: { verb?: string; missing: (string | false | null | undefined)[] }) {
+  const items = missing.filter((m): m is string => !!m);
+  if (!items.length) return null;
+  const list = items.length === 1 ? items[0] : `${items.slice(0, -1).join(', ')} and ${items[items.length - 1]}`;
+  return <Text style={styles.missing}>{`To ${verb}, ${list}.`}</Text>;
+}
+
 export function LoadingState() {
   return (
     <View style={styles.centered}>
@@ -53,6 +63,7 @@ export function ErrorState({ message, onRetry }: { message: string; onRetry: () 
 }
 
 const styles = StyleSheet.create({
+  missing: { fontSize: 14, lineHeight: 20, color: Brand.muted, textAlign: 'center', marginBottom: 8 },
   card: { backgroundColor: Brand.paperRaised, borderRadius: 14, borderWidth: 1, borderColor: Brand.line },
   sectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 8 },
   sectionTitle: { fontSize: 13, fontWeight: '700', letterSpacing: 0.8, textTransform: 'uppercase', color: Brand.muted },

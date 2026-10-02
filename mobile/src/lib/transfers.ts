@@ -32,5 +32,5 @@ export function incomingRoute(vehicle: GarageVehicle, requestId: string, decisio
 export function recordsNote(includeRecords: boolean, noun: string): string {
   return includeRecords
     ? 'Your logged service records, fuel logs, mods, bills and any attached receipts go with it.'
-    : `Your individual records stay private on your own account - only the ${noun}’s identity and a summary go with it.`;
+    : `Your individual records stay private on your own account – only the ${noun}’s identity and a summary go with it.`;
 }

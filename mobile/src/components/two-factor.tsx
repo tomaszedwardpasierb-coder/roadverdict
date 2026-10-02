@@ -102,7 +102,7 @@ export function TwoFactorSection({ enabled, onChanged }: { enabled: boolean; onC
           onChangeText={(t) => setCode(t.replace(/\D/g, '').slice(0, 6))}
           keyboardType="number-pad"
           maxLength={6}
-          placeholder="123456"
+          placeholder="6-digit code"
           placeholderTextColor="#A7A49C"
           accessibilityLabel="6-digit code from your authenticator app"
           style={styles.input}

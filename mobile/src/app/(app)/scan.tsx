@@ -21,6 +21,7 @@ import {
   type ParsedItem,
   type ReviewEntry,
 } from '@/lib/scan';
+import { groupNumber } from '@/lib/mileage';
 import { useVehicle, type GarageVehicle } from '@/lib/vehicle';
 
 type Row = { entry: ReviewEntry; item: ParsedItem; status: 'review' | 'saved' | 'deleted'; error?: string };
@@ -134,7 +135,7 @@ export default function ScanScreen() {
         <View style={styles.pick}>
           <Text style={styles.lead}>
             Photograph a garage invoice, fuel receipt or bill. The AI reads the date, the amount and what it was for, and adds it
-            to your logbook - you check anything it wasn’t sure about.
+            to your logbook – you check anything it wasn’t sure about.
           </Text>
           {phase.error ? (
             <Text style={styles.error} accessibilityRole="alert">
@@ -168,7 +169,7 @@ export default function ScanScreen() {
                 {rows.length === 0
                   ? 'Nothing could be saved from this receipt.'
                   : toReview > 0
-                    ? `${rows.length} ${rows.length === 1 ? 'entry' : 'entries'} added - ${toReview} to check below.`
+                    ? `${rows.length} ${rows.length === 1 ? 'entry' : 'entries'} added – ${toReview} to check below.`
                     : `${rows.filter((r) => r.status === 'saved').length} ${rows.length === 1 ? 'entry' : 'entries'} added to your logbook.`}
               </Text>
             </View>
@@ -255,7 +256,7 @@ function ReviewCard({
   const [date, setDate] = useState(entry.date.slice(0, 10));
   const [cost, setCost] = useState((entry.cost * units.rateFromGbp).toFixed(2));
   const [mileage, setMileage] = useState(
-    entry.category !== 'bills' && !entry.mileageNeedsManualEntry ? String(Math.round(entry.mileage * kmFactor)) : ''
+    entry.category !== 'bills' && !entry.mileageNeedsManualEntry ? groupNumber(entry.mileage * kmFactor) : ''
   );
   const [litres, setLitres] = useState(entry.category === 'fuel' ? String(entry.litres) : '');
   const [busy, setBusy] = useState(false);
@@ -363,7 +364,7 @@ function ReviewCard({
           accessibilityRole="button"
           accessibilityState={{ disabled: !valid || busy, busy }}
           style={({ pressed }) => [styles.save, (!valid || busy) && styles.disabled, pressed && valid && styles.pressed]}>
-          <Text style={styles.saveLabel}>{busy ? 'Saving…' : 'Looks right - save'}</Text>
+          <Text style={styles.saveLabel}>{busy ? 'Saving…' : 'Looks right – save'}</Text>
         </Pressable>
       </View>
     </View>

@@ -3,7 +3,6 @@
 // privacy policy and deleting the account. Every change goes through the
 // website's own routes; /api/app/account only reads the current state.
 import { router } from 'expo-router';
-import * as WebBrowser from 'expo-web-browser';
 import { useState } from 'react';
 import { Alert, KeyboardAvoidingView, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -12,10 +11,9 @@ import { Icon } from '@/components/icon';
 import { OptionPicker } from '@/components/option-picker';
 import { Card, ErrorState, LoadingState, SectionHeader } from '@/components/screen';
 import { AppLockSetting } from '@/components/app-lock-setting';
-import { PushTest } from '@/components/push-test';
 import { TwoFactorSection } from '@/components/two-factor';
 import { Brand } from '@/constants/brand';
-import { API_BASE_URL, apiFetch } from '@/lib/api';
+import { apiFetch } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { useApi } from '@/lib/use-api';
 import { useVehicleOptions } from '@/lib/vehicle-options';
@@ -53,7 +51,7 @@ export default function SettingsScreen() {
 
             {selected && !selected.readOnly ? (
               <>
-                <SectionHeader title={`Units - ${selected.name}`} />
+                <SectionHeader title={`Units – ${selected.name}`} />
                 <UnitsCard vehicle={selected} />
               </>
             ) : null}
@@ -64,22 +62,8 @@ export default function SettingsScreen() {
             <SectionHeader title="App lock" />
             <AppLockSetting />
 
-            <SectionHeader title="Notifications" />
-            <PushTest />
-
             <SectionHeader title="Feature request or bug" />
             <FeedbackCard />
-
-            <SectionHeader title="Privacy" />
-            <Card>
-              <Pressable
-                onPress={() => WebBrowser.openBrowserAsync(`${API_BASE_URL}/privacy`)}
-                accessibilityRole="link"
-                style={({ pressed }) => [styles.linkRow, pressed && styles.pressed]}>
-                <Text style={[styles.linkLabel, styles.flex]}>Privacy policy</Text>
-                <Icon name="chevronRight" size={20} color={Brand.muted} />
-              </Pressable>
-            </Card>
 
             <SectionHeader title="Delete account" />
             <DeleteCard pending={account.data.pendingDeletion} onChanged={account.refresh} />
@@ -188,7 +172,7 @@ function UnitsCard({ vehicle }: { vehicle: GarageVehicle }) {
     // The web's own warning, before the change rather than beside it.
     Alert.alert(
       'Change currency?',
-      'Nothing you’ve logged changes - every amount stays stored as recorded, and is converted for display at today’s rate. But rates move, so switching back and forth makes your past totals come out slightly differently each time. Best treated as a one-time choice.',
+      'Nothing you’ve logged changes – every amount stays stored as recorded, and is converted for display at today’s rate. But rates move, so switching back and forth makes your past totals come out slightly differently each time. Best treated as a one-time choice.',
       [
         { text: 'Cancel', style: 'cancel' },
         { text: 'Change it', onPress: () => save({ currency }) },
@@ -390,7 +374,7 @@ function DeleteCard({ pending, onChanged }: { pending: Account['pendingDeletion'
   return (
     <Card style={styles.card}>
       <Text style={styles.text}>
-        Permanently deletes your account and everything logged on it - every bike or car, service history, receipts, everything. Nothing is
+        Permanently deletes your account and everything logged on it – every bike or car, service history, receipts, everything. Nothing is
         deleted today: it happens in 30 days, and you can cancel any time before then.
       </Text>
       {confirming ? (
@@ -521,8 +505,6 @@ const styles = StyleSheet.create({
   chipOn: { backgroundColor: Brand.asphalt, borderColor: Brand.asphalt },
   chipLabel: { fontSize: 14, fontWeight: '600', color: Brand.ink },
   chipLabelOn: { color: '#FFFFFF' },
-  linkRow: { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 56, paddingHorizontal: 14 },
-  linkLabel: { fontSize: 16, fontWeight: '600', color: Brand.ink },
   warning: { backgroundColor: '#FBEACC', borderColor: '#F1D5A3' },
   warningTitle: { fontSize: 16, fontWeight: '700', color: '#7A4508' },
   warningText: { fontSize: 15, lineHeight: 22, color: '#7A4508' },

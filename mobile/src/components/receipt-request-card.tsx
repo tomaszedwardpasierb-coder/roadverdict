@@ -91,7 +91,7 @@ export function ReceiptRequestCard({ request, onSaved }: { request: ReceiptReque
           <TextInput
             value={reasons[item.entryId] ?? ''}
             onChangeText={(t) => setReasons((prev) => ({ ...prev, [item.entryId]: t }))}
-            placeholder="Reason (optional) - the buyer sees this instead of the default message"
+            placeholder="Reason (optional) – the buyer sees this instead of the default message"
             placeholderTextColor="#A7A49C"
             accessibilityLabel="Reason for not sharing (optional)"
             multiline

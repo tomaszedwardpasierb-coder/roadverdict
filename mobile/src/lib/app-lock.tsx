@@ -11,12 +11,14 @@ import { AppState } from 'react-native';
 
 export type AppLockSetting = 'off' | 'start' | '1' | '5' | '15';
 
-export const APP_LOCK_OPTIONS: { value: AppLockSetting; label: string }[] = [
-  { value: 'off', label: 'Off' },
-  { value: 'start', label: 'Only when the app starts' },
-  { value: '1', label: 'After 1 minute away' },
-  { value: '5', label: 'After 5 minutes away' },
-  { value: '15', label: 'After 15 minutes away' },
+// `short` is the chip text in Settings; `label` says it in full (for
+// screen readers, and the line under the chips).
+export const APP_LOCK_OPTIONS: { value: AppLockSetting; label: string; short: string }[] = [
+  { value: 'off', label: 'Off', short: 'Off' },
+  { value: 'start', label: 'Only when the app starts', short: 'On start' },
+  { value: '1', label: 'After 1 minute away', short: '1 min' },
+  { value: '5', label: 'After 5 minutes away', short: '5 min' },
+  { value: '15', label: 'After 15 minutes away', short: '15 min' },
 ];
 
 const SETTING_KEY = 'rv.appLock';

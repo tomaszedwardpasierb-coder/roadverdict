@@ -1,4 +1,4 @@
-// The Story So Far: the web tab's AI story of the selected vehicle's
+// The story so far: the web tab's AI story of the selected vehicle's
 // logged history, and its "Getting ready to sell" section (see
 // /api/app/story on the server). A story is generated through the web's
 // own story-so-far routes, with the vehicle named in a header, and then
@@ -66,7 +66,7 @@ export default function StoryScreen() {
         </Pressable>
         <View style={styles.flex}>
           <Text style={styles.title} accessibilityRole="header">
-            The Story So Far
+            The story so far
           </Text>
           {selected ? (
             <Text style={styles.subtitle} numberOfLines={1}>
@@ -92,8 +92,8 @@ export default function StoryScreen() {
             <StoryBody key={`${selected.kind}:${selected.id}`} vehicle={selected} data={screen.data} />
           ) : (
             <ProLock
-              feature="The Story So Far"
-              description={`An AI-generated narrative of your ownership - your ${selected.kind}'s history told as a story, with insights on what's been done, what's coming, and how your costs compare.`}
+              feature="The story so far"
+              description={`An AI-generated narrative of your ownership – your ${selected.kind}'s history told as a story, with insights on what's been done, what's coming, and how your costs compare.`}
             />
           )}
         </ScrollView>
@@ -186,10 +186,7 @@ function StoryBody({ vehicle, data }: { vehicle: GarageVehicle; data: StoryScree
           </Text>
           <View style={styles.notice}>
             <Text style={styles.noticeText}>
-              Best used once you&apos;ve built up a decent spread of history with receipts and supporting documents attached, rather than straight after adding the{' '}
-              {noun}. If you run it too early, when there are only a handful of entries, the result is likely to have little or no real value. It may simply come
-              back as &quot;Limited documentation&quot;, or produce a summary that doesn&apos;t tell the {noun}&apos;s story properly at all, regardless of how good
-              its actual history is.
+              Works best once you&apos;ve logged a good spread of history with receipts – with only a few entries, there isn&apos;t much of a story to tell yet.
             </Text>
           </View>
           {button}
@@ -231,7 +228,7 @@ function GettingReady({ prep }: { prep: SellerPrep }) {
             <Text style={styles.text}>
               {prep.mileageConsistent
                 ? 'No conflicting mileage readings across your logged entries.'
-                : 'At least one logged entry shows a lower mileage than an earlier one - worth checking for a typo.'}
+                : 'At least one logged entry shows a lower mileage than an earlier one – worth checking for a typo.'}
             </Text>
           </View>
 
@@ -253,8 +250,8 @@ function GettingReady({ prep }: { prep: SellerPrep }) {
               <Text style={styles.groupTitle}>What a buyer&apos;s report will show as coming up</Text>
               {prep.upcoming.map((item, i) => (
                 <Text key={i} style={styles.text}>
-                  • <Text style={styles.strong}>{item.label}</Text> - {item.timingDetail} ({item.overdue ? 'overdue' : 'due soon'})
-                  {item.typical ? ` - ${item.typical}` : ''}
+                  • <Text style={styles.strong}>{item.label}</Text> – {item.timingDetail} ({item.overdue ? 'overdue' : 'due soon'})
+                  {item.typical ? ` – ${item.typical}` : ''}
                 </Text>
               ))}
             </View>

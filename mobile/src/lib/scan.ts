@@ -93,7 +93,7 @@ export async function scanReceiptPhoto(
 ): Promise<ApiResult<{ items: ParsedItem[]; summary: string | null }>> {
   const file = new File(photo.uri);
   if (file.type !== 'image/jpeg' && file.type !== 'image/png') {
-    return { ok: false, status: 0, error: 'That photo format isn’t supported - please choose a JPEG or PNG photo.' };
+    return { ok: false, status: 0, error: 'That photo format isn’t supported – please choose a JPEG or PNG photo.' };
   }
   const form = new FormData();
   form.append('file', file);
@@ -206,15 +206,15 @@ export function reviewReasons(entry: ReviewEntry, item: ParsedItem, vehicle: Gar
     const v = [entry.vehicleMismatch.makeOnReceipt, entry.vehicleMismatch.modelOnReceipt].filter(Boolean).join(' ');
     reasons.push(`The receipt looks like it’s for a ${v}, not this ${noun}.`);
   }
-  if (item.forceReview) reasons.push('The receipt is in another currency - check the converted amount.');
-  if (item.aiLowConfidence) reasons.push('The receipt was hard to read - check every figure.');
+  if (item.forceReview) reasons.push('The receipt is in another currency – check the converted amount.');
+  if (item.aiLowConfidence) reasons.push('The receipt was hard to read – check every figure.');
   if (entry.category !== 'bills') {
-    if (entry.mileageNeedsManualEntry) reasons.push('There’s no mileage on the receipt and not enough history to estimate it - please enter it.');
+    if (entry.mileageNeedsManualEntry) reasons.push('There’s no mileage on the receipt and not enough history to estimate it – please enter it.');
     else if (entry.mileageWarningText) reasons.push(entry.mileageWarningText);
-    else if (typeof item.mileageOnReceipt !== 'number') reasons.push('There’s no mileage on the receipt, so it’s been estimated from your history - check it.');
+    else if (typeof item.mileageOnReceipt !== 'number') reasons.push('There’s no mileage on the receipt, so it’s been estimated from your history – check it.');
   }
   if (litresLookWrong(entry, vehicle) && entry.category === 'fuel') {
-    reasons.push(`${entry.litres.toFixed(1)} litres is more than this bike’s tank holds - it may have been misread.`);
+    reasons.push(`${entry.litres.toFixed(1)} litres is more than this bike’s tank holds – it may have been misread.`);
   }
   return reasons;
 }

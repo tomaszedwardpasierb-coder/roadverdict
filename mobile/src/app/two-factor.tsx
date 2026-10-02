@@ -77,7 +77,7 @@ export default function TwoFactorScreen() {
 
   if (phoneTrusted && !useCode && !expired) {
     return (
-      <AuthScreen title="One more step" subtitle="This phone is trusted - confirm it’s you with your fingerprint, face or phone PIN.">
+      <AuthScreen title="One more step" subtitle="This phone is trusted – confirm it’s you with your fingerprint, face or phone PIN.">
         <View style={styles.done} accessibilityRole="text">
           <Icon name="check" size={18} color={Brand.amber} strokeWidth={2.6} />
           <Text style={styles.doneText}>Email code accepted</Text>
@@ -95,7 +95,7 @@ export default function TwoFactorScreen() {
       subtitle={
         useBackup
           ? 'Enter one of the backup codes you saved when you turned on two-step sign-in. Each works once.'
-          : 'Your account has two-step sign-in on. Open your authenticator app (such as Google Authenticator) and enter the 6-digit code it shows for RoadVerdict - not the code from your email.'
+          : 'Your account has two-step sign-in on. Open your authenticator app (such as Google Authenticator) and enter the 6-digit code it shows for RoadVerdict – not the code from your email.'
       }>
       <View style={styles.done} accessibilityRole="text">
         <Icon name="check" size={18} color={Brand.amber} strokeWidth={2.6} />

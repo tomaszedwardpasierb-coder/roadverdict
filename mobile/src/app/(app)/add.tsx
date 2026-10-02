@@ -5,7 +5,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Icon, type IconName } from '@/components/icon';
 import { Brand } from '@/constants/brand';
 
-// The ⊕ sheet: every way of adding to the logbook, plus checking a quote.
+// The ⊕ sheet: every way of adding to the logbook (checking a quote lives
+// on Home and in More - it isn't something you add).
 export default function AddSheet() {
   return (
     <View style={styles.root}>
@@ -27,7 +28,7 @@ export default function AddSheet() {
           </View>
           <View style={styles.flex}>
             <Text style={styles.scanTitle}>Scan a receipt</Text>
-            <Text style={styles.scanBody}>Take a photo - AI fills everything in for you</Text>
+            <Text style={styles.scanBody}>Take a photo – the AI fills everything in for you</Text>
           </View>
         </Pressable>
 
@@ -40,7 +41,7 @@ export default function AddSheet() {
           </View>
           <View style={styles.flex}>
             <Text style={styles.sayTitle}>Just say it</Text>
-            <Text style={styles.scanBody}>Tell the assistant what you did - it drafts the entry</Text>
+            <Text style={styles.sayBody}>Tell the assistant what you did – it drafts the entry</Text>
           </View>
         </Pressable>
 
@@ -48,15 +49,14 @@ export default function AddSheet() {
           <Tile icon="fuel" label="Fuel" onPress={() => router.replace('/add-fuel')} />
           <Tile icon="wrench" label="Service or repair" onPress={() => router.replace({ pathname: '/add-entry', params: { type: 'service' } })} />
           <Tile icon="gauge" label="Mileage" onPress={() => router.replace('/update-mileage')} />
-          <Tile icon="quote" label="Check a quote" onPress={() => router.replace('/quote')} />
+          <Tile icon="part" label="Part or accessory" onPress={() => router.replace({ pathname: '/add-entry', params: { type: 'mods' } })} />
         </View>
 
         <Text style={styles.otherTitle}>Something else</Text>
         <View style={styles.chips}>
           {(
             [
-              ['Parts', 'mods'],
-              ['Insurance, tax, MOT', 'bills'],
+              ['Bill (insurance, tax, MOT)', 'bills'],
               ['Labour', 'labour'],
               ['Fine', 'fines'],
               ['Toll', 'tolls'],
@@ -102,6 +102,7 @@ const styles = StyleSheet.create({
   say: { flexDirection: 'row', alignItems: 'center', gap: 14, marginTop: 10, padding: 14, borderRadius: 16, borderWidth: 1.5, borderColor: Brand.line, backgroundColor: Brand.paperRaised },
   sayIcon: { width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center', backgroundColor: Brand.paper, borderWidth: 1.5, borderColor: Brand.line },
   sayTitle: { fontSize: 17, fontWeight: '700', color: Brand.ink },
+  sayBody: { color: Brand.muted, fontSize: 13, marginTop: 2 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   tile: { width: '48%', flexGrow: 1, minHeight: 84, padding: 14, gap: 8, borderRadius: 16, borderWidth: 1, borderColor: Brand.line, backgroundColor: '#FBF9F5' },
   tileLabel: { fontSize: 16, fontWeight: '600', color: Brand.ink },

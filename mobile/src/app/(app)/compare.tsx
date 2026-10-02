@@ -75,7 +75,7 @@ export default function CompareScreen() {
           contentContainerStyle={styles.content}
           refreshControl={<RefreshControl refreshing={api.refreshing} onRefresh={api.refresh} colors={[Brand.amberInk]} />}>
           <Text style={styles.intro}>
-            Cost per mile is the number a spec sheet can’t give you - real spend divided by the miles you’ve actually done, from your own
+            Cost per mile is the number a spec sheet can’t give you – real spend divided by the miles you’ve actually done, from your own
             logged history. Mix bikes and cars freely.
           </Text>
 

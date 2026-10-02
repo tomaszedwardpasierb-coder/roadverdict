@@ -32,11 +32,13 @@ export function AppLockSetting() {
             disabled={busy}
             accessibilityRole="radio"
             accessibilityState={{ selected: setting === o.value, disabled: busy }}
+            accessibilityLabel={o.label}
             style={[styles.option, setting === o.value && styles.optionOn]}>
-            <Text style={[styles.optionLabel, setting === o.value && styles.optionLabelOn]}>{o.label}</Text>
+            <Text style={[styles.optionLabel, setting === o.value && styles.optionLabelOn]}>{o.short}</Text>
           </Pressable>
         ))}
       </View>
+      <Text style={styles.current}>{APP_LOCK_OPTIONS.find((o) => o.value === setting)?.label ?? ''}</Text>
       {error ? (
         <Text style={styles.error} accessibilityRole="alert">
           {error}
@@ -49,10 +51,11 @@ export function AppLockSetting() {
 const styles = StyleSheet.create({
   card: { padding: 16, gap: 12 },
   text: { fontSize: 15, lineHeight: 22, color: Brand.ink },
-  options: { gap: 8 },
-  option: { minHeight: 48, paddingHorizontal: 14, justifyContent: 'center', borderRadius: 12, borderWidth: 1.5, borderColor: Brand.line, backgroundColor: Brand.paperRaised },
-  optionOn: { borderColor: Brand.amber, backgroundColor: '#FBF4E8' },
-  optionLabel: { fontSize: 16, fontWeight: '600', color: Brand.ink },
-  optionLabelOn: { color: '#7A4508' },
+  options: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  option: { minHeight: 44, paddingHorizontal: 16, justifyContent: 'center', borderRadius: 999, borderWidth: 1.5, borderColor: Brand.line, backgroundColor: Brand.paperRaised },
+  optionOn: { borderColor: Brand.asphalt, backgroundColor: Brand.asphalt },
+  optionLabel: { fontSize: 15, fontWeight: '600', color: Brand.ink },
+  optionLabelOn: { color: '#FFFFFF' },
+  current: { fontSize: 13, color: Brand.muted },
   error: { fontSize: 14, lineHeight: 20, color: Brand.danger },
 });

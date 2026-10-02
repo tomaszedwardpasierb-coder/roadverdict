@@ -24,7 +24,7 @@ export function fromIsoDay(iso: string): Date {
 // entry passes its own mileage as `initial`, which is never estimated
 // over.
 export function useEstimatedMileage(vehicle: GarageVehicle | null, date: Date, token: string | null, initial?: string) {
-  const [mileage, setMileageState] = useState(() => initial ?? (vehicle ? String(vehicle.units.currentMileageDisplay) : ''));
+  const [mileage, setMileageState] = useState(() => initial ?? (vehicle ? groupNumber(vehicle.units.currentMileageDisplay) : ''));
   const [touched, setTouched] = useState(initial !== undefined);
   const [note, setNote] = useState<string | null>(null);
   const isoDate = toIsoDay(date);
@@ -37,7 +37,7 @@ export function useEstimatedMileage(vehicle: GarageVehicle | null, date: Date, t
       { token }
     ).then((result) => {
       if (cancelled || !result.ok) return;
-      setMileageState(result.data.mileageDisplay != null ? String(result.data.mileageDisplay) : '');
+      setMileageState(result.data.mileageDisplay != null ? groupNumber(result.data.mileageDisplay) : '');
       setNote(result.data.note);
     });
     return () => {
@@ -52,6 +52,12 @@ export function useEstimatedMileage(vehicle: GarageVehicle | null, date: Date, t
   }
 
   return { mileage, setMileage, note };
+}
+
+// "35,640", not "35640" - mileage is shown with thousands commas everywhere,
+// in fields as well as text (parseMileage reads it back either way).
+export function groupNumber(n: number): string {
+  return Math.round(n).toLocaleString('en-GB');
 }
 
 // Accepts "12,4" as well as "12.4" - many phone keyboards only offer a comma.

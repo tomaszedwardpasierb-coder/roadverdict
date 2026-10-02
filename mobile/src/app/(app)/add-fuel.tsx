@@ -8,11 +8,12 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { EntryLoader } from '@/components/entry-loader';
 import { Icon } from '@/components/icon';
+import { MissingHint } from '@/components/screen';
 import { Brand } from '@/constants/brand';
 import { apiFetch } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { ENTRY_ROUTES, recordPath, type Entry } from '@/lib/entries';
-import { dayLabel, fromIsoDay, parseMileage, parseNumber, toIsoDay, useEstimatedMileage } from '@/lib/mileage';
+import { dayLabel, fromIsoDay, groupNumber, parseMileage, parseNumber, toIsoDay, useEstimatedMileage } from '@/lib/mileage';
 import { toStoredGbp, toStoredMiles, useVehicle, vehicleHeaders } from '@/lib/vehicle';
 
 export default function AddFuelScreen() {
@@ -33,7 +34,7 @@ function FuelForm({ existing }: { existing?: Entry }) {
   const [initial] = useState(() => ({
     amount: existing?.fuel ? String(existing.fuel.amount) : '',
     cost: existing ? existing.costDisplay.toFixed(2) : '',
-    mileage: existing?.mileageDisplay != null ? String(existing.mileageDisplay) : undefined,
+    mileage: existing?.mileageDisplay != null ? groupNumber(existing.mileageDisplay) : undefined,
   }));
   const [amount, setAmount] = useState(initial.amount);
   const [cost, setCost] = useState(initial.cost);
@@ -131,8 +132,8 @@ function FuelForm({ existing }: { existing?: Entry }) {
         <KeyboardAvoidingView style={styles.flex} behavior="height">
           <ScrollView contentContainerStyle={styles.form} keyboardShouldPersistTaps="handled">
             <View style={styles.pair}>
-              <Field label={electric ? 'kWh' : 'Litres'} value={amount} onChangeText={setAmount} placeholder={electric ? '40.5' : '12.4'} autoFocus={!existing} />
-              <Field label={`Cost (${units.currencySymbol})`} value={cost} onChangeText={setCost} placeholder="19.80" />
+              <Field label={electric ? 'kWh' : 'Litres'} value={amount} onChangeText={setAmount} placeholder={electric ? 'e.g. 40.5' : 'e.g. 12.4'} autoFocus={!existing} />
+              <Field label={`Cost (${units.currencySymbol})`} value={cost} onChangeText={setCost} placeholder="e.g. 19.80" />
             </View>
             <Text style={styles.hint} accessibilityLiveRegion="polite">
               {unitPrice != null
@@ -144,7 +145,7 @@ function FuelForm({ existing }: { existing?: Entry }) {
               label={`Mileage (${distanceUnit})`}
               value={mileage}
               onChangeText={setMileage}
-              placeholder={String(units.currentMileageDisplay)}
+              placeholder={`e.g. ${groupNumber(units.currentMileageDisplay)}`}
               keyboardType="number-pad"
               hint={estimateNote ?? `Last recorded: ${units.currentMileageDisplay.toLocaleString('en-GB')} ${distanceUnit}`}
             />
@@ -186,6 +187,7 @@ function FuelForm({ existing }: { existing?: Entry }) {
           </ScrollView>
 
           <View style={styles.footer}>
+            <MissingHint missing={[!(amountN > 0) && 'enter the litres', !(costN > 0) && 'enter the cost', !(mileageN > 0) && 'enter the mileage']} />
             <Pressable
               onPress={() => save(false)}
               disabled={!valid || saving}

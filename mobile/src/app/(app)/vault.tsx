@@ -80,7 +80,7 @@ export default function VaultScreen() {
       <View style={styles.pad}>
         <ProLock
           feature="The Vault"
-          description="Your V5C, insurance certificate, MOT and every other document for this vehicle, in one encrypted place that only you can open - with a fresh two-step code each time."
+          description="Your V5C, insurance certificate, MOT and every other document for this vehicle, in one encrypted place that only you can open – with a fresh two-step code each time."
         />
       </View>
     );
@@ -315,7 +315,7 @@ function QuickUnlockOffer() {
     setShow(false);
     setMessage(
       result.ok
-        ? { ok: true, text: 'Done - next time, open the Vault and sign in with your fingerprint or PIN. You can stop this in Settings on the website.' }
+        ? { ok: true, text: 'Done – next time, open the Vault and sign in with your fingerprint or PIN. You can stop this in Settings on the website.' }
         : { ok: false, text: result.error }
     );
   }
@@ -324,7 +324,7 @@ function QuickUnlockOffer() {
     <Card style={styles.card}>
       <Text style={styles.cardTitle}>Open it with your fingerprint next time?</Text>
       <Text style={styles.text}>
-        Trust this phone and the Vault opens - and signing in is confirmed - with your fingerprint, face or phone PIN instead of a code from your authenticator app.
+        Trust this phone and the Vault opens – and signing in is confirmed – with your fingerprint, face or phone PIN instead of a code from your authenticator app.
       </Text>
       <View style={styles.row}>
         <Pressable
@@ -479,7 +479,7 @@ function Documents({ vehicle, previous, offerQuickUnlock }: { vehicle: GarageVeh
       <ScrollView contentContainerStyle={styles.list}>
         <Text style={styles.text}>
           {documents && documents.length === 0
-            ? `Your ${noun}’s documents in one secure place - V5C, insurance certificate, MOT, or anything you’d hate to lose. Encrypted at rest; only you can open it.`
+            ? `Your ${noun}’s documents in one secure place – V5C, insurance certificate, MOT, or anything you’d hate to lose. Encrypted at rest; only you can open it.`
             : 'Encrypted at rest. Only you can open it.'}
         </Text>
         {previous ? (
@@ -634,7 +634,7 @@ function AddDocument({ vehicle, visible, onClose, onAdded }: { vehicle: GarageVe
       return;
     }
     if (picked.size !== null && picked.size > MAX_FILE_BYTES) {
-      setError('That file is too large - 10MB is the most one document can be.');
+      setError('That file is too large – 10MB is the most one document can be.');
       return;
     }
     setBusy(true);

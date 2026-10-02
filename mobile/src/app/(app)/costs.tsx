@@ -11,7 +11,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Icon } from '@/components/icon';
 import { OptionPicker } from '@/components/option-picker';
-import { Card, ErrorState, LoadingState } from '@/components/screen';
+import { Card, ErrorState, LoadingState, MissingHint } from '@/components/screen';
 import { Brand } from '@/constants/brand';
 import { apiFetch } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
@@ -50,7 +50,7 @@ export default function CostsScreen() {
         </Pressable>
         <View style={styles.flex}>
           <Text style={styles.title} accessibilityRole="header">
-            Running costs
+            Cost calculator
           </Text>
           {selected ? (
             <Text style={styles.subtitle} numberOfLines={1}>
@@ -140,7 +140,7 @@ function CostForm({ vehicle, data }: { vehicle: GarageVehicle; data: ToolsScreen
             value={distance}
             onChangeText={setDistance}
             keyboardType="number-pad"
-            placeholder={bike ? (km ? '6000' : '4000') : km ? '11000' : '7000'}
+            placeholder={bike ? (km ? 'e.g. 6,000' : 'e.g. 4,000') : km ? 'e.g. 11,000' : 'e.g. 7,000'}
             placeholderTextColor="#A7A49C"
             accessibilityLabelledBy="distance-label"
             style={styles.input}
@@ -190,6 +190,7 @@ function CostForm({ vehicle, data }: { vehicle: GarageVehicle; data: ToolsScreen
             {problem}
           </Text>
         ) : null}
+        <MissingHint verb="work it out" missing={[!(typed > 0) && 'enter your miles a year']} />
         <Pressable
           onPress={calculate}
           disabled={!valid || working}
@@ -230,7 +231,7 @@ function CostCard({ kind, result }: { kind: 'bike' | 'car'; result: CostResponse
         Adjusted for {brandLabel} · {regionLabel}
       </Text>
       <Text style={styles.hint}>
-        Insurance isn&apos;t included on purpose - it depends on you (age, licence, no-claims, postcode), not just the {kind === 'bike' ? 'bike' : 'car'}, so
+        Insurance isn&apos;t included on purpose – it depends on you (age, licence, no-claims, postcode), not just the {kind === 'bike' ? 'bike' : 'car'}, so
         a generic estimate would be more misleading than useful.{' '}
         <Text style={styles.link} onPress={() => WebBrowser.openBrowserAsync(insuranceSearch)} accessibilityRole="link">
           Compare insurance quotes

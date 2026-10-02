@@ -7,10 +7,11 @@ import { KeyboardAvoidingView, Pressable, StyleSheet, Text, TextInput, View } fr
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Icon } from '@/components/icon';
+import { MissingHint } from '@/components/screen';
 import { Brand } from '@/constants/brand';
 import { apiFetch } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
-import { parseMileage } from '@/lib/mileage';
+import { groupNumber, parseMileage } from '@/lib/mileage';
 import { toStoredMiles, useVehicle, vehicleHeaders } from '@/lib/vehicle';
 
 export default function UpdateMileageScreen() {
@@ -91,7 +92,7 @@ export default function UpdateMileageScreen() {
                 keyboardType="number-pad"
                 autoFocus
                 accessibilityLabelledBy="new-mileage"
-                placeholder={String(current)}
+                placeholder={`e.g. ${groupNumber(current + 100)}`}
                 placeholderTextColor="#A7A49C"
                 style={[styles.input, tooLow && styles.inputError]}
               />
@@ -108,6 +109,7 @@ export default function UpdateMileageScreen() {
             ) : null}
           </View>
           <View style={styles.footer}>
+            <MissingHint missing={[!(reading > 0) && 'enter what the odometer reads now']} />
             <Pressable
               onPress={save}
               disabled={!valid || saving}

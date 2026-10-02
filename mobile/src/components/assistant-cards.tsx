@@ -185,7 +185,7 @@ export function ShareLinkDraft({ link }: { link: ProposedShareLink }) {
       action="Create the link"
       busy={busy}
       error={error}
-      done={url ? 'Link created - manage it under More, Shareable links' : null}
+      done={url ? 'Link created – manage it under More, Shareable links' : null}
       onConfirm={create}
       extra={
         url ? (
@@ -222,7 +222,7 @@ export function FeedbackDraft({ feedback }: { feedback: ProposedFeedback }) {
 
   async function submit() {
     const sent = await send('/api/account/feedback', 'POST', { type: feedback.feedbackType, message: feedback.message, attachments: [], source: 'assistant' });
-    if (sent !== null) setDone('Sent to the RoadVerdict team - thank you');
+    if (sent !== null) setDone('Sent to the RoadVerdict team – thank you');
   }
 
   return (

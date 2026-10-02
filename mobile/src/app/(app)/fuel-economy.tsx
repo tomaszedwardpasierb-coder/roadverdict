@@ -64,7 +64,7 @@ export default function FuelEconomyScreen() {
         </Pressable>
         <View style={styles.flex}>
           <Text style={styles.title} accessibilityRole="header">
-            Fuel economy
+            MPG calculator
           </Text>
           <Text style={styles.subtitle} numberOfLines={1}>
             {[selected.name, selected.registration].filter(Boolean).join(' · ')}
@@ -204,8 +204,8 @@ function Calculator({ data, symbol }: { data: FuelEconomy; symbol: string }) {
         ))}
       </View>
       <View style={styles.fields}>
-        <Field label={miles ? 'Miles driven' : 'Kilometres driven'} value={distance} onChange={setDistance} suffix={miles ? 'mi' : 'km'} placeholder={miles ? '312' : '502'} />
-        <Field label="Litres used" value={litres} onChange={setLitres} suffix="L" placeholder="34.6" />
+        <Field label={miles ? 'Miles driven' : 'Kilometres driven'} value={distance} onChange={setDistance} suffix={miles ? 'mi' : 'km'} placeholder={miles ? 'e.g. 312' : 'e.g. 502'} />
+        <Field label="Litres used" value={litres} onChange={setLitres} suffix="L" placeholder="e.g. 34.6" />
       </View>
       <Field
         label={inPence ? 'Price per litre (pence)' : `Price per litre (${symbol})`}
@@ -215,7 +215,7 @@ function Calculator({ data, symbol }: { data: FuelEconomy; symbol: string }) {
           setPriceNote(null);
         }}
         suffix={inPence ? 'p' : symbol}
-        placeholder={inPence ? '145.9' : '1.75'}
+        placeholder={inPence ? 'e.g. 145.9' : 'e.g. 1.75'}
       />
       {uk ? (
         <View style={styles.chips}>
