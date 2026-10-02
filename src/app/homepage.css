@@ -11,6 +11,31 @@
  * never render any of these selectors at all.
  */
 
+/* The hero grows to fit its content instead of a fixed height: the content
+   (label, headline, text, two buttons, reassurances) is taller than the
+   fixed height on every screen, and overflow: hidden was cutting off the
+   "Motorcycles & Cars" label at the top and the reassurances at the
+   bottom. The shared .rv-hero height (globals.css) stays as the minimum,
+   so the panels' crop is unchanged wherever the content fits. Scoped to
+   the homepage's own hero; the /cars and /motorcycles figure heroes size
+   themselves already. */
+.rv-hero:not(.rv-hero--figure) {
+  height: auto;
+  min-height: clamp(480px, 30vw, 680px);
+}
+@media (max-width: 640px) {
+  .rv-hero:not(.rv-hero--figure) {
+    height: auto;
+    min-height: clamp(420px, 90vw, 520px);
+  }
+}
+
+/* The page's usual top padding left an empty band between the header and
+   the full-width hero. */
+main:has(> .rv-hero) {
+  padding-top: 0;
+}
+
 /* Comic panel grid — lives behind the hero content */
 .rv-hero-panels {
   position: absolute;

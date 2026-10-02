@@ -80,6 +80,11 @@ export default function HomePage() {
               src="/images/hero/panel-01.webp"
               alt=""
               fill
+              // The left panel is ~55% of the hero's width (1.1fr / 0.9fr)
+              // above 640px, the full width below - without this, `fill`
+              // assumes 100vw and desktops download an image twice the size
+              // they show.
+              sizes="(max-width: 640px) 100vw, 55vw"
               style={{ objectFit: 'cover', objectPosition: 'center top' }}
               priority
               // `priority` alone gives eager loading + a preload link but no
@@ -106,6 +111,7 @@ export default function HomePage() {
                 src="/images/hero/panel-02.webp"
                 alt=""
                 fill
+                sizes="45vw"
                 style={{ objectFit: 'cover', objectPosition: 'center center' }}
               />
               <div className="rv-panel-overlay" />
@@ -116,6 +122,7 @@ export default function HomePage() {
                 src="/images/hero/panel-03.webp"
                 alt=""
                 fill
+                sizes="45vw"
                 style={{ objectFit: 'cover', objectPosition: 'center top' }}
               />
               <div className="rv-panel-overlay" />
