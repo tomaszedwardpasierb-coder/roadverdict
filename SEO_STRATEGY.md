@@ -1,9 +1,11 @@
 # RoadVerdict — SEO Strategy
 
 **For:** the SEO agency or contractor taking on this account, and the RoadVerdict team.
-**Version:** 2 — 27 September 2026. Replaces the 14 September 2026 handover.
-**What changed:** the strategy has been rebuilt from real ranking, indexing and competitor evidence rather than
-assumptions, and the technical fixes it called for have already been shipped (Section 9).
+**Version:** 2.1 — 2 October 2026. Replaces the 14 September 2026 handover.
+**What changed:** version 2 (27 September) rebuilt the strategy from real ranking, indexing and competitor evidence
+rather than assumptions, and shipped the technical fixes it called for (Section 9). Version 2.1 adds where per-model
+data will come from and a five-model motorcycle pilot (Section 8), a data partner for links (Section 7), a fifth
+pillar for the documented service history (Section 4), and judges pages by sign-ups rather than visits (Section 10).
 
 ---
 
@@ -87,7 +89,7 @@ it.
    unsourced "2026 cost guides".
 3. **Independent.** RoadVerdict doesn't sell the repair, so it has no reason to push you towards a garage.
 4. **The whole ownership loop.** Quote checking, buying checks, running costs, a service history that transfers to the
-   next owner, and a shareable verified history for sellers — no competitor connects these.
+   next owner, and a shareable documented history for sellers — no competitor connects these.
 
 ---
 
@@ -103,6 +105,12 @@ Every page, keyword and link-building angle should reinforce one of the four pil
 2. **The buyer's truth** — buying guide, free MOT history and valuation, optional paid history check.
 3. **The true cost** — cost calculators and ownership guides.
 4. **Motorcycles as a first-class vehicle** — the niche RoadVerdict can own first.
+5. **The documented history** — receipts turned into a dated service history that goes with the vehicle when it's
+   sold. Never call it "verified": it's the owner's own record, with receipts attached.
+
+These map onto the four moments the product is sold on: before paying a garage (1), before buying (2), while owning
+(3, 5) and when selling (5). Each search entry point should lead to the tool for its moment, not to a general
+homepage pitch.
 
 ---
 
@@ -160,6 +168,10 @@ still sit on page 6. This is the single most important section of this document.
 4. **Resource pages.** "Useful links for new riders", rider-training schools, bike-insurance comparison blogs.
 5. **Linkable data (from month three).** An annual "True cost of UK motorcycling" report from our own sourced data —
    something journalists and bloggers cite.
+6. **Data partners.** Bike Reliability (bikereliability.co.uk) publishes MOT pass rates for every motorcycle make and
+   model from DVSA data, free to cite under CC BY 4.0 with a link, and covers no costs at all. We cite its figures on
+   per-model pages (Section 8); it is a natural site to link to our quote checker and running-cost pages, since we
+   answer the cost question its visitors have next.
 
 **Targets:** 10 genuine referring domains in 60 days; 25 in 120 days. Quality over quantity — no paid links, link
 farms or directory spam.
@@ -182,13 +194,30 @@ farms or directory spam.
 1. **More price guides, once sourced data exists.** Cars: clutch, cambelt/timing belt, brake discs, battery, air-con
    regas. Motorcycles: valve clearance check, fork seals, battery. The rule: a new job gets a page only after it has
    sourced rows in the price tables (which also makes it available in the quote checker).
-2. **"Proof when selling" guide** — "how to prove service history when selling a motorcycle or car". Low competition,
-   and it leads straight to RoadVerdict's shareable history link.
+2. **The documented-history guides** — "how to prove service history when selling a motorcycle or car" and "how to
+   rebuild a lost service history" (ask the dealer and garages for copies, use the MOT history, photograph the
+   receipts). Low competition, and they lead straight to receipt scanning and the shareable history link.
 3. **Motorcycle-first explainers** — "basic vs full motorcycle service", "why valve checks cost so much", "first year
    of motorcycle ownership: real costs".
-4. **Per-model pages — only with per-model data.** Our prices are by size class, not make and model. Building "Honda
-   CB500F service cost" pages from class-level data would be thin content in Google's eyes. Revisit once real per-model
-   observations exist, for example aggregated, anonymised tracker data.
+4. **Per-model pages — gather the data first, then a five-model motorcycle pilot.** Our prices are by size class, not
+   make and model, and "Honda CB500F service cost" pages built from class-level data would be thin content in Google's
+   eyes. Searches like "Yamaha MT-09 service cost" are still where a small site can win, so the work is collecting real
+   per-model data:
+   - **Dealer service menus.** Many UK dealers publish fixed prices per model and service interval. Three to five
+     dealers per model, each dated and linked, gives a sourced range for each service.
+   - **Manufacturer service schedules.** Intervals and what each service includes (valve checks especially), from
+     the owner's manual.
+   - **DVSA MOT data.** The anonymised MOT results (Open Government Licence, data.gov.uk) give the common failure
+     reasons and typical yearly mileage per model; Bike Reliability's per-model pass rates can be cited with a link.
+   - **Owners' own costs**, aggregated and anonymised, only once a model has enough owners (10 or more) for the
+     figure to mean something.
+   - **First-hand ownership.** The first page can be the founder's own bike: what it has really cost to run, from its
+     receipts. Google rewards first-hand experience, and owners' groups share pages like that.
+
+   **The pilot:** five popular UK motorcycles, chosen by Semrush volume. Each page: the service schedule, sourced
+   dealer prices per service, common MOT failure points, what moves the price, "Got a quote? Check it" and "Track
+   your bike's real costs". Measure for six to eight weeks; build more only if they get indexed and start ranking.
+   Cars follow later through the long tail (for example a specific model's timing-belt or brake job), not head terms.
 
 ### Rules for every new page
 
@@ -196,6 +225,8 @@ farms or directory spam.
 - Written for the specific job and vehicle, not a template with words swapped.
 - Uses `pageMetadata()` for its title, description, canonical URL and share tags, and appears in the sitemap and the
   footer directory (both generated from `PRICE_GUIDES`).
+- When the apps are out, pages point to them with a quiet text link where it helps ("Keep this bike's history in your
+  pocket"), never a pop-up or interstitial — Google demotes intrusive interstitials on mobile.
 
 ---
 
@@ -248,6 +279,10 @@ tracking — track the 56 keywords above plus the car targets once validated).
 
 **Monthly check:** Search Console queries report → new question-style searches become FAQ entries or new pages.
 
+**Judge pages by sign-ups, not visits.** Tag links from our own channels (`?utm_source=` or `?src=`); the sign-up
+funnel in the admin panel counts each step by source, and the activation panel shows how many people go on to add
+something real. A page that brings 50 visitors and two owners who log their bike beats one that brings 500 and none.
+
 ---
 
 ## 11. Actions only a person can do
@@ -258,7 +293,10 @@ tracking — track the 56 keywords above plus the car targets once validated).
 2. **Search Console → Sitemaps:** resubmit `https://roadverdict.co.uk/sitemap.xml`.
 3. **Semrush:** paste in the car targets in Section 6 and note volume and difficulty; start rank tracking.
 4. **Start the link-building plan (Section 7),** beginning with motorcycle communities and tagged links in social bios.
-5. **Azure (optional):** delete the stale `site/wwwroot/public/robots.txt` and the two unused hero images.
+5. **Before building new pages:** check in Search Console whether the seven "Discovered – not indexed" pages are now
+   indexed. If they aren't, links come first.
+6. **Semrush:** monthly volumes for the shortlist of pilot motorcycle models (Section 8).
+7. **Azure (optional):** delete the stale `site/wwwroot/public/robots.txt` and the two unused hero images.
 
 ---
 
