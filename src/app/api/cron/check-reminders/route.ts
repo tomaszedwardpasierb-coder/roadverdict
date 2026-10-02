@@ -83,7 +83,7 @@ async function checkReminder(reminder: ReminderDoc): Promise<ReminderCheckOutcom
     if (status === "due-soon" && !reminder.dueSoonBellNotifiedAt) {
       await notifyReminder(email, {
         title: reminder.name,
-        body: `Due soon for ${vehicleName} - ${reminderDetailLabel(reminder)}`,
+        body: `Due soon for ${vehicleName} – ${reminderDetailLabel(reminder)}`,
       });
       await markReminderDueSoonBellNotified(email, reminder.id);
       notified++;
@@ -93,7 +93,7 @@ async function checkReminder(reminder: ReminderDoc): Promise<ReminderCheckOutcom
       if (!reminder.overdueBellNotifiedAt) {
         await notifyReminder(email, {
           title: reminder.name,
-          body: `Overdue for ${vehicleName} - ${reminderDetailLabel(reminder)}`,
+          body: `Overdue for ${vehicleName} – ${reminderDetailLabel(reminder)}`,
         });
         await markReminderOverdueBellNotified(email, reminder.id);
         notified++;
@@ -141,7 +141,7 @@ async function checkCarReminder(reminder: CarReminderDoc): Promise<ReminderCheck
     if (status === "due-soon" && !reminder.dueSoonBellNotifiedAt) {
       await notifyReminder(email, {
         title: reminder.name,
-        body: `Due soon for ${vehicleName} - ${carReminderDetailLabel(reminder)}`,
+        body: `Due soon for ${vehicleName} – ${carReminderDetailLabel(reminder)}`,
       });
       await markCarReminderDueSoonBellNotified(email, reminder.id);
       notified++;
@@ -151,7 +151,7 @@ async function checkCarReminder(reminder: CarReminderDoc): Promise<ReminderCheck
       if (!reminder.overdueBellNotifiedAt) {
         await notifyReminder(email, {
           title: reminder.name,
-          body: `Overdue for ${vehicleName} - ${carReminderDetailLabel(reminder)}`,
+          body: `Overdue for ${vehicleName} – ${carReminderDetailLabel(reminder)}`,
         });
         await markCarReminderOverdueBellNotified(email, reminder.id);
         notified++;
