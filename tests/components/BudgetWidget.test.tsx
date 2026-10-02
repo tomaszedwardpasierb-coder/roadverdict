@@ -63,7 +63,7 @@ describe("BudgetWidget", () => {
   it("shows the 'on track' status when spend is comfortably under budget", () => {
     render(<BudgetWidget yearSpend={400} currentYear={2026} initialBudget={2000} currency="GBP" rates={null} />);
     expect(screen.getByText("On track for 2026")).toBeInTheDocument();
-    expect(screen.getByText("£400.00 of £2000.00")).toBeInTheDocument();
+    expect(screen.getByText("£400.00 of £2,000.00")).toBeInTheDocument();
   });
 
   it("shows the 'approaching' warning once spend reaches 80% of budget", () => {
@@ -171,7 +171,7 @@ describe("BudgetWidget", () => {
         />
       );
       expect(screen.getByText(/Over budget by £500/)).toBeInTheDocument();
-      expect(screen.getByText("At this rate, you'll go about £1000.00 over budget by the end of 2026.")).toBeInTheDocument();
+      expect(screen.getByText("At this rate, you'll go about £1,000.00 over budget by the end of 2026.")).toBeInTheDocument();
     });
   });
 
@@ -200,7 +200,7 @@ describe("BudgetWidget", () => {
       expect(screen.getByText("Future budget (Next 6 months)")).toBeInTheDocument();
       expect(screen.getByText("Estimate")).toBeInTheDocument();
       // £2000 projected spend of a £1820 prorated (182-day) budget - over by £180.
-      expect(screen.getByText("£2000.00 of £1820.00")).toBeInTheDocument();
+      expect(screen.getByText("£2,000.00 of £1,820.00")).toBeInTheDocument();
       expect(screen.getByText("⚠️ Projected to go £180.00 over your budget for the next 6 months")).toBeInTheDocument();
     });
 
@@ -232,7 +232,7 @@ describe("BudgetWidget", () => {
       await user.click(screen.getByRole("button", { name: "enable forecast" }));
       await user.click(screen.getByRole("button", { name: "window 1y" }));
 
-      expect(screen.getByText("£4000.00 of £3650.00")).toBeInTheDocument();
+      expect(screen.getByText("£4,000.00 of £3,650.00")).toBeInTheDocument();
     });
 
     it("hides the year-end 'At this rate...' sentence while Forecast mode is on, even when a yearEndProjection is given", async () => {
@@ -272,7 +272,7 @@ describe("BudgetWidget", () => {
       await user.click(screen.getByRole("button", { name: "disable forecast" }));
 
       expect(screen.getByText("Annual budget (2026)")).toBeInTheDocument();
-      expect(screen.getByText("£400.00 of £3650.00")).toBeInTheDocument();
+      expect(screen.getByText("£400.00 of £3,650.00")).toBeInTheDocument();
     });
   });
 });

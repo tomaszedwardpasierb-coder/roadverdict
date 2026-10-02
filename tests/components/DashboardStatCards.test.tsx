@@ -404,7 +404,7 @@ describe("DashboardStatCards", () => {
       await user.click(screen.getByRole("button", { name: "enable forecast" }));
 
       expect(screen.getByText("Projected for 2026")).toBeInTheDocument();
-      expect(screen.getByText("£1200.00")).toBeInTheDocument();
+      expect(screen.getByText("£1,200.00")).toBeInTheDocument();
       expect(screen.queryByText("£400.00")).not.toBeInTheDocument();
     });
 

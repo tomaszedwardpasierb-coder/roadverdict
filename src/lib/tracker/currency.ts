@@ -58,5 +58,7 @@ export function convertDisplayToGbp(amount: number, currency: Currency, rates: E
 
 export function formatCurrency(amountGbp: number, currency: Currency, rates: ExchangeRates | null): string {
   const value = convertGbpToDisplay(amountGbp, currency, rates);
-  return `${CURRENCY_SYMBOLS[currency]}${value.toFixed(2)}`;
+  // Grouped thousands ("£13,358.07", not "£13358.07") - always en-GB, so
+  // the server and every browser format it the same way.
+  return `${CURRENCY_SYMBOLS[currency]}${value.toLocaleString("en-GB", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }

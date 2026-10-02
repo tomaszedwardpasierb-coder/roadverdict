@@ -163,7 +163,7 @@ export default function AssistantScreen() {
             ) : (
               <View key={i} style={styles.theirsWrap}>
                 <View style={[styles.bubble, styles.theirs]}>
-                  <Text style={styles.theirsText}>{turn.content}</Text>
+                  <Text style={styles.theirsText}>{formatReply(turn.content)}</Text>
                 </View>
                 {turn.proposedEntry ? <EntryDraft entry={turn.proposedEntry} onSaved={() => send(NEXT_ENTRY)} /> : null}
                 {turn.proposedShareLink ? <ShareLinkDraft link={turn.proposedShareLink} /> : null}
@@ -244,6 +244,22 @@ export default function AssistantScreen() {
   );
 }
 
+// The assistant writes light Markdown (the website renders it): **bold**
+// shows bold here too, a "* " or "- " list line becomes a bullet, and any
+// other stray asterisk is dropped rather than shown.
+function formatReply(text: string) {
+  const lines = text.split('\n').map((line) => line.replace(/^\s*[*-]\s+/, '• '));
+  return lines.join('\n').split(/(\*\*[^*]+\*\*)/g).map((part, i) =>
+    part.startsWith('**') && part.endsWith('**') && part.length > 4 ? (
+      <Text key={i} style={styles.bold}>
+        {part.slice(2, -2)}
+      </Text>
+    ) : (
+      part.replace(/\*/g, '')
+    )
+  );
+}
+
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: Brand.paper },
   flex: { flex: 1 },
@@ -265,6 +281,7 @@ const styles = StyleSheet.create({
   theirsWrap: { alignSelf: 'stretch' },
   theirs: { alignSelf: 'flex-start', backgroundColor: Brand.paperRaised, borderWidth: 1, borderColor: Brand.line, borderBottomLeftRadius: 4 },
   theirsText: { fontSize: 16, lineHeight: 23, color: Brand.ink },
+  bold: { fontWeight: '700' },
   thinking: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   thinkingText: { fontSize: 15, color: Brand.muted },
   error: { fontSize: 15, lineHeight: 22, color: Brand.danger },
