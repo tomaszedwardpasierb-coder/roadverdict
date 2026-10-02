@@ -105,7 +105,7 @@ export default function RemindersScreen() {
             <View style={styles.note}>
               <Icon name="lock" size={14} color="#7A4508" />
               <Text style={styles.noteText}>
-                Free plan: every reminder shows whether it&apos;s due, but exact due dates are Premium. Upgrade on roadverdict.co.uk.
+                Free plan: every reminder shows whether it&apos;s due. Exact due dates are part of Pro.
               </Text>
             </View>
           ) : null}

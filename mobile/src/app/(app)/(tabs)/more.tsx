@@ -49,7 +49,7 @@ export default function MoreScreen() {
             <Text style={styles.rowTitle} numberOfLines={1}>
               {email}
             </Text>
-            <Text style={styles.rowMeta}>Manage your plan on roadverdict.co.uk</Text>
+            <Text style={styles.rowMeta}>Signed in</Text>
           </View>
         </Card>
 
