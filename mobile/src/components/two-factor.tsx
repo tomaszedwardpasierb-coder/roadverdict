@@ -130,7 +130,7 @@ export function TwoFactorSection({ enabled, onChanged }: { enabled: boolean; onC
       <Card style={styles.card}>
         <Text style={styles.title}>Save your backup codes</Text>
         <Text style={styles.text}>
-          If you ever lose your phone, each of these gets you in once instead of a code. Keep them somewhere safe - they won&apos;t be shown
+          If you ever lose your phone, each of these gets you in once instead of a code. Keep them somewhere safe – they won&apos;t be shown
           again.
         </Text>
         <Text selectable style={styles.codes}>

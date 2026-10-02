@@ -1,9 +1,10 @@
 import { router } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { Pressable, RefreshControl, ScrollView, SectionList, StyleSheet, Text, View } from 'react-native';
+import { Pressable, RefreshControl, SectionList, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { EntryRow, type EntryCategory, type LogEntry } from '@/components/entry-row';
+import { Icon } from '@/components/icon';
 import { ErrorState, LoadingState } from '@/components/screen';
 import { Brand } from '@/constants/brand';
 import { openEntry } from '@/lib/entries';
@@ -32,17 +33,25 @@ function monthTitle(iso: string): string {
 export default function LogbookScreen() {
   const { selected } = useVehicle();
   const [filter, setFilter] = useState<Filter>('all');
+  const [query, setQuery] = useState('');
   const log = useApi<LogbookData>(selected ? `/api/app/logbook?kind=${selected.kind}&id=${encodeURIComponent(selected.id)}` : null);
 
   const sections = useMemo(() => {
-    const entries = (log.data?.entries ?? []).filter((e) => filter === 'all' || e.category === filter);
+    // Search matches what it was (the job, part or bill), its description,
+    // the date as shown, the amount and the mileage.
+    const q = query.trim().toLowerCase();
+    const entries = (log.data?.entries ?? []).filter(
+      (e) =>
+        (filter === 'all' || e.category === filter) &&
+        (!q || [e.type, e.description, e.costLabel, e.mileageLabel ?? '', monthTitle(e.date)].some((field) => field.toLowerCase().includes(q)))
+    );
     const byMonth = new Map<string, LogEntry[]>();
     for (const e of entries) {
       const key = monthTitle(e.date);
       byMonth.set(key, [...(byMonth.get(key) ?? []), e]);
     }
     return [...byMonth].map(([title, data]) => ({ title, data }));
-  }, [log.data, filter]);
+  }, [log.data, filter, query]);
 
   const total = log.data?.entries.length ?? 0;
   const count = (id: Filter) => (id === 'all' ? total : (log.data?.counts[id] ?? 0));
@@ -61,8 +70,28 @@ export default function LogbookScreen() {
         ) : null}
       </View>
 
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipsScroll} contentContainerStyle={styles.chips}>
-        {FILTERS.map((f) => {
+      <View style={styles.search}>
+        <Icon name="search" size={18} color={Brand.muted} />
+        <TextInput
+          value={query}
+          onChangeText={setQuery}
+          placeholder="Search your logbook"
+          placeholderTextColor="#8A877F"
+          accessibilityLabel="Search your logbook"
+          returnKeyType="search"
+          style={styles.searchInput}
+        />
+        {query ? (
+          <Pressable onPress={() => setQuery('')} accessibilityRole="button" accessibilityLabel="Clear search" hitSlop={8}>
+            <Icon name="close" size={18} color={Brand.muted} />
+          </Pressable>
+        ) : null}
+      </View>
+
+      {/* Only the kinds this vehicle has entries for, wrapping onto a second
+          row rather than running off the edge of the screen. */}
+      <View style={styles.chips}>
+        {FILTERS.filter((f) => f.id === 'all' || f.id === filter || !log.data || count(f.id) > 0).map((f) => {
           const on = f.id === filter;
           return (
             <Pressable
@@ -79,7 +108,7 @@ export default function LogbookScreen() {
             </Pressable>
           );
         })}
-      </ScrollView>
+      </View>
 
       {!selected ? (
         <View style={styles.empty}>
@@ -104,10 +133,16 @@ export default function LogbookScreen() {
           )}
           ListEmptyComponent={
             <View style={styles.emptyBox}>
-              <Text style={styles.emptyTitle}>No {current.empty} logged yet</Text>
-              <Pressable onPress={() => router.push('/add')} accessibilityRole="button" style={({ pressed }) => [styles.addOne, pressed && { opacity: 0.85 }]}>
-                <Text style={styles.addOneLabel}>Add one</Text>
-              </Pressable>
+              {query.trim() ? (
+                <Text style={styles.emptyTitle}>Nothing matches “{query.trim()}”</Text>
+              ) : (
+                <>
+                  <Text style={styles.emptyTitle}>No {current.empty} logged yet</Text>
+                  <Pressable onPress={() => router.push('/add')} accessibilityRole="button" style={({ pressed }) => [styles.addOne, pressed && { opacity: 0.85 }]}>
+                    <Text style={styles.addOneLabel}>Add one</Text>
+                  </Pressable>
+                </>
+              )}
             </View>
           }
         />
@@ -121,8 +156,21 @@ const styles = StyleSheet.create({
   header: { paddingHorizontal: 20, paddingTop: 12, gap: 2 },
   title: { fontSize: 30, fontWeight: '800', color: Brand.ink },
   subtitle: { fontSize: 13, color: Brand.muted },
-  chipsScroll: { flexGrow: 0 },
-  chips: { gap: 8, paddingHorizontal: 20, paddingVertical: 12 },
+  search: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginHorizontal: 20,
+    marginTop: 12,
+    paddingHorizontal: 14,
+    minHeight: 46,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: Brand.line,
+    backgroundColor: Brand.paperRaised,
+  },
+  searchInput: { flex: 1, fontSize: 16, color: Brand.ink, paddingVertical: 8 },
+  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingHorizontal: 20, paddingVertical: 12 },
   chip: {
     minHeight: 40,
     paddingHorizontal: 14,

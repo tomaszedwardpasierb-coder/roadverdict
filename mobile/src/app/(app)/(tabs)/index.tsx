@@ -38,7 +38,7 @@ export default function HomeScreen() {
       <SafeAreaView style={styles.safe} edges={['top']}>
         <View style={styles.empty}>
           <Text style={styles.emptyTitle}>Add your first vehicle</Text>
-          <Text style={styles.emptyBody}>Start with the registration - we&apos;ll look up the rest, and bring in its MOT history.</Text>
+          <Text style={styles.emptyBody}>Start with the registration – we&apos;ll look up the rest, and bring in its MOT history.</Text>
           <Pressable
             onPress={() => router.push('/add-vehicle')}
             accessibilityRole="button"
@@ -121,7 +121,7 @@ export default function HomeScreen() {
                     ) : (
                       <View style={styles.locked}>
                         <Icon name="lock" size={13} color={Brand.muted} />
-                        <Text style={styles.rowMeta}>Exact due date - Premium</Text>
+                        <Text style={styles.rowMeta}>Exact due date – Pro</Text>
                       </View>
                     )}
                   </View>

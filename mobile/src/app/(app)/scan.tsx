@@ -209,7 +209,7 @@ export default function ScanScreen() {
                 <Text style={styles.primaryLabel}>{toReview > 0 ? 'Check the rest later' : 'Done'}</Text>
               </Pressable>
               {toReview > 0 ? (
-                <Text style={styles.tip}>Anything you leave stays in your logbook marked “Scanned - check details”.</Text>
+                <Text style={styles.tip}>Anything you leave stays in your logbook marked “Scanned – check details”.</Text>
               ) : null}
             </View>
           </ScrollView>

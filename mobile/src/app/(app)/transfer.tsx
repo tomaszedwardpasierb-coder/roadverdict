@@ -187,7 +187,7 @@ function OfferCard({ vehicle, noun, onSent }: { vehicle: GarageVehicle; noun: st
   return (
     <Card style={styles.card}>
       <Text style={styles.text}>
-        Selling this {noun}? Hand the buyer its logged history instead of them starting from scratch - service records, mileage and
+        Selling this {noun}? Hand the buyer its logged history instead of them starting from scratch – service records, mileage and
         documents carry on under their own account.
       </Text>
       <View style={styles.field}>

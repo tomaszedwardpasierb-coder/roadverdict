@@ -148,7 +148,7 @@ function EntryBody({ entry, vehicle, refreshing, onRefresh }: { entry: Entry; ve
           <Card style={styles.review}>
             <Text style={styles.reviewTitle}>Read from a receipt</Text>
             <Text style={styles.reviewText}>
-              Check the details below. If they&apos;re right, confirm them - or edit anything that isn&apos;t.
+              Check the details below. If they&apos;re right, confirm them – or edit anything that isn&apos;t.
               {entry.mileageEstimated ? ' The mileage was estimated, not read off the receipt.' : ''}
             </Text>
             <Pressable
@@ -204,7 +204,7 @@ function EntryBody({ entry, vehicle, refreshing, onRefresh }: { entry: Entry; ve
             <Text style={styles.problemText}>{problem.message}</Text>
             {problem.canOverride ? (
               <Pressable onPress={() => confirm(true)} accessibilityRole="button" style={styles.override}>
-                <Text style={styles.overrideLabel}>That&apos;s right - save anyway</Text>
+                <Text style={styles.overrideLabel}>That&apos;s right – save anyway</Text>
               </Pressable>
             ) : null}
           </View>

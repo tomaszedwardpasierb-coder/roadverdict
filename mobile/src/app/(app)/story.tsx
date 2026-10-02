@@ -163,7 +163,7 @@ function StoryBody({ vehicle, data }: { vehicle: GarageVehicle; data: StoryScree
           ))}
           {story.ownerNotes.length > 0 ? (
             <View style={styles.notes}>
-              <Text style={styles.notesTitle}>For you only - never shown to a buyer</Text>
+              <Text style={styles.notesTitle}>For you only – never shown to a buyer</Text>
               {story.ownerNotes.map((note, i) => (
                 <Text key={i} style={styles.notesText}>
                   {note}
@@ -181,7 +181,7 @@ function StoryBody({ vehicle, data }: { vehicle: GarageVehicle; data: StoryScree
       ) : (
         <Card style={styles.card}>
           <Text style={styles.text}>
-            What your logged history says about this {noun} - where it&apos;s strong, where a bit more logging would strengthen it, and the same story you can hand a
+            What your logged history says about this {noun} – where it&apos;s strong, where a bit more logging would strengthen it, and the same story you can hand a
             buyer when you&apos;re ready to sell, backed by real dates and receipts, not just your word.
           </Text>
           <View style={styles.notice}>
@@ -213,11 +213,11 @@ function GettingReady({ prep }: { prep: SellerPrep }) {
         Getting ready to sell
       </Text>
       <Text style={styles.hint}>
-        A buyer opening a share link sees this exact record, read the same way - here&apos;s how it currently looks, and what&apos;s worth doing before you list it.
+        A buyer opening a share link sees this exact record, read the same way – here&apos;s how it currently looks, and what&apos;s worth doing before you list it.
       </Text>
 
       {prep.totalRecords === 0 ? (
-        <Text style={styles.text}>Nothing logged yet - start adding your service history, fuel, and bills to build the record a buyer will eventually see here.</Text>
+        <Text style={styles.text}>Nothing logged yet – start adding your service history, fuel, and bills to build the record a buyer will eventually see here.</Text>
       ) : (
         <>
           <View style={styles.group}>
@@ -259,7 +259,7 @@ function GettingReady({ prep }: { prep: SellerPrep }) {
 
           {prep.questions.length > 0 ? (
             <View style={styles.group}>
-              <Text style={styles.groupTitle}>Questions a buyer is likely to ask - have your answers ready</Text>
+              <Text style={styles.groupTitle}>Questions a buyer is likely to ask – have your answers ready</Text>
               {prep.questions.map((q, i) => (
                 <Text key={i} style={styles.text}>
                   • {q}

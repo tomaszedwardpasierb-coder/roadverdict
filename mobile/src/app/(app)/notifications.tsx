@@ -1,6 +1,7 @@
 // Notifications: the same list as the website's bell - reminders turning
 // due soon or overdue, and announcements from RoadVerdict. Opening the
-// screen marks them read, as opening the bell does on the website.
+// screen marks them read, as opening the bell does on the website. New ones
+// sit in their own section on top, so what's new is always clear.
 import { router } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import { useEffect } from 'react';
@@ -8,7 +9,7 @@ import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'r
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Icon } from '@/components/icon';
-import { Card, ErrorState, LoadingState } from '@/components/screen';
+import { Card, ErrorState, LoadingState, SectionHeader } from '@/components/screen';
 import { Brand } from '@/constants/brand';
 import { API_BASE_URL, apiFetch } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
@@ -76,34 +77,46 @@ export default function NotificationsScreen() {
               <Text style={styles.emptyText}>Reminders that come due, and news from RoadVerdict, appear here and on your phone.</Text>
             </View>
           ) : (
-            <Card>
-              {list.data?.notifications.map((n, i) => {
-                const unread = !n.readAt;
-                const tappable = n.kind === 'reminder' || !!n.linkTo;
-                return (
-                  <Pressable
-                    key={n.id}
-                    onPress={() => open(n)}
-                    disabled={!tappable}
-                    accessibilityRole={tappable ? 'button' : undefined}
-                    style={({ pressed }) => [styles.row, i > 0 && styles.divider, unread && styles.unread, pressed && { opacity: 0.85 }]}>
-                    <View style={[styles.icon, n.kind === 'reminder' ? styles.iconReminder : styles.iconNews]}>
-                      <Icon name={n.kind === 'reminder' ? 'bell' : 'sparkle'} size={18} color={Brand.asphalt} />
-                    </View>
-                    <View style={styles.flex}>
-                      <View style={styles.titleRow}>
-                        <Text style={[styles.rowTitle, unread && styles.bold]} numberOfLines={2}>
-                          {n.title}
-                        </Text>
-                        <Text style={styles.time}>{when(n.createdAt)}</Text>
-                      </View>
-                      <Text style={styles.body}>{n.body}</Text>
-                    </View>
-                    {unread ? <View style={styles.dot} accessibilityLabel="New" /> : null}
-                  </Pressable>
-                );
-              })}
-            </Card>
+            <>
+              {[
+                { title: 'New', items: list.data?.notifications.filter((n) => !n.readAt) ?? [] },
+                { title: 'Earlier', items: list.data?.notifications.filter((n) => !!n.readAt) ?? [] },
+              ].map((group) =>
+                group.items.length === 0 ? null : (
+                  <View key={group.title} style={styles.group}>
+                    <SectionHeader title={group.title} />
+                    <Card>
+                      {group.items.map((n, i) => {
+                        const unread = !n.readAt;
+                        const tappable = n.kind === 'reminder' || !!n.linkTo;
+                        return (
+                          <Pressable
+                            key={n.id}
+                            onPress={() => open(n)}
+                            disabled={!tappable}
+                            accessibilityRole={tappable ? 'button' : undefined}
+                            style={({ pressed }) => [styles.row, i > 0 && styles.divider, unread && styles.unread, pressed && { opacity: 0.85 }]}>
+                            <View style={[styles.icon, n.kind === 'reminder' ? styles.iconReminder : styles.iconNews]}>
+                              <Icon name={n.kind === 'reminder' ? 'bell' : 'sparkle'} size={18} color={Brand.asphalt} />
+                            </View>
+                            <View style={styles.flex}>
+                              <View style={styles.titleRow}>
+                                <Text style={[styles.rowTitle, unread && styles.bold]} numberOfLines={2}>
+                                  {n.title}
+                                </Text>
+                                <Text style={styles.time}>{when(n.createdAt)}</Text>
+                              </View>
+                              <Text style={styles.body}>{n.body}</Text>
+                            </View>
+                            {unread ? <View style={styles.dot} accessibilityLabel="New" /> : null}
+                          </Pressable>
+                        );
+                      })}
+                    </Card>
+                  </View>
+                )
+              )}
+            </>
           )}
         </ScrollView>
       )}
@@ -118,6 +131,7 @@ const styles = StyleSheet.create({
   back: { width: 48, height: 48, alignItems: 'center', justifyContent: 'center', transform: [{ scaleX: -1 }] },
   title: { fontSize: 28, fontWeight: '800', color: Brand.ink },
   content: { padding: 20, paddingTop: 8, gap: 12 },
+  group: { gap: 8 },
   empty: { alignItems: 'center', gap: 8, paddingTop: 48, paddingHorizontal: 20 },
   emptyTitle: { fontSize: 18, fontWeight: '800', color: Brand.ink },
   emptyText: { fontSize: 15, lineHeight: 22, color: Brand.muted, textAlign: 'center' },

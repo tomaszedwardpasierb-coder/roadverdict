@@ -126,7 +126,7 @@ function CostForm({ vehicle, data }: { vehicle: GarageVehicle; data: ToolsScreen
         {!bike && data.electric ? (
           <Card style={[styles.card, styles.notice]}>
             <Text style={styles.noticeText}>
-              Fully electric cars aren&apos;t covered yet - there isn&apos;t enough sourced UK running-cost data. The figures below are for a
+              Fully electric cars aren&apos;t covered yet – there isn&apos;t enough sourced UK running-cost data. The figures below are for a
               similar-sized petrol, diesel or hybrid car instead.
             </Text>
           </Card>
@@ -152,7 +152,7 @@ function CostForm({ vehicle, data }: { vehicle: GarageVehicle; data: ToolsScreen
           ) : null}
         </View>
 
-        <Text style={styles.hint}>These start from your {vehicle.name} - change anything that&apos;s different.</Text>
+        <Text style={styles.hint}>These start from your {vehicle.name} – change anything that&apos;s different.</Text>
         <OptionPicker label="Make" placeholder="Choose the make" groups={[{ label: '', options: data.options.brands }]} value={brand} onChange={setBrand} />
         <OptionPicker
           label={bike ? 'Engine size' : 'Size of car'}

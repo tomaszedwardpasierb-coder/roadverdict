@@ -53,7 +53,7 @@ export default function ShareLinksScreen() {
             keyboardShouldPersistTaps="handled"
             refreshControl={<RefreshControl refreshing={data.refreshing} onRefresh={data.refresh} colors={[Brand.amberInk]} />}>
             <Text style={styles.intro}>
-              Thinking of selling? A link shows a buyer exactly how this {noun} has been looked after - dates, costs, a real history, not
+              Thinking of selling? A link shows a buyer exactly how this {noun} has been looked after – dates, costs, a real history, not
               just your word. Your personal details stay private, and receipts only appear if you agree when someone asks.
             </Text>
 
@@ -194,7 +194,7 @@ function NewLinkCard({ vehicle, onCreated }: { vehicle: GarageVehicle; onCreated
           autoComplete="off"
           style={styles.input}
         />
-        <Text style={styles.hint}>Their email address - it’s who the link identifies if they ask you for a receipt through it.</Text>
+        <Text style={styles.hint}>Their email address – it’s who the link identifies if they ask you for a receipt through it.</Text>
       </View>
 
       <View style={styles.field}>
@@ -211,7 +211,7 @@ function NewLinkCard({ vehicle, onCreated }: { vehicle: GarageVehicle; onCreated
             </Pressable>
           ))}
         </View>
-        <Text style={styles.hint}>After that it stops working and is deleted - you can extend it any time before then.</Text>
+        <Text style={styles.hint}>After that it stops working and is deleted – you can extend it any time before then.</Text>
       </View>
 
       <View style={styles.field}>

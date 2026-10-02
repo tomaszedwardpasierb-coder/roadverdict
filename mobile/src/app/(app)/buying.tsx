@@ -196,7 +196,7 @@ function PlateCheck({ kind, onFound }: { kind: VehicleKind; onFound: (lookup: Lo
           </Text>
           <Text style={styles.hint}>{[lookup.colour, lookup.fuelType].filter(Boolean).join(' · ')}</Text>
           {lookup.plateInRetention ? (
-            <Text style={styles.hint}>This plate isn&apos;t on a vehicle right now - these details are from the last one it was on.</Text>
+            <Text style={styles.hint}>This plate isn&apos;t on a vehicle right now – these details are from the last one it was on.</Text>
           ) : null}
           {lookup.taxDetails ? <Row label="Tax" value={lookup.taxDetails.taxStatus ?? 'Unknown'} /> : null}
           <Row label="MOT" value={lookup.motDueDate ? `Due ${day(lookup.motDueDate)}` : 'No MOT due date'} />

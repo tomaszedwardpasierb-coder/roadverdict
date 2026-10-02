@@ -615,6 +615,8 @@ export type ReminderListItem = {
   permanent: boolean;
   // An exact-date reminder doesn't repeat - "done" clears it.
   oneOff: boolean;
+  // What the app's edit form starts from (null for an automatic one).
+  schedule: { type: "mileage" | "months" | "date"; value: number | null; exactDate: string | null } | null;
 };
 
 export type ReminderList = { vehicle: GarageVehicle; isPro: boolean; reminders: ReminderListItem[] };
@@ -637,7 +639,11 @@ export async function getReminderList(email: string, kind: VehicleKind, id: stri
   const reminders = raw
     .map(({ r, status, detail }) => {
       const permanent = r.intervalType === "permanent";
-      return { id: r.id, name: r.name, status, detail: permanent || pro.isPro ? detail || null : null, permanent, oneOff: r.intervalType === "date" };
+      const schedule =
+        r.intervalType === "mileage" || r.intervalType === "months" || r.intervalType === "date"
+          ? { type: r.intervalType, value: r.intervalValue ?? null, exactDate: r.exactDate ?? null }
+          : null;
+      return { id: r.id, name: r.name, status, detail: permanent || pro.isPro ? detail || null : null, permanent, oneOff: r.intervalType === "date", schedule };
     })
     .sort((a, b) => STATUS_ORDER[a.status] - STATUS_ORDER[b.status] || a.name.localeCompare(b.name));
 

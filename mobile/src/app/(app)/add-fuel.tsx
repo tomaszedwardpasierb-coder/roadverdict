@@ -179,7 +179,7 @@ function FuelForm({ existing }: { existing?: Entry }) {
                 <Text style={styles.problemText}>{problem.message}</Text>
                 {problem.canOverride ? (
                   <Pressable onPress={() => save(true)} accessibilityRole="button" style={styles.override}>
-                    <Text style={styles.overrideLabel}>That&apos;s right - save anyway</Text>
+                    <Text style={styles.overrideLabel}>That&apos;s right – save anyway</Text>
                   </Pressable>
                 ) : null}
               </View>

@@ -70,11 +70,11 @@ export function ReceiptRequestCard({ request, onSaved }: { request: ReceiptReque
         <Text style={styles.itemTitle}>{item.description}</Text>
         {item.priorDecline ? (
           <Text style={styles.flag}>
-            Asked again - you said no to this on {formatDay(item.priorDecline.decidedAt)}
+            Asked again – you said no to this on {formatDay(item.priorDecline.decidedAt)}
             {item.priorDecline.reason ? ` (“${item.priorDecline.reason}”)` : ''}
           </Text>
         ) : null}
-        {item.attachment ? <Receipts attachments={[item.attachment]} /> : <Text style={styles.note}>No preview - asked for before previews existed.</Text>}
+        {item.attachment ? <Receipts attachments={[item.attachment]} /> : <Text style={styles.note}>No preview – asked for before previews existed.</Text>}
         <View style={styles.choices} accessibilityRole="radiogroup" accessibilityLabel={`Share the receipt for ${item.description}?`}>
           {CHOICES.map((c) => (
             <Pressable

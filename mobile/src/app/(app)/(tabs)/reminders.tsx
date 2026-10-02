@@ -19,6 +19,7 @@ type Reminder = {
   detail: string | null;
   permanent: boolean;
   oneOff: boolean;
+  schedule: { type: 'mileage' | 'months' | 'date'; value: number | null; exactDate: string | null } | null;
 };
 
 type ReminderList = { isPro: boolean; reminders: Reminder[] };
@@ -56,11 +57,20 @@ export default function RemindersScreen() {
     act(reminder, 'PATCH');
   }
 
-  function remove(reminder: Reminder) {
-    Alert.alert('Delete this reminder?', "This can't be undone.", [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Delete', style: 'destructive', onPress: () => act(reminder, 'DELETE') },
-    ]);
+  // Editing - and deleting, which lives on the edit screen rather than
+  // beside Done, where it was too easy to hit by mistake.
+  function edit(reminder: Reminder) {
+    if (!reminder.schedule) return;
+    router.push({
+      pathname: '/add-reminder',
+      params: {
+        id: reminder.id,
+        name: reminder.name,
+        type: reminder.schedule.type,
+        value: reminder.schedule.value != null ? String(reminder.schedule.value) : '',
+        date: reminder.schedule.exactDate ?? '',
+      },
+    });
   }
 
   const reminders = list.data?.reminders ?? [];
@@ -141,7 +151,7 @@ export default function RemindersScreen() {
                           ) : (
                             <View style={styles.locked}>
                               <Icon name="lock" size={13} color={Brand.muted} />
-                              <Text style={styles.detail}>Exact due date - Premium</Text>
+                              <Text style={styles.detail}>Exact due date – Pro</Text>
                             </View>
                           )}
                         </View>
@@ -158,14 +168,17 @@ export default function RemindersScreen() {
                             <Icon name="check" size={16} color={Brand.ink} strokeWidth={2.6} />
                             <Text style={styles.actionLabel}>{busyId === r.id ? 'Saving…' : 'Done'}</Text>
                           </Pressable>
-                          <Pressable
-                            onPress={() => remove(r)}
-                            disabled={busyId === r.id}
-                            accessibilityRole="button"
-                            accessibilityLabel={`Delete ${r.name}`}
-                            style={({ pressed }) => [styles.actionButton, pressed && styles.pressed]}>
-                            <Text style={[styles.actionLabel, styles.deleteLabel]}>Delete</Text>
-                          </Pressable>
+                          {r.schedule ? (
+                            <Pressable
+                              onPress={() => edit(r)}
+                              disabled={busyId === r.id}
+                              accessibilityRole="button"
+                              accessibilityLabel={`Edit ${r.name}`}
+                              style={({ pressed }) => [styles.actionButton, pressed && styles.pressed]}>
+                              <Icon name="pencil" size={15} color={Brand.ink} />
+                              <Text style={styles.actionLabel}>Edit</Text>
+                            </Pressable>
+                          ) : null}
                         </View>
                       ) : null}
                     </View>
@@ -216,5 +229,4 @@ const styles = StyleSheet.create({
     backgroundColor: Brand.paperRaised,
   },
   actionLabel: { fontSize: 14, fontWeight: '600', color: Brand.ink },
-  deleteLabel: { color: Brand.danger },
 });

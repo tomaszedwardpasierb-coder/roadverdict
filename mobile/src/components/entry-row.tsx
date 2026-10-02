@@ -56,7 +56,7 @@ export function EntryRow({ entry, divider, onPress }: { entry: LogEntry; divider
         </Text>
         {entry.needsReview ? (
           <View style={styles.review}>
-            <Text style={styles.reviewText}>Scanned - check details</Text>
+            <Text style={styles.reviewText}>Scanned – check details</Text>
           </View>
         ) : null}
       </View>

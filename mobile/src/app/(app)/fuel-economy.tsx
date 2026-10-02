@@ -78,7 +78,7 @@ export default function FuelEconomyScreen() {
       ) : data.data?.electric ? (
         <View style={styles.pad}>
           <Card style={styles.card}>
-            <Text style={styles.text}>MPG doesn’t apply to a fully electric car - your charging costs are in your logbook and Reports.</Text>
+            <Text style={styles.text}>MPG doesn’t apply to a fully electric car – your charging costs are in your logbook and Reports.</Text>
           </Card>
         </View>
       ) : data.data ? (
@@ -123,7 +123,7 @@ function Body({ vehicle, data }: { vehicle: GarageVehicle; data: FuelEconomy }) 
         ) : (
           <Card style={styles.card}>
             <Text style={styles.text}>
-              Log two full-tank fill-ups in a row and your {noun}’s real average shows here - from what actually went in the tank, not the
+              Log two full-tank fill-ups in a row and your {noun}’s real average shows here – from what actually went in the tank, not the
               manufacturer’s claim.
             </Text>
           </Card>
@@ -135,7 +135,7 @@ function Body({ vehicle, data }: { vehicle: GarageVehicle; data: FuelEconomy }) 
         ) : null}
 
         <Text style={styles.section}>Work out a tank</Text>
-        <Text style={styles.note}>A trip you didn’t log, or a what-if - nothing here is saved.</Text>
+        <Text style={styles.note}>A trip you didn’t log, or a what-if – nothing here is saved.</Text>
         <Calculator data={data} symbol={symbol} />
       </ScrollView>
     </KeyboardAvoidingView>

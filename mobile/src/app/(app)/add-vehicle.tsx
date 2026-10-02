@@ -126,6 +126,13 @@ export default function AddVehicleScreen() {
             Your account can track {limit.limit === 1 ? 'one vehicle' : `${limit.limit} vehicles`} at a time – bikes and cars together.
             Vehicles you&apos;ve transferred to a new owner don&apos;t count.
           </Text>
+          <Text style={styles.panelText}>
+            To make room, transfer a vehicle you&apos;ve sold to its new owner, or remove one: tap the vehicle&apos;s name on Home, then ⋯ next to it.
+          </Text>
+          <Pressable onPress={() => router.replace('/transfer')} accessibilityRole="button" style={({ pressed }) => [styles.fullAction, pressed && { opacity: 0.85 }]}>
+            <Icon name="transfer" size={18} color={Brand.asphalt} />
+            <Text style={styles.fullActionLabel}>Transfer a vehicle</Text>
+          </Pressable>
         </Card>
       </View>
     );
@@ -164,7 +171,7 @@ export default function AddVehicleScreen() {
               <Text style={styles.primaryLabel}>{busy ? 'Looking it up…' : 'Find it'}</Text>
             </Pressable>
             <Text style={styles.hint}>
-              We look it up with DVLA, so we can fill in the make, model and year for you - and tell whether it&apos;s a bike or a car.
+              We look it up with DVLA, so we can fill in the make, model and year for you – and tell whether it&apos;s a bike or a car.
             </Text>
           </>
         ) : null}
@@ -217,7 +224,7 @@ export default function AddVehicleScreen() {
             <Text style={styles.panelTitle}>This {noun} already has a RoadVerdict history</Text>
             <Text style={styles.panelText}>
               If you&apos;ve bought it, you can ask the current owner to pass its history to you. Starting fresh begins a new record under your
-              account instead - the previous owner&apos;s history stays with them.
+              account instead – the previous owner&apos;s history stays with them.
             </Text>
             <Pressable
               onPress={() => requestOwnership(step.kind)}
@@ -578,7 +585,7 @@ function DetailsForm({
         <Field label="Nickname (optional)" value={nickname} onChangeText={edit(setNickname)} placeholder={kind === 'bike' ? 'e.g. The Tiger' : 'e.g. The Family Bus'} />
 
         <Text style={styles.hint}>
-          {registration} is saved as its original registration. It can&apos;t be removed later - only added to, if the plate changes - so a future
+          {registration} is saved as its original registration. It can&apos;t be removed later – only added to, if the plate changes – so a future
           buyer can trust its history belongs to it.
         </Text>
 
@@ -630,6 +637,8 @@ function Field({
 }
 
 const styles = StyleSheet.create({
+  fullAction: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, minHeight: 48, marginTop: 4, borderRadius: 12, backgroundColor: Brand.amber },
+  fullActionLabel: { fontSize: 16, fontWeight: '700', color: Brand.asphalt },
   safe: { flex: 1, backgroundColor: Brand.paper },
   flex: { flex: 1 },
   header: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingTop: 8, paddingBottom: 4 },

@@ -505,7 +505,7 @@ function Documents({ vehicle, previous, offerQuickUnlock }: { vehicle: GarageVeh
           <Icon name="plus" size={20} color={Brand.asphalt} />
           <Text style={styles.primaryLabel}>Add a document</Text>
         </Pressable>
-        {full ? <Text style={styles.hint}>This {noun} has {MAX_DOCUMENTS} documents - delete one to add another.</Text> : null}
+        {full ? <Text style={styles.hint}>This {noun} has {MAX_DOCUMENTS} documents – delete one to add another.</Text> : null}
 
         {groups.map((group) => (
           <View key={group.key} style={styles.group}>

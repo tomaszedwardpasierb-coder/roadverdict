@@ -149,7 +149,7 @@ export function EntryDraft({ entry, onSaved }: { entry: ProposedEntry; onSaved?:
       extra={
         mileageProblem && !done ? (
           <Pressable onPress={() => save(true)} accessibilityRole="button" style={({ pressed }) => [styles.secondary, pressed && { opacity: 0.85 }]}>
-            <Text style={styles.secondaryLabel}>The mileage is right - save anyway</Text>
+            <Text style={styles.secondaryLabel}>The mileage is right – save anyway</Text>
           </Pressable>
         ) : null
       }
@@ -242,7 +242,7 @@ export function VaultDraftNote() {
   return (
     <View style={styles.card}>
       <Text style={styles.cardTitle}>The Vault</Text>
-      <Text style={styles.note}>Add it in the Vault itself - More, then The Vault - where you pick the file and it’s stored encrypted.</Text>
+      <Text style={styles.note}>Add it in the Vault itself – More, then The Vault – where you pick the file and it’s stored encrypted.</Text>
     </View>
   );
 }

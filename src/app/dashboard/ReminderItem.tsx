@@ -9,6 +9,7 @@ import { useTrackerFormSubmit } from './useTrackerFormSubmit';
 import { Icon } from './Icon';
 import styles from './dashboard.module.css';
 import ownStyles from './ReminderItem.module.css';
+import { ReminderEditForm } from './ReminderEditForm';
 
 export function ReminderItem({
   reminder,
@@ -25,6 +26,7 @@ export function ReminderItem({
 }) {
   const { submit, submitting } = useTrackerFormSubmit(`/api/tracker/reminders/${encodeURIComponent(reminder.id)}`);
   const [hidden, setHidden] = useState(false);
+  const [editing, setEditing] = useState(false);
   // A permanent (SORN) reminder can't be dismissed by hand - it only
   // ever clears when a later DVLA tax check confirms the vehicle is
   // taxed again (see reminder.ts's syncSornReminder). The API route
@@ -74,12 +76,18 @@ export function ReminderItem({
             <button type="button" className={styles.iconBtn} onClick={handleDone} disabled={submitting}>
               {submitting && <VehicleSpinner kind="bike" size={20} />}✓ Done
             </button>
+            <button type="button" className={styles.iconBtn} onClick={() => setEditing((v) => !v)} disabled={submitting} aria-expanded={editing}>
+              Edit
+            </button>
             <button type="button" className={styles.iconBtn} onClick={handleDelete} disabled={submitting}>
               {submitting && <VehicleSpinner kind="bike" size={20} />}✕
             </button>
           </>
         )}
       </div>
+      {editing && (
+        <ReminderEditForm reminder={reminder} endpoint={`/api/tracker/reminders/${encodeURIComponent(reminder.id)}`} onClose={() => setEditing(false)} />
+      )}
     </div>
   );
 }

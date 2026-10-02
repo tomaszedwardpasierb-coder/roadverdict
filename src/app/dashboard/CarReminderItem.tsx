@@ -1,11 +1,14 @@
 // Place at: src/app/dashboard/CarReminderItem.tsx
 'use client';
 
+import { useState } from 'react';
+
 import { VehicleSpinner } from '@/components/VehicleSpinner';
 import { useTrackerFormSubmit } from './useTrackerFormSubmit';
 import { carReminderDetailLabel } from '@/lib/tracker/carReminderStatus';
 import type { CarReminderDoc } from '@/lib/tracker/carReminder';
 import styles from './dashboard.module.css';
+import { ReminderEditForm } from './ReminderEditForm';
 
 interface Props {
   reminder: CarReminderDoc;
@@ -20,6 +23,7 @@ const STATUS_LABEL: Record<Props['status'], string> = {
 };
 
 export function CarReminderItem({ reminder, status, isPro = false }: Props) {
+  const [editing, setEditing] = useState(false);
   const { submit, submitting } = useTrackerFormSubmit(`/api/cars/car-reminders/${reminder.id}`);
   // A permanent (SORN) reminder can't be dismissed by hand - see
   // ReminderItem.tsx's own comment on why.
@@ -59,12 +63,16 @@ export function CarReminderItem({ reminder, status, isPro = false }: Props) {
             {submitting && <VehicleSpinner kind="car" size={20} />}
             Mark done
           </button>
+          <button type="button" className={styles.iconBtn} onClick={() => setEditing((v) => !v)} disabled={submitting} aria-expanded={editing}>
+            Edit
+          </button>
           <button type="button" className={styles.iconBtn} onClick={handleDelete} disabled={submitting}>
             {submitting && <VehicleSpinner kind="car" size={20} />}
             Delete
           </button>
         </div>
       )}
+      {editing && <ReminderEditForm reminder={reminder} endpoint={`/api/cars/car-reminders/${reminder.id}`} onClose={() => setEditing(false)} />}
     </div>
   );
 }

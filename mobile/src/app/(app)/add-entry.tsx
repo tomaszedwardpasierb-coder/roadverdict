@@ -7,7 +7,9 @@
 import { DateTimePickerAndroid } from '@react-native-community/datetimepicker';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { KeyboardAvoidingView, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
+import { Image } from 'expo-image';
+import * as ImagePicker from 'expo-image-picker';
+import { ActivityIndicator, Alert, KeyboardAvoidingView, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { EntryLoader } from '@/components/entry-loader';
@@ -16,6 +18,7 @@ import { OptionPicker } from '@/components/option-picker';
 import { ErrorState, LoadingState, MissingHint } from '@/components/screen';
 import { Brand } from '@/constants/brand';
 import { apiFetch } from '@/lib/api';
+import { uploadChatPhoto, type ChatAttachment } from '@/lib/assistant';
 import { useAuth } from '@/lib/auth';
 import { ENTRY_ROUTES, recordPath, TYPED_FIELDS, type Entry, type TypedCategory } from '@/lib/entries';
 import { useFormOptions, type ReminderDefault, type VehicleFormOptions } from '@/lib/form-options';
@@ -70,6 +73,11 @@ function EntryForm({ type, existing }: { type: TypedCategory; existing?: Entry }
   const [cost, setCost] = useState(initial.cost);
   const [date, setDate] = useState(() => (existing ? fromIsoDay(existing.date) : new Date()));
   const [notes, setNotes] = useState(existing?.notes ?? '');
+  // A receipt photo for a new service or bill - uploaded as soon as it's
+  // picked, then saved with the entry as its attachment.
+  const canAttach = !existing && (type === 'service' || type === 'bills');
+  const [photo, setPhoto] = useState<{ uri: string; attachment: ChatAttachment | null } | null>(null);
+  const [photoError, setPhotoError] = useState<string | null>(null);
   const [remind, setRemind] = useState(true);
   // Road tax is paid for 6 or 12 months at a time, so its reminder can be
   // either; every other default stays as the website sets it.
@@ -97,8 +105,36 @@ function EntryForm({ type, existing }: { type: TypedCategory; existing?: Entry }
   const mileageN = parseMileage(mileage);
   const valid = !!kind && costN > 0 && (!fields.hasMileage || mileageN > 0) && (!fields.hasName || name.trim().length > 0);
 
+  async function addPhoto(source: 'camera' | 'library') {
+    setPhotoError(null);
+    if (source === 'camera') {
+      const permission = await ImagePicker.requestCameraPermissionsAsync();
+      if (!permission.granted) return setPhotoError('Camera access is off. Allow it in your phone’s settings, or choose a photo instead.');
+    }
+    const options: ImagePicker.ImagePickerOptions = { mediaTypes: ['images'], quality: 0.7 };
+    const result = source === 'camera' ? await ImagePicker.launchCameraAsync(options) : await ImagePicker.launchImageLibraryAsync(options);
+    const asset = result.canceled ? null : result.assets[0];
+    if (!asset) return;
+    setPhoto({ uri: asset.uri, attachment: null });
+    const uploaded = await uploadChatPhoto(asset.uri, token);
+    if (!uploaded.ok) {
+      setPhoto(null);
+      if (uploaded.status === 401) return signOut();
+      return setPhotoError(uploaded.error);
+    }
+    setPhoto({ uri: asset.uri, attachment: uploaded.data.attachment });
+  }
+
+  function choosePhoto() {
+    Alert.alert('Receipt photo', 'Keep the receipt with this entry – proof of the work when you sell.', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Choose a photo', onPress: () => addPhoto('library') },
+      { text: 'Take a photo', onPress: () => addPhoto('camera') },
+    ]);
+  }
+
   async function save(acknowledgeMileage: boolean) {
-    if (!valid || saving) return;
+    if (!valid || saving || (photo && !photo.attachment)) return;
     setSaving(true);
     setProblem(null);
     const same = {
@@ -121,6 +157,7 @@ function EntryForm({ type, existing }: { type: TypedCategory; existing?: Entry }
         // The same "remind me when it's due again" the web forms offer,
         // with the same default interval for the chosen job or bill.
         ...(reminderDefault && remind ? { reminder: { intervalType: reminderDefault.type, intervalValue: reminderDefault.value } } : {}),
+        ...(photo?.attachment ? { attachments: [photo.attachment] } : {}),
       },
     });
     setSaving(false);
@@ -253,12 +290,38 @@ function EntryForm({ type, existing }: { type: TypedCategory; existing?: Entry }
               multiline
             />
 
+            {canAttach ? (
+              <View style={styles.photoField}>
+                <Text style={styles.photoLabel}>Receipt photo (optional)</Text>
+                {photo ? (
+                  <View style={styles.photoRow}>
+                    <Image source={{ uri: photo.uri }} style={styles.photoThumb} contentFit="cover" alt="Receipt photo" />
+                    <Text style={[styles.photoStatus, styles.flex]}>{photo.attachment ? 'Added – saved with this entry' : 'Adding…'}</Text>
+                    {photo.attachment ? null : <ActivityIndicator color={Brand.amberInk} />}
+                    <Pressable onPress={() => setPhoto(null)} accessibilityRole="button" accessibilityLabel="Remove the photo" hitSlop={8} style={styles.photoRemove}>
+                      <Icon name="close" size={20} color={Brand.muted} />
+                    </Pressable>
+                  </View>
+                ) : (
+                  <Pressable onPress={choosePhoto} accessibilityRole="button" style={({ pressed }) => [styles.photoAdd, pressed && { opacity: 0.85 }]}>
+                    <Icon name="camera" size={20} color={Brand.amberInk} />
+                    <Text style={styles.photoAddLabel}>Add the receipt</Text>
+                  </Pressable>
+                )}
+                {photoError ? (
+                  <Text style={styles.photoError} accessibilityRole="alert">
+                    {photoError}
+                  </Text>
+                ) : null}
+              </View>
+            ) : null}
+
             {problem ? (
               <View style={styles.problem} accessibilityRole="alert" accessibilityLiveRegion="polite">
                 <Text style={styles.problemText}>{problem.message}</Text>
                 {problem.canOverride ? (
                   <Pressable onPress={() => save(true)} accessibilityRole="button" style={styles.override}>
-                    <Text style={styles.overrideLabel}>That&apos;s right - save anyway</Text>
+                    <Text style={styles.overrideLabel}>That&apos;s right – save anyway</Text>
                   </Pressable>
                 ) : null}
               </View>
@@ -266,10 +329,10 @@ function EntryForm({ type, existing }: { type: TypedCategory; existing?: Entry }
           </ScrollView>
 
           <View style={styles.footer}>
-            <MissingHint missing={[!kind && 'choose what it was', fields.hasName && !name.trim() && 'say what it is', !(costN > 0) && 'enter the cost', fields.hasMileage && !(mileageN > 0) && 'enter the mileage']} />
+            <MissingHint missing={[!kind && 'choose what it was', fields.hasName && !name.trim() && 'say what it is', !(costN > 0) && 'enter the cost', fields.hasMileage && !(mileageN > 0) && 'enter the mileage', !!photo && !photo.attachment && 'wait for the photo to finish adding']} />
             <Pressable
               onPress={() => save(false)}
-              disabled={!valid || saving}
+              disabled={!valid || saving || (!!photo && !photo.attachment)}
               accessibilityRole="button"
               accessibilityState={{ disabled: !valid || saving, busy: saving }}
               style={({ pressed }) => [styles.save, (!valid || saving) && styles.saveDisabled, pressed && valid && { opacity: 0.85 }]}>
@@ -314,6 +377,15 @@ function Field({
 }
 
 const styles = StyleSheet.create({
+  photoField: { gap: 8 },
+  photoLabel: { fontSize: 14, fontWeight: '600', color: Brand.ink },
+  photoAdd: { flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 52, paddingHorizontal: 14, borderRadius: 12, borderWidth: 1.5, borderStyle: 'dashed', borderColor: '#C9C4B8', backgroundColor: Brand.paperRaised },
+  photoAddLabel: { fontSize: 16, fontWeight: '600', color: Brand.ink },
+  photoRow: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 10, borderRadius: 12, borderWidth: 1.5, borderColor: Brand.line, backgroundColor: Brand.paperRaised },
+  photoThumb: { width: 52, height: 52, borderRadius: 8, backgroundColor: Brand.line },
+  photoStatus: { fontSize: 14, color: Brand.ink },
+  photoRemove: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
+  photoError: { fontSize: 14, lineHeight: 20, color: Brand.danger },
   safe: { flex: 1, backgroundColor: Brand.paper },
   flex: { flex: 1 },
   header: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingTop: 8, paddingBottom: 4 },

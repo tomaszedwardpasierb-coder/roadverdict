@@ -122,7 +122,7 @@ function QuoteForm({ vehicle, data }: { vehicle: GarageVehicle; data: ToolsScree
           {priceN > MAX_QUOTE ? <Text style={styles.problem}>The quote checker goes up to £{MAX_QUOTE.toLocaleString('en-GB')}.</Text> : null}
         </View>
 
-        <Text style={styles.hint}>These start from your {vehicle.name} - change anything that&apos;s different about this quote.</Text>
+        <Text style={styles.hint}>These start from your {vehicle.name} – change anything that&apos;s different about this quote.</Text>
         <OptionPicker label="Make" placeholder="Choose the make" groups={[{ label: '', options: data.options.brands }]} value={brand} onChange={setBrand} />
         <OptionPicker
           label={bike ? 'Engine size' : 'Size of car'}
