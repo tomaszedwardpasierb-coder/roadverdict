@@ -17,6 +17,7 @@ const mocks = vi.hoisted(() => ({
   sendPushToUser: vi.fn(),
   upsert: vi.fn(),
   isPro: vi.fn(),
+  sendProTrialEndingReminders: vi.fn(),
 }));
 
 // computeReminderStatus/reminderDetailLabel are the route's own pure
@@ -52,6 +53,7 @@ vi.mock("@/lib/cosmos", () => ({
   getContainer: () => ({ items: { upsert: mocks.upsert } }),
 }));
 vi.mock("@/lib/subscriptions", () => ({ isPro: mocks.isPro }));
+vi.mock("@/lib/payments/proSubscription", () => ({ sendProTrialEndingReminders: mocks.sendProTrialEndingReminders }));
 
 import { POST } from "@/app/api/cron/check-reminders/route";
 
@@ -131,6 +133,7 @@ describe("POST /api/cron/check-reminders", () => {
     mocks.createReminderNotification.mockResolvedValue(undefined);
     mocks.sendPushToUser.mockResolvedValue(0);
     mocks.upsert.mockResolvedValue(undefined);
+    mocks.sendProTrialEndingReminders.mockResolvedValue(0);
     mocks.getBike.mockResolvedValue(bike);
     mocks.getCarById.mockResolvedValue(car);
     // Default every account to Pro so the pre-existing send-path tests
@@ -204,6 +207,18 @@ describe("POST /api/cron/check-reminders", () => {
     expect(body).toEqual({ ok: true, checked: 1, sent: 0, notified: 0 });
     expect(mocks.sendReminderEmail).not.toHaveBeenCalled();
     expect(mocks.createReminderNotification).not.toHaveBeenCalled();
+  });
+
+  it("sends Pro trial reminders in the same run, and a failure there never stops the vehicle reminders", async () => {
+    mocks.sendProTrialEndingReminders.mockResolvedValue(2);
+    const response = await POST(request({ authorization: "Bearer top-secret" }));
+    expect(await response.json()).toEqual({ ok: true, checked: 0, sent: 0, notified: 0, trialReminders: 2 });
+    expect(mocks.upsert).toHaveBeenCalledWith(expect.objectContaining({ id: "cronStatus::reminders", trialReminders: 2 }));
+
+    mocks.sendProTrialEndingReminders.mockRejectedValue(new Error("Cosmos unavailable"));
+    mocks.getAllReminders.mockResolvedValue([overdueDateReminder()]);
+    const second = await POST(request({ authorization: "Bearer top-secret" }));
+    expect(await second.json()).toEqual({ ok: true, checked: 1, sent: 1, notified: 1 });
   });
 
   it("emails and marks notified for an overdue reminder, then persists a cronStatus summary", async () => {

@@ -1,5 +1,6 @@
 ﻿// Place at: src/lib/resend.ts
 import { Resend } from "resend";
+import { PRO_MONTHLY_PRICE, PRO_ANNUAL_PRICE } from "@/lib/proPlan";
 let resendInstance: Resend | null = null;
 // Lazily created for the same reason as getContainer() in cosmos.ts:
 // Next.js inspects this module during `next build`, and constructing
@@ -168,6 +169,64 @@ export async function sendReminderEmail(email: string, reminderName: string, det
     html,
   });
 }
+// The two Pro free-trial emails (see proSubscription.ts): one as it starts,
+// one a week before it ends. Both say plainly what will be charged, when,
+// and how to cancel before then without paying anything.
+function fmtLongDate(iso: string): string {
+  return new Date(iso).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric", timeZone: "Europe/London" });
+}
+
+function proPriceAfterTrial(interval: "monthly" | "annual"): string {
+  return interval === "annual" ? `${PRO_ANNUAL_PRICE} a year` : `${PRO_MONTHLY_PRICE} a month`;
+}
+
+export async function sendProTrialStartedEmail(email: string, trial: { trialEndsAt: string; interval: "monthly" | "annual" }) {
+  const resend = getResend();
+  const appUrl = process.env.APP_URL ?? "https://roadverdict.co.uk";
+  const ends = fmtLongDate(trial.trialEndsAt);
+  const price = proPriceAfterTrial(trial.interval);
+  const html = renderEmailLayout({
+    preheader: `Free until ${ends}`,
+    heading: "Your free Pro trial has started",
+    bodyHtml: `
+      <p style="margin:0 0 8px;">Hi,</p>
+      <p style="margin:0 0 8px;">Every Pro feature is now unlocked on your account - on the website and in the app.</p>
+      <p style="margin:0 0 8px;">Your trial is free until <strong>${escapeHtml(ends)}</strong>. If you keep Pro, it then carries on at <strong>${escapeHtml(price)}</strong>, charged to the card you added. We'll email you a week before that.</p>
+      <p style="margin:0 0 8px;">Not for you? Cancel any time before ${escapeHtml(ends)} and you won't pay anything: go to the Pro page and choose Manage billing.</p>
+      ${emailButton("Manage my subscription", `${appUrl}/pro`)}
+    `,
+  });
+  await resend.emails.send({
+    from: FROM,
+    to: email,
+    subject: "Your free RoadVerdict Pro trial has started",
+    html,
+  });
+}
+
+export async function sendProTrialEndingEmail(email: string, trial: { trialEndsAt: string; interval: "monthly" | "annual" }) {
+  const resend = getResend();
+  const appUrl = process.env.APP_URL ?? "https://roadverdict.co.uk";
+  const ends = fmtLongDate(trial.trialEndsAt);
+  const price = proPriceAfterTrial(trial.interval);
+  const html = renderEmailLayout({
+    preheader: `Your Pro trial ends on ${ends}`,
+    heading: `Your Pro trial ends on ${ends}`,
+    bodyHtml: `
+      <p style="margin:0 0 8px;">Hi,</p>
+      <p style="margin:0 0 8px;">Your free RoadVerdict Pro trial ends on <strong>${escapeHtml(ends)}</strong>. Unless you cancel before then, your subscription starts and the card you added is charged <strong>${escapeHtml(price)}</strong>.</p>
+      <p style="margin:0 0 8px;">To keep Pro, there's nothing to do. To cancel, go to the Pro page and choose Manage billing - you won't be charged.</p>
+      ${emailButton("Manage my subscription", `${appUrl}/pro`)}
+    `,
+  });
+  await resend.emails.send({
+    from: FROM,
+    to: email,
+    subject: `Your RoadVerdict Pro trial ends on ${ends}`,
+    html,
+  });
+}
+
 export async function sendReceiptRequestEmail(params: {
   ownerEmail: string;
   bikeName: string;

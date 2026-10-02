@@ -2,7 +2,8 @@
 //
 // The sign-up funnel (lib/analytics/funnel.ts), last 14 days: how many
 // people reached each step, what share made it from one step to the
-// next, and where each step's visitors came from. Anonymous counts only.
+// next, and where each step's visitors came from - then the two shorter
+// funnels after sign-up, Pro and shared reports. Anonymous counts only.
 import { getFunnelDays, FUNNEL_SOURCES, type FunnelDay } from '@/lib/analytics/funnel';
 import styles from './adminShell.module.css';
 
@@ -14,6 +15,28 @@ const STEPS: { key: string; label: string }[] = [
   { key: 'account_created', label: 'New account' },
   { key: 'first_vehicle', label: 'First vehicle added' },
   { key: 'vehicle_added', label: 'Any vehicle added' },
+];
+
+// After sign-up. What happens past checkout is read from Stripe (see
+// ProPanel); buyers are the sign-up steps counted with source "report" -
+// the line at the foot of every shared report.
+const LATER: { group: string; steps: { key: string; label: string }[] }[] = [
+  {
+    group: 'Pro',
+    steps: [
+      { key: 'pro', label: 'Pro page viewed' },
+      { key: 'checkout_started', label: 'Checkout started' },
+    ],
+  },
+  {
+    group: 'Shared reports',
+    steps: [
+      { key: 'report_shared', label: 'Report link shared' },
+      { key: 'report', label: 'Shared report viewed' },
+      { key: 'link_requested__src_report', label: 'Buyer asked for a sign-in link' },
+      { key: 'account_created__src_report', label: 'Buyer opened an account' },
+    ],
+  },
 ];
 
 function total(days: FunnelDay[], key: string): number {
@@ -95,6 +118,34 @@ export async function FunnelPanel() {
           </tbody>
         </table>
       </details>
+      <table className={styles.table} style={{ marginTop: '1rem' }}>
+        <thead>
+          <tr>
+            <th>After sign-up</th>
+            <th>People</th>
+            <th>From the step before</th>
+          </tr>
+        </thead>
+        <tbody>
+          {LATER.flatMap((group) => [
+            <tr key={group.group}>
+              <td colSpan={3}>
+                <strong>{group.group}</strong>
+              </td>
+            </tr>,
+            ...group.steps.map((step, i) => {
+              const n = total(days, step.key);
+              return (
+                <tr key={step.key}>
+                  <td>{step.label}</td>
+                  <td>{n}</td>
+                  <td>{i === 0 ? '' : pct(n, total(days, group.steps[i - 1].key))}</td>
+                </tr>
+              );
+            }),
+          ])}
+        </tbody>
+      </table>
     </>
   );
 }

@@ -10,6 +10,7 @@
 // car ownership transfer existing - that shipped since, so it's now
 // mirrored in full, same as everything else in this file.
 import crypto from "crypto";
+import { recordFunnelStep } from "@/lib/analytics/funnel";
 import { getContainer } from "@/lib/cosmos";
 import { deleteCarReceiptRequestsForShareToken } from "@/lib/tracker/carReceiptRequest";
 import type { ShareLinkDuration } from "@/lib/tracker/shareLink";
@@ -69,6 +70,8 @@ export async function createCarShareLink(
     askingPrice,
   };
   await container.items.upsert(doc);
+  // The first step of the seller-to-buyer loop (see analytics/funnel.ts).
+  void recordFunnelStep("report_shared");
   return doc;
 }
 

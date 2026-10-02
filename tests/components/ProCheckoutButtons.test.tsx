@@ -22,6 +22,25 @@ describe("ProCheckoutButtons", () => {
   });
 
   describe("ProSubscribeButtons", () => {
+    it("offers the free trial on both buttons when the account would get one", () => {
+      render(<ProSubscribeButtons trialDays={14} />);
+      expect(screen.getByText(/Your first 14 days are free/)).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Start free trial - then £5.99/mo" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Start free trial - then £59/yr (2 months free)" })).toBeInTheDocument();
+    });
+
+    it("mentions no trial to someone who has had Pro before", () => {
+      render(<ProSubscribeButtons trialDays={0} />);
+      expect(screen.queryByText(/days are free/)).not.toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Subscribe monthly - £5.99/mo" })).toBeInTheDocument();
+    });
+
+    it("shows the general new-to-Pro line where the page doesn't know", () => {
+      render(<ProSubscribeButtons />);
+      expect(screen.getByText("New to Pro? Your first 14 days are free.")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Subscribe monthly - £5.99/mo" })).toBeInTheDocument();
+    });
+
     it("posts interval 'monthly' and redirects to the returned URL on the monthly button", async () => {
       (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({ ok: true, json: async () => ({ url: "https://checkout.stripe.com/session123" }) });
       const user = userEvent.setup();

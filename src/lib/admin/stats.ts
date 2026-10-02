@@ -54,6 +54,9 @@ export interface ReminderCronStatus {
   lastRunAt: string;
   checked: number;
   sent: number;
+  // Pro free-trial "ends in a week" emails sent in the same run - absent on
+  // runs from before trials existed.
+  trialReminders?: number;
 }
 
 export async function getReminderCronStatus(): Promise<ReminderCronStatus | null> {

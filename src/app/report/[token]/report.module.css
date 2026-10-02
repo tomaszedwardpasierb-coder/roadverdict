@@ -370,6 +370,7 @@
 .table th { font-family: var(--font-mono); font-size: 0.72rem; text-transform: uppercase; color: var(--ink-soft); }
 .table tfoot td { font-weight: 600; border-top: 2px solid var(--asphalt); border-bottom: none; }
 .caveat { font-size: 0.82rem; color: var(--ink-soft); border-top: 1px solid var(--border); padding-top: 1rem; }
+.buyerLine { font-size: 0.85rem; color: var(--ink-soft); margin-top: 0.8rem; }
 
 .clusterWarning {
   background: #f8e2dd;

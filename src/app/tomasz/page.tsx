@@ -26,6 +26,8 @@ import { AdminShell } from './AdminShell';
 import { KnowledgeBaseEditor } from './KnowledgeBaseEditor';
 import styles from './adminShell.module.css';
 import { FunnelPanel } from './FunnelPanel';
+import { ActivationPanel } from './ActivationPanel';
+import { ProPanel } from './ProPanel';
 import { RunCronButton } from './RunCronButton';
 import { AssistantQuestionsTable } from './AssistantQuestionsTable';
 import { FeedbackTable } from './FeedbackTable';
@@ -417,6 +419,7 @@ export default async function AdminDashboardPage(
             <p className={styles.note}>
               Last run {fmtDate(reminderStatus.lastRunAt)} &middot; checked {reminderStatus.checked}, sent{' '}
               {reminderStatus.sent}
+              {reminderStatus.trialReminders != null && <> &middot; Pro trial reminders {reminderStatus.trialReminders}</>}
             </p>
           ) : (
             <p className={styles.warnNote}>No record found - has this ever run successfully?</p>
@@ -554,6 +557,12 @@ export default async function AdminDashboardPage(
       <h2 className={styles.sectionHeading}>Sign-up funnel</h2>
       <FunnelPanel />
 
+      <h2 className={styles.sectionHeading}>Activation</h2>
+      <ActivationPanel accounts={allUserAccounts.map((u) => ({ email: u.email, createdAt: u.createdAt }))} />
+
+      <h2 className={styles.sectionHeading}>Pro subscriptions (live from Stripe)</h2>
+      <ProPanel />
+
       <h2 className={styles.sectionHeading}>Accounts</h2>
       <div className={styles.grid}>
         <div className={styles.card}>
@@ -578,7 +587,7 @@ export default async function AdminDashboardPage(
 
       <h2 className={styles.sectionHeading}>All accounts</h2>
       <p className={styles.warnNote} style={{ marginBottom: '0.6rem' }}>
-        Premium is granted manually here, not via real payment yet - see subscriptions.ts. Grants are capped at 3
+        Premium can also be granted manually here, on top of real Stripe subscriptions. Grants are capped at 3
         years; blocking signs the account out immediately, not just on their next login attempt. Sessions forces
         a re-authentication without blocking - every device signed out now, but they can sign straight back in.
         Delete is permanent - every bike, record, and share link tied to that email is gone, with no undo.

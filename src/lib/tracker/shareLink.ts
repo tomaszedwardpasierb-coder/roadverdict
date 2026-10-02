@@ -1,5 +1,6 @@
 // Place at: src/lib/tracker/shareLink.ts
 import crypto from "crypto";
+import { recordFunnelStep } from "@/lib/analytics/funnel";
 import { getContainer } from "@/lib/cosmos";
 import { deleteReceiptRequestsForShareToken } from "@/lib/tracker/receiptRequest";
 import type { VdiUnlock } from "@/lib/tracker/vdiUnlock";
@@ -92,6 +93,8 @@ export async function createShareLink(
     askingPrice,
   };
   await container.items.upsert(doc);
+  // The first step of the seller-to-buyer loop (see analytics/funnel.ts).
+  void recordFunnelStep("report_shared");
   return doc;
 }
 

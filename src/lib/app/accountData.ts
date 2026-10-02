@@ -9,12 +9,16 @@ import { getUserDoc } from "@/lib/tracker/userDoc";
 import { getPendingDeletionInfo } from "@/lib/tracker/userAccount";
 import { isTwoFactorEnabled } from "@/lib/auth/twoFactor";
 import { isPro } from "@/lib/subscriptions";
+import { isEligibleForProTrial } from "@/lib/payments/proTrial";
+import { PRO_TRIAL_DAYS } from "@/lib/proPlan";
 
 export type AccountSettings = {
   email: string;
   displayName: string;
   twoFactorEnabled: boolean;
   isPro: boolean;
+  // The free Pro trial this account would get on the website (0 = none).
+  proTrialDays: number;
   pendingDeletion: { daysRemaining: number; deleteAfterLabel: string } | null;
 };
 
@@ -25,6 +29,7 @@ export async function getAccountSettings(email: string): Promise<AccountSettings
     displayName: user?.displayName ?? "",
     twoFactorEnabled,
     isPro: pro,
+    proTrialDays: !pro && isEligibleForProTrial(user) ? PRO_TRIAL_DAYS : 0,
     pendingDeletion: getPendingDeletionInfo(user),
   };
 }

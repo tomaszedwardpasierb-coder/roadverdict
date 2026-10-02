@@ -13,6 +13,9 @@
 export const PRO_MONTHLY_PRICE = "£5.99";
 export const PRO_ANNUAL_PRICE = "£59";
 export const PRO_ANNUAL_MONTHLY_EQUIV = "£4.92";
+// A first-time subscriber's free trial - see proSubscription.ts. 0 turns
+// trials off everywhere (checkout and every page that mentions one).
+export const PRO_TRIAL_DAYS = 14;
 // Each extra vehicle on top of Pro's two - see extraVehicles.ts.
 export const EXTRA_VEHICLE_MONTHLY_PRICE = "£1.99";
 export const EXTRA_VEHICLE_MONTHLY_PENCE = 199;

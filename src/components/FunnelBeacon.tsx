@@ -10,7 +10,7 @@
 import { useEffect } from 'react';
 import { classifySource } from '@/lib/analytics/funnelSource';
 
-export function FunnelBeacon({ step }: { step: 'home' | 'login' }) {
+export function FunnelBeacon({ step }: { step: 'home' | 'login' | 'pro' | 'report' }) {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const source = classifySource({ utmSource: params.get('utm_source'), src: params.get('src'), referrer: document.referrer });

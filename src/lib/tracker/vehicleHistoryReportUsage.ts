@@ -9,9 +9,13 @@
 // recordReminderSent.
 import type { UserDoc } from "@/lib/tracker/userDoc";
 import { PRO_FREE_REPORT_COOLDOWN_MS } from "@/lib/payments/pricing";
+import { isInProTrial } from "@/lib/payments/proTrial";
 import { replaceIfUnchanged } from "@/lib/tracker/atomicUpdate";
 
+// A free Pro trial doesn't include it: each report costs a paid data
+// lookup, so the free one starts with the first payment.
 export function canRunFreeVehicleHistoryReport(user: UserDoc | null): boolean {
+  if (isInProTrial(user)) return false;
   if (!user?.vehicleHistoryReportUsage) return true;
   return Date.now() - new Date(user.vehicleHistoryReportUsage.lastRunAt).getTime() > PRO_FREE_REPORT_COOLDOWN_MS;
 }
@@ -19,6 +23,7 @@ export function canRunFreeVehicleHistoryReport(user: UserDoc | null): boolean {
 // Null once the cooldown has already elapsed (or never started) - a
 // free report is available right now, so there is no "next" date to show.
 export function nextFreeVehicleHistoryReportAt(user: UserDoc | null): string | null {
+  if (isInProTrial(user)) return user!.plan!.trialEndsAt!;
   if (!user?.vehicleHistoryReportUsage) return null;
   const nextMs = new Date(user.vehicleHistoryReportUsage.lastRunAt).getTime() + PRO_FREE_REPORT_COOLDOWN_MS;
   return nextMs > Date.now() ? new Date(nextMs).toISOString() : null;

@@ -7,6 +7,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/session";
 import { createProCheckoutSession, type ProInterval } from "@/lib/payments/proSubscription";
+import { recordFunnelStep } from "@/lib/analytics/funnel";
 
 export const dynamic = "force-dynamic";
 
@@ -36,5 +37,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error }, { status });
   }
 
+  void recordFunnelStep("checkout_started");
   return NextResponse.json({ url: result.url });
 }

@@ -286,7 +286,7 @@ export default function HomePage() {
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
             </div>
             <h3 className="rv-sol-title">Sell with proof</h3>
-            <p className="rv-sol-body">Share a verified history link with buyers. Full receipts, confirmed mileage. Gets better prices.</p>
+            <p className="rv-sol-body">Share its documented history with buyers - receipts attached, every entry dated, anything added later clearly marked.</p>
           </div>
           <div className="rv-sol-card">
             <div className="rv-sol-icon" aria-hidden="true">

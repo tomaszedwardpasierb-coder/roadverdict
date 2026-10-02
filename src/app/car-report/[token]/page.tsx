@@ -9,6 +9,7 @@ import { CarPlateGate } from "./CarPlateGate";
 import { CarReportHistoryTable } from "./CarReportHistoryTable";
 import styles from "./report.module.css";
 import { PrintButton } from "@/app/report/[token]/PrintButton";
+import { FunnelBeacon } from "@/components/FunnelBeacon";
 import type { CarDoc } from "@/lib/tracker/car";
 
 export const dynamic = "force-dynamic";
@@ -128,6 +129,14 @@ export default async function CarSaleReportPage(props: { params: Promise<{ token
         dishonest (people digitise old paper receipts all the time), but it&apos;s a fact worth knowing before you
         rely on this history. Fuel spend is not included, since it isn&apos;t relevant to a buyer. Generated {fmtDate(new Date().toISOString())}.
       </p>
+
+      {/* The seller-to-buyer loop: one quiet line for whoever is reading this,
+          tagged so the sign-up funnel can count buyers who arrive from here. */}
+      <p className={`${styles.buyerLine} ${styles.noPrint}`}>
+        Buying this car? Once it&apos;s yours, the seller can hand its RoadVerdict history over to you, so the
+        records carry on with the car. <Link href="/login?src=report">Start a free account</Link>
+      </p>
+      <FunnelBeacon step="report" />
     </div>
   );
 }

@@ -32,9 +32,18 @@ describe("POST /api/funnel", () => {
     expect(mocks.recordFunnelStep).toHaveBeenCalledWith("login", { source: "facebook", inApp: true });
   });
 
-  it("only takes the two page steps - the later ones are counted on the server", async () => {
+  it("counts the Pro page and a shared report as page steps", async () => {
+    await POST(request(JSON.stringify({ step: "pro", source: "direct" })));
+    await POST(request(JSON.stringify({ step: "report", source: "report" })));
+    expect(mocks.recordFunnelStep).toHaveBeenCalledWith("pro", { source: "direct", inApp: false });
+    expect(mocks.recordFunnelStep).toHaveBeenCalledWith("report", { source: "report", inApp: false });
+  });
+
+  it("only takes the page steps - the later ones are counted on the server", async () => {
     await POST(request(JSON.stringify({ step: "account_created" })));
     await POST(request(JSON.stringify({ step: "first_vehicle" })));
+    await POST(request(JSON.stringify({ step: "checkout_started" })));
+    await POST(request(JSON.stringify({ step: "report_shared" })));
     expect(mocks.recordFunnelStep).not.toHaveBeenCalled();
   });
 

@@ -13,6 +13,9 @@ export const FUNNEL_SOURCES = [
   "reddit",
   "email",
   "app",
+  // A buyer who followed the line on a shared report (report pages link
+  // to /login?src=report) - the seller-to-buyer loop.
+  "report",
   "other",
   "direct",
 ] as const;

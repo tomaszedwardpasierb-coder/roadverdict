@@ -25,6 +25,7 @@ import { sendPushToUser } from "@/lib/push/sendPush";
 import { getContainer } from "@/lib/cosmos";
 import { isPro } from "@/lib/subscriptions";
 import { runInBatches } from "@/lib/concurrency";
+import { sendProTrialEndingReminders } from "@/lib/payments/proSubscription";
 
 export const dynamic = "force-dynamic";
 
@@ -207,6 +208,16 @@ export async function POST(req: NextRequest) {
     const carOutcomes = await runInBatches(carReminders, CRON_BATCH_SIZE, checkCarReminder);
     const carTally = tally(carOutcomes);
 
+    // Pro free trials ending within the week get their reminder email from
+    // this daily run too. Its own try, so a problem there never stops the
+    // vehicle reminders above from being recorded.
+    let trialReminders = 0;
+    try {
+      trialReminders = await sendProTrialEndingReminders();
+    } catch (err) {
+      console.error("Pro trial ending reminders failed:", err);
+    }
+
     const checked = reminders.length + carReminders.length;
     const sent = bikeTally.sent + carTally.sent;
     const notified = bikeTally.notified + carTally.notified;
@@ -222,9 +233,10 @@ export async function POST(req: NextRequest) {
       sent,
       notified,
       failed,
+      trialReminders,
     });
 
-    return NextResponse.json({ ok: true, checked, sent, notified, ...(failed ? { failed } : {}) });
+    return NextResponse.json({ ok: true, checked, sent, notified, ...(trialReminders ? { trialReminders } : {}), ...(failed ? { failed } : {}) });
   } catch {
     return NextResponse.json({ error: "Unexpected error checking reminders" }, { status: 500 });
   }

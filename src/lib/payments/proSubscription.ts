@@ -9,10 +9,21 @@
 // subscription exists, plan.expiresAt is kept in lockstep with Stripe's
 // own current_period_end - a renewal extends it, a cancellation (at
 // period end or immediate) lets it lapse or clears it outright.
+//
+// A first-time subscriber gets a free trial (PRO_TRIAL_DAYS): a card is
+// taken at checkout, nothing is charged until the trial ends, and two
+// emails go out - one when it starts, one a week before it ends (card
+// network rules expect that reminder; the daily reminder job sends it).
+// Stripe reports the subscription as "trialing", which counts as Pro.
 import { getContainer } from "@/lib/cosmos";
 import { getStripe } from "@/lib/payments/stripe";
-import { getUserDoc } from "@/lib/tracker/userDoc";
+import { getUserDoc, type UserDoc } from "@/lib/tracker/userDoc";
+import { PRO_TRIAL_DAYS } from "@/lib/proPlan";
+import { isEligibleForProTrial } from "@/lib/payments/proTrial";
+import { sendProTrialStartedEmail, sendProTrialEndingEmail } from "@/lib/resend";
 import type Stripe from "stripe";
+
+const DAY_MS = 86_400_000;
 
 export type ProInterval = "monthly" | "annual";
 
@@ -31,9 +42,14 @@ export async function createProCheckoutSession(email: string, interval: ProInter
     return { ok: false, reason: "already_pro" };
   }
 
+  const trialDays = isEligibleForProTrial(user) ? PRO_TRIAL_DAYS : 0;
+
   try {
     const session = await getStripe().checkout.sessions.create({
       mode: "subscription",
+      // A card is always taken, trial or not - so a trial that isn't
+      // cancelled carries straight on as a paid subscription.
+      payment_method_collection: "always",
       // Reuse the existing Stripe Customer for a returning subscriber
       // (e.g. resubscribing after a cancellation) rather than creating a
       // second one - customer_email only ever applies on a brand new
@@ -45,7 +61,7 @@ export async function createProCheckoutSession(email: string, interval: ProInter
       // the one that actually lands there, which every later
       // customer.subscription.* webhook event needs to resolve back to
       // this account without a cross-partition Cosmos query.
-      subscription_data: { metadata: { email } },
+      subscription_data: { metadata: { email }, ...(trialDays > 0 ? { trial_period_days: trialDays } : {}) },
       metadata: { email, kind: "pro_subscription" },
       success_url: `${appUrl}/pro?subscribed=1&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${appUrl}/pro`,
@@ -64,26 +80,44 @@ export async function createProCheckoutSession(email: string, interval: ProInter
 // `plan`. Only ever grants/extends on a genuinely active subscription;
 // anything else (incomplete, past_due, canceled, ...) is left alone
 // here; a canceled/deleted subscription is handled by applyProSubscriptionCancelled instead.
-async function upsertProSubscriptionState(email: string, customerId: string, subscription: Stripe.Subscription): Promise<void> {
-  if (subscription.status !== "active" && subscription.status !== "trialing") return;
+async function upsertProSubscriptionState(email: string, customerId: string, subscription: Stripe.Subscription): Promise<UserDoc | null> {
+  if (subscription.status !== "active" && subscription.status !== "trialing") return null;
 
   const container = getContainer();
   const user = await getUserDoc(email);
   if (!user) {
     console.error(`Stripe webhook: no account found for ${email} on an active Pro subscription.`);
-    return;
+    return null;
   }
 
   const currentPeriodEndSecs = subscription.items.data[0]?.current_period_end;
   if (currentPeriodEndSecs == null) {
     console.error(`Stripe webhook: subscription ${subscription.id} has no current_period_end to extend Pro to.`);
-    return;
+    return null;
   }
 
-  user.plan = { grantedAt: new Date().toISOString(), expiresAt: new Date(currentPeriodEndSecs * 1000).toISOString() };
+  const trialEndsAt = subscription.status === "trialing" && subscription.trial_end ? new Date(subscription.trial_end * 1000).toISOString() : null;
+  user.plan = {
+    grantedAt: new Date().toISOString(),
+    expiresAt: new Date(currentPeriodEndSecs * 1000).toISOString(),
+    interval: subscription.items.data[0]?.price?.recurring?.interval === "year" ? "annual" : "monthly",
+    ...(trialEndsAt ? { trialEndsAt } : {}),
+    ...(subscription.cancel_at_period_end || subscription.cancel_at ? { cancelling: true } : {}),
+  };
+  if (trialEndsAt && !user.proTrialStartedAt) user.proTrialStartedAt = new Date().toISOString();
   user.stripeCustomerId = customerId;
   user.stripeSubscriptionId = subscription.id;
   await container.items.upsert(user);
+  return user;
+}
+
+// Records that one of the two trial emails went out for this
+// subscription - a patch, so it can't undo anything else written to the
+// account in between.
+async function markTrialEmailSent(user: UserDoc, which: "startedFor" | "endingFor", subscriptionId: string): Promise<void> {
+  await getContainer()
+    .item(user.id, user.pk)
+    .patch([{ op: "set", path: "/proTrialEmails", value: { ...user.proTrialEmails, [which]: subscriptionId } }]);
 }
 
 // Webhook: checkout.session.completed, mode "subscription" - the
@@ -100,7 +134,17 @@ export async function applyProSubscriptionFromCheckoutSession(session: Stripe.Ch
   }
 
   const subscription = await getStripe().subscriptions.retrieve(subscriptionId);
-  await upsertProSubscriptionState(email, customerId, subscription);
+  const user = await upsertProSubscriptionState(email, customerId, subscription);
+  // Only this webhook path sends the welcome email - not the success-page
+  // self-heal below - so a browser racing the webhook can't send two.
+  if (user?.plan?.trialEndsAt && user.proTrialEmails?.startedFor !== subscription.id) {
+    try {
+      await sendProTrialStartedEmail(user.email, { trialEndsAt: user.plan.trialEndsAt, interval: user.plan.interval ?? "monthly" });
+      await markTrialEmailSent(user, "startedFor", subscription.id);
+    } catch (err) {
+      console.error(`Pro trial started email for subscription ${subscription.id} failed:`, err);
+    }
+  }
 }
 
 // Webhook: customer.subscription.updated - covers renewals (Stripe
@@ -178,4 +222,37 @@ export async function createBillingPortalSession(email: string, appUrl: string):
     console.error("Stripe billing portal session creation failed:", err);
     return { ok: false };
   }
+}
+
+// Run daily by the reminder job (cron/check-reminders): one email to each
+// account whose free trial ends within the next 8 days, so it lands at
+// least a week ahead - card network rules expect that notice before the
+// first charge. Skips a trial already set to end without paying, and never
+// emails the same subscription twice. Returns how many were sent.
+export async function sendProTrialEndingReminders(nowMs = Date.now()): Promise<number> {
+  const { resources } = await getContainer()
+    .items.query<UserDoc>({
+      query: "SELECT * FROM c WHERE c.type = 'user' AND IS_DEFINED(c.plan.trialEndsAt) AND c.plan.trialEndsAt > @now AND c.plan.trialEndsAt <= @soon",
+      parameters: [
+        { name: "@now", value: new Date(nowMs).toISOString() },
+        { name: "@soon", value: new Date(nowMs + 8 * DAY_MS).toISOString() },
+      ],
+    })
+    .fetchAll();
+
+  let sent = 0;
+  for (const user of resources) {
+    const subscriptionId = user.stripeSubscriptionId;
+    const trialEndsAt = user.plan?.trialEndsAt;
+    if (!subscriptionId || !trialEndsAt || user.plan?.cancelling) continue;
+    if (user.proTrialEmails?.endingFor === subscriptionId) continue;
+    try {
+      await sendProTrialEndingEmail(user.email, { trialEndsAt, interval: user.plan?.interval ?? "monthly" });
+      await markTrialEmailSent(user, "endingFor", subscriptionId);
+      sent++;
+    } catch (err) {
+      console.error(`Pro trial ending email for subscription ${subscriptionId} failed:`, err);
+    }
+  }
+  return sent;
 }

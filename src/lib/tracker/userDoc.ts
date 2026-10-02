@@ -32,7 +32,23 @@ export interface UserDoc {
   // identity in this app (a single shared password+TOTP login, see
   // src/lib/admin/session.ts), not a per-admin value worth tracking
   // until that changes.
-  plan?: { grantedAt: string; expiresAt: string };
+  //
+  // The rest is only ever set from a real Stripe subscription (see
+  // proSubscription.ts): which price it's on, the end of a free trial
+  // while one is running, and whether it's set to end at the close of the
+  // current period instead of renewing.
+  plan?: {
+    grantedAt: string;
+    expiresAt: string;
+    interval?: "monthly" | "annual";
+    trialEndsAt?: string;
+    cancelling?: boolean;
+  };
+  // When this account's one free Pro trial started - kept for good, so a
+  // second checkout never gets another.
+  proTrialStartedAt?: string;
+  // Which subscription the trial emails were sent for, so each goes once.
+  proTrialEmails?: { startedFor?: string; endingFor?: string };
   // Total vehicles this account may track, set from /tomasz for an owner
   // paying for extra ones - see vehicleLimitFor() in vehicleLimit.ts,
   // which only ever lets it raise the plan's own cap, up to 4. Absent =

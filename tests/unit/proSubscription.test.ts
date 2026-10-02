@@ -6,7 +6,11 @@ const mocks = vi.hoisted(() => ({
   retrieveSubscription: vi.fn(),
   createPortalSession: vi.fn(),
   upsert: vi.fn(),
+  patch: vi.fn(),
+  query: vi.fn(),
   getUserDoc: vi.fn(),
+  sendProTrialStartedEmail: vi.fn(),
+  sendProTrialEndingEmail: vi.fn(),
 }));
 
 vi.mock("@/lib/payments/stripe", () => ({
@@ -17,9 +21,16 @@ vi.mock("@/lib/payments/stripe", () => ({
   }),
 }));
 vi.mock("@/lib/cosmos", () => ({
-  getContainer: () => ({ items: { upsert: mocks.upsert } }),
+  getContainer: () => ({
+    items: { upsert: mocks.upsert, query: mocks.query },
+    item: (id: string, pk: string) => ({ patch: (ops: unknown) => mocks.patch(id, pk, ops) }),
+  }),
 }));
 vi.mock("@/lib/tracker/userDoc", () => ({ getUserDoc: mocks.getUserDoc }));
+vi.mock("@/lib/resend", () => ({
+  sendProTrialStartedEmail: mocks.sendProTrialStartedEmail,
+  sendProTrialEndingEmail: mocks.sendProTrialEndingEmail,
+}));
 
 import {
   createProCheckoutSession,
@@ -28,7 +39,9 @@ import {
   applyProSubscriptionCancelled,
   selfHealProSubscription,
   createBillingPortalSession,
+  sendProTrialEndingReminders,
 } from "@/lib/payments/proSubscription";
+import { isEligibleForProTrial, isInProTrial } from "@/lib/payments/proTrial";
 
 const email = "rider@example.com";
 const futureExpiry = new Date(Date.now() - 1000).toISOString(); // already expired, so "not currently Pro"
@@ -59,7 +72,9 @@ describe("createProCheckoutSession", () => {
     expect(args.customer_email).toBe(email);
     expect(args.customer).toBeUndefined();
     expect(args.line_items).toEqual([{ price: "price_monthly_1", quantity: 1 }]);
-    expect(args.subscription_data).toEqual({ metadata: { email } });
+    // A first-time subscriber gets the free trial, with a card taken up front.
+    expect(args.subscription_data).toEqual({ metadata: { email }, trial_period_days: 14 });
+    expect(args.payment_method_collection).toBe("always");
     expect(args.metadata).toEqual({ email, kind: "pro_subscription" });
     expect(args.success_url).toBe("https://roadverdict.co.uk/pro?subscribed=1&session_id={CHECKOUT_SESSION_ID}");
     expect(args.cancel_url).toBe("https://roadverdict.co.uk/pro");
@@ -79,6 +94,15 @@ describe("createProCheckoutSession", () => {
     const args = mocks.create.mock.calls[0][0];
     expect(args.customer).toBe("cus_existing");
     expect(args.customer_email).toBeUndefined();
+    // Had Pro before, so no second trial.
+    expect(args.subscription_data).toEqual({ metadata: { email } });
+  });
+
+  it("never gives an account a second trial, even without a Stripe Customer", async () => {
+    mocks.getUserDoc.mockResolvedValue({ email, proTrialStartedAt: "2026-09-01T00:00:00.000Z" });
+    mocks.create.mockResolvedValue({ url: "https://checkout.stripe.com/session999" });
+    await createProCheckoutSession(email, "monthly", "https://roadverdict.co.uk");
+    expect(mocks.create.mock.calls[0][0].subscription_data).toEqual({ metadata: { email } });
   });
 
   it("returns creation_failed when Stripe returns no session url", async () => {
@@ -104,14 +128,19 @@ describe("createProCheckoutSession", () => {
   });
 });
 
-function subscription(overrides: Partial<{ id: string; status: string; customer: string; email: string; currentPeriodEnd: number }> = {}) {
-  const { id = "sub_1", status = "active", customer = "cus_1", email: metaEmail = email, currentPeriodEnd = 1_800_000_000 } = overrides;
+function subscription(
+  overrides: Partial<{ id: string; status: string; customer: string; email: string; currentPeriodEnd: number; trialEnd: number; cancelAtPeriodEnd: boolean; interval: string }> = {}
+) {
+  const { id = "sub_1", status = "active", customer = "cus_1", email: metaEmail = email, currentPeriodEnd = 1_800_000_000, trialEnd, cancelAtPeriodEnd = false, interval = "month" } = overrides;
   return {
     id,
     status,
     customer,
     metadata: { email: metaEmail },
-    items: { data: [{ current_period_end: currentPeriodEnd }] },
+    trial_end: trialEnd ?? null,
+    cancel_at_period_end: cancelAtPeriodEnd,
+    cancel_at: null,
+    items: { data: [{ current_period_end: currentPeriodEnd, price: { recurring: { interval } } }] },
   };
 }
 
@@ -142,6 +171,39 @@ describe("applyProSubscriptionFromCheckoutSession", () => {
         plan: expect.objectContaining({ expiresAt: new Date(1_800_000_000 * 1000).toISOString() }),
       })
     );
+  });
+
+  it("starts a free trial: records when it ends, marks the account's one trial as used, and emails once", async () => {
+    const trialEnd = 1_800_000_000;
+    mocks.retrieveSubscription.mockResolvedValue(subscription({ status: "trialing", trialEnd, currentPeriodEnd: trialEnd }));
+    mocks.getUserDoc.mockResolvedValue({ id: email, pk: email, email });
+    mocks.sendProTrialStartedEmail.mockResolvedValue(undefined);
+    mocks.patch.mockResolvedValue(undefined);
+    const session = { id: "cs_1", subscription: "sub_1", customer: "cus_1", metadata: { email, kind: "pro_subscription" } } as never;
+
+    await applyProSubscriptionFromCheckoutSession(session);
+
+    const ends = new Date(trialEnd * 1000).toISOString();
+    const saved = mocks.upsert.mock.calls[0][0];
+    expect(saved.plan).toEqual(expect.objectContaining({ expiresAt: ends, trialEndsAt: ends, interval: "monthly" }));
+    expect(saved.proTrialStartedAt).toEqual(expect.any(String));
+    expect(mocks.sendProTrialStartedEmail).toHaveBeenCalledWith(email, { trialEndsAt: ends, interval: "monthly" });
+    expect(mocks.patch).toHaveBeenCalledWith(email, email, [{ op: "set", path: "/proTrialEmails", value: { startedFor: "sub_1" } }]);
+
+    // Stripe delivers the same event again: no second email.
+    mocks.getUserDoc.mockResolvedValue({ id: email, pk: email, email, proTrialEmails: { startedFor: "sub_1" } });
+    await applyProSubscriptionFromCheckoutSession(session);
+    expect(mocks.sendProTrialStartedEmail).toHaveBeenCalledTimes(1);
+  });
+
+  it("sends no trial email for a subscription that's paid from the start", async () => {
+    mocks.retrieveSubscription.mockResolvedValue(subscription({ interval: "year" }));
+    mocks.getUserDoc.mockResolvedValue({ id: email, pk: email, email });
+    await applyProSubscriptionFromCheckoutSession({ id: "cs_1", subscription: "sub_1", customer: "cus_1", metadata: { email } } as never);
+    const saved = mocks.upsert.mock.calls[0][0];
+    expect(saved.plan.trialEndsAt).toBeUndefined();
+    expect(saved.plan.interval).toBe("annual");
+    expect(mocks.sendProTrialStartedEmail).not.toHaveBeenCalled();
   });
 
   it("does not grant plan when the retrieved subscription isn't active/trialing", async () => {
@@ -186,6 +248,14 @@ describe("applyProSubscriptionRenewed", () => {
     await applyProSubscriptionRenewed({ ...subscription(), metadata: {} } as never);
     expect(mocks.getUserDoc).not.toHaveBeenCalled();
     expect(mocks.upsert).not.toHaveBeenCalled();
+  });
+
+  it("clears the trial end once the trial has become a paid subscription, and notes a pending cancellation", async () => {
+    mocks.getUserDoc.mockResolvedValue({ email, plan: { grantedAt: "x", expiresAt: "old", trialEndsAt: "2026-10-16T00:00:00.000Z" } });
+    await applyProSubscriptionRenewed(subscription({ cancelAtPeriodEnd: true }) as never);
+    const saved = mocks.upsert.mock.calls[0][0];
+    expect(saved.plan.trialEndsAt).toBeUndefined();
+    expect(saved.plan.cancelling).toBe(true);
   });
 
   it("does not touch plan when status has moved to past_due", async () => {
@@ -260,5 +330,75 @@ describe("createBillingPortalSession", () => {
     mocks.createPortalSession.mockRejectedValue(new Error("stripe down"));
     const result = await createBillingPortalSession(email, "https://roadverdict.co.uk");
     expect(result).toEqual({ ok: false });
+  });
+});
+
+describe("the free trial rules", () => {
+  it("offers one trial, only to an account that has never had a Stripe Pro subscription", () => {
+    expect(isEligibleForProTrial(null)).toBe(true);
+    expect(isEligibleForProTrial({ email } as never)).toBe(true);
+    expect(isEligibleForProTrial({ email, stripeCustomerId: "cus_1" } as never)).toBe(false);
+    expect(isEligibleForProTrial({ email, proTrialStartedAt: "2026-09-01T00:00:00.000Z" } as never)).toBe(false);
+  });
+
+  it("is in a trial only until the trial's end", () => {
+    const now = Date.parse("2026-10-02T12:00:00.000Z");
+    expect(isInProTrial({ plan: { grantedAt: "x", expiresAt: "y", trialEndsAt: "2026-10-16T12:00:00.000Z" } } as never, now)).toBe(true);
+    expect(isInProTrial({ plan: { grantedAt: "x", expiresAt: "y", trialEndsAt: "2026-10-01T12:00:00.000Z" } } as never, now)).toBe(false);
+    expect(isInProTrial({ plan: { grantedAt: "x", expiresAt: "y" } } as never, now)).toBe(false);
+  });
+});
+
+describe("sendProTrialEndingReminders", () => {
+  const now = Date.parse("2026-10-09T09:00:00.000Z");
+  const trialEndsAt = "2026-10-16T09:00:00.000Z";
+  const user = (overrides: Record<string, unknown> = {}) => ({
+    id: email,
+    pk: email,
+    email,
+    stripeSubscriptionId: "sub_1",
+    plan: { grantedAt: "x", expiresAt: trialEndsAt, trialEndsAt, interval: "annual" },
+    ...overrides,
+  });
+
+  it("emails each account whose trial ends within the next 8 days, once", async () => {
+    mocks.query.mockReturnValue({ fetchAll: async () => ({ resources: [user()] }) });
+    mocks.sendProTrialEndingEmail.mockResolvedValue(undefined);
+    mocks.patch.mockResolvedValue(undefined);
+
+    expect(await sendProTrialEndingReminders(now)).toBe(1);
+
+    const params = mocks.query.mock.calls[0][0].parameters;
+    expect(params).toEqual([
+      { name: "@now", value: "2026-10-09T09:00:00.000Z" },
+      { name: "@soon", value: "2026-10-17T09:00:00.000Z" },
+    ]);
+    expect(mocks.sendProTrialEndingEmail).toHaveBeenCalledWith(email, { trialEndsAt, interval: "annual" });
+    expect(mocks.patch).toHaveBeenCalledWith(email, email, [{ op: "set", path: "/proTrialEmails", value: { endingFor: "sub_1" } }]);
+  });
+
+  it("skips a trial set to end unpaid, one already reminded, and an account with no subscription", async () => {
+    mocks.query.mockReturnValue({
+      fetchAll: async () => ({
+        resources: [
+          user({ plan: { grantedAt: "x", expiresAt: trialEndsAt, trialEndsAt, cancelling: true } }),
+          user({ proTrialEmails: { startedFor: "sub_1", endingFor: "sub_1" } }),
+          user({ stripeSubscriptionId: undefined }),
+        ],
+      }),
+    });
+    expect(await sendProTrialEndingReminders(now)).toBe(0);
+    expect(mocks.sendProTrialEndingEmail).not.toHaveBeenCalled();
+  });
+
+  it("keeps going when one email fails, without marking it sent", async () => {
+    mocks.query.mockReturnValue({ fetchAll: async () => ({ resources: [user(), user({ email: "second@example.com", id: "second@example.com", pk: "second@example.com" })] }) });
+    mocks.sendProTrialEndingEmail.mockRejectedValueOnce(new Error("Resend down")).mockResolvedValueOnce(undefined);
+    mocks.patch.mockResolvedValue(undefined);
+    vi.spyOn(console, "error").mockImplementation(() => {});
+
+    expect(await sendProTrialEndingReminders(now)).toBe(1);
+    expect(mocks.patch).toHaveBeenCalledTimes(1);
+    expect(mocks.patch.mock.calls[0][0]).toBe("second@example.com");
   });
 });

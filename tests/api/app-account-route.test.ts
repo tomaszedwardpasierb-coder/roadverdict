@@ -35,14 +35,22 @@ describe("GET /api/app/account", () => {
     const res = await GET();
     expect(res.status).toBe(200);
     expect(res.headers.get("cache-control")).toBe("private, no-store");
-    expect(await res.json()).toEqual({ email: "rider@example.com", displayName: "Alex", twoFactorEnabled: true, isPro: false, pendingDeletion: null });
+    expect(await res.json()).toEqual({ email: "rider@example.com", displayName: "Alex", twoFactorEnabled: true, isPro: false, proTrialDays: 14, pendingDeletion: null });
     expect(mocks.getUserDoc).toHaveBeenCalledWith("rider@example.com");
     expect(mocks.isTwoFactorEnabled).toHaveBeenCalledWith("rider@example.com");
   });
 
   it("works for an account with no user document yet", async () => {
     mocks.getUserDoc.mockResolvedValue(null);
-    expect(await (await GET()).json()).toEqual({ email: "rider@example.com", displayName: "", twoFactorEnabled: false, isPro: false, pendingDeletion: null });
+    expect(await (await GET()).json()).toEqual({ email: "rider@example.com", displayName: "", twoFactorEnabled: false, isPro: false, proTrialDays: 14, pendingDeletion: null });
+  });
+
+  it("offers the website's free trial only to an account that could still get one", async () => {
+    mocks.getUserDoc.mockResolvedValue({ stripeCustomerId: "cus_1" });
+    expect((await (await GET()).json()).proTrialDays).toBe(0);
+    mocks.getUserDoc.mockResolvedValue({});
+    mocks.isPro.mockResolvedValue(true);
+    expect((await (await GET()).json()).proTrialDays).toBe(0);
   });
 
   it("says when a requested deletion will happen", async () => {

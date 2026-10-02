@@ -661,7 +661,7 @@ export default async function DetailedReportPage(props: {
           <span className={styles.forecastBadge}>Estimate</span>
         </p>
         <p className={styles.forecastIntro}>
-          A forward-looking prediction, not part of the verified record above - see how below.
+          A forward-looking prediction, not part of the logged record above - see how below.
         </p>
         <p className={styles.forecastTotal}>£{Math.round(forecastTotal).toLocaleString()}</p>
         <ul className={styles.forecastCategoryList}>
@@ -681,7 +681,7 @@ export default async function DetailedReportPage(props: {
         </p>
         <p className={styles.forecastNote}>
           These figures are RoadVerdict&apos;s own predictions, based on this bike&apos;s logged history, due
-          reminders, and sourced UK price data - never a quote, and not verified the way the entries above are.
+          reminders, and sourced UK price data - never a quote, and not a record of work done like the entries above.
           Treat as a helpful guide, not a guarantee.
         </p>
       </div>

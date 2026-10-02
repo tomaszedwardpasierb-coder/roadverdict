@@ -3,16 +3,19 @@ import type { Metadata } from 'next';
 import { pageMetadata } from '@/lib/seo/pageMetadata';
 import { getSession } from '@/lib/auth/session';
 import { isPro, PRO_MONTHLY_PRICE } from '@/lib/subscriptions';
-import { EXTRA_VEHICLE_MONTHLY_PRICE } from '@/lib/proPlan';
+import { EXTRA_VEHICLE_MONTHLY_PRICE, PRO_TRIAL_DAYS } from '@/lib/proPlan';
 import { getUserDoc } from '@/lib/tracker/userDoc';
 import { selfHealProSubscription } from '@/lib/payments/proSubscription';
+import { isEligibleForProTrial } from '@/lib/payments/proTrial';
+import { FunnelBeacon } from '@/components/FunnelBeacon';
 import { PlanComparisonCards } from '@/components/PlanComparisonCards';
 import styles from './pro.module.css';
 
 export const metadata: Metadata = pageMetadata({
   title: 'RoadVerdict Pro: Plans and Pricing',
   description:
-    'RoadVerdict Pro adds a second vehicle, full reports, exact reminder dates and emails, the encrypted Vault, AI summaries and a free vehicle-history report every 4 weeks.',
+    (PRO_TRIAL_DAYS > 0 ? `Try RoadVerdict Pro free for ${PRO_TRIAL_DAYS} days: ` : 'RoadVerdict Pro: ') +
+    'a second vehicle, full reports, exact reminder dates and emails, the encrypted Vault, AI summaries and a free vehicle-history report every 4 weeks.',
   path: '/pro',
   absoluteTitle: true,
 });
@@ -31,6 +34,9 @@ export default async function ProPage(props: { searchParams: Promise<{ session_i
   const userIsPro = session ? await isPro(session.email) : false;
   const userDoc = session ? await getUserDoc(session.email) : null;
   const hasStripeSubscription = !!userDoc?.stripeSubscriptionId;
+  // The trial a signed-in visitor would actually get; unknown (undefined)
+  // when signed out, which shows the general "new to Pro" line.
+  const trialDays = session ? (!userIsPro && isEligibleForProTrial(userDoc) ? PRO_TRIAL_DAYS : 0) : undefined;
 
   return (
     <main className={styles.main}>
@@ -46,7 +52,7 @@ export default async function ProPage(props: { searchParams: Promise<{ session_i
         </p>
       </div>
 
-      <PlanComparisonCards userIsPro={userIsPro} hasStripeSubscription={hasStripeSubscription} />
+      <PlanComparisonCards userIsPro={userIsPro} hasStripeSubscription={hasStripeSubscription} trialDays={trialDays} />
 
       <div className={styles.faq}>
         <h2 className={styles.faqHeading}>Common questions</h2>
@@ -71,9 +77,19 @@ export default async function ProPage(props: { searchParams: Promise<{ session_i
         </div>
         <div className={styles.faqItem}>
           <strong>Is there a trial?</strong>
-          <p>Not yet - but at {PRO_MONTHLY_PRICE}/month you can try it for a month and cancel if it&apos;s not for you.</p>
+          {PRO_TRIAL_DAYS > 0 ? (
+            <p>
+              Yes - your first {PRO_TRIAL_DAYS} days of Pro are free, once per account. You add a card at checkout, but
+              nothing is charged until the trial ends. We email you a week before it does, and if you cancel before then
+              (Manage billing, on this page) you pay nothing. The free vehicle-history report starts with your first
+              payment.
+            </p>
+          ) : (
+            <p>Not at the moment - but at {PRO_MONTHLY_PRICE}/month you can try it for a month and cancel if it&apos;s not for you.</p>
+          )}
         </div>
       </div>
+      <FunnelBeacon step="pro" />
     </main>
   );
 }

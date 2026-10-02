@@ -25,9 +25,13 @@ interface Props {
   // standalone /pro page - pointless when this is already rendered
   // inside the dashboard itself.
   showFreeCta?: boolean;
+  // The free trial this viewer would get at checkout (0 = none, e.g. they've
+  // had Pro before) - only /pro knows; elsewhere it's left out and the
+  // buttons show the general "new to Pro" line.
+  trialDays?: number;
 }
 
-export function PlanComparisonCards({ userIsPro, hasStripeSubscription = false, showFreeCta = true }: Props) {
+export function PlanComparisonCards({ userIsPro, hasStripeSubscription = false, showFreeCta = true, trialDays }: Props) {
   return (
     <div className={styles.plans}>
       <div className={styles.planCard}>
@@ -76,7 +80,7 @@ export function PlanComparisonCards({ userIsPro, hasStripeSubscription = false, 
             )}
           </>
         ) : (
-          <ProSubscribeButtons />
+          <ProSubscribeButtons trialDays={trialDays} />
         )}
       </div>
 
@@ -85,7 +89,7 @@ export function PlanComparisonCards({ userIsPro, hasStripeSubscription = false, 
         car, one-time, available to every account on either plan. The Buying Guide&apos;s own vehicle-history report
         (VDI check plus a full public-data analysis and AI-written summary) is priced by account: £14.99 with no
         vehicle registered, £12.99 once you&apos;ve added one, and free for Pro - one every 4 weeks, or £9.99 to get
-        another sooner.
+        another sooner. During a free trial it&apos;s £9.99; the free one starts with your first payment.
       </p>
     </div>
   );

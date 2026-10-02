@@ -1,15 +1,15 @@
 // Place at: src/app/api/funnel/route.ts
 //
 // The browser's half of the sign-up funnel (see lib/analytics/funnel.ts):
-// only the two page steps - the home page and the sign-in page - come from
-// here. Every later step is counted on the server where it happens, so it
-// can't be faked from a browser. Anonymous counts only.
+// only the page steps - the home page, the sign-in page, /pro and a shared
+// report - come from here. Every later step is counted on the server where
+// it happens, so it can't be faked from a browser. Anonymous counts only.
 import { NextRequest, NextResponse } from "next/server";
 import { recordFunnelStep, toFunnelSource, isInAppBrowser, isLikelyBot } from "@/lib/analytics/funnel";
 
 export const dynamic = "force-dynamic";
 
-const PAGE_STEPS = new Set(["home", "login"]);
+const PAGE_STEPS = new Set(["home", "login", "pro", "report"]);
 
 export async function POST(req: NextRequest) {
   const userAgent = req.headers.get("user-agent");
@@ -21,7 +21,7 @@ export async function POST(req: NextRequest) {
   }
   const { step, source } = (body ?? {}) as { step?: unknown; source?: unknown };
   if (typeof step === "string" && PAGE_STEPS.has(step) && !isLikelyBot(userAgent)) {
-    await recordFunnelStep(step as "home" | "login", { source: toFunnelSource(source) ?? "other", inApp: isInAppBrowser(userAgent) });
+    await recordFunnelStep(step as "home" | "login" | "pro" | "report", { source: toFunnelSource(source) ?? "other", inApp: isInAppBrowser(userAgent) });
   }
   return new NextResponse(null, { status: 204 });
 }

@@ -9,7 +9,7 @@
 // pattern rather than introducing Stripe.js/Elements.
 import { useState } from 'react';
 import { VehicleSpinner } from './VehicleSpinner';
-import { PRO_MONTHLY_PRICE, PRO_ANNUAL_PRICE } from '@/lib/proPlan';
+import { PRO_MONTHLY_PRICE, PRO_ANNUAL_PRICE, PRO_TRIAL_DAYS } from '@/lib/proPlan';
 import styles from '@/app/pro/pro.module.css';
 
 async function redirectToUrl(
@@ -43,7 +43,12 @@ async function redirectToUrl(
 // Session buttons, one per Price, rather than a plan toggle, so both
 // prices stay visible instead of hidden behind a switch someone has to
 // discover first.
-export function ProSubscribeButtons() {
+//
+// trialDays: the free trial this account would get (see
+// isEligibleForProTrial) - 0 for someone who has had Pro before. Left out
+// where the page doesn't know (the inline ProGate cards), which shows the
+// general "new to Pro" line instead; checkout applies the real rule.
+export function ProSubscribeButtons({ trialDays }: { trialDays?: number }) {
   const [loadingInterval, setLoadingInterval] = useState<'monthly' | 'annual' | null>(null);
   const [error, setError] = useState('');
 
@@ -57,12 +62,27 @@ export function ProSubscribeButtons() {
   }
 
   const busy = loadingInterval !== null;
+  const trial = trialDays !== undefined && trialDays > 0;
 
   return (
     <>
+      {trial ? (
+        <p className={styles.planCtaNote} style={{ marginTop: 0 }}>
+          Your first {trialDays} days are free. Nothing is charged until the trial ends, we&apos;ll email you a week
+          before, and you can cancel any time before then.
+        </p>
+      ) : trialDays === undefined && PRO_TRIAL_DAYS > 0 ? (
+        <p className={styles.planCtaNote} style={{ marginTop: 0 }}>
+          New to Pro? Your first {PRO_TRIAL_DAYS} days are free.
+        </p>
+      ) : null}
       <button type="button" className={styles.planCta + ' ' + styles.planCtaPro} onClick={() => subscribe('monthly')} disabled={busy}>
         {loadingInterval === 'monthly' && <VehicleSpinner size={18} />}
-        {loadingInterval === 'monthly' ? 'Starting checkout…' : `Subscribe monthly - ${PRO_MONTHLY_PRICE}/mo`}
+        {loadingInterval === 'monthly'
+          ? 'Starting checkout…'
+          : trial
+            ? `Start free trial - then ${PRO_MONTHLY_PRICE}/mo`
+            : `Subscribe monthly - ${PRO_MONTHLY_PRICE}/mo`}
       </button>
       <button
         type="button"
@@ -72,7 +92,11 @@ export function ProSubscribeButtons() {
         disabled={busy}
       >
         {loadingInterval === 'annual' && <VehicleSpinner size={18} />}
-        {loadingInterval === 'annual' ? 'Starting checkout…' : `Subscribe annually - ${PRO_ANNUAL_PRICE}/yr (2 months free)`}
+        {loadingInterval === 'annual'
+          ? 'Starting checkout…'
+          : trial
+            ? `Start free trial - then ${PRO_ANNUAL_PRICE}/yr (2 months free)`
+            : `Subscribe annually - ${PRO_ANNUAL_PRICE}/yr (2 months free)`}
       </button>
       {error && <p className="error-text" role="alert">{error}</p>}
     </>

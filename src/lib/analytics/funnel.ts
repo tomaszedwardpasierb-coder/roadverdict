@@ -2,7 +2,11 @@
 //
 // The sign-up funnel: how many people reach each step, per day, so we can
 // see where visitors drop out - home page -> sign-in page -> link emailed ->
-// signed in -> new account -> first vehicle. Cloudflare Web Analytics only
+// signed in -> new account -> first vehicle. Two shorter funnels share the
+// same counters: Pro (Pro page viewed -> checkout started; what happens
+// after that is read from Stripe itself, see payments/proStats.ts) and
+// shared reports (link shared -> report viewed -> a buyer signs up, counted
+// as the sign-up steps with source "report"). Cloudflare Web Analytics only
 // counts page views, which can't show any of the steps after the sign-in
 // page.
 //
@@ -28,6 +32,12 @@ export const FUNNEL_STEPS = [
   "account_created",
   "vehicle_added",
   "first_vehicle",
+  // Page steps, like home and login: /pro, and a shared report page.
+  "pro",
+  "report",
+  // Server steps.
+  "checkout_started",
+  "report_shared",
 ] as const;
 export type FunnelStep = (typeof FUNNEL_STEPS)[number];
 

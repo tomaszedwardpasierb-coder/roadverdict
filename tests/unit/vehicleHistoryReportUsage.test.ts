@@ -26,6 +26,15 @@ beforeEach(() => {
 });
 
 describe("canRunFreeVehicleHistoryReport", () => {
+  it("holds it back during a free Pro trial, until the trial ends", () => {
+    const trialEndsAt = new Date(Date.now() + 5 * 86_400_000).toISOString();
+    const inTrial = makeUser({ plan: { grantedAt: "x", expiresAt: trialEndsAt, trialEndsAt } });
+    expect(canRunFreeVehicleHistoryReport(inTrial)).toBe(false);
+    expect(nextFreeVehicleHistoryReportAt(inTrial)).toBe(trialEndsAt);
+    const ended = new Date(Date.now() - 86_400_000).toISOString();
+    expect(canRunFreeVehicleHistoryReport(makeUser({ plan: { grantedAt: "x", expiresAt: "y", trialEndsAt: ended } }))).toBe(true);
+  });
+
   it("allows it when the user has never run one before", () => {
     expect(canRunFreeVehicleHistoryReport(makeUser())).toBe(true);
   });
