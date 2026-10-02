@@ -17,7 +17,7 @@ import { materializeAllDueForBike } from "./billSeries";
 import { computeSpendSummary, computeYearSpend, gatherMileagePoints, type SpendSummary } from "./summary";
 import { getSellerReportCore } from "./sellerReportData";
 import { monthsBetween } from "./reminderStatus";
-import { isDateInRange, mileageAsOf, type ComparisonPeriod } from "./bikeComparisonPeriod";
+import { historyStart, isDateInRange, mileageAsOf, type ComparisonPeriod } from "./bikeComparisonPeriod";
 
 // Shared with the garage compare page AND the assistant's own
 // "which bikes are currently being compared" validation - kept in one
@@ -99,11 +99,14 @@ export async function buildBikeComparisonEntry(
   // history (see mileageAsOf's own comment for why) - never the
   // period-filtered arrays above.
   const mileagePoints = gatherMileagePoints(records, mods, fuelLogs, bills);
-  const mileageAtStart = mileageAsOf(mileagePoints, period?.from, bike.startingMileage);
+  // With no start date, the whole logged history - not just since the
+  // bike was added here (see historyStart).
+  const start = historyStart(mileagePoints, bike.startingMileage, bike.dateAdded);
+  const mileageAtStart = period?.from ? mileageAsOf(mileagePoints, period.from, bike.startingMileage) : start.mileage;
   const mileageAtEnd = period?.to ? mileageAsOf(mileagePoints, period.to, bike.currentMileage) : bike.currentMileage;
   const milesRidden = Math.max(mileageAtEnd - mileageAtStart, 0);
 
-  const periodStart = period?.from ?? bike.dateAdded;
+  const periodStart = period?.from ?? start.date;
   const periodEnd = period?.to ?? new Date().toISOString().slice(0, 10);
   const monthsOwned = Math.max(monthsBetween(new Date(periodStart), new Date(periodEnd)), 0);
   const milesPerMonth = monthsOwned > 0 ? milesRidden / monthsOwned : null;
@@ -129,7 +132,7 @@ export async function buildBikeComparisonEntry(
     isCustomBuild: bike.isCustomBuild,
     currentMileage: bike.currentMileage,
     milesRidden,
-    ownedSince: bike.dateAdded,
+    ownedSince: start.date,
     monthsOwned,
     milesPerMonth,
     spend,

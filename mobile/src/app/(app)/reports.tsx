@@ -161,7 +161,7 @@ function ReportsBody({ data, kind }: { data: Reports; kind: 'bike' | 'car' }) {
             <Card style={styles.card}>
               <Text style={styles.cardTitle}>{data.economyUnit === 'l100km' ? 'Fuel economy' : 'MPG'} over time</Text>
               {data.economySeries.length > 0 ? (
-                <LineChart key={data.range} points={data.economySeries} color={CHART_COLORS.amber} format={economy} label="Fuel economy over time" />
+                <LineChart key={data.range} points={data.economySeries} color={CHART_COLORS.amber} format={economy} label="Fuel economy over time" rollingWindow={5} rollingNoun="tanks" />
               ) : (
                 <Text style={styles.emptyNote}>Log two consecutive full-tank fill-ups to see this.</Text>
               )}

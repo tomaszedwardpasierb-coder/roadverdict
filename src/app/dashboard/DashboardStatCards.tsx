@@ -107,7 +107,11 @@ export function DashboardStatCards({
     // depends on.
     const allSegments = computeMPGSeries(fuelLogs);
     const segmentsInRange = filterByDateRange(allSegments, range);
-    const actualMpg = segmentsInRange.length > 0 ? segmentsInRange.reduce((sum, s) => sum + s.mpg, 0) / segmentsInRange.length : null;
+    // Only trusted tanks - one flagged as a likely missed fill-up reads far
+    // too high, and the MPG chart, the Fuel tab and computeActualMPG all
+    // leave them out, so this card must too or it disagrees with them.
+    const trustedInRange = segmentsInRange.filter((s) => !s.likelyMissedFillUps);
+    const actualMpg = trustedInRange.length > 0 ? trustedInRange.reduce((sum, s) => sum + s.mpg, 0) / trustedInRange.length : null;
 
     // Miles covered in the selected range. For "all", the bike's own
     // lifetime bookends (startingMileage/currentMileage) are seeded in so

@@ -223,7 +223,7 @@ function GettingReady({ prep }: { prep: SellerPrep }) {
           <View style={styles.group}>
             <Text style={styles.groupTitle}>Your record so far</Text>
             <Text style={styles.text}>
-              {prep.totalRecords} entries logged, {prep.receiptCoveragePct}% with a receipt attached, {prep.realTimePct}% entered in real time.
+              {prep.totalRecords} service, parts and bill entries (fill-ups aren&apos;t counted), {prep.receiptCoveragePct}% with a receipt attached, {prep.realTimePct}% entered in real time.
             </Text>
             <Text style={styles.text}>
               {prep.mileageConsistent

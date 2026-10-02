@@ -87,7 +87,7 @@ function SellerPrepSection({ data }: { data: SellerPrepData }) {
         <>
           <p className={styles.subtext} style={{ fontWeight: 600, marginBottom: '0.3rem' }}>Your record so far</p>
           <p className={styles.subtext}>
-            {evidenceQuality.totalRecords} entries logged, {evidenceQuality.receiptCoveragePct}% with a receipt
+            {evidenceQuality.totalRecords} service, parts and bill entries (fill-ups aren&apos;t counted), {evidenceQuality.receiptCoveragePct}% with a receipt
             attached, {evidenceQuality.realTimePct}% entered in real time.
           </p>
           <p className={styles.subtext} style={{ marginBottom: '1.2rem' }}>

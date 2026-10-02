@@ -2,7 +2,7 @@
 // dashboard's colours (chartStyle.ts and each chart's own colour). Tap a
 // chart to read a point; the readout above it shows the latest one until
 // then.
-import { useState, type ReactNode } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import { Pressable, StyleSheet, Text, View, type GestureResponderEvent, type LayoutChangeEvent } from 'react-native';
 import Svg, { Circle, Defs, G, Line, LinearGradient, Path, Rect, Stop, Text as SvgText } from 'react-native-svg';
 
@@ -64,7 +64,8 @@ export function longDate(iso: string): string {
 }
 
 function axisDate(iso: string, spanDays: number): string {
-  return new Date(iso).toLocaleDateString('en-GB', spanDays < 60 ? { day: 'numeric', month: 'short' } : { month: 'short', year: '2-digit' });
+  // "Aug 2026", never "Aug 26", which reads as the 26th of August.
+  return new Date(iso).toLocaleDateString('en-GB', spanDays < 60 ? { day: 'numeric', month: 'short' } : { month: 'short', year: 'numeric' });
 }
 
 // First, middle and last - enough to place the line in time without
@@ -100,12 +101,14 @@ function Frame({ label, onPress, onLayout, children }: { label: string; onPress:
 }
 
 export function LineChart({
-  points,
+  points: rawPoints,
   color,
   format,
   label,
   axisPrefix,
   zeroBased = false,
+  rollingWindow,
+  rollingNoun = 'readings',
 }: {
   points: Point[];
   color: string;
@@ -115,9 +118,23 @@ export function LineChart({
   label: string;
   axisPrefix?: string;
   zeroBased?: boolean;
+  // Plot the average of the last N points instead of each one - for noisy
+  // series like per-tank MPG, where a single short fill can read 30 or 200.
+  // The readout still gives the selected point's own value.
+  rollingWindow?: number;
+  // "tanks" - for the readout: "Average of the last 5 tanks".
+  rollingNoun?: string;
 }) {
   const { width, onLayout } = useWidth();
   const [picked, setPicked] = useState<number | null>(null);
+  const points = useMemo(() => {
+    if (!rollingWindow || rawPoints.length <= rollingWindow) return rawPoints;
+    return rawPoints.map((p, i) => {
+      const window = rawPoints.slice(Math.max(0, i - rollingWindow + 1), i + 1);
+      return { ...p, value: window.reduce((sum, q) => sum + q.value, 0) / window.length };
+    });
+  }, [rawPoints, rollingWindow]);
+  const smoothed = points !== rawPoints;
   const n = points.length;
   const active = picked != null && picked < n ? picked : n - 1;
   if (n === 0) return null;
@@ -148,7 +165,11 @@ export function LineChart({
 
   return (
     <View>
-      <Readout title={active === n - 1 && picked == null ? 'Latest' : 'Selected'} value={format(points[active].value)} detail={longDate(points[active].date)} />
+      <Readout
+        title={smoothed ? `Average of the last ${rollingWindow} ${rollingNoun}` : active === n - 1 && picked == null ? 'Latest' : 'Selected'}
+        value={format(points[active].value)}
+        detail={smoothed ? `${longDate(points[active].date)} · that one alone ${format(rawPoints[active].value)}` : longDate(points[active].date)}
+      />
       <Frame label={summary} onPress={pick} onLayout={onLayout}>
         {width > 0 ? (
           <Svg width={width} height={HEIGHT}>
@@ -263,7 +284,13 @@ export function StackedBarChart({
               );
             })}
             {labelIndexes(n).map((i) => (
-              <SvgText key={i} x={PAD.left + slot * i + slot / 2} y={HEIGHT - 6} fontSize={11} fill={AXIS_LABEL} textAnchor="middle">
+              <SvgText
+                key={i}
+                x={n === 1 ? PAD.left + slot / 2 : i === 0 ? PAD.left : i === n - 1 ? PAD.left + slot * n : PAD.left + slot * i + slot / 2}
+                y={HEIGHT - 6}
+                fontSize={11}
+                fill={AXIS_LABEL}
+                textAnchor={n === 1 ? 'middle' : i === 0 ? 'start' : i === n - 1 ? 'end' : 'middle'}>
                 {bars[i].label}
               </SvgText>
             ))}

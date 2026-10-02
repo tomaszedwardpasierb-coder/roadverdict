@@ -123,7 +123,7 @@ describe("getReports", () => {
     mocks.getProStatus.mockResolvedValue({ isPro: true });
     const r = (await getReports(email, "bike", "bike-1", "all", NOW))!;
     expect(r.monthly!.map((m) => m.month)).toEqual(["2025-06", "2026-03", "2026-08", "2026-09"]);
-    expect(r.monthly![0].label).toBe("Jun 25");
+    expect(r.monthly![0].label).toBe("Jun 2025");
   });
 
   it("counts an electric car's charging in its spend, with no economy figure", async () => {

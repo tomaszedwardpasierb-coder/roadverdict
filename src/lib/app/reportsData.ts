@@ -179,7 +179,8 @@ async function load(email: string, kind: VehicleKind, id: string, year: number):
 const byDate = (a: { date: string }, b: { date: string }) => new Date(a.date).getTime() - new Date(b.date).getTime();
 
 function monthLabel(key: string): string {
-  return new Date(`${key}-01T00:00:00Z`).toLocaleDateString("en-GB", { month: "short", year: "2-digit", timeZone: "UTC" });
+  // "Aug 2026" - "Aug 26" reads as the 26th of August.
+  return new Date(`${key}-01T00:00:00Z`).toLocaleDateString("en-GB", { month: "short", year: "numeric", timeZone: "UTC" });
 }
 
 export async function getReports(email: string, kind: VehicleKind, id: string, range: RangeValue, now: Date = new Date()): Promise<ReportsData | null> {
@@ -194,7 +195,10 @@ export async function getReports(email: string, kind: VehicleKind, id: string, r
   // DashboardStatCards' rules: segments worked out over every fill-up
   // (so one at the edge of the range still has the full tank before it),
   // then the segments themselves filtered to the range.
-  const segments = filterByDateRange(computeMPGSeries(v.mpgInputs, v.officialMpg), range);
+  // Trusted tanks only: one flagged as a likely missed fill-up reads far
+  // too high (150+ mpg), and every other economy figure leaves them out -
+  // the Fuel economy screen, the website's chart and its Fuel tab.
+  const segments = filterByDateRange(computeMPGSeries(v.mpgInputs, v.officialMpg), range).filter((s) => !s.likelyMissedFillUps);
   const averageMpg = segments.length > 0 ? segments.reduce((sum, s) => sum + s.mpg, 0) / segments.length : null;
 
   // Distance covered in the range, from entries that carry a mileage -

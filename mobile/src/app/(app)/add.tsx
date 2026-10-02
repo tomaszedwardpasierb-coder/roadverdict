@@ -41,7 +41,7 @@ export default function AddSheet() {
           </View>
           <View style={styles.flex}>
             <Text style={styles.sayTitle}>Just say it</Text>
-            <Text style={styles.sayBody}>Tell the assistant what you did – it drafts the entry</Text>
+            <Text style={styles.sayBody}>Say what you did – the assistant drafts it</Text>
           </View>
         </Pressable>
 

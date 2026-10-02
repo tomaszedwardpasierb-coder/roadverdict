@@ -37,6 +37,22 @@ export interface MileagePoint {
 // recently BEFORE 1 Jan as its starting point, which by definition
 // isn't in the "since 1 Jan" set. Falls back to the given default when
 // nothing was logged that early yet.
+// Where a vehicle's logged history starts: the lowest mileage and earliest
+// date of anything logged, or the vehicle's own starting point if that's
+// earlier. History is often logged back to before the vehicle was added
+// (old receipts), so the starting mileage alone can sit right next to the
+// current one and make the distance covered look like nothing - every
+// "whole history" figure (Reports, the comparison) starts from here.
+export function historyStart(points: MileagePoint[], startingMileage: number, dateAdded: string): { mileage: number; date: string } {
+  let mileage = startingMileage;
+  let date = dateAdded;
+  for (const p of points) {
+    if (p.mileage > 0 && p.mileage < mileage) mileage = p.mileage;
+    if (p.date < date) date = p.date;
+  }
+  return { mileage, date };
+}
+
 export function mileageAsOf(points: MileagePoint[], boundary: string | undefined, fallback: number): number {
   if (!boundary) return fallback;
   const boundaryTime = new Date(boundary).getTime();

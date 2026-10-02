@@ -66,7 +66,7 @@ describe("StorySoFarTab", () => {
       <StorySoFarTab currentMileage={12000} distanceUnit="mi" initialStory={null} sellerPrep={filledSellerPrep} />
     );
 
-    expect(screen.getByText(/12 entries logged, 75% with a receipt attached, 83% entered in real time\./)).toBeInTheDocument();
+    expect(screen.getByText(/12 service, parts and bill entries \(fill-ups aren't counted\), 75% with a receipt attached, 83% entered in real time\./)).toBeInTheDocument();
     expect(screen.getByText(/At least one logged entry shows a lower mileage/)).toBeInTheDocument();
     expect(screen.getByText("Gap in service history")).toBeInTheDocument();
     expect(screen.getByText(/typically £120-£180/)).toBeInTheDocument();

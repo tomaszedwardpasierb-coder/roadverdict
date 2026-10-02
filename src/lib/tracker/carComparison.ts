@@ -15,7 +15,7 @@ import { getCarBills } from "./carBill";
 import { computeCarSpendSummary, computeCarYearSpend, gatherCarMileagePoints } from "./carSummary";
 import { computeMPGSeries as computeCarMpgSeries } from "./mpgCalc";
 import { monthsBetween } from "./reminderStatus";
-import { isDateInRange, mileageAsOf, type ComparisonPeriod } from "./bikeComparisonPeriod";
+import { historyStart, isDateInRange, mileageAsOf, type ComparisonPeriod } from "./bikeComparisonPeriod";
 import type { VehicleComparisonEntry } from "./vehicleComparison";
 
 export async function buildCarComparisonEntry(
@@ -42,11 +42,14 @@ export async function buildCarComparisonEntry(
   const yearSpend = period ? null : computeCarYearSpend(records, mods, fuelLogs, bills, new Date().getFullYear());
 
   const mileagePoints = gatherCarMileagePoints(records, mods, fuelLogs, bills);
-  const mileageAtStart = mileageAsOf(mileagePoints, period?.from, car.startingMileage);
+  // With no start date, the whole logged history - not just since the
+  // car was added here (see historyStart).
+  const start = historyStart(mileagePoints, car.startingMileage, car.dateAdded);
+  const mileageAtStart = period?.from ? mileageAsOf(mileagePoints, period.from, car.startingMileage) : start.mileage;
   const mileageAtEnd = period?.to ? mileageAsOf(mileagePoints, period.to, car.currentMileage) : car.currentMileage;
   const milesRidden = Math.max(mileageAtEnd - mileageAtStart, 0);
 
-  const periodStart = period?.from ?? car.dateAdded;
+  const periodStart = period?.from ?? start.date;
   const periodEnd = period?.to ?? new Date().toISOString().slice(0, 10);
   const monthsOwned = Math.max(monthsBetween(new Date(periodStart), new Date(periodEnd)), 0);
   const milesPerMonth = monthsOwned > 0 ? milesRidden / monthsOwned : null;
@@ -75,7 +78,7 @@ export async function buildCarComparisonEntry(
     isCustomBuild: car.isCustomBuild,
     currentMileage: car.currentMileage,
     milesRidden,
-    ownedSince: car.dateAdded,
+    ownedSince: start.date,
     monthsOwned,
     milesPerMonth,
     spend,
