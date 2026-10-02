@@ -11,6 +11,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { EntryDraft, FeedbackDraft, SettingsDraft, ShareLinkDraft, VaultDraftNote } from '@/components/assistant-cards';
 import { Icon } from '@/components/icon';
+import { ReportAi } from '@/components/report-ai';
 import { Brand } from '@/constants/brand';
 import { MAX_TURNS, uploadChatPhoto, type AssistantReply, type ChatAttachment, type ChatMessage } from '@/lib/assistant';
 import { apiFetch } from '@/lib/api';
@@ -165,6 +166,9 @@ export default function AssistantScreen() {
                 <View style={[styles.bubble, styles.theirs]}>
                   <Text style={styles.theirsText}>{formatReply(turn.content)}</Text>
                 </View>
+                <View style={styles.replyActions}>
+                  <ReportAi feature="assistant" text={turn.content} />
+                </View>
                 {turn.proposedEntry ? <EntryDraft entry={turn.proposedEntry} onSaved={() => send(NEXT_ENTRY)} /> : null}
                 {turn.proposedShareLink ? <ShareLinkDraft link={turn.proposedShareLink} /> : null}
                 {turn.proposedSettingsChange ? <SettingsDraft change={turn.proposedSettingsChange} /> : null}
@@ -276,6 +280,7 @@ const styles = StyleSheet.create({
   prompt: { minHeight: 48, justifyContent: 'center', paddingHorizontal: 14, borderRadius: 12, borderWidth: 1.5, borderColor: Brand.line, backgroundColor: Brand.paperRaised },
   promptText: { fontSize: 15, color: Brand.ink },
   bubble: { maxWidth: '88%', paddingHorizontal: 14, paddingVertical: 10, borderRadius: 16 },
+  replyActions: { paddingLeft: 6, marginTop: -2 },
   mine: { alignSelf: 'flex-end', backgroundColor: Brand.asphalt, borderBottomRightRadius: 4 },
   mineText: { fontSize: 16, lineHeight: 22, color: '#FFFFFF' },
   theirsWrap: { alignSelf: 'stretch' },

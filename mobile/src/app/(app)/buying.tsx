@@ -10,6 +10,7 @@ import { KeyboardAvoidingView, Pressable, ScrollView, StyleSheet, Text, TextInpu
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Icon } from '@/components/icon';
+import { ReportAi } from '@/components/report-ai';
 import { OptionPicker } from '@/components/option-picker';
 import { Card, ErrorState, LoadingState, SectionHeader } from '@/components/screen';
 import { Brand } from '@/constants/brand';
@@ -225,6 +226,10 @@ function PlateCheck({ kind, onFound }: { kind: VehicleKind; onFound: (lookup: Lo
                 </>
               ) : null}
               <Text style={styles.text}>{lookup.briefing.summary}</Text>
+              <ReportAi
+                feature="buying"
+                text={[...lookup.briefing.motFlags, ...lookup.briefing.modelNotes, lookup.briefing.summary].join('\n')}
+              />
             </View>
           ) : null}
 

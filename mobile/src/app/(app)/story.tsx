@@ -9,6 +9,7 @@ import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, T
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Icon } from '@/components/icon';
+import { ReportAi } from '@/components/report-ai';
 import { ProLock } from '@/components/pro-lock';
 import { Card, ErrorState, LoadingState } from '@/components/screen';
 import { Brand } from '@/constants/brand';
@@ -161,6 +162,7 @@ function StoryBody({ vehicle, data }: { vehicle: GarageVehicle; data: StoryScree
               {paragraph}
             </Text>
           ))}
+          <ReportAi feature="story" text={story.sharedStory.join('\n\n')} />
           {story.ownerNotes.length > 0 ? (
             <View style={styles.notes}>
               <Text style={styles.notesTitle}>For you only – never shown to a buyer</Text>

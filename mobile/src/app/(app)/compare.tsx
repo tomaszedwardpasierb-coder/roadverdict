@@ -8,6 +8,7 @@ import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, T
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Icon } from '@/components/icon';
+import { ReportAi } from '@/components/report-ai';
 import { ProLock } from '@/components/pro-lock';
 import { Card, ErrorState, LoadingState } from '@/components/screen';
 import { Brand } from '@/constants/brand';
@@ -219,7 +220,10 @@ function AiSummary({ ids }: { ids: string[] }) {
             <Text style={[styles.body, styles.flex]}>{point}</Text>
           </View>
         ))}
-        <Text style={styles.note}>Written by AI from the figures below.</Text>
+        <View style={styles.noteRow}>
+          <Text style={[styles.note, styles.flex]}>Written by AI from the figures below.</Text>
+          <ReportAi feature="comparison" text={[summary.summary, ...summary.points].join('\n')} />
+        </View>
       </Card>
     );
   }
@@ -285,6 +289,7 @@ const styles = StyleSheet.create({
   verdict: { padding: 16, backgroundColor: '#FBEACC', borderColor: '#F1D5A3' },
   verdictText: { fontSize: 16, lineHeight: 23, fontWeight: '600', color: '#7A4508' },
   note: { fontSize: 13, lineHeight: 19, color: Brand.muted },
+  noteRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   row: { gap: 4, paddingTop: 4 },
   rowLabel: { fontSize: 13, fontWeight: '700', color: Brand.muted, textTransform: 'uppercase', letterSpacing: 0.3 },
   valueRow: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 28, flexWrap: 'wrap' },
