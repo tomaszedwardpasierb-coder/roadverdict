@@ -1,11 +1,13 @@
 // What a free account sees in place of a Pro feature: the web ProGate's
 // badge, name and description. Deliberately no price, button or link -
-// the app doesn't sell Pro or point anyone to where it's sold.
+// the app doesn't sell Pro. On Android it says in plain words where Pro
+// is bought (see lib/pro-on-web.ts for what Google allows here).
 import { StyleSheet, Text, View } from 'react-native';
 
 import { Icon } from '@/components/icon';
 import { Card } from '@/components/screen';
 import { Brand } from '@/constants/brand';
+import { PRO_ON_WEB } from '@/lib/pro-on-web';
 
 export function ProLock({ feature, description }: { feature: string; description: string }) {
   return (
@@ -19,6 +21,7 @@ export function ProLock({ feature, description }: { feature: string; description
       </Text>
       <Text style={styles.body}>{description}</Text>
       <Text style={styles.note}>One Pro subscription unlocks every locked feature across RoadVerdict together, not just this one.</Text>
+      {PRO_ON_WEB ? <Text style={styles.note}>{`${PRO_ON_WEB} – sign in there with this email and it unlocks here too.`}</Text> : null}
     </Card>
   );
 }

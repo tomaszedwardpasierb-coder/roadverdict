@@ -10,6 +10,7 @@ import { apiFetch } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { useApi } from '@/lib/use-api';
 import { reminderRoute } from '@/lib/reminders';
+import { PRO_ON_WEB } from '@/lib/pro-on-web';
 import { useVehicle, vehicleHeaders } from '@/lib/vehicle';
 
 type Reminder = {
@@ -116,6 +117,7 @@ export default function RemindersScreen() {
               <Icon name="lock" size={14} color="#7A4508" />
               <Text style={styles.noteText}>
                 Free plan: every reminder shows whether it&apos;s due. Exact due dates are part of Pro.
+                {PRO_ON_WEB ? ` ${PRO_ON_WEB}.` : ''}
               </Text>
             </View>
           ) : null}

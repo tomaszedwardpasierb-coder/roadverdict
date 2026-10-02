@@ -10,6 +10,7 @@ import { Brand } from '@/constants/brand';
 import { API_BASE_URL } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { useApi } from '@/lib/use-api';
+import { PRO_ON_WEB } from '@/lib/pro-on-web';
 import { versionLabel, updateLabel } from '@/lib/version';
 
 // Everything outside the four main tabs, each row with its own icon so the
@@ -62,8 +63,14 @@ export default function MoreScreen() {
   const { email, signOut } = useAuth();
   const [signingOut, setSigningOut] = useState(false);
   const [showUpdate, setShowUpdate] = useState(false);
-  const account = useApi<{ isPro: boolean }>('/api/app/account');
+  const account = useApi<{ isPro: boolean; proTrialDays?: number }>('/api/app/account');
   const plan = account.data ? (account.data.isPro ? 'Pro' : 'Free plan') : null;
+  // Where to get Pro, in plain words - Android only (see lib/pro-on-web.ts).
+  const trialDays = account.data?.proTrialDays ?? 0;
+  const proOnWeb =
+    PRO_ON_WEB && account.data && !account.data.isPro
+      ? `${PRO_ON_WEB}${trialDays > 0 ? ` – the first ${trialDays} days are free.` : '.'}`
+      : null;
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
@@ -85,6 +92,7 @@ export default function MoreScreen() {
                 <Text style={[styles.planText, account.data?.isPro && styles.planTextPro]}>{plan}</Text>
               </View>
             ) : null}
+            {proOnWeb ? <Text style={styles.proOnWeb}>{proOnWeb}</Text> : null}
           </View>
         </Card>
 
@@ -149,6 +157,7 @@ const styles = StyleSheet.create({
   planPro: { backgroundColor: Brand.amber },
   planText: { fontSize: 12, fontWeight: '700', color: '#3A3C42' },
   planTextPro: { color: Brand.asphalt },
+  proOnWeb: { marginTop: 6, fontSize: 13, lineHeight: 18, color: Brand.muted },
   signOut: {
     flexDirection: 'row',
     alignItems: 'center',
