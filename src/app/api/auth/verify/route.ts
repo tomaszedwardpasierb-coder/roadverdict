@@ -1,6 +1,7 @@
 // Place at: src/app/api/auth/verify/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { getContainer } from "@/lib/cosmos";
+import { recordFunnelStep, toFunnelSource, isInAppBrowser } from "@/lib/analytics/funnel";
 import { hashToken, decodeEmail } from "@/lib/auth/crypto";
 import { createSessionForEmail } from "@/lib/auth/session";
 import { getSafeRedirectPath } from "@/lib/auth/safeRedirect";
@@ -37,6 +38,7 @@ export async function GET(req: NextRequest) {
   // to trust just because an earlier step approved it. See
   // safeRedirect.ts for the full reasoning.
   const safeRedirect = getSafeRedirectPath(url.searchParams.get("redirect"));
+  const source = toFunnelSource(url.searchParams.get("src"));
 
   if (!rawToken || !encodedEmail) {
     return NextResponse.redirect(`${APP_URL}/login?error=invalid_link`);
@@ -82,6 +84,9 @@ export async function GET(req: NextRequest) {
     throw err;
   }
 
+  // Sign-up funnel (anonymous counts) - see lib/analytics/funnel.ts.
+  void recordFunnelStep("signed_in", { source, inApp: isInAppBrowser(req.headers.get("user-agent")) });
+
   // A real magic-link click is now independently confirmed - if this
   // account has 2FA on, that's only step one. Hand off to a short-lived
   // pending-login cookie instead of a real session; the code-entry page
@@ -100,7 +105,7 @@ export async function GET(req: NextRequest) {
     return response;
   }
 
-  const { cookieValue, maxAge } = await createSessionForEmail(email, getClientIp(req), req.headers.get("user-agent") ?? "unknown");
+  const { cookieValue, maxAge } = await createSessionForEmail(email, getClientIp(req), req.headers.get("user-agent") ?? "unknown", { source });
 
   const response = NextResponse.redirect(`${APP_URL}${safeRedirect ?? "/dashboard"}`);
 

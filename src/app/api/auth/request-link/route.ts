@@ -1,6 +1,7 @@
 // Place at: src/app/api/auth/request-link/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { getContainer } from "@/lib/cosmos";
+import { recordFunnelStep, toFunnelSource, isInAppBrowser } from "@/lib/analytics/funnel";
 import { generateToken, encodeEmail } from "@/lib/auth/crypto";
 import { sendMagicLinkEmail } from "@/lib/resend";
 import { createSessionForEmail } from "@/lib/auth/session";
@@ -42,7 +43,8 @@ const DEMO_EMAIL = "demo@roadverdict.co.uk";
 
 export async function POST(req: NextRequest) {
   const container = getContainer();
-  const { email, redirect } = await req.json();
+  const { email, redirect, src } = await req.json();
+  const source = toFunnelSource(src);
 
   if (!email || typeof email !== "string" || !email.includes("@")) {
     return NextResponse.json({ error: "Valid email required" }, { status: 400 });
@@ -147,9 +149,11 @@ export async function POST(req: NextRequest) {
 
   const link = `${process.env.APP_URL ?? "https://roadverdict.co.uk"}/api/auth/verify?token=${raw}&e=${encodeEmail(
     normalizedEmail
-  )}${safeRedirect ? `&redirect=${encodeURIComponent(safeRedirect)}` : ""}`;
+  )}${safeRedirect ? `&redirect=${encodeURIComponent(safeRedirect)}` : ""}${source ? `&src=${source}` : ""}`;
 
   await sendMagicLinkEmail(normalizedEmail, link);
+  // Sign-up funnel (anonymous counts) - see lib/analytics/funnel.ts.
+  void recordFunnelStep("link_requested", { source, inApp: isInAppBrowser(req.headers.get("user-agent")) });
 
   return NextResponse.json({ ok: true });
 }

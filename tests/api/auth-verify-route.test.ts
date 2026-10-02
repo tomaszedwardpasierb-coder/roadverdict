@@ -121,7 +121,7 @@ describe("GET /api/auth/verify", () => {
 
     expect(mocks.item).toHaveBeenCalledWith(hashToken(RAW_TOKEN), EMAIL);
     expect(mocks.patch).toHaveBeenCalledWith({ operations: [{ op: "replace", path: "/used", value: true }], condition: "from c where c.used = false" });
-    expect(mocks.createSessionForEmail).toHaveBeenCalledWith(EMAIL, "unknown", "unknown");
+    expect(mocks.createSessionForEmail).toHaveBeenCalledWith(EMAIL, "unknown", "unknown", { source: null });
 
     expect(response.headers.get("location")).toBe(`${APP_URL}/dashboard`);
     const cookie = response.cookies.get("session");
@@ -169,7 +169,7 @@ describe("GET /api/auth/verify", () => {
     await GET(req(verifyUrl({ e: encodeEmail(otherEmail) })));
 
     expect(mocks.item).toHaveBeenCalledWith(hashToken(RAW_TOKEN), otherEmail);
-    expect(mocks.createSessionForEmail).toHaveBeenCalledWith(otherEmail, "unknown", "unknown");
+    expect(mocks.createSessionForEmail).toHaveBeenCalledWith(otherEmail, "unknown", "unknown", { source: null });
   });
 
   describe("when the account has 2FA enabled", () => {

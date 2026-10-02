@@ -24,6 +24,7 @@ import {
 } from "@/lib/tracker/bike";
 import { getCarsForUser, countActiveCars } from "@/lib/tracker/car";
 import { getVehicleLimit } from "@/lib/subscriptions";
+import { recordFunnelStep } from "@/lib/analytics/funnel";
 import { MAX_FREE_VEHICLES } from "@/lib/tracker/vehicleLimit";
 import { fetchDvlaDataFromVdg } from "@/lib/tracker/dvlaDataFetch";
 import { fetchVehicleTaxDetailsFromVdg } from "@/lib/tracker/vehicleTaxFetch";
@@ -87,6 +88,7 @@ export async function POST(request: NextRequest) {
   // paid VDG calls (refresh-data alone is 3 calls every 5 days) with no
   // ceiling of its own, so an uncapped vehicle count multiplied that
   // cost indefinitely.
+  let vehiclesBefore = 0;
   {
     // The plan's cap, lifted by any allowance set from /tomasz.
     const limit = await getVehicleLimit(session.email);
@@ -95,6 +97,7 @@ export async function POST(request: NextRequest) {
       getCarsForUser(session.email),
     ]);
     const combinedCount = countActiveBikes(existingBikes) + countActiveCars(existingCars);
+    vehiclesBefore = combinedCount;
     if (combinedCount >= limit) {
       return NextResponse.json(
         {
@@ -173,6 +176,9 @@ export async function POST(request: NextRequest) {
   ]);
 
   void logImpersonationActivityForCurrentRequest("bike", result.bike.id, "create");
+  // Sign-up funnel (anonymous counts) - see lib/analytics/funnel.ts.
+  void recordFunnelStep("vehicle_added");
+  if (vehiclesBefore === 0) void recordFunnelStep("first_vehicle");
   return NextResponse.json({ bike: result.bike });
 }
 

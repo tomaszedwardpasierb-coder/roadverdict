@@ -24,6 +24,7 @@ import {
 } from "@/lib/tracker/car";
 import { getBikesForUser, countActiveBikes, type ChartKind } from "@/lib/tracker/bike";
 import { getVehicleLimit } from "@/lib/subscriptions";
+import { recordFunnelStep } from "@/lib/analytics/funnel";
 import { MAX_FREE_VEHICLES } from "@/lib/tracker/vehicleLimit";
 import { fetchDvlaDataFromVdg } from "@/lib/tracker/dvlaDataFetch";
 import { fetchVehicleTaxDetailsFromVdg } from "@/lib/tracker/vehicleTaxFetch";
@@ -87,6 +88,7 @@ export async function POST(request: NextRequest) {
   // the equivalent block in POST /api/tracker/bike for why this lives
   // at the route layer rather than inside car.ts, and for why Pro gets
   // its own higher (not unlimited) cap.
+  let vehiclesBefore = 0;
   {
     // The plan's cap, lifted by any allowance set from /tomasz.
     const limit = await getVehicleLimit(session.email);
@@ -95,6 +97,7 @@ export async function POST(request: NextRequest) {
       getCarsForUser(session.email),
     ]);
     const combinedCount = countActiveBikes(existingBikes) + countActiveCars(existingCars);
+    vehiclesBefore = combinedCount;
     if (combinedCount >= limit) {
       return NextResponse.json(
         {
@@ -164,6 +167,9 @@ export async function POST(request: NextRequest) {
   ]);
 
   void logImpersonationActivityForCurrentRequest("car", car.id, "create");
+  // Sign-up funnel (anonymous counts) - see lib/analytics/funnel.ts.
+  void recordFunnelStep("vehicle_added");
+  if (vehiclesBefore === 0) void recordFunnelStep("first_vehicle");
   return NextResponse.json({ car });
 }
 

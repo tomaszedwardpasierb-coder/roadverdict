@@ -1,6 +1,7 @@
 // Place at: src/lib/auth/session.ts
 import { cookies, headers } from "next/headers";
 import { getContainer } from "@/lib/cosmos";
+import { recordFunnelStep, type FunnelSource } from "@/lib/analytics/funnel";
 import { hashToken, decodeEmail, generateToken, encodeEmail } from "@/lib/auth/crypto";
 import { isAccountBlocked } from "@/lib/tracker/userDoc";
 import { getAssistantConfig } from "@/lib/tracker/assistantConfig";
@@ -89,7 +90,7 @@ export async function createSessionForEmail(
   email: string,
   ip: string,
   userAgent: string,
-  options: { client?: "web" | "app" } = {}
+  options: { client?: "web" | "app"; source?: FunnelSource | null } = {}
 ): Promise<{ cookieValue: string; maxAge: number }> {
   const isApp = options.client === "app";
   const ttlSeconds = isApp ? APP_SESSION_TTL_SECONDS : SESSION_TTL_SECONDS;
@@ -121,6 +122,8 @@ export async function createSessionForEmail(
         createdAt: new Date().toISOString(),
         ...(config?.autoEnableOnboardingForNewSignups ? { onboarding: { completedSteps: [] } } : {}),
       });
+      // Sign-up funnel (anonymous counts) - see lib/analytics/funnel.ts.
+      void recordFunnelStep("account_created", { source: options.source ?? (isApp ? "app" : null) });
     }
   } catch (err) {
     // A genuine failure to check/create the user document (a network

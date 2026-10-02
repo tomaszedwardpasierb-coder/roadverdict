@@ -25,6 +25,7 @@ import { getAllImpersonationSessions, getAllImpersonationActivityCounts, type Im
 import { AdminShell } from './AdminShell';
 import { KnowledgeBaseEditor } from './KnowledgeBaseEditor';
 import styles from './adminShell.module.css';
+import { FunnelPanel } from './FunnelPanel';
 import { RunCronButton } from './RunCronButton';
 import { AssistantQuestionsTable } from './AssistantQuestionsTable';
 import { FeedbackTable } from './FeedbackTable';
@@ -550,6 +551,9 @@ export default async function AdminDashboardPage(
 
   const accountsContent = (
     <>
+      <h2 className={styles.sectionHeading}>Sign-up funnel</h2>
+      <FunnelPanel />
+
       <h2 className={styles.sectionHeading}>Accounts</h2>
       <div className={styles.grid}>
         <div className={styles.card}>

@@ -57,7 +57,7 @@ export function PrivacyContent() {
   return (
     <div className={styles.wrapper}>
       <h1 className={styles.title}>Privacy Policy</h1>
-      <span className={styles.updated}>Last updated: 27 September 2026</span>
+      <span className={styles.updated}>Last updated: 2 October 2026</span>
       <p className={styles.intro}>
         RoadVerdict is a small, independently run UK site. This page explains, in plain
         terms, what we collect, why, how long we keep it, who we share it with, and how
@@ -365,6 +365,14 @@ export function PrivacyContent() {
           from, your country and your type of device, as anonymous totals. It
           isn&apos;t loaded on shared vehicle reports or ownership-transfer links, so those
           private addresses are never sent to it.
+        </p>
+        <p>
+          We also count, as anonymous daily totals, how many people reach each step of
+          signing up - the home page, the sign-in page, the sign-in email, signing in, a
+          new account and a first vehicle - and roughly where those visits came from (for
+          example a search engine or a social network). Nothing is stored on your device
+          for this, and no email address, IP address or account is recorded with these
+          counts.
         </p>
         <p>
           Separately, we record browser/device information and sign-in timestamps

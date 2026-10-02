@@ -8,6 +8,7 @@ import { pageMetadata } from '@/lib/seo/pageMetadata';
 import Link from 'next/link';
 import Image from 'next/image';
 import './homepage.css';
+import { FunnelBeacon } from '@/components/FunnelBeacon';
 
 export const metadata: Metadata = pageMetadata({
   title: 'Know What Your Vehicle Really Costs | RoadVerdict',
@@ -59,6 +60,7 @@ const jsonLd = {
 export default function HomePage() {
   return (
     <>
+      <FunnelBeacon step="home" />
       <script
         type="application/ld+json"
         // eslint-disable-next-line react/no-danger

@@ -61,7 +61,7 @@ describe("HomePage", () => {
     const ctaLinks = screen.getAllByRole("link", { name: /start logging your motorcycle/i });
     expect(ctaLinks.length).toBeGreaterThan(0);
     for (const link of ctaLinks) {
-      expect(link).toHaveAttribute("href", "/login?redirect=%2Fdashboard%3FaddVehicle%3Dbike");
+      expect(link.getAttribute("href")).toMatch(/^\/login\?redirect=%2Fdashboard%3FaddVehicle%3Dbike(&src=[a-z]+)?$/);
     }
   });
 
@@ -71,7 +71,7 @@ describe("HomePage", () => {
     const ctaLinks = screen.getAllByRole("link", { name: /start logging your car/i });
     expect(ctaLinks.length).toBeGreaterThan(0);
     for (const link of ctaLinks) {
-      expect(link).toHaveAttribute("href", "/login?redirect=%2Fdashboard%3FaddVehicle%3Dcar");
+      expect(link.getAttribute("href")).toMatch(/^\/login\?redirect=%2Fdashboard%3FaddVehicle%3Dcar(&src=[a-z]+)?$/);
     }
   });
 

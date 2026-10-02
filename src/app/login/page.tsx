@@ -4,6 +4,8 @@
 import { Suspense, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import styles from "./login.module.css";
+import { FunnelBeacon } from "@/components/FunnelBeacon";
+import { classifySource } from "@/lib/analytics/funnelSource";
 
 const URL_ERROR_MESSAGES: Record<string, string> = {
   invalid_link: "That sign-in link isn't valid. Request a new one below.",
@@ -20,6 +22,9 @@ function LoginForm() {
   // request-link's own response - see safeRedirect.ts for why this
   // can't just be trusted as-is without validation.
   const redirect = searchParams.get("redirect");
+  // Where this visit came from (the home page adds ?src= to its sign-in
+  // links) - passed on so the later funnel steps count by source.
+  const src = classifySource({ src: searchParams.get("src"), utmSource: searchParams.get("utm_source"), referrer: typeof document === "undefined" ? null : document.referrer });
 
   const [email, setEmail] = useState("");
   const [status, setStatus] = useState<"idle" | "sending" | "sent" | "error">("idle");
@@ -34,7 +39,7 @@ function LoginForm() {
       const res = await fetch("/api/auth/request-link", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, redirect }),
+        body: JSON.stringify({ email, redirect, src }),
       });
       const data = await res.json();
 
@@ -126,6 +131,7 @@ function LoginForm() {
 export default function LoginPage() {
   return (
     <div className={styles.wrapper}>
+      <FunnelBeacon step="login" />
       <Suspense fallback={null}>
         <LoginForm />
       </Suspense>
