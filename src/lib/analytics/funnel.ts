@@ -38,6 +38,12 @@ export const FUNNEL_STEPS = [
   // Server steps.
   "checkout_started",
   "report_shared",
+  // The sample-bike demo (/demo): the page itself, then the two things a
+  // visitor can try - reading a receipt, asking a question. Sign-ups from
+  // it are counted as the sign-up steps with source "demo".
+  "demo",
+  "demo_scanned",
+  "demo_asked",
 ] as const;
 export type FunnelStep = (typeof FUNNEL_STEPS)[number];
 

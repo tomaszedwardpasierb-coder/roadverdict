@@ -220,7 +220,19 @@ async function callGeminiReceiptModel(
   }
 }
 
-export async function parseReceiptFile(file: File, apiKey: string, vehicle: ScanVehicle): Promise<ParseReceiptResult> {
+// Options for callers that aren't a signed-in account's own scan - the
+// public sample-bike demo (api/demo/scan) reads a visitor's receipt
+// without keeping it: store false skips the blob upload (the item's
+// attachment is an empty placeholder), escalate false skips the
+// dearer second read. Both default to the normal behaviour.
+export interface ParseReceiptOptions {
+  store?: boolean;
+  escalate?: boolean;
+}
+
+export async function parseReceiptFile(file: File, apiKey: string, vehicle: ScanVehicle, options: ParseReceiptOptions = {}): Promise<ParseReceiptResult> {
+  const store = options.store !== false;
+  const escalate = options.escalate !== false;
   const fileName = file.name || "receipt.jpg";
   const vehicleKind = vehicleKindOf(vehicle);
 
@@ -283,7 +295,7 @@ export async function parseReceiptFile(file: File, apiKey: string, vehicle: Scan
     // the scan entirely - aiLowConfidence below is what actually routes
     // this to a human either way.
     let aiLowConfidence = parsed.isReceipt !== false && parsed.lowConfidence === true;
-    if (aiLowConfidence) {
+    if (aiLowConfidence && escalate) {
       const escalated = await callGeminiReceiptModel(GEMINI_ESCALATION_MODEL, apiKey, mimeTypeForGemini, base64, vehicleKind);
       if (escalated) {
         parsed = escalated;
@@ -317,11 +329,12 @@ export async function parseReceiptFile(file: File, apiKey: string, vehicle: Scan
     // Uploaded once per file, shared as the attachment across every item
     // split out of this one receipt - they're all proof of the same
     // physical piece of paper.
-    const blobName = `${randomBytes(24).toString("base64url")}.${uploadExtension}`;
-    const container = await getAttachmentContainer();
-    const blockBlobClient = container.getBlockBlobClient(blobName);
-
-    await blockBlobClient.uploadData(uploadBuffer, { blobHTTPHeaders: { blobContentType: uploadContentType } });
+    const blobName = store ? `${randomBytes(24).toString("base64url")}.${uploadExtension}` : "";
+    if (store) {
+      const container = await getAttachmentContainer();
+      const blockBlobClient = container.getBlockBlobClient(blobName);
+      await blockBlobClient.uploadData(uploadBuffer, { blobHTTPHeaders: { blobContentType: uploadContentType } });
+    }
     const attachment: Attachment = { blobName, fileName, fileType: (isPdf ? "application/pdf" : "image/jpeg") as Attachment["fileType"], uploadedAt: new Date().toISOString() };
     const rates = await getExchangeRates();
     const currencySupported = (ALL_CURRENCIES as string[]).includes(detectedCurrency);

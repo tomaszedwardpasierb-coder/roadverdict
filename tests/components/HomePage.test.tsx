@@ -61,6 +61,7 @@ describe("HomePage", () => {
     expect(screen.getByRole("link", { name: /work out what it costs to run/i })).toHaveAttribute("href", "/cost-calculator");
     const carLinks = screen.getAllByRole("link", { name: "For a car" }).map((a) => a.getAttribute("href"));
     expect(carLinks).toEqual(["/cars/quote-checker", "/cars/cost-calculator"]);
+    expect(screen.getByRole("link", { name: /see it with a sample bike/i })).toHaveAttribute("href", "/demo");
     expect(screen.getByRole("link", { name: "Motorcycle" }).getAttribute("href")).toMatch(/^\/login\?redirect=%2Fdashboard%3FaddVehicle%3Dbike/);
     expect(screen.getByRole("link", { name: "Car" }).getAttribute("href")).toMatch(/^\/login\?redirect=%2Fdashboard%3FaddVehicle%3Dcar/);
   });

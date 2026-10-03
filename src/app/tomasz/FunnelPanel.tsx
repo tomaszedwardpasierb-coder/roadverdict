@@ -29,6 +29,16 @@ const LATER: { group: string; steps: { key: string; label: string }[] }[] = [
     ],
   },
   {
+    group: 'Sample-bike demo',
+    steps: [
+      { key: 'demo', label: 'Demo page viewed' },
+      { key: 'demo_scanned', label: 'Read a receipt' },
+      { key: 'demo_asked', label: 'Asked a question' },
+      { key: 'link_requested__src_demo', label: 'Asked for a sign-in link from the demo' },
+      { key: 'account_created__src_demo', label: 'Opened an account from the demo' },
+    ],
+  },
+  {
     group: 'Shared reports',
     steps: [
       { key: 'report_shared', label: 'Report link shared' },

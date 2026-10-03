@@ -9,7 +9,7 @@ import { recordFunnelStep, toFunnelSource, isInAppBrowser, isLikelyBot } from "@
 
 export const dynamic = "force-dynamic";
 
-const PAGE_STEPS = new Set(["home", "login", "pro", "report"]);
+const PAGE_STEPS = new Set(["home", "login", "pro", "report", "demo"]);
 
 export async function POST(req: NextRequest) {
   const userAgent = req.headers.get("user-agent");
@@ -21,7 +21,7 @@ export async function POST(req: NextRequest) {
   }
   const { step, source } = (body ?? {}) as { step?: unknown; source?: unknown };
   if (typeof step === "string" && PAGE_STEPS.has(step) && !isLikelyBot(userAgent)) {
-    await recordFunnelStep(step as "home" | "login" | "pro" | "report", { source: toFunnelSource(source) ?? "other", inApp: isInAppBrowser(userAgent) });
+    await recordFunnelStep(step as "home" | "login" | "pro" | "report" | "demo", { source: toFunnelSource(source) ?? "other", inApp: isInAppBrowser(userAgent) });
   }
   return new NextResponse(null, { status: 204 });
 }

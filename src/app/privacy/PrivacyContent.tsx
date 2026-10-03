@@ -59,7 +59,7 @@ export function PrivacyContent() {
   return (
     <div className={styles.wrapper}>
       <h1 className={styles.title}>Privacy Policy</h1>
-      <span className={styles.updated}>Last updated: 2 October 2026</span>
+      <span className={styles.updated}>Last updated: 3 October 2026</span>
       <p className={styles.intro}>
         RoadVerdict is a small, independently run UK site. This page explains, in plain
         terms, what we collect, why, how long we keep it, who we share it with, and how
@@ -132,6 +132,17 @@ export function PrivacyContent() {
           benchmarks accurate over time. This runs on a legitimate-interest legal basis
           rather than consent, because there&apos;s nothing personal collected to consent
           to in the first place.
+        </p>
+        <p>
+          The sample-bike demo is the same: it needs no account. If you upload a receipt
+          there, it is sent to Google&apos;s paid-tier Gemini API to be read, in the same way
+          as a receipt scanned in your account, and the details it reads are shown back to
+          you. The file is not saved, and nothing from it is added to any account. If you ask
+          the demo a question, the question is sent to the same API together with the sample
+          bike&apos;s made-up figures; we keep no record of the question or answer. To stop
+          misuse, we keep a count of how many receipts and questions each visitor has tried
+          that day, under a scrambled form of the internet address (not the address itself),
+          and delete it after two days.
         </p>
       </section>
 
@@ -438,7 +449,8 @@ export function PrivacyContent() {
           new account and a first vehicle - and roughly where those visits came from (for
           example a search engine or a social network). In the same way we count visits
           to the Pro page, Pro checkouts started, report links shared and shared reports
-          viewed. Nothing is stored on your device for this, and no email address, IP
+          viewed, and visits to the sample-bike demo, receipts read there and questions
+          asked. Nothing is stored on your device for this, and no email address, IP
           address or account is recorded with these counts.
         </p>
         <p>

@@ -18,6 +18,8 @@ export const FUNNEL_SOURCES = [
   "report",
   // The line under a free tool's result (components/LogbookNudge.tsx).
   "tool",
+  // The "Create a free account" links on the sample-bike demo (/demo).
+  "demo",
   "other",
   "direct",
 ] as const;

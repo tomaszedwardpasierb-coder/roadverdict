@@ -120,6 +120,7 @@ main:has(> .rv-hero) {
   text-underline-offset: 3px;
 }
 .rv-try-alt:hover { color: #f0ede6; }
+.rv-try-note { font-size: 13px; color: rgba(240,237,230,0.6); }
 .rv-start-line { margin: 1rem 0 0; font-size: 14px; color: rgba(240,237,230,0.7); }
 .rv-start-line a { color: #f0ede6; font-weight: 700; text-decoration: underline; text-underline-offset: 3px; }
 

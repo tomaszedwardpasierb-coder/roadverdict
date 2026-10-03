@@ -171,6 +171,13 @@ export default function HomePage() {
                 For a car
               </Link>
             </div>
+            <div className="rv-try-row">
+              <Link href="/demo" className="rv-cta-outline">
+                See it with a sample bike
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M2 7h10M8 3l4 4-4 4"/></svg>
+              </Link>
+              <span className="rv-try-note">Scan a receipt, ask the AI</span>
+            </div>
           </div>
           <p className="rv-start-line">
             Or start your logbook:{' '}
