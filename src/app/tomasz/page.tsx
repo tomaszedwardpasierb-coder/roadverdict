@@ -28,6 +28,8 @@ import styles from './adminShell.module.css';
 import { FunnelPanel } from './FunnelPanel';
 import { ActivationPanel } from './ActivationPanel';
 import { ProPanel } from './ProPanel';
+import { ReviewerAccessCard } from './ReviewerAccessCard';
+import { getReviewerAccess, REVIEWER_EMAIL } from '@/lib/auth/reviewerAccess';
 import { RunCronButton } from './RunCronButton';
 import { AssistantQuestionsTable } from './AssistantQuestionsTable';
 import { FeedbackTable } from './FeedbackTable';
@@ -139,6 +141,14 @@ async function getAllUserEmailsSafe(): Promise<string[]> {
   }
 }
 
+async function getReviewerAccessSafe(): Promise<{ enabledAt: string } | null> {
+  try {
+    return await getReviewerAccess();
+  } catch {
+    return null;
+  }
+}
+
 async function getAllUserAccountsSafe(): Promise<UserDoc[]> {
   try {
     return await getAllUserAccounts();
@@ -227,6 +237,7 @@ export default async function AdminDashboardPage(
     broadcastSummaries,
     impersonationSessions,
     impersonationActivityCounts,
+    reviewerAccess,
   ] = await Promise.all([
     getAdminStatsBundle(),
     getFuelPriceStatus(),
@@ -247,6 +258,7 @@ export default async function AdminDashboardPage(
     getBroadcastSummariesSafe(),
     getImpersonationSessionsSafe(),
     getAllImpersonationActivityCountsSafe(),
+    getReviewerAccessSafe(),
   ]);
   const { dbStats, activeSessionCount: activeSessions, totalUserCount: totalUsers, magicLinkRequests, recentSessions, browserBreakdown, detailedCounts } = statsBundle;
   const health = getServerHealth();
@@ -583,6 +595,10 @@ export default async function AdminDashboardPage(
           <p className={styles.note}>Active: {activeSessions}</p>
           <p className={styles.note}>Expired (still stored): {detailedCounts.expiredSessions}</p>
         </div>
+        <ReviewerAccessCard
+          enabledAt={reviewerAccess?.enabledAt ?? null}
+          demoBlocked={!!allUserAccounts.find((u) => u.email === REVIEWER_EMAIL)?.blocked}
+        />
       </div>
 
       <h2 className={styles.sectionHeading}>All accounts</h2>

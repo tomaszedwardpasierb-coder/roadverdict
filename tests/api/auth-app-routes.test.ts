@@ -19,6 +19,10 @@ const mocks = vi.hoisted(() => ({
   recordTotpAttempt: vi.fn(),
   createSessionForEmail: vi.fn(),
   verifyTrustedDevice: vi.fn(),
+  recordFailedGuess: vi.fn(),
+  isReviewerCode: vi.fn(),
+  demoBikeExists: vi.fn(),
+  runDemoSeed: vi.fn(),
 }));
 
 vi.mock("@/lib/tracker/userDoc", () => ({ isAccountBlocked: mocks.isAccountBlocked }));
@@ -32,7 +36,10 @@ vi.mock("@/lib/auth/appLoginCode", () => ({
   isAppCodeRequestCoolingDown: mocks.isAppCodeRequestCoolingDown,
   consumeAppLoginCode: mocks.consumeAppLoginCode,
   isAppCodeGuessingLocked: mocks.isAppCodeGuessingLocked,
+  recordFailedGuess: mocks.recordFailedGuess,
 }));
+vi.mock("@/lib/auth/reviewerAccess", () => ({ REVIEWER_EMAIL: "demo@roadverdict.co.uk", isReviewerCode: mocks.isReviewerCode }));
+vi.mock("@/lib/tracker/demoSeedRunner", () => ({ demoBikeExists: mocks.demoBikeExists, runDemoSeed: mocks.runDemoSeed }));
 vi.mock("@/lib/resend", () => ({ sendAppLoginCodeEmail: mocks.sendAppLoginCodeEmail }));
 vi.mock("@/lib/auth/twoFactor", () => ({
   isTwoFactorEnabled: mocks.isTwoFactorEnabled,
@@ -77,6 +84,10 @@ beforeEach(() => {
   mocks.checkTotpRateLimit.mockResolvedValue(true);
   mocks.recordTotpAttempt.mockResolvedValue(undefined);
   mocks.createSessionForEmail.mockResolvedValue({ cookieValue: "enc.session-token", maxAge: 7776000 });
+  mocks.recordFailedGuess.mockResolvedValue(undefined);
+  mocks.isReviewerCode.mockResolvedValue(false);
+  mocks.demoBikeExists.mockResolvedValue(true);
+  mocks.runDemoSeed.mockResolvedValue({});
 });
 
 describe("POST /api/auth/app/request-code", () => {
@@ -133,6 +144,33 @@ describe("POST /api/auth/app/verify-code", () => {
     await expect(res.json()).resolves.toEqual({ token: "enc.session-token", expiresInSeconds: 7776000 });
     expect(mocks.consumeAppLoginCode).toHaveBeenCalledWith("rider@example.com", "482913");
     expect(mocks.createSessionForEmail).toHaveBeenCalledWith("rider@example.com", "1.2.3.4", "unknown", { client: "app" });
+  });
+
+  it("signs an app store reviewer in to the demo account with the switched-on code, seeding it first if empty", async () => {
+    mocks.isReviewerCode.mockResolvedValue(true);
+    mocks.demoBikeExists.mockResolvedValue(false);
+    const res = await verifyCode(req(path, { email: "Demo@RoadVerdict.co.uk", code: "123456" }));
+    expect(res.status).toBe(200);
+    expect(mocks.isReviewerCode).toHaveBeenCalledWith("demo@roadverdict.co.uk", "123456");
+    expect(mocks.runDemoSeed).toHaveBeenCalled();
+    expect(mocks.consumeAppLoginCode).not.toHaveBeenCalled();
+    expect(mocks.createSessionForEmail).toHaveBeenCalledWith("demo@roadverdict.co.uk", "1.2.3.4", "unknown", { client: "app" });
+  });
+
+  it("refuses the demo account with a wrong code, or when reviewer access is off, counting the guess", async () => {
+    const res = await verifyCode(req(path, { email: "demo@roadverdict.co.uk", code: "000000" }));
+    expect(res.status).toBe(401);
+    expect(mocks.recordFailedGuess).toHaveBeenCalledWith("demo@roadverdict.co.uk");
+    expect(mocks.createSessionForEmail).not.toHaveBeenCalled();
+    expect(mocks.consumeAppLoginCode).not.toHaveBeenCalled();
+  });
+
+  it("applies the usual lockout to the demo account too", async () => {
+    mocks.isAppCodeGuessingLocked.mockResolvedValue(true);
+    mocks.isReviewerCode.mockResolvedValue(true);
+    const res = await verifyCode(req(path, { email: "demo@roadverdict.co.uk", code: "123456" }));
+    expect(res.status).toBe(429);
+    expect(mocks.createSessionForEmail).not.toHaveBeenCalled();
   });
 
   it("rejects anything that isn't six digits without touching the stored code", async () => {

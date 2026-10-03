@@ -89,7 +89,9 @@ export async function isAppCodeGuessingLocked(email: string): Promise<boolean> {
   return resources.length >= MAX_FAILED_GUESSES_PER_WINDOW;
 }
 
-async function recordFailedGuess(email: string): Promise<void> {
+// Exported for the reviewer code path (reviewerAccess.ts), whose wrong
+// guesses count towards the same lockout.
+export async function recordFailedGuess(email: string): Promise<void> {
   const suffix = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   await getContainer().items.create({
     id: `${attemptPrefix()}${suffix}`,

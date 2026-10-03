@@ -7,10 +7,16 @@
 // verify-2fa trades for the real session once the authenticator code
 // checks out - the same two-step hand-off the web flow does with its
 // totp_pending cookie.
+//
+// App store reviewers sign in to the demo account with a fixed code that
+// only works while switched on in /tomasz (see reviewerAccess.ts) - the
+// demo account is never sent an emailed code.
 import { NextRequest, NextResponse } from "next/server";
 import { isAccountBlocked } from "@/lib/tracker/userDoc";
 import { getClientIp } from "@/lib/auth/signInRateLimit";
-import { consumeAppLoginCode, isAppCodeGuessingLocked } from "@/lib/auth/appLoginCode";
+import { consumeAppLoginCode, isAppCodeGuessingLocked, recordFailedGuess } from "@/lib/auth/appLoginCode";
+import { isReviewerCode, REVIEWER_EMAIL } from "@/lib/auth/reviewerAccess";
+import { demoBikeExists, runDemoSeed } from "@/lib/tracker/demoSeedRunner";
 import { isTwoFactorEnabled, createPendingLogin } from "@/lib/auth/twoFactor";
 import { createSessionForEmail } from "@/lib/auth/session";
 
@@ -33,7 +39,20 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Too many attempts. Try again later." }, { status: 429 });
   }
 
-  const result = await consumeAppLoginCode(normalizedEmail, code.trim());
+  if (normalizedEmail === REVIEWER_EMAIL) {
+    if (!(await isReviewerCode(normalizedEmail, code.trim()))) {
+      await recordFailedGuess(normalizedEmail);
+      return NextResponse.json({ error: "Incorrect code." }, { status: 401 });
+    }
+    // Reviewers should land on a garage with something in it.
+    try {
+      if (!(await demoBikeExists())) await runDemoSeed();
+    } catch (err) {
+      console.error("Reviewer sign-in: demo seed failed (signing in anyway):", err);
+    }
+  }
+
+  const result = normalizedEmail === REVIEWER_EMAIL ? "ok" : await consumeAppLoginCode(normalizedEmail, code.trim());
   if (result === "expired") {
     return NextResponse.json({ error: "That code has expired - request a new one." }, { status: 401 });
   }
