@@ -50,21 +50,24 @@ function fill(date: string, mileage: number, litres: number): DemoEntry {
 export const SAMPLE_ENTRIES: DemoEntry[] = [
   fill("2025-10-11", 10700, 9.9),
   { id: "bill-ins", date: "2025-10-18", category: "bills", description: "Insurance (annual)", cost: 312.4 },
-  { id: "svc-tyre", date: "2025-11-02", category: "service", description: "Rear tyre fitted (Michelin Road 6)", cost: 142 },
+  { id: "svc-tyre", date: "2025-11-02", category: "service", description: "Rear tyre fitted (Michelin Road 6)", cost: 142, mileage: 10790 },
+  { id: "mod-bungs", date: "2025-11-22", category: "mods", description: "Frame sliders", cost: 29.99, mileage: 10870 },
   fill("2025-11-15", 10830, 9.8),
+  { id: "lab-valves", date: "2025-12-06", category: "labour", description: "Valve clearance check (labour)", cost: 85, mileage: 10920 },
   fill("2025-12-20", 10960, 9.6),
   { id: "bill-ved", date: "2026-01-12", category: "bills", description: "Road tax (12 months)", cost: 28 },
   fill("2026-02-14", 11060, 7.6),
-  { id: "svc-brakes", date: "2026-03-05", category: "service", description: "Front brake pads (EBC)", cost: 64 },
+  { id: "svc-brakes", date: "2026-03-05", category: "service", description: "Front brake pads (EBC)", cost: 64, mileage: 11130 },
   { id: "bill-mot", date: "2026-03-14", category: "bills", description: "MOT test", cost: 29.65 },
   fill("2026-03-28", 11200, 10.1),
-  { id: "mod-tidy", date: "2026-04-04", category: "mods", description: "Tail tidy and bar-end mirrors", cost: 87.5 },
+  { id: "mod-tidy", date: "2026-04-04", category: "mods", description: "Tail tidy and bar-end mirrors", cost: 87.5, mileage: 11230 },
   fill("2026-04-25", 11360, 11.6),
   fill("2026-05-23", 11520, 11.9),
-  { id: "svc-chain", date: "2026-06-02", category: "service", description: "Chain and sprockets (DID kit)", cost: 215 },
+  { id: "lab-forks", date: "2026-05-09", category: "labour", description: "Fork oil change (labour)", cost: 60, mileage: 11590 },
+  { id: "svc-chain", date: "2026-06-02", category: "service", description: "Chain and sprockets (DID kit)", cost: 215, mileage: 11560 },
   fill("2026-06-20", 11690, 12.8),
   fill("2026-07-18", 11860, 12.4),
-  { id: "svc-lube", date: "2026-08-08", category: "service", description: "Chain lube and cleaner", cost: 18.99 },
+  { id: "svc-lube", date: "2026-08-08", category: "service", description: "Chain lube and cleaner", cost: 18.99, mileage: 11990 },
   fill("2026-08-15", 12040, 13.3),
   fill("2026-09-12", 12230, 14.3),
 ];
@@ -132,6 +135,32 @@ export function fuelEconomy(entries: DemoEntry[]): { date: string; mpg: number }
     if (miles > 0 && litres > 0) out.push({ date: fills[i].date, mpg: Math.round((miles / (litres / IMPERIAL_GALLON_LITRES)) * 10) / 10 });
   }
   return out;
+}
+
+// The shapes the dashboard's own chart components take (MpgChart,
+// FuelCostChart, CategorySpendChart), so /demo can show the real charts
+// on the sample bike instead of look-alikes.
+export function mpgSeries(entries: DemoEntry[]) {
+  const fills = entries
+    .filter((e) => e.category === "fuel" && e.litres && e.mileage)
+    .sort((a, b) => (a.mileage as number) - (b.mileage as number));
+  const out = [];
+  for (let i = 1; i < fills.length; i++) {
+    const miles = (fills[i].mileage as number) - (fills[i - 1].mileage as number);
+    const litres = fills[i].litres as number;
+    if (miles > 0 && litres > 0) {
+      out.push({ mileage: fills[i].mileage as number, mpg: Math.round((miles / (litres / IMPERIAL_GALLON_LITRES)) * 10) / 10, date: fills[i].date, fuelLogId: fills[i].id, miles, litres, likelyMissedFillUps: false });
+    }
+  }
+  return out;
+}
+
+export function chartItems(entries: DemoEntry[], category: DemoCategory) {
+  return entries.filter((e) => e.category === category).map((e) => ({ id: e.id, date: e.date, cost: e.cost, ...(e.mileage ? { mileage: e.mileage } : {}) }));
+}
+
+export function fuelPoints(entries: DemoEntry[]) {
+  return entries.filter((e) => e.category === "fuel" && e.mileage).map((e) => ({ id: e.id, date: e.date, cost: e.cost, mileage: e.mileage as number }));
 }
 
 export interface DemoFigures {

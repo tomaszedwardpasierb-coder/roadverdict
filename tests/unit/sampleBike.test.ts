@@ -32,7 +32,7 @@ describe("the sample bike", () => {
   it("works out plausible running figures", () => {
     const f = figuresFor(SAMPLE_ENTRIES);
     expect(f.total).toBeGreaterThan(900);
-    expect(f.total).toBeLessThan(1400);
+    expect(f.total).toBeLessThan(1500);
     expect(f.milesRidden).toBe(1530);
     expect(f.costPerMile).toBeGreaterThan(0.5);
     expect(f.costPerMile).toBeLessThan(1);

@@ -1,9 +1,14 @@
 // Place at: src/app/dashboard/useChartTypePreference.ts
 'use client';
 
-import { useState } from 'react';
+import { createContext, useContext, useState } from 'react';
 
 export type ChartKind = 'line' | 'bar' | 'pie';
+
+// Whether a chart's line/bar choice is saved to the account. True everywhere
+// except the public sample-bike demo (/demo), which shows the real charts
+// with no account behind them - there, a choice only changes the view.
+export const ChartPersistContext = createContext(true);
 
 // Optimistic: the chart switches instantly, the save happens in the
 // background. If the save fails, the choice simply won't persist to next
@@ -18,9 +23,11 @@ export type ChartKind = 'line' | 'bar' | 'pie';
 // BIKE's own stored chart-type preference instead of the car's.
 export function useChartTypePreference(chartId: string, initial: ChartKind, vehicleKind: 'bike' | 'car' = 'bike') {
   const [kind, setKind] = useState<ChartKind>(initial);
+  const persist = useContext(ChartPersistContext);
 
   async function changeKind(newKind: ChartKind) {
     setKind(newKind);
+    if (!persist) return;
     try {
       await fetch(vehicleKind === 'car' ? '/api/cars/car' : '/api/tracker/bike', {
         method: 'PATCH',

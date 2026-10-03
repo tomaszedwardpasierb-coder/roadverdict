@@ -1,52 +1,42 @@
-/* The sample-bike demo (/demo). Mobile first; one column. */
-.page { max-width: 720px; margin: 0 auto; padding: 1.2rem 1rem 3rem; display: flex; flex-direction: column; gap: 1.1rem; }
+/* The sample-bike demo (/demo): extras on top of the dashboard's own styles
+   (DashboardShell.module.css, dashboard.module.css), which the page reuses so
+   it looks like the real thing. */
 
-.head { display: flex; flex-direction: column; gap: 0.3rem; }
-.chip { align-self: flex-start; border-radius: 999px; padding: 0.2rem 0.7rem; background: var(--amber-tint); color: #7a4508; font-size: 0.78rem; font-weight: 700; }
-.title { margin: 0.2rem 0 0; font-size: 2rem; line-height: 1.1; }
-.sub { margin: 0; color: var(--ink-soft); }
-.lead { margin: 0.6rem 0 0; font-size: 1.02rem; line-height: 1.55; }
+.sampleBar { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 0.8rem; margin-bottom: 1.2rem; padding: 0.6rem 0.9rem; border-radius: 10px; background: var(--amber-tint); color: #5c3a08; font-size: 0.9rem; line-height: 1.4; }
+.sampleBar a { color: #5c3a08; font-weight: 700; text-decoration: underline; text-underline-offset: 3px; }
+.chip { border-radius: 999px; padding: 0.15rem 0.65rem; background: var(--amber); color: var(--asphalt); font-size: 0.75rem; font-weight: 800; white-space: nowrap; }
 
-.card { background: var(--paper); border: 1px solid var(--border); border-radius: 14px; padding: 1.1rem; }
-.cardTitle { margin: 0 0 0.3rem; font-size: 1.15rem; display: flex; align-items: center; gap: 0.55rem; }
+.headRow { display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 0.75rem; }
+
+.scanRow { display: flex; flex-wrap: wrap; align-items: center; gap: 0.7rem 1rem; margin: 0.4rem 0 1.3rem; }
+.scanBtn { position: relative; display: inline-flex; align-items: center; gap: 0.55rem; padding: 0.8rem 1.3rem; border: 0; border-radius: 10px; background: var(--amber); color: var(--asphalt); font: inherit; font-weight: 800; font-size: 1rem; cursor: pointer; }
+.scanBtn:hover { background: #f5a73f; }
+.scanRing { position: absolute; inset: 0; border-radius: 10px; pointer-events: none; animation: scanPulse 1.8s ease-out infinite; }
+.scanHint { font-size: 0.88rem; color: var(--ink-soft); }
+@keyframes scanPulse {
+  0% { box-shadow: 0 0 0 0 rgba(238, 154, 46, 0.65); }
+  70% { box-shadow: 0 0 0 14px rgba(238, 154, 46, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(238, 154, 46, 0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .scanRing { animation: none; box-shadow: 0 0 0 4px rgba(238, 154, 46, 0.45); }
+}
+
+.result { margin: 0 0 1.3rem; padding: 0.8rem 1rem; border-radius: 10px; background: var(--green-tint); line-height: 1.5; }
+.result ul { margin: 0.4rem 0 0.3rem; padding-left: 1.1rem; }
+
+.sideVehicle { display: flex; flex-direction: column; gap: 0.15rem; margin: 0.8rem 0; padding: 0.7rem 0.8rem; border-radius: 10px; background: var(--asphalt-2); font-size: 0.82rem; color: rgba(255, 255, 255, 0.65); }
+.sideVehicle strong { color: #fff; font-size: 0.95rem; }
+.sideCta { display: block; margin-top: 0.7rem; padding: 0.65rem 0.8rem; border-radius: 8px; background: var(--amber); color: var(--asphalt); text-align: center; font-weight: 800; font-size: 0.9rem; text-decoration: none; }
+.topCta { padding: 0.45rem 0.8rem; border-radius: 8px; background: var(--amber); color: var(--asphalt); font-weight: 800; font-size: 0.82rem; text-decoration: none; }
+
 .cardText { margin: 0 0 0.8rem; color: var(--ink-soft); line-height: 1.5; }
-.step { display: inline-flex; align-items: center; justify-content: center; width: 1.7rem; height: 1.7rem; border-radius: 50%; background: var(--asphalt); color: #fff; font-size: 0.9rem; }
 .actions { display: flex; flex-wrap: wrap; gap: 0.6rem; }
-.fine { margin: 0.7rem 0 0; font-size: 0.85rem; color: var(--ink-soft); }
-.result { margin-top: 0.9rem; padding: 0.8rem 0.9rem; border-radius: 10px; background: var(--green-tint); line-height: 1.5; }
-.result ul { margin: 0.4rem 0 0; padding-left: 1.1rem; }
+.fine { margin: 0.2rem 0 0; font-size: 0.85rem; color: var(--ink-soft); }
+.linkButton { align-self: flex-start; background: none; border: 0; padding: 0.4rem 0; color: var(--amber-ink); font: inherit; font-weight: 700; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+.linkButton:disabled { opacity: 0.5; cursor: default; }
 
-.stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.6rem; }
-.stat { background: var(--paper); border: 1px solid var(--border); border-radius: 12px; padding: 0.8rem 0.7rem; display: flex; flex-direction: column; gap: 0.15rem; }
-.statValue { font-size: 1.35rem; font-weight: 800; }
-.statLabel { font-size: 0.78rem; color: var(--ink-soft); line-height: 1.25; }
-
-.chart { margin: 0; background: var(--paper); border: 1px solid var(--border); border-radius: 14px; padding: 0.9rem 1rem 0.7rem; }
-.chartTitle { font-weight: 700; margin-bottom: 0.4rem; }
-.svg { width: 100%; height: auto; display: block; }
-.bars { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.55rem; }
-.barRow { display: grid; grid-template-columns: 7.2rem 1fr 4.2rem; align-items: center; gap: 0.6rem; font-size: 0.92rem; }
-.barLabel { color: var(--ink-soft); }
-.barTrack { height: 0.8rem; background: var(--line-soft); border-radius: 999px; overflow: hidden; }
-.barFill { display: block; height: 100%; background: var(--amber); border-radius: 999px; }
-.barValue { text-align: right; font-weight: 700; }
-
-.entries { list-style: none; margin: 0.4rem 0 0; padding: 0; }
-.entry { display: flex; justify-content: space-between; gap: 0.8rem; padding: 0.7rem 0; border-top: 1px solid var(--line-soft); }
-.entry:first-child { border-top: 0; }
-.entryMain { display: flex; flex-direction: column; gap: 0.1rem; min-width: 0; }
-.entryTitle { font-weight: 600; }
-.entryMeta { font-size: 0.85rem; color: var(--ink-soft); display: flex; flex-wrap: wrap; gap: 0.2rem 0.5rem; align-items: center; }
-.entryCost { font-weight: 700; white-space: nowrap; }
-.scannedTag { border-radius: 999px; padding: 0.05rem 0.5rem; background: var(--green-tint); color: var(--green); font-size: 0.75rem; font-weight: 700; }
-.linkButton { background: none; border: 0; padding: 0.4rem 0; color: var(--amber-ink); font: inherit; font-weight: 700; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
-.subTitle { margin: 1rem 0 0.3rem; font-size: 1rem; }
-.upcoming { margin: 0; padding-left: 1.1rem; line-height: 1.6; }
-
-.locks { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; }
-.lock { text-align: left; background: var(--stone); border: 1px dashed var(--border); border-radius: 10px; padding: 0.7rem; font: inherit; font-weight: 600; color: var(--ink); cursor: pointer; }
-
-.overlay { position: fixed; inset: 0; z-index: 50; display: flex; align-items: flex-end; justify-content: center; background: rgba(23, 24, 27, 0.55); padding: 0.8rem; }
+.overlay { position: fixed; inset: 0; z-index: 60; display: flex; align-items: flex-end; justify-content: center; background: rgba(23, 24, 27, 0.55); padding: 0.8rem; }
 .modal { width: 100%; max-width: 560px; max-height: 88vh; overflow-y: auto; background: var(--paper); border-radius: 16px; padding: 1.2rem; display: flex; flex-direction: column; gap: 0.8rem; }
 .modalTitle { margin: 0; font-size: 1.2rem; }
 .chips { display: flex; flex-direction: column; gap: 0.45rem; }
@@ -63,7 +53,5 @@
 .srOnly { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 
 @media (min-width: 640px) {
-  .page { padding-top: 2rem; }
   .overlay { align-items: center; }
-  .locks { grid-template-columns: repeat(4, 1fr); }
 }
