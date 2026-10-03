@@ -13,7 +13,7 @@ describe("HomePage", () => {
   it("renders the marketing homepage", () => {
     render(<HomePage />);
 
-    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(/really costs/i);
+    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(/living history/i);
     expect(screen.getAllByRole("link", { name: /start logging your motorcycle/i }).length).toBeGreaterThan(0);
     expect(screen.getAllByRole("link", { name: /start logging your car/i }).length).toBeGreaterThan(0);
   });
@@ -53,17 +53,23 @@ describe("HomePage", () => {
 
   // The main hero buttons open tools that need no account; signing in
   // is the quieter line beneath them.
-  it("leads the hero with try-it-now buttons that need no account", () => {
+  it("leads the hero with the logbook buttons, then the sample bike, then the free tools", () => {
     render(<HomePage />);
 
-    expect(screen.getByText("Try it now - no account needed")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /check a garage quote/i })).toHaveAttribute("href", "/quote-checker");
-    expect(screen.getByRole("link", { name: /work out what it costs to run/i })).toHaveAttribute("href", "/cost-calculator");
-    const carLinks = screen.getAllByRole("link", { name: "For a car" }).map((a) => a.getAttribute("href"));
-    expect(carLinks).toEqual(["/cars/quote-checker", "/cars/cost-calculator"]);
-    expect(screen.getByRole("link", { name: /see it with a sample bike/i })).toHaveAttribute("href", "/demo");
-    expect(screen.getByRole("link", { name: "Motorcycle" }).getAttribute("href")).toMatch(/^\/login\?redirect=%2Fdashboard%3FaddVehicle%3Dbike/);
-    expect(screen.getByRole("link", { name: "Car" }).getAttribute("href")).toMatch(/^\/login\?redirect=%2Fdashboard%3FaddVehicle%3Dcar/);
+    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(/living history/i);
+    const bike = screen.getByRole("link", { name: /start your motorcycle's logbook/i });
+    const car = screen.getByRole("link", { name: /start your car's logbook/i });
+    expect(bike.getAttribute("href")).toMatch(/^\/login\?redirect=%2Fdashboard%3FaddVehicle%3Dbike/);
+    expect(car.getAttribute("href")).toMatch(/^\/login\?redirect=%2Fdashboard%3FaddVehicle%3Dcar/);
+
+    const demo = screen.getByRole("link", { name: /see it with a sample bike/i });
+    expect(demo).toHaveAttribute("href", "/demo");
+    // Order on the page: logbook first, then the demo.
+    expect(bike.compareDocumentPosition(demo) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+
+    const tools = screen.getByText(/Just checking a price\?/).closest("p") as HTMLElement;
+    const toolLinks = Array.from(tools.querySelectorAll("a")).map((a) => a.getAttribute("href"));
+    expect(toolLinks).toEqual(["/quote-checker", "/cars/quote-checker", "/cost-calculator", "/cars/cost-calculator"]);
   });
 
   // Straight to the correct add-vehicle flow, not a marketing-page

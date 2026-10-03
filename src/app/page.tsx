@@ -138,69 +138,61 @@ export default function HomePage() {
             Motorcycles &amp; Cars · UK
           </div>
           <h1 className="rv-hero-headline">
-            Know what<br />
-            your vehicle<br />
-            <span className="rv-hl-amber">really costs.</span>
+            Your vehicle&apos;s<br />
+            <span className="rv-hl-amber">living history.</span>
           </h1>
           <p className="rv-hero-sub">
-            Log every fill-up, service, and repair.{' '}
-            <strong>Check if a quote is fair before you pay.</strong>{' '}
-            Know exactly what you&apos;re looking at before you buy.
+            Every fill-up, service and receipt in one place.{' '}
+            <strong>Know what it really costs</strong>, show how it&apos;s been looked
+            after, and hand the history to the next owner when you sell.
           </p>
-          {/* Try it first: the tools work without an account, so the
-              main buttons open them. Signing in is the quieter second
-              step (small links below). 4% of home page visitors reached
-              the sign-in page when both big buttons demanded one. */}
-          <p className="rv-try-label">Try it now - no account needed</p>
-          <div className="rv-hero-actions rv-hero-actions--try">
-            <div className="rv-try-row">
-              <Link href="/quote-checker" className="rv-cta-primary">
-                Check a garage quote
-                <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M2 7h10M8 3l4 4-4 4"/></svg>
-              </Link>
-              <Link href="/cars/quote-checker" className="rv-try-alt">
-                For a car
-              </Link>
-            </div>
-            <div className="rv-try-row">
-              <Link href="/cost-calculator" className="rv-cta-outline">
-                Work out what it costs to run
-                <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M2 7h10M8 3l4 4-4 4"/></svg>
-              </Link>
-              <Link href="/cars/cost-calculator" className="rv-try-alt">
-                For a car
-              </Link>
-            </div>
-            <div className="rv-try-row">
-              <Link href="/demo" className="rv-cta-outline">
-                See it with a sample bike
-                <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M2 7h10M8 3l4 4-4 4"/></svg>
-              </Link>
-              <span className="rv-try-note">Scan a receipt, ask the AI</span>
-            </div>
+          {/* The logbook is the product, so it leads: both buttons start one.
+              The sample bike (try it with no account) comes next, and the
+              free tools sit in a quiet line - they bring people in but
+              shouldn't define the page. */}
+          <div className="rv-hero-actions">
+            <Link href="/login?redirect=%2Fdashboard%3FaddVehicle%3Dbike" className="rv-cta-primary">
+              Start your motorcycle&apos;s logbook
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M2 7h10M8 3l4 4-4 4"/></svg>
+            </Link>
+            <Link href="/login?redirect=%2Fdashboard%3FaddVehicle%3Dcar" className="rv-cta-outline">
+              Start your car&apos;s logbook
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M2 7h10M8 3l4 4-4 4"/></svg>
+            </Link>
           </div>
-          <p className="rv-start-line">
-            Or start your logbook:{' '}
-            <Link href="/login?redirect=%2Fdashboard%3FaddVehicle%3Dbike">Motorcycle</Link>
-            {' · '}
-            <Link href="/login?redirect=%2Fdashboard%3FaddVehicle%3Dcar">Car</Link>
+          <div className="rv-hero-demo">
+            <Link href="/demo" className="rv-cta-ghost">
+              See it with a sample bike
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M2 7h10M8 3l4 4-4 4"/></svg>
+            </Link>
+            <span className="rv-try-note">Scan a receipt, ask the AI. No account needed.</span>
+          </div>
+          <p className="rv-tools-line">
+            Just checking a price? Garage quote:{' '}
+            <Link href="/quote-checker">motorcycle</Link>
+            {' / '}
+            <Link href="/cars/quote-checker">car</Link>
+            {' · '}Running costs:{' '}
+            <Link href="/cost-calculator">motorcycle</Link>
+            {' / '}
+            <Link href="/cars/cost-calculator">car</Link>
           </p>
           <ul className="rv-hero-proof" aria-label="Key facts">
             <li className="rv-proof-item">
               <span className="rv-proof-check" aria-hidden="true">✓</span>
-              No sign-up to try
-            </li>
-            <li className="rv-proof-item">
-              <span className="rv-proof-check" aria-hidden="true">✓</span>
-              Free to start
-            </li>
-            <li className="rv-proof-item">
-              <span className="rv-proof-check" aria-hidden="true">✓</span>
-              Real UK price data
+              Free for one vehicle
             </li>
             <li className="rv-proof-item">
               <span className="rv-proof-check" aria-hidden="true">✓</span>
               No password - email only
+            </li>
+            <li className="rv-proof-item">
+              <span className="rv-proof-check" aria-hidden="true">✓</span>
+              Receipts, history &amp; reminders
+            </li>
+            <li className="rv-proof-item">
+              <span className="rv-proof-check" aria-hidden="true">✓</span>
+              Real UK price data
             </li>
           </ul>
         </div>
