@@ -12,6 +12,7 @@ import {
 import type { CarAnnualCostBreakdown } from '@/lib/carCostCalculator';
 import { CarCostBreakdownResult } from './CarCostBreakdownResult';
 import { VehicleSpinner } from './VehicleSpinner';
+import { LogbookNudge } from '@/components/LogbookNudge';
 
 interface ApiResponse {
   breakdown: CarAnnualCostBreakdown;
@@ -350,6 +351,7 @@ export function CarCostCalculatorForm({ signedIn, initialBrand, initialCarClass 
           advice={result.advice}
         />
       )}
+      {result && !result.error && <LogbookNudge kind="car" topic="cost" signedIn={signedIn} />}
     </>
   );
 }

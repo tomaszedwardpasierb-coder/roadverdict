@@ -1282,6 +1282,20 @@ body:has(main [data-admin-shell]) [data-assistant-widget] {
   color: #f3f1ec;
 }
 
+/* The logbook line under a free tool's result (src/components/LogbookNudge.tsx):
+   one quiet line of text, never a banner. */
+.rv-logbook-nudge {
+  margin: 1rem 0 0;
+  font-size: 0.92rem;
+  line-height: 1.55;
+  color: var(--ink-soft);
+}
+.rv-logbook-nudge a {
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
 /* Affiliate links (src/components/AffiliateLine.tsx): one quiet line of
    text, never a banner. */
 .rv-affiliate {

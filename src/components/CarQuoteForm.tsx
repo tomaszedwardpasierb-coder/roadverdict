@@ -14,6 +14,7 @@ import {
 import type { Verdict } from '@/lib/verdict';
 import { CarVerdictResult } from './CarVerdictResult';
 import { VehicleSpinner } from './VehicleSpinner';
+import { LogbookNudge } from '@/components/LogbookNudge';
 
 interface ApiResponse {
   verdict: Verdict;
@@ -322,6 +323,7 @@ export function CarQuoteForm({ signedIn, initialBrand, initialCarClass }: Props)
           advice={result.advice}
         />
       )}
+      {result && !result.error && <LogbookNudge kind="car" topic="quote" signedIn={signedIn} />}
     </>
   );
 }

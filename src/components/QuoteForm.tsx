@@ -14,6 +14,7 @@ import { getModelsForBrand, getBikeClassForCC, slugifyMake } from '@/lib/motorcy
 import type { Verdict } from '@/lib/verdict';
 import { VerdictResult } from './VerdictResult';
 import { VehicleSpinner } from './VehicleSpinner';
+import { LogbookNudge } from '@/components/LogbookNudge';
 
 interface ApiResponse {
   verdict: Verdict;
@@ -333,6 +334,7 @@ export function QuoteForm({ signedIn, initialBrand, initialBikeClass }: Props) {
           jobType={jobType}
         />
       )}
+      {result && !result.error && <LogbookNudge kind="bike" topic="quote" signedIn={signedIn} />}
     </>
   );
 }

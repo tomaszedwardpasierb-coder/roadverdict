@@ -16,6 +16,8 @@ export const FUNNEL_SOURCES = [
   // A buyer who followed the line on a shared report (report pages link
   // to /login?src=report) - the seller-to-buyer loop.
   "report",
+  // The line under a free tool's result (components/LogbookNudge.tsx).
+  "tool",
   "other",
   "direct",
 ] as const;

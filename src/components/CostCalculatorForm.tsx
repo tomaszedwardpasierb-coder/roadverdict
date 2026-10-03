@@ -16,6 +16,7 @@ import {
 import type { AnnualCostBreakdown } from '@/lib/costCalculator';
 import { CostBreakdownResult } from './CostBreakdownResult';
 import { VehicleSpinner } from './VehicleSpinner';
+import { LogbookNudge } from '@/components/LogbookNudge';
 
 interface ApiResponse {
   breakdown: AnnualCostBreakdown;
@@ -347,6 +348,7 @@ export function CostCalculatorForm({ signedIn, initialBrand, initialModel, initi
           advice={result.advice}
         />
       )}
+      {result && !result.error && <LogbookNudge kind="bike" topic="cost" signedIn={signedIn} />}
     </>
   );
 }
