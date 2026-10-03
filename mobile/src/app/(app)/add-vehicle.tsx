@@ -7,13 +7,14 @@
 // and imports the vehicle's MOT history straight after, as the web does.
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { KeyboardAvoidingView, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Icon } from '@/components/icon';
 import { OptionPicker } from '@/components/option-picker';
 import { Card, ErrorState, LoadingState } from '@/components/screen';
 import { Brand } from '@/constants/brand';
+import { doneBarFor } from '@/components/keyboard-done';
 import { apiFetch } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import type { OptionGroup } from '@/lib/form-options';
@@ -505,7 +506,7 @@ function DetailsForm({
   }
 
   return (
-    <KeyboardAvoidingView style={styles.flex} behavior="height">
+    <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <PlateSummary registration={registration} kind={kind} onChange={onChangeRegistration} />
         {start.note ? <Text style={styles.hint}>{start.note}</Text> : null}
@@ -630,7 +631,7 @@ function Field({
   return (
     <View style={styles.field}>
       <Text style={styles.label}>{label}</Text>
-      <TextInput {...input} keyboardType={keyboardType} accessibilityLabel={label} placeholderTextColor="#A7A49C" style={styles.input} />
+      <TextInput {...input} keyboardType={keyboardType} inputAccessoryViewID={doneBarFor(keyboardType)} accessibilityLabel={label} placeholderTextColor="#A7A49C" style={styles.input} />
       {hint ? <Text style={styles.hint}>{hint}</Text> : null}
     </View>
   );

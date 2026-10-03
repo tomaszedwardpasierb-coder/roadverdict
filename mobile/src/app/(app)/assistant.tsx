@@ -6,7 +6,7 @@ import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useRef, useState } from 'react';
-import { ActivityIndicator, Alert, KeyboardAvoidingView, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { EntryDraft, FeedbackDraft, SettingsDraft, ShareLinkDraft, VaultDraftNote } from '@/components/assistant-cards';
@@ -128,7 +128,7 @@ export default function AssistantScreen() {
         </View>
       </View>
 
-      <KeyboardAvoidingView style={styles.flex} behavior="height">
+      <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         <ScrollView
           ref={scroll}
           contentContainerStyle={styles.content}

@@ -9,6 +9,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Icon } from '@/components/icon';
 import { MissingHint } from '@/components/screen';
 import { Brand } from '@/constants/brand';
+import { KEYBOARD_DONE_ID } from '@/components/keyboard-done';
 import { apiFetch } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { groupNumber, parseMileage } from '@/lib/mileage';
@@ -90,6 +91,7 @@ export default function UpdateMileageScreen() {
                 value={value}
                 onChangeText={setValue}
                 keyboardType="number-pad"
+                inputAccessoryViewID={KEYBOARD_DONE_ID}
                 autoFocus
                 accessibilityLabelledBy="new-mileage"
                 placeholder={`e.g. ${groupNumber(current + 100)}`}

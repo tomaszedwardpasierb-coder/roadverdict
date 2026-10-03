@@ -2,7 +2,7 @@
 // edits that one through the same website route's PATCH.
 import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { KeyboardAvoidingView, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { EntryLoader } from '@/components/entry-loader';
@@ -10,6 +10,7 @@ import { DatePressable } from '@/components/date-pressable';
 import { Icon } from '@/components/icon';
 import { MissingHint } from '@/components/screen';
 import { Brand } from '@/constants/brand';
+import { doneBarFor } from '@/components/keyboard-done';
 import { apiFetch } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { ENTRY_ROUTES, recordPath, type Entry } from '@/lib/entries';
@@ -118,7 +119,7 @@ function FuelForm({ existing }: { existing?: Entry }) {
           <Text style={styles.problemText}>This vehicle has been transferred and is now read-only.</Text>
         </View>
       ) : (
-        <KeyboardAvoidingView style={styles.flex} behavior="height">
+        <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
           <ScrollView contentContainerStyle={styles.form} keyboardShouldPersistTaps="handled">
             <View style={styles.pair}>
               <Field label={electric ? 'kWh' : 'Litres'} value={amount} onChangeText={setAmount} placeholder={electric ? 'e.g. 40.5' : 'e.g. 12.4'} autoFocus={!existing} />
@@ -209,7 +210,7 @@ function Field({
   return (
     <View style={[styles.field, styles.flex]}>
       <Text style={styles.label}>{label}</Text>
-      <TextInput {...input} keyboardType={keyboardType} accessibilityLabel={label} placeholderTextColor="#A7A49C" style={styles.input} />
+      <TextInput {...input} keyboardType={keyboardType} inputAccessoryViewID={doneBarFor(keyboardType)} accessibilityLabel={label} placeholderTextColor="#A7A49C" style={styles.input} />
       {hint ? <Text style={styles.hint}>{hint}</Text> : null}
     </View>
   );

@@ -13,6 +13,7 @@ import { Icon } from '@/components/icon';
 import { OptionPicker } from '@/components/option-picker';
 import { Card, ErrorState, LoadingState, MissingHint } from '@/components/screen';
 import { Brand } from '@/constants/brand';
+import { KEYBOARD_DONE_ID } from '@/components/keyboard-done';
 import { apiFetch } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { parseMileage, parseNumber } from '@/lib/mileage';
@@ -140,6 +141,7 @@ function CostForm({ vehicle, data }: { vehicle: GarageVehicle; data: ToolsScreen
             value={distance}
             onChangeText={setDistance}
             keyboardType="number-pad"
+            inputAccessoryViewID={KEYBOARD_DONE_ID}
             placeholder={bike ? (km ? 'e.g. 6,000' : 'e.g. 4,000') : km ? 'e.g. 11,000' : 'e.g. 7,000'}
             placeholderTextColor="#A7A49C"
             accessibilityLabelledBy="distance-label"
@@ -174,6 +176,7 @@ function CostForm({ vehicle, data }: { vehicle: GarageVehicle; data: ToolsScreen
               value={co2}
               onChangeText={setCo2}
               keyboardType="number-pad"
+              inputAccessoryViewID={KEYBOARD_DONE_ID}
               placeholder="e.g. 120"
               placeholderTextColor="#A7A49C"
               accessibilityLabelledBy="co2-label"

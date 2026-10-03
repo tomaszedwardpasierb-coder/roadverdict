@@ -9,6 +9,7 @@ import { ActivityIndicator, Alert, Pressable, Share, StyleSheet, Text, TextInput
 import { Icon, type IconName } from '@/components/icon';
 import { Card } from '@/components/screen';
 import { Brand } from '@/constants/brand';
+import { KEYBOARD_DONE_ID } from '@/components/keyboard-done';
 import { apiFetch } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { DURATIONS, formatDay, formatPounds, linkRoute, parseAskingPrice, type ShareDuration, type ShareLink } from '@/lib/share-links';
@@ -126,6 +127,7 @@ export function ShareLinkCard({ link, vehicle, onChanged }: { link: ShareLink; v
             value={price}
             onChangeText={(t) => setPrice(t.replace(/[^\d.]/g, ''))}
             keyboardType="decimal-pad"
+            inputAccessoryViewID={KEYBOARD_DONE_ID}
             placeholder="e.g. 3200"
             placeholderTextColor="#A7A49C"
             style={styles.input}

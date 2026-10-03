@@ -3,6 +3,7 @@ import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 
+import { KeyboardDoneBar } from '@/components/keyboard-done';
 import { Brand } from '@/constants/brand';
 import { AuthProvider, useAuth } from '@/lib/auth';
 
@@ -33,6 +34,7 @@ function RootNavigator() {
           <Stack.Screen name="two-factor" />
         </Stack.Protected>
       </Stack>
+      <KeyboardDoneBar />
     </>
   );
 }

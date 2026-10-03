@@ -11,6 +11,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Icon } from '@/components/icon';
 import { Card, ErrorState, LoadingState } from '@/components/screen';
 import { Brand } from '@/constants/brand';
+import { KEYBOARD_DONE_ID } from '@/components/keyboard-done';
 import { apiFetch } from '@/lib/api';
 import {
   convertDistance,
@@ -278,6 +279,7 @@ function Field({ label, value, onChange, suffix, placeholder }: { label: string;
           value={value}
           onChangeText={onChange}
           keyboardType="decimal-pad"
+          inputAccessoryViewID={KEYBOARD_DONE_ID}
           placeholder={placeholder}
           placeholderTextColor="#A7A49C"
           accessibilityLabel={label}

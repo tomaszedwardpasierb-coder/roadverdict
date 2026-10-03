@@ -8,6 +8,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { DatePressable } from '@/components/date-pressable';
 import { Icon } from '@/components/icon';
 import { Brand } from '@/constants/brand';
+import { KEYBOARD_DONE_ID } from '@/components/keyboard-done';
 import { useAuth } from '@/lib/auth';
 import {
   CATEGORY_LABEL,
@@ -317,12 +318,12 @@ function ReviewCard({
       <View style={styles.pair}>
         <View style={[styles.field, styles.flex]}>
           <Text style={styles.label}>Cost ({units.currencySymbol})</Text>
-          <TextInput value={cost} onChangeText={setCost} keyboardType="decimal-pad" accessibilityLabel="Cost" style={[styles.input, styles.inputText]} />
+          <TextInput value={cost} onChangeText={setCost} keyboardType="decimal-pad" inputAccessoryViewID={KEYBOARD_DONE_ID} accessibilityLabel="Cost" style={[styles.input, styles.inputText]} />
         </View>
         {entry.category === 'fuel' ? (
           <View style={[styles.field, styles.flex]}>
             <Text style={styles.label}>Litres</Text>
-            <TextInput value={litres} onChangeText={setLitres} keyboardType="decimal-pad" accessibilityLabel="Litres" style={[styles.input, styles.inputText]} />
+            <TextInput value={litres} onChangeText={setLitres} keyboardType="decimal-pad" inputAccessoryViewID={KEYBOARD_DONE_ID} accessibilityLabel="Litres" style={[styles.input, styles.inputText]} />
           </View>
         ) : null}
       </View>
@@ -333,6 +334,7 @@ function ReviewCard({
             value={mileage}
             onChangeText={setMileage}
             keyboardType="number-pad"
+            inputAccessoryViewID={KEYBOARD_DONE_ID}
             placeholder="Enter the mileage"
             placeholderTextColor="#A7A49C"
             accessibilityLabel="Mileage"

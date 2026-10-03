@@ -1,12 +1,13 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { Alert, KeyboardAvoidingView, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { DatePressable } from '@/components/date-pressable';
 import { Icon } from '@/components/icon';
 import { MissingHint } from '@/components/screen';
 import { Brand } from '@/constants/brand';
+import { KEYBOARD_DONE_ID } from '@/components/keyboard-done';
 import { apiFetch } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { fromIsoDay } from '@/lib/mileage';
@@ -111,7 +112,7 @@ export default function AddReminderScreen() {
         </View>
       </View>
 
-      <KeyboardAvoidingView style={styles.flex} behavior="height">
+      <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         <ScrollView contentContainerStyle={styles.form} keyboardShouldPersistTaps="handled">
           <View style={styles.field}>
             <Text style={styles.label} nativeID="reminder-name">
@@ -168,6 +169,7 @@ export default function AddReminderScreen() {
                 value={value}
                 onChangeText={(t) => setValue(t.replace(/\D/g, ''))}
                 keyboardType="number-pad"
+                inputAccessoryViewID={KEYBOARD_DONE_ID}
                 accessibilityLabel={type === 'months' ? 'Every how many months' : 'Every how many miles'}
                 placeholder={type === 'months' ? 'e.g. 12' : 'e.g. 4,000'}
                 placeholderTextColor="#A7A49C"

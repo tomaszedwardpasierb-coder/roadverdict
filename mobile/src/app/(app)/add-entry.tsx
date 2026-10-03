@@ -8,7 +8,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
-import { ActivityIndicator, Alert, KeyboardAvoidingView, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { EntryLoader } from '@/components/entry-loader';
@@ -17,6 +17,7 @@ import { Icon } from '@/components/icon';
 import { OptionPicker } from '@/components/option-picker';
 import { ErrorState, LoadingState, MissingHint } from '@/components/screen';
 import { Brand } from '@/constants/brand';
+import { doneBarFor } from '@/components/keyboard-done';
 import { apiFetch } from '@/lib/api';
 import { uploadChatPhoto, type ChatAttachment } from '@/lib/assistant';
 import { useAuth } from '@/lib/auth';
@@ -198,7 +199,7 @@ function EntryForm({ type, existing }: { type: TypedCategory; existing?: Entry }
       ) : !options ? (
         form.failed ? <ErrorState message="The list of choices couldn’t be loaded." onRetry={form.retry} /> : <LoadingState />
       ) : (
-        <KeyboardAvoidingView style={styles.flex} behavior="height">
+        <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
           <ScrollView contentContainerStyle={styles.form} keyboardShouldPersistTaps="handled">
             <OptionPicker
               label={config.typeLabel}
@@ -354,7 +355,7 @@ function Field({
       <Text style={styles.label}>{label}</Text>
       <TextInput
         {...input}
-        keyboardType={keyboardType}
+        keyboardType={keyboardType} inputAccessoryViewID={doneBarFor(keyboardType)}
         multiline={multiline}
         accessibilityLabel={label}
         placeholderTextColor="#A7A49C"

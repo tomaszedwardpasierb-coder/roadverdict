@@ -13,6 +13,7 @@ import { ReceiptRequestCard } from '@/components/receipt-request-card';
 import { Card, ErrorState, LoadingState, SectionHeader } from '@/components/screen';
 import { ShareLinkCard, shareLinkUrl } from '@/components/share-link-card';
 import { Brand } from '@/constants/brand';
+import { KEYBOARD_DONE_ID } from '@/components/keyboard-done';
 import { apiFetch } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { createLinkRoute, DURATIONS, formatDay, linkRoute, parseAskingPrice, shareLinksPath, type ShareDuration, type ShareLinksData } from '@/lib/share-links';
@@ -223,6 +224,7 @@ function NewLinkCard({ vehicle, onCreated }: { vehicle: GarageVehicle; onCreated
           value={price}
           onChangeText={(t) => setPrice(t.replace(/[^\d.]/g, ''))}
           keyboardType="decimal-pad"
+          inputAccessoryViewID={KEYBOARD_DONE_ID}
           placeholder="e.g. 3200"
           placeholderTextColor="#A7A49C"
           style={styles.input}
