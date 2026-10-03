@@ -147,20 +147,41 @@ export default function HomePage() {
             <strong>Check if a quote is fair before you pay.</strong>{' '}
             Know exactly what you&apos;re looking at before you buy.
           </p>
-          <div className="rv-hero-actions">
-            <Link href="/login?redirect=%2Fdashboard%3FaddVehicle%3Dbike" className="rv-cta-primary">
-              Start logging your motorcycle
-              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M2 7h10M8 3l4 4-4 4"/></svg>
-            </Link>
-            <Link href="/login?redirect=%2Fdashboard%3FaddVehicle%3Dcar" className="rv-cta-outline">
-              Start logging your car
-              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M2 7h10M8 3l4 4-4 4"/></svg>
-            </Link>
+          {/* Try it first: the tools work without an account, so the
+              main buttons open them. Signing in is the quieter second
+              step (small links below). 4% of home page visitors reached
+              the sign-in page when both big buttons demanded one. */}
+          <p className="rv-try-label">Try it now - no account needed</p>
+          <div className="rv-hero-actions rv-hero-actions--try">
+            <div className="rv-try-row">
+              <Link href="/quote-checker" className="rv-cta-primary">
+                Check a garage quote
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M2 7h10M8 3l4 4-4 4"/></svg>
+              </Link>
+              <Link href="/cars/quote-checker" className="rv-try-alt">
+                For a car
+              </Link>
+            </div>
+            <div className="rv-try-row">
+              <Link href="/cost-calculator" className="rv-cta-outline">
+                Work out what it costs to run
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M2 7h10M8 3l4 4-4 4"/></svg>
+              </Link>
+              <Link href="/cars/cost-calculator" className="rv-try-alt">
+                For a car
+              </Link>
+            </div>
           </div>
+          <p className="rv-start-line">
+            Or start your logbook:{' '}
+            <Link href="/login?redirect=%2Fdashboard%3FaddVehicle%3Dbike">Motorcycle</Link>
+            {' · '}
+            <Link href="/login?redirect=%2Fdashboard%3FaddVehicle%3Dcar">Car</Link>
+          </p>
           <ul className="rv-hero-proof" aria-label="Key facts">
             <li className="rv-proof-item">
               <span className="rv-proof-check" aria-hidden="true">✓</span>
-              No password - email only
+              No sign-up to try
             </li>
             <li className="rv-proof-item">
               <span className="rv-proof-check" aria-hidden="true">✓</span>
@@ -172,7 +193,7 @@ export default function HomePage() {
             </li>
             <li className="rv-proof-item">
               <span className="rv-proof-check" aria-hidden="true">✓</span>
-              See what&apos;s coming next
+              No password - email only
             </li>
           </ul>
         </div>

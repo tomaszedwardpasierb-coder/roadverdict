@@ -51,6 +51,20 @@ describe("HomePage", () => {
     }
   });
 
+  // The main hero buttons open tools that need no account; signing in
+  // is the quieter line beneath them.
+  it("leads the hero with try-it-now buttons that need no account", () => {
+    render(<HomePage />);
+
+    expect(screen.getByText("Try it now - no account needed")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /check a garage quote/i })).toHaveAttribute("href", "/quote-checker");
+    expect(screen.getByRole("link", { name: /work out what it costs to run/i })).toHaveAttribute("href", "/cost-calculator");
+    const carLinks = screen.getAllByRole("link", { name: "For a car" }).map((a) => a.getAttribute("href"));
+    expect(carLinks).toEqual(["/cars/quote-checker", "/cars/cost-calculator"]);
+    expect(screen.getByRole("link", { name: "Motorcycle" }).getAttribute("href")).toMatch(/^\/login\?redirect=%2Fdashboard%3FaddVehicle%3Dbike/);
+    expect(screen.getByRole("link", { name: "Car" }).getAttribute("href")).toMatch(/^\/login\?redirect=%2Fdashboard%3FaddVehicle%3Dcar/);
+  });
+
   // Straight to the correct add-vehicle flow, not a marketing-page
   // detour that then asks the visitor to "start logging" a second time -
   // see dashboard/page.tsx's addVehicle handling, which forces this exact
