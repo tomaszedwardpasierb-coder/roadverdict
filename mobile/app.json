@@ -8,7 +8,19 @@
     "scheme": "roadverdict",
     "userInterfaceStyle": "light",
     "ios": {
-      "icon": "./assets/expo.icon"
+      "icon": "./assets/expo.icon",
+      "bundleIdentifier": "uk.co.roadverdict.app",
+      "supportsTablet": false,
+      "runtimeVersion": {
+        "policy": "fingerprint"
+      },
+      "config": {
+        "usesNonExemptEncryption": false
+      },
+      "infoPlist": {
+        "NSFaceIDUsageDescription": "RoadVerdict uses Face ID to open the Vault and to confirm sign-ins on this iPhone.",
+        "NSSpeechRecognitionUsageDescription": "RoadVerdict turns what you say into text so you can talk to the assistant instead of typing."
+      }
     },
     "android": {
       "package": "uk.co.roadverdict.app",
