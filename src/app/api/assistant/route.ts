@@ -9,6 +9,7 @@
 // for the full reasoning behind that boundary.
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/session";
+import { EXTRA_VEHICLE_MONTHLY_PRICE, PRO_ANNUAL_PRICE, PRO_MONTHLY_PRICE, PRO_TRIAL_DAYS } from "@/lib/proPlan";
 import { markOnboardingStepComplete } from "@/lib/tracker/userAccount";
 import {
   canSendAnonAssistantMessage,
@@ -72,6 +73,16 @@ const MAX_TOOL_ROUNDS = 4; // safety cap against a runaway tool-call loop
 // feature that exists. Fold into the knowledge base when it's next edited.
 const CURRENT_FEATURE_FACTS =
   "\n\n---\n\nCURRENT ROADVERDICT FEATURES (always true, whatever the knowledge base above says or leaves out): RoadVerdict has an MPG calculator - the public page roadverdict.co.uk/mpg-calculator works out any single tank from the distance and the litres, in UK mpg or litres per 100 km (with US mpg alongside), plus fuel cost per mile or per 100 km at a price per litre, offering this week's official UK average petrol and diesel prices. Signed in, the dashboard's Fuel tab has a Fuel economy card - the owner's real average from their own consecutive full-tank fill-ups, their last full tank, and fuel cost per mile at their last fill-up's price - with a 'Work out a tank' button opening the same calculator, started from that last tank. In the Android app it's under More, then Tools, then MPG calculator. The automatic average still needs two consecutive full-tank fill-ups logged; the calculator works out any tank straight away, without logging anything.";
+
+// How Pro is bought, for the website's assistant only (the apps never
+// mention buying). Built from proPlan so prices and the trial can't drift.
+const PRO_ON_THE_WEBSITE =
+  "\n\n---\n\nHOW TO GET PRO (always true on the website, and it replaces anything the knowledge base above says about Pro not being self-serve or not having a working checkout - that part is out of date): Pro is self-serve. Anyone signed in can upgrade at roadverdict.co.uk/pro (the 'Pro' link in the site menu, and on any locked feature) for " +
+  `${PRO_MONTHLY_PRICE} a month or ${PRO_ANNUAL_PRICE} a year. ` +
+  (PRO_TRIAL_DAYS > 0
+    ? `The first ${PRO_TRIAL_DAYS} days are free, once per account: a card is added at checkout but nothing is charged until the trial ends, RoadVerdict emails a week before it ends, and cancelling before then (Manage billing, on the /pro page) costs nothing. `
+    : "") +
+  `Pro can be cancelled any time and lasts to the end of the paid period. Vehicles beyond Pro's two are ${EXTRA_VEHICLE_MONTHLY_PRICE} a month each, up to four in total. If asked how to upgrade, give these steps plainly (someone signed out signs in first). Don't bring Pro up unprompted - only when they ask about it, or ask for something only Pro does.`;
 
 // Appended to the system instruction only when the attached photo or PDF
 // is actually included for the AI to read (see loadAttachmentForAi).
@@ -300,6 +311,10 @@ function buildSystemInstruction(config: AssistantConfigDoc, signedIn: boolean, p
     parts.push(
       "\n\n---\n\nWHERE THIS CHAT IS: the RoadVerdict Android app. Never suggest upgrading, subscribing or buying anything, never mention RoadVerdict Pro's price or how to get it, and never point to a website to purchase. If something they ask for isn't available on their account, just say so plainly, without mentioning a plan."
     );
+  } else {
+    // The knowledge base in the database predates self-serve Pro and still
+    // says it can't be bought - this keeps the website's assistant right.
+    parts.push(PRO_ON_THE_WEBSITE);
   }
 
   if (vaultChatAccess === "available") {

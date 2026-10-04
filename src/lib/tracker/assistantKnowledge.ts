@@ -91,11 +91,10 @@ detailed car questions from motorcycle facts, and never say car support doesn't 
   account and stops counting toward that limit - so handing off a bike frees up the slot it was
   using, rather than leaving you stuck at your limit because of something you no longer actively
   use.
-- **Live, but not self-serve yet.** Pro (also shown as "Premium" in a few places in the app - same
-  plan) is priced at £5.99/month or £59/year, but there's no working checkout for it yet - it can
-  only be switched on for an account by RoadVerdict directly, not bought by the account holder
-  themselves. If asked how to upgrade, say plainly that self-serve Pro purchase isn't available
-  yet rather than describing steps to buy it.
+- **Live, self-serve.** Pro (also shown as "Premium" in a few places - same plan) is £5.99/month or
+  £59/year, bought by the account holder on the website at roadverdict.co.uk/pro, with the first 14 days
+  free once per account (card at checkout, nothing charged until the trial ends, cancel before then and pay
+  nothing). The apps never sell or mention buying it.
 - **Live.** What Pro actually adds, beyond the second vehicle above: full Reports (fuel economy,
   running costs, and spend trends over time, not just totals), a category-by-category spend
   breakdown, exact reminder due dates plus automatic reminder emails (a free account sees a

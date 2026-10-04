@@ -43,6 +43,16 @@ describe("classifySource", () => {
     expect(classifySource({ src: "made-up" })).toBe("direct");
   });
 
+  it("counts printed QR cards, partners and press, with or without a name after a dash", () => {
+    expect(classifySource({ src: "qr" })).toBe("qr");
+    expect(classifySource({ src: "qr-acme-motorcycle-training" })).toBe("qr");
+    expect(classifySource({ src: "partner-mt07-owners-club" })).toBe("partner");
+    expect(classifySource({ src: "press-mcn" })).toBe("press");
+    expect(toFunnelSource("QR-Acme")).toBe("qr");
+    expect(toFunnelSource("qr-")).toBeNull();
+    expect(toFunnelSource("demo-x")).toBeNull();
+  });
+
   it("only accepts known sources", () => {
     expect(toFunnelSource("google")).toBe("google");
     expect(toFunnelSource("<script>")).toBeNull();

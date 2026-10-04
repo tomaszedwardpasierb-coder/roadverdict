@@ -934,6 +934,33 @@ describe("POST /api/assistant - car-active knowledge base and log-entry gating",
     expect(instruction).not.toContain("WHERE THIS CHAT IS");
   });
 
+  it("on the website, says how to buy Pro (over the knowledge base's out-of-date line), with the real prices and trial", async () => {
+    mocks.getSession.mockResolvedValue({ email: "rider@example.com" });
+    mocks.resolveActiveVehicle.mockResolvedValue({ kind: "bike", bike: { id: "bike-1" }, hasAnyCar: false });
+    mocks.isPro.mockResolvedValue(false);
+
+    await POST(request({ messages: [{ role: "user", content: "How do I get Pro?" }] }));
+
+    const instruction = JSON.parse(mocks.fetch.mock.calls[0][1].body).systemInstruction.parts[0].text;
+    expect(instruction).toContain("HOW TO GET PRO");
+    expect(instruction).toContain("roadverdict.co.uk/pro");
+    expect(instruction).toContain("£5.99 a month or £59 a year");
+    expect(instruction).toContain("The first 14 days are free, once per account");
+  });
+
+  it("in the apps, never says how to buy Pro", async () => {
+    mocks.getSession.mockResolvedValue({ email: "rider@example.com" });
+    mocks.resolveActiveVehicle.mockResolvedValue({ kind: "bike", bike: { id: "bike-1" }, hasAnyCar: false });
+    mocks.isPro.mockResolvedValue(false);
+
+    await POST(request({ messages: [{ role: "user", content: "How do I get Pro?" }], client: "android" }));
+
+    const instruction = JSON.parse(mocks.fetch.mock.calls[0][1].body).systemInstruction.parts[0].text;
+    expect(instruction).not.toContain("HOW TO GET PRO");
+    expect(instruction).not.toContain("roadverdict.co.uk/pro");
+    expect(instruction).not.toContain("£5.99");
+  });
+
   it("still offers the log-entry tool normally for a bike-active Pro session", async () => {
     mocks.getSession.mockResolvedValue({ email: "rider@example.com" });
     mocks.resolveActiveVehicle.mockResolvedValue({ kind: "bike", bike: { id: "bike-1" }, hasAnyCar: false });

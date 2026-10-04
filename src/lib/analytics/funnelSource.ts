@@ -20,13 +20,21 @@ export const FUNNEL_SOURCES = [
   "tool",
   // The "Create a free account" links on the sample-bike demo (/demo).
   "demo",
+  // Printed cards with a QR code (garages, training schools), partner
+  // pages and press stories. A name can follow a dash - ?src=qr-acme -
+  // to tell partners apart in the link; it's counted under the bucket.
+  "qr",
+  "partner",
+  "press",
   "other",
   "direct",
 ] as const;
 export type FunnelSource = (typeof FUNNEL_SOURCES)[number];
 
 export function toFunnelSource(v: unknown): FunnelSource | null {
-  return typeof v === "string" && (FUNNEL_SOURCES as readonly string[]).includes(v) ? (v as FunnelSource) : null;
+  if (typeof v !== "string") return null;
+  const bucket = /^(qr|partner|press)-[a-z0-9-]{1,40}$/i.test(v) ? v.slice(0, v.indexOf("-")).toLowerCase() : v;
+  return (FUNNEL_SOURCES as readonly string[]).includes(bucket) ? (bucket as FunnelSource) : null;
 }
 
 // Where a visit came from, worked out from the page address's own
