@@ -7,6 +7,9 @@
 .chip { border-radius: 999px; padding: 0.15rem 0.65rem; background: var(--amber); color: var(--asphalt); font-size: 0.75rem; font-weight: 800; white-space: nowrap; }
 
 .headRow { display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 0.75rem; }
+@media (max-width: 900px) {
+  .headRow { margin-bottom: 0.8rem; }
+}
 
 .scanRow { display: flex; flex-wrap: wrap; align-items: center; gap: 0.7rem 1rem; margin: 0.4rem 0 1.3rem; }
 .scanBtn { position: relative; display: inline-flex; align-items: center; gap: 0.55rem; padding: 0.8rem 1.3rem; border: 0; border-radius: 10px; background: var(--amber); color: var(--asphalt); font: inherit; font-weight: 800; font-size: 1rem; cursor: pointer; }

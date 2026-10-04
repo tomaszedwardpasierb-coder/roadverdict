@@ -69,7 +69,7 @@ describe("HomePage", () => {
 
     const tools = screen.getByText(/Just checking a price\?/).closest("p") as HTMLElement;
     const toolLinks = Array.from(tools.querySelectorAll("a")).map((a) => a.getAttribute("href"));
-    expect(toolLinks).toEqual(["/quote-checker", "/cars/quote-checker", "/cost-calculator", "/cars/cost-calculator"]);
+    expect(toolLinks).toEqual(["/quote-checker", "/cost-calculator"]);
   });
 
   // Straight to the correct add-vehicle flow, not a marketing-page

@@ -168,14 +168,10 @@ export default function HomePage() {
             <span className="rv-try-note">Scan a receipt, ask the AI. No account needed.</span>
           </div>
           <p className="rv-tools-line">
-            Just checking a price? Garage quote:{' '}
-            <Link href="/quote-checker">motorcycle</Link>
-            {' / '}
-            <Link href="/cars/quote-checker">car</Link>
-            {' · '}Running costs:{' '}
-            <Link href="/cost-calculator">motorcycle</Link>
-            {' / '}
-            <Link href="/cars/cost-calculator">car</Link>
+            Just checking a price?{' '}
+            <Link href="/quote-checker">Garage quote</Link>
+            {' · '}
+            <Link href="/cost-calculator">Running costs</Link>
           </p>
           <ul className="rv-hero-proof" aria-label="Key facts">
             <li className="rv-proof-item">
@@ -189,10 +185,6 @@ export default function HomePage() {
             <li className="rv-proof-item">
               <span className="rv-proof-check" aria-hidden="true">✓</span>
               Receipts, history &amp; reminders
-            </li>
-            <li className="rv-proof-item">
-              <span className="rv-proof-check" aria-hidden="true">✓</span>
-              Real UK price data
             </li>
           </ul>
         </div>

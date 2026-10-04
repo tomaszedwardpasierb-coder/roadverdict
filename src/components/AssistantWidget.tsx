@@ -698,6 +698,10 @@ function AssistantWidgetInner() {
 // worth of context. fallback=null is fine here: before hydration
 // finishes this widget renders nothing visible anyway.
 export function AssistantWidget() {
+  // The sample-bike demo has its own AI, scoped to the sample bike; this
+  // button there would only cover the charts' buttons on a phone.
+  const pathname = usePathname();
+  if (pathname === '/demo') return null;
   return (
     <Suspense fallback={null}>
       <AssistantWidgetInner />
