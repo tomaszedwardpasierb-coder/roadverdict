@@ -16,6 +16,7 @@ import { useAuth } from '@/lib/auth';
 import { ENTRY_ROUTES, recordPath, type Entry } from '@/lib/entries';
 import { dayLabel, fromIsoDay, groupNumber, parseMileage, parseNumber, toIsoDay, useEstimatedMileage } from '@/lib/mileage';
 import { toStoredGbp, toStoredMiles, useVehicle, vehicleHeaders } from '@/lib/vehicle';
+import { noteNewEntries } from '@/lib/review-prompt';
 
 export default function AddFuelScreen() {
   const { entryId } = useLocalSearchParams<{ entryId?: string }>();
@@ -85,6 +86,7 @@ function FuelForm({ existing }: { existing?: Entry }) {
     if (result.ok) {
       refresh();
       router.back();
+      if (!existing) void noteNewEntries();
       return;
     }
     if (result.status === 401) {

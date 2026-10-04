@@ -24,6 +24,7 @@ import {
 } from '@/lib/scan';
 import { groupNumber } from '@/lib/mileage';
 import { useVehicle, type GarageVehicle } from '@/lib/vehicle';
+import { noteNewEntries } from '@/lib/review-prompt';
 
 type Row = { entry: ReviewEntry; item: ParsedItem; status: 'review' | 'saved' | 'deleted'; error?: string };
 type Phase =
@@ -104,6 +105,7 @@ export default function ScanScreen() {
     setPhase({ name: 'results' });
     // Receipts can move the vehicle's current mileage on.
     refresh();
+    void noteNewEntries(saved.length);
   }
 
   function update(index: number, patch: Partial<Row>) {

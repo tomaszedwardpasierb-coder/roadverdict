@@ -23,6 +23,7 @@ import { uploadChatPhoto, type ChatAttachment } from '@/lib/assistant';
 import { useAuth } from '@/lib/auth';
 import { ENTRY_ROUTES, recordPath, TYPED_FIELDS, type Entry, type TypedCategory } from '@/lib/entries';
 import { useFormOptions, type ReminderDefault, type VehicleFormOptions } from '@/lib/form-options';
+import { noteNewEntries } from '@/lib/review-prompt';
 import { dayLabel, fromIsoDay, groupNumber, parseMileage, parseNumber, toIsoDay, useEstimatedMileage } from '@/lib/mileage';
 import { toStoredGbp, toStoredMiles, useVehicle, vehicleHeaders } from '@/lib/vehicle';
 
@@ -165,6 +166,7 @@ function EntryForm({ type, existing }: { type: TypedCategory; existing?: Entry }
     if (result.ok) {
       refresh();
       router.back();
+      if (!existing) void noteNewEntries();
       return;
     }
     if (result.status === 401) {
