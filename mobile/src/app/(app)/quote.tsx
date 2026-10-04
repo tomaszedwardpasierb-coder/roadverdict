@@ -2,12 +2,11 @@
 // CarQuoteForm, starting from that bike or car (make, size and region, as
 // the web forms start for a signed-in owner). The check goes to the
 // website's own /api/verdict or /api/cars/verdict, and the verdict reads
-// exactly as it does on the web - including, for a bike, the parts line
-// shown whatever the verdict says.
+// as it does on the web. The web's affiliate parts line isn't shown in the
+// apps, so their store listings carry no ads.
 import { router } from 'expo-router';
-import * as WebBrowser from 'expo-web-browser';
 import { useRef, useState } from 'react';
-import { KeyboardAvoidingView, Linking, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { KeyboardAvoidingView, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Icon } from '@/components/icon';
@@ -15,7 +14,7 @@ import { OptionPicker } from '@/components/option-picker';
 import { Card, ErrorState, LoadingState, MissingHint } from '@/components/screen';
 import { Brand } from '@/constants/brand';
 import { KEYBOARD_DONE_ID } from '@/components/keyboard-done';
-import { API_BASE_URL, apiFetch } from '@/lib/api';
+import { apiFetch } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { parseNumber } from '@/lib/mileage';
 import { useToolsScreen, type ToolsScreen, type Verdict } from '@/lib/tools';
@@ -173,7 +172,6 @@ function VerdictCard({ data, result }: { data: ToolsScreen; result: { verdict: V
   const words = data.verdicts[verdict];
   const look = STAMP[verdict];
   const who = data.kind === 'bike' ? 'riders' : 'drivers';
-  const parts = data.partsLinks[result.job] ?? [];
 
   return (
     <Card style={styles.card}>
@@ -211,25 +209,6 @@ function VerdictCard({ data, result }: { data: ToolsScreen; result: { verdict: V
           ) : null}
         </View>
       ) : null}
-      {parts.length > 0 ? (
-        // Shown whatever the verdict says, so it's never steering - the
-        // web's quiet, labelled affiliate line.
-        <Text style={styles.hint}>
-          Prefer to buy the parts yourself?{' '}
-          {parts.map((p, i) => (
-            <Text key={p.href}>
-              {i > 0 ? ' · ' : ''}
-              <Text style={styles.partsLink} onPress={() => Linking.openURL(p.href)} accessibilityRole="link">
-                {p.label}
-              </Text>
-            </Text>
-          ))}{' '}
-          at Sportsbikeshop.{' '}
-          <Text style={styles.affiliateTag} onPress={() => WebBrowser.openBrowserAsync(`${API_BASE_URL}/privacy#affiliate-links`)} accessibilityRole="link">
-            Affiliate link
-          </Text>
-        </Text>
-      ) : null}
     </Card>
   );
 }
@@ -263,8 +242,6 @@ const styles = StyleSheet.create({
   stampRange: { fontSize: 15, fontWeight: '600' },
   advice: { gap: 6, paddingTop: 10, borderTopWidth: 1, borderTopColor: '#EDEAE3' },
   adviceTitle: { fontSize: 15, fontWeight: '700', color: Brand.ink, marginTop: 4 },
-  partsLink: { color: Brand.ink, textDecorationLine: 'underline' },
-  affiliateTag: { fontSize: 12, color: Brand.muted },
   footer: { gap: 10, paddingHorizontal: 20, paddingVertical: 12, borderTopWidth: 1, borderTopColor: Brand.line, backgroundColor: Brand.paper },
   primary: { height: 56, borderRadius: 12, backgroundColor: Brand.amber, alignItems: 'center', justifyContent: 'center' },
   primaryLabel: { fontSize: 17, fontWeight: '700', color: Brand.asphalt },
