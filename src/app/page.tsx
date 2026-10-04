@@ -78,7 +78,7 @@ export default function HomePage() {
                 far better than a photo would. */}
             <Image
               src="/images/hero/panel-01.webp"
-              alt=""
+              alt="Comic-style illustration of a man in his garage with a van, a sports car and two motorbikes"
               fill
               // The left panel is ~55% of the hero's width (1.1fr / 0.9fr)
               // above 640px, the full width below - without this, `fill`
@@ -109,7 +109,7 @@ export default function HomePage() {
                   for the same early bandwidth. */}
               <Image
                 src="/images/hero/panel-02.webp"
-                alt=""
+                alt="Comic-style illustration of oily hands holding a phone with a workshop log of mileage and price"
                 fill
                 sizes="45vw"
                 style={{ objectFit: 'cover', objectPosition: 'center center' }}
@@ -120,7 +120,7 @@ export default function HomePage() {
             <div className="rv-panel rv-panel-rb">
               <Image
                 src="/images/hero/panel-03.webp"
-                alt=""
+                alt="Comic-style illustration of a rider looking out through an open motorcycle helmet"
                 fill
                 sizes="45vw"
                 style={{ objectFit: 'cover', objectPosition: 'center top' }}
@@ -337,7 +337,7 @@ export default function HomePage() {
               artifacts don't show at all. */}
           <Image
             src="/images/hero/panel-04.webp"
-            alt=""
+            alt="Comic-style illustration of a phone in a gloved hand showing a vehicle verdict: buy, negotiate or walk away"
             fill
             style={{ objectFit: 'cover', objectPosition: 'center center' }}
             quality={50}

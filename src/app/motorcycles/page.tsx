@@ -227,7 +227,7 @@ export default function MotorcyclesPage() {
         <div className="rv-verdict-panel-img" aria-hidden="true">
           <Image
             src="/images/hero/panel-04.webp"
-            alt=""
+            alt="Comic-style illustration of a phone in a gloved hand showing a vehicle verdict: buy, negotiate or walk away"
             fill
             sizes="100vw"
             style={{ objectFit: 'cover', objectPosition: 'center center' }}
