@@ -15,10 +15,10 @@
 //     (sole trader vs a registered company) - firm this up before relying
 //     on this policy in a dispute; UK GDPR Article 13 expects a
 //     controller to be identifiable by more than an email address.
-//   - The ICO registration line below states registration has happened,
-//     but has no registration number in it - add the real number (from
-//     your ICO certificate, or by searching the public register at
-//     ico.org.uk/ESDWebPages/Search) once you're ready to display it.
+//   - ICO registration: the line saying RoadVerdict is registered with the
+//     ICO was taken out on 5 October 2026 because the data protection fee
+//     hadn't been paid yet. Once it is, add it back under "Who we are" with
+//     the real registration number (ZB...).
 // This is a drafting aid, not legal advice - have it reviewed by a
 // solicitor or UK GDPR consultant, particularly the AI and
 // international-transfer sections, before treating it as final.
@@ -98,10 +98,6 @@ export function PrivacyContent() {
           RoadVerdict is operated independently, as a small personal project rather than
           a large company. For data protection purposes, that means whoever runs the site
           is the &quot;data controller&quot; for anything RoadVerdict collects.
-        </p>
-        <p>
-          RoadVerdict is registered with the UK Information Commissioner&apos;s Office
-          (ICO) under the Data Protection (Charges and Information) Regulations 2018.
         </p>
         <p>
           The quickest way to reach us about anything in this policy, or about your own
