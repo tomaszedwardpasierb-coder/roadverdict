@@ -49,6 +49,7 @@ const SECTIONS = [
   { id: 'childrens-privacy', label: "Children's privacy" },
   { id: 'automated-decisions', label: 'Automated decision-making' },
   { id: 'your-rights', label: 'Your rights' },
+  { id: 'delete-account', label: 'Deleting your account' },
   { id: 'breach-notification', label: 'If something goes wrong' },
   { id: 'changes', label: 'Changes to this policy' },
   { id: 'governing-law', label: 'Governing law' },
@@ -59,7 +60,7 @@ export function PrivacyContent() {
   return (
     <div className={styles.wrapper}>
       <h1 className={styles.title}>Privacy Policy</h1>
-      <span className={styles.updated}>Last updated: 3 October 2026</span>
+      <span className={styles.updated}>Last updated: 5 October 2026</span>
       <p className={styles.intro}>
         RoadVerdict is a small, independently run UK site. This page explains, in plain
         terms, what we collect, why, how long we keep it, who we share it with, and how
@@ -655,6 +656,32 @@ export function PrivacyContent() {
           we&apos;ve handled your data:{' '}
           <a href="https://ico.org.uk/make-a-complaint/" target="_blank" rel="noopener">ico.org.uk/make-a-complaint</a>,
           or by phone on 0303 123 1113.
+        </p>
+      </section>
+
+      <section id="delete-account" className={styles.section}>
+        <h2>Deleting your account</h2>
+        <p>You can delete your RoadVerdict account, and everything on it, yourself:</p>
+        <ul>
+          <li><strong>In the RoadVerdict app:</strong> More, then Settings, then Delete account.</li>
+          <li><strong>On the website:</strong> sign in, open Settings in the dashboard menu, then Delete account.</li>
+          <li>
+            <strong>By email:</strong> write to{' '}
+            <a href="mailto:hello@roadverdict.co.uk">hello@roadverdict.co.uk</a> from the email address on
+            your account and ask us to delete it.
+          </li>
+        </ul>
+        <p>
+          There&apos;s a 30-day grace period, in case you change your mind: signing in during it lets you
+          cancel. After that your account is deleted for good, with everything on it - your vehicles and
+          their history, receipts and photos, Vault documents, reminders, share links, your questions to the
+          AI assistant, feedback you sent, and the records of your phones (notification tokens and trusted
+          phones). If you have Pro, cancel it first in Manage billing on the Pro page.
+        </p>
+        <p>
+          What isn&apos;t deleted: anonymised Quote Checker figures, which hold nothing that identifies you;
+          the payment records Stripe, our payment processor, keeps as the law requires; and ordinary server
+          logs, which age out on their own (see &quot;How long we keep data&quot;).
         </p>
       </section>
 
