@@ -441,6 +441,16 @@ export default async function AdminDashboardPage(
           </div>
         </div>
         <div className={styles.card}>
+          <div className={styles.cardTitle}>Monday report (weekly)</div>
+          <p className={styles.note}>
+            Last week&apos;s numbers in one email, to the address in the WEEKLY_REPORT_TO setting
+            {process.env.WEEKLY_REPORT_TO ? '' : ' - not set yet, so nothing is sent'}.
+          </p>
+          <div style={{ marginTop: '0.6rem' }}>
+            <RunCronButton name="weekly-report" label="Send now" />
+          </div>
+        </div>
+        <div className={styles.card}>
           <div className={styles.cardTitle}>Delete expired share links (daily)</div>
           <p className={styles.note}>Permanently removes any shareable report link past its expiry date.</p>
           <div style={{ marginTop: '0.6rem' }}>

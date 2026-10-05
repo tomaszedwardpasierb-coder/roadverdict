@@ -150,6 +150,14 @@ export async function sendAppLoginCodeEmail(email: string, code: string) {
   });
 }
 
+// The Monday report to the site owner (see analytics/weeklyReport.ts). The
+// body is built there from numbers only, with any text escaped.
+export async function sendWeeklyReportEmail(to: string, report: { subject: string; preheader: string; bodyHtml: string }) {
+  const resend = getResend();
+  const html = renderEmailLayout({ preheader: report.preheader, heading: "Your week on RoadVerdict", bodyHtml: report.bodyHtml });
+  await resend.emails.send({ from: FROM, to, subject: report.subject, html });
+}
+
 export async function sendReminderEmail(email: string, reminderName: string, detail: string) {
   const resend = getResend();
   const appUrl = process.env.APP_URL ?? "https://roadverdict.co.uk";

@@ -14,6 +14,7 @@ const mocks = vi.hoisted(() => ({
   backfillUsers: vi.fn(),
   seedAssistantConfig: vi.fn(),
   purgeStaleData: vi.fn(),
+  weeklyReport: vi.fn(),
 }));
 
 vi.mock("@/lib/admin/session", () => ({ getAdminSession: mocks.getAdminSession }));
@@ -29,6 +30,7 @@ vi.mock("@/app/api/cron/send-history-follow-ups/route", () => ({ POST: mocks.sen
 vi.mock("@/app/api/cron/backfill-users/route", () => ({ POST: mocks.backfillUsers }));
 vi.mock("@/app/api/cron/seed-assistant-config/route", () => ({ POST: mocks.seedAssistantConfig }));
 vi.mock("@/app/api/cron/purge-stale-data/route", () => ({ POST: mocks.purgeStaleData }));
+vi.mock("@/app/api/cron/weekly-report/route", () => ({ POST: mocks.weeklyReport }));
 
 import { POST } from "@/app/api/admin/run-cron/[name]/route";
 
