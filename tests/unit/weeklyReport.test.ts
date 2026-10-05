@@ -56,6 +56,11 @@ describe("the report email", () => {
     expect(r.bodyHtml).toContain("Home page visits by source: youtube 80 · google 10");
   });
 
+  it("shows a dash, not 0, for a week before the funnel was counting", () => {
+    const r = buildWeeklyReport({ ...base, lastWeek: {} });
+    expect(r.bodyHtml).toMatch(/Sign-in page<\/td><td[^>]*><strong>12<\/strong><\/td><td[^>]*>-<\/td>/);
+  });
+
   it("still sends, saying so, when Stripe or the records can't be read", () => {
     const r = buildWeeklyReport({ ...base, activation: null, pro: null, checks: null });
     expect(r.subject).toBe("RoadVerdict, week of 28 September: ? active, 3 new, ? Pro");

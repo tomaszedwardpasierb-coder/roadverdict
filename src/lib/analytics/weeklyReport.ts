@@ -93,13 +93,15 @@ const td = "padding:6px 8px;border-bottom:1px solid #e6e1d6;";
 const tdNum = `${td}text-align:right;font-variant-numeric:tabular-nums;`;
 
 function table(rows: { key: string; label: string }[], a: WeekCounts, b: WeekCounts, withRate: boolean): string {
+  // No counters at all that week means the funnel wasn't counting yet - a dash, not a misleading 0.
+  const counted = Object.keys(b).length > 0;
   let prev: number | null = null;
   const body = rows
     .map((r) => {
       const now = a[r.key] ?? 0;
       const rate = withRate && prev !== null ? pct(now, prev) : "";
       prev = now;
-      return `<tr><td style="${td}">${esc(r.label)}</td><td style="${tdNum}"><strong>${now}</strong></td><td style="${tdNum}color:#8a867d;">${b[r.key] ?? 0}</td>${withRate ? `<td style="${tdNum}color:#8a867d;">${rate}</td>` : ""}</tr>`;
+      return `<tr><td style="${td}">${esc(r.label)}</td><td style="${tdNum}"><strong>${now}</strong></td><td style="${tdNum}color:#8a867d;">${counted ? (b[r.key] ?? 0) : "-"}</td>${withRate ? `<td style="${tdNum}color:#8a867d;">${rate}</td>` : ""}</tr>`;
     })
     .join("");
   return `<table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;border-collapse:collapse;font-size:14px;margin:0 0 18px;">
