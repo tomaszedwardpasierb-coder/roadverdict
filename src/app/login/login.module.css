@@ -144,3 +144,38 @@
   from { opacity: 0; transform: translateY(6px); }
   to { opacity: 1; transform: translateY(0); }
 }
+
+/* What you get, between the heading and the form. */
+.ticks {
+  list-style: none;
+  padding: 0;
+  margin: -12px 0 24px;
+  display: grid;
+  gap: 6px;
+  font-size: 14px;
+  color: var(--ink-soft);
+}
+.ticks li::before {
+  content: "¹3";
+  color: var(--amber-ink);
+  font-weight: 700;
+  margin-right: 8px;
+}
+
+/* A way out that keeps people on the site. */
+.alt {
+  margin: 20px 0 0;
+  font-size: 14px;
+  color: var(--ink-soft);
+  text-align: center;
+}
+.alt a {
+  color: var(--amber-ink);
+  font-weight: 600;
+}
+
+.hint {
+  font-size: 14px;
+  color: var(--ink-soft);
+  margin: -16px 0 0;
+}

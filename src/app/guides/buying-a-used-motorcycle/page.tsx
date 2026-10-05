@@ -7,9 +7,9 @@ import { AffiliateLine } from '@/components/AffiliateLine';
 import { sportsbikeshopLinks } from '@/lib/affiliates';
 
 export const metadata: Metadata = pageMetadata({
-  title: 'What to Check Before Buying a Used Motorcycle',
+  title: 'Buying a Used Motorcycle: Checks & Paperwork',
   description:
-    'A real UK buyer checklist: paperwork, mechanical checks, and the questions to ask before you hand over any money for a used motorcycle.',
+    'Buying a motorcycle from a private seller? The UK checklist: V5C and free MOT history check, what to inspect, questions to ask, and the paperwork on the day.',
   path: '/guides/buying-a-used-motorcycle',
 });
 
@@ -19,6 +19,14 @@ const faqJsonLd = {
   '@context': 'https://schema.org',
   '@type': 'FAQPage',
   mainEntity: [
+    {
+      '@type': 'Question',
+      name: 'What paperwork do I need when buying a motorcycle privately?',
+      acceptedAnswer: {
+        '@type': 'Answer',
+        text: 'The seller gives you the green new keeper slip from the V5C and tells DVLA about the sale. Tax doesn’t transfer, so you tax it yourself before you ride away, and you need your own insurance first. Write a receipt with the date, price, registration, VIN, and both names and addresses, signed by you both.',
+      },
+    },
     {
       '@type': 'Question',
       name: 'What paperwork should a used motorcycle have?',
@@ -81,9 +89,10 @@ export default function BuyingAUsedMotorcyclePage() {
         </li>
         <li>
           <strong>MOT history.</strong> Any bike over three years old needs a valid MOT. Beyond
-          just checking it&apos;s current, the full test history (free to look up by registration)
-          shows advisories and past mileage readings - a pattern of the same advisory repeated
-          test after test suggests something that&apos;s been ignored, not fixed.
+          just checking it&apos;s current, the full test history - a free MOT history check by
+          registration, on GOV.UK or in RoadVerdict&apos;s Buying Guide - shows advisories and past
+          mileage readings. A pattern of the same advisory repeated test after test suggests
+          something that&apos;s been ignored, not fixed.
         </li>
         <li>
           <strong>Service history.</strong> Receipts, a stamped service book, or a digital record
@@ -144,6 +153,39 @@ export default function BuyingAUsedMotorcyclePage() {
         A seller who answers these quickly and consistently, with paperwork to back it up, is a
         much better sign than the price alone.
       </p>
+
+      <h2>Buying privately: the paperwork on the day</h2>
+      <ul style={{ maxWidth: 'none' }}>
+        <li>
+          <strong>The new keeper slip.</strong> The seller gives you the green &quot;new keeper&quot;
+          slip from the V5C and tells DVLA about the sale - online is quickest. Your own V5C then
+          arrives by post in your name.
+        </li>
+        <li>
+          <strong>Tax doesn&apos;t come with it.</strong> Vehicle tax no longer transfers when a
+          bike is sold. Tax it yourself before you ride away - it takes minutes online with the
+          11-digit reference number on the new keeper slip.
+        </li>
+        <li>
+          <strong>Insurance first.</strong> You need your own insurance in place before you ride
+          it home. Most insurers can start cover the same day.
+        </li>
+        <li>
+          <strong>A written receipt.</strong> The date, the price, the registration, the VIN
+          /frame number, and both names and addresses, signed by you both. &quot;Sold as seen&quot;
+          doesn&apos;t let a seller off for describing the bike wrongly.
+        </li>
+        <li>
+          <strong>Pay in a way that leaves a record.</strong> A bank transfer at the handover is
+          safest. Never pay a deposit on a bike you haven&apos;t seen in person.
+        </li>
+        <li>
+          <strong>Keep its history going.</strong> Put the receipt, the old MOTs and the service
+          paperwork together - or 
+          <Link href="/login?redirect=%2Fdashboard%3FaddVehicle%3Dbike">photograph them into a free RoadVerdict logbook</Link>
+          {' '}- so the bike&apos;s history carries on with you, ready for when you sell it.
+        </li>
+      </ul>
 
       <h2>The last-mile check</h2>
       <p style={{ maxWidth: 'none' }}>

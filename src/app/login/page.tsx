@@ -26,6 +26,13 @@ function LoginForm() {
   // links) - passed on so the later funnel steps count by source.
   const src = classifySource({ src: searchParams.get("src"), utmSource: searchParams.get("utm_source"), referrer: typeof document === "undefined" ? null : document.referrer });
 
+  // Most people arrive from a "Start your motorcycle's/car's logbook"
+  // button and have no account yet, so the page speaks to them as new
+  // (it used to say "Sign in to track your bike" to everyone - 4 in 5
+  // visitors left without entering an email).
+  const kind = redirect?.includes("addVehicle=car") ? "car" : redirect?.includes("addVehicle=bike") ? "bike" : null;
+  const heading = kind === "car" ? "Start your car's logbook" : kind === "bike" ? "Start your motorcycle's logbook" : "Sign in, or start your free logbook";
+
   const [email, setEmail] = useState("");
   const [status, setStatus] = useState<"idle" | "sending" | "sent" | "error">("idle");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -72,6 +79,7 @@ function LoginForm() {
           We&apos;ve sent a sign-in link to <strong>{email}</strong>. It expires in 15 minutes
           and works once.
         </p>
+        <p className={styles.hint}>Not there in a minute? Check your spam or promotions folder.</p>
         <button
           type="button"
           className={styles.resendLink}
@@ -86,10 +94,16 @@ function LoginForm() {
   return (
     <div className={styles.card}>
       <img src="/logo.png" alt="RoadVerdict" className={styles.logoImg} />
-      <h1 className={styles.heading}>Sign in to track your bike</h1>
+      <h1 className={styles.heading}>{heading}</h1>
       <p className={styles.subtext}>
-        Enter your email and we&apos;ll send you a link to sign in - no password to remember.
+        Enter your email and we&apos;ll send you a link. New here? The same link creates your free account - no
+        password, nothing to install.
       </p>
+      <ul className={styles.ticks}>
+        <li>Free for one vehicle</li>
+        <li>No password - just a link to your email</li>
+        <li>Your email is never sold or shared for marketing</li>
+      </ul>
 
       {urlError && URL_ERROR_MESSAGES[urlError] && (
         <div className={styles.banner} role="alert">
@@ -124,6 +138,10 @@ function LoginForm() {
           {status === "sending" ? "Sending link..." : "Send sign-in link"}
         </button>
       </form>
+
+      <p className={styles.alt}>
+        Not ready yet? <a href="/demo">See it with a sample bike first</a>
+      </p>
     </div>
   );
 }
