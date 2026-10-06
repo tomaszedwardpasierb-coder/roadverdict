@@ -451,6 +451,16 @@ export default async function AdminDashboardPage(
           </div>
         </div>
         <div className={styles.card}>
+          <div className={styles.cardTitle}>Tell Bing about changed pages (daily)</div>
+          <p className={styles.note}>
+            IndexNow: sends Bing (and DuckDuckGo, Ecosia, ChatGPT search) the sitemap pages whose date changed since the
+            last run. Change a page&apos;s date in sitemap.ts when its content changes.
+          </p>
+          <div style={{ marginTop: '0.6rem' }}>
+            <RunCronButton name="indexnow" label="Run now" />
+          </div>
+        </div>
+        <div className={styles.card}>
           <div className={styles.cardTitle}>Delete expired share links (daily)</div>
           <p className={styles.note}>Permanently removes any shareable report link past its expiry date.</p>
           <div style={{ marginTop: '0.6rem' }}>

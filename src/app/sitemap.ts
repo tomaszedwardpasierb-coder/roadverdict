@@ -10,7 +10,7 @@ const BASE = 'https://roadverdict.co.uk';
 // tells Google every page changed every time it looked, so it learns to
 // ignore the field entirely; an honest date is a real signal to recrawl.
 const PAGES: { path: string; lastModified: string; priority: number }[] = [
-  { path: '/', lastModified: '2026-09-27', priority: 1 },
+  { path: '/', lastModified: '2026-10-04', priority: 1 },
   { path: '/motorcycles', lastModified: '2026-09-27', priority: 0.9 },
   { path: '/cars', lastModified: '2026-09-27', priority: 0.9 },
   { path: '/quote-checker', lastModified: '2026-09-27', priority: 0.9 },
@@ -21,14 +21,14 @@ const PAGES: { path: string; lastModified: string; priority: number }[] = [
   { path: '/cars/buying-guide', lastModified: '2026-09-27', priority: 0.9 },
   { path: '/mpg-calculator', lastModified: '2026-09-28', priority: 0.8 },
   { path: '/guides', lastModified: '2026-09-27', priority: 0.7 },
-  { path: '/guides/buying-a-used-motorcycle', lastModified: '2026-09-15', priority: 0.7 },
-  { path: '/guides/buying-a-used-car', lastModified: '2026-09-15', priority: 0.7 },
+  { path: '/guides/buying-a-used-motorcycle', lastModified: '2026-10-05', priority: 0.7 },
+  { path: '/guides/buying-a-used-car', lastModified: '2026-10-05', priority: 0.7 },
   { path: '/guides/cost-of-owning-a-motorcycle', lastModified: '2026-09-15', priority: 0.7 },
   { path: '/guides/cost-of-owning-a-car', lastModified: '2026-09-15', priority: 0.7 },
   { path: '/pro', lastModified: '2026-09-27', priority: 0.5 },
   { path: '/about', lastModified: '2026-09-21', priority: 0.4 },
   { path: '/videos', lastModified: '2026-09-28', priority: 0.4 },
-  { path: '/privacy', lastModified: '2026-09-26', priority: 0.2 },
+  { path: '/privacy', lastModified: '2026-10-05', priority: 0.2 },
 ];
 
 // The price guides' copy and layout were written on this date; a page's

@@ -26,6 +26,7 @@ import { POST as backfillUsers } from "@/app/api/cron/backfill-users/route";
 import { POST as seedAssistantConfig } from "@/app/api/cron/seed-assistant-config/route";
 import { POST as purgeStaleData } from "@/app/api/cron/purge-stale-data/route";
 import { POST as weeklyReport } from "@/app/api/cron/weekly-report/route";
+import { POST as indexNow } from "@/app/api/cron/indexnow/route";
 
 export const dynamic = "force-dynamic";
 
@@ -47,6 +48,7 @@ const CRON_HANDLERS: Record<string, (req: NextRequest) => Promise<Response>> = {
   "seed-assistant-config": seedAssistantConfig,
   "purge-stale-data": purgeStaleData,
   "weekly-report": weeklyReport,
+  indexnow: indexNow,
 };
 
 export async function POST(request: Request, props: { params: Promise<{ name: string }> }) {
