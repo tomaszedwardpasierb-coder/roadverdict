@@ -31,7 +31,7 @@ describe("Login page", () => {
 
   it("covers both returning and new people when nothing says which", () => {
     render(<LoginPage />);
-    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Sign in, or start your free logbook");
+    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Start your free logbook – motorcycle or car");
   });
 
   it("lists what you get, and offers the sample bike instead of leaving", () => {

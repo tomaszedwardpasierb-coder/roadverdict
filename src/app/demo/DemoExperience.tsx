@@ -28,7 +28,8 @@ import { CategorySpendChart } from '@/app/dashboard/CategorySpendChart';
 import { SAMPLE_BIKE, SAMPLE_ENTRIES, CATEGORY_LABELS, chartItems, fuelPoints, mpgSeries, type DemoCategory, type DemoEntry } from '@/lib/demo/sampleBike';
 import styles from './demo.module.css';
 
-const SIGN_UP_HREF = `/login?redirect=${encodeURIComponent('/dashboard?addVehicle=bike')}&src=demo`;
+// No vehicle kind: the visitor may own a car, so they choose after signing in.
+const SIGN_UP_HREF = `/login?redirect=${encodeURIComponent('/dashboard')}&src=demo`;
 
 // The dashboard's navigation, as in DashboardShell.tsx - all of it
 // read-only here except the groups opening and closing.

@@ -31,7 +31,7 @@ function LoginForm() {
   // (it used to say "Sign in to track your bike" to everyone - 4 in 5
   // visitors left without entering an email).
   const kind = redirect?.includes("addVehicle=car") ? "car" : redirect?.includes("addVehicle=bike") ? "bike" : null;
-  const heading = kind === "car" ? "Start your car's logbook" : kind === "bike" ? "Start your motorcycle's logbook" : "Sign in, or start your free logbook";
+  const heading = kind === "car" ? "Start your car's logbook" : kind === "bike" ? "Start your motorcycle's logbook" : "Start your free logbook – motorcycle or car";
 
   const [email, setEmail] = useState("");
   const [status, setStatus] = useState<"idle" | "sending" | "sent" | "error">("idle");

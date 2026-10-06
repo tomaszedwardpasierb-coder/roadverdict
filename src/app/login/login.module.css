@@ -156,7 +156,7 @@
   color: var(--ink-soft);
 }
 .ticks li::before {
-  content: "¹3";
+  content: "\2713";
   color: var(--amber-ink);
   font-weight: 700;
   margin-right: 8px;

@@ -59,7 +59,7 @@ describe("DemoExperience", () => {
     expect(screen.getByRole("button", { name: /Scan a receipt with AI/ })).toBeEnabled();
     await user.click(screen.getByRole("button", { name: "Reminders" }));
     expect(screen.getByRole("dialog")).toHaveTextContent("Reminders is part of your free account");
-    expect(screen.getAllByRole("link", { name: "Create a free account" })[0].getAttribute("href")).toBe("/login?redirect=%2Fdashboard%3FaddVehicle%3Dbike&src=demo");
+    expect(screen.getAllByRole("link", { name: "Create a free account" })[0].getAttribute("href")).toBe("/login?redirect=%2Fdashboard&src=demo");
     await user.click(screen.getByRole("button", { name: "Keep looking around" }));
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });

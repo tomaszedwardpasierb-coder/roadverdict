@@ -266,6 +266,29 @@ export default async function DashboardPage(props: { searchParams: Promise<{ add
   // once one exists, this same URL (which a POST's router.refresh()
   // would revisit, still carrying the query param) correctly falls
   // through instead of re-showing the form.
+  // A brand-new account that didn't say which kind it's for (the demo's
+  // sign-up link, a plain sign-in) chooses here - it used to drop straight
+  // into "Add your bike", leaving car owners no way to start.
+  if (bikes.length === 0 && existingCars.length === 0 && searchParams.addVehicle !== "bike" && searchParams.addVehicle !== "car") {
+    return (
+      <main className={ownStyles.main}>
+        <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "1rem" }}>
+          <LogoutButton />
+        </div>
+        <h1 className={styles.heading}>Start your logbook</h1>
+        <p className={styles.subtext}>Signed in as {session.email}. What are you adding first?</p>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: "0.8rem", marginTop: "1.2rem" }}>
+          <a href="/dashboard?addVehicle=bike" className="btn-primary" style={{ textDecoration: "none" }}>
+            A motorcycle
+          </a>
+          <a href="/dashboard?addVehicle=car" className="btn-primary" style={{ textDecoration: "none" }}>
+            A car
+          </a>
+        </div>
+      </main>
+    );
+  }
+
   if (searchParams.addVehicle === "car" && existingCars.length === 0) {
     return (
       <main className={ownStyles.main}>
