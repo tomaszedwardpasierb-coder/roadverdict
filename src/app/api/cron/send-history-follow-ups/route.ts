@@ -11,6 +11,7 @@
 // establish for this app's other cron routes (one combined run, one
 // combined set of totals, not two separately-tracked cron jobs).
 import { NextRequest, NextResponse } from "next/server";
+import { withCronRun } from "@/lib/admin/cronRuns";
 import { getShareLinksNeedingFollowUp, markShareLinkFollowUpSent, type ShareLinkDoc } from "@/lib/tracker/shareLink";
 import { getCarShareLinksNeedingFollowUp, markCarShareLinkFollowUpSent, type CarShareLinkDoc } from "@/lib/tracker/carShareLink";
 import { getBike, isBikeReadOnly } from "@/lib/tracker/bike";
@@ -125,7 +126,7 @@ function tally(outcomes: PromiseSettledResult<FollowUpOutcome>[]) {
   return { sent, skipped, failed };
 }
 
-export async function POST(req: NextRequest) {
+async function handle(req: NextRequest) {
   const authHeader = req.headers.get("authorization");
   const expected = `Bearer ${process.env.CRON_SECRET}`;
   if (!process.env.CRON_SECRET || authHeader !== expected) {
@@ -154,3 +155,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Unexpected error sending history follow-ups" }, { status: 500 });
   }
 }
+
+// Records "last run" for /tomasz (see admin/cronRuns.ts).
+export const POST = withCronRun("send-history-follow-ups", handle);

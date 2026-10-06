@@ -1,5 +1,6 @@
 // Place at: src/app/api/cron/check-reminders/route.ts
 import { NextRequest, NextResponse } from "next/server";
+import { withCronRun } from "@/lib/admin/cronRuns";
 import {
   getAllReminders,
   computeReminderStatus,
@@ -192,7 +193,7 @@ function tally(outcomes: PromiseSettledResult<ReminderCheckOutcome>[]) {
   return { sent, notified, failed };
 }
 
-export async function POST(req: NextRequest) {
+async function handle(req: NextRequest) {
   const authHeader = req.headers.get("authorization");
   const expected = `Bearer ${process.env.CRON_SECRET}`;
   if (!process.env.CRON_SECRET || authHeader !== expected) {
@@ -241,3 +242,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Unexpected error checking reminders" }, { status: 500 });
   }
 }
+
+// Records "last run" for /tomasz (see admin/cronRuns.ts).
+export const POST = withCronRun("check-reminders", handle);

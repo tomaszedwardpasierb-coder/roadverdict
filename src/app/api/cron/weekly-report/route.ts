@@ -5,13 +5,14 @@
 // runnable from /tomasz ("Send now"). The address comes from the
 // WEEKLY_REPORT_TO setting rather than the code, since the repo is public.
 import { NextRequest, NextResponse } from "next/server";
+import { withCronRun } from "@/lib/admin/cronRuns";
 import { buildWeeklyReport, gatherWeeklyReport } from "@/lib/analytics/weeklyReport";
 import { getAllUserAccounts } from "@/lib/tracker/userAccount";
 import { sendWeeklyReportEmail } from "@/lib/resend";
 
 export const dynamic = "force-dynamic";
 
-export async function POST(req: NextRequest) {
+async function handle(req: NextRequest) {
   const authHeader = req.headers.get("authorization");
   const expected = `Bearer ${process.env.CRON_SECRET}`;
   if (!process.env.CRON_SECRET || authHeader !== expected) {
@@ -33,3 +34,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Couldn't build or send the report." }, { status: 500 });
   }
 }
+
+// Records "last run" for /tomasz (see admin/cronRuns.ts).
+export const POST = withCronRun("weekly-report", handle);

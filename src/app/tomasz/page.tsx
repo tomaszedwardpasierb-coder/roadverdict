@@ -23,6 +23,7 @@ import { getGeminiUsageByTask, type GeminiUsageByTask } from '@/lib/tracker/gemi
 import type { UserDoc } from '@/lib/tracker/userDoc';
 import { getAllImpersonationSessions, getAllImpersonationActivityCounts, type ImpersonationSession } from '@/lib/admin/impersonation';
 import { AdminShell } from './AdminShell';
+import { getCronRuns, type CronRunDoc } from '@/lib/admin/cronRuns';
 import { KnowledgeBaseEditor } from './KnowledgeBaseEditor';
 import styles from './adminShell.module.css';
 import { FunnelPanel } from './FunnelPanel';
@@ -54,6 +55,15 @@ const HOUR_OPTIONS = [
   { hours: 24, label: '24 hours' },
   { hours: 168, label: '7 days' },
 ];
+
+function LastRun({ run }: { run: CronRunDoc | undefined }) {
+  if (!run) return <p className={styles.warnNote}>No scheduled run recorded yet.</p>;
+  return (
+    <p className={run.ok ? styles.note : styles.warnNote}>
+      Last run {fmtDate(run.lastRunAt)} &middot; {run.ok ? 'worked' : `failed (${run.status})`}
+    </p>
+  );
+}
 
 function fmtDate(d: string): string {
   return new Date(d).toLocaleString('en-GB', {
@@ -238,6 +248,7 @@ export default async function AdminDashboardPage(
     impersonationSessions,
     impersonationActivityCounts,
     reviewerAccess,
+    cronRuns,
   ] = await Promise.all([
     getAdminStatsBundle(),
     getFuelPriceStatus(),
@@ -259,6 +270,7 @@ export default async function AdminDashboardPage(
     getImpersonationSessionsSafe(),
     getAllImpersonationActivityCountsSafe(),
     getReviewerAccessSafe(),
+    getCronRuns(),
   ]);
   const { dbStats, activeSessionCount: activeSessions, totalUserCount: totalUsers, magicLinkRequests, recentSessions, browserBreakdown, detailedCounts } = statsBundle;
   const health = getServerHealth();
@@ -421,6 +433,7 @@ export default async function AdminDashboardPage(
           ) : (
             <p className={styles.warnNote}>No record found - has this ever run successfully?</p>
           )}
+          <LastRun run={cronRuns['update-fuel-price']} />
           <div style={{ marginTop: '0.6rem' }}>
             <RunCronButton name="update-fuel-price" label="Run now" />
           </div>
@@ -436,6 +449,7 @@ export default async function AdminDashboardPage(
           ) : (
             <p className={styles.warnNote}>No record found - has this ever run successfully?</p>
           )}
+          <LastRun run={cronRuns['check-reminders']} />
           <div style={{ marginTop: '0.6rem' }}>
             <RunCronButton name="check-reminders" label="Run now" />
           </div>
@@ -446,6 +460,7 @@ export default async function AdminDashboardPage(
             Last week&apos;s numbers in one email, to the address in the WEEKLY_REPORT_TO setting
             {process.env.WEEKLY_REPORT_TO ? '' : ' - not set yet, so nothing is sent'}.
           </p>
+          <LastRun run={cronRuns['weekly-report']} />
           <div style={{ marginTop: '0.6rem' }}>
             <RunCronButton name="weekly-report" label="Send now" />
           </div>
@@ -456,6 +471,7 @@ export default async function AdminDashboardPage(
             IndexNow: sends Bing (and DuckDuckGo, Ecosia, ChatGPT search) the sitemap pages whose date changed since the
             last run. Change a page&apos;s date in sitemap.ts when its content changes.
           </p>
+          <LastRun run={cronRuns['indexnow']} />
           <div style={{ marginTop: '0.6rem' }}>
             <RunCronButton name="indexnow" label="Run now" />
           </div>
@@ -463,6 +479,7 @@ export default async function AdminDashboardPage(
         <div className={styles.card}>
           <div className={styles.cardTitle}>Delete expired share links (daily)</div>
           <p className={styles.note}>Permanently removes any shareable report link past its expiry date.</p>
+          <LastRun run={cronRuns['delete-expired-share-links']} />
           <div style={{ marginTop: '0.6rem' }}>
             <RunCronButton name="delete-expired-share-links" label="Run now" />
           </div>
@@ -481,24 +498,59 @@ export default async function AdminDashboardPage(
           ) : (
             <p className={styles.warnNote}>No record found - has this ever run successfully?</p>
           )}
+          <LastRun run={cronRuns['hard-delete-expired-accounts']} />
           <div style={{ marginTop: '0.6rem' }}>
             <RunCronButton name="hard-delete-expired-accounts" label="Run now" />
           </div>
         </div>
         <div className={styles.card}>
-          <div className={styles.cardTitle}>Purge stale data</div>
+          <div className={styles.cardTitle}>Purge stale data (weekly, Mondays)</div>
           <p className={styles.note}>
             Notifications (read &amp; 90+ days old, or any age past a year), abandoned receipt-scan batches (48h+),
             knowledge base/personality version history beyond the most recent 50, and impersonation log entries
             over a year old.
           </p>
+          <LastRun run={cronRuns['purge-stale-data']} />
           <div style={{ marginTop: '0.6rem' }}>
             <RunCronButton name="purge-stale-data" label="Run now" />
           </div>
         </div>
+        <div className={styles.card}>
+          <div className={styles.cardTitle}>Mileage audit (weekly, Mondays)</div>
+          <p className={styles.warnNote} style={{ marginBottom: '0.5rem' }}>
+            Re-flags any AI-derived mileage that breaks chronological ordering against its own neighbouring records
+            (mileage can only go up over time), or where a full-tank fill-up&apos;s litres imply an impossible mpg
+            against the fill before it - catches records damaged by earlier estimator bugs, including ones
+            already marked &quot;confirmed&quot;. Never changes the mileage value itself, only re-flags it for review.
+            Safe to click more than once.
+          </p>
+          <LastRun run={cronRuns['audit-mileage']} />
+          <div style={{ marginTop: '0.6rem' }}>
+            <RunCronButton name="audit-mileage" label="Run audit" />
+          </div>
+        </div>
+        <div className={styles.card}>
+          <div className={styles.cardTitle}>Exchange rates (daily)</div>
+          <p className={styles.note}>Today&apos;s GBP rates for the currencies people can show costs in.</p>
+          <LastRun run={cronRuns['update-exchange-rates']} />
+          <div style={{ marginTop: '0.6rem' }}>
+            <RunCronButton name="update-exchange-rates" label="Run now" />
+          </div>
+        </div>
+        <div className={styles.card}>
+          <div className={styles.cardTitle}>History follow-up emails (daily)</div>
+          <p className={styles.note}>Follow-up emails about shared vehicle histories that are due today.</p>
+          <LastRun run={cronRuns['send-history-follow-ups']} />
+          <div style={{ marginTop: '0.6rem' }}>
+            <RunCronButton name="send-history-follow-ups" label="Run now" />
+          </div>
+        </div>
       </div>
 
-      <h2 className={styles.sectionHeading}>Migrations (one-time, safe to re-run)</h2>
+      <details style={{ marginTop: '1.5rem' }}>
+        <summary className={styles.sectionHeading} style={{ cursor: 'pointer' }}>
+          Finished one-off migrations (done in September - safe to re-run, nothing to do)
+        </summary>
       <div className={styles.grid}>
         <div className={styles.card}>
           <div className={styles.cardTitle}>Assistant config seed</div>
@@ -556,19 +608,6 @@ export default async function AdminDashboardPage(
           </div>
         </div>
         <div className={styles.card}>
-          <div className={styles.cardTitle}>Mileage audit</div>
-          <p className={styles.warnNote} style={{ marginBottom: '0.5rem' }}>
-            Re-flags any AI-derived mileage that breaks chronological ordering against its own neighbouring records
-            (mileage can only go up over time), or where a full-tank fill-up&apos;s litres imply an impossible mpg
-            against the fill before it - catches records damaged by earlier estimator bugs, including ones
-            already marked &quot;confirmed&quot;. Never changes the mileage value itself, only re-flags it for review.
-            Safe to click more than once.
-          </p>
-          <div style={{ marginTop: '0.6rem' }}>
-            <RunCronButton name="audit-mileage" label="Run audit" />
-          </div>
-        </div>
-        <div className={styles.card}>
           <div className={styles.cardTitle}>Purge orphaned receipt requests</div>
           <p className={styles.warnNote} style={{ marginBottom: '0.5rem' }}>
             Deletes any receipt request left behind by a shareable link that no longer exists - this backlog only
@@ -581,6 +620,7 @@ export default async function AdminDashboardPage(
           </div>
         </div>
       </div>
+      </details>
     </>
   );
 

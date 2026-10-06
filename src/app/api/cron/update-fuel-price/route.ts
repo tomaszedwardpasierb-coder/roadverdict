@@ -1,5 +1,6 @@
 ﻿// Place at: src/app/api/cron/update-fuel-price/route.ts
 import { NextRequest, NextResponse } from "next/server";
+import { withCronRun } from "@/lib/admin/cronRuns";
 import { saveCurrentPetrolPrice, saveCurrentDieselPrice } from "@/lib/fuelPrice";
 import { fetchWithTimeout } from "@/lib/fetchWithTimeout";
 
@@ -79,7 +80,7 @@ function extractLatestFuelPrices(csvText: string): LatestFuelPrices | null {
   return { petrolPrice, dieselPrice, weekCommencing };
 }
 
-export async function POST(req: NextRequest) {
+async function handle(req: NextRequest) {
   const authHeader = req.headers.get("authorization");
   const expected = `Bearer ${process.env.CRON_SECRET}`;
   if (!process.env.CRON_SECRET || authHeader !== expected) {
@@ -124,3 +125,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Unexpected error updating fuel price" }, { status: 500 });
   }
 }
+
+// Records "last run" for /tomasz (see admin/cronRuns.ts).
+export const POST = withCronRun("update-fuel-price", handle);

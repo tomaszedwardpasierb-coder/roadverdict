@@ -8,6 +8,7 @@
 // one URL instead of five, while still reporting a per-type breakdown
 // so nothing is opaque.
 import { NextRequest, NextResponse } from "next/server";
+import { withCronRun } from "@/lib/admin/cronRuns";
 import { purgeOldNotifications } from "@/lib/tracker/notification";
 import { purgeStalePendingScanBatches } from "@/lib/tracker/pendingScanBatch";
 import { pruneKnowledgeBaseVersions, prunePersonalityVersions, pruneCarKnowledgeBaseVersions } from "@/lib/tracker/assistantConfig";
@@ -15,7 +16,7 @@ import { purgeOldImpersonationLogs } from "@/lib/admin/impersonation";
 
 export const dynamic = "force-dynamic";
 
-export async function POST(req: NextRequest) {
+async function handle(req: NextRequest) {
   const authHeader = req.headers.get("authorization");
   const expected = `Bearer ${process.env.CRON_SECRET}`;
   if (!process.env.CRON_SECRET || authHeader !== expected) {
@@ -42,3 +43,6 @@ export async function POST(req: NextRequest) {
     );
   }
 }
+
+// Records "last run" for /tomasz (see admin/cronRuns.ts).
+export const POST = withCronRun("purge-stale-data", handle);

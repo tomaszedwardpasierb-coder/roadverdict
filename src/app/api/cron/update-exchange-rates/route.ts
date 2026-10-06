@@ -1,5 +1,6 @@
 ﻿// Place at: src/app/api/cron/update-exchange-rates/route.ts
 import { NextRequest, NextResponse } from "next/server";
+import { withCronRun } from "@/lib/admin/cronRuns";
 import { getContainer } from "@/lib/cosmos";
 import { ALL_CURRENCIES } from "@/lib/tracker/currency";
 import { fetchWithTimeout } from "@/lib/fetchWithTimeout";
@@ -11,7 +12,7 @@ interface FrankfurterRow {
   rate: number;
 }
 
-export async function POST(req: NextRequest) {
+async function handle(req: NextRequest) {
   const authHeader = req.headers.get("authorization");
   const expected = `Bearer ${process.env.CRON_SECRET}`;
   if (!process.env.CRON_SECRET || authHeader !== expected) {
@@ -51,3 +52,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Failed to fetch exchange rates", detail: String(err) }, { status: 500 });
   }
 }
+
+// Records "last run" for /tomasz (see admin/cronRuns.ts).
+export const POST = withCronRun("update-exchange-rates", handle);

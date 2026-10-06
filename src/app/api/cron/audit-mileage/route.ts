@@ -1,5 +1,6 @@
 // Place at: src/app/api/cron/audit-mileage/route.ts
 import { NextRequest, NextResponse } from "next/server";
+import { withCronRun } from "@/lib/admin/cronRuns";
 import { getContainer } from "@/lib/cosmos";
 import { updateTrackerDoc } from "@/lib/tracker/cosmosHelpers";
 import { runInBatches } from "@/lib/concurrency";
@@ -147,7 +148,7 @@ async function auditCar(car: CarDoc): Promise<AuditOutcome> {
   }
 }
 
-export async function POST(req: NextRequest) {
+async function handle(req: NextRequest) {
   const authHeader = req.headers.get("authorization");
   const expected = `Bearer ${process.env.CRON_SECRET}`;
   if (!process.env.CRON_SECRET || authHeader !== expected) {
@@ -216,3 +217,6 @@ export async function POST(req: NextRequest) {
     );
   }
 }
+
+// Records "last run" for /tomasz (see admin/cronRuns.ts).
+export const POST = withCronRun("audit-mileage", handle);

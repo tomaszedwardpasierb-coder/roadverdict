@@ -5,12 +5,13 @@
 // Runs daily from the scheduler; also "Run now" in /tomasz. A day with no
 // changes sends nothing.
 import { NextRequest, NextResponse } from "next/server";
+import { withCronRun } from "@/lib/admin/cronRuns";
 import sitemap from "@/app/sitemap";
 import { submitChangedPages } from "@/lib/seo/indexNow";
 
 export const dynamic = "force-dynamic";
 
-export async function POST(req: NextRequest) {
+async function handle(req: NextRequest) {
   const authHeader = req.headers.get("authorization");
   const expected = `Bearer ${process.env.CRON_SECRET}`;
   if (!process.env.CRON_SECRET || authHeader !== expected) {
@@ -29,3 +30,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "IndexNow submission failed." }, { status: 500 });
   }
 }
+
+// Records "last run" for /tomasz (see admin/cronRuns.ts).
+export const POST = withCronRun("indexnow", handle);

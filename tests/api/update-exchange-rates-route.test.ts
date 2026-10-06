@@ -84,13 +84,17 @@ describe("POST /api/cron/update-exchange-rates", () => {
     expect(response.status).toBe(500);
     const body = await response.json();
     expect(body.error).toBe("Failed to fetch exchange rates");
-    expect(mocks.upsert).not.toHaveBeenCalled();
+    // No exchange rates are saved - only the job's own "last run (failed)" record.
+    expect(mocks.upsert).not.toHaveBeenCalledWith(expect.objectContaining({ type: "exchangeRates" }));
+    expect(mocks.upsert).toHaveBeenCalledWith(expect.objectContaining({ id: "cronRun::update-exchange-rates", ok: false }));
   });
 
   it("returns a 500 when the fetch itself throws", async () => {
     mocks.fetch.mockRejectedValue(new Error("network timeout"));
     const response = await POST(request({ authorization: "Bearer top-secret" }));
     expect(response.status).toBe(500);
-    expect(mocks.upsert).not.toHaveBeenCalled();
+    // No exchange rates are saved - only the job's own "last run (failed)" record.
+    expect(mocks.upsert).not.toHaveBeenCalledWith(expect.objectContaining({ type: "exchangeRates" }));
+    expect(mocks.upsert).toHaveBeenCalledWith(expect.objectContaining({ id: "cronRun::update-exchange-rates", ok: false }));
   });
 });
