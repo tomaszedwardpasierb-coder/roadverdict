@@ -1,12 +1,8 @@
-// Place at: src/components/viewer/ViewerForms.tsx
+// Place at: src/components/viewer/CostCalculatorFormsForViewer.tsx
 'use client';
 
-import { QuoteForm } from '@/components/QuoteForm';
-import { CarQuoteForm } from '@/components/CarQuoteForm';
 import { CostCalculatorForm } from '@/components/CostCalculatorForm';
 import { CarCostCalculatorForm } from '@/components/CarCostCalculatorForm';
-import { BuyingGuideForm } from '@/components/BuyingGuideForm';
-import { CarBuyingGuideForm } from '@/components/CarBuyingGuideForm';
 import { useViewer } from './useViewer';
 
 // The public tool pages are static, so a signed-in visitor's "you're
@@ -16,30 +12,10 @@ import { useViewer } from './useViewer';
 // remounted (via key) rather than passed changed props it would ignore.
 // Only signed-in visitors ever remount; an anonymous visitor's form is
 // never touched.
-
-export function QuoteFormForViewer() {
-  const viewer = useViewer();
-  return (
-    <QuoteForm
-      key={viewer.signedIn ? 'signed-in' : 'anon'}
-      signedIn={viewer.signedIn}
-      initialBrand={viewer.bike?.brand}
-      initialBikeClass={viewer.bike?.bikeClass}
-    />
-  );
-}
-
-export function CarQuoteFormForViewer() {
-  const viewer = useViewer();
-  return (
-    <CarQuoteForm
-      key={viewer.signedIn ? 'signed-in' : 'anon'}
-      signedIn={viewer.signedIn}
-      initialBrand={viewer.car?.brand}
-      initialCarClass={viewer.car?.carClass}
-    />
-  );
-}
+//
+// Each tool's pair of wrappers lives in its own file, so a page loads only
+// its own form: when all six shared one file, every tool page also
+// downloaded the Buying Guide's chart library (~48 KB) it never used.
 
 export function CostCalculatorFormForViewer() {
   const viewer = useViewer();
@@ -64,14 +40,4 @@ export function CarCostCalculatorFormForViewer() {
       initialCarClass={viewer.car?.carClass}
     />
   );
-}
-
-export function BuyingGuideFormForViewer() {
-  const viewer = useViewer();
-  return <BuyingGuideForm signedIn={viewer.signedIn} />;
-}
-
-export function CarBuyingGuideFormForViewer() {
-  const viewer = useViewer();
-  return <CarBuyingGuideForm signedIn={viewer.signedIn} />;
 }

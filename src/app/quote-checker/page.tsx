@@ -4,7 +4,7 @@
 // promoted to the site root. See src/app/page.tsx.
 import type { Metadata } from 'next';
 import { pageMetadata } from '@/lib/seo/pageMetadata';
-import { QuoteFormForViewer } from '@/components/viewer/ViewerForms';
+import { QuoteFormForViewer } from '@/components/viewer/QuoteFormsForViewer';
 import { RelatedTools } from '@/components/RelatedTools';
 import { buildBreadcrumbJsonLd } from '@/lib/seo/breadcrumbs';
 

@@ -16,7 +16,7 @@ import { PRICE_GUIDES, formatPounds, overallRange, priceGuideHubPath, priceGuide
 export const metadata: Metadata = pageMetadata({
   title: 'Motorcycle & Car Guides and Price Guides (UK)',
   description:
-    'Free, UK-specific guides on buying a used motorcycle or car and what either costs to own, plus sourced price guides for servicing, tyres, brakes and the MOT.',
+    'Free, UK-specific guides on buying, owning and selling a motorcycle or car - service history included - plus sourced price guides for servicing, tyres, brakes and the MOT.',
   path: '/guides',
 });
 
@@ -43,6 +43,16 @@ const GUIDES = [
     title: 'The Real Cost of Owning a Car in the UK',
     description: 'Fuel, insurance, tax, servicing and depreciation - the full picture, not just the price on the forecourt.',
   },
+  {
+    href: '/guides/proving-service-history',
+    title: 'How to Prove Your Service History When You Sell',
+    description: 'What counts as proof, what buyers check, how to present it - and what never to share.',
+  },
+  {
+    href: '/guides/rebuild-lost-service-history',
+    title: 'How to Rebuild a Lost Service History',
+    description: 'MOT history, garages, dealer records and your inbox - piecing a lost history back together.',
+  },
 ] as const;
 
 export default function GuidesPage() {
@@ -56,8 +66,8 @@ export default function GuidesPage() {
       <h1>Guides</h1>
       <p style={{ maxWidth: 'none', marginBottom: '1.5rem' }}>
         Free, UK-specific guides - not a generic template with &quot;vehicle&quot; swapped for
-        the word you searched. Motorcycles and cars each get their own version, written for how
-        that vehicle actually works.
+        the word you searched. Where motorcycles and cars differ, each gets its own version, written
+        for how that vehicle actually works.
       </p>
       <div style={{ display: 'grid', gap: '1rem' }}>
         {GUIDES.map((g) => (

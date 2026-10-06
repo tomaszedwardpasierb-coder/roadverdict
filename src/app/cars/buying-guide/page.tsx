@@ -2,7 +2,7 @@
 import type { Metadata } from 'next';
 import { pageMetadata } from '@/lib/seo/pageMetadata';
 import Link from 'next/link';
-import { CarBuyingGuideFormForViewer } from '@/components/viewer/ViewerForms';
+import { CarBuyingGuideFormForViewer } from '@/components/viewer/BuyingGuideFormsForViewer';
 import { CarRelatedTools } from '@/components/CarRelatedTools';
 import { buildBreadcrumbJsonLd } from '@/lib/seo/breadcrumbs';
 

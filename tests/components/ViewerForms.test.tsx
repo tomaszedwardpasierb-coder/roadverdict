@@ -29,14 +29,9 @@ vi.mock("@/components/CarBuyingGuideForm", () => ({
   CarBuyingGuideForm: (p: Record<string, unknown>) => <div data-testid="car-guide">{JSON.stringify(p)}</div>,
 }));
 
-import {
-  BuyingGuideFormForViewer,
-  CarBuyingGuideFormForViewer,
-  CarCostCalculatorFormForViewer,
-  CarQuoteFormForViewer,
-  CostCalculatorFormForViewer,
-  QuoteFormForViewer,
-} from "@/components/viewer/ViewerForms";
+import { BuyingGuideFormForViewer, CarBuyingGuideFormForViewer } from "@/components/viewer/BuyingGuideFormsForViewer";
+import { CarCostCalculatorFormForViewer, CostCalculatorFormForViewer } from "@/components/viewer/CostCalculatorFormsForViewer";
+import { CarQuoteFormForViewer, QuoteFormForViewer } from "@/components/viewer/QuoteFormsForViewer";
 
 let fakeNow = 5_000_000;
 

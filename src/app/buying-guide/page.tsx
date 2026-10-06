@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import { pageMetadata } from '@/lib/seo/pageMetadata';
 import Link from 'next/link';
-import { BuyingGuideFormForViewer } from '@/components/viewer/ViewerForms';
+import { BuyingGuideFormForViewer } from '@/components/viewer/BuyingGuideFormsForViewer';
 import { RelatedTools } from '@/components/RelatedTools';
 import { buildBreadcrumbJsonLd } from '@/lib/seo/breadcrumbs';
 

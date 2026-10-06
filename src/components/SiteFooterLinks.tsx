@@ -83,6 +83,12 @@ export function SiteFooterLinks() {
           <li>
             <Link href="/guides/cost-of-owning-a-car">Cost of owning a car</Link>
           </li>
+          <li>
+            <Link href="/guides/proving-service-history">Proving service history</Link>
+          </li>
+          <li>
+            <Link href="/guides/rebuild-lost-service-history">Rebuilding a lost history</Link>
+          </li>
         </ul>
       </div>
       <div className="site-footer__col">

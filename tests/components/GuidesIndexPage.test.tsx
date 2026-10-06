@@ -4,7 +4,7 @@ import { render, screen } from "@testing-library/react";
 import GuidesPage from "@/app/guides/page";
 
 describe("GuidesPage", () => {
-  it("links to all four cornerstone guides", () => {
+  it("links to all six guides", () => {
     render(<GuidesPage />);
 
     expect(screen.getByRole("link", { name: /What to Check Before Buying a Used Motorcycle/ })).toHaveAttribute(
@@ -22,6 +22,14 @@ describe("GuidesPage", () => {
     expect(screen.getByRole("link", { name: /The Real Cost of Owning a Car/ })).toHaveAttribute(
       "href",
       "/guides/cost-of-owning-a-car"
+    );
+    expect(screen.getByRole("link", { name: /How to Prove Your Service History/ })).toHaveAttribute(
+      "href",
+      "/guides/proving-service-history"
+    );
+    expect(screen.getByRole("link", { name: /How to Rebuild a Lost Service History/ })).toHaveAttribute(
+      "href",
+      "/guides/rebuild-lost-service-history"
     );
   });
 

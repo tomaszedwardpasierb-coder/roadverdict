@@ -1,7 +1,7 @@
 // Place at: src/app/cars/quote-checker/page.tsx
 import type { Metadata } from 'next';
 import { pageMetadata } from '@/lib/seo/pageMetadata';
-import { CarQuoteFormForViewer } from '@/components/viewer/ViewerForms';
+import { CarQuoteFormForViewer } from '@/components/viewer/QuoteFormsForViewer';
 import { CarRelatedTools } from '@/components/CarRelatedTools';
 import { buildBreadcrumbJsonLd } from '@/lib/seo/breadcrumbs';
 

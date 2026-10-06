@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import { pageMetadata } from '@/lib/seo/pageMetadata';
 import Link from 'next/link';
-import { CostCalculatorFormForViewer } from '@/components/viewer/ViewerForms';
+import { CostCalculatorFormForViewer } from '@/components/viewer/CostCalculatorFormsForViewer';
 import { RelatedTools } from '@/components/RelatedTools';
 import { buildBreadcrumbJsonLd } from '@/lib/seo/breadcrumbs';
 
