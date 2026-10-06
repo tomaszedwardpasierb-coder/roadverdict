@@ -46,6 +46,21 @@ describe("checkAndRecordWrite", () => {
     expect(mocks.itemsCreate).not.toHaveBeenCalled();
   });
 
+  it("counts only attempts inside the last 15 minutes, so a database without ttl can't lock an account out for good", async () => {
+    mocks.fetchAll.mockResolvedValue({ resources: [] });
+    mocks.itemsCreate.mockResolvedValue(undefined);
+    const before = Date.now();
+
+    await checkAndRecordWrite("owner@example.com");
+
+    const [spec] = mockContainer.items.query.mock.calls[0] as any[];
+    expect(spec.query).toContain("c.createdAt >= @since");
+    const since = spec.parameters.find((p: { name: string }) => p.name === "@since").value as string;
+    const ageMs = before - new Date(since).getTime();
+    expect(ageMs).toBeGreaterThanOrEqual(15 * 60 * 1000 - 1000);
+    expect(ageMs).toBeLessThanOrEqual(15 * 60 * 1000 + 1000);
+  });
+
   it("scopes the count query to the calling account's own partition", async () => {
     mocks.fetchAll.mockResolvedValue({ resources: [] });
     mocks.itemsCreate.mockResolvedValue(undefined);

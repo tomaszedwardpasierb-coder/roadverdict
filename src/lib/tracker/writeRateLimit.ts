@@ -38,13 +38,21 @@ function attemptId(): string {
   return `${ATTEMPT_ID_PREFIX}${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
+// Counts only attempts inside the window, rather than relying on Cosmos's
+// ttl alone to remove older ones: a container without ttl switched on
+// (the CI test database's, for one) never removes them, and the account
+// would then be locked out for good after its 120th write ever.
 async function isRateLimited(email: string): Promise<boolean> {
   const container = getContainer();
+  const since = new Date(Date.now() - WINDOW_SECONDS * 1000).toISOString();
   const { resources } = await container.items
     .query<{ id: string }>(
       {
-        query: "SELECT c.id FROM c WHERE c.type = 'trackerWriteAttempt' AND STARTSWITH(c.id, @prefix)",
-        parameters: [{ name: "@prefix", value: ATTEMPT_ID_PREFIX }],
+        query: "SELECT c.id FROM c WHERE c.type = 'trackerWriteAttempt' AND STARTSWITH(c.id, @prefix) AND c.createdAt >= @since",
+        parameters: [
+          { name: "@prefix", value: ATTEMPT_ID_PREFIX },
+          { name: "@since", value: since },
+        ],
       },
       { partitionKey: email }
     )
