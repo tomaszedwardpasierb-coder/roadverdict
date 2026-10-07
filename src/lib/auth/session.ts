@@ -5,6 +5,7 @@ import { recordFunnelStep, type FunnelSource } from "@/lib/analytics/funnel";
 import { hashToken, decodeEmail, generateToken, encodeEmail } from "@/lib/auth/crypto";
 import { isAccountBlocked } from "@/lib/tracker/userDoc";
 import { getAssistantConfig } from "@/lib/tracker/assistantConfig";
+import { noteActivity } from "@/lib/admin/userActivity";
 
 // The Android app can't hold an httpOnly cookie the way a browser does, so
 // it sends the very same `${encodedEmail}.${sessionRaw}` value as a bearer
@@ -47,6 +48,11 @@ export async function getSession(): Promise<{ email: string } | null> {
     // account's next login attempt.
     if (await isAccountBlocked(email)) return null;
     if (resource.client === "app") await renewAppSession(sessionHash, email, resource.expiresAt);
+    // "Last seen" for /tomasz - not awaited, throttled, never throws. An
+    // admin viewing as this user (impersonating_as) isn't the user's own
+    // activity, so it isn't counted.
+    const cookieStore = await cookies();
+    if (!cookieStore.get("impersonating_as")) void noteActivity(email, resource.client === "app" ? "app" : "web");
     return { email };
   } catch {
     return null;

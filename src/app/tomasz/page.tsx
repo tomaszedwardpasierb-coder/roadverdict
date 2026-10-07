@@ -39,13 +39,8 @@ import { ImpersonateButton } from './ImpersonateButton';
 import { AdminLogoutButton } from './AdminLogoutButton';
 import { SendNotificationForm } from './SendNotificationForm';
 import { ClearNotificationsForm } from './ClearNotificationsForm';
-import { BlockAccountButton } from './BlockAccountButton';
-import { GrantPremiumForm } from './GrantPremiumForm';
-import { VehicleAllowanceForm } from './VehicleAllowanceForm';
-import { DeleteAccountButton } from './DeleteAccountButton';
-import { ResetStoryCooldownButton } from './ResetStoryCooldownButton';
-import { RevokeSessionsButton } from './RevokeSessionsButton';
-import { EnableOnboardingButton } from './EnableOnboardingButton';
+import { AccountsTable } from './AccountsTable';
+import { getAccountActivity, type AccountActivity } from '@/lib/admin/accountActivity';
 import { OnboardingAutoEnableToggle } from './OnboardingAutoEnableToggle';
 
 export const dynamic = 'force-dynamic';
@@ -274,6 +269,8 @@ export default async function AdminDashboardPage(
   ]);
   const { dbStats, activeSessionCount: activeSessions, totalUserCount: totalUsers, magicLinkRequests, recentSessions, browserBreakdown, detailedCounts } = statsBundle;
   const health = getServerHealth();
+  // Needs the account list, so it runs after the batch above.
+  const accountActivity: Record<string, AccountActivity> = await getAccountActivity(allUserAccounts).catch(() => ({}));
   const commonQuestions = groupSimilarQuestions(assistantQuestions);
   // One query for every session's count (see
   // getAllImpersonationActivityCounts's own comment), already fetched
@@ -672,39 +669,19 @@ export default async function AdminDashboardPage(
       {allUserAccounts.length === 0 ? (
         <p className={styles.warnNote}>No accounts found.</p>
       ) : (
-        <table className={styles.table}>
-          <thead>
-            <tr>
-              <th>Email</th>
-              <th>Created</th>
-              <th>Status</th>
-              <th>Premium</th>
-              <th>Vehicles</th>
-              <th>Story cooldown</th>
-              <th>Sessions</th>
-              <th>Onboarding</th>
-              <th>Delete</th>
-            </tr>
-          </thead>
-          <tbody>
-            {allUserAccounts.map((u) => (
-              <tr key={u.email}>
-                <td>{u.email}</td>
-                <td>{fmtDate(u.createdAt)}</td>
-                <td>
-                  {u.blocked ? <span style={{ color: 'var(--admin-danger)' }}>Blocked</span> : 'Active'}{' '}
-                  <BlockAccountButton email={u.email} blocked={!!u.blocked} />
-                </td>
-                <td><GrantPremiumForm email={u.email} plan={u.plan ?? null} /></td>
-                <td><VehicleAllowanceForm email={u.email} allowance={u.vehicleAllowance ?? null} /></td>
-                <td><ResetStoryCooldownButton email={u.email} /></td>
-                <td><RevokeSessionsButton email={u.email} /></td>
-                <td><EnableOnboardingButton email={u.email} enabled={!!u.onboarding} /></td>
-                <td><DeleteAccountButton email={u.email} /></td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <AccountsTable
+          defaultSince="2026-10-07"
+          rows={allUserAccounts.map((u) => ({
+            email: u.email,
+            createdAt: u.createdAt,
+            blocked: !!u.blocked,
+            plan: u.plan ? { expiresAt: u.plan.expiresAt } : null,
+            vehicleAllowance: u.vehicleAllowance ?? null,
+            onboarding: !!u.onboarding,
+            tags: u.tags ?? [],
+            activity: accountActivity[u.email] ?? null,
+          }))}
+        />
       )}
 
       <h2 className={styles.sectionHeading}>Magic link requests (every email, ever - including ones that never completed sign-in)</h2>

@@ -60,7 +60,7 @@ export function PrivacyContent() {
   return (
     <div className={styles.wrapper}>
       <h1 className={styles.title}>Privacy Policy</h1>
-      <span className={styles.updated}>Last updated: 5 October 2026</span>
+      <span className={styles.updated}>Last updated: 7 October 2026</span>
       <p className={styles.intro}>
         RoadVerdict is a small, independently run UK site. This page explains, in plain
         terms, what we collect, why, how long we keep it, who we share it with, and how
@@ -459,7 +459,9 @@ export function PrivacyContent() {
           Separately, we record browser/device information and sign-in timestamps
           against specific accounts, mainly to help you and us spot suspicious access -
           for example, the Vault&apos;s own access log shows you your last few sign-ins.
-          Unlike the paragraph above, this is linked to your account.
+          We also note when your account was last used and on how many days, on the website
+          or in the app, so we can see which accounts are active and keep the service
+          running well. Unlike the paragraph above, this is linked to your account.
         </p>
         <p>
           We also use Microsoft Application Insights (part of Azure) for error and

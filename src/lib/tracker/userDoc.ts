@@ -83,6 +83,10 @@ export interface UserDoc {
   // sidebar avatar. Both optional; unset falls back to email-derived
   // initials everywhere they'd otherwise appear.
   displayName?: string;
+  // Labels set from /tomasz only (see ACCOUNT_TAGS in userAccount.ts) -
+  // e.g. "tester" for the Play closed-test testers, so they can be picked
+  // out, given Pro in one go, and kept apart from real users' numbers.
+  tags?: string[];
   // Points at a small, already-resized (~256px) JPEG in the same blob
   // container the receipt/attachment system uses - see
   // api/account/avatar/route.ts. Never the original upload; that's

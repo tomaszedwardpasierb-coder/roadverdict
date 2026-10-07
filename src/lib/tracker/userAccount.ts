@@ -15,6 +15,38 @@ import { MAX_GRANTED_VEHICLES } from "@/lib/tracker/vehicleLimit";
 
 export const MAX_GRANT_YEARS = 3;
 
+export const ACCOUNT_TAGS = ["tester", "friend", "press"] as const;
+export type AccountTag = (typeof ACCOUNT_TAGS)[number];
+
+export function isAccountTag(value: unknown): value is AccountTag {
+  return typeof value === "string" && (ACCOUNT_TAGS as readonly string[]).includes(value);
+}
+
+// A patch rather than read-and-upsert, so tagging can't overwrite a plan
+// or block change made at the same moment.
+export async function setAccountTag(email: string, tag: AccountTag, on: boolean): Promise<void> {
+  const user = await getUserDoc(email);
+  if (!user) throw new Error(`No account found for ${email}.`);
+  const tags = new Set(user.tags ?? []);
+  if (on) tags.add(tag);
+  else tags.delete(tag);
+  await getContainer().item(email, email).patch([{ op: "set", path: "/tags", value: [...tags].sort() }]);
+}
+
+export type BulkGrantOutcome = "granted" | "paying" | "already-longer" | "no-account";
+
+// The bulk "give Pro until..." for testers and friends. It never touches a
+// real Stripe subscription, and never shortens a longer grant that's
+// already there.
+export async function grantPremiumUnlessPaying(email: string, expiresAt: string): Promise<BulkGrantOutcome> {
+  const user = await getUserDoc(email);
+  if (!user) return "no-account";
+  if (user.stripeSubscriptionId || user.plan?.interval) return "paying";
+  if (user.plan && user.plan.expiresAt >= expiresAt) return "already-longer";
+  await grantPremium(email, expiresAt);
+  return "granted";
+}
+
 // Every user document ever created (see createSessionForEmail in
 // auth/session.ts) - the same underlying query getAllUserEmails()
 // (notification.ts) already runs for the "send to everyone" broadcast,
