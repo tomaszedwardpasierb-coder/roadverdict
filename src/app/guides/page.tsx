@@ -44,6 +44,11 @@ const GUIDES = [
     description: 'Fuel, insurance, tax, servicing and depreciation - the full picture, not just the price on the forecourt.',
   },
   {
+    href: '/guides/motorcycle-road-tax',
+    title: 'Motorcycle Road Tax: How Much by Engine Size',
+    description: 'The official UK rates by engine size, monthly payments, electric bikes and buying used.',
+  },
+  {
     href: '/guides/proving-service-history',
     title: 'How to Prove Your Service History When You Sell',
     description: 'What counts as proof, what buyers check, how to present it - and what never to share.',

@@ -6,9 +6,9 @@ import { RelatedTools } from '@/components/RelatedTools';
 import { buildBreadcrumbJsonLd } from '@/lib/seo/breadcrumbs';
 
 export const metadata: Metadata = pageMetadata({
-  title: 'Used Motorcycle Buying Guide & Free Bike Check (UK)',
+  title: 'Free Motorcycle History Check: MOT & Mileage (UK)',
   description:
-    "Buying a used motorcycle? Enter the registration for a free buyer checklist, full MOT history and valuation - weighted by the bike's age. No account needed.",
+    "Free motorcycle history check by registration: the full MOT history with the mileage at every test, plus a buyer checklist for the bike's age. No account needed.",
   path: '/buying-guide',
 });
 
@@ -77,8 +77,11 @@ export default function BuyingGuidePage() {
         dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }}
       />
       <div className="hero">
-        <h1>What should you check before buying it?</h1>
-        <p>A buyer checklist weighted by how old the bike actually is - not a generic list.</p>
+        <h1>Free motorcycle history check</h1>
+        <p>
+          Enter the registration for the full MOT history, the mileage at every test, and a buyer
+          checklist weighted by how old the bike actually is - not a generic list.
+        </p>
       </div>
       <BuyingGuideFormForViewer />
       <p className="disclaimer">

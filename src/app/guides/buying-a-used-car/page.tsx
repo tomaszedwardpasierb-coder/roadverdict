@@ -164,7 +164,7 @@ export default function BuyingAUsedCarPage() {
         <li>
           <strong>Tax doesn&apos;t come with it.</strong> Vehicle tax no longer transfers when a
           car is sold. Tax it yourself before you drive away - it takes minutes online with the
-          11-digit reference number on the new keeper slip.
+          reference number on the green new keeper slip.
         </li>
         <li>
           <strong>Insurance first.</strong> You need your own insurance in place before you drive

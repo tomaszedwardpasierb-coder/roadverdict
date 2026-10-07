@@ -86,7 +86,8 @@ export default function CostOfOwningAMotorcyclePage() {
       <p style={{ maxWidth: 'none' }}>
         Motorcycle VED is banded by engine size and is generally low compared to cars - but
         it&apos;s still a real annual cost, and it&apos;s one of the few here that&apos;s fixed
-        and predictable rather than variable.
+        and predictable rather than variable. It runs from £27 a year up to 150cc to £125 over
+        600cc - see <Link href="/guides/motorcycle-road-tax">motorcycle road tax by engine size</Link>.
       </p>
 
       <h2>Servicing and consumables</h2>

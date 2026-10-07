@@ -84,6 +84,9 @@ export function SiteFooterLinks() {
             <Link href="/guides/cost-of-owning-a-car">Cost of owning a car</Link>
           </li>
           <li>
+            <Link href="/guides/motorcycle-road-tax">Motorcycle road tax</Link>
+          </li>
+          <li>
             <Link href="/guides/proving-service-history">Proving service history</Link>
           </li>
           <li>

@@ -1,5 +1,6 @@
 ﻿import { getAdjustedBenchmark, type BikeClass, type Region } from './priceData';
 import { getCurrentPetrolPricePenceLitre } from './fuelPrice';
+import { vedBand } from './motorcycleVed';
 /**
  * Cost breakdown sourcing notes - same spirit as priceData.ts.
  *
@@ -35,10 +36,11 @@ import { getCurrentPetrolPricePenceLitre } from './fuelPrice';
  *   real tyre life varies hugely with riding style and tyre choice.
  */
 const MOT_COST = 28; // per year (bikes need one from year 3 onward - shown as if annual for simplicity)
+// The rates themselves live in motorcycleVed.ts (shared with the road tax guide).
 const VED_BY_CLASS: Record<BikeClass, number> = {
-  small: 59, // covers 151-400cc band; a sub-150cc learner bike would actually pay £27, not £59 - flagged imprecision
-  medium: 125, // most "medium" bikes (650s, 689cc) are over the 600cc line, so this is the over-600cc rate, not the 401-600cc one
-  large: 125,
+  small: vedBand('151-400').twelveMonths, // covers 151-400cc band; a sub-150cc learner bike would actually pay £27, not £59 - flagged imprecision
+  medium: vedBand('over-600').twelveMonths, // most "medium" bikes (650s, 689cc) are over the 600cc line, so this is the over-600cc rate, not the 401-600cc one
+  large: vedBand('over-600').twelveMonths,
 };
 
 const LITRES_PER_UK_GALLON = 4.546;
