@@ -393,6 +393,16 @@ describe("POST /api/assistant", () => {
     expect(callBody.systemInstruction.parts[0].text).toContain('CURRENT DASHBOARD TAB: the signed-in user currently has the "Settings" tab open');
   });
 
+  it("names the buying guide tab exactly as the sidebar does, so 'where is it?' answers match what the user sees", async () => {
+    mocks.getSession.mockResolvedValue({ email: "rider@example.com" });
+
+    await POST(request({ messages: [{ role: "user", content: "where do I run the history check?" }], dashboardTab: "buyingGuide" }));
+
+    const text = JSON.parse(mocks.fetch.mock.calls[0][1].body).systemInstruction.parts[0].text;
+    expect(text).toContain('currently has the "Full history check" tab open');
+    expect(text).toContain('This tab lives inside the "Buying Tools" group');
+  });
+
   it("names the sidebar group a tab lives in, for a tab that belongs to one", async () => {
     mocks.getSession.mockResolvedValue({ email: "rider@example.com" });
 

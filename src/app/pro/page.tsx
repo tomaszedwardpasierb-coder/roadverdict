@@ -15,7 +15,7 @@ export const metadata: Metadata = pageMetadata({
   title: 'RoadVerdict Pro: Plans and Pricing',
   description:
     (PRO_TRIAL_DAYS > 0 ? `Try RoadVerdict Pro free for ${PRO_TRIAL_DAYS} days: ` : 'RoadVerdict Pro: ') +
-    'a second vehicle, full reports, exact reminder dates and emails, the encrypted Vault, AI summaries and a free vehicle-history report every 4 weeks.',
+    'a second vehicle, full reports, exact reminder dates and emails, the encrypted Vault, AI summaries and a free full vehicle history check every 4 weeks.',
   path: '/pro',
   absoluteTitle: true,
 });
@@ -50,6 +50,10 @@ export default async function ProPage(props: { searchParams: Promise<{ session_i
         <p className={styles.sub}>
           One subscription, {PRO_MONTHLY_PRICE}/month - it unlocks every Pro feature below together, not one at a time.
         </p>
+        <p className={styles.sub}>
+          Pro includes a full vehicle history check every 4 weeks - the kind that costs up to £20 elsewhere. One check
+          alone is worth more than a month of Pro.
+        </p>
       </div>
 
       <PlanComparisonCards userIsPro={userIsPro} hasStripeSubscription={hasStripeSubscription} trialDays={trialDays} />
@@ -81,7 +85,7 @@ export default async function ProPage(props: { searchParams: Promise<{ session_i
             <p>
               Yes - your first {PRO_TRIAL_DAYS} days of Pro are free, once per account. You add a card at checkout, but
               nothing is charged until the trial ends. We email you a week before it does, and if you cancel before then
-              (Manage billing, on this page) you pay nothing. The free vehicle-history report starts with your first
+              (Manage billing, on this page) you pay nothing. The free vehicle history check starts with your first
               payment.
             </p>
           ) : (

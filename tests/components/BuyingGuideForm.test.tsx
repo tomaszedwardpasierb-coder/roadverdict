@@ -230,7 +230,7 @@ describe("BuyingGuideForm", () => {
     await user.type(screen.getByLabelText("Search by registration (optional)"), "AB12CDE");
     await user.click(screen.getByRole("button", { name: "Look up" }));
 
-    expect(await screen.findByRole("button", { name: /Buy the vehicle history report - £14\.99/ })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: /Buy the full vehicle history check - £14\.99/ })).toBeInTheDocument();
     expect(screen.getByText(/Add a vehicle to your garage to unlock £12\.99/)).toBeInTheDocument();
   });
 
@@ -249,7 +249,7 @@ describe("BuyingGuideForm", () => {
     await user.type(screen.getByLabelText("Search by registration (optional)"), "AB12CDE");
     await user.click(screen.getByRole("button", { name: "Look up" }));
 
-    expect(await screen.findByRole("button", { name: /Get your free vehicle history report/ })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: /Get your free full vehicle history check/ })).toBeInTheDocument();
   });
 
   it("shows the priced CTA and next-free-date note for a Pro account off its allowance", async () => {
@@ -267,7 +267,7 @@ describe("BuyingGuideForm", () => {
     await user.type(screen.getByLabelText("Search by registration (optional)"), "AB12CDE");
     await user.click(screen.getByRole("button", { name: "Look up" }));
 
-    expect(await screen.findByRole("button", { name: /Buy the vehicle history report - £9\.99/ })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: /Buy the full vehicle history check - £9\.99/ })).toBeInTheDocument();
     expect(screen.getByText(/Your next free report is available 01\/02\/2026/)).toBeInTheDocument();
   });
 
@@ -300,7 +300,7 @@ describe("BuyingGuideForm", () => {
     render(<BuyingGuideForm signedIn />);
     await user.type(screen.getByLabelText("Search by registration (optional)"), "AB12CDE");
     await user.click(screen.getByRole("button", { name: "Look up" }));
-    const buyButton = await screen.findByRole("button", { name: /Buy the vehicle history report/ });
+    const buyButton = await screen.findByRole("button", { name: /Buy the full vehicle history check/ });
     await user.click(buyButton);
 
     expect(await screen.findByRole("button", { name: "Getting your report…" })).toBe(buyButton);
@@ -346,7 +346,7 @@ describe("BuyingGuideForm", () => {
     render(<BuyingGuideForm signedIn />);
     await user.type(screen.getByLabelText("Search by registration (optional)"), "AB12CDE");
     await user.click(screen.getByRole("button", { name: "Look up" }));
-    await user.click(await screen.findByRole("button", { name: /Buy the vehicle history report/ }));
+    await user.click(await screen.findByRole("button", { name: /Buy the full vehicle history check/ }));
 
     await waitFor(() => expect(window.location.href).toBe("https://checkout.stripe.com/test-session"));
     expect(fetchMock).toHaveBeenCalledWith(
@@ -400,7 +400,7 @@ describe("BuyingGuideForm", () => {
     render(<BuyingGuideForm signedIn />);
     await user.type(screen.getByLabelText("Search by registration (optional)"), "AB12CDE");
     await user.click(screen.getByRole("button", { name: "Look up" }));
-    await user.click(await screen.findByRole("button", { name: /Get your free vehicle history report/ }));
+    await user.click(await screen.findByRole("button", { name: /Get your free full vehicle history check/ }));
 
     expect(await screen.findByText(/your free Premium report/)).toBeInTheDocument();
     expect(fetchMock).toHaveBeenCalledWith(
@@ -454,7 +454,7 @@ describe("BuyingGuideForm", () => {
     const keeperEntries = screen.getAllByText(/new keeper registered/);
     expect(keeperEntries[0]).toHaveTextContent("01/06/2024");
     expect(keeperEntries[1]).toHaveTextContent("01/01/2023");
-    expect(screen.queryByRole("button", { name: /Buy the vehicle history report/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Buy the full vehicle history check/ })).not.toBeInTheDocument();
   });
 
   it("shows 'your free Premium report' when the check was granted free, not purchased", async () => {
@@ -587,7 +587,7 @@ describe("BuyingGuideForm", () => {
     await user.click(screen.getByRole("button", { name: "Look up" }));
 
     expect(await screen.findByText(/already been used/)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Buy the vehicle history report/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Buy the full vehicle history check/ })).toBeInTheDocument();
   });
 
   it("shows the free-lookup-used-up message and a Buy button, without the MOT section, when requiresPayment is true", async () => {
@@ -609,7 +609,7 @@ describe("BuyingGuideForm", () => {
 
     expect(await screen.findByText(/used your free bike check for this period/)).toBeInTheDocument();
     expect(screen.getByText(/01\/02\/2026/)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Buy the vehicle history report - £14\.99/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Buy the full vehicle history check - £14\.99/ })).toBeInTheDocument();
     expect(screen.queryByText(/MOT due/)).not.toBeInTheDocument();
     expect(screen.queryByText(/no mot due date on record/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/no mot test history found/i)).not.toBeInTheDocument();

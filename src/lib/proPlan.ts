@@ -29,6 +29,7 @@ export const EXTRA_VEHICLE_MONTHLY_PENCE = 199;
 // Pro-gated (see export/csv/route.ts), so it belongs on the Free card
 // instead; it used to be listed here by mistake.
 export const PRO_FEATURES = [
+  "One free full vehicle history check every 4 weeks - the kind that costs up to £20 elsewhere (£9.99 for another sooner)",
   "The Vault - encrypted, 2FA-protected document storage for your V5C, insurance, MOT, and everything else you'd hate to lose",
   "Detailed buyer/seller verdict report",
   "AI-generated \"Story So Far\" summary",
@@ -37,7 +38,6 @@ export const PRO_FEATURES = [
   "Category-by-category spend breakdown (which category, and how much)",
   "Batch receipt scanning (multiple files at once)",
   "Exact reminder due dates, plus automatic reminder emails",
-  "One free Buying Guide vehicle-history report every 4 weeks (£9.99 for another sooner)",
   "Quote Checker, Cost Calculator & Buying Guide, pre-filled with your bike's own details",
   "A second vehicle (bike or car) - with side-by-side cost comparison to see which one actually costs you more to run",
 ] as const;

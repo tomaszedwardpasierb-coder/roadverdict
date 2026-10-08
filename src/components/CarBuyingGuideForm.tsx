@@ -336,15 +336,15 @@ export function CarBuyingGuideForm({ signedIn }: Props) {
                 {motResult.nextFreeLookupAt
                   ? ` - your next free one is available ${new Date(motResult.nextFreeLookupAt).toLocaleDateString('en-GB')}`
                   : ''}
-                . Buy the vehicle history report for this registration to check it now instead.
+                . Buy the full vehicle history check for this registration to run it now instead.
               </p>
               <button type="button" className="btn-primary" onClick={handleBuyVdiCheck} disabled={vdiPurchasing}>
                 {vdiPurchasing && <VehicleSpinner kind="car" size={20} />}
                 {vdiPurchasing
                   ? 'Getting your report…'
                   : motResult.proFreeAvailable
-                    ? 'Get your free vehicle history report (1 every 4 weeks)'
-                    : `Buy the vehicle history report - ${motResult.reportPriceLabel}`}
+                    ? 'Get your free full vehicle history check (1 every 4 weeks)'
+                    : `Buy the full vehicle history check - ${motResult.reportPriceLabel}`}
               </button>
               {vdiPurchaseError && <p className="error-text" role="alert">{vdiPurchaseError}</p>}
             </div>
@@ -367,8 +367,8 @@ export function CarBuyingGuideForm({ signedIn }: Props) {
                 {vdiPurchasing
                   ? 'Getting your report…'
                   : motResult.proFreeAvailable
-                    ? 'Get your free vehicle history report (1 every 4 weeks)'
-                    : `Buy the vehicle history report - ${motResult.reportPriceLabel}`}
+                    ? 'Get your free full vehicle history check (1 every 4 weeks)'
+                    : `Buy the full vehicle history check - ${motResult.reportPriceLabel}`}
               </button>
               {motResult.reportTier === 'pro' && !motResult.proFreeAvailable && motResult.nextFreeReportAt && (
                 <p className="field-note">

@@ -38,7 +38,7 @@ const ICONS = {
   // item), same reuse-the-lucide-component convention as the rest of
   // this map.
   lock: Lock,
-  // Secondary sidebar menu (Cost Calculator / Buying a Used Bike /
+  // Secondary sidebar menu (Cost Calculator / Full History Check /
   // Privacy) - deliberately not reusing Shield or BookOpen, both
   // already meaning something else above (Insurance/Tax/MOT/Finance, Story So
   // Far), to avoid two different nav items reading as the same icon.

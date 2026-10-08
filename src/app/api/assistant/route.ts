@@ -178,7 +178,7 @@ const DASHBOARD_TAB_LABELS: Record<string, string> = {
   shareLinks: "Shareable Links",
   quoteChecker: "Quote Checker",
   costCalculator: "Cost calculator",
-  buyingGuide: "Buying a used bike",
+  buyingGuide: "Full history check",
   privacy: "Privacy",
   transferOwnership: "Transfer ownership",
   security: "Settings",

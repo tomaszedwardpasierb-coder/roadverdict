@@ -1074,12 +1074,12 @@ export default async function DashboardPage(props: { searchParams: Promise<{ add
   );
 
   const buyingGuideContent = activeSection !== 'buyingGuide' ? undefined : (
-    <ProGate featureName="Buying a Used Bike" description="A buyer's checklist weighted by how old the bike actually is, so you know exactly what to check before handing any money over." isPro={userIsPro}>
+    <ProGate featureName="Full Vehicle History Check" description="Check any bike's plate for stolen, written-off and outstanding-finance records, plus keeper and plate changes - the kind of check that costs up to £20 elsewhere. One included every 4 weeks with Pro, with a buyer checklist weighted by how old the bike actually is." isPro={userIsPro}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "0.75rem" }}>
-        <h1 className={styles.heading}>Buying a used bike{bikeTag}</h1>
+        <h1 className={styles.heading}>Full vehicle history check{bikeTag}</h1>
         {mileagePill}
       </div>
-      <p className={styles.subtext}>A buyer checklist weighted by how old the bike actually is - not a generic list.</p>
+      <p className={styles.subtext}>Check any plate before you buy: stolen, written-off and outstanding-finance records, plus keeper and plate changes, from police and DVLA data - the kind of check that costs up to £20 elsewhere. Includes a buyer checklist weighted by how old the bike actually is.</p>
       <BuyingGuideForm signedIn />
     </ProGate>
   );
@@ -1516,12 +1516,12 @@ async function renderCarDashboard(
   );
 
   const carBuyingGuideContent = activeSection !== 'buyingGuide' ? undefined : (
-    <ProGate featureName="Buying a Used Car" description="A buyer's checklist weighted by how old the car actually is, so you know exactly what to check before handing any money over." isPro={userIsPro}>
+    <ProGate featureName="Full Vehicle History Check" description="Check any car's plate for stolen, written-off and outstanding-finance records, plus keeper and plate changes - the kind of check that costs up to £20 elsewhere. One included every 4 weeks with Pro, with a buyer checklist weighted by how old the car actually is." isPro={userIsPro}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "0.75rem" }}>
-        <h1 className={styles.heading}>Buying a used car{carTag}</h1>
+        <h1 className={styles.heading}>Full vehicle history check{carTag}</h1>
         {mileagePill}
       </div>
-      <p className={styles.subtext}>A buyer checklist weighted by how old the car actually is - not a generic list.</p>
+      <p className={styles.subtext}>Check any plate before you buy: stolen, written-off and outstanding-finance records, plus keeper and plate changes, from police and DVLA data - the kind of check that costs up to £20 elsewhere. Includes a buyer checklist weighted by how old the car actually is.</p>
       <CarBuyingGuideForm signedIn />
     </ProGate>
   );

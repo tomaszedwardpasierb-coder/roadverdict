@@ -78,7 +78,7 @@ const NAV_GROUPS: { key: string; label: string; icon: IconName; open: boolean; i
     items: [
       { label: 'Quote Checker', icon: 'quoteChecker' },
       { label: 'Cost calculator', icon: 'costCalculator' },
-      { label: 'Buying a used bike', icon: 'buyingGuide' },
+      { label: 'Full history check', icon: 'buyingGuide' },
     ],
   },
 ];

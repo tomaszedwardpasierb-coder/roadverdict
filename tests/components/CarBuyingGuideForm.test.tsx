@@ -264,7 +264,7 @@ describe("CarBuyingGuideForm", () => {
     await user.type(screen.getByLabelText("Search by registration (optional)"), "AB12CDE");
     await user.click(screen.getByRole("button", { name: "Look up" }));
 
-    expect(await screen.findByRole("button", { name: /Buy the vehicle history report - £14\.99/ })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: /Buy the full vehicle history check - £14\.99/ })).toBeInTheDocument();
   });
 
   it("clicking Buy calls the checkout route with the current vrm and redirects to the returned url", async () => {
@@ -297,7 +297,7 @@ describe("CarBuyingGuideForm", () => {
     render(<CarBuyingGuideForm signedIn />);
     await user.type(screen.getByLabelText("Search by registration (optional)"), "AB12CDE");
     await user.click(screen.getByRole("button", { name: "Look up" }));
-    const buyButton = await screen.findByRole("button", { name: /Buy the vehicle history report/ });
+    const buyButton = await screen.findByRole("button", { name: /Buy the full vehicle history check/ });
     await user.click(buyButton);
 
     expect(await screen.findByRole("button", { name: "Getting your report…" })).toBe(buyButton);
@@ -346,7 +346,7 @@ describe("CarBuyingGuideForm", () => {
     render(<CarBuyingGuideForm signedIn />);
     await user.type(screen.getByLabelText("Search by registration (optional)"), "AB12CDE");
     await user.click(screen.getByRole("button", { name: "Look up" }));
-    await user.click(await screen.findByRole("button", { name: /Buy the vehicle history report/ }));
+    await user.click(await screen.findByRole("button", { name: /Buy the full vehicle history check/ }));
 
     await waitFor(() => expect(window.location.href).toBe("https://checkout.stripe.com/test-session"));
     expect(fetchMock).toHaveBeenCalledWith(
@@ -398,7 +398,7 @@ describe("CarBuyingGuideForm", () => {
     expect(screen.getByText("Keeper change history")).toBeInTheDocument();
     expect(screen.getByText("Private average: £23,994")).toBeInTheDocument();
     expect(screen.getByText("Dealer forecourt: £27,161")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /Buy the vehicle history report/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Buy the full vehicle history check/ })).not.toBeInTheDocument();
   });
 
   // The fuller identity/technical-spec/PNC block added for the car
@@ -693,7 +693,7 @@ describe("CarBuyingGuideForm", () => {
     await user.click(screen.getByRole("button", { name: "Look up" }));
 
     expect(await screen.findByText(/already been used/)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Buy the vehicle history report/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Buy the full vehicle history check/ })).toBeInTheDocument();
   });
 
   it("shows the free-lookup-used-up message and a Buy button, without the MOT section, when requiresPayment is true", async () => {
@@ -715,7 +715,7 @@ describe("CarBuyingGuideForm", () => {
 
     expect(await screen.findByText(/used your free car check for this period/)).toBeInTheDocument();
     expect(screen.getByText(/01\/02\/2026/)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Buy the vehicle history report - £14\.99/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Buy the full vehicle history check - £14\.99/ })).toBeInTheDocument();
     expect(screen.queryByText(/MOT due/)).not.toBeInTheDocument();
     expect(screen.queryByText(/no mot due date on record/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/no mot test history found/i)).not.toBeInTheDocument();

@@ -219,7 +219,7 @@ standalone items that don't belong to any group:
   anything new yourself.
 - **Selling** - Shareable Links and Transfer ownership. The tabs you'd only reach for when
   you're actually selling the car or handing it to a new owner.
-- **Buying Tools** - Quote Checker, Cost Calculator, and Buying a used car. These don't need
+- **Buying Tools** - Quote Checker, Cost Calculator, and Full history check. These don't need
   your own car logged at all - they're useful even before you own one, or for sizing up a car
   you're thinking of buying.
 - **Standalone**, not inside any group - Dashboard (the overview), Reminders, Settings (profile,
@@ -509,7 +509,7 @@ test history and an AI-written summary of everything found.
 no way to verify what they're being told. This gives a buyer a concrete checklist to work from,
 whether or not the seller happens to be using RoadVerdict themselves.
 **How:** Available two ways - directly from the RoadVerdict site with no account required, or as
-"Buying a used car" in the Buying Tools group of your dashboard if you're signed in. Enter the
+"Full history check" in the Buying Tools group of your dashboard if you're signed in. Enter the
 car's registration to get the free checklist, its full official MOT test history, and an
 AI-written briefing alongside it, so you're not checking the guide and a separate DVSA lookup as
 two different steps. From there, you can optionally pay to unlock a full vehicle-history report

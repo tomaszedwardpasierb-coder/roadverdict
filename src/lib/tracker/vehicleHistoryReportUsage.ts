@@ -12,17 +12,31 @@ import { PRO_FREE_REPORT_COOLDOWN_MS } from "@/lib/payments/pricing";
 import { isInProTrial } from "@/lib/payments/proTrial";
 import { replaceIfUnchanged } from "@/lib/tracker/atomicUpdate";
 
+// Accounts tagged "tester" (the Play closed-test testers - see
+// ACCOUNT_TAGS in userAccount.ts, which this deliberately doesn't import:
+// it pulls in bike/subscriptions and the circular-import trap userDoc.ts
+// documents) are given Pro from /tomasz so they can try every screen.
+// Each free report is a paid data lookup, so theirs never come free;
+// they can still buy one at the Pro price like anyone else.
+function isTesterAccount(user: UserDoc | null): boolean {
+  return user?.tags?.includes("tester") ?? false;
+}
+
 // A free Pro trial doesn't include it: each report costs a paid data
 // lookup, so the free one starts with the first payment.
 export function canRunFreeVehicleHistoryReport(user: UserDoc | null): boolean {
+  if (isTesterAccount(user)) return false;
   if (isInProTrial(user)) return false;
   if (!user?.vehicleHistoryReportUsage) return true;
   return Date.now() - new Date(user.vehicleHistoryReportUsage.lastRunAt).getTime() > PRO_FREE_REPORT_COOLDOWN_MS;
 }
 
 // Null once the cooldown has already elapsed (or never started) - a
-// free report is available right now, so there is no "next" date to show.
+// free report is available right now, so there is no "next" date to show
+// - and null for a tester, who never gets one.
 export function nextFreeVehicleHistoryReportAt(user: UserDoc | null): string | null {
+  // A tester's free report never arrives, so don't promise a date.
+  if (isTesterAccount(user)) return null;
   if (isInProTrial(user)) return user!.plan!.trialEndsAt!;
   if (!user?.vehicleHistoryReportUsage) return null;
   const nextMs = new Date(user.vehicleHistoryReportUsage.lastRunAt).getTime() + PRO_FREE_REPORT_COOLDOWN_MS;

@@ -52,6 +52,19 @@ describe("canRunFreeVehicleHistoryReport", () => {
     const user = makeUser({ vehicleHistoryReportUsage: { lastRunAt: new Date(Date.now() - PRO_FREE_REPORT_COOLDOWN_MS - 1000).toISOString() } });
     expect(canRunFreeVehicleHistoryReport(user)).toBe(true);
   });
+
+  it("never grants it to an account tagged 'tester', even one that has never run a report", () => {
+    expect(canRunFreeVehicleHistoryReport(makeUser({ tags: ["tester"] }))).toBe(false);
+    expect(canRunFreeVehicleHistoryReport(makeUser({ tags: ["friend", "tester"] }))).toBe(false);
+    const longAgo = new Date(Date.now() - PRO_FREE_REPORT_COOLDOWN_MS - 1000).toISOString();
+    expect(canRunFreeVehicleHistoryReport(makeUser({ tags: ["tester"], vehicleHistoryReportUsage: { lastRunAt: longAgo } }))).toBe(false);
+  });
+
+  it("is not held back by any other tag", () => {
+    expect(canRunFreeVehicleHistoryReport(makeUser({ tags: ["friend"] }))).toBe(true);
+    expect(canRunFreeVehicleHistoryReport(makeUser({ tags: ["press"] }))).toBe(true);
+    expect(canRunFreeVehicleHistoryReport(makeUser({ tags: [] }))).toBe(true);
+  });
 });
 
 describe("nextFreeVehicleHistoryReportAt", () => {
@@ -62,6 +75,13 @@ describe("nextFreeVehicleHistoryReportAt", () => {
   it("returns null once the cooldown has already elapsed", () => {
     const user = makeUser({ vehicleHistoryReportUsage: { lastRunAt: new Date(Date.now() - PRO_FREE_REPORT_COOLDOWN_MS - 1000).toISOString() } });
     expect(nextFreeVehicleHistoryReportAt(user)).toBeNull();
+  });
+
+  it("returns null for a tester - their free report never arrives, so there is no date to promise", () => {
+    const recent = new Date(Date.now() - 1000).toISOString();
+    expect(nextFreeVehicleHistoryReportAt(makeUser({ tags: ["tester"], vehicleHistoryReportUsage: { lastRunAt: recent } }))).toBeNull();
+    const trialEndsAt = new Date(Date.now() + 5 * 86_400_000).toISOString();
+    expect(nextFreeVehicleHistoryReportAt(makeUser({ tags: ["tester"], plan: { grantedAt: "x", expiresAt: trialEndsAt, trialEndsAt } }))).toBeNull();
   });
 
   it("returns the date the cooldown ends when still within it", () => {
@@ -82,6 +102,14 @@ describe("recordVehicleHistoryReportRun", () => {
     const [saved, options] = mocks.replace.mock.calls[0];
     expect(new Date((saved as UserDoc).vehicleHistoryReportUsage!.lastRunAt).getTime()).toBeGreaterThanOrEqual(before);
     expect(options).toEqual({ accessCondition: { type: "IfMatch", condition: "etag-1" } });
+  });
+
+  it("refuses the claim when the account was tagged a tester between the check and the write", async () => {
+    mocks.replace.mockRejectedValueOnce(Object.assign(new Error("conflict"), { code: 412 }));
+    mocks.read.mockResolvedValue({ resource: { ...makeUser({ tags: ["tester"] }), _etag: "etag-2" } });
+    const result = await recordVehicleHistoryReportRun("a@example.com", "etag-1", makeUser());
+    expect(result).toEqual({ recorded: false, alreadyUsed: true });
+    expect(mocks.replace).toHaveBeenCalledTimes(1);
   });
 
   it("reports alreadyUsed when a concurrent writer already consumed this month's free report", async () => {

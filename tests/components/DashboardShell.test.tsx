@@ -467,12 +467,15 @@ describe("DashboardShell", () => {
   // (Logbook/Insights/Selling/Buying Tools) rather than one flat 15-item
   // list - Logbook defaults open (daily-use tabs), the other three default
   // closed (the long-tail tabs that were causing the actual clutter).
-  it("shows the bike-flavoured 'Buying a used bike' label for a bike-active session", async () => {
+  it("labels the buying guide 'Full history check' in Buying Tools for a bike-active session", async () => {
     const user = userEvent.setup();
     render(<DashboardShell {...baseProps()} />);
     const buyingToolsHeader = screen.getAllByRole("button", { name: /Buying Tools/ })[0];
     await user.click(buyingToolsHeader);
-    expect(screen.getByRole("button", { name: "Buying a used bike" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Full history check" })).toBeInTheDocument();
+    // The paid history check is the point of this tab - the old label
+    // ("Buying a used bike") never said so, which is why nobody found it.
+    expect(screen.queryByRole("button", { name: "Buying a used bike" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Buying a used car" })).not.toBeInTheDocument();
   });
 
@@ -637,26 +640,27 @@ describe("DashboardShell", () => {
       expect(mockRouter.push).toHaveBeenCalledWith("/dashboard?tab=transferOwnership");
     });
 
-    // Quote Checker/Cost calculator/Buying a used car all have real car
+    // Quote Checker/Cost calculator/Full history check all have real car
     // equivalents now (standalone /cars/quote-checker etc, wired into
     // the dashboard's own tabs) - they must render as real, clickable
     // nav items for a car-active session, not just be absent from the
     // unavailable-labels list above.
-    it("still shows all three buying tools as real, clickable nav items for a car-active session, with a car-flavoured buying-guide label", async () => {
+    it("still shows all three buying tools as real, clickable nav items for a car-active session, with the same buying-guide label", async () => {
       const user = userEvent.setup();
       render(<DashboardShell {...carProps()} />);
       const buyingToolsHeader = screen.getAllByRole("button", { name: /Buying Tools/ })[0];
       await user.click(buyingToolsHeader);
 
-      // Not "Buying a used bike" - that was a real bug (NAV_GROUPS is
-      // shared by both vehicle kinds, and only this one label mentions
-      // the kind by name; see DashboardShell.tsx's navLabelFor).
+      // The label no longer names a vehicle kind, so a bike-only label can't
+      // leak into a car session (it once did, when it said "Buying a used
+      // bike" and NAV_GROUPS is shared by both vehicle kinds).
       expect(screen.queryByRole("button", { name: "Buying a used bike" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Buying a used car" })).not.toBeInTheDocument();
 
       for (const [label, tabKey] of [
         ["Quote Checker", "quoteChecker"],
         ["Cost calculator", "costCalculator"],
-        ["Buying a used car", "buyingGuide"],
+        ["Full history check", "buyingGuide"],
       ]) {
         expect(screen.getByRole("button", { name: label })).toBeInTheDocument();
         await user.click(screen.getByRole("button", { name: label }));
