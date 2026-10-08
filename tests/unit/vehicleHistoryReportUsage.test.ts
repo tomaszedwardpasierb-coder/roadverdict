@@ -9,6 +9,7 @@ vi.mock("@/lib/cosmos", () => ({ getContainer: () => mockContainer }));
 
 import {
   canRunFreeVehicleHistoryReport,
+  freeVehicleHistoryCheckStatus,
   nextFreeVehicleHistoryReportAt,
   recordVehicleHistoryReportRun,
 } from "@/lib/tracker/vehicleHistoryReportUsage";
@@ -90,6 +91,45 @@ describe("nextFreeVehicleHistoryReportAt", () => {
     const next = nextFreeVehicleHistoryReportAt(user);
     expect(next).not.toBeNull();
     expect(new Date(next!).getTime()).toBe(new Date(lastRunAt).getTime() + PRO_FREE_REPORT_COOLDOWN_MS);
+  });
+});
+
+describe("freeVehicleHistoryCheckStatus", () => {
+  const inTrial = () => {
+    const trialEndsAt = new Date(Date.now() + 5 * 86_400_000).toISOString();
+    return { trialEndsAt, plan: { grantedAt: "x", expiresAt: trialEndsAt, trialEndsAt } };
+  };
+
+  it("is ready for an account that has never run a report, and when there is no user doc at all", () => {
+    expect(freeVehicleHistoryCheckStatus(makeUser())).toEqual({ state: "ready" });
+    expect(freeVehicleHistoryCheckStatus(null)).toEqual({ state: "ready" });
+  });
+
+  it("gives the date the next one is due while the 4-week cooldown is still running", () => {
+    const lastRunAt = new Date(Date.now() - 1000).toISOString();
+    const status = freeVehicleHistoryCheckStatus(makeUser({ vehicleHistoryReportUsage: { lastRunAt } }));
+    expect(status).toEqual({ state: "later", at: new Date(new Date(lastRunAt).getTime() + PRO_FREE_REPORT_COOLDOWN_MS).toISOString() });
+  });
+
+  it("is ready again once the cooldown has passed", () => {
+    const lastRunAt = new Date(Date.now() - PRO_FREE_REPORT_COOLDOWN_MS - 1000).toISOString();
+    expect(freeVehicleHistoryCheckStatus(makeUser({ vehicleHistoryReportUsage: { lastRunAt } }))).toEqual({ state: "ready" });
+  });
+
+  it("says the free check starts when the free trial ends", () => {
+    const { trialEndsAt, plan } = inTrial();
+    expect(freeVehicleHistoryCheckStatus(makeUser({ plan }))).toEqual({ state: "trial", at: trialEndsAt });
+  });
+
+  it("says tester for a tester, ahead of a trial or of any earlier use", () => {
+    expect(freeVehicleHistoryCheckStatus(makeUser({ tags: ["tester"] }))).toEqual({ state: "tester" });
+    expect(freeVehicleHistoryCheckStatus(makeUser({ tags: ["tester"], plan: inTrial().plan }))).toEqual({ state: "tester" });
+    const recent = new Date(Date.now() - 1000).toISOString();
+    expect(freeVehicleHistoryCheckStatus(makeUser({ tags: ["tester"], vehicleHistoryReportUsage: { lastRunAt: recent } }))).toEqual({ state: "tester" });
+  });
+
+  it("is not changed by other tags", () => {
+    expect(freeVehicleHistoryCheckStatus(makeUser({ tags: ["friend", "press"] }))).toEqual({ state: "ready" });
   });
 });
 

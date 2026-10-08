@@ -43,6 +43,22 @@ export function nextFreeVehicleHistoryReportAt(user: UserDoc | null): string | n
   return nextMs > Date.now() ? new Date(nextMs).toISOString() : null;
 }
 
+// What the Full history check tab tells a Pro account about its free
+// check, so the answer to "where's my monthly one?" is on the page before
+// any plate is typed. Pure, from the user doc the dashboard already has.
+export type FreeHistoryCheckStatus =
+  | { state: "ready" }
+  | { state: "later"; at: string }
+  | { state: "trial"; at: string }
+  | { state: "tester" };
+
+export function freeVehicleHistoryCheckStatus(user: UserDoc | null): FreeHistoryCheckStatus {
+  if (isTesterAccount(user)) return { state: "tester" };
+  if (isInProTrial(user)) return { state: "trial", at: user!.plan!.trialEndsAt! };
+  const at = nextFreeVehicleHistoryReportAt(user);
+  return at ? { state: "later", at } : { state: "ready" };
+}
+
 // Takes the exact UserDoc + etag the caller already read to run
 // canRunFreeVehicleHistoryReport in the first place (see getDocWithEtag),
 // and writes the new lastRunAt conditioned on nothing else having

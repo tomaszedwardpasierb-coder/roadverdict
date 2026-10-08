@@ -74,6 +74,7 @@ import { NotificationBell } from "./NotificationBell";
 import { QuoteForm } from "@/components/QuoteForm";
 import { CostCalculatorForm } from "@/components/CostCalculatorForm";
 import { BuyingGuideForm } from "@/components/BuyingGuideForm";
+import { FreeCheckStatusLine } from "./FreeCheckStatusLine";
 import { PrivacyContent } from "../privacy/PrivacyContent";
 import { TransferOwnershipSection } from "./TransferOwnershipSection";
 import { IncomingOwnershipRequestCard } from "./IncomingOwnershipRequestCard";
@@ -118,6 +119,7 @@ import { PlanComparisonCards } from "@/components/PlanComparisonCards";
 import { isTwoFactorEnabled } from "@/lib/auth/twoFactor";
 import { SettingsTab } from "./SettingsTab";
 import { getUserDoc } from "@/lib/tracker/userDoc";
+import { freeVehicleHistoryCheckStatus } from "@/lib/tracker/vehicleHistoryReportUsage";
 import { getPendingDeletionInfo } from "@/lib/tracker/userAccount";
 
 // --- Car support (see RoadVerdict_Car_Plan_v3.md's ADR) ---
@@ -1080,6 +1082,7 @@ export default async function DashboardPage(props: { searchParams: Promise<{ add
         {mileagePill}
       </div>
       <p className={styles.subtext}>Check any plate before you buy: stolen, written-off and outstanding-finance records, plus keeper and plate changes, from police and DVLA data - the kind of check that costs up to £20 elsewhere. Includes a buyer checklist weighted by how old the bike actually is.</p>
+      <FreeCheckStatusLine status={freeVehicleHistoryCheckStatus(userAccount)} />
       <BuyingGuideForm signedIn />
     </ProGate>
   );
@@ -1522,6 +1525,7 @@ async function renderCarDashboard(
         {mileagePill}
       </div>
       <p className={styles.subtext}>Check any plate before you buy: stolen, written-off and outstanding-finance records, plus keeper and plate changes, from police and DVLA data - the kind of check that costs up to £20 elsewhere. Includes a buyer checklist weighted by how old the car actually is.</p>
+      <FreeCheckStatusLine status={freeVehicleHistoryCheckStatus(userAccount)} />
       <CarBuyingGuideForm signedIn />
     </ProGate>
   );

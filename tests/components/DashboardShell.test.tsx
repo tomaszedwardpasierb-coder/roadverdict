@@ -465,13 +465,12 @@ describe("DashboardShell", () => {
 
   // Sidebar/mobile-sheet nav items are grouped into collapsible categories
   // (Logbook/Insights/Selling/Buying Tools) rather than one flat 15-item
-  // list - Logbook defaults open (daily-use tabs), the other three default
+  // list - Logbook defaults open (daily-use tabs), and so does Buying Tools
+  // (it holds the paid Full history check); Insights and Selling default
   // closed (the long-tail tabs that were causing the actual clutter).
-  it("labels the buying guide 'Full history check' in Buying Tools for a bike-active session", async () => {
-    const user = userEvent.setup();
+  it("labels the buying guide 'Full history check' in Buying Tools for a bike-active session, with no click needed", () => {
     render(<DashboardShell {...baseProps()} />);
-    const buyingToolsHeader = screen.getAllByRole("button", { name: /Buying Tools/ })[0];
-    await user.click(buyingToolsHeader);
+    expect(screen.getAllByRole("button", { name: /Buying Tools/ })[0]).toHaveAttribute("aria-expanded", "true");
     expect(screen.getByRole("button", { name: "Full history check" })).toBeInTheDocument();
     // The paid history check is the point of this tab - the old label
     // ("Buying a used bike") never said so, which is why nobody found it.
@@ -480,13 +479,25 @@ describe("DashboardShell", () => {
   });
 
   describe("collapsible nav groups", () => {
-    it("Logbook's own items are visible with no interaction; the other three groups' items are not", () => {
+    it("Logbook's and Buying Tools' items are visible with no interaction; Insights' and Selling's are not", () => {
       render(<DashboardShell {...baseProps()} />);
       expect(screen.getByRole("button", { name: "Fuel" })).toBeInTheDocument();
       expect(screen.getByRole("button", { name: "Labour" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Quote Checker" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Cost calculator" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Full history check" })).toBeInTheDocument();
       expect(screen.queryByRole("button", { name: "Reports" })).not.toBeInTheDocument();
       expect(screen.queryByRole("button", { name: "Shareable Links" })).not.toBeInTheDocument();
-      expect(screen.queryByRole("button", { name: "Quote Checker" })).not.toBeInTheDocument();
+    });
+
+    it("Buying Tools can still be folded away by clicking its header", async () => {
+      const user = userEvent.setup();
+      render(<DashboardShell {...baseProps()} />);
+      const header = screen.getAllByRole("button", { name: /Buying Tools/ })[0];
+      expect(header).toHaveAttribute("aria-expanded", "true");
+      await user.click(header);
+      expect(header).toHaveAttribute("aria-expanded", "false");
+      expect(screen.queryByRole("button", { name: "Full history check" })).not.toBeInTheDocument();
     });
 
     // The mobile bottom bar itself shows group-level icons (Dashboard,
@@ -648,8 +659,6 @@ describe("DashboardShell", () => {
     it("still shows all three buying tools as real, clickable nav items for a car-active session, with the same buying-guide label", async () => {
       const user = userEvent.setup();
       render(<DashboardShell {...carProps()} />);
-      const buyingToolsHeader = screen.getAllByRole("button", { name: /Buying Tools/ })[0];
-      await user.click(buyingToolsHeader);
 
       // The label no longer names a vehicle kind, so a bike-only label can't
       // leak into a car session (it once did, when it said "Buying a used

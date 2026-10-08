@@ -95,8 +95,10 @@ const STANDALONE_ITEMS: NavItemDef[] = [
 
 // Groups the flat 15-item sidebar used to be, into what the tabs actually
 // are: day-to-day logging vs. the long-tail stuff. Logbook defaults open
-// (it's the daily-use set); the other three default closed - that's
-// where the real clutter was coming from. Shared by both the desktop
+// (it's the daily-use set) and so does Buying Tools (it holds the paid
+// Full history check, which nobody found while the group was folded
+// away); Insights and Selling default closed - that's where the real
+// clutter was coming from. Shared by both the desktop
 // sidebar and the mobile More sheet (see renderNavButton/isGroupExpanded
 // below) so there's one definition of "what's in each group", not two
 // hand-kept-in-sync lists.
@@ -129,7 +131,7 @@ const NAV_GROUPS: NavGroupDef[] = [
     ],
   },
   {
-    groupKey: 'buyingTools', groupLabel: 'Buying Tools', groupIcon: 'buyingTools', defaultExpanded: false, inBottomBar: false,
+    groupKey: 'buyingTools', groupLabel: 'Buying Tools', groupIcon: 'buyingTools', defaultExpanded: true, inBottomBar: false,
     items: [
       { key: 'quoteChecker', label: 'Quote Checker', icon: 'quoteChecker' },
       { key: 'costCalculator', label: 'Cost calculator', icon: 'costCalculator' },
