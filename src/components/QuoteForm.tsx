@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import {
   BIKE_CLASS_LABELS,
   BRAND_OPTIONS,
@@ -58,6 +58,15 @@ export function QuoteForm({ signedIn, initialBrand, initialBikeClass }: Props) {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<ApiResponse | null>(null);
+  const resultRef = useRef<HTMLDivElement>(null);
+
+  // The form fits on one phone screen, so the verdict lands just below the
+  // fold - bring it into view when it arrives.
+  useEffect(() => {
+    if (!result || result.error) return;
+    const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    resultRef.current?.scrollIntoView?.({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'start' });
+  }, [result]);
 
   // Deep links from the price guides (e.g. ?job=brake-pads-front&size=large)
   // pre-select the job and size. Read after mount rather than during render:
@@ -176,102 +185,6 @@ export function QuoteForm({ signedIn, initialBrand, initialBikeClass }: Props) {
     <>
       <form className="ticket" onSubmit={handleSubmit}>
         <div className="ticket__section">
-          <div className="ticket__eyebrow">
-            <span className="ticket__label">Your bike</span>
-            <span className="ticket__step">Step 1 of 4</span>
-          </div>
-
-          {motTests.length === 0 && (
-            <p className="field-note" style={{ marginBottom: '0.9rem' }}>
-              {signedIn ? (
-                <>
-                  Enter a registration and the job you&apos;ve been quoted for - we&apos;ll compare it against real
-                  regional pricing benchmarks and this bike&apos;s own MOT history, so you know if it&apos;s a fair
-                  price before you agree to anything.
-                </>
-              ) : (
-                <>
-                  Search a registration and we&apos;ll check the quote against real pricing benchmarks for this
-                  bike&apos;s region, brand and job type - plus its own MOT advisory history, so you know if a
-                  quoted repair matches something it&apos;s actually needed before. Sign in to search by
-                  registration - <a href="/login">sign in here</a>.
-                </>
-              )}
-            </p>
-          )}
-
-          <div className="field" style={{ marginBottom: '1.1rem' }}>
-            <label htmlFor="qc-vrm">Search by registration (optional)</label>
-            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-              <input
-                id="qc-vrm"
-                type="text"
-                value={vrm}
-                onChange={(e) => setVrm(e.target.value)}
-                placeholder="e.g. AB12 CDE"
-                style={{ flex: '1 1 160px' }}
-              />
-              <button type="button" className="btn-primary" onClick={handlePlateLookup} disabled={lookupLoading}>
-                {lookupLoading && <VehicleSpinner kind="bike" size={20} />}
-                {lookupLoading ? 'Looking up…' : 'Look up'}
-              </button>
-            </div>
-            {lookupError && <p className="error-text" role="alert">{lookupError}</p>}
-            {lookupNote && <p className="field-note">{lookupNote}</p>}
-          </div>
-
-          <div className="field">
-            <label htmlFor="brand">Make</label>
-            <select id="brand" value={brand} onChange={(e) => setBrand(e.target.value)}>
-              {BRAND_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="field" style={{ marginTop: '0.9rem' }}>
-            <label htmlFor="bikeClass">Engine size</label>
-            <select
-              id="bikeClass"
-              value={bikeClass}
-              onChange={(e) => setBikeClass(e.target.value as BikeClass)}
-            >
-              {BIKE_CLASSES.map((key) => (
-                <option key={key} value={key}>
-                  {BIKE_CLASS_LABELS[key]}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
-
-        <hr className="ticket__divider" />
-
-        <div className="ticket__section">
-          <div className="ticket__eyebrow">
-            <span className="ticket__label">Where</span>
-            <span className="ticket__step">Step 2 of 4</span>
-          </div>
-          <div className="field">
-            <label htmlFor="region">Where the work is being done</label>
-            <select id="region" value={region} onChange={(e) => setRegion(e.target.value as Region)}>
-              {REGIONS.map((key) => (
-                <option key={key} value={key}>
-                  {REGION_LABELS[key]}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
-
-        <hr className="ticket__divider" />
-
-        <div className="ticket__section">
-          <div className="ticket__eyebrow">
-            <span className="ticket__label">The job</span>
-            <span className="ticket__step">Step 3 of 4</span>
-          </div>
           <div className="field">
             <label htmlFor="jobType">What needs doing</label>
             <select
@@ -286,16 +199,8 @@ export function QuoteForm({ signedIn, initialBrand, initialBikeClass }: Props) {
               ))}
             </select>
           </div>
-        </div>
 
-        <hr className="ticket__divider" />
-
-        <div className="ticket__section">
-          <div className="ticket__eyebrow">
-            <span className="ticket__label">Your quote</span>
-            <span className="ticket__step">Step 4 of 4</span>
-          </div>
-          <div className="price-field">
+          <div className="price-field" style={{ marginTop: '0.9rem' }}>
             <div className="field price-field__input-wrap">
               <label htmlFor="quotedPrice">What you were quoted</label>
               <div className="price-field__input-wrap">
@@ -314,14 +219,99 @@ export function QuoteForm({ signedIn, initialBrand, initialBikeClass }: Props) {
                 />
               </div>
             </div>
-            <button className="btn-primary" type="submit" disabled={submitting}>
-              {submitting ? 'Checking…' : 'Check my quote'}
-            </button>
           </div>
+
+          <div className="ticket__eyebrow" style={{ marginTop: '1.25rem' }}>
+            <span className="ticket__label">Your bike</span>
+          </div>
+          <div className="ticket__grid">
+            <div className="field">
+              <label htmlFor="brand">Make</label>
+              <select id="brand" value={brand} onChange={(e) => setBrand(e.target.value)}>
+                {BRAND_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="field">
+              <label htmlFor="bikeClass">Engine size</label>
+              <select
+                id="bikeClass"
+                value={bikeClass}
+                onChange={(e) => setBikeClass(e.target.value as BikeClass)}
+              >
+                {BIKE_CLASSES.map((key) => (
+                  <option key={key} value={key}>
+                    {BIKE_CLASS_LABELS[key]}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="field ticket__grid-wide">
+              <label htmlFor="region">Where the work is being done</label>
+              <select id="region" value={region} onChange={(e) => setRegion(e.target.value as Region)}>
+                {REGIONS.map((key) => (
+                  <option key={key} value={key}>
+                    {REGION_LABELS[key]}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <button className="btn-primary ticket__submit" type="submit" disabled={submitting}>
+            {submitting ? 'Checking…' : 'Check my quote'}
+          </button>
           {error && <p className="error-text" role="alert">{error}</p>}
         </div>
+
+        <hr className="ticket__divider" />
+
+        <details className="ticket__more">
+          <summary>Know the registration? Fill in the bike for me</summary>
+          <div className="ticket__more-body">
+            {motTests.length === 0 && (
+              <p className="field-note" style={{ marginBottom: '0.9rem' }}>
+                {signedIn ? (
+                  <>
+                    We&apos;ll fill in the make and engine size from the bike&apos;s own record, and check its MOT history for
+                    advisories that match the job.
+                  </>
+                ) : (
+                  <>
+                    We&apos;ll fill in the make and engine size from the bike&apos;s own record, and check its MOT history for
+                    advisories that match the job. Sign in to use registration search - <a href="/login">sign in here</a>.
+                  </>
+                )}
+              </p>
+            )}
+
+            <div className="field">
+              <label htmlFor="qc-vrm">Search by registration (optional)</label>
+              <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                <input
+                  id="qc-vrm"
+                  type="text"
+                  value={vrm}
+                  onChange={(e) => setVrm(e.target.value)}
+                  placeholder="e.g. AB12 CDE"
+                  style={{ flex: '1 1 160px' }}
+                />
+                <button type="button" className="btn-primary" onClick={handlePlateLookup} disabled={lookupLoading}>
+                  {lookupLoading && <VehicleSpinner kind="bike" size={20} />}
+                  {lookupLoading ? 'Looking up…' : 'Look up'}
+                </button>
+              </div>
+              {lookupError && <p className="error-text" role="alert">{lookupError}</p>}
+              {lookupNote && <p className="field-note">{lookupNote}</p>}
+            </div>
+          </div>
+        </details>
       </form>
 
+      <div ref={resultRef} style={{ scrollMarginTop: '1rem' }}>
       {result && !result.error && (
         <VerdictResult
           verdict={result.verdict}
@@ -335,6 +325,7 @@ export function QuoteForm({ signedIn, initialBrand, initialBikeClass }: Props) {
         />
       )}
       {result && !result.error && <LogbookNudge kind="bike" topic="quote" signedIn={signedIn} />}
+      </div>
     </>
   );
 }

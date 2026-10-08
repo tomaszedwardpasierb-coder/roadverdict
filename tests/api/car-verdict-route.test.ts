@@ -7,7 +7,7 @@ const mocks = vi.hoisted(() => ({
   generateCarQuoteAdvice: vi.fn(),
 }));
 
-vi.mock("@/lib/db", () => ({
+vi.mock("@/lib/quoteLogs", () => ({
   logCarQuoteCheck: mocks.logCarQuoteCheck,
   getCarCommunityStats: mocks.getCarCommunityStats,
 }));
@@ -43,7 +43,7 @@ beforeEach(() => {
   mocks.logCarQuoteCheck.mockReset();
   mocks.getCarCommunityStats.mockReset();
   mocks.generateCarQuoteAdvice.mockReset();
-  mocks.getCarCommunityStats.mockReturnValue(null);
+  mocks.getCarCommunityStats.mockResolvedValue(null);
   mocks.generateCarQuoteAdvice.mockResolvedValue(null);
   delete process.env.GEMINI_API_KEY;
 });
@@ -120,7 +120,7 @@ describe("POST /api/cars/verdict", () => {
   });
 
   it("includes community stats in the response when available", async () => {
-    mocks.getCarCommunityStats.mockReturnValue({ sampleSize: 12, low: 200, high: 300 });
+    mocks.getCarCommunityStats.mockResolvedValue({ sampleSize: 12, low: 200, high: 300 });
 
     const response = await POST(request(validBody, "203.113.10.11"));
     const body = await response.json();

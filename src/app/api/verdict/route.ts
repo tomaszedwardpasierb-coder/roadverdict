@@ -2,10 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { quoteRequestSchema } from '@/lib/validation';
 import { getAdjustedBenchmark, REGION_LABELS, BRAND_OPTIONS, JOB_LABELS, BIKE_CLASS_LABELS } from '@/lib/priceData';
 import { computeVerdict, VERDICT_LABELS } from '@/lib/verdict';
-import { logQuoteCheck, getCommunityStats } from '@/lib/db';
+import { logQuoteCheck, getCommunityStats } from '@/lib/quoteLogs';
 import { generateQuoteAdvice } from '@/lib/tracker/quoteAdvice';
 
-// better-sqlite3 needs the Node.js runtime, not the Edge runtime.
+// The Cosmos SDK needs the Node.js runtime, not the Edge runtime.
 export const runtime = 'nodejs';
 
 // A simple in-memory limiter. This resets whenever the app restarts and won't
@@ -60,11 +60,12 @@ export async function POST(request: NextRequest) {
 
   // Anonymised by design: job type, bike size band, brand, region, price, verdict —
   // nothing that identifies the person who submitted it.
-  logQuoteCheck({ jobType, bikeClass, quotedPrice, verdict, brand, region });
+  // Not awaited: it never throws, and the visitor shouldn't wait for it.
+  void logQuoteCheck({ jobType, bikeClass, quotedPrice, verdict, brand, region });
 
   // Real submitted quotes, shown separately from the verdict above — see the
-  // comment in db.ts for why this isn't used to calculate the verdict itself.
-  const communityStats = getCommunityStats(jobType, bikeClass);
+  // comment in quoteLogs.ts for why this isn't used to calculate the verdict itself.
+  const communityStats = await getCommunityStats(jobType, bikeClass);
 
   // Additive only - the verdict stamp above already works standalone, so a
   // missing GEMINI_API_KEY or a failed call just means this section stays

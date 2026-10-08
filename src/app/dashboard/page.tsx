@@ -1057,7 +1057,7 @@ export default async function DashboardPage(props: { searchParams: Promise<{ add
         <h1 className={styles.heading}>Quote Checker{bikeTag}</h1>
         {mileagePill}
       </div>
-      <p className={styles.subtext}>Three quick questions. One honest answer, benchmarked against typical UK prices.</p>
+      <p className={styles.subtext}>Tell us the job and the price. One honest answer, benchmarked against typical UK prices.</p>
       <QuoteForm signedIn initialBrand={toolInitialBrand} initialBikeClass={toolInitialBikeClass} />
     </ProGate>
   );
@@ -1499,7 +1499,7 @@ async function renderCarDashboard(
         <h1 className={styles.heading}>Quote Checker{carTag}</h1>
         {mileagePill}
       </div>
-      <p className={styles.subtext}>Four quick questions. One honest answer, benchmarked against typical UK prices.</p>
+      <p className={styles.subtext}>Tell us the job and the price. One honest answer, benchmarked against typical UK prices.</p>
       <CarQuoteForm signedIn initialBrand={toolInitialCarBrand} initialCarClass={toolInitialCarClass} />
     </ProGate>
   );

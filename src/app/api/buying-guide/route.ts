@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { buyingGuideRequestSchema } from '@/lib/validation';
 import { CHECKLISTS, AGE_BAND_LABELS, BIKE_CLASS_ADDENDUM, BRAND_SPECIFIC_NOTES } from '@/lib/buyerChecklist';
 import { BRAND_OPTIONS, BIKE_CLASS_LABELS } from '@/lib/priceData';
-import { logBuyingGuideCheck } from '@/lib/db';
+import { logBuyingGuideCheck } from '@/lib/quoteLogs';
 
 export const runtime = 'nodejs';
 
@@ -50,7 +50,7 @@ export async function POST(request: NextRequest) {
 
   // Anonymised by design, same as the other two tools — bike class, brand,
   // age band, nothing that identifies the person checking it.
-  logBuyingGuideCheck({ bikeClass, brand, ageBand });
+  void logBuyingGuideCheck({ bikeClass, brand, ageBand });
 
   return NextResponse.json({
     checklist: CHECKLISTS[ageBand],

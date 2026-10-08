@@ -5,7 +5,7 @@ const mocks = vi.hoisted(() => ({
   logCarBuyingGuideCheck: vi.fn(),
 }));
 
-vi.mock("@/lib/db", () => ({ logCarBuyingGuideCheck: mocks.logCarBuyingGuideCheck }));
+vi.mock("@/lib/quoteLogs", () => ({ logCarBuyingGuideCheck: mocks.logCarBuyingGuideCheck }));
 
 import { POST } from "@/app/api/cars/buying-guide/route";
 

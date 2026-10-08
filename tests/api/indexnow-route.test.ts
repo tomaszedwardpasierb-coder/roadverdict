@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({ submitChangedPages: vi.fn() }));
 vi.mock("@/lib/seo/indexNow", () => ({ submitChangedPages: mocks.submitChangedPages }));
 
 import { POST } from "@/app/api/cron/indexnow/route";
+import sitemap from "@/app/sitemap";
 
 function req(auth?: string) {
   return new NextRequest("http://localhost/api/cron/indexnow", { method: "POST", headers: auth ? { authorization: auth } : {} });
@@ -32,7 +33,10 @@ describe("POST /api/cron/indexnow", () => {
     expect(await res.json()).toEqual({ ok: true, submitted: ["https://roadverdict.co.uk/"], status: 202, unchanged: 32 });
     const pages = mocks.submitChangedPages.mock.calls[0][0] as { url: string; lastModified: string }[];
     expect(pages.length).toBeGreaterThanOrEqual(33);
-    expect(pages).toContainEqual({ url: "https://roadverdict.co.uk/", lastModified: "2026-10-04" });
+    // The homepage date comes from the sitemap itself, so this doesn't break each time that date moves.
+    const home = sitemap().find((e) => e.url === "https://roadverdict.co.uk/")!;
+    const homeDay = (home.lastModified instanceof Date ? home.lastModified : new Date(home.lastModified ?? 0)).toISOString().slice(0, 10);
+    expect(pages).toContainEqual({ url: "https://roadverdict.co.uk/", lastModified: homeDay });
     expect(pages.every((p) => /^\d{4}-\d{2}-\d{2}$/.test(p.lastModified))).toBe(true);
   });
 

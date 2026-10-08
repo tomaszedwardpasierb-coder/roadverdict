@@ -377,7 +377,7 @@ export function CarBuyingGuideForm({ signedIn }: Props) {
               )}
               {motResult.reportTier === 'freeNoVehicle' && (
                 <p className="field-note">
-                  Add a vehicle to your garage to unlock £12.99, or go Premium for £9.99 - with one free every 4 weeks.
+                  Add a vehicle to your garage to unlock £12.99, or go Pro and get one free report every 4 weeks.
                 </p>
               )}
               <p className="field-note">Stolen marker, write-off history, outstanding finance, and keeper/plate/colour change history, straight from police/DVLA data. This check cross-references data from the DVLA, the Police National Computer (PNC), insurance databases (MIAFTR), and major finance houses, to help confirm this vehicle is safe and legal to buy.</p>

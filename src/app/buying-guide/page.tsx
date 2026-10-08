@@ -1,6 +1,8 @@
 import type { Metadata } from 'next';
 import { pageMetadata } from '@/lib/seo/pageMetadata';
 import Link from 'next/link';
+import { Fragment } from 'react';
+import { REPORT_PRICING_FAQ } from '@/lib/seo/reportPricingCopy';
 import { BuyingGuideFormForViewer } from '@/components/viewer/BuyingGuideFormsForViewer';
 import { RelatedTools } from '@/components/RelatedTools';
 import { buildBreadcrumbJsonLd } from '@/lib/seo/breadcrumbs';
@@ -50,9 +52,14 @@ const faqJsonLd = {
       name: 'Can I check the bike’s history in more depth?',
       acceptedAnswer: {
         '@type': 'Answer',
-        text: 'Yes. An optional paid Independent Vehicle Check (stolen marker, write-off history, outstanding finance, and a valuation) can be added on top of the free checklist.',
+        text: 'Yes. An optional paid Independent Vehicle Check (stolen marker, write-off history and outstanding finance) can be added on top of the free checklist.',
       },
     },
+    ...REPORT_PRICING_FAQ.map((f) => ({
+      '@type': 'Question',
+      name: f.question,
+      acceptedAnswer: { '@type': 'Answer', text: f.answer },
+    })),
   ],
 };
 
@@ -105,9 +112,15 @@ export default function BuyingGuidePage() {
         <p>No. The checklist, MOT history, and briefing are all free with no account required.</p>
         <h3>Can I check the bike&apos;s history in more depth?</h3>
         <p>
-          Yes. An optional paid Independent Vehicle Check (stolen marker, write-off history,
-          outstanding finance, and a valuation) can be added on top of the free checklist.
+          Yes. An optional paid Independent Vehicle Check (stolen marker, write-off history
+          and outstanding finance) can be added on top of the free checklist.
         </p>
+        {REPORT_PRICING_FAQ.map((f) => (
+          <Fragment key={f.question}>
+            <h3>{f.question}</h3>
+            <p>{f.answer}</p>
+          </Fragment>
+        ))}
       </section>
       <script
         type="application/ld+json"

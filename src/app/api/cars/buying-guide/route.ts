@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { carBuyingGuideRequestSchema } from '@/lib/validation';
 import { CAR_CHECKLISTS, CAR_AGE_BAND_LABELS, CAR_SIZE_CLASS_ADDENDUM, CAR_BRAND_SPECIFIC_NOTES, CAR_CLASS_LABELS_FOR_BUYING_GUIDE } from '@/lib/tracker/carBuyerChecklist';
 import { CAR_BRAND_OPTIONS } from '@/lib/carPriceData';
-import { logCarBuyingGuideCheck } from '@/lib/db';
+import { logCarBuyingGuideCheck } from '@/lib/quoteLogs';
 
 export const runtime = 'nodejs';
 
@@ -50,7 +50,7 @@ export async function POST(request: NextRequest) {
 
   // Anonymised by design, same as the other two car tools - car class,
   // brand, age band, nothing that identifies the person checking it.
-  logCarBuyingGuideCheck({ carClass, brand, ageBand });
+  void logCarBuyingGuideCheck({ carClass, brand, ageBand });
 
   return NextResponse.json({
     checklist: CAR_CHECKLISTS[ageBand],

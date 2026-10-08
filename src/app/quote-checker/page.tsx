@@ -86,7 +86,7 @@ export default function QuoteCheckerPage() {
       />
       <div className="hero">
         <h1>Is your motorcycle service quote fair?</h1>
-        <p>Three quick questions. One honest answer, benchmarked against typical UK prices.</p>
+        <p>Tell us the job and the price. One honest answer, benchmarked against typical UK prices.</p>
       </div>
       <QuoteFormForViewer />
       <p className="disclaimer">

@@ -60,7 +60,7 @@ export function PrivacyContent() {
   return (
     <div className={styles.wrapper}>
       <h1 className={styles.title}>Privacy Policy</h1>
-      <span className={styles.updated}>Last updated: 7 October 2026</span>
+      <span className={styles.updated}>Last updated: 8 October 2026</span>
       <p className={styles.intro}>
         RoadVerdict is a small, independently run UK site. This page explains, in plain
         terms, what we collect, why, how long we keep it, who we share it with, and how
@@ -123,9 +123,11 @@ export function PrivacyContent() {
         <p>
           The Quote Checker, Cost Calculator, and Buying Guide don&apos;t require signing
           in and don&apos;t ask for your name, email, or registration number. When you use
-          them, we store only the vehicle size/type, the job type, and the price you were
-          quoted - never anything that identifies you, and never your IP address linked
-          to your answers. These anonymised answers help keep the underlying price
+          the Quote Checker or the Buying Guide, we store only the vehicle&apos;s size band,
+          make and age band, the job type, your region, the price you were quoted and the
+          verdict you got - never anything that identifies you, and never your IP address
+          linked to your answers. The Cost Calculator stores nothing. These anonymised
+          answers help keep the underlying price
           benchmarks accurate over time. This runs on a legitimate-interest legal basis
           rather than consent, because there&apos;s nothing personal collected to consent
           to in the first place.

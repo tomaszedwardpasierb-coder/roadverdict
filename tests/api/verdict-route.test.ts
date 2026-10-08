@@ -7,7 +7,7 @@ const mocks = vi.hoisted(() => ({
   generateQuoteAdvice: vi.fn(),
 }));
 
-vi.mock("@/lib/db", () => ({
+vi.mock("@/lib/quoteLogs", () => ({
   logQuoteCheck: mocks.logQuoteCheck,
   getCommunityStats: mocks.getCommunityStats,
 }));
@@ -43,7 +43,7 @@ beforeEach(() => {
   mocks.logQuoteCheck.mockReset();
   mocks.getCommunityStats.mockReset();
   mocks.generateQuoteAdvice.mockReset();
-  mocks.getCommunityStats.mockReturnValue(null);
+  mocks.getCommunityStats.mockResolvedValue(null);
   mocks.generateQuoteAdvice.mockResolvedValue(null);
   delete process.env.GEMINI_API_KEY;
 });
@@ -111,7 +111,7 @@ describe("POST /api/verdict", () => {
   });
 
   it("includes community stats in the response when available", async () => {
-    mocks.getCommunityStats.mockReturnValue({ sampleSize: 12, low: 150, high: 250 });
+    mocks.getCommunityStats.mockResolvedValue({ sampleSize: 12, low: 150, high: 250 });
 
     const response = await POST(request(validBody, "203.0.113.48"));
     const body = await response.json();
@@ -119,7 +119,7 @@ describe("POST /api/verdict", () => {
   });
 
   it("returns null community stats when there isn't enough sample data yet", async () => {
-    mocks.getCommunityStats.mockReturnValue(null);
+    mocks.getCommunityStats.mockResolvedValue(null);
 
     const response = await POST(request(validBody, "203.0.113.49"));
     const body = await response.json();

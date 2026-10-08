@@ -2,10 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { carQuoteRequestSchema } from '@/lib/validation';
 import { getAdjustedCarBenchmark, CAR_REGION_LABELS, CAR_BRAND_OPTIONS, CAR_JOB_LABELS_BENCHMARKED, CAR_SIZE_CLASS_LABELS } from '@/lib/carPriceData';
 import { computeVerdict, VERDICT_LABELS } from '@/lib/verdict';
-import { logCarQuoteCheck, getCarCommunityStats } from '@/lib/db';
+import { logCarQuoteCheck, getCarCommunityStats } from '@/lib/quoteLogs';
 import { generateCarQuoteAdvice } from '@/lib/tracker/carQuoteAdvice';
 
-// better-sqlite3 needs the Node.js runtime, not the Edge runtime.
+// The Cosmos SDK needs the Node.js runtime, not the Edge runtime.
 export const runtime = 'nodejs';
 
 // Own in-memory limiter, same shape and same caveat as the motorcycle
@@ -59,12 +59,13 @@ export async function POST(request: NextRequest) {
 
   // Anonymised by design: job type, car size band, brand, region, price,
   // verdict - nothing that identifies the person who submitted it.
-  logCarQuoteCheck({ jobType, carClass, quotedPrice, verdict, brand, region });
+  // Not awaited: it never throws, and the visitor shouldn't wait for it.
+  void logCarQuoteCheck({ jobType, carClass, quotedPrice, verdict, brand, region });
 
   // Real submitted quotes, shown separately from the verdict above - see
-  // the comment in db.ts for why this isn't used to calculate the
+  // the comment in quoteLogs.ts for why this isn't used to calculate the
   // verdict itself.
-  const communityStats = getCarCommunityStats(jobType, carClass);
+  const communityStats = await getCarCommunityStats(jobType, carClass);
   const brandLabel = CAR_BRAND_OPTIONS.find((b) => b.value === brand)?.label ?? brand;
   const regionLabel = CAR_REGION_LABELS[region];
 

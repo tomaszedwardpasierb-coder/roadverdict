@@ -9,6 +9,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import './homepage.css';
 import { FunnelBeacon } from '@/components/FunnelBeacon';
+import { REPORT_PRICE_SUMMARY } from '@/lib/seo/reportPricingCopy';
 
 export const metadata: Metadata = pageMetadata({
   title: 'Know What Your Vehicle Really Costs | RoadVerdict',
@@ -284,7 +285,7 @@ export default function HomePage() {
             </div>
             <h3 className="rv-sol-title">Buying guide</h3>
             <p className="rv-sol-body">Enter a plate or paste a listing. Get a real verdict - buy, negotiate, or walk away - before you hand over money.</p>
-            <p className="rv-sol-body">Full vehicle history report: £14.99 - free account with a registered vehicle: £12.99 - Premium: from free, one every 4 weeks.</p>
+            <p className="rv-sol-body">{REPORT_PRICE_SUMMARY}</p>
           </Link>
           <Link href="/cost-calculator" className="rv-sol-card">
             <div className="rv-sol-icon" aria-hidden="true">

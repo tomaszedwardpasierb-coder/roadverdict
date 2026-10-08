@@ -2,6 +2,8 @@
 import type { Metadata } from 'next';
 import { pageMetadata } from '@/lib/seo/pageMetadata';
 import Link from 'next/link';
+import { Fragment } from 'react';
+import { REPORT_PRICING_FAQ } from '@/lib/seo/reportPricingCopy';
 import { CarBuyingGuideFormForViewer } from '@/components/viewer/BuyingGuideFormsForViewer';
 import { CarRelatedTools } from '@/components/CarRelatedTools';
 import { buildBreadcrumbJsonLd } from '@/lib/seo/breadcrumbs';
@@ -54,6 +56,11 @@ const faqJsonLd = {
         text: 'Yes. An optional paid Independent Vehicle Check (stolen marker, write-off history, and outstanding finance) can be added on top of the free checklist.',
       },
     },
+    ...REPORT_PRICING_FAQ.map((f) => ({
+      '@type': 'Question',
+      name: f.question,
+      acceptedAnswer: { '@type': 'Answer', text: f.answer },
+    })),
   ],
 };
 
@@ -109,6 +116,12 @@ export default function CarBuyingGuidePage() {
           Yes. An optional paid Independent Vehicle Check (stolen marker, write-off history, and
           outstanding finance) can be added on top of the free checklist.
         </p>
+        {REPORT_PRICING_FAQ.map((f) => (
+          <Fragment key={f.question}>
+            <h3>{f.question}</h3>
+            <p>{f.answer}</p>
+          </Fragment>
+        ))}
       </section>
       <script
         type="application/ld+json"

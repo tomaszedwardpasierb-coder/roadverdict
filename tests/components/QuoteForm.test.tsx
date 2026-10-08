@@ -38,22 +38,38 @@ describe("QuoteForm", () => {
     window.history.replaceState({}, "", "/");
   });
 
-  it("renders all four steps with their default selections", () => {
+  it("puts the job and the quote first, then the bike and area, with default selections - no numbered steps", () => {
     render(<QuoteForm signedIn={false} />);
-    expect(screen.getByText("Step 1 of 4")).toBeInTheDocument();
-    expect(screen.getByText("Step 4 of 4")).toBeInTheDocument();
+    expect(screen.queryByText(/Step \d of 4/)).not.toBeInTheDocument();
     expect(screen.getByLabelText("Make")).toHaveValue("honda");
     expect(screen.getByLabelText("Engine size")).toHaveValue("medium");
+
+    // The one answer a visitor must give comes straight after the job - not
+    // 2-3 phone screens down, after everything that has a default.
+    const order = ["What needs doing", "What you were quoted", "Make", "Engine size", "Where the work is being done"].map((l) => screen.getByLabelText(l));
+    for (let i = 0; i < order.length - 1; i++) {
+      expect(order[i].compareDocumentPosition(order[i + 1]) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    }
+    const button = screen.getByRole("button", { name: "Check my quote" });
+    expect(order[order.length - 1].compareDocumentPosition(button) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
-  it("shows a sell description before any lookup, tailored to signed-in vs anonymous", () => {
+  it("keeps registration search in a disclosure that starts closed", () => {
+    render(<QuoteForm signedIn={false} />);
+    const details = screen.getByText(/Know the registration\? Fill in the bike for me/).closest("details")!;
+    expect(details).not.toHaveAttribute("open");
+    expect(details).toContainElement(screen.getByLabelText("Search by registration (optional)"));
+  });
+
+  it("explains registration search inside the disclosure, tailored to signed-in vs anonymous", () => {
     const { unmount } = render(<QuoteForm signedIn />);
-    expect(screen.getByText(/we'll compare it against real regional pricing benchmarks/)).toBeInTheDocument();
+    expect(screen.getByText(/fill in the make and engine size from the bike's own record/)).toBeInTheDocument();
+    expect(screen.queryByText(/Sign in to use registration search/)).not.toBeInTheDocument();
     unmount();
 
     render(<QuoteForm signedIn={false} />);
-    expect(screen.getByText(/Sign in to search by registration/)).toBeInTheDocument();
-    expect(screen.getByText(/pricing benchmarks for this bike's region, brand and job type/)).toBeInTheDocument();
+    expect(screen.getByText(/Sign in to use registration search/)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "sign in here" })).toHaveAttribute("href", "/login");
   });
 
   it("the price input's own min=1/required attributes block a browser submit before any price is entered", () => {
@@ -101,6 +117,36 @@ describe("QuoteForm", () => {
         }),
       })
     );
+  });
+
+  it("scrolls the verdict into view when it arrives (the form fits one phone screen, so it lands below the fold)", async () => {
+    const scrollIntoView = vi.fn();
+    const original = window.HTMLElement.prototype.scrollIntoView;
+    window.HTMLElement.prototype.scrollIntoView = scrollIntoView;
+    try {
+      (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
+        ok: true,
+        json: async () => ({
+        verdict: "fair",
+        range: { low: 100, high: 200 },
+        brandTier: "mainstream",
+        brandLabel: "Honda",
+        regionLabel: "Rest of England & Wales",
+        communityStats: null,
+        advice: null,
+      }),
+      });
+      const user = userEvent.setup();
+      render(<QuoteForm signedIn={false} />);
+      await user.type(screen.getByLabelText("What you were quoted"), "180");
+      expect(scrollIntoView).not.toHaveBeenCalled();
+      await user.click(screen.getByRole("button", { name: "Check my quote" }));
+
+      expect(await screen.findByText(/typical £100–£200/)).toBeInTheDocument();
+      expect(scrollIntoView).toHaveBeenCalledTimes(1);
+    } finally {
+      window.HTMLElement.prototype.scrollIntoView = original;
+    }
   });
 
   it("shows the server's own error message when the API responds not-ok", async () => {

@@ -78,7 +78,7 @@ export default function CarQuoteCheckerPage() {
       />
       <div className="hero">
         <h1>Is your car service quote fair?</h1>
-        <p>Four quick questions. One honest answer, benchmarked against typical UK prices.</p>
+        <p>Tell us the job and the price. One honest answer, benchmarked against typical UK prices.</p>
       </div>
       <CarQuoteFormForViewer />
       <p className="disclaimer">

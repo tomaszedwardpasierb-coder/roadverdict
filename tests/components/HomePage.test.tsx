@@ -8,6 +8,7 @@
 import { describe, expect, it } from "vitest";
 import { render, screen } from "@testing-library/react";
 import HomePage from "@/app/page";
+import { REPORT_PRICE_SUMMARY } from "@/lib/seo/reportPricingCopy";
 
 describe("HomePage", () => {
   it("renders the marketing homepage", () => {
@@ -16,6 +17,13 @@ describe("HomePage", () => {
     expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(/living history/i);
     expect(screen.getAllByRole("link", { name: /start logging your motorcycle/i }).length).toBeGreaterThan(0);
     expect(screen.getAllByRole("link", { name: /start logging your car/i }).length).toBeGreaterThan(0);
+  });
+
+  it("says plainly what the full history report costs and that Pro includes it", () => {
+    render(<HomePage />);
+
+    expect(screen.getByText(REPORT_PRICE_SUMMARY)).toBeInTheDocument();
+    expect(REPORT_PRICE_SUMMARY).toMatch(/£14\.99.*£12\.99.*Included with Pro, one every 4 weeks/);
   });
 
   it("embeds the WebApplication and Organization JSON-LD under one @graph", () => {
