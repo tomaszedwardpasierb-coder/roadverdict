@@ -51,6 +51,8 @@ export default function AddVehicleScreen() {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [lookupFailed, setLookupFailed] = useState(false);
+  // The "enter the details yourself" route, offered up front for plates DVLA can't look up (non-UK, for one).
+  const [manualEntry, setManualEntry] = useState(false);
 
   const limit = garage.vehicleLimit;
   const atLimit = !!limit && limit.active >= limit.limit;
@@ -115,6 +117,7 @@ export default function AddVehicleScreen() {
     setStep({ name: 'plate' });
     setMessage(null);
     setLookupFailed(false);
+    setManualEntry(false);
   }
 
   let body;
@@ -174,6 +177,17 @@ export default function AddVehicleScreen() {
             <Text style={styles.hint}>
               We look it up with DVLA, so we can fill in the make, model and year for you – and tell whether it&apos;s a bike or a car.
             </Text>
+            {!manualEntry ? (
+              <Pressable
+                onPress={() => {
+                  setManualEntry(true);
+                  setMessage(null);
+                }}
+                accessibilityRole="button"
+                style={styles.manualLink}>
+                <Text style={styles.manualLinkLabel}>Not a UK registration? Enter the details yourself</Text>
+              </Pressable>
+            ) : null}
           </>
         ) : null}
 
@@ -183,9 +197,17 @@ export default function AddVehicleScreen() {
           </Text>
         ) : null}
 
-        {step.name === 'choose-kind' || lookupFailed ? (
+        {step.name === 'choose-kind' || lookupFailed || manualEntry ? (
           <Card style={styles.panel}>
-            <Text style={styles.panelText}>{step.name === 'choose-kind' ? step.message : 'You can still add it by entering the details yourself.'} Is it a motorcycle or a car?</Text>
+            <Text style={styles.panelText}>
+              {step.name === 'choose-kind'
+                ? step.message
+                : manualEntry && !lookupFailed
+                  ? 'No lookup needed - you can enter the details yourself, for a registration from any country.'
+                  : 'You can still add it by entering the details yourself.'}{' '}
+              Is it a motorcycle or a car?
+            </Text>
+            {!vrm ? <Text style={styles.hint}>Type the registration in the box above first.</Text> : null}
             <View style={styles.pair}>
               {(['bike', 'car'] as const).map((kind) => (
                 <Pressable
@@ -683,6 +705,8 @@ const styles = StyleSheet.create({
   summaryRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   smallPlate: { borderRadius: 6, borderWidth: 1.5, borderColor: Brand.asphalt, backgroundColor: '#F7D117', paddingHorizontal: 10, paddingVertical: 4 },
   smallPlateText: { fontSize: 16, fontWeight: '800', letterSpacing: 1.5, color: '#111111' },
+  manualLink: { minHeight: 44, justifyContent: 'center' },
+  manualLinkLabel: { fontSize: 15, fontWeight: '700', color: Brand.amberInk },
   change: { minHeight: 44, justifyContent: 'center' },
   changeLabel: { fontSize: 15, fontWeight: '700', color: Brand.amberInk },
   field: { gap: 6 },

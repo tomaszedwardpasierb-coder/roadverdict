@@ -2,7 +2,7 @@
   "expo": {
     "name": "RoadVerdict",
     "slug": "roadverdict-android-app",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "roadverdict",
@@ -70,6 +70,15 @@
         {
           "icon": "./assets/images/android-icon-monochrome.png",
           "color": "#EE9A2E"
+        }
+      ],
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "enableMinifyInReleaseBuilds": true,
+            "enableShrinkResourcesInReleaseBuilds": true
+          }
         }
       ]
     ],
