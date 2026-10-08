@@ -393,6 +393,53 @@ describe("getDetailedCounts", () => {
   });
 });
 
+// The eight cross-partition queries behind /tomasz's stats (five counts, two
+// GROUP BYs and the newest-sessions list) go straight to the query plan. The
+// Cosmos SDK would otherwise try each one directly first, be answered with a
+// "400, use the query plan" and run it again - a wasted round trip, and a
+// "failed" call in Application Insights eight times per stats refresh.
+describe("the cross-partition stats queries skip the SDK's direct first try", () => {
+  beforeEach(resetMocks);
+
+  it.each([
+    ["getDbStats", 1, () => getDbStats()],
+    ["getActiveSessionCount", 1, () => getActiveSessionCount()],
+    ["getTotalUserCount", 1, () => getTotalUserCount()],
+    ["getMagicLinkRequests", 1, () => getMagicLinkRequests()],
+    ["getRecentSessions", 1, () => getRecentSessions()],
+    ["getDetailedCounts", 3, () => getDetailedCounts()],
+  ])("%s sends all %i of its queries with forceQueryPlan and no partitionKey", async (_name, queries, run) => {
+    mocks.fetchAll.mockResolvedValue({ resources: [] });
+    await run();
+    const calls = mockContainer.items.query.mock.calls as any[][];
+    expect(calls).toHaveLength(queries);
+    for (const [, options] of calls) {
+      // Exactly this - a partitionKey next to forceQueryPlan would return cross-partition results.
+      expect(options).toEqual({ forceQueryPlan: true });
+    }
+  });
+
+  it("covers all eight, and no query shares an options object with another", async () => {
+    mocks.itemRead.mockResolvedValue({ resource: undefined });
+    mocks.fetchAll.mockResolvedValue({ resources: [] });
+    mocks.itemUpsert.mockResolvedValue(undefined);
+    await getAdminStatsBundle();
+    const calls = mockContainer.items.query.mock.calls as any[][];
+    // Nine scans in the bundle: the eight above plus the browser breakdown.
+    expect(calls).toHaveLength(9);
+    const forced = calls.filter(([, options]) => options?.forceQueryPlan === true);
+    expect(forced).toHaveLength(8);
+    expect(new Set(forced.map(([, options]) => options)).size).toBe(8);
+  });
+
+  it("leaves the plain browser-breakdown scan alone: Cosmos serves it directly, so forcing the plan would only add work", async () => {
+    mocks.fetchAll.mockResolvedValue({ resources: [] });
+    await getBrowserBreakdown();
+    const [, options] = mockContainer.items.query.mock.calls.at(-1) as any[];
+    expect(options).toBeUndefined();
+  });
+});
+
 describe("getAdminStatsBundle", () => {
   beforeEach(resetMocks);
 

@@ -1,5 +1,23 @@
 // Place at: src/lib/admin/stats.ts
+import type { FeedOptions } from "@azure/cosmos";
 import { getContainer } from "@/lib/cosmos";
+
+// A query that has to be combined across partitions - an aggregate such as
+// COUNT, a GROUP BY, or a TOP with ORDER BY - can't be served by the Cosmos
+// gateway directly. Left alone, the SDK tries it that way first, is told
+// "400, use the query plan" (Microsoft calls this a first-chance exception to
+// ignore), and only then runs it properly: one wasted round trip per query,
+// and a "failed" 400 in Application Insights every time /tomasz refreshes its
+// stats. forceQueryPlan goes straight to the plan, which is the path the SDK
+// ends up on anyway, so the results are the same.
+//
+// Only for queries that really are cross-partition and need it - a plain
+// SELECT is served directly and doesn't. Never combine it with a
+// partitionKey option (the SDK warns against it). A fresh object each call,
+// so concurrent queries never share one.
+function planFirst(): FeedOptions {
+  return { forceQueryPlan: true };
+}
 
 export interface DbTypeCount {
   type: string;
@@ -9,7 +27,7 @@ export interface DbTypeCount {
 export async function getDbStats(): Promise<DbTypeCount[]> {
   const container = getContainer();
   const { resources } = await container.items
-    .query<DbTypeCount>({ query: "SELECT c.type, COUNT(1) as count FROM c GROUP BY c.type" })
+    .query<DbTypeCount>({ query: "SELECT c.type, COUNT(1) as count FROM c GROUP BY c.type" }, planFirst())
     .fetchAll();
   return resources.sort((a, b) => b.count - a.count);
 }
@@ -20,7 +38,7 @@ export async function getActiveSessionCount(): Promise<number> {
     .query<number>({
       query: "SELECT VALUE COUNT(1) FROM c WHERE c.type = 'session' AND c.expiresAt > @now",
       parameters: [{ name: "@now", value: new Date().toISOString() }],
-    })
+    }, planFirst())
     .fetchAll();
   return resources[0] ?? 0;
 }
@@ -28,7 +46,7 @@ export async function getActiveSessionCount(): Promise<number> {
 export async function getTotalUserCount(): Promise<number> {
   const container = getContainer();
   const { resources } = await container.items
-    .query<number>({ query: "SELECT VALUE COUNT(1) FROM c WHERE c.type = 'user'" })
+    .query<number>({ query: "SELECT VALUE COUNT(1) FROM c WHERE c.type = 'user'" }, planFirst())
     .fetchAll();
   return resources[0] ?? 0;
 }
@@ -160,7 +178,7 @@ export async function getMagicLinkRequests(): Promise<MagicLinkRequestSummary[]>
     .query<MagicLinkRequestSummary>({
       query:
         "SELECT c.pk as email, COUNT(1) as requestCount, MAX(c.createdAt) as lastRequestedAt FROM c WHERE c.type = 'magicLink' GROUP BY c.pk",
-    })
+    }, planFirst())
     .fetchAll();
   return resources.sort((a, b) => new Date(b.lastRequestedAt).getTime() - new Date(a.lastRequestedAt).getTime());
 }
@@ -182,7 +200,7 @@ export async function getRecentSessions(limit = 50): Promise<RecentSession[]> {
     .query<RecentSession>({
       query: "SELECT TOP @limit c.pk as email, c.createdAt, c.ip, c.userAgent FROM c WHERE c.type = 'session' ORDER BY c.createdAt DESC",
       parameters: [{ name: "@limit", value: limit }],
-    })
+    }, planFirst())
     .fetchAll();
   return resources;
 }
@@ -376,15 +394,15 @@ export async function getDetailedCounts(): Promise<DetailedCounts> {
       .query<number>({
         query: "SELECT VALUE COUNT(1) FROM c WHERE c.type = 'session' AND c.expiresAt <= @now",
         parameters: [{ name: "@now", value: now }],
-      })
+      }, planFirst())
       .fetchAll()
       .then((r) => r.resources[0] ?? 0),
     container.items
-      .query<number>({ query: "SELECT VALUE COUNT(1) FROM c WHERE c.type = 'magicLink' AND c.used = true" })
+      .query<number>({ query: "SELECT VALUE COUNT(1) FROM c WHERE c.type = 'magicLink' AND c.used = true" }, planFirst())
       .fetchAll()
       .then((r) => r.resources[0] ?? 0),
     container.items
-      .query<number>({ query: "SELECT VALUE COUNT(1) FROM c WHERE c.type = 'magicLink' AND c.used = false" })
+      .query<number>({ query: "SELECT VALUE COUNT(1) FROM c WHERE c.type = 'magicLink' AND c.used = false" }, planFirst())
       .fetchAll()
       .then((r) => r.resources[0] ?? 0),
   ]);
