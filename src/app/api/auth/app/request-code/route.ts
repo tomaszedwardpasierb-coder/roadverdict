@@ -9,6 +9,7 @@ import { isAccountBlocked } from "@/lib/tracker/userDoc";
 import { getClientIp, isIpRateLimited, recordIpAttempt } from "@/lib/auth/signInRateLimit";
 import { createAppLoginCode, isAppCodeRequestCoolingDown } from "@/lib/auth/appLoginCode";
 import { sendAppLoginCodeEmail } from "@/lib/resend";
+import { logSignInEvent } from "@/lib/admin/signInEvents";
 
 export const dynamic = "force-dynamic";
 
@@ -46,7 +47,18 @@ export async function POST(req: NextRequest) {
   }
 
   const code = await createAppLoginCode(normalizedEmail);
-  await sendAppLoginCodeEmail(normalizedEmail, code);
+  // Note whether the email service took the message, so /tomasz can show codes that never
+  // went out. Never awaited and never throws (admin/signInEvents.ts); the reply below is
+  // exactly what it was before.
+  let sentOk = true;
+  try {
+    const sent = await sendAppLoginCodeEmail(normalizedEmail, code);
+    sentOk = sent?.ok !== false;
+  } catch (err) {
+    void logSignInEvent("requested", normalizedEmail, { sentOk: false });
+    throw err;
+  }
+  void logSignInEvent("requested", normalizedEmail, { sentOk });
 
   return NextResponse.json({ ok: true });
 }

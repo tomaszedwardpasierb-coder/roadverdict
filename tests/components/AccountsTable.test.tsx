@@ -29,6 +29,9 @@ function row(email: string, status: AccountStatus, opts: Partial<AccountRow> & {
       vehicles: status === "never-started" ? 0 : 1,
       usesApp: !!opts.usesApp,
       spark30: Array(30).fill(0),
+      clientByDay: Array(30).fill(null),
+      sessions: 0,
+      entriesTotal: 0,
     },
   };
 }

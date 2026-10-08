@@ -35,6 +35,35 @@ describe("noteActivity", () => {
     );
   });
 
+  it("counts app visits apart from website visits, and starts the split today for a new account", async () => {
+    await noteActivity("rider@example.com", "app", T0);
+    expect(mocks.upsert).toHaveBeenLastCalledWith(
+      expect.objectContaining({ days: { "2026-10-07": 1 }, appDays: { "2026-10-07": 1 }, splitFrom: "2026-10-07" })
+    );
+    await noteActivity("web-rider@example.com", "web", T0);
+    expect(mocks.upsert).toHaveBeenLastCalledWith(
+      expect.objectContaining({ days: { "2026-10-07": 1 }, appDays: {}, splitFrom: "2026-10-07" })
+    );
+  });
+
+  it("starts an older record's split tomorrow, so today's old and new visits stay unknown", async () => {
+    mocks.read.mockResolvedValue({ resource: { days: { "2026-10-07": 2 } } });
+    await noteActivity("rider@example.com", "app", T0);
+    expect(mocks.upsert).toHaveBeenLastCalledWith(
+      expect.objectContaining({ days: { "2026-10-07": 3 }, appDays: { "2026-10-07": 1 }, splitFrom: "2026-10-08" })
+    );
+  });
+
+  it("keeps an existing split date, adds to the app count and drops app days older than 60", async () => {
+    mocks.read.mockResolvedValue({
+      resource: { days: { "2026-10-07": 1, "2026-07-01": 1 }, appDays: { "2026-10-07": 1, "2026-07-01": 1 }, splitFrom: "2026-09-01" },
+    });
+    await noteActivity("rider@example.com", "app", T0);
+    expect(mocks.upsert).toHaveBeenLastCalledWith(
+      expect.objectContaining({ days: { "2026-10-07": 2 }, appDays: { "2026-10-07": 2 }, splitFrom: "2026-09-01" })
+    );
+  });
+
   it("writes at most once per 30 minutes per account", async () => {
     await noteActivity("rider@example.com", "web", T0);
     await noteActivity("rider@example.com", "web", new Date(T0.getTime() + 10 * 60 * 1000));

@@ -19,6 +19,7 @@ import { isReviewerCode, REVIEWER_EMAIL } from "@/lib/auth/reviewerAccess";
 import { demoBikeExists, runDemoSeed } from "@/lib/tracker/demoSeedRunner";
 import { isTwoFactorEnabled, createPendingLogin } from "@/lib/auth/twoFactor";
 import { createSessionForEmail } from "@/lib/auth/session";
+import { logSignInEvent } from "@/lib/admin/signInEvents";
 
 export const dynamic = "force-dynamic";
 
@@ -53,12 +54,18 @@ export async function POST(req: NextRequest) {
   }
 
   const result = normalizedEmail === REVIEWER_EMAIL ? "ok" : await consumeAppLoginCode(normalizedEmail, code.trim());
+  // Recorded for /tomasz's sign-in health (never awaited, never throws); store reviewers using
+  // the demo account aren't part of it.
+  const tracked = normalizedEmail !== REVIEWER_EMAIL;
   if (result === "expired") {
+    if (tracked) void logSignInEvent("expired", normalizedEmail);
     return NextResponse.json({ error: "That code has expired - request a new one." }, { status: 401 });
   }
   if (result === "invalid") {
+    if (tracked) void logSignInEvent("wrong", normalizedEmail);
     return NextResponse.json({ error: "Incorrect code." }, { status: 401 });
   }
+  if (tracked) void logSignInEvent("entered", normalizedEmail);
 
   // Re-checked here as well as at request time - an account blocked in
   // the ten minutes the code was live mustn't still get a session.

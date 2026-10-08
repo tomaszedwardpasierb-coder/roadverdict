@@ -42,6 +42,13 @@ import { ClearNotificationsForm } from './ClearNotificationsForm';
 import { AccountsTable } from './AccountsTable';
 import { getAccountActivity, type AccountActivity } from '@/lib/admin/accountActivity';
 import { OnboardingAutoEnableToggle } from './OnboardingAutoEnableToggle';
+import { getSignInHealth } from '@/lib/admin/signInEvents';
+import { getReceiptScanCounts } from '@/lib/admin/receiptScanLog';
+import { buildDailyActive, buildTesterGrid, topActive } from '@/lib/admin/testerReport';
+import { TesterGridPanel } from './TesterGridPanel';
+import { SignInHealthPanel } from './SignInHealthPanel';
+import { ActivityChart } from './ActivityChart';
+import { TopActivePanel } from './TopActivePanel';
 
 export const dynamic = 'force-dynamic';
 
@@ -270,7 +277,14 @@ export default async function AdminDashboardPage(
   const { dbStats, activeSessionCount: activeSessions, totalUserCount: totalUsers, magicLinkRequests, recentSessions, browserBreakdown, detailedCounts } = statsBundle;
   const health = getServerHealth();
   // Needs the account list, so it runs after the batch above.
-  const accountActivity: Record<string, AccountActivity> = await getAccountActivity(allUserAccounts).catch(() => ({}));
+  // One `now` for everything below, so the per-day lists and the days shown line up. The sign-in
+  // and receipt-scan reads return null on failure, so a failed read shows as "couldn't load".
+  const reportNow = new Date();
+  const [accountActivity, signInHealth, receiptScans] = await Promise.all([
+    getAccountActivity(allUserAccounts, reportNow).catch((): Record<string, AccountActivity> => ({})),
+    getSignInHealth(reportNow),
+    getReceiptScanCounts(new Date(reportNow.getTime() - 90 * 24 * 60 * 60 * 1000)),
+  ]);
   const commonQuestions = groupSimilarQuestions(assistantQuestions);
   // One query for every session's count (see
   // getAllImpersonationActivityCounts's own comment), already fetched
@@ -764,6 +778,30 @@ export default async function AdminDashboardPage(
     </>
   );
 
+  const reportAccounts = allUserAccounts.map((u) => ({ email: u.email, createdAt: u.createdAt, tags: u.tags ?? [] }));
+  // The store reviewers' demo account isn't a tester or a customer; leave it out of every count.
+  const reportExclude = [REVIEWER_EMAIL];
+  const testerGrid = buildTesterGrid(reportAccounts, accountActivity, receiptScans?.byEmail ?? new Map(), reportNow, reportExclude);
+  const dailyActive = buildDailyActive(reportAccounts, accountActivity, reportNow, reportExclude);
+  const mostActive = topActive(reportAccounts, accountActivity, 10, reportExclude);
+
+  const activityContent = (
+    <>
+      <h2 className={styles.sectionHeading}>Testers, last 14 days</h2>
+      <TesterGridPanel grid={testerGrid} scansFrom={receiptScans?.firstAt ?? null} scansUnavailable={receiptScans === null} now={reportNow} />
+      <h2 className={styles.sectionHeading}>Sign-in health, last 24 hours</h2>
+      <SignInHealthPanel health={signInHealth} now={reportNow} />
+      <h2 className={styles.sectionHeading}>Daily active users, last 30 days</h2>
+      <p className={styles.note} style={{ marginBottom: '0.7rem' }}>
+        Each account counts once a day. &ldquo;Everyone except testers&rdquo; includes friends, press and your own accounts.
+      </p>
+      <ActivityChart title="Everyone except testers" series={dailyActive.others} />
+      <ActivityChart title="Testers" series={dailyActive.testers} />
+      <h2 className={styles.sectionHeading}>Most active, last 14 days</h2>
+      <TopActivePanel rows={mostActive} now={reportNow} />
+    </>
+  );
+
   const impersonationsContent = (
     <>
       <h2 className={styles.sectionHeading}>Impersonate sessions</h2>
@@ -926,6 +964,7 @@ export default async function AdminDashboardPage(
       trafficContent={trafficContent}
       jobsContent={jobsContent}
       accountsContent={accountsContent}
+      activityContent={activityContent}
       impersonationsContent={impersonationsContent}
       notificationsContent={notificationsContent}
       assistantContent={assistantContent}

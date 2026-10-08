@@ -6,12 +6,14 @@ const mocks = vi.hoisted(() => ({
   getPrimaryBike: vi.fn(),
   getPrimaryCar: vi.fn(),
   parseReceiptFile: vi.fn(),
+  logReceiptScan: vi.fn(),
 }));
 
 vi.mock("@/lib/auth/session", () => ({ getSession: mocks.getSession }));
 vi.mock("@/lib/tracker/bike", () => ({ getPrimaryBike: mocks.getPrimaryBike }));
 vi.mock("@/lib/tracker/car", () => ({ getPrimaryCar: mocks.getPrimaryCar }));
 vi.mock("@/lib/tracker/receiptParse", () => ({ parseReceiptFile: mocks.parseReceiptFile }));
+vi.mock("@/lib/admin/receiptScanLog", () => ({ logReceiptScan: mocks.logReceiptScan }));
 
 import { POST } from "@/app/api/tracker/scan-receipt/route";
 
@@ -99,6 +101,23 @@ describe("POST /api/tracker/scan-receipt", () => {
     const response = await POST(requestWithFile());
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual(result);
+  });
+
+  it("counts a successful scan for the admin tester totals, with the item count and no receipt content", async () => {
+    mocks.getSession.mockResolvedValue({ email: "owner@example.com" });
+    mocks.parseReceiptFile.mockResolvedValue({ ok: true, fileName: "receipt.jpg", summary: "Service", items: [{ category: "service" }, { category: "parts" }], skippedBeforeProduction: 0, skippedNonPetrol: 0, skippedUnreadableLitres: 0 });
+    await POST(requestWithFile());
+    expect(mocks.logReceiptScan).toHaveBeenCalledTimes(1);
+    expect(mocks.logReceiptScan).toHaveBeenCalledWith("owner@example.com", 2);
+  });
+
+  it("doesn't count a scan that failed or found nothing", async () => {
+    mocks.getSession.mockResolvedValue({ email: "owner@example.com" });
+    mocks.parseReceiptFile.mockResolvedValue({ ok: false, fileName: "receipt.jpg", error: "Couldn't read this image.", status: 422 });
+    await POST(requestWithFile());
+    mocks.parseReceiptFile.mockResolvedValue({ ok: true, fileName: "receipt.jpg", summary: null, items: [], skippedBeforeProduction: 0, skippedNonPetrol: 0, skippedUnreadableLitres: 0 });
+    await POST(requestWithFile());
+    expect(mocks.logReceiptScan).not.toHaveBeenCalled();
   });
 
   it("passes the signed-in email's bike through to the parser", async () => {

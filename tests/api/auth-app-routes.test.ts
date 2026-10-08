@@ -23,6 +23,7 @@ const mocks = vi.hoisted(() => ({
   isReviewerCode: vi.fn(),
   demoBikeExists: vi.fn(),
   runDemoSeed: vi.fn(),
+  logSignInEvent: vi.fn(),
 }));
 
 vi.mock("@/lib/tracker/userDoc", () => ({ isAccountBlocked: mocks.isAccountBlocked }));
@@ -41,6 +42,7 @@ vi.mock("@/lib/auth/appLoginCode", () => ({
 vi.mock("@/lib/auth/reviewerAccess", () => ({ REVIEWER_EMAIL: "demo@roadverdict.co.uk", isReviewerCode: mocks.isReviewerCode }));
 vi.mock("@/lib/tracker/demoSeedRunner", () => ({ demoBikeExists: mocks.demoBikeExists, runDemoSeed: mocks.runDemoSeed }));
 vi.mock("@/lib/resend", () => ({ sendAppLoginCodeEmail: mocks.sendAppLoginCodeEmail }));
+vi.mock("@/lib/admin/signInEvents", () => ({ logSignInEvent: mocks.logSignInEvent }));
 vi.mock("@/lib/auth/twoFactor", () => ({
   isTwoFactorEnabled: mocks.isTwoFactorEnabled,
   createPendingLogin: mocks.createPendingLogin,
@@ -101,6 +103,26 @@ describe("POST /api/auth/app/request-code", () => {
     expect(mocks.sendAppLoginCodeEmail).toHaveBeenCalledWith("rider@example.com", "482913");
   });
 
+  it("records that the code was requested, and that the email service took it", async () => {
+    mocks.sendAppLoginCodeEmail.mockResolvedValue({ ok: true });
+    await requestCode(req(path, { email: "Rider@Example.com" }));
+    expect(mocks.logSignInEvent).toHaveBeenCalledWith("requested", "rider@example.com", { sentOk: true });
+  });
+
+  it("records a refused email but still gives the ordinary reply", async () => {
+    mocks.sendAppLoginCodeEmail.mockResolvedValue({ ok: false, error: "The recipient is on the suppression list" });
+    const res = await requestCode(req(path, { email: "rider@example.com" }));
+    expect(res.status).toBe(200);
+    await expect(res.json()).resolves.toEqual({ ok: true });
+    expect(mocks.logSignInEvent).toHaveBeenCalledWith("requested", "rider@example.com", { sentOk: false });
+  });
+
+  it("records a send that throws, and still fails the way it always did", async () => {
+    mocks.sendAppLoginCodeEmail.mockRejectedValue(new Error("network down"));
+    await expect(requestCode(req(path, { email: "rider@example.com" }))).rejects.toThrow("network down");
+    expect(mocks.logSignInEvent).toHaveBeenCalledWith("requested", "rider@example.com", { sentOk: false });
+  });
+
   it("rejects a missing or malformed email", async () => {
     expect((await requestCode(req(path, {}))).status).toBe(400);
     expect((await requestCode(req(path, { email: "nope" }))).status).toBe(400);
@@ -132,6 +154,7 @@ describe("POST /api/auth/app/request-code", () => {
     await expect(res.json()).resolves.toEqual({ ok: true });
     expect(mocks.createAppLoginCode).not.toHaveBeenCalled();
     expect(mocks.sendAppLoginCodeEmail).not.toHaveBeenCalled();
+    expect(mocks.logSignInEvent).not.toHaveBeenCalled();
   });
 });
 
@@ -144,6 +167,24 @@ describe("POST /api/auth/app/verify-code", () => {
     await expect(res.json()).resolves.toEqual({ token: "enc.session-token", expiresInSeconds: 7776000 });
     expect(mocks.consumeAppLoginCode).toHaveBeenCalledWith("rider@example.com", "482913");
     expect(mocks.createSessionForEmail).toHaveBeenCalledWith("rider@example.com", "1.2.3.4", "unknown", { client: "app" });
+  });
+
+  it("records a right code as entered, a wrong one as wrong, and an unusable one as expired", async () => {
+    await verifyCode(req(path, { email: "Rider@example.com", code: "482913" }));
+    expect(mocks.logSignInEvent).toHaveBeenLastCalledWith("entered", "rider@example.com");
+    mocks.consumeAppLoginCode.mockResolvedValue("invalid");
+    await verifyCode(req(path, { email: "rider@example.com", code: "000000" }));
+    expect(mocks.logSignInEvent).toHaveBeenLastCalledWith("wrong", "rider@example.com");
+    mocks.consumeAppLoginCode.mockResolvedValue("expired");
+    await verifyCode(req(path, { email: "rider@example.com", code: "482913" }));
+    expect(mocks.logSignInEvent).toHaveBeenLastCalledWith("expired", "rider@example.com");
+    expect(mocks.logSignInEvent).toHaveBeenCalledTimes(3);
+  });
+
+  it("leaves store reviewers on the demo account out of the sign-in record", async () => {
+    mocks.isReviewerCode.mockResolvedValue(true);
+    await verifyCode(req(path, { email: "demo@roadverdict.co.uk", code: "123456" }));
+    expect(mocks.logSignInEvent).not.toHaveBeenCalled();
   });
 
   it("signs an app store reviewer in to the demo account with the switched-on code, seeding it first if empty", async () => {

@@ -12,6 +12,7 @@ import { getSession } from "@/lib/auth/session";
 import { getPrimaryBike } from "@/lib/tracker/bike";
 import { getPrimaryCar } from "@/lib/tracker/car";
 import { parseReceiptFile, type ScanVehicle } from "@/lib/tracker/receiptParse";
+import { logReceiptScan } from "@/lib/admin/receiptScanLog";
 export const dynamic = "force-dynamic";
 export async function POST(request: NextRequest) {
   const session = await getSession();
@@ -60,5 +61,8 @@ export async function POST(request: NextRequest) {
       { status: 422 }
     );
   }
+  // Counted for /tomasz's tester totals (admin/receiptScanLog.ts): who and when, never the
+  // photo. Never awaited, never throws.
+  void logReceiptScan(session.email, result.items.length);
   return NextResponse.json(result);
 }

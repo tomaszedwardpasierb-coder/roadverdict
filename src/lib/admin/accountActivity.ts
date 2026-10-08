@@ -12,6 +12,10 @@ import { getAllUserActivity, ukDay, type ActivityClient } from "./userActivity";
 
 export type AccountStatus = "active" | "cooling" | "inactive" | "never-started";
 
+// Which client an account used on a day: the Android app, the website, or "unknown" for days
+// recorded before the split existed. null = not active that day.
+export type ActivityDayClient = "app" | "web" | "unknown" | null;
+
 // Used it in the last 7 days = active; 8-30 = cooling; longer = inactive.
 // No vehicle at all = never started, whatever the dates say.
 export const ACTIVE_WITHIN_DAYS = 7;
@@ -38,6 +42,12 @@ export interface AccountActivity {
   usesApp: boolean;
   // Oldest to newest, one value per UK day: visits + entries logged.
   spark30: number[];
+  // Same days: which client was used (null when not active).
+  clientByDay: ActivityDayClient[];
+  // Sign-in sessions on record (website 30 days, app 90): any at all means they have signed in.
+  sessions: number;
+  // Entries logged inside the 90-day look-back: everything, for an account under 90 days old.
+  entriesTotal: number;
 }
 
 export function accountStatus(vehicles: number, lastActivityAt: string, now: Date): AccountStatus {
@@ -85,8 +95,10 @@ export async function getAccountActivity(
   for (const e of entries) entriesByUser.set(e.pk, [...(entriesByUser.get(e.pk) ?? []), e.createdAt]);
 
   const lastSession = new Map<string, string>();
+  const sessionCount = new Map<string, number>();
   const appUsers = new Set<string>();
   for (const s of sessions) {
+    sessionCount.set(s.pk, (sessionCount.get(s.pk) ?? 0) + 1);
     if (s.createdAt > (lastSession.get(s.pk) ?? "")) lastSession.set(s.pk, s.createdAt);
     if (s.client === "app") appUsers.add(s.pk);
   }
@@ -107,6 +119,12 @@ export async function getAccountActivity(
     }
     const lastActivityAt = latest(createdAt, a?.lastSeenAt, lastSession.get(email), ...userEntries);
     const count = vehicleCount.get(email) ?? 0;
+    const clientByDay: ActivityDayClient[] = days30.map((day) => {
+      if (!((perDay.get(day) ?? 0) > 0)) return null;
+      if ((a?.appDays?.[day] ?? 0) > 0) return "app";
+      if (a?.splitFrom && day >= a.splitFrom && (a.days?.[day] ?? 0) > 0) return "web";
+      return "unknown";
+    });
     result[email] = {
       lastSeenAt: a?.lastSeenAt ?? null,
       lastClient: a?.lastClient ?? null,
@@ -117,6 +135,9 @@ export async function getAccountActivity(
       vehicles: count,
       usesApp: appUsers.has(email) || a?.lastClient === "app",
       spark30: days30.map((day) => perDay.get(day) ?? 0),
+      clientByDay,
+      sessions: sessionCount.get(email) ?? 0,
+      entriesTotal: userEntries.length,
     };
   }
   return result;

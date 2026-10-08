@@ -461,9 +461,17 @@ export function PrivacyContent() {
           Separately, we record browser/device information and sign-in timestamps
           against specific accounts, mainly to help you and us spot suspicious access -
           for example, the Vault&apos;s own access log shows you your last few sign-ins.
-          We also note when your account was last used and on how many days, on the website
-          or in the app, so we can see which accounts are active and keep the service
-          running well. Unlike the paragraph above, this is linked to your account.
+          We also note when your account was last used and on how many days, and whether
+          that was on the website or in the app, so we can see which accounts are active
+          and keep the service running well. Unlike the paragraph above, this is linked
+          to your account.
+        </p>
+        <p>
+          To catch sign-in emails that don&apos;t arrive, each time the app emails you a
+          sign-in code we keep a short record, for 30 days, of your email address, the
+          time, whether the email service accepted the message, and whether a code was
+          then entered. When you scan a receipt, we note the time and how many items
+          were read, for 90 days - never the photo or what was on it.
         </p>
         <p>
           We also use Microsoft Application Insights (part of Azure) for error and

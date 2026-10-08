@@ -49,6 +49,22 @@ describe("getResend lazy singleton (exercised via every send* function)", () => 
   });
 });
 
+describe("sendAppLoginCodeEmail", () => {
+  it("sends the code to the address and says the email service accepted it", async () => {
+    const { sendAppLoginCodeEmail } = await import("@/lib/resend");
+    await expect(sendAppLoginCodeEmail("rider@example.com", "482913")).resolves.toEqual({ ok: true });
+    const call = mocks.send.mock.calls[0][0];
+    expect(call.to).toBe("rider@example.com");
+    expect(call.subject).toBe("482913 is your RoadVerdict sign-in code");
+  });
+
+  it("reports a refusal from the email service instead of ignoring it", async () => {
+    mocks.send.mockResolvedValue({ data: null, error: { name: "validation_error", message: "Invalid recipient", statusCode: 422 } });
+    const { sendAppLoginCodeEmail } = await import("@/lib/resend");
+    await expect(sendAppLoginCodeEmail("rider@example.com", "482913")).resolves.toEqual({ ok: false, error: "Invalid recipient" });
+  });
+});
+
 describe("sendMagicLinkEmail", () => {
   it("sends from the RoadVerdict noreply address to the given email", async () => {
     const { sendMagicLinkEmail } = await import("@/lib/resend");

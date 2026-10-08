@@ -7,6 +7,10 @@
 // small document per account, in the account's own partition; days older
 // than 60 are dropped. It's never awaited by the request and never throws -
 // bookkeeping can't slow down or break anything real.
+//
+// Each visit also notes whether it came from the Android app or the website
+// (appDays), so /tomasz can chart app and web users apart. Days recorded
+// before that existed carry no split and show as "unknown".
 import { getContainer } from "@/lib/cosmos";
 
 export type ActivityClient = "web" | "app";
@@ -20,6 +24,11 @@ export interface UserActivityDoc {
   lastClient: ActivityClient;
   // UK date (YYYY-MM-DD) -> visits that day.
   days: Record<string, number>;
+  // The same, counting only visits from the Android app (website visits are days minus appDays).
+  appDays?: Record<string, number>;
+  // The first UK day this account's visits carry that split. Earlier days were recorded
+  // without it, so which client they used is unknown.
+  splitFrom?: string;
 }
 
 const THROTTLE_MS = 30 * 60 * 1000;
@@ -48,11 +57,17 @@ export async function noteActivity(email: string, client: ActivityClient, now: D
       existing = undefined;
     }
     const days = { ...(existing?.days ?? {}) };
+    const appDays = { ...(existing?.appDays ?? {}) };
     const today = ukDay(now);
     days[today] = (days[today] ?? 0) + 1;
+    if (client === "app") appDays[today] = (appDays[today] ?? 0) + 1;
     const cutoff = ukDay(new Date(now.getTime() - KEEP_DAYS * 24 * 60 * 60 * 1000));
     for (const day of Object.keys(days)) if (day < cutoff) delete days[day];
-    const doc: UserActivityDoc = { id, pk: email, type: "userActivity", email, lastSeenAt: now.toISOString(), lastClient: client, days };
+    for (const day of Object.keys(appDays)) if (day < cutoff) delete appDays[day];
+    // An account that already had a record before the split existed is split from
+    // tomorrow, so today's mix of old and new visits stays "unknown" rather than guessed.
+    const splitFrom = existing?.splitFrom ?? (existing ? ukDay(new Date(now.getTime() + 24 * 60 * 60 * 1000)) : today);
+    const doc: UserActivityDoc = { id, pk: email, type: "userActivity", email, lastSeenAt: now.toISOString(), lastClient: client, days, appDays, splitFrom };
     await container.items.upsert(doc);
   } catch {
     // Never let bookkeeping fail a request.

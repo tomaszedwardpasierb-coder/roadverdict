@@ -131,7 +131,11 @@ export async function sendMagicLinkEmail(email: string, link: string) {
 }
 // The app's sign-in code. The code sits in the subject line too, so most
 // phones show it in the notification without the email being opened.
-export async function sendAppLoginCodeEmail(email: string, code: string) {
+// Returns whether the email service accepted the message. It reports a refusal as an
+// `error` in its reply rather than throwing, and that used to be ignored - so a code that
+// never went out looked the same as one that did. Callers that don't look are unaffected;
+// the sign-in route records it (admin/signInEvents.ts) for /tomasz.
+export async function sendAppLoginCodeEmail(email: string, code: string): Promise<{ ok: boolean; error?: string }> {
   const resend = getResend();
   const html = renderEmailLayout({
     preheader: `Your RoadVerdict code is ${code} - expires in 10 minutes.`,
@@ -142,12 +146,13 @@ export async function sendAppLoginCodeEmail(email: string, code: string) {
       <p style="margin:0;color:#54555A;font-size:13px;">If you didn't request this, you can safely ignore this email - no one can sign in without the code.</p>
     `,
   });
-  await resend.emails.send({
+  const result = await resend.emails.send({
     from: FROM,
     to: email,
     subject: `${code} is your RoadVerdict sign-in code`,
     html,
   });
+  return result?.error ? { ok: false, error: result.error.message } : { ok: true };
 }
 
 // The Monday report to the site owner (see analytics/weeklyReport.ts). The
