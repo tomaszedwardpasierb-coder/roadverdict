@@ -48,6 +48,9 @@ export const PUBLIC_STATIC_SEGMENTS = [
   'track',
   'videos',
   'demo',
+  'motorcycle-service-log-app',
+  'vehicle-smart-alternative',
+  'drivvo-alternative',
 ] as const;
 
 export function usesStrictNonceCsp(pathname: string): boolean {

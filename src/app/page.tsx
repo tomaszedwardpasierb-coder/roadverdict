@@ -12,9 +12,11 @@ import { FunnelBeacon } from '@/components/FunnelBeacon';
 import { REPORT_PRICE_SUMMARY } from '@/lib/seo/reportPricingCopy';
 
 export const metadata: Metadata = pageMetadata({
-  title: 'Know What Your Vehicle Really Costs | RoadVerdict',
+  // The title Google shows carries the words people search for (logbook,
+  // MOT, service history); the brand line stays as the page's own heading.
+  title: 'Motorcycle & Car Logbook: MOT & Service History | RoadVerdict',
   description:
-    'Log every service, fill-up, and repair. Check if a quote is fair before you pay. Know what you\'re looking at before you buy. Free for motorcycles and cars.',
+    'A free UK logbook for motorcycles and cars: MOT history by registration, every service, fill-up and repair, receipts read for you, and a check that a quote is fair.',
   path: '/',
   absoluteTitle: true,
 });

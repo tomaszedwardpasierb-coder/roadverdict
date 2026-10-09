@@ -104,6 +104,15 @@ export function SiteFooterLinks() {
             <Link href="/pro">Pro</Link>
           </li>
           <li>
+            <Link href="/motorcycle-service-log-app">Motorcycle service log</Link>
+          </li>
+          <li>
+            <Link href="/vehicle-smart-alternative">Vs Vehicle Smart</Link>
+          </li>
+          <li>
+            <Link href="/drivvo-alternative">Vs Drivvo &amp; Fuelio</Link>
+          </li>
+          <li>
             <Link href="/videos">Videos</Link>
           </li>
           <li>

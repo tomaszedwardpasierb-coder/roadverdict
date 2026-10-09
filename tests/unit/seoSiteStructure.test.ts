@@ -79,6 +79,7 @@ describe("pageMetadata", () => {
       "guides/proving-service-history/page.tsx", "guides/rebuild-lost-service-history/page.tsx", "guides/motorcycle-road-tax/page.tsx",
       "about/page.tsx", "privacy/page.tsx", "cars/costs/page.tsx", "motorcycles/costs/page.tsx",
       "cars/costs/[slug]/page.tsx", "motorcycles/costs/[slug]/page.tsx",
+      "motorcycle-service-log-app/page.tsx", "vehicle-smart-alternative/page.tsx", "drivvo-alternative/page.tsx",
     ];
     for (const page of pages) {
       expect(readFileSync(path.join(APP, page), "utf8"), page).toContain("pageMetadata(");
