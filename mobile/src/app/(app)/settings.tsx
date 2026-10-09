@@ -1,7 +1,8 @@
 // Settings, as the web's SettingsTab and UnitSettings have them: your
-// name, the selected vehicle's units, two-factor sign-in, feedback, the
-// privacy policy and deleting the account. Every change goes through the
-// website's own routes; /api/app/account only reads the current state.
+// name, the selected vehicle's units, two-factor sign-in, feedback, a link
+// to rate the app on Google Play, the privacy policy and deleting the
+// account. Every change goes through the website's own routes;
+// /api/app/account only reads the current state.
 import { router } from 'expo-router';
 import { useState } from 'react';
 import { Alert, KeyboardAvoidingView, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
@@ -15,6 +16,7 @@ import { TwoFactorSection } from '@/components/two-factor';
 import { Brand } from '@/constants/brand';
 import { apiFetch } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
+import { canOpenStoreListing, openStoreListing } from '@/lib/review-prompt';
 import { useApi } from '@/lib/use-api';
 import { useVehicleOptions } from '@/lib/vehicle-options';
 import { useVehicle, vehicleHeaders, type GarageVehicle } from '@/lib/vehicle';
@@ -64,6 +66,13 @@ export default function SettingsScreen() {
 
             <SectionHeader title="Feature request or bug" />
             <FeedbackCard />
+
+            {canOpenStoreListing ? (
+              <>
+                <SectionHeader title="Rate RoadVerdict" />
+                <RateCard />
+              </>
+            ) : null}
 
             <SectionHeader title="Delete account" />
             <DeleteCard pending={account.data.pendingDeletion} onChanged={account.refresh} />
@@ -325,6 +334,24 @@ function FeedbackCard() {
             {status.text}
           </Text>
         ) : null}
+      </View>
+    </Card>
+  );
+}
+
+// Opens the Play listing so someone who wants to rate the app can, any time -
+// the in-app review sheet only ever appears once, when Google allows it.
+function RateCard() {
+  return (
+    <Card style={styles.card}>
+      <Text style={styles.hint}>A rating on Google Play helps other riders and drivers find RoadVerdict.</Text>
+      <View style={styles.saveRow}>
+        <Pressable
+          onPress={() => void openStoreListing()}
+          accessibilityRole="link"
+          style={({ pressed }) => [styles.secondary, pressed && styles.pressed]}>
+          <Text style={styles.secondaryLabel}>Rate on Google Play</Text>
+        </Pressable>
       </View>
     </Card>
   );

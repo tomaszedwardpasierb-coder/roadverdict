@@ -19,6 +19,7 @@ import { apiFetch } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import type { OptionGroup } from '@/lib/form-options';
 import { groupNumber, parseMileage, parseNumber } from '@/lib/mileage';
+import { noteMotHistoryImported } from '@/lib/review-prompt';
 import { matchMake, matchModel, mapDvlaFuelType, useVehicleOptions, type CarFuelType, type VehicleOptions } from '@/lib/vehicle-options';
 import { useVehicle, type VehicleKind } from '@/lib/vehicle';
 
@@ -516,11 +517,12 @@ function DetailsForm({
       // Best effort, as on the web: the vehicle is saved either way, and
       // the import skips anything already logged if it's run again later.
       setSaving('mot');
-      await apiFetch(kind === 'bike' ? '/api/tracker/mot-history' : '/api/cars/car/mot-history', {
+      const imported = await apiFetch<{ createdCount?: number }>(kind === 'bike' ? '/api/tracker/mot-history' : '/api/cars/car/mot-history', {
         method: 'POST',
         token,
         body: kind === 'bike' ? { bikeId: id } : { carId: id },
       });
+      if (imported.ok) void noteMotHistoryImported(imported.data.createdCount ?? 0);
       garage.select({ kind, id });
     }
     garage.refresh();
