@@ -293,9 +293,20 @@ export default function HomePage() {
       </section>
 
       {/* ── VERDICT PANEL ────────────────────────────────────────────── */}
-      {/* Plain amber - the picture that used to sit behind these buttons
-          made the strip busy, and the hero now carries the page's one image. */}
+      {/* Amber, with two real RoadVerdict charts (fuel cost and MPG, from
+          the sample car) printed faintly at either end - the middle of the
+          image is blank, so the text and buttons sit on plain amber. */}
       <section className="rv-verdict-strip" aria-labelledby="verdict-cta-heading">
+        <div className="rv-verdict-charts" aria-hidden="true">
+          <Image
+            src="/images/hero/verdict-charts.jpg"
+            alt=""
+            fill
+            sizes="100vw"
+            style={{ objectFit: 'cover', objectPosition: 'center center' }}
+            quality={70}
+          />
+        </div>
         <div className="rv-verdict-content">
           <h2 className="rv-verdict-heading" id="verdict-cta-heading">
             The verdict is in.

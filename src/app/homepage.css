@@ -209,6 +209,19 @@ a.rv-sol-card {
 /* .rv-verdict-panel-img / .rv-verdict-img-overlay live in globals.css -
    the hub pages use them too. */
 
+/* Homepage closing strip: the charts image is greyscale on white, so
+   multiplying it onto the amber leaves faint dark lines and no white. */
+.rv-verdict-charts {
+  position: absolute;
+  inset: 0;
+}
+.rv-verdict-charts img { opacity: 0.32; mix-blend-mode: multiply; }
+/* Phones: the text spans the full width, so the charts would sit right
+   behind it - left out. */
+@media (max-width: 768px) {
+  .rv-verdict-charts { display: none; }
+}
+
 /* ── Responsive tweaks ────────────────────────────────────────────── */
 .rv-solution-grid {
   grid-template-columns: repeat(3, 1fr) !important;
