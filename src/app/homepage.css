@@ -36,54 +36,66 @@ main:has(> .rv-hero) {
   padding-top: 0;
 }
 
-/* Comic panel grid — lives behind the hero content */
-.rv-hero-panels {
+/* Product hero: the real app on a phone fills the right half, fading into
+   the dark behind the text so the two read as one picture. */
+.rv-hero--product {
+  padding-left: max(2rem, calc((100vw - 1200px) / 2));
+}
+.rv-hero--product .rv-hero-content {
+  max-width: min(560px, 44vw);
+}
+.rv-hero--product .rv-hero-headline {
+  font-size: clamp(44px, 5.2vw, 72px);
+}
+.rv-hero-photo {
   position: absolute;
-  inset: 0;
-  display: grid;
-  grid-template-columns: 1.1fr 0.9fr;
-  gap: 3px;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 52%;
   background: #0e0e0e;
 }
-.rv-panel {
-  position: relative;
-  overflow: hidden;
-  background: #161616;
-}
-.rv-panel-right-col {
-  display: grid;
-  grid-template-rows: 1fr 1fr;
-  gap: 3px;
-}
-.rv-panel-rt { background: #131313; }
-.rv-panel-rb { background: #1a1208; }
-
-/* Dark overlay on each panel so text stays readable */
-.rv-panel-overlay {
+.rv-hero-photo-fade {
   position: absolute;
   inset: 0;
-  background: linear-gradient(135deg, rgba(14,14,14,0.55) 0%, rgba(14,14,14,0.25) 100%);
-  z-index: 1;
-}
-/* Dark behind the hero text (which spans most of this panel on desktop),
-   fading out towards the panel's right edge so the picture still shows. */
-.rv-panel-left .rv-panel-overlay {
-  background: linear-gradient(90deg, rgba(14,14,14,0.92) 0%, rgba(14,14,14,0.84) 50%, rgba(14,14,14,0.5) 78%, rgba(14,14,14,0.2) 100%);
+  background:
+    linear-gradient(90deg, #0e0e0e 0%, rgba(14,14,14,0.55) 10%, rgba(14,14,14,0) 26%),
+    linear-gradient(180deg, rgba(14,14,14,0.25) 0%, rgba(14,14,14,0) 18%, rgba(14,14,14,0) 82%, rgba(14,14,14,0.35) 100%);
 }
 
-/* Comic-style panel number tag */
-.rv-panel-tag {
-  position: absolute;
-  top: 10px;
-  left: 10px;
-  font-size: 9px;
-  font-weight: 700;
-  letter-spacing: 0.15em;
-  text-transform: uppercase;
-  color: var(--amber);
-  opacity: 0.45;
-  z-index: 2;
-  font-family: var(--font-mono, monospace);
+/* Tablets and phones: the text first, then the photo full width below it. */
+@media (max-width: 768px) {
+  .rv-hero--product {
+    flex-direction: column;
+    align-items: stretch;
+    padding: 3.5rem 2rem 0;
+  }
+  .rv-hero--product .rv-hero-content {
+    max-width: 560px;
+  }
+  .rv-hero--product .rv-hero-headline {
+    font-size: clamp(44px, 12vw, 64px);
+  }
+  .rv-hero-photo {
+    position: relative;
+    order: 2;
+    width: auto;
+    height: clamp(260px, 72vw, 420px);
+    margin: 0 -2rem;
+  }
+  .rv-hero-photo-fade {
+    background: linear-gradient(180deg, #0e0e0e 0%, rgba(14,14,14,0) 22%);
+  }
+}
+/* Phones: globals.css narrows the hero's side padding here, so the photo's
+   full-bleed margin follows it. */
+@media (max-width: 640px) {
+  .rv-hero--product {
+    padding: 3rem 1.2rem 0;
+  }
+  .rv-hero-photo {
+    margin: 0 -1.2rem;
+  }
 }
 
 .rv-cta-outline {
@@ -198,16 +210,6 @@ a.rv-sol-card {
    the hub pages use them too. */
 
 /* ── Responsive tweaks ────────────────────────────────────────────── */
-@media (max-width: 640px) {
-  .rv-hero-panels { grid-template-columns: 1fr; }
-  .rv-panel-right-col { display: none; }
-  .rv-panel-left .rv-panel-overlay {
-    background: rgba(14,14,14,0.75);
-  }
-}
-
-.rv-panel-tag { display: none; }
-
 .rv-solution-grid {
   grid-template-columns: repeat(3, 1fr) !important;
 }

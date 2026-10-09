@@ -71,67 +71,28 @@ export default function HomePage() {
       />
 
       {/* ── HERO ─────────────────────────────────────────────────────── */}
-      <section className="rv-hero" aria-label="Hero">
-        {/* Comic panel grid */}
-        <div className="rv-hero-panels" aria-hidden="true">
-          <div className="rv-panel rv-panel-left">
-            {/* quality below default (75) - PageSpeed flagged ~105KB of
-                savings here with negligible visible difference, since a
-                busy comic-style illustration hides compression artifacts
-                far better than a photo would. */}
-            <Image
-              src="/images/hero/panel-01.webp"
-              alt="Comic-style illustration of a man in his garage with a van, a sports car and two motorbikes"
-              fill
-              // The left panel is ~55% of the hero's width (1.1fr / 0.9fr)
-              // above 640px, the full width below - without this, `fill`
-              // assumes 100vw and desktops download an image twice the size
-              // they show.
-              sizes="(max-width: 640px) 100vw, 55vw"
-              style={{ objectFit: 'cover', objectPosition: 'center top' }}
-              priority
-              // `priority` alone gives eager loading + a preload link but no
-              // fetchpriority hint - Lighthouse's "LCP request discovery"
-              // flagged it as not priority-hinted.
-              fetchPriority="high"
-              // Kept at 68: Next encodes AVIF a notch below the quality prop, and 50
-              // visibly smeared the faces/chrome. With AVIF enabled (next.config.mjs)
-              // 68 is ~28 KiB at 828w vs ~64 KiB as WebP q68 - same visual quality.
-              quality={68}
-            />
-            <div className="rv-panel-overlay" />
-            <span className="rv-panel-tag">Panel 01</span>
-          </div>
-          <div className="rv-panel-right-col">
-            <div className="rv-panel rv-panel-rt">
-              {/* Not `priority` - panel-01 is the real LCP element (confirmed via
-                  PageSpeed Insights), and this panel is hidden entirely on mobile
-                  (.rv-panel-right-col is display:none below 768px) - marking it
-                  priority forced an eager, high-fetchpriority fetch of an image
-                  that mobile visitors never even see, competing with panel-01
-                  for the same early bandwidth. */}
-              <Image
-                src="/images/hero/panel-02.webp"
-                alt="Comic-style illustration of oily hands holding a phone with a workshop log of mileage and price"
-                fill
-                sizes="45vw"
-                style={{ objectFit: 'cover', objectPosition: 'center center' }}
-              />
-              <div className="rv-panel-overlay" />
-              <span className="rv-panel-tag">Panel 02</span>
-            </div>
-            <div className="rv-panel rv-panel-rb">
-              <Image
-                src="/images/hero/panel-03.webp"
-                alt="Comic-style illustration of a rider looking out through an open motorcycle helmet"
-                fill
-                sizes="45vw"
-                style={{ objectFit: 'cover', objectPosition: 'center top' }}
-              />
-              <div className="rv-panel-overlay" />
-              <span className="rv-panel-tag">Panel 03</span>
-            </div>
-          </div>
+      <section className="rv-hero rv-hero--product" aria-label="Hero">
+        {/* The product itself: a real RoadVerdict logbook screen (a real
+            motorcycle's services, registration removed) on a phone, with a
+            car and a motorbike behind - so the first thing a visitor sees is
+            what they'd get. Right half on desktop, under the text on phones. */}
+        <div className="rv-hero-photo">
+          <Image
+            src="/images/hero/hero-phone-logbook.jpg"
+            alt="A phone showing a RoadVerdict logbook of a motorcycle's services and what each cost, held in front of a car and a motorbike"
+            fill
+            sizes="(max-width: 768px) 100vw, 50vw"
+            style={{ objectFit: 'cover', objectPosition: '38% center' }}
+            priority
+            // `priority` alone gives eager loading + a preload link but no
+            // fetchpriority hint - Lighthouse's "LCP request discovery"
+            // flagged that on the old hero image.
+            fetchPriority="high"
+            // A photo of a screen shows compression on the text far sooner
+            // than the old comic art did, so this sits a notch higher.
+            quality={78}
+          />
+          <div className="rv-hero-photo-fade" aria-hidden="true" />
         </div>
 
         {/* Content */}
@@ -332,21 +293,9 @@ export default function HomePage() {
       </section>
 
       {/* ── VERDICT PANEL ────────────────────────────────────────────── */}
+      {/* Plain amber - the picture that used to sit behind these buttons
+          made the strip busy, and the hero now carries the page's one image. */}
       <section className="rv-verdict-strip" aria-labelledby="verdict-cta-heading">
-        <div className="rv-verdict-panel-img" aria-hidden="true">
-          {/* Lower quality than panel-01 - this one sits under a much
-              heavier overlay (rv-verdict-img-overlay is 82-96% opaque),
-              so the image itself is barely visible and compression
-              artifacts don't show at all. */}
-          <Image
-            src="/images/hero/panel-04.webp"
-            alt="Comic-style illustration of a phone in a gloved hand showing a vehicle verdict: buy, negotiate or walk away"
-            fill
-            style={{ objectFit: 'cover', objectPosition: 'center center' }}
-            quality={50}
-          />
-          <div className="rv-verdict-img-overlay" />
-        </div>
         <div className="rv-verdict-content">
           <h2 className="rv-verdict-heading" id="verdict-cta-heading">
             The verdict is in.
