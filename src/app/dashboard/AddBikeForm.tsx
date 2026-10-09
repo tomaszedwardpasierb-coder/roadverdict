@@ -12,13 +12,15 @@ import styles from './dashboard.module.css';
 
 const REGIONS = Object.keys(REGION_LABELS) as Region[];
 
-export function AddBikeForm() {
+// initialRegistration: arriving from the free MOT check's "Save to my
+// garage", the plate the visitor just checked.
+export function AddBikeForm({ initialRegistration = '' }: { initialRegistration?: string } = {}) {
   const [make, setMake] = useState(ALL_BRANDS[0]);
   const modelsForBrand = MOTORCYCLE_MODELS.filter((m) => m.make === make);
   const [model, setModel] = useState(modelsForBrand[0]?.model ?? '');
   const [year, setYear] = useState('');
   const [isCustomBuild, setIsCustomBuild] = useState(false);
-  const [registration, setRegistration] = useState('');
+  const [registration, setRegistration] = useState(initialRegistration);
   const [mileage, setMileage] = useState('');
   const [nickname, setNickname] = useState('');
   const [region, setRegion] = useState<Region>('rest-england-wales');

@@ -1,0 +1,190 @@
+/* Place at: src/app/mot-check/mot-check.module.css
+ *
+ * The free MOT check. `div.page p` resets the shared .hero p rule (a
+ * narrow, large lead paragraph) for everything on this page except the
+ * lead itself. */
+
+div.page p {
+  max-width: none;
+  margin: 0 0 0.6rem;
+  font-size: 1rem;
+}
+div.page p.lead {
+  font-size: 1.1rem;
+  max-width: 60ch;
+  margin-bottom: 1.5rem;
+}
+
+.adminNote {
+  display: inline-block;
+  font-size: 0.85rem !important;
+  background: var(--amber-tint);
+  color: #7A4508;
+  border-radius: var(--radius-sm);
+  padding: 0.3rem 0.7rem;
+}
+
+/* The registration box looks like a UK rear number plate. */
+.form { margin: 0 0 1.5rem; }
+.formLabel { display: block; font-weight: 700; margin-bottom: 0.4rem; }
+.formRow { display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: stretch; }
+.plateInput {
+  flex: 1 1 14rem;
+  max-width: 20rem;
+  min-height: 3.4rem;
+  background: #F7D117;
+  border: 2px solid #1C1D20;
+  border-radius: var(--radius-sm);
+  color: #111;
+  font-family: var(--font-display);
+  font-size: 2rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-align: center;
+  text-transform: uppercase;
+  padding: 0 0.75rem;
+}
+.plateInput::placeholder { color: rgba(17, 17, 17, 0.35); }
+.plateInput:focus-visible { outline: 3px solid var(--blue); outline-offset: 2px; }
+
+.primary,
+.secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 3rem;
+  padding: 0 1.3rem;
+  border-radius: var(--radius-sm);
+  font-weight: 700;
+  font-size: 1rem;
+  text-decoration: none;
+  cursor: pointer;
+}
+.primary { background: var(--asphalt); color: #fff; border: 2px solid var(--asphalt); }
+.primary:hover { background: #000; color: #fff; }
+.secondary { background: transparent; color: var(--ink); border: 2px solid var(--border); }
+.secondary:hover { border-color: var(--ink-soft); color: var(--ink); }
+
+div.page p.notice {
+  background: var(--amber-tint);
+  border-radius: var(--radius-md);
+  padding: 0.9rem 1.1rem;
+  color: #5c3606;
+}
+
+.result { display: grid; gap: 1rem; margin-bottom: 2rem; }
+.card {
+  background: var(--paper);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 1.1rem 1.25rem;
+  box-shadow: var(--shadow-card);
+}
+.cardTitle { font-size: 1.05rem; margin: 0 0 0.6rem; }
+.sectionTitle { font-family: var(--font-display); font-size: 1.6rem; margin: 0.5rem 0 0.75rem; }
+
+div.page p.plate {
+  display: inline-block;
+  background: #F7D117;
+  border: 1.5px solid #1C1D20;
+  border-radius: 6px;
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 1.3rem;
+  letter-spacing: 0.08em;
+  padding: 0.1rem 0.7rem;
+  color: #111;
+}
+.vehicle { font-family: var(--font-display); font-size: 1.9rem; margin: 0.2rem 0; }
+div.page p.muted, .muted { color: var(--ink-soft); font-size: 0.95rem; }
+div.page p.statusOk,
+div.page p.statusBad {
+  display: inline-block;
+  font-weight: 700;
+  border-radius: var(--radius-sm);
+  padding: 0.35rem 0.75rem;
+  margin-top: 0.4rem;
+}
+div.page p.statusOk { background: var(--green-tint); color: #155c40; }
+div.page p.statusBad { background: var(--red-tint); color: #8d2f24; }
+
+/* Score */
+div.page p.score { display: flex; align-items: baseline; flex-wrap: wrap; gap: 0.2rem 0.6rem; margin-bottom: 0.8rem; }
+.scoreNumber { font-family: var(--font-display); font-size: 3.4rem; font-weight: 800; line-height: 1; }
+.scoreOutOf { font-size: 1.1rem; color: var(--ink-soft); }
+.scoreBand { font-weight: 700; }
+.band_clean .scoreNumber, .band_clean .scoreBand { color: var(--green); }
+.band_minor .scoreNumber, .band_minor .scoreBand { color: #5d7c1f; }
+.band_closer_look .scoreNumber, .band_closer_look .scoreBand { color: var(--amber-ink); }
+.band_questions .scoreNumber, .band_questions .scoreBand { color: var(--red); }
+.reasons { list-style: none; margin: 0 0 0.6rem; padding: 0; }
+.reasons li {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.45rem 0;
+  border-top: 1px solid var(--line-soft);
+}
+.minus { color: var(--red); font-weight: 700; white-space: nowrap; }
+.plus { color: var(--green); font-weight: 700; }
+.rules summary { cursor: pointer; font-weight: 600; color: var(--ink-soft); }
+.rules ul { margin: 0.4rem 0 0; padding-left: 1.2rem; color: var(--ink-soft); }
+
+/* Mileage */
+.mileage { list-style: none; margin: 0; padding: 0; }
+.mileage li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem 1rem;
+  padding: 0.4rem 0;
+  border-top: 1px solid var(--line-soft);
+}
+.mileage li span:first-child { min-width: 10rem; color: var(--ink-soft); }
+.mileageDown span:nth-child(2) { color: var(--red); font-weight: 700; }
+.flag { color: var(--red); font-size: 0.9rem; }
+
+/* Tests */
+.test {
+  background: var(--paper);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 1rem 1.25rem;
+  margin-bottom: 0.75rem;
+}
+.testHead { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem 0.9rem; margin-bottom: 0.6rem; }
+.pass, .fail { font-weight: 800; font-size: 0.8rem; letter-spacing: 0.06em; text-transform: uppercase; border-radius: 6px; padding: 0.2rem 0.55rem; }
+.pass { background: var(--green-tint); color: #155c40; }
+.fail { background: var(--red-tint); color: #8d2f24; }
+.testDate { font-weight: 700; }
+.defects { list-style: none; margin: 0; padding: 0; }
+.defect { padding: 0.75rem 0; border-top: 1px solid var(--line-soft); }
+div.page p.defectHead { display: flex; flex-wrap: wrap; gap: 0.4rem 0.6rem; align-items: baseline; margin-bottom: 0.35rem; }
+.official { font-weight: 600; color: var(--ink); }
+.chip { font-size: 0.75rem; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; border-radius: 999px; padding: 0.15rem 0.55rem; white-space: nowrap; }
+.sev_dangerous { background: #8d2f24; color: #fff; }
+.sev_failed { background: var(--red-tint); color: #8d2f24; }
+.sev_minor { background: var(--amber-tint); color: #7A4508; }
+.sev_advisory { background: #EDEAE3; color: #4a4b50; }
+.sev_fixed { background: var(--green-tint); color: #155c40; }
+.sev_note { background: var(--blue-tint); color: #2f3f8f; }
+div.page p.explain { font-size: 0.95rem; color: var(--ink); margin-bottom: 0.25rem; }
+div.page p.severityNote { font-size: 0.88rem; color: var(--ink-soft); margin-bottom: 0.25rem; }
+div.page p.cost { font-size: 0.92rem; background: var(--stone); border-radius: var(--radius-sm); padding: 0.45rem 0.7rem; margin: 0.35rem 0 0; }
+
+/* Save */
+.save {
+  background: var(--asphalt);
+  color: #f0ede6;
+  border-radius: var(--radius-md);
+  padding: 1.25rem;
+}
+.save .cardTitle { color: #fff; }
+div.page .save p { color: rgba(240, 237, 230, 0.8); }
+.saveActions { display: flex; flex-wrap: wrap; gap: 0.75rem; margin-top: 0.4rem; }
+.save .primary { background: var(--amber); border-color: var(--amber); color: #111; }
+.save .primary:hover { background: #f5ad4f; }
+.save .secondary { color: #f0ede6; border-color: rgba(240, 237, 230, 0.4); }
+div.page p.quiet { font-size: 0.95rem; color: var(--ink-soft); }
+
+.about h2 { font-size: 1.2rem; margin: 0.5rem 0; }
+.about ul { padding-left: 1.2rem; margin: 0 0 1rem; color: var(--ink-soft); }

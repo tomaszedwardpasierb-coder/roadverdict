@@ -38,6 +38,7 @@ import {
 import { type Currency, formatCurrency } from "@/lib/tracker/currency";
 import { getExchangeRates } from "@/lib/tracker/currencyRates";
 import { AddBikeForm } from "./AddBikeForm";
+import { cleanRegistration } from "@/lib/mot/motRecord";
 import { SetRegionForm } from "./SetRegionForm";
 import { LogServiceForm } from "./LogServiceForm";
 import { LogFuelForm } from "./LogFuelForm";
@@ -210,7 +211,7 @@ function buildStatCardForecasts(
 
 export const dynamic = "force-dynamic";
 
-export default async function DashboardPage(props: { searchParams: Promise<{ addVehicle?: string; tab?: string }> }) {
+export default async function DashboardPage(props: { searchParams: Promise<{ addVehicle?: string; tab?: string; vrm?: string }> }) {
   const searchParams = await props.searchParams;
   const session = await getSession();
   if (!session) redirect("/login");
@@ -233,6 +234,8 @@ export default async function DashboardPage(props: { searchParams: Promise<{ add
   // OnboardingChecklistCard.tsx's own items (see ONBOARDING_STEPS in
   // userDoc.ts). All six keep working unchanged - they're ordinary
   // members of ALL_SECTIONS now, not a separate allow-list.
+  // A plate handed over by the free MOT check's "Save to my garage".
+  const initialRegistration = cleanRegistration(searchParams.vrm) ?? undefined;
   const activeSection: Section = (ALL_SECTIONS as readonly string[]).includes(searchParams.tab ?? "")
     ? (searchParams.tab as Section)
     : "dashboard";
@@ -299,7 +302,7 @@ export default async function DashboardPage(props: { searchParams: Promise<{ add
         </div>
         <h1 className={styles.heading}>Add your car</h1>
         <p className={styles.subtext}>Signed in as {session.email}.</p>
-        <AddCarForm />
+        <AddCarForm initialRegistration={initialRegistration} />
       </main>
     );
   }
@@ -360,7 +363,7 @@ export default async function DashboardPage(props: { searchParams: Promise<{ add
         </div>
         <h1 className={styles.heading}>Add your bike</h1>
         <p className={styles.subtext}>Signed in as {session.email}.</p>
-        <AddBikeForm />
+        <AddBikeForm initialRegistration={initialRegistration} />
       </main>
     );
   }

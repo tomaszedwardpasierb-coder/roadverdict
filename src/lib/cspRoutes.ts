@@ -28,6 +28,9 @@ export const STRICT_CSP_SEGMENTS = [
   'tomasz',
   'pro',
   'privacy-draft',
+  // The free MOT check renders each lookup per request, from the
+  // registration a visitor typed.
+  'mot-check',
 ] as const;
 
 // Segments that are prerendered public pages ('' is the homepage). Also

@@ -46,7 +46,9 @@ function mapDvlaFuelType(raw: string): CarFuelType | null {
 
 const OTHER = '__other__';
 
-export function AddCarForm() {
+// initialRegistration: arriving from the free MOT check's "Save to my
+// garage", the plate the visitor just checked.
+export function AddCarForm({ initialRegistration = '' }: { initialRegistration?: string } = {}) {
   const [fuelType, setFuelType] = useState<CarFuelType>('petrol');
   const [make, setMake] = useState(ALL_CAR_BRANDS[0]);
   const modelsForBrand = CAR_MODELS.filter((m) => m.make === make);
@@ -57,7 +59,7 @@ export function AddCarForm() {
   const [batteryKwh, setBatteryKwh] = useState('');
   const [isCustomBuild, setIsCustomBuild] = useState(false);
   const [year, setYear] = useState('');
-  const [registration, setRegistration] = useState('');
+  const [registration, setRegistration] = useState(initialRegistration);
   const [mileage, setMileage] = useState('');
   const [nickname, setNickname] = useState('');
   const [region, setRegion] = useState<Region>('rest-england-wales');
