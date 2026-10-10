@@ -65,6 +65,7 @@ const GEMINI_VISION_TIMEOUT_MS = 30_000;
 // line strings that could quietly drift apart.
 function buildPrompt(vehicleKind: VehicleKind): string {
   const noun = vehicleKind === "motorcycle" ? "motorcycle" : "car";
+  const ridingOrDriving = vehicleKind === "motorcycle" ? "riding" : "driving";
   const serviceExamples =
     vehicleKind === "motorcycle"
       ? "oil change, brake pads, tyres, chain, valve clearance, etc."
@@ -95,7 +96,7 @@ function buildPrompt(vehicleKind: VehicleKind): string {
   "vehicleModelOnReceipt": the specific model, ONLY if named alongside the make above in that same "this is the vehicle" context (e.g. "CB500F", "Meteor 350") - otherwise null. Only relevant if isReceipt is true.,
   "items": [
     {
-      "category": one of "service", "fuel", "mods", "bills", "labour",
+      "category": one of "service", "fuel", "mods", "bills", "labour", "unrelated",
       "date": the transaction date as YYYY-MM-DD (your best reading of the receipt; if genuinely illegible, use today's date),
       "cost": the cost of just THIS item, in whatever currency you identified above, as a plain number with no currency symbol - not the receipt's grand total, unless there is genuinely only one item,
       "description": a short (max 6 words) plain-English description of this specific item,
@@ -110,8 +111,9 @@ Category guide:
 - "service": ${noun} servicing or repairs where a specific part or consumable is named (${serviceExamples}) - use this whenever the line item names the part or job itself, even if labour/fitting is also being charged
 - "labour": a line item billed purely as workshop labour or diagnostic time, with NO specific part or consumable named (e.g. "Suspension work - labour", "Diagnostic fee", "2 hrs labour @ £75") - even if it relates to a system "service" above also covers
 - "fuel": a petrol or diesel fill-up
-- "mods": accessories, gear, luggage, or electronics bought (not fitted as a labour job)
+- "mods": accessories, gear, luggage, or electronics bought for the ${noun} or for ${ridingOrDriving} it (not fitted as a labour job)
 - "bills": insurance, road tax (VED), or an MOT test
+- "unrelated": anything clearly NOT for the ${noun} or for ${ridingOrDriving} it - groceries, food and drink (including a snack bought with fuel), household and cleaning products for the home (e.g. toilet roll, anti-bacterial wipes, washing-up liquid), toiletries, medicine, everyday clothing, tobacco, lottery tickets, newspapers. Products made for vehicles (car shampoo, screenwash, de-icer, chain lube, polish) and general items a ${noun} owner plausibly bought for it (a padlock, cable ties, WD-40, a phone mount) are NOT unrelated - categorise them as usual. A supermarket receipt is often entirely unrelated: say so rather than forcing its items into another category.
 If isReceipt is false, return an empty items array. If the receipt only really contains one purchase, return a single-item array rather than trying to invent a split. If you cannot confidently read a value on a genuine receipt, make your best reasonable estimate rather than leaving it out - every field on every item must have a value, except merchantName/address/city (genuinely null if not visible) and litres (genuinely null if you can't read it - see above).`;
 }
 
@@ -175,6 +177,9 @@ export type ParseReceiptResult =
       skippedBeforeProduction: number;
       skippedNonPetrol: number;
       skippedUnreadableLitres: number;
+      // Lines the AI read as not for the vehicle (a snack bought with
+      // fuel) - dropped, the rest of the receipt still logged.
+      skippedUnrelated: number;
     }
   | { ok: false; fileName: string; error: string; status: number };
 
@@ -314,6 +319,24 @@ export async function parseReceiptFile(file: File, apiKey: string, vehicle: Scan
 
     const rawItems = Array.isArray(parsed.items) ? parsed.items : [];
     const validItems = rawItems.filter((item) => item.category && VALID_CATEGORIES.has(item.category));
+    // A genuine receipt with nothing on it for the vehicle (a supermarket
+    // shop) used to have its lines forced into "mods" and logged. Refused
+    // before the photo is stored, naming what was read so the person can
+    // see why.
+    const unrelatedItems = rawItems.filter((item) => item.category === "unrelated");
+    if (validItems.length === 0 && unrelatedItems.length > 0) {
+      const seen = unrelatedItems
+        .map((item) => (typeof item.description === "string" ? item.description.trim().toLowerCase() : ""))
+        .filter(Boolean)
+        .slice(0, 3);
+      const noun = vehicleKind === "motorcycle" ? "motorcycle" : "car";
+      return {
+        ok: false,
+        fileName,
+        error: `Nothing on this receipt looks like it's for your ${noun}${seen.length > 0 ? ` (it shows ${seen.join(", ")})` : ""}, so nothing was logged. If it is, add it manually.`,
+        status: 422,
+      };
+    }
     if (validItems.length === 0) {
       return { ok: false, fileName, error: "Could not work out what kind of expense this is. Please enter it manually.", status: 502 };
     }
@@ -416,7 +439,7 @@ export async function parseReceiptFile(file: File, apiKey: string, vehicle: Scan
       });
     }
 
-    return { ok: true, fileName, summary, items, skippedBeforeProduction, skippedNonPetrol, skippedUnreadableLitres };
+    return { ok: true, fileName, summary, items, skippedBeforeProduction, skippedNonPetrol, skippedUnreadableLitres, skippedUnrelated: unrelatedItems.length };
   } catch (err) {
     return {
       ok: false,

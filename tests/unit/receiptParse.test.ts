@@ -121,6 +121,39 @@ describe("parseReceiptFile", () => {
     expect((result as any).error).toContain("Could not work out what kind of expense this is");
   });
 
+  // The real report: a Tesco receipt for anti-bac wipes and toilet paper
+  // was logged as parts. Refused outright, before the photo is stored.
+  it("refuses a receipt where nothing is for the vehicle, naming what it read", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(geminiResponse(JSON.stringify({
+      isReceipt: true, merchantName: "Tesco",
+      items: [
+        { category: "unrelated", date: "2026-10-09", cost: 2, description: "Anti-bac wipes" },
+        { category: "unrelated", date: "2026-10-09", cost: 4.5, description: "Toilet roll" },
+      ],
+    }))));
+    const result = await parseReceiptFile(fakeFile(), "key", car);
+    expect(result).toEqual({
+      ok: false,
+      fileName: "receipt.jpg",
+      error: "Nothing on this receipt looks like it's for your car (it shows anti-bac wipes, toilet roll), so nothing was logged. If it is, add it manually.",
+      status: 422,
+    });
+    expect(mocks.uploadData).not.toHaveBeenCalled();
+  });
+
+  it("keeps the fuel and drops the snack on a mixed receipt, and counts what it dropped", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(geminiResponse(JSON.stringify({
+      isReceipt: true,
+      items: [
+        { category: "fuel", date: "2025-06-01", cost: 18, fuelType: "petrol", litres: 12 },
+        { category: "unrelated", date: "2025-06-01", cost: 1.5, description: "Chocolate bar" },
+      ],
+    }))));
+    const result = await parseReceiptFile(fakeFile(), "key", bike);
+    expect(result).toMatchObject({ ok: true, skippedUnrelated: 1 });
+    expect((result as any).items.map((i: any) => i.category)).toEqual(["fuel"]);
+  });
+
   it("skips an item dated before the bike's production year, and counts it", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(geminiResponse(JSON.stringify({
       isReceipt: true, items: [{ category: "service", date: "2010-01-01", cost: 50, description: "Oil change" }],

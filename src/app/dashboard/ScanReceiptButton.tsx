@@ -18,6 +18,7 @@ interface FileParseOutcome {
   skippedBeforeProduction?: number;
   skippedNonPetrol?: number;
   skippedUnreadableLitres?: number;
+  skippedUnrelated?: number;
   items?: ParsedReceiptItem[];
   error?: string;
 }
@@ -79,6 +80,7 @@ export function ScanReceiptButton({ isPro = false, vehicleKind = 'bike' }: { isP
         skippedBeforeProduction: typeof data.skippedBeforeProduction === 'number' ? data.skippedBeforeProduction : 0,
         skippedNonPetrol: typeof data.skippedNonPetrol === 'number' ? data.skippedNonPetrol : 0,
         skippedUnreadableLitres: typeof data.skippedUnreadableLitres === 'number' ? data.skippedUnreadableLitres : 0,
+        skippedUnrelated: typeof data.skippedUnrelated === 'number' ? data.skippedUnrelated : 0,
         items: Array.isArray(data.items) ? data.items : [],
       };
     } catch {
@@ -135,6 +137,7 @@ export function ScanReceiptButton({ isPro = false, vehicleKind = 'bike' }: { isP
   const totalSkippedBeforeProduction = outcomes?.reduce((sum, o) => sum + (o.skippedBeforeProduction ?? 0), 0) ?? 0;
   const totalSkippedNonPetrol = outcomes?.reduce((sum, o) => sum + (o.skippedNonPetrol ?? 0), 0) ?? 0;
   const totalSkippedUnreadableLitres = outcomes?.reduce((sum, o) => sum + (o.skippedUnreadableLitres ?? 0), 0) ?? 0;
+  const totalSkippedUnrelated = outcomes?.reduce((sum, o) => sum + (o.skippedUnrelated ?? 0), 0) ?? 0;
 
   return (
     <div className={styles.scanCard}>
@@ -253,6 +256,13 @@ export function ScanReceiptButton({ isPro = false, vehicleKind = 'bike' }: { isP
             <p className={styles.scanSkipNote}>
               {totalSkippedUnreadableLitres} fuel item{totalSkippedUnreadableLitres === 1 ? '' : 's'} couldn&apos;t
               be read clearly enough - please add {totalSkippedUnreadableLitres === 1 ? 'it' : 'them'} manually.
+            </p>
+          )}
+          {totalSkippedUnrelated > 0 && (
+            <p className={styles.scanSkipNote}>
+              {totalSkippedUnrelated} item{totalSkippedUnrelated === 1 ? '' : 's'} on the receipt{' '}
+              {totalSkippedUnrelated === 1 ? "wasn't" : "weren't"} for your {vehicleKind === 'car' ? 'car' : 'bike'} and{' '}
+              {totalSkippedUnrelated === 1 ? "wasn't" : "weren't"} logged.
             </p>
           )}
           {failCount > 0 && (

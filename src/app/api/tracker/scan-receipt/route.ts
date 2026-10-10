@@ -56,6 +56,7 @@ export async function POST(request: NextRequest) {
       );
     }
     if (result.skippedUnreadableLitres > 0) reasons.push("the litres couldn't be read clearly enough to log automatically");
+    if (result.skippedUnrelated > 0) reasons.push(`some items aren't for your ${vehicleKind === "car" ? "car" : "bike"}`);
     return NextResponse.json(
       { error: reasons.length > 0 ? `Nothing to log from this receipt: ${reasons.join("; ")}.` : "Nothing usable was found on this receipt." },
       { status: 422 }
