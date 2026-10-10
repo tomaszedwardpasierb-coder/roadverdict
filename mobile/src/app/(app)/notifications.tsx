@@ -5,7 +5,7 @@
 import { router } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import { useEffect } from 'react';
-import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Linking, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Icon } from '@/components/icon';
@@ -47,8 +47,11 @@ export default function NotificationsScreen() {
 
   function open(n: AppNotification) {
     if (n.kind === 'reminder') router.push('/reminders');
-    // Announcement links are website pages.
+    // Announcement links are website pages, or RoadVerdict's Facebook,
+    // Instagram or TikTok (the server allows only those) - handed to the
+    // phone so they open in that app when it's installed.
     else if (n.linkTo && n.linkTo.startsWith('/')) WebBrowser.openBrowserAsync(`${API_BASE_URL}${n.linkTo}`);
+    else if (n.linkTo && n.linkTo.startsWith('https://')) Linking.openURL(n.linkTo).catch(() => {});
   }
 
   return (

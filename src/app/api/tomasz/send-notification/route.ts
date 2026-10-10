@@ -2,7 +2,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAdminSession } from "@/lib/admin/session";
 import { createBroadcastNotifications, getAllUserEmails } from "@/lib/tracker/notification";
-import { getSafeRedirectPath } from "@/lib/auth/safeRedirect";
+import { getSafeNotificationLink } from "@/lib/notificationLink";
 import { sendPushToUser } from "@/lib/push/sendPush";
 import { runInBatches } from "@/lib/concurrency";
 
@@ -35,13 +35,18 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "A message is required." }, { status: 400 });
   }
 
-  // Reused rather than duplicated - an admin-supplied link going out to
-  // potentially every user deserves the same validation as any other
-  // redirect destination in this app, even though the admin is trusted.
-  // Mainly guards against an honest typo (a missing leading slash, say)
-  // producing a broken link for every single recipient at once, not
-  // just malicious input.
-  const safeLinkTo = getSafeRedirectPath(linkTo);
+  // A page on this site, or RoadVerdict's Facebook/Instagram/TikTok (see
+  // notificationLink.ts). Anything else is refused with a reason rather
+  // than silently dropped, so a typo is caught before it reaches every
+  // recipient as a link-less message.
+  const hasLink = typeof linkTo === "string" && linkTo.trim() !== "";
+  const safeLinkTo = hasLink ? getSafeNotificationLink(linkTo) : null;
+  if (hasLink && !safeLinkTo) {
+    return NextResponse.json(
+      { error: "The link must be a page on this site (like /dashboard) or a Facebook, Instagram or TikTok address starting with https://." },
+      { status: 400 }
+    );
+  }
 
   let recipientEmails: string[];
   if (recipients === "all") {

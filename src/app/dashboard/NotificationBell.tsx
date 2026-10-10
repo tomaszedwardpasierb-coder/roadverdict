@@ -87,7 +87,9 @@ export function NotificationBell() {
       }
     }
     if (notification.linkTo) {
-      window.location.href = notification.linkTo;
+      // Facebook/Instagram/TikTok open in a new tab, so the dashboard stays put.
+      if (notification.linkTo.startsWith('https://')) window.open(notification.linkTo, '_blank', 'noopener,noreferrer');
+      else window.location.href = notification.linkTo;
     }
   }
 

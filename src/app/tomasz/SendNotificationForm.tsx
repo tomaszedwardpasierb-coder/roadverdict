@@ -115,12 +115,12 @@ export function SendNotificationForm({ allEmails }: Props) {
             type="text"
             value={linkTo}
             onChange={(e) => setLinkTo(e.target.value)}
-            placeholder="/dashboard"
+            placeholder="/dashboard or https://www.instagram.com/..."
             className={styles.input}
           />
           <p className={styles.warnNote} style={{ marginTop: '0.3rem' }}>
-            Must be a path on this site starting with a single /, e.g. /dashboard - anything else is silently
-            dropped, same validation the sign-in redirect uses.
+            A page on this site starting with a single / (e.g. /dashboard), or a Facebook, Instagram or TikTok
+            address starting with https:// - those open in the app or a new tab. Anything else is refused.
           </p>
         </div>
 

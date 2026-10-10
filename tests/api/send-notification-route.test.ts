@@ -113,25 +113,33 @@ describe("POST /api/tomasz/send-notification", () => {
     expect(mocks.createBroadcastNotifications).not.toHaveBeenCalled();
   });
 
-  // Open-redirect guard: an admin-supplied linkTo still goes through
-  // getSafeRedirectPath (real, unmocked) before being handed to every
-  // recipient - a scheme or protocol-relative value must be dropped.
-  it("drops an unsafe linkTo (protocol-relative) rather than sending it to every recipient", async () => {
+  // Open-redirect guard: an admin-supplied linkTo goes through
+  // getSafeNotificationLink (real, unmocked) before being handed to every
+  // recipient - anything but a site page or RoadVerdict's social pages is
+  // refused, and nothing is sent.
+  it("refuses an unsafe linkTo (protocol-relative) rather than sending it to every recipient", async () => {
     mocks.getAdminSession.mockResolvedValue(true);
-    await POST(request(JSON.stringify({ ...validBody, linkTo: "//evil.example.com" })));
-    expect(mocks.createBroadcastNotifications).toHaveBeenCalledWith(
-      expect.anything(),
-      expect.objectContaining({ linkTo: undefined })
-    );
+    const response = await POST(request(JSON.stringify({ ...validBody, linkTo: "//evil.example.com" })));
+    expect(response.status).toBe(400);
+    expect(mocks.createBroadcastNotifications).not.toHaveBeenCalled();
   });
 
-  it("drops a linkTo containing a scheme", async () => {
+  it("refuses a script link, a look-alike social domain, and plain http", async () => {
     mocks.getAdminSession.mockResolvedValue(true);
-    await POST(request(JSON.stringify({ ...validBody, linkTo: "javascript:alert(1)" })));
-    expect(mocks.createBroadcastNotifications).toHaveBeenCalledWith(
-      expect.anything(),
-      expect.objectContaining({ linkTo: undefined })
-    );
+    for (const linkTo of ["javascript:alert(1)", "https://instagram.com.evil.example/x", "http://www.instagram.com/roadverdict"]) {
+      const response = await POST(request(JSON.stringify({ ...validBody, linkTo })));
+      expect(response.status, linkTo).toBe(400);
+    }
+    expect(mocks.createBroadcastNotifications).not.toHaveBeenCalled();
+  });
+
+  it("sends Facebook, Instagram and TikTok links as given", async () => {
+    mocks.getAdminSession.mockResolvedValue(true);
+    for (const linkTo of ["https://www.facebook.com/roadverdict", "https://www.instagram.com/roadverdict/", "https://www.tiktok.com/@roadverdict"]) {
+      mocks.createBroadcastNotifications.mockClear();
+      await POST(request(JSON.stringify({ ...validBody, linkTo })));
+      expect(mocks.createBroadcastNotifications).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ linkTo }));
+    }
   });
 
   it("passes through a safe, relative linkTo unchanged", async () => {
