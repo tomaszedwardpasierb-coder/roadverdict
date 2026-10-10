@@ -35,7 +35,7 @@ const PAGES: { path: string; lastModified: string; priority: number }[] = [
   { path: '/pro', lastModified: '2026-10-08', priority: 0.5 },
   { path: '/about', lastModified: '2026-09-21', priority: 0.4 },
   { path: '/videos', lastModified: '2026-09-28', priority: 0.4 },
-  { path: '/privacy', lastModified: '2026-10-08', priority: 0.2 },
+  { path: '/privacy', lastModified: '2026-10-10', priority: 0.2 },
 ];
 
 // The price guides' copy and layout were written on this date; a page's

@@ -8,6 +8,7 @@
 import { redirect } from 'next/navigation';
 import { getSession } from '@/lib/auth/session';
 import { getSafeRedirectPath } from '@/lib/auth/safeRedirect';
+import { googleWebSignInEnabled } from '@/lib/auth/googleSignIn';
 import { LoginScreen } from './LoginScreen';
 
 export default async function LoginPage(props: { searchParams: Promise<{ redirect?: string | string[] }> }) {
@@ -15,5 +16,5 @@ export default async function LoginPage(props: { searchParams: Promise<{ redirec
     const { redirect: to } = await props.searchParams;
     redirect(getSafeRedirectPath(to) ?? '/dashboard');
   }
-  return <LoginScreen />;
+  return <LoginScreen googleEnabled={googleWebSignInEnabled()} />;
 }

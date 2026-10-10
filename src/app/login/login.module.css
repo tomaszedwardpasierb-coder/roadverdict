@@ -179,3 +179,46 @@
   color: var(--ink-soft);
   margin: -16px 0 0;
 }
+
+/* "Continue with Google": Google's light button (white, grey border, the
+   four-colour G), as its branding rules ask, above the email form. */
+.google {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  padding: 12px 14px;
+  font-family: var(--font-body);
+  font-weight: 600;
+  font-size: 0.95rem;
+  color: #1f1f1f;
+  background: #ffffff;
+  border: 1px solid #747775;
+  border-radius: var(--radius-lg);
+  text-decoration: none;
+  margin-bottom: 1rem;
+}
+.google:hover {
+  background: #f7f8f8;
+}
+.google:focus-visible {
+  outline: 3px solid var(--amber);
+  outline-offset: 2px;
+}
+.divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 0 0 1rem;
+  font-size: 0.85rem;
+  color: var(--ink-soft);
+}
+.divider::before,
+.divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: currentColor;
+  opacity: 0.3;
+}

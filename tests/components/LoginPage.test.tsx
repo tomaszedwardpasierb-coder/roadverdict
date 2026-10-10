@@ -35,6 +35,18 @@ describe("Login page for someone already signed in", () => {
     await expect(LoginRoute({ searchParams: Promise.resolve({ redirect: "//evil.example" }) })).rejects.toThrow("REDIRECT /dashboard");
   });
 
+  it("offers Continue with Google only once it's set up, keeping where the visitor was going", () => {
+    mockSearchParams.current = new URLSearchParams("redirect=%2Fdashboard%3FaddVehicle%3Dbike&src=google");
+    const { unmount } = render(<LoginPage />);
+    expect(screen.queryByRole("link", { name: "Continue with Google" })).toBeNull();
+    unmount();
+    render(<LoginPage googleEnabled />);
+    expect(screen.getByRole("link", { name: "Continue with Google" })).toHaveAttribute(
+      "href",
+      "/api/auth/google/start?src=google&redirect=%2Fdashboard%3FaddVehicle%3Dbike"
+    );
+  });
+
   it("shows the form to everyone else", async () => {
     getSessionMock.mockResolvedValue(null);
     render(await LoginRoute({ searchParams: Promise.resolve({}) }));

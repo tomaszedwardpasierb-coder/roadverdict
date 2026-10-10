@@ -60,7 +60,7 @@ export function PrivacyContent() {
   return (
     <div className={styles.wrapper}>
       <h1 className={styles.title}>Privacy Policy</h1>
-      <span className={styles.updated}>Last updated: 8 October 2026</span>
+      <span className={styles.updated}>Last updated: 10 October 2026</span>
       <p className={styles.intro}>
         RoadVerdict is a small, independently run UK site. This page explains, in plain
         terms, what we collect, why, how long we keep it, who we share it with, and how
@@ -151,7 +151,10 @@ export function PrivacyContent() {
           Tracking your bike or car&apos;s service history, mileage, fuel, and running
           costs requires a free account. We use passwordless sign-in - you enter your
           email, we send a one-time link (or, in the app, a one-time code), and using it
-          signs you in. We never ask you to create or remember a password. This processing is
+          signs you in. You can instead choose &quot;Continue with Google&quot;: Google then confirms
+          your email address to us, and that&apos;s the only thing we take from your Google
+          account - not your name, photo, contacts or anything else, and we can&apos;t see your
+          Google password. We never ask you to create or remember a password. This processing is
           carried out on the basis that it&apos;s necessary to perform our contract with
           you to provide the tracker (UK GDPR Article 6(1)(b)).
         </p>
@@ -524,6 +527,7 @@ export function PrivacyContent() {
           <li><strong>Cloudflare</strong> - cookieless visit counting (Web Analytics): pages viewed, referring site, country and device type, as anonymous totals.</li>
           <li><strong>Expo</strong> - delivers the app&apos;s notifications (your phone&apos;s notification token and the notification itself) and its updates (a random installation ID). See &quot;The RoadVerdict app&quot;.</li>
           <li><strong>Google Firebase Cloud Messaging</strong> - carries the app&apos;s notifications to Android phones.</li>
+          <li><strong>Google Sign-In</strong> - only if you choose &quot;Continue with Google&quot;: confirms your email address so you can sign in without an emailed link or code.</li>
         </ul>
         <p>
           Fonts on this site are bundled and served from our own domain at build time
