@@ -75,9 +75,9 @@ describe("HomePage", () => {
     // Order on the page: logbook first, then the demo.
     expect(bike.compareDocumentPosition(demo) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
 
-    const tools = screen.getByText(/Just checking a price\?/).closest("p") as HTMLElement;
+    const tools = screen.getByText(/Just checking\?/).closest("p") as HTMLElement;
     const toolLinks = Array.from(tools.querySelectorAll("a")).map((a) => a.getAttribute("href"));
-    expect(toolLinks).toEqual(["/quote-checker", "/cost-calculator"]);
+    expect(toolLinks).toEqual(["/mot-check", "/quote-checker", "/cost-calculator"]);
   });
 
   // Straight to the correct add-vehicle flow, not a marketing-page

@@ -80,6 +80,7 @@ describe("pageMetadata", () => {
       "about/page.tsx", "privacy/page.tsx", "cars/costs/page.tsx", "motorcycles/costs/page.tsx",
       "cars/costs/[slug]/page.tsx", "motorcycles/costs/[slug]/page.tsx",
       "motorcycle-service-log-app/page.tsx", "vehicle-smart-alternative/page.tsx", "drivvo-alternative/page.tsx",
+      "mot-check/page.tsx",
     ];
     for (const page of pages) {
       expect(readFileSync(path.join(APP, page), "utf8"), page).toContain("pageMetadata(");

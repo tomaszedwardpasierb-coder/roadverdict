@@ -27,7 +27,7 @@ vi.mock("@/lib/cosmos", () => ({
 const fetchMock = vi.hoisted(() => vi.fn());
 vi.mock("@/lib/fetchWithTimeout", () => ({ fetchWithTimeout: fetchMock }));
 
-import { motCheckMode, takeNewLookup, takeVisitorCheck } from "@/lib/mot/motCheckUsage";
+import { motCheckMode, takeNewLookup, takeVisitorCheck, visitorAddress } from "@/lib/mot/motCheckUsage";
 import { cachedMotLookup, freshMotLookup, motSource } from "@/lib/mot/motCheckLookup";
 
 beforeEach(() => {
@@ -43,14 +43,24 @@ afterEach(() => {
 });
 
 describe("motCheckMode", () => {
-  it("is admin-only unless switched on or off", () => {
-    expect(motCheckMode()).toBe("admin");
-    process.env.MOT_CHECK_MODE = "public";
+  it("is public unless pulled back to admin-only or off", () => {
     expect(motCheckMode()).toBe("public");
+    process.env.MOT_CHECK_MODE = "admin";
+    expect(motCheckMode()).toBe("admin");
     process.env.MOT_CHECK_MODE = "off";
     expect(motCheckMode()).toBe("off");
     process.env.MOT_CHECK_MODE = "nonsense";
-    expect(motCheckMode()).toBe("admin");
+    expect(motCheckMode()).toBe("public");
+  });
+});
+
+describe("visitorAddress", () => {
+  it("drops the port Azure adds, so one visitor stays one visitor", () => {
+    expect(visitorAddress("203.0.113.5:51234")).toBe("203.0.113.5");
+    expect(visitorAddress("203.0.113.5:51234, 10.0.0.1")).toBe("203.0.113.5");
+    expect(visitorAddress("[2001:db8::1]:443")).toBe("2001:db8::1");
+    expect(visitorAddress("2001:db8::1")).toBe("2001:db8::1");
+    expect(visitorAddress(null)).toBe("unknown");
   });
 });
 

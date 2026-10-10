@@ -26,10 +26,9 @@ const breadcrumbJsonLd = buildBreadcrumbJsonLd('Vehicle Smart alternative', '/ve
 
 const ROWS: { what: string; vs: string; rv: string }[] = [
   {
-    // Update this row (and the FAQ) when the free /mot-check page goes live.
     what: 'Check any UK vehicle’s MOT and tax status',
     vs: 'Yes, free, any registration',
-    rv: 'For your own vehicles; a free check for any plate is coming',
+    rv: 'MOT history free for any registration, with every advisory explained; tax status for your own vehicles',
   },
   {
     what: 'MOT history of your own vehicle',
@@ -182,6 +181,11 @@ export default function VehicleSmartAlternativePage() {
         <li>
           <strong>You want the whole history in one place.</strong> Services, repairs, tyres, fuel, mods
           and bills, with the date, mileage and cost of each - and the MOT history alongside.
+        </li>
+        <li>
+          <strong>You want to know what the MOT advisories mean.</strong> The{' '}
+          <Link href="/mot-check">free MOT history check</Link> explains every advisory and failure in
+          plain English, with what common repairs cost - for any car or motorcycle.
         </li>
         <li>
           <strong>You don&apos;t want to type it all in.</strong> Photograph a receipt and RoadVerdict reads

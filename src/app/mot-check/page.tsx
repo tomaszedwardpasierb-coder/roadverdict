@@ -6,8 +6,8 @@
 //
 // A plain GET form, so the lookup runs on the server and works with no
 // JavaScript; a result page (?vrm=...) is never indexed. MOT_CHECK_MODE
-// decides who can open it at all (see motCheckUsage.ts) - "admin" until
-// it's switched on for everyone. While the data comes from VDG, each new
+// decides who can open it at all (see motCheckUsage.ts) - public by
+// default. While the data comes from VDG, each new
 // plate is a paid lookup, so the per-visitor and site-wide daily limits
 // apply; a plate already checked today comes from the cache for free.
 import type { Metadata } from 'next';
@@ -19,7 +19,7 @@ import { buildBreadcrumbJsonLd } from '@/lib/seo/breadcrumbs';
 import { getAdminSession } from '@/lib/admin/session';
 import { cleanRegistration } from '@/lib/mot/motRecord';
 import { cachedMotLookup, freshMotLookup, type MotLookupResult } from '@/lib/mot/motCheckLookup';
-import { motCheckMode, takeNewLookup, takeVisitorCheck, MOT_CHECK_MESSAGES } from '@/lib/mot/motCheckUsage';
+import { motCheckMode, takeNewLookup, takeVisitorCheck, visitorAddress, MOT_CHECK_MESSAGES } from '@/lib/mot/motCheckUsage';
 import { MotCheckResult } from './MotCheckResult';
 import styles from './mot-check.module.css';
 
@@ -55,7 +55,7 @@ async function runCheck(rawVrm: string | undefined, isAdmin: boolean): Promise<O
   if (!registration) return { kind: 'invalid' };
 
   if (!isAdmin) {
-    const ip = (await headers()).get('x-forwarded-for')?.split(',')[0].trim() || 'unknown';
+    const ip = visitorAddress((await headers()).get('x-forwarded-for'));
     if ((await takeVisitorCheck(ip)) !== 'ok') return { kind: 'limit', message: MOT_CHECK_MESSAGES.visitor_limit };
   }
   const cached = await cachedMotLookup(registration);

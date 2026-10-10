@@ -16,6 +16,7 @@ const VEHICLE_COLUMNS: { vehicle: GuideVehicle; heading: string; hub: string; to
     heading: 'Motorcycles',
     hub: '/motorcycles',
     tools: [
+      { href: '/mot-check', label: 'Free MOT check' },
       { href: '/quote-checker', label: 'Quote checker' },
       { href: '/cost-calculator', label: 'Cost calculator' },
       { href: '/mpg-calculator', label: 'MPG calculator' },
@@ -27,6 +28,7 @@ const VEHICLE_COLUMNS: { vehicle: GuideVehicle; heading: string; hub: string; to
     heading: 'Cars',
     hub: '/cars',
     tools: [
+      { href: '/mot-check', label: 'Free MOT check' },
       { href: '/cars/quote-checker', label: 'Quote checker' },
       { href: '/cars/cost-calculator', label: 'Cost calculator' },
       { href: '/mpg-calculator', label: 'MPG calculator' },

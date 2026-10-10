@@ -132,7 +132,9 @@ export default function HomePage() {
             <span className="rv-try-note">Scan a receipt, ask the AI. No account needed.</span>
           </div>
           <p className="rv-tools-line">
-            Just checking a price?{' '}
+            Just checking?{' '}
+            <Link href="/mot-check">Free MOT history</Link>
+            {' · '}
             <Link href="/quote-checker">Garage quote</Link>
             {' · '}
             <Link href="/cost-calculator">Running costs</Link>

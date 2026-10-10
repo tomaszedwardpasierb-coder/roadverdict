@@ -4,15 +4,43 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 
 const mockSearchParams = vi.hoisted(() => ({ current: new URLSearchParams() }));
+const redirectMock = vi.hoisted(() => vi.fn((to: string) => { throw new Error(`REDIRECT ${to}`); }));
+const getSessionMock = vi.hoisted(() => vi.fn());
 vi.mock("next/navigation", () => ({
   useSearchParams: () => mockSearchParams.current,
+  redirect: redirectMock,
 }));
+vi.mock("@/lib/auth/session", () => ({ getSession: getSessionMock }));
 vi.mock("@/components/FunnelBeacon", () => ({ FunnelBeacon: () => null }));
 
-import LoginPage from "@/app/login/page";
+import { LoginScreen as LoginPage } from "@/app/login/LoginScreen";
+import LoginRoute from "@/app/login/page";
 
 afterEach(() => {
   mockSearchParams.current = new URLSearchParams();
+  redirectMock.mockClear();
+  getSessionMock.mockReset();
+});
+
+describe("Login page for someone already signed in", () => {
+  it("sends them straight on to where the link was going", async () => {
+    getSessionMock.mockResolvedValue({ email: "rider@example.com" });
+    await expect(LoginRoute({ searchParams: Promise.resolve({ redirect: "/dashboard?addVehicle=car&vrm=AB12CDE" }) })).rejects.toThrow(
+      "REDIRECT /dashboard?addVehicle=car&vrm=AB12CDE"
+    );
+  });
+
+  it("goes to the dashboard when there's no safe place to return to", async () => {
+    getSessionMock.mockResolvedValue({ email: "rider@example.com" });
+    await expect(LoginRoute({ searchParams: Promise.resolve({ redirect: "//evil.example" }) })).rejects.toThrow("REDIRECT /dashboard");
+  });
+
+  it("shows the form to everyone else", async () => {
+    getSessionMock.mockResolvedValue(null);
+    render(await LoginRoute({ searchParams: Promise.resolve({}) }));
+    expect(redirectMock).not.toHaveBeenCalled();
+    expect(screen.getByRole("button", { name: "Send sign-in link" })).toBeInTheDocument();
+  });
 });
 
 describe("Login page", () => {

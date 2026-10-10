@@ -10,13 +10,26 @@
 import { getContainer } from "@/lib/cosmos";
 import { hashToken } from "@/lib/auth/crypto";
 
-// "off": the page doesn't exist. "admin": only a signed-in admin sees it
-// (for checking real records on the live site). "public": everyone.
+// "public" (the default, since 10 Oct 2026): everyone. "admin": only a
+// signed-in admin sees it. "off": the page doesn't exist. Set
+// MOT_CHECK_MODE in Azure to pull it back without a deploy.
 export type MotCheckMode = "off" | "admin" | "public";
 
 export function motCheckMode(): MotCheckMode {
   const v = process.env.MOT_CHECK_MODE;
-  return v === "off" || v === "public" ? v : "admin";
+  return v === "off" || v === "admin" ? v : "public";
+}
+
+// The visitor's address for the daily limit. Azure adds the client's port
+// to X-Forwarded-For ("203.0.113.5:51234"), which would make every
+// connection a new visitor - the port is dropped.
+export function visitorAddress(forwardedFor: string | null): string {
+  const first = forwardedFor?.split(",")[0].trim();
+  if (!first) return "unknown";
+  const v4 = first.match(/^(\d{1,3}(?:\.\d{1,3}){3}):\d+$/);
+  if (v4) return v4[1];
+  const v6 = first.match(/^\[([^\]]+)\]:\d+$/);
+  return v6 ? v6[1] : first;
 }
 
 export const MOT_CHECK_LIMITS = {
