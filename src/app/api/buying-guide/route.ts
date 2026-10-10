@@ -3,6 +3,7 @@ import { buyingGuideRequestSchema } from '@/lib/validation';
 import { CHECKLISTS, AGE_BAND_LABELS, BIKE_CLASS_ADDENDUM, BRAND_SPECIFIC_NOTES } from '@/lib/buyerChecklist';
 import { BRAND_OPTIONS, BIKE_CLASS_LABELS } from '@/lib/priceData';
 import { logBuyingGuideCheck } from '@/lib/quoteLogs';
+import { clientIpFromForwardedFor } from '@/lib/clientIp';
 
 export const runtime = 'nodejs';
 
@@ -22,7 +23,7 @@ function isRateLimited(ip: string): boolean {
 }
 
 export async function POST(request: NextRequest) {
-  const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown';
+  const ip = clientIpFromForwardedFor(request.headers.get('x-forwarded-for'));
 
   if (isRateLimited(ip)) {
     return NextResponse.json(

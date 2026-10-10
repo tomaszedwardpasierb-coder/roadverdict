@@ -6,6 +6,7 @@ import { hashToken, decodeEmail } from "@/lib/auth/crypto";
 import { createSessionForEmail } from "@/lib/auth/session";
 import { getSafeRedirectPath } from "@/lib/auth/safeRedirect";
 import { isTwoFactorEnabled, createPendingLogin } from "@/lib/auth/twoFactor";
+import { clientIpFromForwardedFor } from "@/lib/clientIp";
 
 export const dynamic = "force-dynamic";
 
@@ -16,9 +17,7 @@ const APP_URL = process.env.APP_URL ?? "https://roadverdict.co.uk";
 // first entry is the original client, anything after it is
 // intermediate proxies.
 function getClientIp(req: NextRequest): string {
-  const forwarded = req.headers.get("x-forwarded-for");
-  if (forwarded) return forwarded.split(",")[0].trim();
-  return "unknown";
+  return clientIpFromForwardedFor(req.headers.get("x-forwarded-for"));
 }
 
 function isPreconditionFailed(err: unknown): boolean {

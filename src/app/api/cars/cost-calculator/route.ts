@@ -3,6 +3,7 @@ import { carCostCalculatorRequestSchema } from '@/lib/validation';
 import { computeCarAnnualCost } from '@/lib/carCostCalculator';
 import { CAR_BRAND_OPTIONS, CAR_REGION_LABELS, CAR_SIZE_CLASS_LABELS } from '@/lib/carPriceData';
 import { generateCarCostAdvice } from '@/lib/tracker/carCostAdvice';
+import { clientIpFromForwardedFor } from '@/lib/clientIp';
 
 export const runtime = 'nodejs';
 
@@ -25,7 +26,7 @@ function isRateLimited(ip: string): boolean {
 }
 
 export async function POST(request: NextRequest) {
-  const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown';
+  const ip = clientIpFromForwardedFor(request.headers.get('x-forwarded-for'));
 
   if (isRateLimited(ip)) {
     return NextResponse.json(

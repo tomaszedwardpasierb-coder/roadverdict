@@ -12,12 +12,12 @@ import { isTwoFactorEnabled, checkTotpRateLimit, recordTotpAttempt } from "@/lib
 import { verifyTrustedDevice } from "@/lib/auth/trustedDevice";
 import { createVaultSession } from "@/lib/tracker/vaultSession";
 import { lookupCountry, recordVaultAccess } from "@/lib/tracker/vaultAudit";
+import { clientIpFromForwardedFor } from "@/lib/clientIp";
 
 export const dynamic = "force-dynamic";
 
 function getClientIp(req: NextRequest): string {
-  const forwarded = req.headers.get("x-forwarded-for");
-  return forwarded ? forwarded.split(",")[0].trim() : "unknown";
+  return clientIpFromForwardedFor(req.headers.get("x-forwarded-for"));
 }
 
 export async function POST(request: NextRequest) {

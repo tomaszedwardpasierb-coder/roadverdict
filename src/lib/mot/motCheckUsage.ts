@@ -9,6 +9,7 @@
 // visitor is a hash of their address inside the counter's id.
 import { getContainer } from "@/lib/cosmos";
 import { hashToken } from "@/lib/auth/crypto";
+import { clientIpFromForwardedFor } from "@/lib/clientIp";
 
 // "public" (the default, since 10 Oct 2026): everyone. "admin": only a
 // signed-in admin sees it. "off": the page doesn't exist. Set
@@ -20,16 +21,9 @@ export function motCheckMode(): MotCheckMode {
   return v === "off" || v === "admin" ? v : "public";
 }
 
-// The visitor's address for the daily limit. Azure adds the client's port
-// to X-Forwarded-For ("203.0.113.5:51234"), which would make every
-// connection a new visitor - the port is dropped.
+// The visitor's address for the daily limit, port dropped (see clientIp.ts).
 export function visitorAddress(forwardedFor: string | null): string {
-  const first = forwardedFor?.split(",")[0].trim();
-  if (!first) return "unknown";
-  const v4 = first.match(/^(\d{1,3}(?:\.\d{1,3}){3}):\d+$/);
-  if (v4) return v4[1];
-  const v6 = first.match(/^\[([^\]]+)\]:\d+$/);
-  return v6 ? v6[1] : first;
+  return clientIpFromForwardedFor(forwardedFor);
 }
 
 export const MOT_CHECK_LIMITS = {

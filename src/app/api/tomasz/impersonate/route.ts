@@ -4,13 +4,12 @@ import { getAdminSession, verifyAdminPassword, checkAdminLoginRateLimit, recordA
 import { verifyTotpCode } from "@/lib/admin/totp";
 import { createSessionForEmail } from "@/lib/auth/session";
 import { userExists, logImpersonation, newImpersonationSessionId } from "@/lib/admin/impersonation";
+import { clientIpFromForwardedFor } from "@/lib/clientIp";
 
 export const dynamic = "force-dynamic";
 
 function getClientIp(req: NextRequest): string {
-  const forwarded = req.headers.get("x-forwarded-for");
-  if (forwarded) return forwarded.split(",")[0].trim();
-  return "unknown";
+  return clientIpFromForwardedFor(req.headers.get("x-forwarded-for"));
 }
 
 export async function POST(request: NextRequest) {

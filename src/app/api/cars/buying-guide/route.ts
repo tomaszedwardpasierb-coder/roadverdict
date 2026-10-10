@@ -3,6 +3,7 @@ import { carBuyingGuideRequestSchema } from '@/lib/validation';
 import { CAR_CHECKLISTS, CAR_AGE_BAND_LABELS, CAR_SIZE_CLASS_ADDENDUM, CAR_BRAND_SPECIFIC_NOTES, CAR_CLASS_LABELS_FOR_BUYING_GUIDE } from '@/lib/tracker/carBuyerChecklist';
 import { CAR_BRAND_OPTIONS } from '@/lib/carPriceData';
 import { logCarBuyingGuideCheck } from '@/lib/quoteLogs';
+import { clientIpFromForwardedFor } from '@/lib/clientIp';
 
 export const runtime = 'nodejs';
 
@@ -22,7 +23,7 @@ function isRateLimited(ip: string): boolean {
 }
 
 export async function POST(request: NextRequest) {
-  const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown';
+  const ip = clientIpFromForwardedFor(request.headers.get('x-forwarded-for'));
 
   if (isRateLimited(ip)) {
     return NextResponse.json(

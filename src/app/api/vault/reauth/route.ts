@@ -11,13 +11,12 @@ import { isPro } from "@/lib/subscriptions";
 import { isTwoFactorEnabled, verifyLoginCode, checkTotpRateLimit, recordTotpAttempt } from "@/lib/auth/twoFactor";
 import { createVaultSession, VAULT_SESSION_COOKIE_NAME } from "@/lib/tracker/vaultSession";
 import { detectBrowser, lookupCountry, recordVaultAccess } from "@/lib/tracker/vaultAudit";
+import { clientIpFromForwardedFor } from "@/lib/clientIp";
 
 export const dynamic = "force-dynamic";
 
 function getClientIp(req: NextRequest): string {
-  const forwarded = req.headers.get("x-forwarded-for");
-  if (forwarded) return forwarded.split(",")[0].trim();
-  return "unknown";
+  return clientIpFromForwardedFor(req.headers.get("x-forwarded-for"));
 }
 
 export async function POST(request: NextRequest) {

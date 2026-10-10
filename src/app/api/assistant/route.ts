@@ -55,6 +55,7 @@ import { MIN_COMPARE_VEHICLES, MAX_COMPARE_VEHICLES } from "@/lib/tracker/vehicl
 import { fuelCostPerDistance, tankEconomy, type MpgCalculatorAssistantContext } from "@/lib/fuelEconomy";
 import { ALL_CURRENCIES, CURRENCY_SYMBOLS } from "@/lib/tracker/currency";
 import { loadAttachmentForAi } from "@/lib/tracker/chatAttachment";
+import { clientIpFromForwardedFor } from "@/lib/clientIp";
 
 export const dynamic = "force-dynamic";
 
@@ -373,7 +374,7 @@ function toGeminiContents(messages: ChatMessage[]): GeminiContent[] {
 // not a correctness bug.
 function clientIp(req: NextRequest): string {
   const forwarded = req.headers.get("x-forwarded-for");
-  if (forwarded) return forwarded.split(",")[0].trim();
+  if (forwarded) return clientIpFromForwardedFor(forwarded);
   return req.headers.get("x-real-ip") ?? "unknown";
 }
 

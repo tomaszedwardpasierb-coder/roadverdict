@@ -16,6 +16,7 @@
 // code doesn't double it.
 import type { NextRequest } from "next/server";
 import { getContainer } from "@/lib/cosmos";
+import { clientIpFromForwardedFor } from "@/lib/clientIp";
 
 const IP_RATE_LIMIT_WINDOW_SECONDS = 15 * 60;
 const IP_RATE_LIMIT_MAX_ATTEMPTS = 20;
@@ -25,9 +26,7 @@ const IP_RATE_LIMIT_MAX_ATTEMPTS = 20;
 // first entry is the original client, anything after it is
 // intermediate proxies.
 export function getClientIp(req: NextRequest): string {
-  const forwarded = req.headers.get("x-forwarded-for");
-  if (forwarded) return forwarded.split(",")[0].trim();
-  return "unknown";
+  return clientIpFromForwardedFor(req.headers.get("x-forwarded-for"));
 }
 
 function ipAttemptPrefix(ip: string): string {

@@ -4,6 +4,7 @@ import { getAdjustedBenchmark, REGION_LABELS, BRAND_OPTIONS, JOB_LABELS, BIKE_CL
 import { computeVerdict, VERDICT_LABELS } from '@/lib/verdict';
 import { logQuoteCheck, getCommunityStats } from '@/lib/quoteLogs';
 import { generateQuoteAdvice } from '@/lib/tracker/quoteAdvice';
+import { clientIpFromForwardedFor } from '@/lib/clientIp';
 
 // The Cosmos SDK needs the Node.js runtime, not the Edge runtime.
 export const runtime = 'nodejs';
@@ -28,7 +29,7 @@ function isRateLimited(ip: string): boolean {
 }
 
 export async function POST(request: NextRequest) {
-  const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown';
+  const ip = clientIpFromForwardedFor(request.headers.get('x-forwarded-for'));
 
   if (isRateLimited(ip)) {
     return NextResponse.json(
