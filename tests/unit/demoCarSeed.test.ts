@@ -22,7 +22,8 @@ describe("generateDemoCarDataset", () => {
   it("exports the expected demo car account constants", () => {
     expect(DEMO_CAR_MAKE).toBe("BMW");
     expect(DEMO_CAR_MODEL).toBe("640i Gran Coupe");
-    expect(DEMO_CAR_REGISTRATION).toBe("PA63 ERB");
+    // "00" is an age identifier never issued, so no real vehicle has this plate.
+    expect(DEMO_CAR_REGISTRATION).toBe("RV00 DMO");
     expect(DEMO_CAR_YEAR).toBe(2013);
   });
 

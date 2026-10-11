@@ -24,6 +24,7 @@ const SECTIONS: { title: string; rows: Row[] }[] = [
     rows: [
       { label: 'Add a vehicle', icon: 'plus', open: () => router.push('/add-vehicle') },
       { label: 'Compare vehicles', icon: 'compare', open: () => router.push('/compare') },
+      { label: 'MOT history', icon: 'check', open: () => router.push('/mot-history') },
     ],
   },
   {

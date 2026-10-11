@@ -8,7 +8,7 @@ export const DEMO_MODEL = "MT-07";
 export const DEMO_ENGINE_CC = 689;
 export const DEMO_BIKE_CLASS: BikeClass = "medium";
 export const DEMO_REGION: Region = "rest-england-wales";
-export const DEMO_REGISTRATION = "YA16 MTO";
+export const DEMO_REGISTRATION = "RV00 BKE";
 export const DEMO_NICKNAME = "Demo MT-07";
 const DEMO_BRAND_VALUE = "yamaha";
 

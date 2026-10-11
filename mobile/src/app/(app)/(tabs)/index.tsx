@@ -131,6 +131,19 @@ export default function HomeScreen() {
             )}
           </Card>
 
+          {/* The MOT record, explained - the reason many people install. */}
+          <Pressable onPress={() => router.push('/mot-history')} accessibilityRole="button" accessibilityLabel="MOT history: every test and advisory explained">
+            <Card>
+              <View style={styles.row}>
+                <View style={styles.rowMain}>
+                  <Text style={styles.rowTitle}>MOT history</Text>
+                  <Text style={styles.rowMeta}>Every test and advisory, explained</Text>
+                </View>
+                <Icon name="chevronRight" size={20} color={Brand.muted} />
+              </View>
+            </Card>
+          </Pressable>
+
           <SectionHeader title="Quick actions" />
           <View style={styles.actions}>
             <QuickAction icon="camera" label="Scan receipt" primary href="/scan" />

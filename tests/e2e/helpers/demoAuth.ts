@@ -11,7 +11,7 @@
 import { expect, type Page } from "@playwright/test";
 
 export const DEMO_EMAIL = "demo@roadverdict.co.uk";
-export const DEMO_REGISTRATION = "YA16 MTO";
+export const DEMO_REGISTRATION = "RV00 BKE";
 export const DEMO_NICKNAME = "Demo MT-07";
 
 // The FIRST call to this helper in a given run doesn't just sign in - it

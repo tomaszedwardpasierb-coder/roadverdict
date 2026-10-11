@@ -26,6 +26,7 @@ vi.mock("@/lib/tracker/bike", () => ({
   getBikesForUser: mocks.getBikesForUser,
   createBike: mocks.createBike,
   deleteBike: mocks.deleteBike,
+  getCurrentRegistration: (b: { registration?: string }) => b.registration,
 }));
 vi.mock("@/lib/motorcycleModels", () => ({ getBikeClassForCC: mocks.getBikeClassForCC }));
 vi.mock("@/lib/tracker/serviceRecord", () => ({ createServiceRecord: mocks.createServiceRecord }));
@@ -44,6 +45,7 @@ vi.mock("@/lib/tracker/car", () => ({
   getCarsForUser: mocks.getCarsForUser,
   createCar: mocks.createCar,
   deleteCar: mocks.deleteCar,
+  getCurrentRegistration: (c: { registration?: string }) => c.registration,
 }));
 vi.mock("@/lib/tracker/carServiceRecord", () => ({ createCarServiceRecord: mocks.createCarServiceRecord }));
 vi.mock("@/lib/tracker/carFuelLog", () => ({ createCarFuelLog: mocks.createCarFuelLog }));
@@ -111,10 +113,18 @@ describe("demoBikeExists", () => {
     expect(result).toBe(false);
   });
 
-  it("returns true when the demo account has at least one bike", async () => {
-    mocks.getBikesForUser.mockResolvedValue([{ id: "demo-bike-id" }]);
-    const result = await demoBikeExists();
-    expect(result).toBe(true);
+  it("returns true when the demo account has the current demo bike and car", async () => {
+    mocks.getBikesForUser.mockResolvedValue([{ id: "demo-bike-id", registration: "RV00 BKE" }]);
+    mocks.getCarsForUser.mockResolvedValue([{ id: "demo-car-id", registration: "RV00DMO" }]);
+    expect(await demoBikeExists()).toBe(true);
+  });
+
+  // A plate change reaches the live demo account this way: the next demo
+  // sign-in sees the old plate as missing and rebuilds the dataset.
+  it("returns false when a demo vehicle is still on an old plate", async () => {
+    mocks.getBikesForUser.mockResolvedValue([{ id: "demo-bike-id", registration: "YA16 MTO" }]);
+    mocks.getCarsForUser.mockResolvedValue([{ id: "demo-car-id", registration: "RV00 DMO" }]);
+    expect(await demoBikeExists()).toBe(false);
   });
 });
 
@@ -135,7 +145,7 @@ describe("runDemoSeed", () => {
     await runDemoSeed();
     expect(mocks.createCar).toHaveBeenCalledWith(
       "demo@roadverdict.co.uk",
-      expect.objectContaining({ make: "BMW", model: "640i Gran Coupe", registration: "PA63 ERB" })
+      expect.objectContaining({ make: "BMW", model: "640i Gran Coupe", registration: "RV00 DMO" })
     );
   });
 

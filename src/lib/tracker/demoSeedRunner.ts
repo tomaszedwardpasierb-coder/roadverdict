@@ -4,7 +4,7 @@
 // Cosmos-free (it's imported client-side for the DEMO_EMAIL constant).
 // This file is the one that actually writes to the database, so it's
 // only ever imported from server-side routes.
-import { getBikesForUser, createBike, deleteBike } from "@/lib/tracker/bike";
+import { getBikesForUser, createBike, deleteBike, getCurrentRegistration } from "@/lib/tracker/bike";
 import { getBikeClassForCC } from "@/lib/motorcycleModels";
 import { createServiceRecord } from "@/lib/tracker/serviceRecord";
 import { createFuelLog } from "@/lib/tracker/fuelLog";
@@ -21,7 +21,7 @@ import {
   DEMO_REGISTRATION,
   DEMO_NICKNAME,
 } from "@/lib/tracker/demoSeed";
-import { getCarsForUser, createCar, deleteCar } from "@/lib/tracker/car";
+import { getCarsForUser, createCar, deleteCar, getCurrentRegistration as getCurrentCarRegistration } from "@/lib/tracker/car";
 import { createCarServiceRecord } from "@/lib/tracker/carServiceRecord";
 import { createCarFuelLog } from "@/lib/tracker/carFuelLog";
 import { createCarMod } from "@/lib/tracker/carMod";
@@ -50,9 +50,17 @@ export interface SeedCounts {
   carBills: number;
 }
 
+// True when the demo account already holds the current demo vehicles. A
+// demo bike or car still on an older plate counts as missing, so the next
+// demo sign-in rebuilds the dataset with the current ones - which is how a
+// plate change here reaches the live demo account without a manual reset.
 export async function demoBikeExists(): Promise<boolean> {
-  const bikes = await getBikesForUser(DEMO_EMAIL);
-  return bikes.length > 0;
+  const plain = (r: string | undefined) => (r ?? "").replace(/\s+/g, "").toUpperCase();
+  const [bikes, cars] = await Promise.all([getBikesForUser(DEMO_EMAIL), getCarsForUser(DEMO_EMAIL)]);
+  return (
+    bikes.some((b) => plain(getCurrentRegistration(b)) === plain(DEMO_REGISTRATION)) &&
+    cars.some((c) => plain(getCurrentCarRegistration(c)) === plain(DEMO_CAR_REGISTRATION))
+  );
 }
 
 // Wipes any existing demo bike (cascade-deleting every record and

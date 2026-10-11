@@ -17,7 +17,8 @@ describe("generateDemoDataset", () => {
     expect(DEMO_EMAIL).toBe("demo@roadverdict.co.uk");
     expect(DEMO_MAKE).toBe("Yamaha");
     expect(DEMO_MODEL).toBe("MT-07");
-    expect(DEMO_REGISTRATION).toMatch(/^YA/);
+    // "00" is an age identifier never issued, so no real vehicle has this plate.
+    expect(DEMO_REGISTRATION).toBe("RV00 BKE");
   });
 
   // ── Dataset shape ───────────────────────────────────────────────────
