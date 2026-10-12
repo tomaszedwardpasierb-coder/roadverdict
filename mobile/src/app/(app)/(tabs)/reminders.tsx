@@ -10,7 +10,7 @@ import { apiFetch } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { useApi } from '@/lib/use-api';
 import { reminderRoute } from '@/lib/reminders';
-import { PRO_ON_WEB } from '@/lib/pro-on-web';
+import { UpgradeButton, useProUpgrade } from '@/components/pro-upgrade';
 import { useVehicle, vehicleHeaders } from '@/lib/vehicle';
 
 type Reminder = {
@@ -28,6 +28,7 @@ type ReminderList = { isPro: boolean; reminders: Reminder[] };
 export default function RemindersScreen() {
   const { selected } = useVehicle();
   const { token, signOut } = useAuth();
+  const upgrade = useProUpgrade();
   const list = useApi<ReminderList>(selected ? `/api/app/reminders?kind=${selected.kind}&id=${encodeURIComponent(selected.id)}` : null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -117,10 +118,11 @@ export default function RemindersScreen() {
               <Icon name="lock" size={14} color="#7A4508" />
               <Text style={styles.noteText}>
                 Free plan: every reminder shows whether it&apos;s due. Exact due dates are part of Pro.
-                {PRO_ON_WEB ? ` ${PRO_ON_WEB}.` : ''}
+                {upgrade.webLine ? ` ${upgrade.webLine}.` : ''}
               </Text>
             </View>
           ) : null}
+          {list.data && !list.data.isPro && upgrade.canUpgradeInApp ? <UpgradeButton label="Get exact dates with Pro" /> : null}
 
           {actionError ? (
             <Text style={styles.error} accessibilityRole="alert">

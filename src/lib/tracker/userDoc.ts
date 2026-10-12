@@ -17,6 +17,7 @@ import { getContainer } from "@/lib/cosmos";
 // Re-exported for any existing importer - see onboardingSteps.ts's own
 // comment for why the real definitions live there now, not here.
 import type { OnboardingStep } from "@/lib/tracker/onboardingSteps";
+import type { StorePro } from "@/lib/payments/storePro";
 export type { OnboardingStep } from "@/lib/tracker/onboardingSteps";
 export { ONBOARDING_STEPS } from "@/lib/tracker/onboardingSteps";
 
@@ -44,6 +45,14 @@ export interface UserDoc {
     trialEndsAt?: string;
     cancelling?: boolean;
   };
+  // Pro bought inside the app (Google Play or the App Store, via
+  // RevenueCat) - its own field so Stripe and the stores never overwrite
+  // each other's dates. Pro is active while either this or `plan` runs:
+  // see proExpiry() in payments/storePro.ts.
+  storePro?: StorePro;
+  // The id RevenueCat knows this account by (an HMAC of the email, never
+  // the email itself) - how a store webhook finds the account.
+  revenuecatAppUserId?: string;
   // When this account's one free Pro trial started - kept for good, so a
   // second checkout never gets another.
   proTrialStartedAt?: string;

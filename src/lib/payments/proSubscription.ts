@@ -20,6 +20,7 @@ import { getStripe } from "@/lib/payments/stripe";
 import { getUserDoc, type UserDoc } from "@/lib/tracker/userDoc";
 import { PRO_TRIAL_DAYS } from "@/lib/proPlan";
 import { isEligibleForProTrial } from "@/lib/payments/proTrial";
+import { isProActive } from "@/lib/payments/storePro";
 import { sendProTrialStartedEmail, sendProTrialEndingEmail } from "@/lib/resend";
 import type Stripe from "stripe";
 
@@ -38,7 +39,9 @@ export type CreateProCheckoutResult = { ok: true; url: string } | { ok: false; r
 
 export async function createProCheckoutSession(email: string, interval: ProInterval, appUrl: string): Promise<CreateProCheckoutResult> {
   const user = await getUserDoc(email);
-  if (user?.plan && new Date(user.plan.expiresAt).getTime() > Date.now()) {
+  // Already Pro - through the website or bought in the app - so a second
+  // subscription would only charge twice.
+  if (isProActive(user)) {
     return { ok: false, reason: "already_pro" };
   }
 

@@ -10,7 +10,7 @@ import { Brand } from '@/constants/brand';
 import { API_BASE_URL } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { useApi } from '@/lib/use-api';
-import { PRO_ON_WEB } from '@/lib/pro-on-web';
+import { UpgradeButton, useProUpgrade } from '@/components/pro-upgrade';
 import { versionLabel, updateLabel } from '@/lib/version';
 
 // Everything outside the four main tabs, each row with its own icon so the
@@ -66,11 +66,13 @@ export default function MoreScreen() {
   const [showUpdate, setShowUpdate] = useState(false);
   const account = useApi<{ isPro: boolean; proTrialDays?: number }>('/api/app/account');
   const plan = account.data ? (account.data.isPro ? 'Pro' : 'Free plan') : null;
-  // Where to get Pro, in plain words - Android only (see lib/pro-on-web.ts).
+  // Where to get Pro: an Upgrade button when the app sells it, otherwise
+  // the plain website line (Android only) - see components/pro-upgrade.tsx.
+  const upgrade = useProUpgrade();
   const trialDays = account.data?.proTrialDays ?? 0;
   const proOnWeb =
-    PRO_ON_WEB && account.data && !account.data.isPro
-      ? `${PRO_ON_WEB}${trialDays > 0 ? ` – the first ${trialDays} days are free.` : '.'}`
+    upgrade.webLine && account.data && !account.data.isPro
+      ? `${upgrade.webLine}${trialDays > 0 ? ` – the first ${trialDays} days are free.` : '.'}`
       : null;
 
   return (
@@ -94,6 +96,7 @@ export default function MoreScreen() {
               </View>
             ) : null}
             {proOnWeb ? <Text style={styles.proOnWeb}>{proOnWeb}</Text> : null}
+            {upgrade.canUpgradeInApp && account.data && !account.data.isPro ? <UpgradeButton /> : null}
           </View>
         </Card>
 

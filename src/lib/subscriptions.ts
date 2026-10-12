@@ -15,6 +15,7 @@
 //   }
 import { getUserDoc, type UserDoc } from "@/lib/tracker/userDoc";
 import { MAX_FREE_VEHICLES, vehicleLimitFor } from "@/lib/tracker/vehicleLimit";
+import { isProActive, proExpiry } from "@/lib/payments/storePro";
 // Re-exported for any existing server-side importer - see proPlan.ts's
 // own comment for why the real definitions live there now, not here.
 export { PRO_MONTHLY_PRICE, PRO_ANNUAL_PRICE, PRO_ANNUAL_MONTHLY_EQUIV, PRO_FEATURES } from "@/lib/proPlan";
@@ -35,14 +36,17 @@ export interface ProStatus {
 export async function getProStatus(email: string): Promise<ProStatus> {
   try {
     const user = await getUserDoc(email);
-    if (!user?.plan) return { isPro: false, expiresAt: null, daysRemaining: null };
+    // Stripe or an admin grant (`plan`), or Pro bought in the app
+    // (`storePro`) - whichever runs longest.
+    const expiresAt = proExpiry(user);
+    if (!expiresAt) return { isPro: false, expiresAt: null, daysRemaining: null };
 
-    const expiresAtMs = new Date(user.plan.expiresAt).getTime();
+    const expiresAtMs = new Date(expiresAt).getTime();
     const active = expiresAtMs > Date.now();
     if (!active) return { isPro: false, expiresAt: null, daysRemaining: null };
 
     const daysRemaining = Math.ceil((expiresAtMs - Date.now()) / 86_400_000);
-    return { isPro: true, expiresAt: user.plan.expiresAt, daysRemaining };
+    return { isPro: true, expiresAt, daysRemaining };
   } catch {
     // Fail closed - same direction getSession() already fails in for
     // any other auth-adjacent check gone wrong (a network blip, a
@@ -71,7 +75,7 @@ export function paidExtraVehicles(user: UserDoc | null | undefined): number {
 export async function getVehicleLimit(email: string): Promise<number> {
   try {
     const user = await getUserDoc(email);
-    const pro = !!user?.plan && new Date(user.plan.expiresAt).getTime() > Date.now();
+    const pro = isProActive(user);
     return vehicleLimitFor(pro, user?.vehicleAllowance, paidExtraVehicles(user));
   } catch {
     return MAX_FREE_VEHICLES;

@@ -16,6 +16,7 @@ import { getContainer } from "@/lib/cosmos";
 import { getStripe } from "@/lib/payments/stripe";
 import { getUserDoc } from "@/lib/tracker/userDoc";
 import { paidExtraVehicles } from "@/lib/subscriptions";
+import { isProActive } from "@/lib/payments/storePro";
 import { EXTRA_VEHICLE_MONTHLY_PENCE } from "@/lib/proPlan";
 import { MAX_EXTRA_VEHICLES, MAX_GRANTED_VEHICLES, vehicleLimitFor } from "@/lib/tracker/vehicleLimit";
 import type Stripe from "stripe";
@@ -44,7 +45,7 @@ function lineItem(): Stripe.Checkout.SessionCreateParams.LineItem {
 }
 
 function proIsActive(user: { plan?: { expiresAt: string } } | null): boolean {
-  return !!user?.plan && new Date(user.plan.expiresAt).getTime() > Date.now();
+  return isProActive(user);
 }
 
 export interface ExtraVehiclesStatus {

@@ -60,7 +60,7 @@ export function PrivacyContent() {
   return (
     <div className={styles.wrapper}>
       <h1 className={styles.title}>Privacy Policy</h1>
-      <span className={styles.updated}>Last updated: 10 October 2026</span>
+      <span className={styles.updated}>Last updated: 12 October 2026</span>
       <p className={styles.intro}>
         RoadVerdict is a small, independently run UK site. This page explains, in plain
         terms, what we collect, why, how long we keep it, who we share it with, and how
@@ -185,6 +185,14 @@ export function PrivacyContent() {
           identifiers, and a record of what was purchased, when, and for how much. This
           is carried out on the basis that it&apos;s necessary to perform our contract
           with you (Article 6(1)(b)).
+        </p>
+        <p>
+          If you buy Pro inside the RoadVerdict app, the payment is taken by Google Play (or,
+          on iPhone, the App Store) under their own terms - we never see your card or store
+          account details. RevenueCat, our in-app subscription service, confirms the purchase
+          and tells us whether Pro is active and when it renews or ends. RevenueCat knows your
+          account only by a random identifier we create, never your email address. You manage
+          or cancel an in-app subscription in Google Play or the App Store.
         </p>
         <p>
           If you have a Pro subscription, you can view invoices, change plan, update your
@@ -527,6 +535,7 @@ export function PrivacyContent() {
           <li><strong>Cloudflare</strong> - cookieless visit counting (Web Analytics): pages viewed, referring site, country and device type, as anonymous totals.</li>
           <li><strong>Expo</strong> - delivers the app&apos;s notifications (your phone&apos;s notification token and the notification itself) and its updates (a random installation ID). See &quot;The RoadVerdict app&quot;.</li>
           <li><strong>Google Firebase Cloud Messaging</strong> - carries the app&apos;s notifications to Android phones.</li>
+          <li><strong>RevenueCat</strong> - only if you buy Pro inside the app: confirms Google Play and App Store purchases and tells us whether Pro is active. It knows your account only by a random identifier, never your email.</li>
           <li><strong>Google Sign-In</strong> - only if you choose &quot;Continue with Google&quot;: confirms your email address so you can sign in without an emailed link or code.</li>
         </ul>
         <p>
