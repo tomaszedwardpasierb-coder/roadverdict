@@ -1,4 +1,3 @@
-import * as ImagePicker from 'expo-image-picker';
 import { Stack } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
 import { useEffect } from 'react';
@@ -9,13 +8,12 @@ import { Brand } from '@/constants/brand';
 import { AppLockProvider, useAppLock } from '@/lib/app-lock';
 import { useAuth } from '@/lib/auth';
 import { listenForTaps, registerForPush } from '@/lib/push';
-import { requestMicrophone } from '@/lib/use-dictation';
 import { VehicleProvider } from '@/lib/vehicle';
 
-// Asked once, the first time someone is signed in: the camera (receipts,
-// the Vault), the microphone (speaking to the assistant) and notifications
-// (reminders). Android shows its own allow/deny dialogs; a "deny" for the
-// camera or microphone is asked again in context, the first time it's used.
+// Asked once, the first time someone is signed in: notifications only
+// (reminders). The camera (receipts, the Vault) and the microphone
+// (speaking to the assistant) are asked in context, the first time
+// they're used - one dialog on a first open, not three.
 const PERMISSIONS_ASKED_KEY = 'rv.permissionsAsked';
 
 async function firstOpenPermissions(token: string | null) {
@@ -25,10 +23,6 @@ async function firstOpenPermissions(token: string | null) {
     if (firstTime) await SecureStore.setItemAsync(PERMISSIONS_ASKED_KEY, '1');
   } catch {
     firstTime = false;
-  }
-  if (firstTime) {
-    await ImagePicker.requestCameraPermissionsAsync().catch(() => {});
-    await requestMicrophone();
   }
   // Every start: registers for push (asking only the first time), so a
   // changed token is always the one the server has.
