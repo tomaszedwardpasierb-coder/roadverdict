@@ -25,7 +25,7 @@ async function handle(req: NextRequest) {
   }
 
   try {
-    const accounts = (await getAllUserAccounts()).map((u) => ({ email: u.email, createdAt: u.createdAt }));
+    const accounts = (await getAllUserAccounts()).map((u) => ({ email: u.email, createdAt: u.createdAt, tags: u.tags }));
     const report = buildWeeklyReport(await gatherWeeklyReport(accounts));
     await sendWeeklyReportEmail(to, report);
     return NextResponse.json({ ok: true, sent: true, subject: report.subject });

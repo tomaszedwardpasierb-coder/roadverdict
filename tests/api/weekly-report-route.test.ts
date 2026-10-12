@@ -23,7 +23,7 @@ beforeEach(() => {
   Object.values(mocks).forEach((m) => m.mockReset());
   process.env.CRON_SECRET = "s3cret";
   process.env.WEEKLY_REPORT_TO = "owner@example.com";
-  mocks.getAllUserAccounts.mockResolvedValue([{ email: "a@example.com", createdAt: "2026-09-30T10:00:00Z", extra: "x" }]);
+  mocks.getAllUserAccounts.mockResolvedValue([{ email: "a@example.com", createdAt: "2026-09-30T10:00:00Z", tags: ["tester"], extra: "x" }]);
   mocks.gatherWeeklyReport.mockResolvedValue({ weekStart: "2026-09-28" });
   mocks.buildWeeklyReport.mockReturnValue({ subject: "RoadVerdict, week of 28 September", preheader: "p", bodyHtml: "<p>b</p>" });
 });
@@ -46,10 +46,10 @@ describe("POST /api/cron/weekly-report", () => {
     expect(mocks.sendWeeklyReportEmail).not.toHaveBeenCalled();
   });
 
-  it("builds the report from the accounts (email and sign-up date only) and sends it", async () => {
+  it("builds the report from the accounts (email, sign-up date and tags only) and sends it", async () => {
     const res = await POST(req("Bearer s3cret"));
     expect(await res.json()).toEqual({ ok: true, sent: true, subject: "RoadVerdict, week of 28 September" });
-    expect(mocks.gatherWeeklyReport).toHaveBeenCalledWith([{ email: "a@example.com", createdAt: "2026-09-30T10:00:00Z" }]);
+    expect(mocks.gatherWeeklyReport.mock.calls[0][0]).toStrictEqual([{ email: "a@example.com", createdAt: "2026-09-30T10:00:00Z", tags: ["tester"] }]);
     expect(mocks.sendWeeklyReportEmail).toHaveBeenCalledWith("owner@example.com", { subject: "RoadVerdict, week of 28 September", preheader: "p", bodyHtml: "<p>b</p>" });
   });
 

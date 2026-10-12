@@ -1,7 +1,7 @@
 // The Monday report: which week it covers, how the funnel days add up, and what
 // the email says.
 import { describe, expect, it } from "vitest";
-import { buildWeeklyReport, daysOfWeek, lastCompleteWeekStart, sumDays } from "@/lib/analytics/weeklyReport";
+import { buildWeeklyReport, daysOfWeek, excludedCreatedIn, excludedFromReport, lastCompleteWeekStart, sumDays } from "@/lib/analytics/weeklyReport";
 import type { ProStats } from "@/lib/payments/proStats";
 import type { FunnelDay } from "@/lib/analytics/funnel";
 
@@ -24,6 +24,26 @@ describe("which week the Monday report covers", () => {
       { day: "2026-09-27", counts: { home: 100 } },
     ];
     expect(sumDays(days, daysOfWeek("2026-09-28"))).toEqual({ home: 15, login: 2, home__src_youtube: 7 });
+  });
+});
+
+describe("who the report leaves out", () => {
+  const accounts = [
+    { email: "real@example.com", createdAt: "2026-09-29T09:00:00Z" },
+    { email: "tester@example.com", createdAt: "2026-09-29T09:00:00Z", tags: ["tester"] },
+    { email: "press@example.com", createdAt: "2026-09-22T09:00:00Z", tags: ["press"] },
+    { email: "friend@example.com", createdAt: "2026-09-30T09:00:00Z", tags: ["friend"] },
+    { email: "other@example.com", createdAt: "2026-09-30T09:00:00Z", tags: ["something-else"] },
+  ];
+
+  it("is testers, friends, press and the demo account - nobody else", () => {
+    expect([...excludedFromReport(accounts)].sort()).toEqual(["demo@roadverdict.co.uk", "friend@example.com", "press@example.com", "tester@example.com"]);
+  });
+
+  it("counts their sign-ups by UK week", () => {
+    const excluded = excludedFromReport(accounts);
+    expect(excludedCreatedIn(accounts, excluded, "2026-09-28")).toBe(2);
+    expect(excludedCreatedIn(accounts, excluded, "2026-09-21")).toBe(1);
   });
 });
 
@@ -59,6 +79,17 @@ describe("the report email", () => {
   it("shows a dash, not 0, for a week before the funnel was counting", () => {
     const r = buildWeeklyReport({ ...base, lastWeek: {} });
     expect(r.bodyHtml).toMatch(/Sign-in page<\/td><td[^>]*><strong>12<\/strong><\/td><td[^>]*>-<\/td>/);
+  });
+
+  it("says how many of the funnel's anonymous new accounts were testers, friends or press", () => {
+    const r = buildWeeklyReport({ ...base, taggedSignups: { thisWeek: 2, lastWeek: 1 } });
+    expect(r.bodyHtml).toContain("New accounts in this table include 2 tagged tester, friend or press (week before: 1)");
+    expect(buildWeeklyReport(base).bodyHtml).not.toContain("New accounts in this table include");
+  });
+
+  it("takes the tagged sign-ups off the funnel's count when the records can't be read", () => {
+    const r = buildWeeklyReport({ ...base, activation: null, taggedSignups: { thisWeek: 2, lastWeek: 0 } });
+    expect(r.bodyHtml).toContain("<strong>1</strong> new account.");
   });
 
   it("still sends, saying so, when Stripe or the records can't be read", () => {

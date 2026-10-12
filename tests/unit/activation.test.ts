@@ -54,6 +54,21 @@ describe("buildActivationStats", () => {
     expect(stats.weeks[7].weekStart).toBe("2026-08-10");
   });
 
+  it("leaves excluded accounts (testers, for the Monday report) out of every number", () => {
+    const stats = buildActivationStats({
+      now,
+      accounts: [
+        { email: "real@example.com", createdAt: "2026-09-29T09:00:00.000Z" },
+        { email: "tester@example.com", createdAt: "2026-09-29T09:00:00.000Z" },
+      ],
+      vehicleOwners: new Set(["real@example.com", "tester@example.com"]),
+      records: [record("real@example.com", "2026-09-30T10:00:00.000Z"), record("tester@example.com", "2026-09-30T10:00:00.000Z")],
+      exclude: new Set(["tester@example.com"]),
+    });
+    expect(stats.weeks[0]).toEqual({ weekStart: "2026-09-28", people: 1 });
+    expect(stats.cohorts[0]).toMatchObject({ weekStart: "2026-09-28", accounts: 1, addedVehicle: 1, addedRecord: 1 });
+  });
+
   it("follows each week's new accounts: a vehicle, a first record, and something again in week 2", () => {
     const stats = buildActivationStats({
       now,

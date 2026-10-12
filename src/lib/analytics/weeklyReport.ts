@@ -7,14 +7,34 @@
 // records, Stripe's Pro subscriptions, and paid vehicle checks - with the
 // week before alongside for comparison. Nothing here names a person.
 //
+// Accounts tagged tester, friend or press on /tomasz, and the demo account,
+// are left out of the account-based numbers (active people, new accounts,
+// what new accounts did). The funnel counters are anonymous and can't be
+// filtered, so the report says how many of its new accounts were tagged.
+//
 // buildWeeklyReport is pure (and tested); gatherWeeklyReport reads the data.
 import { getFunnelDays, FUNNEL_SOURCES, type FunnelDay } from "@/lib/analytics/funnel";
 import { getActivationStats, weekStartOf, type ActivationStats, type AccountRow } from "@/lib/analytics/activation";
 import { getProStats, type ProStats } from "@/lib/payments/proStats";
 import { getContainer } from "@/lib/cosmos";
+import { DEMO_EMAIL } from "@/lib/tracker/demoSeed";
 
 export type WeekCounts = Record<string, number>;
 export type VehicleChecks = { count: number; pence: number };
+
+export const REPORT_EXCLUDED_TAGS = ["tester", "friend", "press"];
+
+// The accounts the report leaves out: tagged on /tomasz, plus the demo account.
+export function excludedFromReport(accounts: AccountRow[]): Set<string> {
+  const out = new Set<string>([DEMO_EMAIL]);
+  for (const a of accounts) if (a.tags?.some((t) => REPORT_EXCLUDED_TAGS.includes(t))) out.add(a.email);
+  return out;
+}
+
+// How many left-out accounts were created in the UK week starting `monday`.
+export function excludedCreatedIn(accounts: AccountRow[], excluded: Set<string>, monday: string): number {
+  return accounts.filter((a) => excluded.has(a.email) && a.createdAt && weekStartOf(new Date(a.createdAt)) === monday).length;
+}
 
 export type WeeklyReportInput = {
   weekStart: string; // the Monday the report covers, YYYY-MM-DD
@@ -23,6 +43,8 @@ export type WeeklyReportInput = {
   activation: ActivationStats | null;
   pro: ProStats | null;
   checks: { thisWeek: VehicleChecks; lastWeek: VehicleChecks } | null;
+  // Tester/friend/press sign-ups inside the anonymous funnel's New accounts.
+  taggedSignups?: { thisWeek: number; lastWeek: number };
 };
 
 export type WeeklyReport = { subject: string; preheader: string; bodyHtml: string };
@@ -120,6 +142,7 @@ const h2 = "font-size:16px;margin:22px 0 8px;";
 
 export function buildWeeklyReport(input: WeeklyReportInput): WeeklyReport {
   const { weekStart, thisWeek, lastWeek, activation, pro, checks } = input;
+  const tagged = input.taggedSignups ?? { thisWeek: 0, lastWeek: 0 };
   const prevMonday = (() => {
     const [y, m, d] = weekStart.split("-").map(Number);
     return new Date(Date.UTC(y, m - 1, d - 7)).toISOString().slice(0, 10);
@@ -127,7 +150,7 @@ export function buildWeeklyReport(input: WeeklyReportInput): WeeklyReport {
   const activeNow = activation?.weeks.find((w) => w.weekStart === weekStart)?.people ?? null;
   const activeBefore = activation?.weeks.find((w) => w.weekStart === prevMonday)?.people ?? null;
   const cohort = activation?.cohorts.find((c) => c.weekStart === weekStart) ?? null;
-  const newAccounts = cohort?.accounts ?? thisWeek.account_created ?? 0;
+  const newAccounts = cohort?.accounts ?? Math.max(0, (thisWeek.account_created ?? 0) - tagged.thisWeek);
   const paying = pro ? pro.payingMonthly + pro.payingAnnual : null;
 
   const headline: string[] = [];
@@ -162,6 +185,11 @@ ${table(FUNNEL_ROWS, thisWeek, lastWeek, true)}
 <p style="margin:0 0 6px;font-size:13px;color:#5b5850;">Home page visits by source: ${esc(sourcesLine(thisWeek, "home"))}</p>
 <p style="margin:0 0 6px;font-size:13px;color:#5b5850;">Sign-in page by source: ${esc(sourcesLine(thisWeek, "login"))}</p>
 <p style="margin:0 0 6px;font-size:13px;color:#5b5850;">New accounts by source: ${esc(sourcesLine(thisWeek, "account_created"))}</p>
+${
+  tagged.thisWeek || tagged.lastWeek
+    ? `<p style="margin:0 0 6px;font-size:13px;color:#5b5850;">New accounts in this table include ${tagged.thisWeek} tagged tester, friend or press (week before: ${tagged.lastWeek}) - they're left out of the numbers at the top.</p>`
+    : ""
+}
 
 <h2 style="${h2}">Sample bike</h2>
 ${table(DEMO_ROWS, thisWeek, lastWeek, false)}
@@ -179,7 +207,7 @@ ${
 <a href="${appUrl}/tomasz">/tomasz</a> · <a href="https://dash.cloudflare.com/?to=/:account/web-analytics">Cloudflare visits</a> ·
 <a href="https://search.google.com/search-console">Search Console</a> · <a href="https://play.google.com/console">Play Console</a>
 </p>
-<p style="margin:12px 0 0;font-size:12px;color:#8a867d;">Anonymous totals from the site's own counters. The funnel counts people who reached each step; your own visits count too.</p>`;
+<p style="margin:12px 0 0;font-size:12px;color:#8a867d;">The numbers at the top leave out accounts tagged tester, friend or press on /tomasz, and the demo account. The tables are anonymous totals from the site's own counters: they count everyone who reached each step, testers and your own visits included.</p>`;
 
   const subject = `RoadVerdict, week of ${longDay(weekStart)}: ${activeNow ?? "?"} active, ${newAccounts} new, ${paying ?? "?"} Pro`;
   return { subject, preheader: `${activeNow ?? "?"} people added something real; ${newAccounts} new accounts.`, bodyHtml };
@@ -202,6 +230,7 @@ async function paidChecks(fromIso: string, toIso: string): Promise<VehicleChecks
 }
 
 export async function gatherWeeklyReport(accounts: AccountRow[], now = new Date()): Promise<WeeklyReportInput> {
+  const excluded = excludedFromReport(accounts);
   const weekStart = lastCompleteWeekStart(now);
   const [y, m, d] = weekStart.split("-").map(Number);
   const prevStart = new Date(Date.UTC(y, m - 1, d - 7)).toISOString().slice(0, 10);
@@ -209,7 +238,7 @@ export async function gatherWeeklyReport(accounts: AccountRow[], now = new Date(
   const thisWeek = sumDays(days, daysOfWeek(weekStart));
   const lastWeek = sumDays(days, daysOfWeek(prevStart));
   const [activation, pro, checks] = await Promise.all([
-    getActivationStats(accounts, now).catch(() => null),
+    getActivationStats(accounts, now, excluded).catch(() => null),
     getProStats(now.getTime()).catch(() => null),
     (async () => {
       const iso = (s: string, add: number) => {
@@ -220,5 +249,6 @@ export async function gatherWeeklyReport(accounts: AccountRow[], now = new Date(
       return { thisWeek: a, lastWeek: b };
     })().catch(() => null),
   ]);
-  return { weekStart, thisWeek, lastWeek, activation, pro, checks };
+  const taggedSignups = { thisWeek: excludedCreatedIn(accounts, excluded, weekStart), lastWeek: excludedCreatedIn(accounts, excluded, prevStart) };
+  return { weekStart, thisWeek, lastWeek, activation, pro, checks, taggedSignups };
 }

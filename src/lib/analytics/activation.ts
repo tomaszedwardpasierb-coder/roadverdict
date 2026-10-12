@@ -35,7 +35,7 @@ export const REAL_RECORD_TYPES = [
 ] as const;
 
 export type RecordRow = { pk: string; createdAt: string; type: string; billType?: string; cost?: number; source?: string };
-export type AccountRow = { email: string; createdAt: string };
+export type AccountRow = { email: string; createdAt: string; tags?: string[] };
 
 export function isRealRecord(r: RecordRow): boolean {
   if (r.pk === DEMO_EMAIL) return false;
@@ -95,9 +95,14 @@ export function activationWindowStart(now: Date): string {
 
 // The pure half, newest week first: separate from the queries so it can be
 // tested on plain rows.
-export function buildActivationStats(input: { now: Date; accounts: AccountRow[]; records: RecordRow[]; vehicleOwners: Set<string> }): ActivationStats {
-  const { now, accounts, vehicleOwners } = input;
-  const records = input.records.filter(isRealRecord);
+// `exclude` leaves accounts out of every number - the Monday report passes
+// testers, friends, press and the demo account, so its headline counts are
+// real users only; /tomasz passes nothing and counts everyone.
+export function buildActivationStats(input: { now: Date; accounts: AccountRow[]; records: RecordRow[]; vehicleOwners: Set<string>; exclude?: Set<string> }): ActivationStats {
+  const { now, vehicleOwners } = input;
+  const exclude = input.exclude ?? new Set<string>();
+  const accounts = input.accounts.filter((a) => !exclude.has(a.email));
+  const records = input.records.filter((r) => isRealRecord(r) && !exclude.has(r.pk));
 
   const peopleByWeek = new Map<string, Set<string>>();
   for (const r of records) {
@@ -135,7 +140,7 @@ export function buildActivationStats(input: { now: Date; accounts: AccountRow[];
   return { weeks, cohorts };
 }
 
-export async function getActivationStats(accounts: AccountRow[], now = new Date()): Promise<ActivationStats> {
+export async function getActivationStats(accounts: AccountRow[], now = new Date(), exclude?: Set<string>): Promise<ActivationStats> {
   const container = getContainer();
   const [recordsResult, vehiclesResult] = await Promise.all([
     container.items
@@ -155,5 +160,6 @@ export async function getActivationStats(accounts: AccountRow[], now = new Date(
     accounts,
     records: recordsResult.resources,
     vehicleOwners: new Set(vehiclesResult.resources.map((v) => v.pk)),
+    exclude,
   });
 }
