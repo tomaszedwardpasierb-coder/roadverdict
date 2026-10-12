@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { generateDemoDataset, DEMO_EMAIL, DEMO_MAKE, DEMO_MODEL, DEMO_REGISTRATION } from "@/lib/tracker/demoSeed";
+import { demoBikeMotRecord } from "@/lib/mot/demoMotRecords";
 
 // generateDemoDataset uses a fixed seed (mulberry32(42)) — the output
 // is completely deterministic. These tests lock down the shape and
@@ -50,6 +51,14 @@ describe("generateDemoDataset", () => {
     const billTypes = dataset.bills.map((b) => b.billType);
     expect(billTypes).toContain("insurance");
     expect(billTypes).toContain("road-tax");
+  });
+
+  it("dates the yearly bills so insurance isn't due the day the demo is seeded, and the last MOT bill matches the demo MOT history", () => {
+    const seededOn = new Date("2026-10-12T10:00:00.000Z");
+    const bills = generateDemoDataset(seededOn).bills;
+    const last = (type: string) => [...bills].reverse().find((b) => b.billType === type)!.date;
+    expect(last("insurance").slice(0, 7)).toBe("2026-03"); // renewal due March 2027, five months away
+    expect(last("mot-test")).toBe(demoBikeMotRecord(seededOn).tests[0].date.slice(0, 10));
   });
 
   // ── Determinism ─────────────────────────────────────────────────────

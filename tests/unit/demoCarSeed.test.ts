@@ -6,6 +6,7 @@ import {
   DEMO_CAR_REGISTRATION,
   DEMO_CAR_YEAR,
 } from "@/lib/tracker/demoCarSeed";
+import { demoCarMotRecord } from "@/lib/mot/demoMotRecords";
 
 // Mirrors demoSeed.test.ts's own structure and reasoning exactly -
 // generateDemoCarDataset uses a fixed seed (mulberry32(43)), so the
@@ -60,6 +61,14 @@ describe("generateDemoCarDataset", () => {
     expect(billTypes).toContain("insurance");
     expect(billTypes).toContain("road-tax");
     expect(billTypes).toContain("mot-test");
+  });
+
+  it("dates the yearly bills so insurance isn't due the day the demo is seeded, and the last MOT bill matches the demo MOT history", () => {
+    const seededOn = new Date("2026-10-12T10:00:00.000Z");
+    const bills = generateDemoCarDataset(seededOn).bills;
+    const last = (type: string) => [...bills].reverse().find((b) => b.billType === type)!.date;
+    expect(last("insurance").slice(0, 7)).toBe("2026-05"); // renewal due May 2027, seven months away
+    expect(last("mot-test")).toBe(demoCarMotRecord(seededOn).tests[0].date.slice(0, 10));
   });
 
   // ── Determinism ─────────────────────────────────────────────────────

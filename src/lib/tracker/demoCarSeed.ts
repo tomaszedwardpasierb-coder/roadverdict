@@ -202,13 +202,16 @@ export function generateDemoCarDataset(now: Date = new Date()): DemoCarDataset {
   // past the 3-year MOT threshold for its entire logged history), plus
   // a couple of Congestion Charge entries for a car that's clearly been
   // into a city centre now and then.
+  // The yearly round falls 5 months before "now", on the day of the demo
+  // car's latest MOT (mot/demoMotRecords.ts), so the insurance renewal is
+  // months away - never overdue the day the demo is seeded.
   const bills: DemoCarBillEntry[] = [];
   for (let year = 1; year <= 10; year++) {
-    const monthIndex = year * 12 - 12;
+    const monthIndex = year * 12 - 5;
     const day = 1 + Math.floor(rand() * 10);
     bills.push({ date: dateAt(monthIndex, day), billType: "insurance", cost: Math.round(420 + rand() * 260) });
     bills.push({ date: dateAt(monthIndex, day + 2), billType: "road-tax", cost: Math.round(295 + rand() * 40) });
-    bills.push({ date: dateAt(monthIndex, day + 5), billType: "mot-test", cost: 45 + Math.floor(rand() * 10) });
+    bills.push({ date: dateAt(monthIndex, 20), billType: "mot-test", cost: 45 + Math.floor(rand() * 10) });
   }
   bills.push({ date: dateAt(41, 16), billType: "congestion", cost: 15 });
   bills.push({ date: dateAt(87, 3), billType: "congestion", cost: 15 });

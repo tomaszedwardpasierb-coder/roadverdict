@@ -201,14 +201,17 @@ export function generateDemoDataset(now: Date = new Date()): DemoDataset {
 
   // BILLS - annual insurance and road tax from year 1, MOT joining from
   // year 3 onward (a bike's first UK MOT isn't due until it's 3 years old).
+  // The yearly round falls 7 months before "now", on the day of the demo's
+  // latest MOT (mot/demoMotRecords.ts), so the insurance renewal is months
+  // away - never overdue the day the demo is seeded.
   const bills: DemoBillEntry[] = [];
   for (let year = 1; year <= 10; year++) {
-    const monthIndex = year * 12 - 12;
+    const monthIndex = year * 12 - 7;
     const day = 1 + Math.floor(rand() * 10);
     bills.push({ date: dateAt(monthIndex, day), billType: "insurance", cost: Math.round(165 + rand() * 110) });
     bills.push({ date: dateAt(monthIndex, day + 2), billType: "road-tax", cost: 105 + Math.min(year, 15) });
     if (year >= 3) {
-      bills.push({ date: dateAt(monthIndex, day + 5), billType: "mot-test", cost: 25 + Math.floor(rand() * 5) });
+      bills.push({ date: dateAt(monthIndex, 13), billType: "mot-test", cost: 25 + Math.floor(rand() * 5) });
     }
   }
   bills.sort((a, b) => a.date.localeCompare(b.date));
