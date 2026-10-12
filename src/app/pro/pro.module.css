@@ -155,6 +155,15 @@
   margin: 0.4rem 0 0;
 }
 
+/* The vehicle-checks note under both plan cards: it spans the whole row,
+   not just the Free card's column. */
+.planChecksNote {
+  grid-column: 1 / -1;
+  max-width: 46rem;
+  margin: 0 auto;
+  line-height: 1.5;
+}
+
 .faq {
   border-top: 1px solid var(--line);
   padding-top: 2.5rem;

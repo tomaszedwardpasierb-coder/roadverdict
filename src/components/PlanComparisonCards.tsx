@@ -84,7 +84,7 @@ export function PlanComparisonCards({ userIsPro, hasStripeSubscription = false, 
         )}
       </div>
 
-      <p className={styles.planCtaNote}>
+      <p className={styles.planCtaNote + ' ' + styles.planChecksNote}>
         Independent Vehicle Check (stolen/write-off/finance on a shared buyer report, plus a valuation for cars) - £9.99
         bike / £13.99 car, one-time, available to every account on either plan. The Buying Guide&apos;s own vehicle-history report
         (VDI check plus a full public-data analysis and AI-written summary) is priced by account: £14.99 with no
