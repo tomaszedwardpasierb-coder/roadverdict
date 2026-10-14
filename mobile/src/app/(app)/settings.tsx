@@ -16,7 +16,7 @@ import { TwoFactorSection } from '@/components/two-factor';
 import { Brand } from '@/constants/brand';
 import { apiFetch } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
-import { canOpenStoreListing, openStoreListing } from '@/lib/review-prompt';
+import { canOpenStoreListing, openStoreListing, shareApp } from '@/lib/review-prompt';
 import { useApi } from '@/lib/use-api';
 import { useVehicleOptions } from '@/lib/vehicle-options';
 import { useVehicle, vehicleHeaders, type GarageVehicle } from '@/lib/vehicle';
@@ -69,7 +69,7 @@ export default function SettingsScreen() {
 
             {canOpenStoreListing ? (
               <>
-                <SectionHeader title="Rate RoadVerdict" />
+                <SectionHeader title="Rate or share RoadVerdict" />
                 <RateCard />
               </>
             ) : null}
@@ -344,13 +344,19 @@ function FeedbackCard() {
 function RateCard() {
   return (
     <Card style={styles.card}>
-      <Text style={styles.hint}>A rating on Google Play helps other riders and drivers find RoadVerdict.</Text>
+      <Text style={styles.hint}>A rating on Google Play helps other riders and drivers find RoadVerdict. Know someone who&apos;d use it? Send them the link.</Text>
       <View style={styles.saveRow}>
         <Pressable
           onPress={() => void openStoreListing()}
           accessibilityRole="link"
           style={({ pressed }) => [styles.secondary, pressed && styles.pressed]}>
           <Text style={styles.secondaryLabel}>Rate on Google Play</Text>
+        </Pressable>
+        <Pressable
+          onPress={() => void shareApp()}
+          accessibilityRole="button"
+          style={({ pressed }) => [styles.secondary, pressed && styles.pressed]}>
+          <Text style={styles.secondaryLabel}>Share RoadVerdict</Text>
         </Pressable>
       </View>
     </Card>

@@ -7,7 +7,7 @@
 // forbids asking anything before or alongside the review sheet.
 import * as SecureStore from 'expo-secure-store';
 import * as StoreReview from 'expo-store-review';
-import { Linking, Platform } from 'react-native';
+import { Linking, Platform, Share } from 'react-native';
 
 const SAVES_KEY = 'rv-review-saves';
 const ASKED_KEY = 'rv-review-asked';
@@ -54,6 +54,18 @@ export async function noteMotHistoryImported(createdCount: number): Promise<void
     await askOnce();
   } catch {
     // A rating prompt is never worth an error.
+  }
+}
+
+// The Settings card's Share button: the phone's share sheet with a short
+// line and the Play listing. Never throws.
+export async function shareApp(): Promise<void> {
+  try {
+    await Share.share({
+      message: `I keep my vehicle's MOT history, service records and running costs in RoadVerdict - free on Google Play: ${PLAY_LISTING_URL}`,
+    });
+  } catch {
+    // Dismissing the share sheet is not an error worth showing.
   }
 }
 
