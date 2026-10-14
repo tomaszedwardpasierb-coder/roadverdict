@@ -345,7 +345,7 @@ function RateCard() {
   return (
     <Card style={styles.card}>
       <Text style={styles.hint}>A rating on Google Play helps other riders and drivers find RoadVerdict. Know someone who&apos;d use it? Send them the link.</Text>
-      <View style={styles.saveRow}>
+      <View style={[styles.saveRow, styles.wrapRow]}>
         <Pressable
           onPress={() => void openStoreListing()}
           accessibilityRole="link"
@@ -483,6 +483,8 @@ const styles = StyleSheet.create({
   },
   inputMultiline: { height: 110, paddingTop: 12, textAlignVertical: 'top', fontSize: 16 },
   saveRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  // Two buttons that may not fit side by side on a narrow phone.
+  wrapRow: { flexWrap: 'wrap' },
   saved: { fontSize: 15, fontWeight: '600', color: '#1A6B4A' },
   problem: { fontSize: 15, lineHeight: 22, color: Brand.danger },
   secondary: {
