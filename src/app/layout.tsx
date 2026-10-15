@@ -119,6 +119,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 width={232}
                 height={145}
                 priority
+                // An 8 KB file: served as-is. Through /_next/image it was one
+                // more resize for the single small server to do after every
+                // restart (it showed up among the slowest requests).
+                unoptimized
                 className="site-header__logo-img"
               />
             </Link>

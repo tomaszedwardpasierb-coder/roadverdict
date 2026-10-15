@@ -7,6 +7,7 @@ import type { Metadata } from 'next';
 import { pageMetadata } from '@/lib/seo/pageMetadata';
 import Link from 'next/link';
 import Image from 'next/image';
+import { StaticHeroImage } from '@/components/StaticHeroImage';
 import './homepage.css';
 import { FunnelBeacon } from '@/components/FunnelBeacon';
 import { REPORT_PRICE_SUMMARY } from '@/lib/seo/reportPricingCopy';
@@ -77,20 +78,14 @@ export default function HomePage() {
             car and a motorbike behind - so the first thing a visitor sees is
             what they'd get. Right half on desktop, under the text on phones. */}
         <div className="rv-hero-photo">
-          <Image
-            src="/images/hero/hero-phone-logbook.jpg"
+          {/* Ready-made WebP files, not /_next/image: see StaticHeroImage. */}
+          <StaticHeroImage
+            base="/images/hero/hero-phone-logbook"
+            widths={[640, 828, 1152]}
             alt="A phone showing a RoadVerdict logbook of a motorcycle's services and what each cost, held in front of a car and a motorbike"
-            fill
             sizes="(max-width: 768px) 100vw, 50vw"
-            style={{ objectFit: 'cover', objectPosition: '38% center' }}
+            objectPosition="38% center"
             priority
-            // `priority` alone gives eager loading + a preload link but no
-            // fetchpriority hint - Lighthouse's "LCP request discovery"
-            // flagged that on the old hero image.
-            fetchPriority="high"
-            // A photo of a screen shows compression on the text far sooner
-            // than the old comic art did, so this sits a notch higher.
-            quality={78}
           />
           <div className="rv-hero-photo-fade" aria-hidden="true" />
         </div>

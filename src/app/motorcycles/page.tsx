@@ -16,6 +16,7 @@ import type { Metadata } from 'next';
 import { pageMetadata } from '@/lib/seo/pageMetadata';
 import Link from 'next/link';
 import Image from 'next/image';
+import { StaticHeroImage } from '@/components/StaticHeroImage';
 import { ViewerCtaLink, ViewerSwitchKindLink } from '@/components/viewer/ViewerCta';
 import { buildBreadcrumbJsonLd } from '@/lib/seo/breadcrumbs';
 
@@ -225,13 +226,11 @@ export default function MotorcyclesPage() {
         {/* Same background image as the homepage's verdict strip; it sits under
             a heavy amber overlay, so a low quality setting doesn't show. */}
         <div className="rv-verdict-panel-img" aria-hidden="true">
-          <Image
-            src="/images/hero/panel-04.webp"
+          <StaticHeroImage
+            base="/images/hero/panel-04"
+            widths={[640, 896]}
             alt="Comic-style illustration of a phone in a gloved hand showing a vehicle verdict: buy, negotiate or walk away"
-            fill
             sizes="100vw"
-            style={{ objectFit: 'cover', objectPosition: 'center center' }}
-            quality={50}
           />
           <div className="rv-verdict-img-overlay" />
         </div>

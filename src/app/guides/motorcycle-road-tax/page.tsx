@@ -22,8 +22,10 @@ function checkedLabel(iso: string): string {
 }
 
 export const metadata: Metadata = pageMetadata({
-  title: 'Motorcycle Road Tax: Cost by Engine Size (UK)',
-  description: `How much is motorcycle road tax? ${formatPounds(up150.twelveMonths)} up to 150cc, ${formatPounds(mid.twelveMonths)} for 151-400cc, ${formatPounds(upper.twelveMonths)} for 401-600cc and ${formatPounds(top.twelveMonths)} over 600cc a year - plus monthly payments, electric bikes and buying used.`,
+  // The rates are the ones from 1 April 2026 (lib/motorcycleVed.ts), so the
+  // year is accurate - and "rates 2026" is how people search for them.
+  title: 'Motorcycle Road Tax 2026: Rates by Engine Size',
+  description: `Motorcycle road tax 2026/27: ${formatPounds(up150.twelveMonths)} a year up to 150cc (every 125), ${formatPounds(mid.twelveMonths)} for 151-400cc, ${formatPounds(upper.twelveMonths)} for 401-600cc, ${formatPounds(top.twelveMonths)} over 600cc. Monthly, electric and used bikes.`,
   path: '/guides/motorcycle-road-tax',
 });
 

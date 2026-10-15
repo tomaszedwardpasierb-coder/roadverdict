@@ -564,7 +564,7 @@ const MOTORCYCLE_GUIDES: PriceGuide[] = [
     slug: 'brake-pads',
     name: 'Front brake pads',
     quotedFor: 'new front brake pads',
-    title: 'Motorcycle Brake Pad Replacement Cost UK: Front Pads',
+    title: 'Motorcycle Front Brake Pads: Replacement Cost UK',
     h1: 'How much does it cost to replace motorcycle brake pads?',
     description:
       'Typical UK prices for replacing a motorcycle’s front brake pads by engine size, twin-disc bikes, pad types, and the signs your pads are worn.',
