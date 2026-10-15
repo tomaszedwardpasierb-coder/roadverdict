@@ -39,6 +39,8 @@
 // standing, widely-used pattern for exactly this situation, not a hack
 // specific to this app.
 
+import { installTelemetryScrubbers } from "@/lib/telemetryScrub";
+
 type ApplicationInsightsModule = any;
 
 export async function register() {
@@ -61,7 +63,7 @@ export async function register() {
   // eslint-disable-next-line no-eval
   const appInsights: ApplicationInsightsModule = eval("require")("applicationinsights");
 
-  appInsights
+  const configuration = appInsights
     .setup(connectionString)
     .setAutoDependencyCorrelation(true)
     .setAutoCollectRequests(true)
@@ -70,7 +72,13 @@ export async function register() {
     .setAutoCollectDependencies(true)
     .setAutoCollectConsole(true, true)
     .setUseDiskRetryCaching(true)
-    .setSendLiveMetrics(true)
-    .start();
+    .setSendLiveMetrics(true);
+
+  // Keep API keys and one-time sign-in tokens out of the logs: VDG takes its
+  // key in the URL, and every outgoing call is recorded with its full URL.
+  // Must happen after setup() and before start().
+  installTelemetryScrubbers(appInsights);
+
+  configuration.start();
 }
 
