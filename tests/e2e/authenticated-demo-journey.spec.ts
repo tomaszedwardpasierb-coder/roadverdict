@@ -87,7 +87,8 @@ test.describe("Authenticated demo journeys", () => {
 
       await anonPage.getByPlaceholder("e.g. AB12 CDE").fill("WRONG PLATE");
       await anonPage.getByRole("button", { name: "View report" }).click();
-      await expect(anonPage.getByRole("alert")).toBeVisible();
+      // Next.js's own route announcer is a role="alert" too, so match ours by its text.
+      await expect(anonPage.getByRole("alert").filter({ hasText: "match this bike" })).toBeVisible();
       // Still gated - a wrong plate must never grant access.
       await expect(anonPage.getByRole("heading", { name: "Confirm you have the right bike" })).toBeVisible();
 
