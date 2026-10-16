@@ -186,5 +186,11 @@ div.page .save p { color: rgba(240, 237, 230, 0.8); }
 .save .secondary { color: #f0ede6; border-color: rgba(240, 237, 230, 0.4); }
 div.page p.quiet { font-size: 0.95rem; color: var(--ink-soft); }
 
+/* "Buying it?": the step after the free check - a proper button, in the
+   solid dark style (the amber one in the card above is for saving). */
+.buying { margin-top: 0.5rem; }
+.buying .saveActions { align-items: center; gap: 0.9rem; }
+.buyingPrice { font-size: 0.95rem; color: var(--ink-soft); }
+
 .about h2 { font-size: 1.2rem; margin: 0.5rem 0; }
 .about ul { padding-left: 1.2rem; margin: 0 0 1rem; color: var(--ink-soft); }

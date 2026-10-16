@@ -73,6 +73,18 @@ describe("MotCheckResult", () => {
     expect(screen.getByRole("link", { name: "Run the full history check" })).toHaveAttribute("href", "/buying-guide");
   });
 
+  it("offers the full history check as a button with the real price, to the right guide for the vehicle", () => {
+    const { unmount } = render(<MotCheckResult record={bike} now={NOW} />);
+    const section = screen.getByRole("heading", { name: "Buying it?" }).closest("section")!;
+    expect(within(section).getByText(/finance, theft or write-off records/)).toBeInTheDocument();
+    // The price is quoted from the checkout's own constants: £14.99 with no vehicle, £12.99 with one.
+    expect(within(section).getByText(/£14\.99, or £12\.99 once you’ve added a vehicle to a free account\./)).toBeInTheDocument();
+    expect(within(section).getByRole("link", { name: "Run the full history check" })).toHaveAttribute("href", "/buying-guide");
+    unmount();
+    render(<MotCheckResult record={{ ...bike, kind: "car" }} now={NOW} />);
+    expect(screen.getByRole("link", { name: "Run the full history check" })).toHaveAttribute("href", "/cars/buying-guide");
+  });
+
   it("offers both kinds when it can't tell, and says when an MOT has run out", () => {
     render(<MotCheckResult record={{ ...bike, kind: null, motDueDate: "2026-01-01" }} now={NOW} />);
     expect(screen.getByRole("link", { name: "Save as a motorcycle" })).toBeInTheDocument();

@@ -9,6 +9,7 @@ import Link from 'next/link';
 import { explainDefect, SEVERITY, CATEGORIES } from '@/lib/mot/motDefects';
 import { computeMotScore, BAND_LABEL, SCORE_RULES } from '@/lib/mot/motScore';
 import type { MotRecord, MotVehicleKind } from '@/lib/mot/motRecord';
+import { BUYING_GUIDE_REPORT_PRICE_LABEL } from '@/lib/payments/pricing';
 import styles from './mot-check.module.css';
 
 function ukDate(iso: string): string {
@@ -167,11 +168,21 @@ export function MotCheckResult({ record, now = new Date() }: { record: MotRecord
         </div>
       </section>
 
-      <p className={styles.quiet}>
-        Buying it?{' '}
-        <Link href={record.kind === 'car' ? '/cars/buying-guide' : '/buying-guide'}>Run the full history check</Link> for
-        outstanding finance, theft and write-off records - the MOT record doesn’t show those.
-      </p>
+      <section className={styles.buying} aria-labelledby="buying-heading">
+        <h2 id="buying-heading" className={styles.cardTitle}>Buying it?</h2>
+        <p>
+          The MOT record doesn’t show outstanding finance, theft or write-off records. The full history check does.
+        </p>
+        <div className={styles.saveActions}>
+          <Link className={styles.primary} href={record.kind === 'car' ? '/cars/buying-guide' : '/buying-guide'}>
+            Run the full history check
+          </Link>
+          <span className={styles.buyingPrice}>
+            {BUYING_GUIDE_REPORT_PRICE_LABEL.freeNoVehicle}, or {BUYING_GUIDE_REPORT_PRICE_LABEL.freeWithVehicle} once you’ve
+            added a vehicle to a free account.
+          </span>
+        </div>
+      </section>
     </div>
   );
 }
