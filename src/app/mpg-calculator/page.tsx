@@ -10,7 +10,7 @@ import styles from './page.module.css';
 export const metadata: Metadata = pageMetadata({
   title: 'MPG Calculator UK - Miles per Gallon and L/100km',
   description:
-    'Work out your real fuel economy from one tank, in UK miles per gallon or litres per 100 km, and what every mile costs you at this week’s UK fuel price. Free, for cars and motorcycles.',
+    'Work out your real fuel economy from one tank, in miles per gallon or litres per 100 km, and what each mile costs at this week’s UK fuel price. Free.',
   path: '/mpg-calculator',
 });
 

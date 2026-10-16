@@ -18,7 +18,7 @@ const VS_CHECKED = '9 October 2026';
 export const metadata: Metadata = pageMetadata({
   title: 'Vehicle Smart Alternative With a Full Service Logbook',
   description:
-    'Vehicle Smart is great for checking any car or bike. RoadVerdict keeps your own vehicle’s full history - services, receipts, fuel and costs. An honest comparison.',
+    'Vehicle Smart is great for checking any car or bike. RoadVerdict keeps your own vehicle’s history: services, receipts, fuel and costs. An honest comparison.',
   path: '/vehicle-smart-alternative',
 });
 

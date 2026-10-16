@@ -6,7 +6,7 @@ import Link from 'next/link';
 export const metadata: Metadata = pageMetadata({
   title: 'About RoadVerdict',
   description:
-    'Who runs RoadVerdict and why it exists.',
+    'Who runs RoadVerdict and why it exists: an independent UK logbook and quote checker for motorcycles and cars, built to give honest answers on what things cost.',
   path: '/about',
   absoluteTitle: true,
 });

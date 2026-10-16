@@ -13,7 +13,7 @@ import { buildBreadcrumbJsonLd } from '@/lib/seo/breadcrumbs';
 import { PRO_ANNUAL_PRICE, PRO_MONTHLY_PRICE } from '@/lib/proPlan';
 
 export const metadata: Metadata = pageMetadata({
-  title: 'Motorcycle Service Log App: Your Bike’s Full History (UK)',
+  title: 'Motorcycle Service Log App: Your Bike’s History (UK)',
   description:
     'Log every motorcycle service, tyre, chain and MOT in one place. Receipts read for you, MOT history by registration, reminders by miles or months. Free.',
   path: '/motorcycle-service-log-app',

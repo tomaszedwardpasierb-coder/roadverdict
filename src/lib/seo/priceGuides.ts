@@ -110,7 +110,7 @@ const CAR_GUIDES: PriceGuide[] = [
     title: 'Full Car Service Cost UK: Typical Prices by Car Size',
     h1: 'How much does a full car service cost?',
     description:
-      'Typical UK prices for a full car service by car size, from named sources - plus what’s included, what pushes the price up, and how to tell if your quote is fair.',
+      'Typical UK prices for a full car service by car size, from named sources, plus what’s included, what pushes the price up and how to check your quote.',
     summary: 'The annual, comprehensive service - and the one that keeps a service history “full”.',
     intro:
       'A full service is the comprehensive, usually annual service in your car’s schedule - typically every 12 months or 12,000 miles, though many modern cars use longer or variable intervals, so the schedule in your handbook or service app is what counts. It goes well beyond an oil change, and it’s the service a buyer expects to see in a “full service history”.',
@@ -420,7 +420,7 @@ const MOTORCYCLE_GUIDES: PriceGuide[] = [
     title: 'Motorcycle Service Cost UK: Full Service Prices',
     h1: 'How much does a full motorcycle service cost?',
     description:
-      'Typical UK prices for a full motorcycle service by engine size, from named sources - what’s included, why valve checks cost so much, and how to check your quote.',
+      'Typical UK prices for a full motorcycle service by engine size, from named sources: what’s included, why valve checks cost so much, and how to check a quote.',
     summary: 'The major service in your bike’s schedule - and why a valve check changes everything.',
     intro:
       'A full (or major) motorcycle service is the comprehensive service in your bike’s schedule - commonly every 12 months, or at a mileage set by the manufacturer that varies a lot from bike to bike. Your handbook’s service schedule is what counts. The biggest swing in price is whether a valve clearance check is due this time.',
@@ -520,7 +520,7 @@ const MOTORCYCLE_GUIDES: PriceGuide[] = [
     title: 'Motorcycle Tyre Prices UK: Pair Fitted by Engine Size',
     h1: 'How much do motorcycle tyres cost?',
     description:
-      'Typical UK prices for a pair of motorcycle tyres fitted, by engine size - the legal tread depth for bikes, what drives the price, and how to pay less for fitting.',
+      'Typical UK prices for a pair of motorcycle tyres fitted, by engine size: the legal tread depth for bikes, what drives the price, and how to pay less.',
     summary: 'A pair fitted - the legal limit for bikes, and how to save on fitting.',
     intro:
       'These prices are for a pair of tyres fitted, the usual benchmark - though rear tyres typically wear faster, so it’s common to replace them one at a time. For motorcycles over 50cc, the legal minimum is 1mm of tread across at least three-quarters of the tyre’s width, in a continuous band all the way round, with visible tread on the rest.',
@@ -610,7 +610,7 @@ const MOTORCYCLE_GUIDES: PriceGuide[] = [
     title: 'Motorcycle Chain and Sprocket Kit Cost UK: Fitted Prices',
     h1: 'How much does a motorcycle chain and sprocket kit cost?',
     description:
-      'Typical UK prices for a chain and sprocket kit fitted, by engine size - why they’re replaced together, how to tell they’re worn, and how to make the next kit last.',
+      'Typical UK prices for a chain and sprocket kit fitted, by engine size: why they’re replaced together, how to tell they’re worn, and how to make it last.',
     summary: 'Chain and both sprockets, replaced together - and how to make a kit last.',
     intro:
       'The chain and both sprockets wear together, so they’re replaced as a set: a new chain on worn sprockets wears out quickly, and the other way round. How well the chain is looked after makes a big difference to how long a kit lasts.',
@@ -653,7 +653,7 @@ const MOTORCYCLE_GUIDES: PriceGuide[] = [
     slug: 'mot',
     name: 'MOT',
     quotedFor: 'an MOT',
-    title: 'Motorcycle MOT Cost UK: The Maximum Fee and What’s Tested',
+    title: 'Motorcycle MOT Cost UK: Maximum Fee and What’s Tested',
     h1: 'How much does a motorcycle MOT cost?',
     description:
       'The legal maximum MOT fee for a motorcycle in the UK, when a bike’s first MOT is due, what’s tested, and how to find a test centre that does bikes.',

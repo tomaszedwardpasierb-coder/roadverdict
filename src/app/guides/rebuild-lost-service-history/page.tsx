@@ -12,7 +12,7 @@ import { buildBreadcrumbJsonLd } from '@/lib/seo/breadcrumbs';
 export const metadata: Metadata = pageMetadata({
   title: 'Lost Service History? How to Rebuild It (UK)',
   description:
-    'Lost the service book or receipts? How to rebuild a motorcycle or car service history from the MOT history, garages, dealer digital records, your emails and DVLA.',
+    'Lost the service book or receipts? How to rebuild a motorcycle or car service history from the MOT history, garages, dealers, your emails and DVLA.',
   path: '/guides/rebuild-lost-service-history',
 });
 

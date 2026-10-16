@@ -10,7 +10,7 @@ import { buildBreadcrumbJsonLd } from '@/lib/seo/breadcrumbs';
 export const metadata: Metadata = pageMetadata({
   title: 'Free Motorcycle History Check: MOT & Mileage (UK)',
   description:
-    "Free motorcycle history check by registration: the full MOT history with the mileage at every test, plus a buyer checklist for the bike's age. No account needed.",
+    "Free motorcycle history check by registration: the full MOT history, the mileage at every test and a buyer checklist for the bike's age. No account needed.",
   path: '/buying-guide',
 });
 

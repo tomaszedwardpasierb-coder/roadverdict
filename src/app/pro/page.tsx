@@ -15,7 +15,7 @@ export const metadata: Metadata = pageMetadata({
   title: 'RoadVerdict Pro: Plans and Pricing',
   description:
     (PRO_TRIAL_DAYS > 0 ? `Try RoadVerdict Pro free for ${PRO_TRIAL_DAYS} days: ` : 'RoadVerdict Pro: ') +
-    'a second vehicle, full reports, exact reminder dates and emails, the encrypted Vault, AI summaries and a free full vehicle history check every 4 weeks.',
+    'a second vehicle, full reports, exact reminder dates, the Vault, AI summaries and a free history check every 4 weeks.',
   path: '/pro',
   absoluteTitle: true,
 });

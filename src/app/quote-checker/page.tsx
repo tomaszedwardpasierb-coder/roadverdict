@@ -11,7 +11,7 @@ import { buildBreadcrumbJsonLd } from '@/lib/seo/breadcrumbs';
 export const metadata: Metadata = pageMetadata({
   title: 'Motorcycle Service Quote Checker UK - Is It Fair?',
   description:
-    'Free UK motorcycle quote checker: enter your bike, the job and what you were quoted, and get a fair, high or worth-a-second-opinion verdict against sourced UK prices.',
+    'Free UK motorcycle quote checker: enter your bike, the job and the quote, and get a fair, high or second-opinion verdict against sourced UK prices.',
   path: '/quote-checker',
 });
 

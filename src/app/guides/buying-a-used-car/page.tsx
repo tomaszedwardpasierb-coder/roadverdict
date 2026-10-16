@@ -7,7 +7,7 @@ import { buildBreadcrumbJsonLd } from '@/lib/seo/breadcrumbs';
 export const metadata: Metadata = pageMetadata({
   title: 'Buying a Used Car: Checks & Paperwork (UK)',
   description:
-    'How to check a used car when buying it: V5C, free MOT history check, what to inspect, questions to ask the seller, and the paperwork for a private sale in the UK.',
+    'How to check a used car before buying: V5C, free MOT history check, what to inspect, questions for the seller, and the paperwork for a private sale in the UK.',
   path: '/guides/buying-a-used-car',
 });
 

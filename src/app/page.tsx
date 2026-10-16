@@ -17,7 +17,7 @@ export const metadata: Metadata = pageMetadata({
   // MOT, service history); the brand line stays as the page's own heading.
   title: 'Motorcycle & Car Logbook: MOT & Service History | RoadVerdict',
   description:
-    'A free UK logbook for motorcycles and cars: MOT history by registration, every service, fill-up and repair, receipts read for you, and a check that a quote is fair.',
+    'A free UK logbook for motorcycles and cars: MOT history by registration, every service and fill-up, receipts read for you, and a check that a quote is fair.',
   path: '/',
   absoluteTitle: true,
 });

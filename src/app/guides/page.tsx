@@ -16,7 +16,7 @@ import { PRICE_GUIDES, formatPounds, overallRange, priceGuideHubPath, priceGuide
 export const metadata: Metadata = pageMetadata({
   title: 'Motorcycle & Car Guides and Price Guides (UK)',
   description:
-    'Free, UK-specific guides on buying, owning and selling a motorcycle or car - service history included - plus sourced price guides for servicing, tyres, brakes and the MOT.',
+    'Free UK guides on buying, owning and selling a motorcycle or car, service history included, plus sourced price guides for servicing, tyres, brakes and the MOT.',
   path: '/guides',
 });
 

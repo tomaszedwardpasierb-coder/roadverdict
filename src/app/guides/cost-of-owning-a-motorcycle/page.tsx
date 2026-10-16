@@ -9,7 +9,7 @@ import { sportsbikeshopLinks } from '@/lib/affiliates';
 export const metadata: Metadata = pageMetadata({
   title: 'The Real Cost of Owning a Motorcycle in the UK',
   description:
-    'What a motorcycle actually costs beyond the purchase price - fuel, insurance, tax, servicing, tyres, and depreciation, and how to get a real number for a specific bike.',
+    'What a motorcycle really costs beyond the price - fuel, insurance, tax, servicing, tyres and depreciation - and how to get a real number for your own bike.',
   path: '/guides/cost-of-owning-a-motorcycle',
 });
 
