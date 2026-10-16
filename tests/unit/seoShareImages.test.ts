@@ -30,7 +30,7 @@ describe("share images", () => {
 });
 
 describe("price guide titles and descriptions", () => {
-  const guides = Object.entries(PRICE_GUIDES).flatMap(([vehicle, list]) => list.map((g) => ({ vehicle, ...g })));
+  const guides = Object.values(PRICE_GUIDES).flat();
 
   it("descriptions fit what Google shows (70 to 160 characters)", () => {
     for (const g of guides) {
