@@ -12,6 +12,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Icon } from '@/components/icon';
 import { OptionPicker } from '@/components/option-picker';
+import { UpgradeButton, useProUpgrade } from '@/components/pro-upgrade';
 import { Card, ErrorState, LoadingState } from '@/components/screen';
 import { Brand } from '@/constants/brand';
 import { doneBarFor } from '@/components/keyboard-done';
@@ -55,6 +56,7 @@ export default function AddVehicleScreen() {
   // The "enter the details yourself" route, offered up front for plates DVLA can't look up (non-UK, for one).
   const [manualEntry, setManualEntry] = useState(false);
 
+  const upgrade = useProUpgrade();
   const limit = garage.vehicleLimit;
   const atLimit = !!limit && limit.active >= limit.limit;
   const vrm = registration.trim();
@@ -138,6 +140,15 @@ export default function AddVehicleScreen() {
             <Icon name="transfer" size={18} color={Brand.asphalt} />
             <Text style={styles.fullActionLabel}>Transfer a vehicle</Text>
           </Pressable>
+          {/* A bike and a car is common: a free account is told Pro holds both. */}
+          {upgrade.loaded && !upgrade.isPro && limit.limit === 1 ? (
+            <>
+              <Text style={styles.panelText}>
+                Or keep both: Pro holds two vehicles.{upgrade.webLine ? ` ${upgrade.webLine} – sign in there with this email.` : ''}
+              </Text>
+              {upgrade.canUpgradeInApp ? <UpgradeButton /> : null}
+            </>
+          ) : null}
         </Card>
       </View>
     );

@@ -42,6 +42,19 @@ export function storePurchasesEnabled(): boolean {
   );
 }
 
+// Whether the app may offer buying to this account (on top of
+// storePurchasesEnabled). While REVENUECAT_ONLY_EMAILS is set
+// (comma-separated), only those accounts see it - for trying real store
+// purchases with Play licence testers before everyone does. Remove the
+// setting to open it to all. The webhook and the "I just bought it" sync
+// don't check this: a purchase that happened is always honoured.
+export function storeBuyingOpenTo(email: string): boolean {
+  const only = process.env.REVENUECAT_ONLY_EMAILS?.trim();
+  if (!only) return true;
+  const wanted = email.toLowerCase().trim();
+  return only.split(",").some((e) => e.toLowerCase().trim() === wanted);
+}
+
 // The public SDK key the app configures RevenueCat with, per platform.
 // These are meant to ship inside apps; they only allow buying, not reading.
 export function revenueCatPublicKey(platform: "android" | "ios"): string | null {
@@ -90,10 +103,13 @@ export function proSource(user: ProDates, now = Date.now()): "store" | "web" | n
 }
 
 // RevenueCat's subscriber record, only the parts we read.
-interface RcSubscriber {
+export interface RcSubscriber {
   subscriber?: {
     entitlements?: Record<string, { expires_date: string | null; product_identifier: string }>;
     subscriptions?: Record<string, { store?: string; unsubscribe_detected_at?: string | null; expires_date?: string | null }>;
+    // One-off purchases (the full history check), per product, one entry
+    // per purchase - see storeHistoryCheck.ts.
+    non_subscriptions?: Record<string, { id: string; purchase_date: string; store?: string; is_sandbox?: boolean }[]>;
   };
 }
 
@@ -116,7 +132,7 @@ export function storeProFromSubscriber(data: RcSubscriber, now = Date.now()): St
   };
 }
 
-async function fetchSubscriber(appUserId: string): Promise<RcSubscriber | null> {
+export async function fetchSubscriber(appUserId: string): Promise<RcSubscriber | null> {
   const key = process.env.REVENUECAT_SECRET_KEY;
   if (!key) return null;
   try {

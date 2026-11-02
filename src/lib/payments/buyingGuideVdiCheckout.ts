@@ -51,6 +51,25 @@ function appendQuery(path: string, query: string): string {
   return path.includes("?") ? `${path}&${query}` : `${path}?${query}`;
 }
 
+// Pro's free report every 4 weeks, as an already-paid purchase for this
+// plate - or null when it isn't available. The caller has already checked
+// the account is Pro (computeBuyingGuideReportTier's proFreeAvailable).
+// Shared by the web checkout below and the app (api/app/history-check),
+// which never goes to Stripe.
+// Re-checks right before granting, not just trusting the caller's earlier
+// read, AND records the run atomically against the exact etag this check
+// read - closes the race where two concurrent requests both read
+// "available" before either recorded a run (a plain read-then-upsert
+// previously let both through).
+export async function grantFreeProHistoryCheck(email: string, vrm: string, vehicleKind: VehicleKind): Promise<string | null> {
+  const current = await getDocWithEtag<UserDoc>(email, email);
+  if (!current || !canRunFreeVehicleHistoryReport(current.doc)) return null;
+  const { recorded } = await recordVehicleHistoryReportRun(email, current.etag, current.doc);
+  if (!recorded) return null;
+  const purchase = await createFreeProVdiPurchase(email, vrm, vehicleKind, "pro");
+  return purchase.id;
+}
+
 export async function createBuyingGuideVdiCheckoutSession(
   email: string,
   vrm: string,
@@ -61,22 +80,11 @@ export async function createBuyingGuideVdiCheckoutSession(
   const tierResult = await computeBuyingGuideReportTier(email);
 
   if (tierResult.proFreeAvailable) {
-    // Re-check right before granting, not just trusting the read inside
-    // computeBuyingGuideReportTier above, AND record the run atomically
-    // against the exact etag this check read - closes the race where two
-    // concurrent requests both read "available" before either recorded a
-    // run (a plain read-then-upsert previously let both through). Losing
-    // this race isn't an error: it just falls through to the normal paid
-    // "pro" price below, same as a Pro account that's already used this
-    // month's free report.
-    const current = await getDocWithEtag<UserDoc>(email, email);
-    if (current && canRunFreeVehicleHistoryReport(current.doc)) {
-      const { recorded } = await recordVehicleHistoryReportRun(email, current.etag, current.doc);
-      if (recorded) {
-        const purchase = await createFreeProVdiPurchase(email, vrm, vehicleKind, tierResult.tier);
-        return { ok: true, freeReportReady: true, purchaseId: purchase.id };
-      }
-    }
+    // Losing the race inside isn't an error: it just falls through to the
+    // normal paid "pro" price below, same as a Pro account that's already
+    // used this month's free report.
+    const purchaseId = await grantFreeProHistoryCheck(email, vrm, vehicleKind);
+    if (purchaseId) return { ok: true, freeReportReady: true, purchaseId };
   }
 
   const pricePence = tierResult.proFreeAvailable ? BUYING_GUIDE_REPORT_PRICE_PENCE.pro : tierResult.pricePence;

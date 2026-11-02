@@ -20,6 +20,7 @@ import {
   rememberAppUserId,
   revenueCatAppUserId,
   revenueCatPublicKey,
+  storeBuyingOpenTo,
   storePurchasesEnabled,
   syncStorePro,
 } from "@/lib/payments/storePro";
@@ -37,7 +38,7 @@ export async function GET(req: NextRequest) {
   // The same feature list the website's Pro page uses, so they never differ.
   const status = { isPro: isProActive(user), proSource: proSource(user), features: PRO_FEATURES };
   const apiKey = revenueCatPublicKey(platform);
-  if (!storePurchasesEnabled() || !apiKey || !user) {
+  if (!storePurchasesEnabled() || !storeBuyingOpenTo(session.email) || !apiKey || !user) {
     return NextResponse.json({ enabled: false, ...status }, { headers: NO_STORE });
   }
 

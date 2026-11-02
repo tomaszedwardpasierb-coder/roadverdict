@@ -50,6 +50,12 @@ export const BUYING_GUIDE_REPORT_PRICE_LABEL: Record<BuyingGuideReportTier, stri
   freeNoVehicle: "£14.99",
 };
 
+// The same report bought inside the app: one store price for everyone
+// (the full_history_check product in Play Console), since a store product
+// can't be priced per account. What the buyer pays, the store's cut
+// included - see storeHistoryCheck.ts.
+export const APP_HISTORY_CHECK_PRICE_PENCE = 1299;
+
 export const PRO_FREE_REPORT_COOLDOWN_MS = 28 * 24 * 60 * 60 * 1000;
 
 // Cap on the Buying Guide's free lookup itself (MOT history + tax

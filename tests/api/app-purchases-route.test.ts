@@ -52,6 +52,16 @@ describe("GET /api/app/purchases", () => {
     expect(mocks.remember).not.toHaveBeenCalled();
   });
 
+  it("stays off for accounts outside the test list while one is set", async () => {
+    process.env.REVENUECAT_ONLY_EMAILS = "tester@example.com";
+    try {
+      expect(await (await get()).json()).toMatchObject({ enabled: false });
+      expect(mocks.remember).not.toHaveBeenCalled();
+    } finally {
+      delete process.env.REVENUECAT_ONLY_EMAILS;
+    }
+  });
+
   it("gives the platform's key and the account's own id, remembers the id, and lists Pro's features", async () => {
     const body = await (await get()).json();
     expect(body).toMatchObject({ enabled: true, apiKey: "goog_test", appUserId: "rv_17", isPro: false, proSource: null });

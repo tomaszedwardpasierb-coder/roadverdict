@@ -2,13 +2,14 @@
 // Two parts, as there: a registration check (MOT history, tax and an
 // AI-written briefing, through the website's own buying-guide lookup,
 // with the same free allowance) and a buyer's checklist for the make, size
-// and age. The paid vehicle history report isn't offered in the app - v1
-// has no purchases.
+// and age. Under the registration check, the full history check: Pro's
+// free one or bought through the store (components/history-check.tsx).
 import { router } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { KeyboardAvoidingView, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { HistoryCheck, type HistoryCheckState } from '@/components/history-check';
 import { Icon } from '@/components/icon';
 import { ReportAi } from '@/components/report-ai';
 import { OptionPicker } from '@/components/option-picker';
@@ -22,7 +23,7 @@ type Option = { value: string; label: string };
 type KindOptions = { brands: Option[]; classes: Option[]; ageBands: Option[] };
 type BuyingOptions = { bike: KindOptions; car: KindOptions };
 
-type Lookup = {
+type Lookup = HistoryCheckState & {
   make: string;
   model: string;
   fuelType: string;
@@ -137,14 +138,15 @@ function PlateCheck({ kind, onFound }: { kind: VehicleKind; onFound: (lookup: Lo
   const [lookup, setLookup] = useState<Lookup | null>(null);
   const noun = kind === 'bike' ? 'bike' : 'car';
 
-  async function check() {
-    const cleaned = vrm.trim().toUpperCase().replace(/\s+/g, '');
-    if (!cleaned || checking) return;
+  // With a purchase, the same lookup runs the paid check too; the current
+  // result stays on screen meanwhile.
+  async function run(plate: string, vdiPurchaseId?: string) {
     setChecking(true);
     setProblem(null);
-    setLookup(null);
+    if (!vdiPurchaseId) setLookup(null);
     const path = kind === 'bike' ? '/api/tracker/buying-guide-lookup' : '/api/cars/buying-guide-lookup';
-    const result = await apiFetch<Lookup>(`${path}?vrm=${encodeURIComponent(cleaned)}`, { token });
+    const purchase = vdiPurchaseId ? `&vdiPurchaseId=${encodeURIComponent(vdiPurchaseId)}` : '';
+    const result = await apiFetch<Lookup>(`${path}?vrm=${encodeURIComponent(plate)}${purchase}`, { token });
     setChecking(false);
     if (!result.ok) {
       if (result.status === 401) await signOut();
@@ -153,6 +155,12 @@ function PlateCheck({ kind, onFound }: { kind: VehicleKind; onFound: (lookup: Lo
     }
     setLookup(result.data);
     if (!result.data.requiresPayment) onFound(result.data);
+  }
+
+  function check() {
+    const cleaned = vrm.trim().toUpperCase().replace(/\s+/g, '');
+    if (!cleaned || checking) return;
+    run(cleaned);
   }
 
   return (
@@ -186,10 +194,13 @@ function PlateCheck({ kind, onFound }: { kind: VehicleKind; onFound: (lookup: Lo
       ) : null}
 
       {lookup?.requiresPayment ? (
-        <Text style={styles.text}>
-          You&apos;ve used your free {noun} check for this period
-          {lookup.nextFreeLookupAt ? ` – your next free one is available ${day(lookup.nextFreeLookupAt)}` : ''}.
-        </Text>
+        <>
+          <Text style={styles.text}>
+            You&apos;ve used today&apos;s free registration checks
+            {lookup.nextFreeLookupAt ? ` – more from ${day(lookup.nextFreeLookupAt)}` : ''}. The full history check below still works.
+          </Text>
+          <HistoryCheck kind={kind} state={lookup} onUse={(id) => run(lookup.vrm, id)} />
+        </>
       ) : lookup ? (
         <View style={styles.found}>
           <Text style={styles.foundTitle}>
@@ -201,6 +212,8 @@ function PlateCheck({ kind, onFound }: { kind: VehicleKind; onFound: (lookup: Lo
           ) : null}
           {lookup.taxDetails ? <Row label="Tax" value={lookup.taxDetails.taxStatus ?? 'Unknown'} /> : null}
           <Row label="MOT" value={lookup.motDueDate ? `Due ${day(lookup.motDueDate)}` : 'No MOT due date'} />
+
+          <HistoryCheck kind={kind} state={lookup} onUse={(id) => run(lookup.vrm, id)} />
 
           {lookup.briefing ? (
             <View style={styles.briefing}>

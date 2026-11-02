@@ -49,7 +49,11 @@ export interface VdiPurchaseDoc {
   // "stripe" (the only way a purchase could ever be created before now).
   tier?: BuyingGuideReportTier;
   pricePence?: number;
-  grantMethod?: "stripe" | "proFreeAllowance";
+  // "store" = bought inside the app through Google Play or the App Store
+  // (see storeHistoryCheck.ts), created already "paid" like a Pro grant.
+  grantMethod?: "stripe" | "proFreeAllowance" | "store";
+  // RevenueCat's id for that store purchase.
+  storeTransactionId?: string;
 }
 
 function generatePurchaseId(): string {

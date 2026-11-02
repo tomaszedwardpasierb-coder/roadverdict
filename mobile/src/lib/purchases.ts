@@ -16,6 +16,7 @@ import { useAuth } from '@/lib/auth';
 
 type PurchasesModule = typeof import('react-native-purchases');
 type PurchasesPackage = import('react-native-purchases').PurchasesPackage;
+type PurchasesStoreProduct = import('react-native-purchases').PurchasesStoreProduct;
 
 export type ProSource = 'store' | 'web' | null;
 
@@ -118,6 +119,33 @@ export async function buy(config: PurchasesConfig, option: ProPlanOption, token:
     return { kind: 'error', message: 'The purchase didn’t go through. Please try again – if you were charged, tap Restore purchases.' };
   }
   return syncWithServer(token);
+}
+
+// The full history check: a one-off store product, one report per
+// purchase. The store takes the payment; the server then turns the
+// purchase into a check on the plate (/api/app/history-check, use
+// "store") - see lib/payments/storeHistoryCheck.ts on the web side.
+export const HISTORY_CHECK_PRODUCT = 'full_history_check';
+
+export async function loadHistoryCheckProduct(config: PurchasesConfig): Promise<PurchasesStoreProduct | null> {
+  const mod = configure(config);
+  if (!mod) return null;
+  const products = await mod.default.getProducts([HISTORY_CHECK_PRODUCT], mod.default.PRODUCT_CATEGORY.NON_SUBSCRIPTION);
+  return products[0] ?? null;
+}
+
+export type OneOffResult = { kind: 'paid' } | { kind: 'cancelled' } | { kind: 'error'; message: string };
+
+export async function buyHistoryCheck(config: PurchasesConfig, product: PurchasesStoreProduct): Promise<OneOffResult> {
+  const mod = configure(config);
+  if (!mod) return { kind: 'error', message: 'Buying in the app isn’t available right now.' };
+  try {
+    await mod.default.purchaseStoreProduct(product);
+    return { kind: 'paid' };
+  } catch (err) {
+    if ((err as { userCancelled?: boolean })?.userCancelled) return { kind: 'cancelled' };
+    return { kind: 'error', message: 'The purchase didn’t go through. If you were charged, look the plate up again – your check will be waiting.' };
+  }
 }
 
 export async function restore(config: PurchasesConfig, token: string | null): Promise<BuyResult> {

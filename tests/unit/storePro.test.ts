@@ -16,6 +16,7 @@ import {
   proExpiry,
   proSource,
   revenueCatAppUserId,
+  storeBuyingOpenTo,
   storeProFromSubscriber,
   storePurchasesEnabled,
   syncStorePro,
@@ -64,6 +65,18 @@ describe("the id RevenueCat sees", () => {
     expect(storePurchasesEnabled()).toBe(true);
     delete process.env.REVENUECAT_WEBHOOK_AUTH;
     expect(storePurchasesEnabled()).toBe(false);
+  });
+
+  it("is offered to everyone, or only to the listed test accounts while the list is set", () => {
+    expect(storeBuyingOpenTo("rider@example.com")).toBe(true);
+    process.env.REVENUECAT_ONLY_EMAILS = " Tester@Example.com , me@example.com";
+    try {
+      expect(storeBuyingOpenTo("tester@example.com")).toBe(true);
+      expect(storeBuyingOpenTo("me@example.com")).toBe(true);
+      expect(storeBuyingOpenTo("rider@example.com")).toBe(false);
+    } finally {
+      delete process.env.REVENUECAT_ONLY_EMAILS;
+    }
   });
 });
 
