@@ -67,6 +67,18 @@ describe("GrantPremiumForm", () => {
     });
   });
 
+  describe("when the account's plan has already ended", () => {
+    it("says when it ended and offers the Grant form, not 'Premium - 0 days left'", () => {
+      const expiresAt = new Date(Date.now() - 2 * 3_600_000).toISOString();
+      render(<GrantPremiumForm email="rider@example.com" plan={{ expiresAt }} />);
+
+      expect(screen.getByText(/Premium ended/)).toBeInTheDocument();
+      expect(screen.queryByText(/days? left/)).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Revoke" })).not.toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Grant" })).toBeInTheDocument();
+    });
+  });
+
   describe("when the account already has an active plan", () => {
     it("shows days remaining and a Revoke button instead of the date form", () => {
       const expiresAt = new Date(Date.now() + 10 * 86_400_000).toISOString();

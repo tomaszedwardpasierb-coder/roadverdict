@@ -74,8 +74,13 @@ export function GrantPremiumForm({ email, plan }: Props) {
     }
   }
 
-  if (plan) {
-    const daysLeft = Math.max(0, Math.ceil((new Date(plan.expiresAt).getTime() - Date.now()) / 86_400_000));
+  // A plan whose date has passed is still stored on the account, but it no
+  // longer gives Pro (getProStatus) - show it as ended, with the Grant form,
+  // rather than as "Premium - 0 days left".
+  const planActive = !!plan && new Date(plan.expiresAt).getTime() > Date.now();
+
+  if (plan && planActive) {
+    const daysLeft = Math.ceil((new Date(plan.expiresAt).getTime() - Date.now()) / 86_400_000);
     return (
       <span>
         <strong>Premium</strong> - {daysLeft} day{daysLeft === 1 ? '' : 's'} left
@@ -96,6 +101,11 @@ export function GrantPremiumForm({ email, plan }: Props) {
 
   return (
     <span style={{ display: 'inline-flex', gap: '0.3rem', alignItems: 'center' }}>
+      {plan && (
+        <span style={{ fontSize: '0.72rem', color: 'var(--admin-text-secondary)' }}>
+          Premium ended {new Date(plan.expiresAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
+        </span>
+      )}
       <input
         type="date"
         aria-label={`Premium expiry date for ${email}`}
