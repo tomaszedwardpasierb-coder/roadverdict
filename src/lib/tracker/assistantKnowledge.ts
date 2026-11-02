@@ -521,10 +521,10 @@ AI-written briefing alongside it, so you're not checking the guide and a separat
 two different steps. From there, you can optionally pay to unlock a full vehicle-history report
 - see 6.17a.
 **Status:** Live.
-**The free lookup itself is capped, not unlimited:** one new registration free every 30 days per
+**The free lookup itself is capped, not unlimited:** up to 10 new registrations free per day per
 account, Free and Pro alike - re-checking a plate that's already been looked up (by anyone) stays
-free and instant any time, but a second, different plate within that same 30-day window needs the
-paid vehicle-history report instead (6.17a), not just another free lookup.
+free and instant any time and doesn't count. Past 10 in one day, the next new plate needs the paid
+vehicle-history report (6.17a), or waits until the next day.
 **Limits:** [VERIFY: the exact checklist content and structure beyond the registration/MOT
 lookup described above - that part is confirmed, the specific checklist wording hasn't been
 reviewed here.]

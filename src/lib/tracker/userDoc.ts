@@ -119,11 +119,12 @@ export interface UserDoc {
   // products with different cooldown lengths and only one of them
   // (this one) is Pro-exclusive.
   vehicleHistoryReportUsage?: { lastRunAt: string };
-  // Per-account cooldown on the Buying Guide's free lookup itself (MOT
-  // history + tax details, before any VDI report purchase) - see
-  // buyingGuideLookupUsage.ts. Applies to every account alike, unlike
-  // vehicleHistoryReportUsage above which is Pro-only.
-  buyingGuideLookupUsage?: { lastRunAt: string };
+  // Per-account daily allowance on the Buying Guide's free lookup itself
+  // (MOT history + tax details, before any VDI report purchase): new
+  // plates looked up on the UK day `day` - see buyingGuideLookupUsage.ts.
+  // Applies to every account alike, unlike vehicleHistoryReportUsage
+  // above which is Pro-only.
+  buyingGuideLookupUsage?: { lastRunAt: string; day?: string; count?: number };
   // Shared anti-spam-click floor across every previously-uncapped VDG
   // vehicle-lookup route (plate-lookup, mot-history-preview, mot-history
   // import, quote-lookup, cost-calculator-lookup) - see

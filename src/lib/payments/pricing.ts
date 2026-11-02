@@ -56,13 +56,12 @@ export const PRO_FREE_REPORT_COOLDOWN_MS = 28 * 24 * 60 * 60 * 1000;
 // details - see buyingGuideLookupUsage.ts) - separate from
 // PRO_FREE_REPORT_COOLDOWN_MS above, which gates the paid VDI report,
 // not the free checklist/MOT-history/AI-briefing lookup underneath it.
-// Applies to every account alike, Free and Pro - there is no unlimited
-// tier for this one, and no free lookup at all beyond this one allowance.
-// A second, different plate within the same 30-day window needs the
-// paid report purchase instead (which also unlocks and caches the free
-// facts for that plate) - see buying-guide-lookup's own route for the
-// actual gating logic.
-export const BUYING_GUIDE_LOOKUP_COOLDOWN_MS = 30 * 24 * 60 * 60 * 1000;
+// New plates per account per UK day, Free and Pro alike; re-checking a
+// plate already looked up is free and doesn't count. Past the cap, the
+// paid report purchase still runs it straight away - see
+// buying-guide-lookup's own route for the actual gating logic. Was one
+// plate per 30 days until DVSA's free MOT API replaced the paid VDG call.
+export const BUYING_GUIDE_FREE_LOOKUPS_PER_DAY = 10;
 
 export const BUYING_GUIDE_REPORT_PRODUCT_NAME: Record<VehicleKind, string> = {
   bike: "RoadVerdict Vehicle History Report (motorcycle)",
