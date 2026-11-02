@@ -10,6 +10,7 @@ import { explainDefect, SEVERITY, CATEGORIES } from '@/lib/mot/motDefects';
 import { computeMotScore, BAND_LABEL, SCORE_RULES } from '@/lib/mot/motScore';
 import type { MotRecord, MotVehicleKind } from '@/lib/mot/motRecord';
 import { BUYING_GUIDE_REPORT_PRICE_LABEL } from '@/lib/payments/pricing';
+import { PlayStoreLink } from '@/components/PlayStoreLink';
 import styles from './mot-check.module.css';
 
 function ukDate(iso: string): string {
@@ -166,6 +167,14 @@ export function MotCheckResult({ record, now = new Date() }: { record: MotRecord
             </Link>
           ) : null}
         </div>
+        {/* About reminders, not the paid check below: a check bought on the
+            website earns more than one bought through the store. */}
+        <PlayStoreLink
+          campaign="mot-check"
+          lead="On Android?"
+          label="Get the MOT reminder in the RoadVerdict app"
+          className={styles.appLine}
+        />
       </section>
 
       <section className={styles.buying} aria-labelledby="buying-heading">

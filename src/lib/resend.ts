@@ -1,6 +1,7 @@
 ﻿// Place at: src/lib/resend.ts
 import { Resend } from "resend";
 import { PRO_MONTHLY_PRICE, PRO_ANNUAL_PRICE } from "@/lib/proPlan";
+import { playStoreUrl } from "@/lib/playStore";
 let resendInstance: Resend | null = null;
 // Lazily created for the same reason as getContainer() in cosmos.ts:
 // Next.js inspects this module during `next build`, and constructing
@@ -86,7 +87,7 @@ function renderEmailLayout(params: { preheader: string; heading: string; bodyHtm
             <!-- Footer -->
             <tr>
               <td style="padding:20px 36px 28px;border-top:1px solid #E4E0D6;font-family:Inter,Arial,sans-serif;font-size:12px;line-height:1.6;color:#54555A;">
-                <p style="margin:0;">RoadVerdict &middot; <a href="${appUrl}" style="color:#54555A;text-decoration:underline;">roadverdict.co.uk</a></p>
+                <p style="margin:0;">RoadVerdict &middot; <a href="${appUrl}" style="color:#54555A;text-decoration:underline;">roadverdict.co.uk</a> &middot; <a href="${playStoreUrl("email", "footer")}" style="color:#54555A;text-decoration:underline;">Android app on Google Play</a></p>
               </td>
             </tr>
           </table>

@@ -191,6 +191,7 @@ div.page p.quiet { font-size: 0.95rem; color: var(--ink-soft); }
 .buying { margin-top: 0.5rem; }
 .buying .saveActions { align-items: center; gap: 0.9rem; }
 .buyingPrice { font-size: 0.95rem; color: var(--ink-soft); }
+.appLine { margin: 0.8rem 0 0; font-size: 0.95rem; color: var(--ink-soft); }
 
 .about h2 { font-size: 1.2rem; margin: 0.5rem 0; }
 .about ul { padding-left: 1.2rem; margin: 0 0 1rem; color: var(--ink-soft); }

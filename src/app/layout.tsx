@@ -10,6 +10,7 @@ import { NavigationLoadingOverlay } from '@/components/NavigationLoadingOverlay'
 import { SocialLinks } from '@/components/SocialLinks';
 import { WebAnalytics } from '@/components/WebAnalytics';
 import { SiteFooterLinks } from '@/components/SiteFooterLinks';
+import { PlayStoreLink } from '@/components/PlayStoreLink';
 import { SiteHeaderNav } from './SiteHeaderNav';
 import './globals.css';
 // Google's own catalog folded the old "Big Shoulders Display" static cut
@@ -136,6 +137,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               inspection. <Link href="/privacy">Privacy</Link> · <Link href="/about">About us</Link> ·{' '}
               <a href="mailto:hello@roadverdict.co.uk">hello@roadverdict.co.uk</a>
             </p>
+            <PlayStoreLink campaign="footer" label="RoadVerdict for Android on Google Play" />
             {/* Required wherever DVSA's MOT data is shown (lib/mot/dvsaMot.ts) -
                 and it never implies DVSA endorses RoadVerdict. */}
             <p>
