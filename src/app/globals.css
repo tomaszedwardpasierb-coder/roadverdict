@@ -143,6 +143,20 @@ a {
   background: var(--asphalt-2);
 }
 
+/* MOT Check and History Check: the two links visitors come for, picked
+   out in amber text with a quiet amber outline - the full amber border
+   and fill stay the "you are here" signal (--active above). */
+.site-header__nav-item--key {
+  color: var(--amber);
+  font-weight: 600;
+  border-color: rgba(255, 255, 255, 0.18);
+}
+
+/* The phone-only row for those two links - off at every width by
+   default, like the mobile menu below, and switched on in the media
+   query. */
+.site-header__keyRow { display: none; }
+
 /* Hidden at every width by default - only ever shown inside the
    mobile media query below. Keeping the "off" state as the base rule
    (rather than only defining these inside the media query) means a
@@ -199,6 +213,21 @@ a {
     margin-top: 0.75rem;
     padding-top: 0.75rem;
     border-top: 1px solid rgba(255, 255, 255, 0.12);
+    order: 2;
+  }
+
+  /* Its own full-width row under the logo and menu button (order puts it
+     after the button, which comes later in the markup), two equal
+     buttons side by side - so neither check ever needs the menu opened. */
+  .site-header__keyRow {
+    display: flex;
+    gap: 0.5rem;
+    flex-basis: 100%;
+    order: 1;
+  }
+  .site-header__keyRow .site-header__nav-item {
+    flex: 1;
+    justify-content: center;
   }
 }
 

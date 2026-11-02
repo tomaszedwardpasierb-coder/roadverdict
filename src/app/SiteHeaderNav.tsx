@@ -27,25 +27,46 @@ function navItems(pathname: string) {
   ];
 }
 
+// The two things most visitors come for - the free MOT check (one page for
+// both kinds) and the paid full history check - lead the row on desktop and
+// stay on screen on a phone instead of hiding behind the menu button. The
+// history check opens the bike version on motorcycle pages and the car
+// version everywhere else, since most history-check buyers are buying cars.
+function keyItems(pathname: string) {
+  const onBikePage =
+    pathname === '/motorcycles' ||
+    pathname.startsWith('/motorcycles/') ||
+    pathname === '/buying-guide' ||
+    pathname === '/quote-checker' ||
+    pathname.startsWith('/guides/motorcycle');
+  return [
+    { href: '/mot-check', label: 'MOT Check' },
+    { href: onBikePage ? '/buying-guide' : '/cars/buying-guide', label: 'History Check' },
+  ];
+}
+
 export function SiteHeaderNav() {
   const pathname = usePathname();
   const NAV_ITEMS = navItems(pathname ?? '/');
+  const KEY_ITEMS = keyItems(pathname ?? '/');
   // layout.tsx persists across navigation (that's the whole point of a
   // layout), so this component never remounts between pages - closing
   // explicitly on link click is required, not just tidy, or the menu
   // would still be open after navigating to the page just chosen.
   const [open, setOpen] = useState(false);
 
-  const links = NAV_ITEMS.map((item) => (
+  const toLink = (item: { href: string; label: string }, key: boolean) => (
     <Link
       key={item.href}
       href={item.href}
-      className={`site-header__nav-item${pathname === item.href ? ' site-header__nav-item--active' : ''}`}
+      className={`site-header__nav-item${key ? ' site-header__nav-item--key' : ''}${pathname === item.href ? ' site-header__nav-item--active' : ''}`}
       onClick={() => setOpen(false)}
     >
       {item.label}
     </Link>
-  ));
+  );
+  const links = NAV_ITEMS.map((item) => toLink(item, false));
+  const keyLinks = KEY_ITEMS.map((item) => toLink(item, true));
 
   return (
     <>
@@ -53,7 +74,15 @@ export function SiteHeaderNav() {
           not conditionally rendered, so there's no client/server
           hydration mismatch from viewport-dependent JSX. */}
       <nav className="site-header__nav" aria-label="Site">
+        {keyLinks}
         {links}
+      </nav>
+
+      {/* The phone's own row for the two key links, always visible under
+          the logo - hidden by CSS on wider screens, where they lead the
+          row above instead. */}
+      <nav className="site-header__keyRow" aria-label="Checks">
+        {keyLinks}
       </nav>
 
       {/* Mirror image of the row above: invisible until the mobile
