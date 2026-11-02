@@ -4,7 +4,7 @@
 // just car-shaped: engine size in litres (or a battery/fuel-type note
 // for an EV) instead of engineCC, and CarDoc's own dvlaData shape.
 import type { CarDoc } from "./car";
-import type { fetchMotHistoryFromVdg } from "./motHistoryFetch";
+import type { fetchMotHistory } from "./motHistoryFetch";
 
 export type CarFactSource = "RoadVerdict" | "DVLA" | "DVSA";
 
@@ -28,7 +28,7 @@ export function buildCarKnownFacts(
   registrationChangesCount: number,
   totalEntries: number,
   receiptCount: number,
-  motHistory: Awaited<ReturnType<typeof fetchMotHistoryFromVdg>>
+  motHistory: Awaited<ReturnType<typeof fetchMotHistory>>
 ): CarKnownFact[] {
   const facts: CarKnownFact[] = [];
   const vehicleSource: CarFactSource = car.isCustomBuild ? "RoadVerdict" : "DVLA";

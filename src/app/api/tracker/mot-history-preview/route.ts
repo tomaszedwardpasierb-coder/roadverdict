@@ -1,15 +1,13 @@
 // Place at: src/app/api/tracker/mot-history-preview/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/session";
-import { parseMotHistory, type RawMotTest, type ParsedMotTest } from "@/lib/tracker/motHistory";
+import { parseMotHistory, type ParsedMotTest } from "@/lib/tracker/motHistory";
 import { getUserDoc } from "@/lib/tracker/userDoc";
 import { canRunVehicleLookup, recordVehicleLookupRun } from "@/lib/tracker/vehicleLookupCooldown";
 import { getCachedMotHistoryLookup, setCachedMotHistoryLookup } from "@/lib/tracker/motHistoryLookupCache";
-import { fetchWithTimeout } from "@/lib/fetchWithTimeout";
+import { fetchMotHistoryDetails } from "@/lib/mot/motHistorySource";
 
 export const dynamic = "force-dynamic";
-
-const VDG_ENDPOINT = "https://uk.api.vehicledataglobal.com/r2/lookup";
 
 // Read-only, no bikeId needed - unlike /api/tracker/mot-history (which
 // writes bill records against an existing bike), this just answers "what's
@@ -34,7 +32,7 @@ export async function GET(request: NextRequest) {
 
   // Checked before the cooldown gate below, same ordering as
   // buying-guide-lookup/route.ts and plate-lookup/route.ts - shared with
-  // quote-lookup, which queries this exact same VDG package for the
+  // quote-lookup, which fetches this exact same MOT history for the
   // same plate.
   const cached = await getCachedMotHistoryLookup(vrm);
   let motTestsOldestFirst: ParsedMotTest[];
@@ -47,27 +45,21 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Please wait a few seconds before looking up another registration." }, { status: 429 });
     }
 
-    const url = `${VDG_ENDPOINT}?apiKey=${apiKey}&packageName=MotHistoryDetails&vrm=${encodeURIComponent(vrm)}`;
-
-    let data: any;
-    try {
-      const res = await fetchWithTimeout(url);
-      data = await res.json();
-    } catch (err) {
-      console.error("VDG MOT history preview request failed:", err);
+    const lookup = await fetchMotHistoryDetails(vrm);
+    if (lookup.status === "unavailable") {
       return NextResponse.json({ error: "Couldn't reach the MOT lookup service." }, { status: 502 });
     }
     await recordVehicleLookupRun(session.email);
 
-    if (!data?.ResponseInformation?.IsSuccessStatusCode || !data?.Results?.MotHistoryDetails) {
+    if (lookup.status === "not_found") {
       // Genuinely normal, not an error - MOT-exempt (under 3 years old) or
       // simply no test history yet. Not cached, same as quote-lookup's
       // identical not-found branch - nothing real to cache here.
       return NextResponse.json({ latestTrustedMileage: null, latestTestDate: null });
     }
 
-    const motData = data.Results.MotHistoryDetails;
-    const parsed = parseMotHistory(motData.MotDueDate ?? null, (motData.MotTestDetailsList ?? []) as RawMotTest[]);
+    const motData = lookup.details;
+    const parsed = parseMotHistory(motData.MotDueDate ?? null, motData.MotTestDetailsList ?? []);
     motTestsOldestFirst = parsed.tests;
 
     await setCachedMotHistoryLookup(vrm, {
@@ -75,7 +67,7 @@ export async function GET(request: NextRequest) {
       model: motData.Model ?? "",
       fuelType: motData.FuelType ?? "",
       colour: motData.Colour ?? "",
-      plateInRetention: data.ResponseInformation.StatusCode === 21,
+      plateInRetention: lookup.plateInRetention,
       motDueDate: parsed.motDueDate,
       motTestsOldestFirst: parsed.tests,
     });

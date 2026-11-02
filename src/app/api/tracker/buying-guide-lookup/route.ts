@@ -11,7 +11,8 @@
 // risks that existing caller for no reason when a new route risks
 // nothing there at all.
 //
-// MotHistoryDetails + VehicleTaxDetails only, same deliberate gaps as
+// MOT history (DVSA, or VDG's MotHistoryDetails as the fallback - see
+// motHistorySource.ts) + VDG's VehicleTaxDetails only, same deliberate gaps as
 // quote-lookup/route.ts and cost-calculator-lookup/route.ts - no
 // VehicleDetails call, so no vehicle-type classification and no
 // authoritative engine size here either. The paid VDI check below fills
@@ -22,9 +23,9 @@
 // first), so this adds real latency to the response, not just cost.
 // Worth revisiting if that turns out to feel slow in practice.
 import { NextRequest, NextResponse } from "next/server";
-import { fetchWithTimeout } from "@/lib/fetchWithTimeout";
 import { getSession } from "@/lib/auth/session";
-import { parseMotHistory, type RawMotTest, type ParsedMotTest } from "@/lib/tracker/motHistory";
+import { parseMotHistory, type ParsedMotTest } from "@/lib/tracker/motHistory";
+import { fetchMotHistoryDetails, type MotHistoryDetailsResult } from "@/lib/mot/motHistorySource";
 import { generateBuyingGuideBriefing, type BuyingGuideBriefingResult } from "@/lib/tracker/buyingGuideBriefing";
 import { getVdiPurchase, markVdiPurchaseConsumed, findRecentConsumedPurchase, VDI_PURCHASE_RETRIEVAL_WINDOW_MS } from "@/lib/tracker/vdiPurchase";
 import { selfHealBuyingGuideVdiPurchase } from "@/lib/payments/buyingGuideVdiCheckout";
@@ -39,22 +40,6 @@ import { canRunFreeBuyingGuideLookup, nextFreeBuyingGuideLookupAt, recordBuyingG
 import { getCachedBuyingGuideLookup, setCachedBuyingGuideLookup } from "@/lib/tracker/buyingGuideLookupCache";
 
 export const dynamic = "force-dynamic";
-
-const VDG_ENDPOINT = "https://uk.api.vehicledataglobal.com/r2/lookup";
-
-interface VdgMotResponse {
-  ResponseInformation: { StatusCode: number; IsSuccessStatusCode: boolean };
-  Results: {
-    MotHistoryDetails?: {
-      Make?: string;
-      Model?: string;
-      FuelType?: string;
-      Colour?: string;
-      MotDueDate?: string | null;
-      MotTestDetailsList?: RawMotTest[];
-    };
-  };
-}
 
 export interface BuyingGuideLookupResult {
   vrm: string;
@@ -249,14 +234,9 @@ export async function GET(request: NextRequest) {
     motTests = [...cached.motTestsOldestFirst].reverse();
     taxDetails = cached.taxDetails;
   } else {
-    let motData: VdgMotResponse;
+    let lookup: MotHistoryDetailsResult;
     try {
-      const [motRes, tax] = await Promise.all([
-        fetchWithTimeout(`${VDG_ENDPOINT}?apiKey=${apiKey}&packageName=MotHistoryDetails&vrm=${encodeURIComponent(vrm)}`),
-        fetchVehicleTaxDetailsFromVdg(vrm, apiKey),
-      ]);
-      motData = await motRes.json();
-      taxDetails = tax;
+      [lookup, taxDetails] = await Promise.all([fetchMotHistoryDetails(vrm), fetchVehicleTaxDetailsFromVdg(vrm, apiKey)]);
     } catch (err) {
       console.error("Buying guide lookup request failed:", err);
       return NextResponse.json(
@@ -264,17 +244,23 @@ export async function GET(request: NextRequest) {
         { status: 502 }
       );
     }
+    if (lookup.status === "unavailable") {
+      return NextResponse.json(
+        { error: "Couldn't reach the lookup service. Enter the details manually." },
+        { status: 502 }
+      );
+    }
 
-    if (!motData.ResponseInformation?.IsSuccessStatusCode || !motData.Results?.MotHistoryDetails) {
+    if (lookup.status === "not_found") {
       return NextResponse.json(
         { error: "No vehicle found for that registration. Enter the details manually." },
         { status: 404 }
       );
     }
 
-    details = motData.Results.MotHistoryDetails;
-    plateInRetention = motData.ResponseInformation.StatusCode === 21;
-    const parsed = parseMotHistory(motData.Results.MotHistoryDetails.MotDueDate ?? null, motData.Results.MotHistoryDetails.MotTestDetailsList ?? []);
+    details = lookup.details;
+    plateInRetention = lookup.plateInRetention;
+    const parsed = parseMotHistory(lookup.details.MotDueDate ?? null, lookup.details.MotTestDetailsList ?? []);
     motDueDate = parsed.motDueDate;
     motTestsOldestFirst = parsed.tests;
     motTests = [...parsed.tests].reverse();

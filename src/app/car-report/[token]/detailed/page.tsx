@@ -16,7 +16,7 @@ import { CarPlateGate } from "../CarPlateGate";
 import { describeJobTypeGroup } from "@/lib/tracker/reportNarrative";
 import { CarReportHistoryTable } from "../CarReportHistoryTable";
 import QRCode from "qrcode";
-import { fetchMotHistoryFromVdg } from "@/lib/tracker/motHistoryFetch";
+import { fetchMotHistory } from "@/lib/tracker/motHistoryFetch";
 import { updateCarBuyerOpinionCache, type CarDoc } from "@/lib/tracker/car";
 import { generateCarBuyerOpinion, type CarBuyerOpinionInput } from "@/lib/tracker/carBuyerOpinionProse";
 import { buildCarKnownFacts } from "@/lib/tracker/carKnownFacts";
@@ -142,7 +142,7 @@ export default async function CarDetailedReportPage(props: {
   const canonicalReportUrl = `${process.env.APP_URL ?? "https://roadverdict.co.uk"}/car-report/${params.token}/detailed`;
   const qrDataUrl = await QRCode.toDataURL(canonicalReportUrl, { margin: 1, width: 150 });
 
-  const motHistory = currentRegistration ? await fetchMotHistoryFromVdg(currentRegistration) : null;
+  const motHistory = currentRegistration ? await fetchMotHistory(currentRegistration) : null;
 
   const knownFacts = buildCarKnownFacts(car, currentRegistration, registrationChangesCount, rows.length, receiptCount, motHistory);
   const walkAwayIssues = buildCarWalkAwayIssues(car, mileageCheck, evidenceQuality);

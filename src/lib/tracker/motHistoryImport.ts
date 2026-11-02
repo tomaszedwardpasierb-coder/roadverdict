@@ -8,7 +8,7 @@
 // bike's current plate in RoadVerdict isn't the plate DVSA has MOT test
 // history under).
 import type { BikeDoc } from "./bike";
-import { fetchMotHistoryFromVdg } from "./motHistoryFetch";
+import { fetchMotHistory } from "./motHistoryFetch";
 import { createBill, getBills } from "./bill";
 import { createReminder, deleteRemindersBySourceKey } from "./reminder";
 import { isBeforeProduction } from "./productionYearCheck";
@@ -28,7 +28,7 @@ export async function importMotHistoryForBike(
   bike: BikeDoc,
   vrm: string
 ): Promise<MotImportResult | { error: string; status: number }> {
-  const parsed = await fetchMotHistoryFromVdg(vrm);
+  const parsed = await fetchMotHistory(vrm);
   if (!parsed) {
     return {
       error: "No MOT history found - this vehicle may be MOT-exempt (under 3 years old) or not yet tested.",

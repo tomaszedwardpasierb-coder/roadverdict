@@ -1,15 +1,18 @@
 // Place at: src/lib/mot/motCheckUsage.ts
 //
-// Who can use the free MOT check, and how much. While the MOT data comes
-// from Vehicle Data Global, every new plate is a paid lookup, so two
-// ceilings apply per UK day, the same way as the sample-bike demo
-// (demoUsage.ts): checks per visitor's address, and new (uncached)
-// lookups across the whole site. Counters are single documents bumped
+// Who can use the free MOT check, and how much. Two ceilings apply per UK
+// day, the same way as the sample-bike demo (demoUsage.ts): checks per
+// visitor's address, and new (uncached) lookups across the whole site.
+// The site-wide one is tight (150) while the data comes from Vehicle Data
+// Global, where every new plate is a paid lookup, and wide (2,000) on
+// DVSA's free API - still a ceiling, because a DVSA outage sends lookups
+// to paid VDG (motHistorySource.ts). Counters are single documents bumped
 // atomically and expire on their own after two days; the only trace of a
 // visitor is a hash of their address inside the counter's id.
 import { getContainer } from "@/lib/cosmos";
 import { hashToken } from "@/lib/auth/crypto";
 import { clientIpFromForwardedFor } from "@/lib/clientIp";
+import { motSource } from "./motHistorySource";
 
 // "public" (the default, since 10 Oct 2026): everyone. "admin": only a
 // signed-in admin sees it. "off": the page doesn't exist. Set
@@ -29,8 +32,11 @@ export function visitorAddress(forwardedFor: string | null): string {
 export const MOT_CHECK_LIMITS = {
   // Checks per visitor per day, cached or not.
   perVisitor: Number(process.env.MOT_CHECK_PER_VISITOR) || 20,
-  // New paid lookups across the whole site per day.
-  newLookupsSiteWide: Number(process.env.MOT_CHECK_DAILY_NEW_LOOKUPS) || 150,
+  // New (uncached) lookups across the whole site per day - read on each
+  // call, so it follows the MOT source.
+  get newLookupsSiteWide(): number {
+    return Number(process.env.MOT_CHECK_DAILY_NEW_LOOKUPS) || (motSource() === "dvsa" ? 2000 : 150);
+  },
 };
 
 const PK = "mot-check-usage";

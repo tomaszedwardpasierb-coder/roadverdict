@@ -14,7 +14,7 @@ import { PlateGate } from "../PlateGate";
 import { describeJobTypeGroup } from "@/lib/tracker/reportNarrative";
 import { ReportHistoryTable } from "../ReportHistoryTable";
 import QRCode from "qrcode";
-import { fetchMotHistoryFromVdg } from "@/lib/tracker/motHistoryFetch";
+import { fetchMotHistory } from "@/lib/tracker/motHistoryFetch";
 import { updateBikeBuyerOpinionCache } from "@/lib/tracker/bike";
 import { generateBuyerOpinion, type BuyerOpinionInput } from "@/lib/tracker/buyerOpinionProse";
 import { buildKnownFacts } from "@/lib/tracker/knownFacts";
@@ -142,7 +142,7 @@ export default async function DetailedReportPage(props: {
   // Best-effort, non-blocking - a failed lookup or a bike with no MOT
   // history yet (under 3 years old, MOT-exempt) just means this section
   // doesn't render. Never lets a lookup problem break the report itself.
-  const motHistory = currentRegistration ? await fetchMotHistoryFromVdg(currentRegistration) : null;
+  const motHistory = currentRegistration ? await fetchMotHistory(currentRegistration) : null;
 
   const knownFacts = buildKnownFacts(bike, currentRegistration, registrationChangesCount, rows.length, receiptCount, motHistory);
   const walkAwayIssues = buildWalkAwayIssues(bike, mileageCheck, evidenceQuality);

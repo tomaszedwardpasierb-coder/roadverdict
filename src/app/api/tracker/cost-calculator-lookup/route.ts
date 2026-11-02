@@ -1,37 +1,21 @@
 // Place at: src/app/api/tracker/cost-calculator-lookup/route.ts
 //
 // Shared by both Cost Calculator forms (bike and car) - same
-// vehicle-neutral reasoning as quote-lookup/route.ts. Calls
-// MotHistoryDetails (identity + MOT advisories) and VehicleTaxDetails
-// (real tax/SORN status, replacing a benchmark tax estimate) in
-// parallel - no VehicleDetails call at all, same deliberate gaps as
-// quote-lookup/route.ts (no vehicle-type classification, no
-// authoritative EngineCapacityCc).
+// vehicle-neutral reasoning as quote-lookup/route.ts. Fetches the MOT
+// history (identity + MOT advisories - DVSA, or VDG as the fallback, see
+// motHistorySource.ts) and VDG's VehicleTaxDetails (real tax/SORN status,
+// replacing a benchmark tax estimate) in parallel - no VehicleDetails call
+// at all, same deliberate gaps as quote-lookup/route.ts (no vehicle-type
+// classification, no authoritative EngineCapacityCc).
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/session";
-import { parseMotHistory, type RawMotTest } from "@/lib/tracker/motHistory";
+import { parseMotHistory } from "@/lib/tracker/motHistory";
 import { fetchVehicleTaxDetailsFromVdg, type VehicleTaxDetails } from "@/lib/tracker/vehicleTaxFetch";
 import { getUserDoc } from "@/lib/tracker/userDoc";
 import { canRunVehicleLookup, recordVehicleLookupRun } from "@/lib/tracker/vehicleLookupCooldown";
-import { fetchWithTimeout } from "@/lib/fetchWithTimeout";
+import { fetchMotHistoryDetails, type MotHistoryDetailsResult } from "@/lib/mot/motHistorySource";
 
 export const dynamic = "force-dynamic";
-
-const VDG_ENDPOINT = "https://uk.api.vehicledataglobal.com/r2/lookup";
-
-interface VdgMotResponse {
-  ResponseInformation: { StatusCode: number; IsSuccessStatusCode: boolean };
-  Results: {
-    MotHistoryDetails?: {
-      Make?: string;
-      Model?: string;
-      FuelType?: string;
-      Colour?: string;
-      MotDueDate?: string | null;
-      MotTestDetailsList?: RawMotTest[];
-    };
-  };
-}
 
 export interface CostCalculatorLookupResult {
   vrm: string;
@@ -77,27 +61,25 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Lookup is not available right now." }, { status: 503 });
   }
 
-  let motData: VdgMotResponse;
+  let lookup: MotHistoryDetailsResult;
   let taxDetails: VehicleTaxDetails | null;
   try {
-    const [motRes, tax] = await Promise.all([
-      fetchWithTimeout(`${VDG_ENDPOINT}?apiKey=${apiKey}&packageName=MotHistoryDetails&vrm=${encodeURIComponent(vrm)}`),
-      fetchVehicleTaxDetailsFromVdg(vrm, apiKey),
-    ]);
-    motData = await motRes.json();
-    taxDetails = tax;
+    [lookup, taxDetails] = await Promise.all([fetchMotHistoryDetails(vrm), fetchVehicleTaxDetailsFromVdg(vrm, apiKey)]);
   } catch (err) {
     console.error("Cost calculator lookup request failed:", err);
     return NextResponse.json({ error: "Couldn't reach the lookup service. Enter the details manually." }, { status: 502 });
   }
+  if (lookup.status === "unavailable") {
+    return NextResponse.json({ error: "Couldn't reach the lookup service. Enter the details manually." }, { status: 502 });
+  }
   await recordVehicleLookupRun(session.email);
 
-  if (!motData.ResponseInformation?.IsSuccessStatusCode || !motData.Results?.MotHistoryDetails) {
+  if (lookup.status === "not_found") {
     return NextResponse.json({ error: "No vehicle found for that registration. Enter the details manually." }, { status: 404 });
   }
 
-  const details = motData.Results.MotHistoryDetails;
-  const plateInRetention = motData.ResponseInformation.StatusCode === 21;
+  const details = lookup.details;
+  const plateInRetention = lookup.plateInRetention;
   const parsed = parseMotHistory(details.MotDueDate ?? null, details.MotTestDetailsList ?? []);
 
   const result: CostCalculatorLookupResult = {

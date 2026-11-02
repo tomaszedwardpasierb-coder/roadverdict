@@ -7,7 +7,7 @@ vi.stubGlobal("fetch", mocks.fetch);
 // file (motHistory.test.ts) - deliberately NOT mocked here, so these
 // tests confirm the real end-to-end wiring (VDG's raw shape actually
 // reaches it and comes back out), not a second copy of its own logic.
-import { fetchMotHistoryFromVdg } from "@/lib/tracker/motHistoryFetch";
+import { fetchMotHistory } from "@/lib/tracker/motHistoryFetch";
 
 function vdgSuccess(overrides: { motDueDate?: string | null; tests?: any[] } = {}) {
   return {
@@ -41,23 +41,23 @@ beforeEach(() => {
   process.env.VDG_API_KEY = "test-key";
 });
 
-describe("fetchMotHistoryFromVdg", () => {
+describe("fetchMotHistory", () => {
   it("returns null and never calls fetch when VDG_API_KEY is not set", async () => {
     delete process.env.VDG_API_KEY;
-    const result = await fetchMotHistoryFromVdg("AB12CDE");
+    const result = await fetchMotHistory("AB12CDE");
     expect(result).toBeNull();
     expect(mocks.fetch).not.toHaveBeenCalled();
   });
 
   it("fails soft to null when the fetch itself throws", async () => {
     mocks.fetch.mockRejectedValue(new Error("network error"));
-    const result = await fetchMotHistoryFromVdg("AB12CDE");
+    const result = await fetchMotHistory("AB12CDE");
     expect(result).toBeNull();
   });
 
   it("fails soft to null when res.json() throws (malformed response body)", async () => {
     mocks.fetch.mockResolvedValue({ ok: true, json: () => Promise.reject(new Error("bad json")) });
-    const result = await fetchMotHistoryFromVdg("AB12CDE");
+    const result = await fetchMotHistory("AB12CDE");
     expect(result).toBeNull();
   });
 
@@ -66,7 +66,7 @@ describe("fetchMotHistoryFromVdg", () => {
       ok: true,
       json: () => Promise.resolve({ ResponseInformation: { IsSuccessStatusCode: false }, Results: {} }),
     });
-    const result = await fetchMotHistoryFromVdg("AB12CDE");
+    const result = await fetchMotHistory("AB12CDE");
     expect(result).toBeNull();
   });
 
@@ -75,13 +75,13 @@ describe("fetchMotHistoryFromVdg", () => {
       ok: true,
       json: () => Promise.resolve({ ResponseInformation: { IsSuccessStatusCode: true }, Results: {} }),
     });
-    const result = await fetchMotHistoryFromVdg("AB12CDE");
+    const result = await fetchMotHistory("AB12CDE");
     expect(result).toBeNull();
   });
 
   it("returns the real parsed history on success, with each test's DVSA reading correctly turned into a trusted mileage anchor", async () => {
     mocks.fetch.mockResolvedValue(vdgSuccess());
-    const result = await fetchMotHistoryFromVdg("AB12CDE");
+    const result = await fetchMotHistory("AB12CDE");
     expect(result).toEqual({
       motDueDate: "2026-01-15",
       tests: [{ testDate: "2025-01-15T00:00:00.000Z", passed: true, mileage: 12000, mileageTrusted: true, notes: "Passed" }],
@@ -90,7 +90,7 @@ describe("fetchMotHistoryFromVdg", () => {
 
   it("passes null through as motDueDate when VDG has none (e.g. exempt vehicle)", async () => {
     mocks.fetch.mockResolvedValue(vdgSuccess({ motDueDate: null }));
-    const result = await fetchMotHistoryFromVdg("AB12CDE");
+    const result = await fetchMotHistory("AB12CDE");
     expect(result?.motDueDate).toBeNull();
   });
 
@@ -102,7 +102,7 @@ describe("fetchMotHistoryFromVdg", () => {
         Results: { MotHistoryDetails: { MotDueDate: "2026-01-15" } },
       }),
     });
-    const result = await fetchMotHistoryFromVdg("AB12CDE");
+    const result = await fetchMotHistory("AB12CDE");
     expect(result).toEqual({ motDueDate: "2026-01-15", tests: [] });
   });
 
@@ -114,19 +114,19 @@ describe("fetchMotHistoryFromVdg", () => {
         DaysOutOfMot: 0, IsRetest: false, AnnotationList: [],
       }],
     }));
-    const result = await fetchMotHistoryFromVdg("AB12CDE");
+    const result = await fetchMotHistory("AB12CDE");
     expect(result?.tests[0]).toMatchObject({ mileage: null, mileageTrusted: false });
   });
 
   it("includes the VRM, URL-encoded, in the VDG request", async () => {
     mocks.fetch.mockResolvedValue(vdgSuccess());
-    await fetchMotHistoryFromVdg("AB 12 CDE");
+    await fetchMotHistory("AB 12 CDE");
     expect(mocks.fetch).toHaveBeenCalledWith(expect.stringContaining(encodeURIComponent("AB 12 CDE")), expect.anything());
   });
 
   it("hits the VDG MOT history endpoint with the MotHistoryDetails package and the configured API key", async () => {
     mocks.fetch.mockResolvedValue(vdgSuccess());
-    await fetchMotHistoryFromVdg("AB12CDE");
+    await fetchMotHistory("AB12CDE");
     const url = mocks.fetch.mock.calls[0][0] as string;
     expect(url).toContain("https://uk.api.vehicledataglobal.com/r2/lookup");
     expect(url).toContain("packageName=MotHistoryDetails");

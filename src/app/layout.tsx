@@ -136,6 +136,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               inspection. <Link href="/privacy">Privacy</Link> · <Link href="/about">About us</Link> ·{' '}
               <a href="mailto:hello@roadverdict.co.uk">hello@roadverdict.co.uk</a>
             </p>
+            {/* Required wherever DVSA's MOT data is shown (lib/mot/dvsaMot.ts) -
+                and it never implies DVSA endorses RoadVerdict. */}
+            <p>
+              MOT history contains public sector information licensed under the{' '}
+              <a href="https://www.nationalarchives.gov.uk/doc/open-government-licence/version/3/">Open Government Licence v3.0</a>.
+            </p>
             <SocialLinks />
           </footer>
           <AssistantWidgetLoader />

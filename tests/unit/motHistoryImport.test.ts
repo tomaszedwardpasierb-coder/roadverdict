@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
-  fetchMotHistoryFromVdg: vi.fn(),
+  fetchMotHistory: vi.fn(),
   getBills: vi.fn(),
   createBill: vi.fn(),
   createReminder: vi.fn(),
@@ -12,7 +12,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("@/lib/tracker/motHistoryFetch", () => ({
-  fetchMotHistoryFromVdg: mocks.fetchMotHistoryFromVdg,
+  fetchMotHistory: mocks.fetchMotHistory,
 }));
 vi.mock("@/lib/tracker/bill", () => ({
   getBills: mocks.getBills,
@@ -55,7 +55,7 @@ const failedTest = {
 
 beforeEach(() => {
   Object.values(mocks).forEach((m) => m.mockReset());
-  mocks.fetchMotHistoryFromVdg.mockResolvedValue({
+  mocks.fetchMotHistory.mockResolvedValue({
     motDueDate: "2026-01-15",
     tests: [passedTest],
   });
@@ -71,8 +71,8 @@ beforeEach(() => {
 describe("importMotHistoryForBike", () => {
   // ── VDG fetch failure ───────────────────────────────────────────────────
 
-  it("returns a 404 error object when fetchMotHistoryFromVdg returns null", async () => {
-    mocks.fetchMotHistoryFromVdg.mockResolvedValue(null);
+  it("returns a 404 error object when fetchMotHistory returns null", async () => {
+    mocks.fetchMotHistory.mockResolvedValue(null);
     const result = await importMotHistoryForBike(email, bike, "AB12CDE");
     expect(result).toMatchObject({ error: expect.any(String), status: 404 });
     expect(mocks.createBill).not.toHaveBeenCalled();
@@ -96,9 +96,9 @@ describe("importMotHistoryForBike", () => {
     expect(result).toMatchObject({ createdCount: 1, skippedCount: 0, skipped: [] });
   });
 
-  it("passes the vrm to fetchMotHistoryFromVdg", async () => {
+  it("passes the vrm to fetchMotHistory", async () => {
     await importMotHistoryForBike(email, bike, "XY99ZZZ");
-    expect(mocks.fetchMotHistoryFromVdg).toHaveBeenCalledWith("XY99ZZZ");
+    expect(mocks.fetchMotHistory).toHaveBeenCalledWith("XY99ZZZ");
   });
 
   // ── Deduplication against existing bills ────────────────────────────────
@@ -155,7 +155,7 @@ describe("importMotHistoryForBike", () => {
   // ── Multiple tests ───────────────────────────────────────────────────────
 
   it("processes multiple tests independently — create some, skip others", async () => {
-    mocks.fetchMotHistoryFromVdg.mockResolvedValue({
+    mocks.fetchMotHistory.mockResolvedValue({
       motDueDate: "2026-01-15",
       tests: [failedTest, passedTest],
     });
@@ -208,7 +208,7 @@ describe("importMotHistoryForBike", () => {
   });
 
   it("returns reminderSet:false and does not create a reminder when motDueDate is null", async () => {
-    mocks.fetchMotHistoryFromVdg.mockResolvedValue({
+    mocks.fetchMotHistory.mockResolvedValue({
       motDueDate: null,
       tests: [passedTest],
     });
@@ -250,7 +250,7 @@ describe("importMotHistoryForBike", () => {
   // ── Null mileage handling ────────────────────────────────────────────────
 
   it("omits mileage from the bill when the test has no mileage", async () => {
-    mocks.fetchMotHistoryFromVdg.mockResolvedValue({
+    mocks.fetchMotHistory.mockResolvedValue({
       motDueDate: "2026-01-15",
       tests: [{ ...passedTest, mileage: null }],
     });

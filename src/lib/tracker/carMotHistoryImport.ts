@@ -1,13 +1,13 @@
 // Place at: src/lib/tracker/carMotHistoryImport.ts
 //
 // Car equivalent of motHistoryImport.ts - fetch, dedupe against what's
-// already logged, create bill entries + a reminder. fetchMotHistoryFromVdg,
+// already logged, create bill entries + a reminder. fetchMotHistory,
 // motReminderDate, and isBeforeProduction are all already vehicle-agnostic
 // (VRM/date-string/ProductionYearCheckable-only, no BikeDoc coupling), so
 // they're reused directly rather than duplicated - only the bill/reminder/
 // fuel-mileage calls below are genuinely car-specific.
 import type { CarDoc } from "./car";
-import { fetchMotHistoryFromVdg } from "./motHistoryFetch";
+import { fetchMotHistory } from "./motHistoryFetch";
 import { createCarBill, getCarBills } from "./carBill";
 import { createCarReminder, deleteCarRemindersBySourceKey } from "./carReminder";
 import { isBeforeProduction } from "./productionYearCheck";
@@ -27,7 +27,7 @@ export async function importMotHistoryForCar(
   car: CarDoc,
   vrm: string
 ): Promise<CarMotImportResult | { error: string; status: number }> {
-  const parsed = await fetchMotHistoryFromVdg(vrm);
+  const parsed = await fetchMotHistory(vrm);
   if (!parsed) {
     return {
       error: "No MOT history found - this vehicle may be MOT-exempt (under 3 years old) or not yet tested.",

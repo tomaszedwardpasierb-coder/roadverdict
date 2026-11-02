@@ -2,7 +2,8 @@
 //
 // Shared by both Quote Checker forms (bike and car) - genuinely
 // vehicle-neutral, same as /api/tracker/plate-lookup. Deliberately
-// calls VDG's MotHistoryDetails package ONLY, not VehicleDetails:
+// fetches the MOT history ONLY (DVSA, or VDG's MotHistoryDetails as the
+// fallback - see motHistorySource.ts), not VDG's VehicleDetails:
 // MotHistoryDetails already carries Make/Model/FuelType/Colour at its
 // top level (confirmed from a real sample), so a second call isn't
 // needed just for identity, and Quote Checker's actual job - judging
@@ -22,29 +23,13 @@
 //   engine data at all, see carModels.ts's own header comment).
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/session";
-import { parseMotHistory, type RawMotTest } from "@/lib/tracker/motHistory";
+import { parseMotHistory } from "@/lib/tracker/motHistory";
 import { getUserDoc } from "@/lib/tracker/userDoc";
 import { canRunVehicleLookup, recordVehicleLookupRun } from "@/lib/tracker/vehicleLookupCooldown";
 import { getCachedMotHistoryLookup, setCachedMotHistoryLookup } from "@/lib/tracker/motHistoryLookupCache";
-import { fetchWithTimeout } from "@/lib/fetchWithTimeout";
+import { fetchMotHistoryDetails } from "@/lib/mot/motHistorySource";
 
 export const dynamic = "force-dynamic";
-
-const VDG_ENDPOINT = "https://uk.api.vehicledataglobal.com/r2/lookup";
-
-interface VdgMotResponse {
-  ResponseInformation: { StatusCode: number; IsSuccessStatusCode: boolean };
-  Results: {
-    MotHistoryDetails?: {
-      Make?: string;
-      Model?: string;
-      FuelType?: string;
-      Colour?: string;
-      MotDueDate?: string | null;
-      MotTestDetailsList?: RawMotTest[];
-    };
-  };
-}
 
 export interface QuoteLookupResult {
   vrm: string;
@@ -104,22 +89,18 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Please wait a few seconds before looking up another registration." }, { status: 429 });
   }
 
-  let data: VdgMotResponse;
-  try {
-    const res = await fetchWithTimeout(`${VDG_ENDPOINT}?apiKey=${apiKey}&packageName=MotHistoryDetails&vrm=${encodeURIComponent(vrm)}`);
-    data = await res.json();
-  } catch (err) {
-    console.error("Quote lookup request failed:", err);
+  const lookup = await fetchMotHistoryDetails(vrm);
+  if (lookup.status === "unavailable") {
     return NextResponse.json({ error: "Couldn't reach the lookup service. Enter the details manually." }, { status: 502 });
   }
   await recordVehicleLookupRun(session.email);
 
-  if (!data.ResponseInformation?.IsSuccessStatusCode || !data.Results?.MotHistoryDetails) {
+  if (lookup.status === "not_found") {
     return NextResponse.json({ error: "No vehicle found for that registration. Enter the details manually." }, { status: 404 });
   }
 
-  const details = data.Results.MotHistoryDetails;
-  const plateInRetention = data.ResponseInformation.StatusCode === 21;
+  const details = lookup.details;
+  const plateInRetention = lookup.plateInRetention;
   const parsed = parseMotHistory(details.MotDueDate ?? null, details.MotTestDetailsList ?? []);
 
   await setCachedMotHistoryLookup(vrm, {

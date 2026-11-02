@@ -12,7 +12,7 @@
 // pure function of data the caller already has, not a second place
 // that reaches out to the MOT API.
 import type { BikeDoc } from "./bike";
-import type { fetchMotHistoryFromVdg } from "./motHistoryFetch";
+import type { fetchMotHistory } from "./motHistoryFetch";
 
 export type FactSource = "RoadVerdict" | "DVLA" | "DVSA";
 
@@ -28,7 +28,7 @@ export function buildKnownFacts(
   registrationChangesCount: number,
   totalEntries: number,
   receiptCount: number,
-  motHistory: Awaited<ReturnType<typeof fetchMotHistoryFromVdg>>
+  motHistory: Awaited<ReturnType<typeof fetchMotHistory>>
 ): KnownFact[] {
   const facts: KnownFact[] = [];
   // A custom build has no real DVLA vehicle record behind it - these

@@ -2,20 +2,18 @@
 //
 // Gets a vehicle's MOT record for the free MOT check (/mot-check).
 //
-// Where it comes from is one setting, MOT_SOURCE:
-//   "vdg" (the default for now) - Vehicle Data Global's MotHistoryDetails,
-//     the same paid package the rest of the site uses.
-//   "dvsa" - DVSA's own free MOT History API, once its key arrives. Not
-//     connected yet: until it is, this falls back to VDG and logs why.
+// Where it comes from is motHistorySource.ts's job, shared with every
+// other MOT lookup on the site: DVSA's free MOT History API when
+// MOT_SOURCE=dvsa (VDG if DVSA is down), otherwise VDG's paid package.
 //
 // Every record is cached for a day per registration, shared by everyone
 // who checks that plate, so a popular plate costs one lookup a day.
 import { getContainer } from "@/lib/cosmos";
-import { fetchWithTimeout } from "@/lib/fetchWithTimeout";
-import type { RawMotTest } from "@/lib/tracker/motHistory";
 import { fromVdg, type MotRecord } from "./motRecord";
+import { fetchMotHistoryDetails } from "./motHistorySource";
 
-const VDG_ENDPOINT = "https://uk.api.vehicledataglobal.com/r2/lookup";
+export { motSource } from "./motHistorySource";
+
 const CACHE_TTL_SECONDS = 24 * 60 * 60;
 const PK = "system";
 
@@ -73,38 +71,18 @@ export async function cachedMotLookup(registration: string): Promise<MotLookupRe
   return hit.record ? { status: "found", record: hit.record, cached: true } : { status: "not_found" };
 }
 
-async function fetchFromVdg(registration: string): Promise<MotLookupResult> {
-  const apiKey = process.env.VDG_API_KEY;
-  if (!apiKey) {
-    console.error("VDG_API_KEY is not configured.");
-    return { status: "unavailable" };
-  }
-  try {
-    const res = await fetchWithTimeout(`${VDG_ENDPOINT}?apiKey=${apiKey}&packageName=MotHistoryDetails&vrm=${encodeURIComponent(registration)}`);
-    const data = await res.json();
-    const details = data?.Results?.MotHistoryDetails as
-      | { Make?: string; Model?: string; FuelType?: string; Colour?: string; MotDueDate?: string | null; MotTestDetailsList?: RawMotTest[] }
-      | undefined;
-    if (!data?.ResponseInformation?.IsSuccessStatusCode || !details) return { status: "not_found" };
-    return { status: "found", record: fromVdg(registration, details), cached: false };
-  } catch (err) {
-    // The error never includes the request URL, which carries the key.
-    console.error("MOT check VDG lookup failed:", err instanceof Error ? err.message : "unknown error");
-    return { status: "unavailable" };
-  }
-}
-
-export function motSource(): "vdg" | "dvsa" {
-  return process.env.MOT_SOURCE === "dvsa" ? "dvsa" : "vdg";
+async function fetchRecord(registration: string): Promise<MotLookupResult> {
+  const lookup = await fetchMotHistoryDetails(registration);
+  if (lookup.status !== "found") return lookup;
+  // Either source arrives in VDG's shape (see dvsaMot.ts); the record
+  // says which one it really was.
+  return { status: "found", record: { ...fromVdg(registration, lookup.details), source: lookup.source }, cached: false };
 }
 
 // A fresh lookup from the source - the caller checks the cache and the
 // daily limits first (see /mot-check).
 export async function freshMotLookup(registration: string): Promise<MotLookupResult> {
-  if (motSource() === "dvsa") {
-    console.warn("MOT_SOURCE is dvsa but the DVSA client isn't connected yet - using VDG.");
-  }
-  const result = await fetchFromVdg(registration);
+  const result = await fetchRecord(registration);
   if (result.status === "found") await writeCache(registration, result.record);
   if (result.status === "not_found") await writeCache(registration, null);
   return result;

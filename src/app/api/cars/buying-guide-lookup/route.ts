@@ -1,7 +1,7 @@
 // Place at: src/app/api/cars/buying-guide-lookup/route.ts
 //
 // Car equivalent of api/tracker/buying-guide-lookup/route.ts - same
-// MotHistoryDetails + VehicleTaxDetails free tier, same paid-purchase
+// MOT history (DVSA, or VDG as the fallback) + VehicleTaxDetails free tier, same paid-purchase
 // VDI check, calling generateCarBuyingGuideBriefing instead. Also adds
 // the car-only independent valuation, which is free but rate-limited
 // (see valuationCheckUsage.ts) - fully decoupled from the paid VDI
@@ -13,9 +13,9 @@
 // first), so this adds real latency to the response, not just cost.
 // Worth revisiting if that turns out to feel slow in practice.
 import { NextRequest, NextResponse } from "next/server";
-import { fetchWithTimeout } from "@/lib/fetchWithTimeout";
 import { getSession } from "@/lib/auth/session";
-import { parseMotHistory, type RawMotTest, type ParsedMotTest } from "@/lib/tracker/motHistory";
+import { parseMotHistory, type ParsedMotTest } from "@/lib/tracker/motHistory";
+import { fetchMotHistoryDetails, type MotHistoryDetailsResult } from "@/lib/mot/motHistorySource";
 import { generateCarBuyingGuideBriefing, type CarBuyingGuideBriefingResult } from "@/lib/tracker/carBuyingGuideBriefing";
 import { isPro } from "@/lib/subscriptions";
 import type { UserDoc } from "@/lib/tracker/userDoc";
@@ -28,27 +28,11 @@ import { fetchValuationFromVdg } from "@/lib/tracker/valuationFetch";
 import { fetchVehicleTaxDetailsFromVdg, type VehicleTaxDetails } from "@/lib/tracker/vehicleTaxFetch";
 import type { VdiCheckResult, ValuationResult } from "@/lib/tracker/vdiUnlock";
 import { computeBuyingGuideReportTier } from "@/lib/payments/buyingGuideReportTier";
-import { BUYING_GUIDE_REPORT_PRICE_LABEL, BUYING_GUIDE_LOOKUP_COOLDOWN_MS, type BuyingGuideReportTier } from "@/lib/payments/pricing";
+import { BUYING_GUIDE_REPORT_PRICE_LABEL, type BuyingGuideReportTier } from "@/lib/payments/pricing";
 import { canRunFreeBuyingGuideLookup, nextFreeBuyingGuideLookupAt, recordBuyingGuideLookupRun } from "@/lib/tracker/buyingGuideLookupUsage";
 import { getCachedBuyingGuideLookup, setCachedBuyingGuideLookup } from "@/lib/tracker/buyingGuideLookupCache";
 
 export const dynamic = "force-dynamic";
-
-const VDG_ENDPOINT = "https://uk.api.vehicledataglobal.com/r2/lookup";
-
-interface VdgMotResponse {
-  ResponseInformation: { StatusCode: number; IsSuccessStatusCode: boolean };
-  Results: {
-    MotHistoryDetails?: {
-      Make?: string;
-      Model?: string;
-      FuelType?: string;
-      Colour?: string;
-      MotDueDate?: string | null;
-      MotTestDetailsList?: RawMotTest[];
-    };
-  };
-}
 
 export interface CarBuyingGuideLookupResult {
   vrm: string;
@@ -258,14 +242,9 @@ export async function GET(request: NextRequest) {
     motTests = [...cached.motTestsOldestFirst].reverse();
     taxDetails = cached.taxDetails;
   } else {
-    let motData: VdgMotResponse;
+    let lookup: MotHistoryDetailsResult;
     try {
-      const [motRes, tax] = await Promise.all([
-        fetchWithTimeout(`${VDG_ENDPOINT}?apiKey=${apiKey}&packageName=MotHistoryDetails&vrm=${encodeURIComponent(vrm)}`),
-        fetchVehicleTaxDetailsFromVdg(vrm, apiKey),
-      ]);
-      motData = await motRes.json();
-      taxDetails = tax;
+      [lookup, taxDetails] = await Promise.all([fetchMotHistoryDetails(vrm), fetchVehicleTaxDetailsFromVdg(vrm, apiKey)]);
     } catch (err) {
       console.error("Car buying guide lookup request failed:", err);
       return NextResponse.json(
@@ -273,17 +252,23 @@ export async function GET(request: NextRequest) {
         { status: 502 }
       );
     }
+    if (lookup.status === "unavailable") {
+      return NextResponse.json(
+        { error: "Couldn't reach the lookup service. Enter the details manually." },
+        { status: 502 }
+      );
+    }
 
-    if (!motData.ResponseInformation?.IsSuccessStatusCode || !motData.Results?.MotHistoryDetails) {
+    if (lookup.status === "not_found") {
       return NextResponse.json(
         { error: "No vehicle found for that registration. Enter the details manually." },
         { status: 404 }
       );
     }
 
-    details = motData.Results.MotHistoryDetails;
-    plateInRetention = motData.ResponseInformation.StatusCode === 21;
-    const parsed = parseMotHistory(motData.Results.MotHistoryDetails.MotDueDate ?? null, motData.Results.MotHistoryDetails.MotTestDetailsList ?? []);
+    details = lookup.details;
+    plateInRetention = lookup.plateInRetention;
+    const parsed = parseMotHistory(lookup.details.MotDueDate ?? null, lookup.details.MotTestDetailsList ?? []);
     motDueDate = parsed.motDueDate;
     motTestsOldestFirst = parsed.tests;
     motTests = [...parsed.tests].reverse();

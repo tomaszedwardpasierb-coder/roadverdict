@@ -39,7 +39,11 @@ export interface ParsedMotHistory {
 
 function summarizeAnnotations(annotations: RawMotTest["AnnotationList"]): string {
   if (!annotations || annotations.length === 0) return "";
-  return annotations.map((a) => `${a.IsDangerous ? "DANGEROUS: " : ""}${a.Type}: ${a.Text}`).join("; ");
+  // DVSA's own data can say it twice (type DANGEROUS and the dangerous
+  // flag) - one "DANGEROUS:" is enough.
+  return annotations
+    .map((a) => `${a.IsDangerous && a.Type?.toUpperCase() !== "DANGEROUS" ? "DANGEROUS: " : ""}${a.Type}: ${a.Text}`)
+    .join("; ");
 }
 
 // Same-day retest pairs (fail then pass, often an identical odometer

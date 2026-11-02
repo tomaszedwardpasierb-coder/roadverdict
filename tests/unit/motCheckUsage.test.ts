@@ -109,13 +109,10 @@ describe("lookup", () => {
     expect(await freshMotLookup("AB12CDE")).toEqual({ status: "unavailable" });
   });
 
-  it("still uses VDG when MOT_SOURCE asks for DVSA, until that's connected", async () => {
+  it("stays on VDG when MOT_SOURCE asks for DVSA but the DVSA settings aren't there", async () => {
     process.env.MOT_SOURCE = "dvsa";
-    expect(motSource()).toBe("dvsa");
+    expect(motSource()).toBe("vdg");
     fetchMock.mockResolvedValue({ json: async () => vdgFound });
-    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
-    expect(await freshMotLookup("YA16MTO")).toMatchObject({ status: "found" });
-    expect(warn).toHaveBeenCalled();
-    warn.mockRestore();
+    expect(await freshMotLookup("YA16MTO")).toMatchObject({ status: "found", record: { source: "vdg" } });
   });
 });
