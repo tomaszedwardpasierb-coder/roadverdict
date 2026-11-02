@@ -192,9 +192,9 @@ export default function BuyingAUsedCarPage() {
         A visual inspection can&apos;t tell you about outstanding finance, a stolen marker, or
         whether the car&apos;s been written off and repaired - those need a real records check,
         not a walk-around. Run the registration through{' '}
-        <Link href="/cars/buying-guide">RoadVerdict&apos;s free Buying Guide</Link> first for the
-        MOT history, an estimated valuation, and an AI-written briefing, then add the full{' '}
-        <Link href="/cars/buying-guide">Independent Vehicle Check</Link> if anything above made
+        <Link href="/cars/buying-guide">RoadVerdict&apos;s free car history check</Link> first for the
+        MOT history, an estimated valuation, and an AI-written briefing, then add the{' '}
+        <Link href="/cars/buying-guide">full history check</Link> if anything above made
         you want the deeper certainty before you pay.
       </p>
 

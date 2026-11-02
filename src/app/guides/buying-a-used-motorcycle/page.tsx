@@ -192,9 +192,9 @@ export default function BuyingAUsedMotorcyclePage() {
         A visual inspection can&apos;t tell you about outstanding finance, a stolen marker, or
         whether the bike&apos;s been written off and repaired - those need a real records check,
         not a walk-around. Run the registration through{' '}
-        <Link href="/buying-guide">RoadVerdict&apos;s free Buying Guide</Link> first for the MOT
-        history and an AI-written briefing, then add the full{' '}
-        <Link href="/buying-guide">Independent Vehicle Check</Link> if anything above made you
+        <Link href="/buying-guide">RoadVerdict&apos;s free motorcycle history check</Link> first for the MOT
+        history and an AI-written briefing, then add the{' '}
+        <Link href="/buying-guide">full history check</Link> if anything above made you
         want the deeper certainty before you pay.
       </p>
       <AffiliateLine lead="Bought it? Keep it yours:" links={sportsbikeshopLinks(['disc-locks', 'security-chains'], 'guides')} />

@@ -9,9 +9,9 @@ import { CarRelatedTools } from '@/components/CarRelatedTools';
 import { buildBreadcrumbJsonLd } from '@/lib/seo/breadcrumbs';
 
 export const metadata: Metadata = pageMetadata({
-  title: 'Used Car Buying Guide & Free Car Check (UK)',
+  title: 'Free Car History Check: MOT, Mileage & Tax (UK)',
   description:
-    "Buying a used car? Enter the registration for a free buyer checklist, full MOT history and valuation - weighted by the car's age. No account needed.",
+    "Free car history check by registration: the full MOT history, the mileage at every test, tax and a valuation, plus a buyer checklist for the car's age. No account needed.",
   path: '/cars/buying-guide',
 });
 
@@ -85,8 +85,11 @@ export default function CarBuyingGuidePage() {
         dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }}
       />
       <div className="hero">
-        <h1>What should you check before buying it?</h1>
-        <p>A buyer checklist weighted by how old the car actually is - not a generic list.</p>
+        <h1>Free car history check</h1>
+        <p>
+          Enter the registration for the full MOT history, the mileage at every test, tax and a
+          valuation, plus a buyer checklist weighted by how old the car actually is - not a generic list.
+        </p>
       </div>
       <CarBuyingGuideFormForViewer />
       <p className="disclaimer">

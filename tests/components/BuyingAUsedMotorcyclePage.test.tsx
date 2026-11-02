@@ -17,7 +17,7 @@ describe("BuyingAUsedMotorcyclePage", () => {
 
   it("links out to the real Buying Guide tool for the last-mile check, not the car version", () => {
     render(<BuyingAUsedMotorcyclePage />);
-    const links = screen.getAllByRole("link", { name: "RoadVerdict's free Buying Guide" });
+    const links = screen.getAllByRole("link", { name: "RoadVerdict's free motorcycle history check" });
     expect(links.length).toBeGreaterThan(0);
     for (const link of links) {
       expect(link).toHaveAttribute("href", "/buying-guide");
