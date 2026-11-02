@@ -1078,16 +1078,20 @@ export default async function DashboardPage(props: { searchParams: Promise<{ add
     </ProGate>
   );
 
+  // Open to free accounts too: the form sells them the check outright (the
+  // same tiered checkout as the public /buying-guide page), and Pro gets
+  // its included one. Gating the whole tab hid the one-off price from the
+  // very people most likely to pay it.
   const buyingGuideContent = activeSection !== 'buyingGuide' ? undefined : (
-    <ProGate featureName="Full Vehicle History Check" description="Check any bike's plate for stolen, written-off and outstanding-finance records, plus keeper and plate changes - the kind of check that costs up to £20 elsewhere. One included every 4 weeks with Pro, with a buyer checklist weighted by how old the bike actually is." isPro={userIsPro}>
+    <>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "0.75rem" }}>
         <h1 className={styles.heading}>Full vehicle history check{bikeTag}</h1>
         {mileagePill}
       </div>
       <p className={styles.subtext}>Check any plate before you buy: stolen, written-off and outstanding-finance records, plus keeper and plate changes, from police and DVLA data - the kind of check that costs up to £20 elsewhere. Includes a buyer checklist weighted by how old the bike actually is.</p>
-      <FreeCheckStatusLine status={freeVehicleHistoryCheckStatus(userAccount)} />
+      <FreeCheckStatusLine status={userIsPro ? freeVehicleHistoryCheckStatus(userAccount) : { state: 'notPro' }} />
       <BuyingGuideForm signedIn />
-    </ProGate>
+    </>
   );
 
   // No bikeTag/mileagePill header wrapper here, unlike the other
@@ -1521,16 +1525,17 @@ async function renderCarDashboard(
     </ProGate>
   );
 
+  // Open to free accounts too - see buyingGuideContent's note.
   const carBuyingGuideContent = activeSection !== 'buyingGuide' ? undefined : (
-    <ProGate featureName="Full Vehicle History Check" description="Check any car's plate for stolen, written-off and outstanding-finance records, plus keeper and plate changes - the kind of check that costs up to £20 elsewhere. One included every 4 weeks with Pro, with a buyer checklist weighted by how old the car actually is." isPro={userIsPro}>
+    <>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "0.75rem" }}>
         <h1 className={styles.heading}>Full vehicle history check{carTag}</h1>
         {mileagePill}
       </div>
       <p className={styles.subtext}>Check any plate before you buy: stolen, written-off and outstanding-finance records, plus keeper and plate changes, from police and DVLA data - the kind of check that costs up to £20 elsewhere. Includes a buyer checklist weighted by how old the car actually is.</p>
-      <FreeCheckStatusLine status={freeVehicleHistoryCheckStatus(userAccount)} />
+      <FreeCheckStatusLine status={userIsPro ? freeVehicleHistoryCheckStatus(userAccount) : { state: 'notPro' }} />
       <CarBuyingGuideForm signedIn />
-    </ProGate>
+    </>
   );
 
   const serviceContent = activeSection !== 'service' ? undefined : (

@@ -44,4 +44,12 @@ describe("FreeCheckStatusLine", () => {
     expect(screen.queryByText(/is ready/)).not.toBeInTheDocument();
     expect(screen.queryByText(/next free check/)).not.toBeInTheDocument();
   });
+
+  it("tells a free account the one-off price, with Pro as the alternative, and promises no free check", () => {
+    render(<FreeCheckStatusLine status={{ state: "notPro" }} />);
+    expect(screen.getByText(`One check is ${BUYING_GUIDE_REPORT_PRICE_LABEL.freeWithVehicle}`)).toBeInTheDocument();
+    expect(screen.getByText(/pay once, no subscription/)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Pro" })).toHaveAttribute("href", "/pro");
+    expect(screen.queryByText(/is ready/)).not.toBeInTheDocument();
+  });
 });

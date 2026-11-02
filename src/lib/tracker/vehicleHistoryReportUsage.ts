@@ -50,7 +50,9 @@ export type FreeHistoryCheckStatus =
   | { state: "ready" }
   | { state: "later"; at: string }
   | { state: "trial"; at: string }
-  | { state: "tester" };
+  | { state: "tester" }
+  // A free account: no included check, it buys one outright.
+  | { state: "notPro" };
 
 export function freeVehicleHistoryCheckStatus(user: UserDoc | null): FreeHistoryCheckStatus {
   if (isTesterAccount(user)) return { state: "tester" };

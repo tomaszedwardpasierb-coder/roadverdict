@@ -2,10 +2,12 @@
 //
 // One quiet line under the Full history check heading telling a Pro
 // account where it stands with its included check: ready, due on a date,
-// waiting for the trial to end, or not part of a tester account. Plain
-// text on purpose (no banner or box) - the numbers come from
-// freeVehicleHistoryCheckStatus(), which the dashboard feeds from the
-// user doc it has already loaded.
+// waiting for the trial to end, or not part of a tester account - and
+// telling a free account the one-off price, since the tab sells it the
+// check outright. Plain text on purpose (no banner or box) - the numbers
+// come from freeVehicleHistoryCheckStatus(), which the dashboard feeds
+// from the user doc it has already loaded.
+import Link from 'next/link';
 import styles from './dashboard.module.css';
 import { BUYING_GUIDE_REPORT_PRICE_LABEL } from '@/lib/payments/pricing';
 import type { FreeHistoryCheckStatus } from '@/lib/tracker/vehicleHistoryReportUsage';
@@ -39,6 +41,13 @@ export function FreeCheckStatusLine({ status }: { status: FreeHistoryCheckStatus
       return (
         <p className={styles.subtext}>
           <strong>Tester accounts don&apos;t include the free check.</strong> A check is {price}.
+        </p>
+      );
+    case 'notPro':
+      return (
+        <p className={styles.subtext}>
+          <strong>One check is {BUYING_GUIDE_REPORT_PRICE_LABEL.freeWithVehicle}</strong> - pay once, no subscription.{' '}
+          <Link href="/pro">Pro</Link> includes one every 4 weeks.
         </p>
       );
   }
