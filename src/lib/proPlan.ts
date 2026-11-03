@@ -41,3 +41,13 @@ export const PRO_FEATURES = [
   "Quote Checker, Cost Calculator & Buying Guide, pre-filled with your bike's own details",
   "A second vehicle (bike or car) - with side-by-side cost comparison to see which one actually costs you more to run",
 ] as const;
+
+// The app's Upgrade screen: there another check costs the store's £12.99
+// for everyone, so the website's "£9.99 for another sooner" would promise a
+// price the app doesn't charge; the tool is called History check there;
+// and the list is read by car owners too.
+export const APP_PRO_FEATURES: string[] = PRO_FEATURES.map((f) =>
+  f
+    .replace(" (£9.99 for another sooner)", "")
+    .replace("Buying Guide, pre-filled with your bike's own details", "History check, pre-filled with your vehicle's own details")
+);

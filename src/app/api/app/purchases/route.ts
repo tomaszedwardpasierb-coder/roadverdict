@@ -13,7 +13,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/session";
 import { getUserDoc } from "@/lib/tracker/userDoc";
-import { PRO_FEATURES } from "@/lib/proPlan";
+import { APP_PRO_FEATURES } from "@/lib/proPlan";
 import {
   isProActive,
   proSource,
@@ -36,7 +36,7 @@ export async function GET(req: NextRequest) {
 
   const user = await getUserDoc(session.email);
   // The same feature list the website's Pro page uses, so they never differ.
-  const status = { isPro: isProActive(user), proSource: proSource(user), features: PRO_FEATURES };
+  const status = { isPro: isProActive(user), proSource: proSource(user), features: APP_PRO_FEATURES };
   const apiKey = revenueCatPublicKey(platform);
   if (!storePurchasesEnabled() || !storeBuyingOpenTo(session.email) || !apiKey || !user) {
     return NextResponse.json({ enabled: false, ...status }, { headers: NO_STORE });

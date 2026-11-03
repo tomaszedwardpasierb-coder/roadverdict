@@ -66,6 +66,9 @@ describe("GET /api/app/purchases", () => {
     const body = await (await get()).json();
     expect(body).toMatchObject({ enabled: true, apiKey: "goog_test", appUserId: "rv_17", isPro: false, proSource: null });
     expect(body.features.length).toBeGreaterThan(3);
+    // The app's own wording: no website price, and not just for bikes.
+    expect(body.features.join(" ")).not.toMatch(/£9\.99|bike's own/);
+    expect(body.features).toContain("Quote Checker, Cost Calculator & History check, pre-filled with your vehicle's own details");
     expect(mocks.publicKey).toHaveBeenCalledWith("android");
     expect(mocks.remember).toHaveBeenCalledWith(expect.objectContaining({ id: "rider@example.com" }), "rv_17");
   });
