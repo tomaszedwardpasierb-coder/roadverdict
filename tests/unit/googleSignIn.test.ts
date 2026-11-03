@@ -5,10 +5,13 @@ import { createSign, generateKeyPairSync } from "crypto";
 
 const fetchMock = vi.hoisted(() => vi.fn());
 vi.mock("@/lib/fetchWithTimeout", () => ({ fetchWithTimeout: fetchMock }));
+const accounts = vi.hoisted(() => new Set<string>());
+vi.mock("@/lib/tracker/userDoc", () => ({ getUserDoc: async (email: string) => (accounts.has(email) ? { email } : null) }));
 
 import {
   decodeAttempt,
   encodeAttempt,
+  googleAccountEmail,
   googleAuthUrl,
   googleWebSignInEnabled,
   newGoogleAttempt,
@@ -111,5 +114,24 @@ describe("the website's attempt", () => {
     expect(url.searchParams.get("scope")).toBe("openid email");
     expect(url.searchParams.get("code_challenge_method")).toBe("S256");
     expect(url.searchParams.get("code_challenge")).not.toBe(attempt.verifier);
+  });
+});
+
+describe("googleAccountEmail", () => {
+  afterEach(() => accounts.clear());
+
+  it("treats googlemail.com and gmail.com as one account, preferring the one that exists", async () => {
+    accounts.add("rider@gmail.com");
+    expect(await googleAccountEmail("rider@googlemail.com")).toBe("rider@gmail.com");
+    accounts.clear();
+    accounts.add("rider@googlemail.com");
+    expect(await googleAccountEmail("rider@gmail.com")).toBe("rider@googlemail.com");
+    accounts.add("rider@gmail.com");
+    expect(await googleAccountEmail("rider@googlemail.com")).toBe("rider@gmail.com");
+  });
+
+  it("starts new Gmail accounts on gmail.com and leaves other addresses alone", async () => {
+    expect(await googleAccountEmail("rider@googlemail.com")).toBe("rider@gmail.com");
+    expect(await googleAccountEmail("rider@example.com")).toBe("rider@example.com");
   });
 });

@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   verifyGoogleIdToken: vi.fn(),
   exchangeCode: vi.fn(),
   isAccountBlocked: vi.fn(),
+  getUserDoc: vi.fn(),
   isTwoFactorEnabled: vi.fn(),
   createPendingLogin: vi.fn(),
   createSessionForEmail: vi.fn(),
@@ -17,7 +18,7 @@ vi.mock("@/lib/auth/googleSignIn", async (importOriginal) => {
   const real = await importOriginal<typeof import("@/lib/auth/googleSignIn")>();
   return { ...real, verifyGoogleIdToken: mocks.verifyGoogleIdToken, exchangeCode: mocks.exchangeCode };
 });
-vi.mock("@/lib/tracker/userDoc", () => ({ isAccountBlocked: mocks.isAccountBlocked }));
+vi.mock("@/lib/tracker/userDoc", () => ({ isAccountBlocked: mocks.isAccountBlocked, getUserDoc: mocks.getUserDoc }));
 vi.mock("@/lib/auth/signInRateLimit", () => ({ getClientIp: () => "1.2.3.4" }));
 vi.mock("@/lib/auth/twoFactor", () => ({ isTwoFactorEnabled: mocks.isTwoFactorEnabled, createPendingLogin: mocks.createPendingLogin }));
 vi.mock("@/lib/auth/session", () => ({ createSessionForEmail: mocks.createSessionForEmail }));
@@ -37,6 +38,7 @@ beforeEach(() => {
   process.env.GOOGLE_OAUTH_CLIENT_ID = "web-client";
   process.env.GOOGLE_OAUTH_CLIENT_SECRET = "secret";
   mocks.isAccountBlocked.mockResolvedValue(false);
+  mocks.getUserDoc.mockResolvedValue(null);
   mocks.isTwoFactorEnabled.mockResolvedValue(false);
   mocks.createSessionForEmail.mockResolvedValue({ cookieValue: "session-token", maxAge: 100 });
   mocks.createPendingLogin.mockResolvedValue({ cookieValue: "pending-token", maxAge: 300 });
@@ -138,6 +140,13 @@ describe("app: Continue with Google", () => {
     expect(await res.json()).toEqual({ token: "session-token", expiresInSeconds: 100 });
     expect(mocks.verifyGoogleIdToken).toHaveBeenCalledWith("id-token");
     expect(mocks.createSessionForEmail).toHaveBeenCalledWith("rider@example.com", "1.2.3.4", expect.any(String), { client: "app" });
+  });
+
+  it("signs a googlemail.com address in to the existing gmail.com account", async () => {
+    mocks.verifyGoogleIdToken.mockResolvedValue("rider@googlemail.com");
+    mocks.getUserDoc.mockImplementation(async (email: string) => (email === "rider@gmail.com" ? { email } : null));
+    await post({ idToken: "id-token" });
+    expect(mocks.createSessionForEmail).toHaveBeenCalledWith("rider@gmail.com", "1.2.3.4", expect.any(String), { client: "app" });
   });
 
   it("refuses a bad token, a blocked account, and hands 2FA accounts a pending token", async () => {

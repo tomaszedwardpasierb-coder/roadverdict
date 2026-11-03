@@ -13,7 +13,7 @@ import { isAccountBlocked } from "@/lib/tracker/userDoc";
 import { getClientIp } from "@/lib/auth/signInRateLimit";
 import { isTwoFactorEnabled, createPendingLogin } from "@/lib/auth/twoFactor";
 import { createSessionForEmail } from "@/lib/auth/session";
-import { googleAppSignInEnabled, googleClientId, verifyGoogleIdToken } from "@/lib/auth/googleSignIn";
+import { googleAppSignInEnabled, googleClientId, verifyGoogleIdToken, googleAccountEmail } from "@/lib/auth/googleSignIn";
 
 export const dynamic = "force-dynamic";
 
@@ -36,10 +36,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid request." }, { status: 400 });
   }
 
-  const email = await verifyGoogleIdToken(idToken);
-  if (!email) {
+  const verified = await verifyGoogleIdToken(idToken);
+  if (!verified) {
     return NextResponse.json({ error: "Google sign-in didn't work. Try again, or use your email instead." }, { status: 401 });
   }
+  const email = await googleAccountEmail(verified);
   if (await isAccountBlocked(email)) {
     return NextResponse.json({ error: "This account is no longer able to sign in." }, { status: 403 });
   }

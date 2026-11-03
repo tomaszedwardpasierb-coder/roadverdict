@@ -15,6 +15,7 @@
 // Google's published keys) rather than adding a library for one call.
 import { createHash, createPublicKey, randomBytes, verify as verifySignature, type JsonWebKey } from "crypto";
 import { fetchWithTimeout } from "@/lib/fetchWithTimeout";
+import { getUserDoc } from "@/lib/tracker/userDoc";
 
 const GOOGLE_AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth";
 const GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token";
@@ -201,4 +202,20 @@ export async function verifyGoogleIdToken(idToken: string, options: { nonce?: st
   if (payload.email_verified !== true && payload.email_verified !== "true") return null;
   if (typeof payload.email !== "string" || !payload.email.includes("@")) return null;
   return payload.email.toLowerCase().trim();
+}
+
+// Gmail addresses also exist as @googlemail.com - Gmail's UK name until
+// 2012, and still the address Google reports for many older UK accounts.
+// Both reach the same inbox, so they're one person: sign in to whichever
+// account already exists (the gmail.com one if both do), and start a new
+// one on gmail.com, the address people type into the email box.
+export async function googleAccountEmail(email: string): Promise<string> {
+  const at = email.lastIndexOf("@");
+  const domain = email.slice(at + 1);
+  if (domain !== "gmail.com" && domain !== "googlemail.com") return email;
+  const gmail = `${email.slice(0, at)}@gmail.com`;
+  const googlemail = `${email.slice(0, at)}@googlemail.com`;
+  if (await getUserDoc(gmail)) return gmail;
+  if (await getUserDoc(googlemail)) return googlemail;
+  return gmail;
 }

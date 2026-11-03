@@ -12,7 +12,7 @@ import { getSafeRedirectPath } from "@/lib/auth/safeRedirect";
 import { getClientIp } from "@/lib/auth/signInRateLimit";
 import { isTwoFactorEnabled, createPendingLogin } from "@/lib/auth/twoFactor";
 import { isAccountBlocked } from "@/lib/tracker/userDoc";
-import { decodeAttempt, exchangeCode, googleRedirectUri, verifyGoogleIdToken, GOOGLE_ATTEMPT_COOKIE } from "@/lib/auth/googleSignIn";
+import { decodeAttempt, exchangeCode, googleRedirectUri, verifyGoogleIdToken, googleAccountEmail, GOOGLE_ATTEMPT_COOKIE } from "@/lib/auth/googleSignIn";
 
 export const dynamic = "force-dynamic";
 
@@ -40,8 +40,9 @@ export async function GET(req: NextRequest) {
   if (!attempt || !code || url.searchParams.get("state") !== attempt.state) return backToLogin(redirect, "google_failed");
 
   const idToken = await exchangeCode(code, attempt.verifier, googleRedirectUri(APP_URL));
-  const email = idToken ? await verifyGoogleIdToken(idToken, { nonce: attempt.nonce }) : null;
-  if (!email) return backToLogin(redirect, "google_failed");
+  const verified = idToken ? await verifyGoogleIdToken(idToken, { nonce: attempt.nonce }) : null;
+  if (!verified) return backToLogin(redirect, "google_failed");
+  const email = await googleAccountEmail(verified);
 
   if (await isAccountBlocked(email)) return backToLogin(null, "blocked");
 
