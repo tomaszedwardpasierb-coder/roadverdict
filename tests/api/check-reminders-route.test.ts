@@ -18,6 +18,8 @@ const mocks = vi.hoisted(() => ({
   upsert: vi.fn(),
   isPro: vi.fn(),
   sendProTrialEndingReminders: vi.fn(),
+  acquireCronLock: vi.fn(),
+  releaseCronLock: vi.fn(),
 }));
 
 // computeReminderStatus/reminderDetailLabel are the route's own pure
@@ -53,6 +55,7 @@ vi.mock("@/lib/cosmos", () => ({
   getContainer: () => ({ items: { upsert: mocks.upsert } }),
 }));
 vi.mock("@/lib/subscriptions", () => ({ isPro: mocks.isPro }));
+vi.mock("@/lib/admin/cronLock", () => ({ acquireCronLock: mocks.acquireCronLock, releaseCronLock: mocks.releaseCronLock }));
 vi.mock("@/lib/payments/proSubscription", () => ({ sendProTrialEndingReminders: mocks.sendProTrialEndingReminders }));
 
 import { POST } from "@/app/api/cron/check-reminders/route";
@@ -116,11 +119,34 @@ function dueSoonDateCarReminder(overrides: Record<string, unknown> = {}) {
 }
 
 describe("POST /api/cron/check-reminders", () => {
+  // Two schedulers fire it at 09:00 within seconds: the second must not
+  // send everything the first hasn't stamped yet a second time.
+  it("stops without reading or sending anything while another run holds the lock", async () => {
+    mocks.acquireCronLock.mockResolvedValue(false);
+    mocks.getAllReminders.mockResolvedValue([overdueDateReminder()]);
+    const response = await POST(request({ authorization: "Bearer top-secret" }));
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ ok: true, skipped: "Another run is in progress." });
+    expect(mocks.getAllReminders).not.toHaveBeenCalled();
+    expect(mocks.createReminderNotification).not.toHaveBeenCalled();
+    expect(mocks.releaseCronLock).not.toHaveBeenCalled();
+  });
+
+  it("takes the lock only for a caller with the secret, and gives it back when done", async () => {
+    await POST(request({ authorization: "Bearer wrong" }));
+    expect(mocks.acquireCronLock).not.toHaveBeenCalled();
+    await POST(request({ authorization: "Bearer top-secret" }));
+    expect(mocks.acquireCronLock).toHaveBeenCalledWith("check-reminders");
+    expect(mocks.releaseCronLock).toHaveBeenCalledWith("check-reminders");
+  });
+
   const originalSecret = process.env.CRON_SECRET;
 
   beforeEach(() => {
     Object.values(mocks).forEach((m) => m.mockReset());
     process.env.CRON_SECRET = "top-secret";
+    mocks.acquireCronLock.mockResolvedValue(true);
+    mocks.releaseCronLock.mockResolvedValue(undefined);
     mocks.getAllReminders.mockResolvedValue([]);
     mocks.markReminderNotified.mockResolvedValue(undefined);
     mocks.markReminderDueSoonBellNotified.mockResolvedValue(undefined);

@@ -1,6 +1,7 @@
 // Place at: src/app/api/cron/check-reminders/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { withCronRun } from "@/lib/admin/cronRuns";
+import { acquireCronLock, releaseCronLock } from "@/lib/admin/cronLock";
 import {
   getAllReminders,
   computeReminderStatus,
@@ -200,6 +201,12 @@ async function handle(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  // The second scheduler's call, seconds behind the first, stops here
+  // rather than sending everything not yet stamped a second time.
+  if (!(await acquireCronLock("check-reminders"))) {
+    return NextResponse.json({ ok: true, skipped: "Another run is in progress." });
+  }
+
   try {
     const reminders = await getAllReminders();
     const bikeOutcomes = await runInBatches(reminders, CRON_BATCH_SIZE, checkReminder);
@@ -240,6 +247,8 @@ async function handle(req: NextRequest) {
     return NextResponse.json({ ok: true, checked, sent, notified, ...(trialReminders ? { trialReminders } : {}), ...(failed ? { failed } : {}) });
   } catch {
     return NextResponse.json({ error: "Unexpected error checking reminders" }, { status: 500 });
+  } finally {
+    await releaseCronLock("check-reminders");
   }
 }
 
