@@ -2,7 +2,7 @@
 // iPhones or iPads, which have no RoadVerdict app.
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
-import { isAppleMobile, PlayStoreLink } from "@/components/PlayStoreLink";
+import { isAppleMobile, PlayStoreLink, PLAY_BADGE_SRC } from "@/components/PlayStoreLink";
 import { playStoreUrl } from "@/lib/playStore";
 
 afterEach(() => vi.restoreAllMocks());
@@ -29,9 +29,13 @@ describe("PlayStoreLink", () => {
   it("shows the tagged link on Android and desktops", async () => {
     vi.spyOn(navigator, "userAgent", "get").mockReturnValue("Mozilla/5.0 (Linux; Android 15; Pixel 7)");
     render(<PlayStoreLink campaign="mot-check" lead="On Android?" label="Get the app" />);
-    const link = await screen.findByRole("link", { name: "Get the app" });
+    const link = await screen.findByRole("link", { name: /^Get the app/ });
     expect(link.getAttribute("href")).toBe(playStoreUrl("website", "mot-check"));
     expect(screen.getByText(/On Android\?/)).toBeInTheDocument();
+    // Google's own badge, inside the same link, named for screen readers.
+    const badge = screen.getByRole("img", { name: "Get it on Google Play" });
+    expect(badge.getAttribute("src")).toBe(PLAY_BADGE_SRC);
+    expect(link).toContainElement(badge);
   });
 
   it("shows nothing on an iPhone", () => {

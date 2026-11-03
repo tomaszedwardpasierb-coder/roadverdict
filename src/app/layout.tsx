@@ -143,6 +143,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <p>
               MOT history contains public sector information licensed under the{' '}
               <a href="https://www.nationalarchives.gov.uk/doc/open-government-licence/version/3/">Open Government Licence v3.0</a>.
+              {/* Google's attribution for the Play badge (PlayStoreLink). */} Google Play and the Google Play logo are trademarks of
+              Google LLC.
             </p>
             <SocialLinks />
           </footer>
