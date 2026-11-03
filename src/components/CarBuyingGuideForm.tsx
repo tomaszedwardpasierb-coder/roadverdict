@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, type FormEvent, type ReactNode } from 'react';
+import { motNoteDetail } from '@/lib/tracker/motHistory';
 import { CAR_BRAND_OPTIONS, slugifyCarMake } from '@/lib/carPriceData';
 import type { CarSizeClass } from '@/lib/tracker/car';
 import {
@@ -478,7 +479,7 @@ export function CarBuyingGuideForm({ signedIn }: Props) {
                       <strong>{new Date(t.testDate).toLocaleDateString('en-GB')}</strong> - {t.passed ? 'Passed' : 'Failed'}
                       {' - '}
                       {t.mileage != null ? `${t.mileage.toLocaleString()} miles${t.mileageTrusted ? '' : ' (reading not verified)'}` : 'mileage not recorded'}
-                      {t.notes && <div>{t.notes}</div>}
+                      {motNoteDetail(t.notes) && <div>{motNoteDetail(t.notes)}</div>}
                     </div>
                   ))}
                 </div>

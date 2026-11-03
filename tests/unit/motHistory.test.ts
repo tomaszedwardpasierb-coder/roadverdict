@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseMotHistory, motReminderDate, type RawMotTest } from "@/lib/tracker/motHistory";
+import { parseMotHistory, motReminderDate, motNoteDetail, type RawMotTest } from "@/lib/tracker/motHistory";
 
 // Minimal valid raw test — callers set only what the individual test cares about
 function rawTest(overrides: Partial<RawMotTest> = {}): RawMotTest {
@@ -189,5 +189,14 @@ describe("motReminderDate", () => {
   it("handles leap years correctly", () => {
     // 2024 is a leap year; 30 days before March 1 = Jan 31
     expect(motReminderDate("2024-03-01")).toBe("2024-01-31");
+  });
+});
+
+describe("motNoteDetail", () => {
+  it("drops the result the heading already shows, keeping everything after it", () => {
+    expect(motNoteDetail("Passed")).toBe("");
+    expect(motNoteDetail("Passed - ADVISORY: Front Brake disc worn")).toBe("ADVISORY: Front Brake disc worn");
+    expect(motNoteDetail("Failed - MAJOR: Exhaust emissions exceed limit")).toBe("MAJOR: Exhaust emissions exceed limit");
+    expect(motNoteDetail("ADVISORY: Passed through the hole")).toBe("ADVISORY: Passed through the hole");
   });
 });

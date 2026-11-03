@@ -37,6 +37,13 @@ export interface ParsedMotHistory {
   tests: ParsedMotTest[];
 }
 
+// A test's notes open with "Passed"/"Failed" - needed where they stand
+// alone (a logged MOT entry), doubled where the result is already in the
+// heading next to them (the history checks): there, just the rest.
+export function motNoteDetail(notes: string): string {
+  return notes.replace(/^(Passed|Failed)(\s*-\s*)?/, "");
+}
+
 function summarizeAnnotations(annotations: RawMotTest["AnnotationList"]): string {
   if (!annotations || annotations.length === 0) return "";
   // DVSA's own data can say it twice (type DANGEROUS and the dangerous

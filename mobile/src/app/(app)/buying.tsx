@@ -68,6 +68,9 @@ function useBuyingOptions() {
 }
 
 const day = (iso: string) => new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+// The notes open with the result, already in the heading above them
+// (the website's motNoteDetail in lib/tracker/motHistory.ts).
+const noteDetail = (notes: string) => notes.replace(/^(Passed|Failed)(\s*-\s*)?/, '');
 
 export default function BuyingScreen() {
   const { selected } = useVehicle();
@@ -278,7 +281,7 @@ function PlateCheck({ kind, onFound }: { kind: VehicleKind; onFound: (lookup: Lo
                     ? `${t.mileage.toLocaleString('en-GB')} miles${t.mileageTrusted ? '' : ' (reading not verified)'}`
                     : 'Mileage not recorded'}
                 </Text>
-                {t.notes ? <Text style={styles.testNotes}>{t.notes}</Text> : null}
+                {noteDetail(t.notes) ? <Text style={styles.testNotes}>{noteDetail(t.notes)}</Text> : null}
               </View>
             ))
           )}
