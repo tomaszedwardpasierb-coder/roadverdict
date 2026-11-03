@@ -33,7 +33,7 @@ const SECTIONS: { title: string; rows: Row[] }[] = [
       { label: 'Quote checker', icon: 'quote', open: () => router.push('/quote') },
       { label: 'Cost calculator', icon: 'calculator', open: () => router.push('/costs') },
       { label: 'MPG calculator', icon: 'fuel', open: () => router.push('/fuel-economy') },
-      { label: 'Buying guide', icon: 'search', open: () => router.push('/buying') },
+      { label: 'History check', icon: 'search', open: () => router.push('/buying') },
     ],
   },
   {

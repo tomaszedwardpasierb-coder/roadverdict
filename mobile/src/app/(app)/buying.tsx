@@ -9,7 +9,7 @@ import { useEffect, useRef, useState } from 'react';
 import { KeyboardAvoidingView, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { HistoryCheck, type HistoryCheckState } from '@/components/history-check';
+import { HistoryCheck, useHistoryCheckStore, type HistoryCheckState } from '@/components/history-check';
 import { Icon } from '@/components/icon';
 import { ReportAi } from '@/components/report-ai';
 import { OptionPicker } from '@/components/option-picker';
@@ -72,7 +72,7 @@ const day = (iso: string) => new Date(iso).toLocaleDateString('en-GB', { day: 'n
 export default function BuyingScreen() {
   const { selected } = useVehicle();
   const options = useBuyingOptions();
-  const [kind, setKind] = useState<VehicleKind>(selected?.kind ?? 'bike');
+  const [kind, setKind] = useState<VehicleKind>(selected?.kind ?? 'car');
   const [foundMake, setFoundMake] = useState<string | null>(null);
   const scroll = useRef<ScrollView>(null);
 
@@ -84,9 +84,9 @@ export default function BuyingScreen() {
         </Pressable>
         <View style={styles.flex}>
           <Text style={styles.title} accessibilityRole="header">
-            Buying guide
+            History check
           </Text>
-          <Text style={styles.subtitle}>Before you buy a used bike or car</Text>
+          <Text style={styles.subtitle}>Before you buy a used car or bike</Text>
         </View>
       </View>
       {options.options ? (
@@ -136,6 +136,8 @@ function PlateCheck({ kind, onFound }: { kind: VehicleKind; onFound: (lookup: Lo
   const [checking, setChecking] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
   const [lookup, setLookup] = useState<Lookup | null>(null);
+  const store = useHistoryCheckStore();
+  const fullPrice = store.config?.enabled ? (store.product?.priceString ?? null) : null;
   const noun = kind === 'bike' ? 'bike' : 'car';
 
   // With a purchase, the same lookup runs the paid check too; the current
@@ -165,7 +167,13 @@ function PlateCheck({ kind, onFound }: { kind: VehicleKind; onFound: (lookup: Lo
 
   return (
     <Card style={styles.card}>
-      <Text style={styles.hint}>Its MOT history and tax, with an AI-written briefing on what to check before you buy.</Text>
+      <Text style={styles.hint}>Free: its MOT history, the mileage at each test and tax, with an AI-written briefing on what to check.</Text>
+      {/* On its own button too: found only after a free lookup, nobody knew
+          it was there. Both run the same lookup - the buyer sees which
+          vehicle the plate is before paying for it. */}
+      {fullPrice ? (
+        <Text style={styles.hint}>Full history check, {fullPrice}: stolen, written off, outstanding finance, keepers and plate changes.</Text>
+      ) : null}
       <TextInput
         value={vrm}
         onChangeText={(t) => setVrm(t.toUpperCase())}
@@ -185,8 +193,18 @@ function PlateCheck({ kind, onFound }: { kind: VehicleKind; onFound: (lookup: Lo
         accessibilityRole="button"
         accessibilityState={{ disabled: !vrm.trim() || checking, busy: checking }}
         style={({ pressed }) => [styles.primary, (!vrm.trim() || checking) && styles.disabled, pressed && styles.pressed]}>
-        <Text style={styles.primaryLabel}>{checking ? 'Checking…' : 'Check it'}</Text>
+        <Text style={styles.primaryLabel}>{checking ? 'Checking…' : fullPrice ? 'Free check' : 'Check it'}</Text>
       </Pressable>
+      {fullPrice ? (
+        <Pressable
+          onPress={check}
+          disabled={!vrm.trim() || checking}
+          accessibilityRole="button"
+          accessibilityState={{ disabled: !vrm.trim() || checking }}
+          style={({ pressed }) => [styles.full, (!vrm.trim() || checking) && styles.disabled, pressed && styles.pressed]}>
+          <Text style={styles.fullLabel}>Full history check – {fullPrice}</Text>
+        </Pressable>
+      ) : null}
       {problem ? (
         <Text style={styles.problem} accessibilityRole="alert">
           {problem}
@@ -199,7 +217,7 @@ function PlateCheck({ kind, onFound }: { kind: VehicleKind; onFound: (lookup: Lo
             You&apos;ve used today&apos;s free registration checks
             {lookup.nextFreeLookupAt ? ` – more from ${day(lookup.nextFreeLookupAt)}` : ''}. The full history check below still works.
           </Text>
-          <HistoryCheck kind={kind} state={lookup} onUse={(id) => run(lookup.vrm, id)} />
+          <HistoryCheck kind={kind} state={lookup} store={store} onUse={(id) => run(lookup.vrm, id)} />
         </>
       ) : lookup ? (
         <View style={styles.found}>
@@ -213,7 +231,7 @@ function PlateCheck({ kind, onFound }: { kind: VehicleKind; onFound: (lookup: Lo
           {lookup.taxDetails ? <Row label="Tax" value={lookup.taxDetails.taxStatus ?? 'Unknown'} /> : null}
           <Row label="MOT" value={lookup.motDueDate ? `Due ${day(lookup.motDueDate)}` : 'No MOT due date'} />
 
-          <HistoryCheck kind={kind} state={lookup} onUse={(id) => run(lookup.vrm, id)} />
+          <HistoryCheck kind={kind} state={lookup} store={store} onUse={(id) => run(lookup.vrm, id)} />
 
           {lookup.briefing ? (
             <View style={styles.briefing}>
@@ -417,6 +435,8 @@ const styles = StyleSheet.create({
   },
   primary: { minHeight: 52, borderRadius: 12, backgroundColor: Brand.amber, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 16 },
   primaryLabel: { fontSize: 16, fontWeight: '700', color: Brand.asphalt },
+  full: { minHeight: 52, borderRadius: 12, backgroundColor: Brand.asphalt, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 16 },
+  fullLabel: { fontSize: 16, fontWeight: '700', color: '#fff' },
   disabled: { opacity: 0.5 },
   pressed: { opacity: 0.85 },
   found: { gap: 8, paddingTop: 12, borderTopWidth: 1, borderTopColor: '#EDEAE3' },

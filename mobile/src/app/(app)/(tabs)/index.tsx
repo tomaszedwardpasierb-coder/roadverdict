@@ -45,6 +45,10 @@ export default function HomeScreen() {
             style={({ pressed }) => [styles.emptyButton, pressed && { opacity: 0.85 }]}>
             <Text style={styles.emptyButtonLabel}>Add a vehicle</Text>
           </Pressable>
+          {/* Not theirs yet: a check, not a garage slot. */}
+          <Pressable onPress={() => router.push('/buying')} accessibilityRole="button" hitSlop={8}>
+            <Text style={styles.emptyLink}>Buying a used car or bike? Check its history first</Text>
+          </Pressable>
         </View>
       </SafeAreaView>
     );
@@ -138,6 +142,18 @@ export default function HomeScreen() {
                 <View style={styles.rowMain}>
                   <Text style={styles.rowTitle}>MOT history</Text>
                   <Text style={styles.rowMeta}>Every test and advisory, explained</Text>
+                </View>
+                <Icon name="chevronRight" size={20} color={Brand.muted} />
+              </View>
+            </Card>
+          </Pressable>
+
+          <Pressable onPress={() => router.push('/buying')} accessibilityRole="button" accessibilityLabel="History check: check a used car or bike before you buy">
+            <Card>
+              <View style={styles.row}>
+                <View style={styles.rowMain}>
+                  <Text style={styles.rowTitle}>History check</Text>
+                  <Text style={styles.rowMeta}>Check a used car or bike before you buy</Text>
                 </View>
                 <Icon name="chevronRight" size={20} color={Brand.muted} />
               </View>
@@ -372,6 +388,7 @@ const styles = StyleSheet.create({
   emptyBody: { fontSize: 16, lineHeight: 24, color: Brand.muted },
   emptyButton: { alignSelf: 'flex-start', height: 52, paddingHorizontal: 22, borderRadius: 12, backgroundColor: Brand.amber, justifyContent: 'center', marginTop: 4 },
   emptyButtonLabel: { fontSize: 17, fontWeight: '700', color: Brand.asphalt },
+  emptyLink: { fontSize: 16, fontWeight: '600', color: Brand.amberInk, marginTop: 12 },
   backdrop: { flex: 1, backgroundColor: 'rgba(23,24,27,0.55)' },
   sheet: { backgroundColor: Brand.paperRaised, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20, gap: 8 },
   sheetTitle: { fontSize: 22, fontWeight: '800', color: Brand.ink, marginBottom: 4 },

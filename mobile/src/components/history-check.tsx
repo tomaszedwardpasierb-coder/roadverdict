@@ -15,10 +15,31 @@ import { PrimaryButton } from '@/components/auth-ui';
 import { Brand } from '@/constants/brand';
 import { apiFetch } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
-import { buyHistoryCheck, loadHistoryCheckProduct, usePurchases } from '@/lib/purchases';
+import { buyHistoryCheck, loadHistoryCheckProduct, usePurchases, type PurchasesConfig } from '@/lib/purchases';
 import type { VehicleKind } from '@/lib/vehicle';
 
 type StoreProduct = Awaited<ReturnType<typeof loadHistoryCheckProduct>>;
+
+// Whether this account can buy the check in the app, and the store's own
+// product (with its price) once the store answers. Loaded once per screen:
+// the Buying screen shows the price on its own button as well as here.
+export type HistoryCheckStore = { config: PurchasesConfig | null; product: StoreProduct };
+
+export function useHistoryCheckStore(): HistoryCheckStore {
+  const { config } = usePurchases();
+  const [product, setProduct] = useState<StoreProduct>(null);
+  useEffect(() => {
+    if (!config?.enabled) return;
+    let cancelled = false;
+    loadHistoryCheckProduct(config)
+      .then((p) => !cancelled && setProduct(p))
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [config]);
+  return { config, product };
+}
 
 // The parts of the website's VdiCheckResult shown here.
 export type VdiCheck = {
@@ -67,22 +88,32 @@ const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 export function HistoryCheck({
   kind,
   state,
+  store,
   onUse,
 }: {
   kind: VehicleKind;
   state: HistoryCheckState;
+  store: HistoryCheckStore;
   // Looks the plate up again with this purchase, which runs the check.
   onUse: (vdiPurchaseId: string) => Promise<void>;
 }) {
   if (state.vdiCheck) return <HistoryReport kind={kind} state={state} check={state.vdiCheck} />;
-  return <HistoryCheckOffer kind={kind} state={state} onUse={onUse} />;
+  return <HistoryCheckOffer kind={kind} state={state} store={store} onUse={onUse} />;
 }
 
-function HistoryCheckOffer({ kind, state, onUse }: { kind: VehicleKind; state: HistoryCheckState; onUse: (id: string) => Promise<void> }) {
+function HistoryCheckOffer({
+  kind,
+  state,
+  store: { config, product },
+  onUse,
+}: {
+  kind: VehicleKind;
+  state: HistoryCheckState;
+  store: HistoryCheckStore;
+  onUse: (id: string) => Promise<void>;
+}) {
   const { token } = useAuth();
-  const { config } = usePurchases();
   const [unused, setUnused] = useState(0);
-  const [product, setProduct] = useState<StoreProduct>(null);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [lastPurchaseId, setLastPurchaseId] = useState<string | null>(null);
@@ -94,9 +125,6 @@ function HistoryCheckOffer({ kind, state, onUse }: { kind: VehicleKind; state: H
     apiFetch<{ unusedPaidChecks: number | null }>('/api/app/history-check', { token }).then((r) => {
       if (!cancelled && r.ok) setUnused(r.data.unusedPaidChecks ?? 0);
     });
-    loadHistoryCheckProduct(config)
-      .then((p) => !cancelled && setProduct(p))
-      .catch(() => undefined);
     return () => {
       cancelled = true;
     };
