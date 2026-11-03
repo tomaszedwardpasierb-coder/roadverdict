@@ -6,7 +6,7 @@
 import { router } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import { useRef, useState } from 'react';
-import { KeyboardAvoidingView, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Keyboard, KeyboardAvoidingView, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Icon } from '@/components/icon';
@@ -96,6 +96,7 @@ function CostForm({ vehicle, data }: { vehicle: GarageVehicle; data: ToolsScreen
 
   async function calculate() {
     if (!valid || working) return;
+    Keyboard.dismiss();
     setWorking(true);
     setProblem(null);
     const annualMileage = Math.round(miles);

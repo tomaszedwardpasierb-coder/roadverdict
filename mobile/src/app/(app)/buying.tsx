@@ -6,7 +6,7 @@
 // free one or bought through the store (components/history-check.tsx).
 import { router } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { KeyboardAvoidingView, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Keyboard, KeyboardAvoidingView, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { HistoryCheck, useHistoryCheckStore, type HistoryCheckState } from '@/components/history-check';
@@ -165,12 +165,14 @@ function PlateCheck({ kind, onFound }: { kind: VehicleKind; onFound: (lookup: Lo
   function check() {
     const cleaned = vrm.trim().toUpperCase().replace(/\s+/g, '');
     if (!cleaned || checking) return;
+    // Out of the way of the result it's about to show.
+    Keyboard.dismiss();
     run(cleaned);
   }
 
   return (
     <Card style={styles.card}>
-      <Text style={styles.hint}>Free: its MOT history, the mileage at each test and tax, with an AI-written briefing on what to check.</Text>
+      <Text style={styles.hint}>Free: the MOT history, the mileage at each test and tax, plus an AI-written briefing on what to check.</Text>
       {/* On its own button too: found only after a free lookup, nobody knew
           it was there. Both run the same lookup - the buyer sees which
           vehicle the plate is before paying for it. */}

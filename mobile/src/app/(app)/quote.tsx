@@ -6,7 +6,7 @@
 // apps, so their store listings carry no ads.
 import { router } from 'expo-router';
 import { useRef, useState } from 'react';
-import { KeyboardAvoidingView, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Keyboard, KeyboardAvoidingView, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Icon } from '@/components/icon';
@@ -80,6 +80,7 @@ function QuoteForm({ vehicle, data }: { vehicle: GarageVehicle; data: ToolsScree
 
   async function check() {
     if (!valid || !job || checking) return;
+    Keyboard.dismiss();
     setChecking(true);
     setProblem(null);
     const response = await apiFetch<VerdictResponse>(bike ? '/api/verdict' : '/api/cars/verdict', {
