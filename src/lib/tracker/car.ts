@@ -21,6 +21,7 @@ import type { ChartKind, DvlaVehicleData, RegistrationChangeEntry, RegistrationC
 import { REFRESH_DATA_COOLDOWN_MS } from "@/lib/tracker/refreshDataCooldown";
 import { deleteAttachmentBlobsNoLongerReferenced } from "@/lib/tracker/sharedAttachments";
 import { deleteVaultDocumentsForVehicle } from "@/lib/tracker/vaultDocument";
+import { raiseMileageToMotReading, type MotReading } from "@/lib/tracker/motMileageFloor";
 
 export type CarFuelType = "petrol" | "diesel" | "hybrid" | "phev" | "electric";
 export type CarSizeClass = "small" | "medium" | "large" | "electric";
@@ -273,6 +274,16 @@ export async function updateCarMileage(email: string, carId: string, newMileage:
   if (!resource) return null;
   resource.currentMileage = newMileage;
   await container.items.upsert(resource);
+  return resource;
+}
+
+// After an MOT import: lift the car's mileage to its latest MOT reading
+// (motMileageFloor.ts). Returns the car as saved, or null if it's gone.
+export async function raiseCarMileageToMot(email: string, carId: string, reading: MotReading): Promise<CarDoc | null> {
+  const container = getContainer();
+  const { resource } = await container.item(carId, email).read<CarDoc>();
+  if (!resource) return null;
+  if (raiseMileageToMotReading(resource, reading)) await container.items.upsert(resource);
   return resource;
 }
 

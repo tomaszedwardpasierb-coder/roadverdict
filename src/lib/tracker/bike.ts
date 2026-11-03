@@ -11,6 +11,7 @@ import type { BikeIdentity, CategorySpend } from "@/lib/tracker/storyFacts";
 import { REFRESH_DATA_COOLDOWN_MS } from "@/lib/tracker/refreshDataCooldown";
 import { deleteAttachmentBlobsNoLongerReferenced } from "@/lib/tracker/sharedAttachments";
 import { deleteVaultDocumentsForVehicle } from "@/lib/tracker/vaultDocument";
+import { raiseMileageToMotReading, type MotReading } from "@/lib/tracker/motMileageFloor";
 
 // Free-tier cap - Pro accounts (see isPro() below) skip it entirely.
 // Kept in sync with vehicleLimit.ts's MAX_FREE_VEHICLES by convention,
@@ -445,6 +446,16 @@ export async function updateBikeMileage(email: string, bikeId: string, newMileag
   if (!resource) return null;
   resource.currentMileage = newMileage;
   await container.items.upsert(resource);
+  return resource;
+}
+
+// After an MOT import: lift the bike's mileage to its latest MOT reading
+// (motMileageFloor.ts). Returns the bike as saved, or null if it's gone.
+export async function raiseBikeMileageToMot(email: string, bikeId: string, reading: MotReading): Promise<BikeDoc | null> {
+  const container = getContainer();
+  const { resource } = await container.item(bikeId, email).read<BikeDoc>();
+  if (!resource) return null;
+  if (raiseMileageToMotReading(resource, reading)) await container.items.upsert(resource);
   return resource;
 }
 

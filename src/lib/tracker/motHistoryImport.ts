@@ -7,13 +7,14 @@
 // can target a specific VRM directly, for correcting cases where a
 // bike's current plate in RoadVerdict isn't the plate DVSA has MOT test
 // history under).
-import type { BikeDoc } from "./bike";
+import { raiseBikeMileageToMot, type BikeDoc } from "./bike";
 import { fetchMotHistory } from "./motHistoryFetch";
 import { createBill, getBills } from "./bill";
 import { createReminder, deleteRemindersBySourceKey } from "./reminder";
 import { isBeforeProduction } from "./productionYearCheck";
 import { motReminderDate } from "./motHistory";
 import { reestimateFuelMileage } from "./reestimateFuelMileage";
+import { latestMotReading } from "./motMileageFloor";
 
 export interface MotImportResult {
   createdCount: number;
@@ -82,6 +83,11 @@ export async function importMotHistoryForBike(
     reminderSet = true;
   }
 
+  // Even with nothing new logged: a mileage below what DVSA recorded is
+  // wrong whenever it got in.
+  const reading = latestMotReading(parsed.tests.filter((t) => !isBeforeProduction(t.testDate, bike)));
+  const saved = reading ? await raiseBikeMileageToMot(email, bike.id, reading) : null;
+
   // Best-effort, non-blocking - new MOT anchors are exactly the case
   // that motivated this: a real, trusted odometer reading landing months
   // or years into an existing fuel-log timeline, right where several AI
@@ -89,7 +95,7 @@ export async function importMotHistoryForBike(
   // never undo an otherwise-successful MOT import.
   if (created.length > 0) {
     try {
-      await reestimateFuelMileage(email, bike);
+      await reestimateFuelMileage(email, saved ?? bike);
     } catch (err) {
       console.error("Fuel mileage re-estimation after MOT import failed:", err);
     }

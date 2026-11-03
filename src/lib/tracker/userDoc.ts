@@ -130,7 +130,7 @@ export interface UserDoc {
   // import, quote-lookup, cost-calculator-lookup) - see
   // vehicleLookupCooldown.ts. One shared field, not one per route, so
   // bouncing between tools doesn't dodge the cooldown.
-  vehicleLookupUsage?: { lastRunAt: string };
+  vehicleLookupUsage?: { lastRunAt: string; lastVrm?: string };
   // Per-day message ceiling for the AI assistant once signed in - see
   // assistantSignedInUsage.ts. date is a UTC calendar date
   // ("YYYY-MM-DD"); count resets the moment it rolls over.

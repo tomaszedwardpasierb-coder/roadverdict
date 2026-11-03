@@ -39,6 +39,22 @@ describe("canRunVehicleLookup", () => {
   });
 });
 
+describe("canRunVehicleLookup with a plate", () => {
+  const justNow = () => new Date(Date.now() - 1000).toISOString();
+
+  it("lets the plate just looked up through again - adding a vehicle reads it three times in seconds", () => {
+    const user = makeUser({ vehicleLookupUsage: { lastRunAt: justNow(), lastVrm: "AB12CDE" } });
+    expect(canRunVehicleLookup(user, "AB12CDE")).toBe(true);
+    expect(canRunVehicleLookup(user, "ab12 cde")).toBe(true);
+  });
+
+  it("still blocks a different plate, or a lookup that doesn't name one", () => {
+    const user = makeUser({ vehicleLookupUsage: { lastRunAt: justNow(), lastVrm: "AB12CDE" } });
+    expect(canRunVehicleLookup(user, "XY34ZZZ")).toBe(false);
+    expect(canRunVehicleLookup(user)).toBe(false);
+  });
+});
+
 describe("recordVehicleLookupRun", () => {
   it("does nothing when the user doc doesn't exist", async () => {
     mocks.read.mockResolvedValue({ resource: undefined });
@@ -52,5 +68,11 @@ describe("recordVehicleLookupRun", () => {
     await recordVehicleLookupRun("a@example.com");
     const saved = mocks.upsert.mock.calls[0][0] as UserDoc;
     expect(new Date(saved.vehicleLookupUsage!.lastRunAt).getTime()).toBeGreaterThanOrEqual(before);
+  });
+
+  it("remembers the plate, tidied, when one is given", async () => {
+    mocks.read.mockResolvedValue({ resource: makeUser() });
+    await recordVehicleLookupRun("a@example.com", "ab12 cde");
+    expect((mocks.upsert.mock.calls[0][0] as UserDoc).vehicleLookupUsage!.lastVrm).toBe("AB12CDE");
   });
 });

@@ -82,7 +82,7 @@ export async function GET(request: NextRequest) {
   }
 
   const lookupUser = await getUserDoc(session.email);
-  if (!canRunVehicleLookup(lookupUser)) {
+  if (!canRunVehicleLookup(lookupUser, vrm)) {
     return NextResponse.json({ error: 'Please wait a few seconds before looking up another registration.' }, { status: 429 });
   }
 
@@ -99,7 +99,7 @@ export async function GET(request: NextRequest) {
       { status: 502 }
     );
   }
-  await recordVehicleLookupRun(session.email);
+  await recordVehicleLookupRun(session.email, vrm);
 
   if (!data.ResponseInformation?.IsSuccessStatusCode || !data.Results?.VehicleDetails) {
     return NextResponse.json(

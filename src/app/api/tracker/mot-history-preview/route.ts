@@ -41,7 +41,7 @@ export async function GET(request: NextRequest) {
     motTestsOldestFirst = cached.motTestsOldestFirst;
   } else {
     const lookupUser = await getUserDoc(session.email);
-    if (!canRunVehicleLookup(lookupUser)) {
+    if (!canRunVehicleLookup(lookupUser, vrm)) {
       return NextResponse.json({ error: "Please wait a few seconds before looking up another registration." }, { status: 429 });
     }
 
@@ -49,7 +49,7 @@ export async function GET(request: NextRequest) {
     if (lookup.status === "unavailable") {
       return NextResponse.json({ error: "Couldn't reach the MOT lookup service." }, { status: 502 });
     }
-    await recordVehicleLookupRun(session.email);
+    await recordVehicleLookupRun(session.email, vrm);
 
     if (lookup.status === "not_found") {
       // Genuinely normal, not an error - MOT-exempt (under 3 years old) or

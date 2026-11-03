@@ -13,6 +13,7 @@ const mocks = vi.hoisted(() => ({
   isBeforeProduction: vi.fn(),
   motReminderDate: vi.fn(),
   reestimateCarFuelMileage: vi.fn(),
+  raiseCarMileageToMot: vi.fn(),
 }));
 
 vi.mock("@/lib/tracker/motHistoryFetch", () => ({
@@ -34,6 +35,9 @@ vi.mock("@/lib/tracker/motHistory", () => ({
 }));
 vi.mock("@/lib/tracker/reestimateCarFuelMileage", () => ({
   reestimateCarFuelMileage: mocks.reestimateCarFuelMileage,
+}));
+vi.mock("@/lib/tracker/car", () => ({
+  raiseCarMileageToMot: mocks.raiseCarMileageToMot,
 }));
 
 import { importMotHistoryForCar } from "@/lib/tracker/carMotHistoryImport";
@@ -70,6 +74,7 @@ beforeEach(() => {
   mocks.isBeforeProduction.mockReturnValue(false);
   mocks.motReminderDate.mockReturnValue("2025-12-16");
   mocks.reestimateCarFuelMileage.mockResolvedValue({ updatedCount: 0 });
+  mocks.raiseCarMileageToMot.mockResolvedValue(null);
 });
 
 describe("importMotHistoryForCar", () => {
@@ -233,5 +238,33 @@ describe("importMotHistoryForCar", () => {
     expect(mocks.createCarBill).toHaveBeenCalledWith(email, expect.objectContaining({
       mileage: undefined,
     }));
+  });
+
+  it("lifts the car's mileage to its latest MOT reading, even when every test is already logged", async () => {
+    mocks.fetchMotHistory.mockResolvedValue({ motDueDate: "2026-01-15", tests: [failedTest, passedTest] });
+    mocks.getCarBills.mockResolvedValue([
+      { billType: "mot-test", date: failedTest.testDate },
+      { billType: "mot-test", date: passedTest.testDate },
+    ]);
+    await importMotHistoryForCar(email, car, "AB12CDE");
+    expect(mocks.raiseCarMileageToMot).toHaveBeenCalledWith(email, "car-1", { miles: 12000, date: "2025-01-15" });
+  });
+
+  it("skips readings DVSA didn't confirm, and tests from before the car was built", async () => {
+    mocks.fetchMotHistory.mockResolvedValue({ motDueDate: "2026-01-15", tests: [failedTest, { ...passedTest, mileage: null }] });
+    await importMotHistoryForCar(email, car, "AB12CDE");
+    expect(mocks.raiseCarMileageToMot).toHaveBeenCalledWith(email, "car-1", { miles: 9000, date: "2024-06-01" });
+
+    mocks.raiseCarMileageToMot.mockClear();
+    mocks.isBeforeProduction.mockReturnValue(true);
+    await importMotHistoryForCar(email, car, "AB12CDE");
+    expect(mocks.raiseCarMileageToMot).not.toHaveBeenCalled();
+  });
+
+  it("re-estimates fuel mileage against the car as saved after the lift", async () => {
+    const lifted = { ...car, currentMileage: 12000 };
+    mocks.raiseCarMileageToMot.mockResolvedValue(lifted);
+    await importMotHistoryForCar(email, car, "AB12CDE");
+    expect(mocks.reestimateCarFuelMileage).toHaveBeenCalledWith(email, lifted);
   });
 });

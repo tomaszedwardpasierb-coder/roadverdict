@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   isBeforeProduction: vi.fn(),
   motReminderDate: vi.fn(),
   reestimateFuelMileage: vi.fn(),
+  raiseBikeMileageToMot: vi.fn(),
 }));
 
 vi.mock("@/lib/tracker/motHistoryFetch", () => ({
@@ -30,6 +31,9 @@ vi.mock("@/lib/tracker/motHistory", () => ({
 }));
 vi.mock("@/lib/tracker/reestimateFuelMileage", () => ({
   reestimateFuelMileage: mocks.reestimateFuelMileage,
+}));
+vi.mock("@/lib/tracker/bike", () => ({
+  raiseBikeMileageToMot: mocks.raiseBikeMileageToMot,
 }));
 
 import { importMotHistoryForBike } from "@/lib/tracker/motHistoryImport";
@@ -66,6 +70,7 @@ beforeEach(() => {
   mocks.isBeforeProduction.mockReturnValue(false);
   mocks.motReminderDate.mockReturnValue("2025-12-16");
   mocks.reestimateFuelMileage.mockResolvedValue({ updatedCount: 0 });
+  mocks.raiseBikeMileageToMot.mockResolvedValue(null);
 });
 
 describe("importMotHistoryForBike", () => {
@@ -258,5 +263,18 @@ describe("importMotHistoryForBike", () => {
     expect(mocks.createBill).toHaveBeenCalledWith(email, expect.objectContaining({
       mileage: undefined,
     }));
+  });
+
+  it("lifts the bike's mileage to its latest MOT reading", async () => {
+    mocks.fetchMotHistory.mockResolvedValue({ motDueDate: "2026-01-15", tests: [failedTest, passedTest] });
+    await importMotHistoryForBike(email, bike, "AB12CDE");
+    expect(mocks.raiseBikeMileageToMot).toHaveBeenCalledWith(email, "bike-1", { miles: 12000, date: "2025-01-15" });
+  });
+
+  it("re-estimates fuel mileage against the bike as saved after the lift", async () => {
+    const lifted = { ...bike, currentMileage: 12000 };
+    mocks.raiseBikeMileageToMot.mockResolvedValue(lifted);
+    await importMotHistoryForBike(email, bike, "AB12CDE");
+    expect(mocks.reestimateFuelMileage).toHaveBeenCalledWith(email, lifted);
   });
 });

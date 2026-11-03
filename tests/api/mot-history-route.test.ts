@@ -66,7 +66,7 @@ describe("POST /api/tracker/mot-history", () => {
 
   it("records the lookup run after a successful import", async () => {
     await POST(request({ bikeId: "bike1" }));
-    expect(mocks.recordVehicleLookupRun).toHaveBeenCalledWith(email);
+    expect(mocks.recordVehicleLookupRun).toHaveBeenCalledWith(email, "AB12CDE");
   });
 
 

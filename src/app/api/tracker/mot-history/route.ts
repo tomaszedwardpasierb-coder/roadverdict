@@ -14,11 +14,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Not signed in." }, { status: 401 });
   }
 
-  const lookupUser = await getUserDoc(session.email);
-  if (!canRunVehicleLookup(lookupUser)) {
-    return NextResponse.json({ error: "Please wait a few seconds before trying again." }, { status: 429 });
-  }
-
   let body: unknown;
   try {
     body = await request.json();
@@ -43,8 +38,15 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  // After the plate is known: the import straight after adding a vehicle
+  // is for the plate just looked up, which the cooldown lets through.
+  const lookupUser = await getUserDoc(session.email);
+  if (!canRunVehicleLookup(lookupUser, registration)) {
+    return NextResponse.json({ error: "Please wait a few seconds before trying again." }, { status: 429 });
+  }
+
   const result = await importMotHistoryForBike(session.email, bike, registration);
-  await recordVehicleLookupRun(session.email);
+  await recordVehicleLookupRun(session.email, registration);
   if ("error" in result) {
     return NextResponse.json({ error: result.error }, { status: result.status });
   }

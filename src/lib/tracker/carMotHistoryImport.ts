@@ -6,13 +6,14 @@
 // (VRM/date-string/ProductionYearCheckable-only, no BikeDoc coupling), so
 // they're reused directly rather than duplicated - only the bill/reminder/
 // fuel-mileage calls below are genuinely car-specific.
-import type { CarDoc } from "./car";
+import { raiseCarMileageToMot, type CarDoc } from "./car";
 import { fetchMotHistory } from "./motHistoryFetch";
 import { createCarBill, getCarBills } from "./carBill";
 import { createCarReminder, deleteCarRemindersBySourceKey } from "./carReminder";
 import { isBeforeProduction } from "./productionYearCheck";
 import { motReminderDate } from "./motHistory";
 import { reestimateCarFuelMileage } from "./reestimateCarFuelMileage";
+import { latestMotReading } from "./motMileageFloor";
 
 export interface CarMotImportResult {
   createdCount: number;
@@ -81,11 +82,16 @@ export async function importMotHistoryForCar(
     reminderSet = true;
   }
 
+  // Even with nothing new logged: a mileage below what DVSA recorded is
+  // wrong whenever it got in.
+  const reading = latestMotReading(parsed.tests.filter((t) => !isBeforeProduction(t.testDate, car)));
+  const saved = reading ? await raiseCarMileageToMot(email, car.id, reading) : null;
+
   // Best-effort, non-blocking - same reasoning as the motorcycle version:
   // a failure here should never undo an otherwise-successful MOT import.
   if (created.length > 0) {
     try {
-      await reestimateCarFuelMileage(email, car);
+      await reestimateCarFuelMileage(email, saved ?? car);
     } catch (err) {
       console.error("Fuel mileage re-estimation after car MOT import failed:", err);
     }

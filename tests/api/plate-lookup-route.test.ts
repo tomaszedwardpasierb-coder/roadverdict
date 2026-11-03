@@ -133,7 +133,7 @@ describe("GET /api/tracker/plate-lookup", () => {
   it("records the lookup run after a successful VDG call", async () => {
     mocks.fetch.mockResolvedValue(vdgSuccess());
     await GET(request("AB12CDE"));
-    expect(mocks.recordVehicleLookupRun).toHaveBeenCalledWith("rider@example.com");
+    expect(mocks.recordVehicleLookupRun).toHaveBeenCalledWith("rider@example.com", "AB12CDE");
   });
 
 
