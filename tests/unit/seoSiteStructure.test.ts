@@ -77,7 +77,7 @@ describe("pageMetadata", () => {
       "guides/page.tsx", "guides/buying-a-used-car/page.tsx", "guides/buying-a-used-motorcycle/page.tsx",
       "guides/cost-of-owning-a-car/page.tsx", "guides/cost-of-owning-a-motorcycle/page.tsx", "mpg-calculator/page.tsx", "pro/page.tsx",
       "guides/proving-service-history/page.tsx", "guides/rebuild-lost-service-history/page.tsx", "guides/motorcycle-road-tax/page.tsx",
-      "about/page.tsx", "privacy/page.tsx", "cars/costs/page.tsx", "motorcycles/costs/page.tsx",
+      "about/page.tsx", "privacy/page.tsx", "terms/page.tsx", "cars/costs/page.tsx", "motorcycles/costs/page.tsx",
       "cars/costs/[slug]/page.tsx", "motorcycles/costs/[slug]/page.tsx",
       "motorcycle-service-log-app/page.tsx", "vehicle-smart-alternative/page.tsx", "drivvo-alternative/page.tsx",
       "mot-check/page.tsx", "mot-statistics/page.tsx",

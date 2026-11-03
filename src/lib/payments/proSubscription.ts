@@ -23,6 +23,7 @@ import { isEligibleForProTrial } from "@/lib/payments/proTrial";
 import { isProActive } from "@/lib/payments/storePro";
 import { sendProTrialStartedEmail, sendProTrialEndingEmail } from "@/lib/resend";
 import type Stripe from "stripe";
+import { PRO_SUBMIT_MESSAGE, submitText } from "@/lib/payments/checkoutTerms";
 
 const DAY_MS = 86_400_000;
 
@@ -66,6 +67,7 @@ export async function createProCheckoutSession(email: string, interval: ProInter
       // this account without a cross-partition Cosmos query.
       subscription_data: { metadata: { email }, ...(trialDays > 0 ? { trial_period_days: trialDays } : {}) },
       metadata: { email, kind: "pro_subscription" },
+      custom_text: submitText(PRO_SUBMIT_MESSAGE),
       success_url: `${appUrl}/pro?subscribed=1&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${appUrl}/pro`,
     });

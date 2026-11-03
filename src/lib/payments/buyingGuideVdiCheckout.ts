@@ -21,6 +21,7 @@ import {
   type VdiPurchaseDoc,
 } from "@/lib/tracker/vdiPurchase";
 import type { VehicleKind } from "@/lib/tracker/vdiUnlock";
+import { HISTORY_CHECK_SUBMIT_MESSAGE, submitText } from "@/lib/payments/checkoutTerms";
 
 export type CreateBuyingGuideVdiCheckoutResult =
   | { ok: true; url: string }
@@ -108,6 +109,8 @@ export async function createBuyingGuideVdiCheckoutSession(
           },
         },
       ],
+      // The buyer's consent to the check running now (checkoutTerms.ts).
+      custom_text: submitText(HISTORY_CHECK_SUBMIT_MESSAGE),
       success_url: `${appUrl}${appendQuery(path, `vdiPurchaseId=${purchase.id}&vrm=${encodeURIComponent(vrm)}&session_id={CHECKOUT_SESSION_ID}`)}`,
       cancel_url: `${appUrl}${path}`,
     });

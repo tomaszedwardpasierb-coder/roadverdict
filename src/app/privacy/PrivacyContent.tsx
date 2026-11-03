@@ -22,6 +22,8 @@
 // This is a drafting aid, not legal advice - have it reviewed by a
 // solicitor or UK GDPR consultant, particularly the AI and
 // international-transfer sections, before treating it as final.
+import Link from 'next/link';
+import { TRADER } from '@/lib/legal';
 import styles from './privacy.module.css';
 
 const SECTIONS = [
@@ -60,7 +62,7 @@ export function PrivacyContent() {
   return (
     <div className={styles.wrapper}>
       <h1 className={styles.title}>Privacy Policy</h1>
-      <span className={styles.updated}>Last updated: 12 October 2026</span>
+      <span className={styles.updated}>Last updated: 3 November 2026</span>
       <p className={styles.intro}>
         RoadVerdict is a small, independently run UK site. This page explains, in plain
         terms, what we collect, why, how long we keep it, who we share it with, and how
@@ -95,9 +97,10 @@ export function PrivacyContent() {
       <section id="who-we-are" className={styles.section}>
         <h2>Who we are</h2>
         <p>
-          RoadVerdict is operated independently, as a small personal project rather than
-          a large company. For data protection purposes, that means whoever runs the site
-          is the &quot;data controller&quot; for anything RoadVerdict collects.
+          RoadVerdict is run by {TRADER}, a small independent UK business. For data
+          protection purposes, that makes them the &quot;data controller&quot; for anything
+          RoadVerdict collects. Our <Link href="/terms">terms of service</Link> cover
+          everything else about using RoadVerdict.
         </p>
         <p>
           The quickest way to reach us about anything in this policy, or about your own

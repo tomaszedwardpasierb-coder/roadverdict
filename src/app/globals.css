@@ -1415,3 +1415,6 @@ body:has(main [data-admin-shell]) [data-assistant-widget] {
   height: 56px;
   width: auto;
 }
+.site-footer .play-store-link a {
+  justify-content: center;
+}

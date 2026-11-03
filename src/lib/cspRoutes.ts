@@ -41,6 +41,7 @@ export const PUBLIC_STATIC_SEGMENTS = [
   '',
   'about',
   'privacy',
+  'terms',
   'motorcycles',
   'cars',
   'quote-checker',

@@ -10,6 +10,7 @@ import { VDI_CHECK_PRICE_PENCE, VDI_CHECK_PRODUCT_NAME } from "@/lib/payments/pr
 import { resolveShareToken, updateShareLinkVdiUnlock } from "@/lib/tracker/shareLink";
 import { resolveCarShareToken, updateCarShareLinkVdiUnlock } from "@/lib/tracker/carShareLink";
 import type { VehicleKind, VdiUnlock } from "@/lib/tracker/vdiUnlock";
+import { HISTORY_CHECK_SUBMIT_MESSAGE, submitText } from "@/lib/payments/checkoutTerms";
 
 export type CreateVdiCheckoutResult =
   | { ok: true; url: string }
@@ -41,6 +42,8 @@ export async function createVdiCheckoutSession(token: string, vehicleKind: Vehic
             },
           },
         ],
+        // The buyer's consent to the check running now (checkoutTerms.ts).
+        custom_text: submitText(HISTORY_CHECK_SUBMIT_MESSAGE),
         success_url: `${appUrl}${path}?session_id={CHECKOUT_SESSION_ID}`,
         cancel_url: `${appUrl}${path}`,
       },

@@ -137,6 +137,9 @@ export default function ProScreen() {
             you cancel at least 24 hours before the period ends. Manage or cancel any time: {MANAGE}. Pro bought here also unlocks
             Pro on the RoadVerdict website when you sign in with this email.
           </Text>
+          <Pressable onPress={() => WebBrowser.openBrowserAsync(`${API_BASE_URL}/terms`)} accessibilityRole="link" hitSlop={6}>
+            <Text style={styles.link}>Terms of service</Text>
+          </Pressable>
           <Pressable onPress={() => WebBrowser.openBrowserAsync(`${API_BASE_URL}/privacy`)} accessibilityRole="link" hitSlop={6}>
             <Text style={styles.link}>Privacy policy</Text>
           </Pressable>

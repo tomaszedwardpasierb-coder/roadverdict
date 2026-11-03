@@ -134,7 +134,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <SiteFooterLinks />
             <p>
               RoadVerdict is guidance benchmarked against typical prices, not a professional
-              inspection. <Link href="/privacy">Privacy</Link> · <Link href="/about">About us</Link> ·{' '}
+              inspection. <Link href="/privacy">Privacy</Link> · <Link href="/terms">Terms</Link> ·{' '}
+              <Link href="/about">About us</Link> ·{' '}
               <a href="mailto:hello@roadverdict.co.uk">hello@roadverdict.co.uk</a>
             </p>
             <PlayStoreLink campaign="footer" label="RoadVerdict for Android on Google Play" />

@@ -20,6 +20,7 @@ import { isProActive } from "@/lib/payments/storePro";
 import { EXTRA_VEHICLE_MONTHLY_PENCE } from "@/lib/proPlan";
 import { MAX_EXTRA_VEHICLES, MAX_GRANTED_VEHICLES, vehicleLimitFor } from "@/lib/tracker/vehicleLimit";
 import type Stripe from "stripe";
+import { EXTRA_VEHICLE_SUBMIT_MESSAGE, submitText } from "@/lib/payments/checkoutTerms";
 
 export const EXTRA_VEHICLES_KIND = "extra_vehicles";
 
@@ -106,6 +107,7 @@ export async function addExtraVehicle(email: string, appUrl: string): Promise<Ad
       line_items: [lineItem()],
       subscription_data: { metadata: { email, kind: EXTRA_VEHICLES_KIND } },
       metadata: { email, kind: EXTRA_VEHICLES_KIND },
+      custom_text: submitText(EXTRA_VEHICLE_SUBMIT_MESSAGE),
       success_url: `${appUrl}/garage?extra_vehicle=1&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${appUrl}/garage`,
     });
