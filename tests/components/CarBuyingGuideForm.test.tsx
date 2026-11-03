@@ -464,7 +464,7 @@ describe("CarBuyingGuideForm", () => {
     expect(screen.getByText(/First registered in the UK: 10\/09\/2013/)).toBeInTheDocument();
     expect(screen.getByText(/Date of manufacture: 10\/09\/2013/)).toBeInTheDocument();
 
-    expect(screen.getByText(/Current keeper since 01\/01\/2020 \(2 previous keeper\(s\)\)/)).toBeInTheDocument();
+    expect(screen.getByText(/2 previous keeper\(s\) - the current one since 01\/01\/2020/)).toBeInTheDocument();
 
     expect(screen.getByText(/Imported/)).toBeInTheDocument();
 

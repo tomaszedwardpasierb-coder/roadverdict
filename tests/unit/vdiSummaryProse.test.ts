@@ -237,6 +237,8 @@ describe("generateVdiSummary", () => {
     expect(idxNov).toBeGreaterThan(idxJune);
   });
 
+  // averageMileageForAge is a lifetime total: without an age to divide by,
+  // the AI is told it's a total, never that it's a yearly figure.
   it("includes the independent mileage-vs-average-for-age comparison when given", async () => {
     const fetchMock = vi.fn().mockResolvedValue(geminiResponse(JSON.stringify(validResult)));
     vi.stubGlobal("fetch", fetchMock);
@@ -247,7 +249,8 @@ describe("generateVdiSummary", () => {
     const prompt = JSON.parse(fetchMock.mock.calls[0][1].body).contents[0].parts[0].text;
     expect(prompt).toContain("INDEPENDENT MILEAGE CHECK");
     expect(prompt).toContain("1,120 miles/year");
-    expect(prompt).toContain("16,000 miles/year");
+    expect(prompt).toContain("Typical TOTAL mileage for a vehicle of this age: 16,000 miles");
+    expect(prompt).not.toContain("16,000 miles/year");
     expect(prompt).toContain("Anomaly flagged: no");
   });
 

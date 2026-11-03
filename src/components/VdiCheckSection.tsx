@@ -30,6 +30,7 @@ import type { VdiUnlock, VdiCheckResult } from '@/lib/tracker/vdiUnlock';
 import { VDI_CHECK_PRICE_LABEL } from '@/lib/payments/pricing';
 import { VdiIcon } from './VdiIcon';
 import { VdiMileageChart } from './VdiMileageChart';
+import { typicalMileageText } from '@/lib/tracker/vdiMileageForAge';
 import { VehicleSpinner } from './VehicleSpinner';
 import styles from '@/app/report/[token]/report.module.css';
 import { FileSearch } from 'lucide-react';
@@ -565,7 +566,7 @@ export function VdiCheckSection({ vehicleKind, token, registration, make, model,
           <div className={styles.itemByItemRow}>
             <dt><VdiIcon name="mileage" /> Average annual mileage</dt>
             <dd>
-              {v.calculatedAverageAnnualMileage!.toLocaleString()} mi/year (typical for this age: {v.averageMileageForAge!.toLocaleString()})
+              {v.calculatedAverageAnnualMileage!.toLocaleString()} mi/year ({typicalMileageText(v)})
               {v.mileageAnomalyDetected ? ' - ⚠️ anomaly flagged' : ''}
             </dd>
           </div>

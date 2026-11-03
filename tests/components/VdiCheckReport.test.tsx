@@ -64,6 +64,21 @@ describe("VdiCheckReport", () => {
     expect(screen.getByText("0 V5C logbook reissue(s) on record")).toBeInTheDocument();
   });
 
+  it("says the previous keepers once, and the typical mileage per year like the car's own figure", () => {
+    const vdi = {
+      ...minimalVdi,
+      keeperChanges: [{ keeperStartDate: "2011-07-17", numberOfPreviousKeepers: 2 }],
+      keeperChangeCount: 1,
+      calculatedAverageAnnualMileage: 2699,
+      averageMileageForAge: 228000,
+      dateFirstRegisteredInUk: "2007-03-20",
+    } as VdiCheckResult;
+    render(<VdiCheckReport vdiCheck={vdi} vehicleNoun="car" pricePaidPence={1299} purchasedAt={null} expiresAt={null} />);
+    expect(screen.getByText(/2 previous keeper\(s\) - the current one since 17\/07\/2011/)).toBeInTheDocument();
+    expect(screen.queryByText(/keeper change\(s\) on record/)).toBeNull();
+    expect(screen.getByText(/about 12,000 miles a year is typical for its age/)).toBeInTheDocument();
+  });
+
   it("renders the purchase banner using pricePaidPence/purchasedAt/expiresAt", () => {
     render(<VdiCheckReport vdiCheck={minimalVdi} vehicleNoun="car" pricePaidPence={1499} purchasedAt="2026-01-01T00:00:00.000Z" expiresAt="2026-01-15T00:00:00.000Z" />);
     expect(screen.getByText(/included with your £14\.99 purchase/)).toBeInTheDocument();

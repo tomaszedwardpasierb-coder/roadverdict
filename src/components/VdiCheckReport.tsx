@@ -20,6 +20,7 @@ import type { ReactNode } from 'react';
 import type { VdiCheckResult } from '@/lib/tracker/vdiUnlock';
 import { VdiIcon } from './VdiIcon';
 import { VdiMileageChart } from './VdiMileageChart';
+import { typicalMileageText } from '@/lib/tracker/vdiMileageForAge';
 
 function formatChargeMinutes(minutes: number): string {
   if (minutes < 60) return `${minutes}m`;
@@ -207,14 +208,21 @@ export function VdiCheckReport({ vdiCheck: v, vehicleNoun, pricePaidPence, purch
 
       <p className="field-note" style={{ fontWeight: 600, margin: '0.6rem 0 0.3rem' }}>Ownership history</p>
       <ul style={{ margin: 0, paddingLeft: '1.1rem' }}>
-        <li className="field-note"><VdiIcon name="keeperChanges" /> {v.keeperChangeCount} keeper change(s) on record</li>
-        {v.keeperChanges.length > 0 && (() => {
-          const latest = v.keeperChanges[v.keeperChanges.length - 1];
-          return (
+        {(() => {
+          // The previous-keeper count, when there is one, is the whole story;
+          // the change list only holds the changes on file ("1 keeper change"
+          // next to "2 previous keepers" read as a contradiction).
+          const latest = v.keeperChanges.length > 0 ? v.keeperChanges[v.keeperChanges.length - 1] : null;
+          const since = latest ? new Date(latest.keeperStartDate).toLocaleDateString('en-GB') : null;
+          return latest?.numberOfPreviousKeepers != null ? (
             <li className="field-note">
-              <VdiIcon name="keeperChanges" /> Current keeper since {new Date(latest.keeperStartDate).toLocaleDateString('en-GB')}
-              {latest.numberOfPreviousKeepers != null ? ` (${latest.numberOfPreviousKeepers} previous keeper(s))` : ''}
+              <VdiIcon name="keeperChanges" /> {latest.numberOfPreviousKeepers} previous keeper(s) - the current one since {since}
             </li>
+          ) : (
+            <>
+              <li className="field-note"><VdiIcon name="keeperChanges" /> {v.keeperChangeCount} keeper change(s) on record</li>
+              {since ? <li className="field-note"><VdiIcon name="keeperChanges" /> Current keeper since {since}</li> : null}
+            </>
           );
         })()}
         <li className="field-note"><VdiIcon name="plateChanges" /> {v.plateChangeCount} plate change(s) on record</li>
@@ -445,7 +453,7 @@ export function VdiCheckReport({ vdiCheck: v, vehicleNoun, pricePaidPence, purch
         {hasMileageStats && (
           <li className="field-note">
             <VdiIcon name="mileage" /> Average annual mileage: {v.calculatedAverageAnnualMileage!.toLocaleString()} mi/year
-            (typical for this age: {v.averageMileageForAge!.toLocaleString()})
+            ({typicalMileageText(v)})
             {v.mileageAnomalyDetected ? ' - ⚠️ anomaly flagged' : ''}
           </li>
         )}

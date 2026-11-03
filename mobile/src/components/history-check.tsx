@@ -85,6 +85,22 @@ const day = (iso: string) => new Date(iso).toLocaleDateString('en-GB', { day: 'n
 const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
+// averageMileageForAge is the TOTAL typical for the vehicle's age (12,000 a
+// year times its whole years), not a yearly figure - the website's
+// lib/tracker/vdiMileageForAge.ts, mirrored.
+function typicalMileageText(v: VdiCheck): string {
+  const total = Math.round(v.averageMileageForAge ?? 0);
+  const from = v.dateFirstRegisteredInUk ?? v.dateOfManufacture;
+  const start = from ? new Date(from) : null;
+  if (start && !Number.isNaN(start.getTime())) {
+    const now = new Date();
+    let years = now.getUTCFullYear() - start.getUTCFullYear();
+    if (now.getUTCMonth() < start.getUTCMonth() || (now.getUTCMonth() === start.getUTCMonth() && now.getUTCDate() < start.getUTCDate())) years--;
+    if (years >= 1) return `about ${(Math.round(total / years / 100) * 100).toLocaleString('en-GB')} a year is typical for its age`;
+  }
+  return `about ${total.toLocaleString('en-GB')} miles in total is typical for its age`;
+}
+
 export function HistoryCheck({
   kind,
   state,
@@ -270,13 +286,18 @@ function HistoryReport({ kind, state, check: v }: { kind: VehicleKind; state: Hi
       {v.isImported ? <Fact>{`Imported${v.isImportedFromOutsideEu ? ' from outside the EU' : ''}`}</Fact> : null}
 
       <Text style={styles.listTitle}>Keepers and plates</Text>
-      <Text style={styles.text}>• {plural(v.keeperChangeCount, 'keeper change')} on record</Text>
-      {latestKeeper ? (
+      {/* The previous-keeper count, when there is one, is the whole story;
+          the change list only holds the changes on file. */}
+      {latestKeeper?.numberOfPreviousKeepers != null ? (
         <Text style={styles.text}>
-          • Current keeper since {day(latestKeeper.keeperStartDate)}
-          {latestKeeper.numberOfPreviousKeepers != null ? ` (${plural(latestKeeper.numberOfPreviousKeepers, 'previous keeper')})` : ''}
+          • {plural(latestKeeper.numberOfPreviousKeepers, 'previous keeper')} – the current one since {day(latestKeeper.keeperStartDate)}
         </Text>
-      ) : null}
+      ) : (
+        <>
+          <Text style={styles.text}>• {plural(v.keeperChangeCount, 'keeper change')} on record</Text>
+          {latestKeeper ? <Text style={styles.text}>• Current keeper since {day(latestKeeper.keeperStartDate)}</Text> : null}
+        </>
+      )}
       <Text style={styles.text}>• {plural(v.v5cReissueCount, 'V5C logbook reissue')}</Text>
       <Text style={styles.text}>• {plural(v.plateChangeCount, 'plate change')} on record</Text>
       {(v.plateChanges ?? []).map((p, i) => (
@@ -297,8 +318,8 @@ function HistoryReport({ kind, state, check: v }: { kind: VehicleKind; state: Hi
       </Fact>
       {v.calculatedAverageAnnualMileage != null && v.averageMileageForAge != null ? (
         <Text style={styles.hint}>
-          This {noun} has averaged about {Math.round(v.calculatedAverageAnnualMileage).toLocaleString('en-GB')} miles a year; about{' '}
-          {Math.round(v.averageMileageForAge).toLocaleString('en-GB')} is typical for its age.
+          This {noun} has averaged about {Math.round(v.calculatedAverageAnnualMileage).toLocaleString('en-GB')} miles a year;{' '}
+          {typicalMileageText(v)}.
         </Text>
       ) : null}
 

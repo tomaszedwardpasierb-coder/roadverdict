@@ -11,6 +11,7 @@
 // VDI was purchased later; this one is generated once, at first view
 // after purchase, and cached forever on the share link's own vdiUnlock
 // field.
+import { typicalAnnualMileage } from "@/lib/tracker/vdiMileageForAge";
 import { logGeminiUsage } from "@/lib/tracker/geminiUsageLog";
 import { fetchWithTimeout } from "@/lib/fetchWithTimeout";
 import type { VdiCheckResult, ValuationResult, VdiSummaryResult } from "@/lib/tracker/vdiUnlock";
@@ -82,7 +83,12 @@ function buildFactsBlock(input: VdiSummaryInput): string {
   if (vdiCheck.calculatedAverageAnnualMileage != null && vdiCheck.averageMileageForAge != null) {
     lines.push("INDEPENDENT MILEAGE CHECK (DVSA-derived, separate from the owner's own logged mileage):");
     lines.push(`- Calculated average annual mileage for this vehicle: ${vdiCheck.calculatedAverageAnnualMileage.toLocaleString()} miles/year`);
-    lines.push(`- Typical average annual mileage for a vehicle of this age: ${vdiCheck.averageMileageForAge.toLocaleString()} miles/year`);
+    const typicalPerYear = typicalAnnualMileage(vdiCheck);
+    lines.push(
+      typicalPerYear != null
+        ? `- Typical average annual mileage for a vehicle of this age: ${typicalPerYear.toLocaleString()} miles/year`
+        : `- Typical TOTAL mileage for a vehicle of this age: ${vdiCheck.averageMileageForAge.toLocaleString()} miles`
+    );
     lines.push(`- Anomaly flagged: ${vdiCheck.mileageAnomalyDetected ? "yes" : "no"}`);
     lines.push("");
   }
