@@ -54,6 +54,7 @@ export const PUBLIC_STATIC_SEGMENTS = [
   'motorcycle-service-log-app',
   'vehicle-smart-alternative',
   'drivvo-alternative',
+  'mot-statistics',
   // Azure's health check: plain text, no page, so the policy is moot.
   'health',
 ] as const;

@@ -94,6 +94,9 @@ export function SiteFooterLinks() {
           <li>
             <Link href="/guides/rebuild-lost-service-history">Rebuilding a lost history</Link>
           </li>
+          <li>
+            <Link href="/mot-statistics">UK MOT statistics</Link>
+          </li>
         </ul>
       </div>
       <div className="site-footer__col">
