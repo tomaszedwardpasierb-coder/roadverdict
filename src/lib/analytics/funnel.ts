@@ -44,6 +44,15 @@ export const FUNNEL_STEPS = [
   "demo",
   "demo_scanned",
   "demo_asked",
+  // The full history check - the money step (4 Nov 2026): a free MOT
+  // check result shown, the history check page (a page step), a free
+  // registration lookup there (website and app; the app's counted with
+  // source "app"), and a website checkout for the paid check. Paid checks
+  // themselves are counted from their purchase records (weeklyReport.ts).
+  "mot_result",
+  "history",
+  "history_lookup",
+  "history_checkout",
 ] as const;
 export type FunnelStep = (typeof FUNNEL_STEPS)[number];
 

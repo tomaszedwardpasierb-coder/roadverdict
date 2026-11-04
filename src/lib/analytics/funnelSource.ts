@@ -20,6 +20,8 @@ export const FUNNEL_SOURCES = [
   "tool",
   // The "Create a free account" links on the sample-bike demo (/demo).
   "demo",
+  // The free MOT check's "Run the full history check" buttons (/mot-check).
+  "mot",
   // Printed cards with a QR code (garages, training schools), partner
   // pages and press stories. A name can follow a dash - ?src=qr-acme -
   // to tell partners apart in the link; it's counted under the bucket.

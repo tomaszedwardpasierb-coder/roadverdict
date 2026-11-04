@@ -183,7 +183,7 @@ export function MotCheckResult({ record, now = new Date() }: { record: MotRecord
           The MOT record doesn’t show outstanding finance, theft or write-off records. The full history check does.
         </p>
         <div className={styles.saveActions}>
-          <Link className={styles.primary} href={record.kind === 'car' ? '/cars/buying-guide' : '/buying-guide'}>
+          <Link className={styles.primary} href={record.kind === 'car' ? '/cars/buying-guide?src=mot' : '/buying-guide?src=mot'}>
             Run the full history check
           </Link>
           <span className={styles.buyingPrice}>

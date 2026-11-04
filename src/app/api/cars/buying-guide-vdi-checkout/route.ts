@@ -3,6 +3,7 @@
 // Car equivalent of tracker/buying-guide-vdi-checkout/route.ts - same
 // mechanic, just "car" instead of "bike" as the vehicleKind.
 import { NextRequest, NextResponse } from "next/server";
+import { recordFunnelStep } from "@/lib/analytics/funnel";
 import { getSession } from "@/lib/auth/session";
 import { createBuyingGuideVdiCheckoutSession, type BuyingGuideReturnContext } from "@/lib/payments/buyingGuideVdiCheckout";
 
@@ -40,5 +41,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ freeReportReady: true, vdiPurchaseId: result.purchaseId });
   }
 
+  void recordFunnelStep("history_checkout");
   return NextResponse.json({ url: result.url });
 }

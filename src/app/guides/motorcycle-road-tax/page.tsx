@@ -171,7 +171,8 @@ export default function MotorcycleRoadTaxPage() {
         <li>
           <strong>Check any bike&apos;s tax status free</strong> on GOV.UK by registration - or run the
           registration through <Link href="/buying-guide">RoadVerdict&apos;s free motorcycle history check</Link>{' '}
-          for the MOT history too.
+          for the MOT history too. To see every past MOT test and advisory explained, use the{' '}
+          <Link href="/mot-check">free MOT history check</Link>.
         </li>
       </ul>
 

@@ -92,7 +92,9 @@ export default function BuyingAUsedMotorcyclePage() {
           just checking it&apos;s current, the full test history - a free MOT history check by
           registration, on GOV.UK or in RoadVerdict&apos;s Buying Guide - shows advisories and past
           mileage readings. A pattern of the same advisory repeated test after test suggests
-          something that&apos;s been ignored, not fixed.
+          something that&apos;s been ignored, not fixed. Start with the{' '}
+          <Link href="/mot-check">free MOT history check</Link>: every advisory explained, and a warning if
+          the mileage ever went down.
         </li>
         <li>
           <strong>Service history.</strong> Receipts, a stamped service book, or a digital record

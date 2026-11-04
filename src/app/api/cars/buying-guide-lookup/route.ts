@@ -14,6 +14,7 @@
 // Worth revisiting if that turns out to feel slow in practice.
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/session";
+import { recordFunnelStep } from "@/lib/analytics/funnel";
 import { parseMotHistory, type ParsedMotTest } from "@/lib/tracker/motHistory";
 import { fetchMotHistoryDetails, type MotHistoryDetailsResult } from "@/lib/mot/motHistorySource";
 import { generateCarBuyingGuideBriefing, type CarBuyingGuideBriefingResult } from "@/lib/tracker/carBuyingGuideBriefing";
@@ -166,6 +167,15 @@ export async function GET(request: NextRequest) {
 
   const vdiPurchaseId = request.nextUrl.searchParams.get("vdiPurchaseId");
   const sessionId = request.nextUrl.searchParams.get("session_id");
+
+  // The money funnel's free-lookup step (analytics/funnel.ts), from the
+  // website or the app - not the paid check's own run, which comes back
+  // here with a purchase id.
+  if (!vdiPurchaseId && !sessionId) {
+    // The app signs its requests with a bearer token; the website uses a cookie.
+    const fromApp = /^bearer\s/i.test(request.headers.get("authorization") ?? "");
+    void recordFunnelStep("history_lookup", { source: fromApp ? "app" : null });
+  }
 
   // Resolved BEFORE the free lookup's own cache/quota gate below, even
   // though it doesn't need any MOT/tax data itself - a real, paid VDI

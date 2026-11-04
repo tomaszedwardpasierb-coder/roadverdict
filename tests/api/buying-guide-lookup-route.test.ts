@@ -18,10 +18,12 @@ const mocks = vi.hoisted(() => ({
   canRunFreeBuyingGuideLookup: vi.fn(),
   nextFreeBuyingGuideLookupAt: vi.fn(),
   recordBuyingGuideLookupRun: vi.fn(),
+  recordFunnelStep: vi.fn(),
   fetch: vi.fn(),
 }));
 
 vi.mock("@/lib/auth/session", () => ({ getSession: mocks.getSession }));
+vi.mock("@/lib/analytics/funnel", () => ({ recordFunnelStep: mocks.recordFunnelStep }));
 vi.mock("@/lib/tracker/motHistory", () => ({ parseMotHistory: mocks.parseMotHistory }));
 vi.mock("@/lib/tracker/buyingGuideBriefing", () => ({
   generateBuyingGuideBriefing: mocks.generateBuyingGuideBriefing,
@@ -159,6 +161,18 @@ describe("GET /api/tracker/buying-guide-lookup", () => {
     delete process.env.VDG_API_KEY;
     const response = await GET(request("AB20YAM"));
     expect(response.status).toBe(503);
+  });
+
+  // The money funnel (analytics/funnel.ts): free lookups, site and app.
+  it("counts a free lookup, from the website or the app, but not a paid check's own run", async () => {
+    await GET(request("AB20YAM"));
+    expect(mocks.recordFunnelStep).toHaveBeenLastCalledWith("history_lookup", { source: null });
+    await GET(new NextRequest("http://localhost/api/tracker/buying-guide-lookup?vrm=AB20YAM", { method: "GET", headers: { authorization: "Bearer app-token" } }));
+    expect(mocks.recordFunnelStep).toHaveBeenLastCalledWith("history_lookup", { source: "app" });
+    mocks.recordFunnelStep.mockClear();
+    await GET(request("AB20YAM", { vdiPurchaseId: "p1" })).catch(() => undefined);
+    await GET(request("AB20YAM", { session_id: "cs_1" })).catch(() => undefined);
+    expect(mocks.recordFunnelStep).not.toHaveBeenCalled();
   });
 
   it("returns 502 when the VDG fetch throws entirely", async () => {

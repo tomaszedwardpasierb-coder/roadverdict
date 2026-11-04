@@ -20,6 +20,8 @@ import { getAdminSession } from '@/lib/admin/session';
 import { cleanRegistration } from '@/lib/mot/motRecord';
 import { cachedMotLookup, freshMotLookup, type MotLookupResult } from '@/lib/mot/motCheckLookup';
 import { motCheckMode, takeNewLookup, takeVisitorCheck, visitorAddress, MOT_CHECK_MESSAGES } from '@/lib/mot/motCheckUsage';
+import { BUYING_GUIDE_REPORT_PRICE_LABEL } from '@/lib/payments/pricing';
+import { isLikelyBot, recordFunnelStep } from '@/lib/analytics/funnel';
 import { MotCheckResult } from './MotCheckResult';
 import styles from './mot-check.module.css';
 
@@ -71,6 +73,11 @@ export default async function MotCheckPage(props: { searchParams: SearchParams }
 
   const { vrm } = await props.searchParams;
   const outcome = await runCheck(vrm, isAdmin);
+  // The top of the money funnel (analytics/funnel.ts): a result someone
+  // can act on. Not the owner's own checks, and not crawlers.
+  if (outcome.kind === 'lookup' && outcome.result.status === 'found' && !isAdmin && !isLikelyBot((await headers()).get('user-agent'))) {
+    await recordFunnelStep('mot_result');
+  }
   const shown = outcome.kind === 'lookup' && outcome.result.status === 'found' ? outcome.result.record.registration : (vrm ?? '').toUpperCase().replace(/\s+/g, '');
 
   return (
@@ -138,6 +145,74 @@ export default async function MotCheckPage(props: { searchParams: SearchParams }
           <p>
             Got a garage quote for one of them? <Link href="/quote-checker">Check a motorcycle quote</Link> or{' '}
             <Link href="/cars/quote-checker">a car quote</Link>.
+          </p>
+
+          <h2>How to read an MOT history</h2>
+          <p>Each test shows the date, the mileage and the result. Anything the tester found is graded:</p>
+          <ul>
+            <li><strong>Dangerous</strong> and <strong>Major</strong>: the vehicle failed, and the fault had to be fixed before it could pass.</li>
+            <li><strong>Minor</strong>: it passed, but the fault was recorded.</li>
+            <li>
+              <strong>Advisory</strong>: it passed, but the tester saw something to keep an eye on, such as a tyre close
+              to the legal limit or light corrosion.
+            </li>
+          </ul>
+          <p>These grades have been used since May 2018. Older tests list failures and advisories.</p>
+          <h3>What to look for</h3>
+          <ul>
+            <li><strong>The same advisory year after year.</strong> A worn tyre or corroded brake pipe that keeps coming back was probably never fixed.</li>
+            <li>
+              <strong>Mileage that goes down between tests.</strong> It can mean the clock was wound back, or simply a
+              typing mistake at a test. Our check flags it. Ask the seller for receipts that show the mileage.
+            </li>
+            <li><strong>A long gap between tests.</strong> The vehicle may have been off the road. Ask the seller why.</li>
+          </ul>
+
+          <h2>When an MOT is due</h2>
+          <p>
+            In England, Scotland and Wales, a car or motorcycle needs its first MOT three years after it was first
+            registered, then every year. You can have it tested up to a month (minus a day) before the current MOT runs
+            out and keep the same renewal date. Driving without a valid MOT can mean a fine of up to £1,000.
+          </p>
+
+          <h2>What an MOT history doesn’t tell you</h2>
+          <p>
+            An MOT checks that the vehicle was roadworthy on the day of the test. It doesn’t check the engine, clutch or
+            gearbox. And it says nothing about:
+          </p>
+          <ul>
+            <li><strong>outstanding finance</strong> (a lender may still own it);</li>
+            <li>whether an insurer <strong>wrote it off</strong>;</li>
+            <li>whether it’s recorded as <strong>stolen</strong>.</li>
+          </ul>
+          <p>
+            <strong>Buying it?</strong> The full history check covers all three, plus the keepers, plate changes and the
+            mileage record.
+          </p>
+          <div className={styles.saveActions}>
+            <Link className={styles.primary} href="/cars/buying-guide?src=mot">
+              Full history check: car
+            </Link>
+            <Link className={styles.secondary} href="/buying-guide?src=mot">
+              Full history check: motorbike
+            </Link>
+          </div>
+          <p className={styles.buyingPrice}>
+            {BUYING_GUIDE_REPORT_PRICE_LABEL.freeNoVehicle}, or {BUYING_GUIDE_REPORT_PRICE_LABEL.freeWithVehicle} once you’ve
+            added a vehicle to a free account.
+          </p>
+
+          <h2>Common questions</h2>
+          <h3>Is it really free?</h3>
+          <p>
+            Yes. The MOT history and the explanations are free, with no account. Only the full history check (finance,
+            write-off, stolen) is paid.
+          </p>
+          <h3>Does it work for motorcycles?</h3>
+          <p>Yes, for any UK car or motorcycle with an MOT record.</p>
+          <h3>Why is there no MOT history?</h3>
+          <p>
+            A vehicle under three years old hasn’t needed an MOT yet, and many vehicles over 40 years old are exempt.
           </p>
         </section>
       ) : null}

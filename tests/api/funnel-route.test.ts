@@ -39,7 +39,14 @@ describe("POST /api/funnel", () => {
     expect(mocks.recordFunnelStep).toHaveBeenCalledWith("report", { source: "report", inApp: false });
   });
 
+  it("counts the full history check page, with the MOT check's button as its source", async () => {
+    await POST(request(JSON.stringify({ step: "history", source: "mot" })));
+    expect(mocks.recordFunnelStep).toHaveBeenCalledWith("history", { source: "mot", inApp: false });
+  });
+
   it("only takes the page steps - the later ones are counted on the server", async () => {
+    await POST(request(JSON.stringify({ step: "history_lookup" })));
+    await POST(request(JSON.stringify({ step: "history_checkout" })));
     await POST(request(JSON.stringify({ step: "account_created" })));
     await POST(request(JSON.stringify({ step: "first_vehicle" })));
     await POST(request(JSON.stringify({ step: "checkout_started" })));

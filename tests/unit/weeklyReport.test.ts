@@ -76,6 +76,18 @@ describe("the report email", () => {
     expect(r.bodyHtml).toContain("Home page visits by source: youtube 80 · google 10");
   });
 
+  it("shows the full history check's steps up to the payment, with where page visits came from", () => {
+    const r = buildWeeklyReport({
+      ...base,
+      thisWeek: { ...base.thisWeek, mot_result: 40, history: 12, history__src_mot: 7, history__src_google: 5, history_lookup: 9, history_lookup__src_app: 4, history_checkout: 3 },
+    });
+    expect(r.bodyHtml).toContain("Full history check</h2>");
+    expect(r.bodyHtml).toMatch(/Free MOT check results<\/td><td[^>]*><strong>40<\/strong>/);
+    expect(r.bodyHtml).toMatch(/Paid check: checkouts started \(site\)<\/td><td[^>]*><strong>3<\/strong>/);
+    expect(r.bodyHtml).toContain("History check page by source (\"mot\" is the MOT check's button): mot 7 · google 5");
+    expect(r.bodyHtml).toContain("Registrations checked in the app: 4.");
+  });
+
   it("shows a dash, not 0, for a week before the funnel was counting", () => {
     const r = buildWeeklyReport({ ...base, lastWeek: {} });
     expect(r.bodyHtml).toMatch(/Sign-in page<\/td><td[^>]*><strong>12<\/strong><\/td><td[^>]*>-<\/td>/);

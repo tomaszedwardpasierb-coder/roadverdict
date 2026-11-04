@@ -8,6 +8,7 @@
 // it), and the resulting vdiPurchase doc is bound to this exact email.
 // Tier/price is never accepted from the client - only `vrm`.
 import { NextRequest, NextResponse } from "next/server";
+import { recordFunnelStep } from "@/lib/analytics/funnel";
 import { getSession } from "@/lib/auth/session";
 import { createBuyingGuideVdiCheckoutSession, type BuyingGuideReturnContext } from "@/lib/payments/buyingGuideVdiCheckout";
 
@@ -44,5 +45,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ freeReportReady: true, vdiPurchaseId: result.purchaseId });
   }
 
+  void recordFunnelStep("history_checkout");
   return NextResponse.json({ url: result.url });
 }

@@ -195,3 +195,9 @@ div.page p.quiet { font-size: 0.95rem; color: var(--ink-soft); }
 
 .about h2 { font-size: 1.2rem; margin: 0.5rem 0; }
 .about ul { padding-left: 1.2rem; margin: 0 0 1rem; color: var(--ink-soft); }
+/* The guide under "What you'll see" (4 Nov 2026): each later section gets
+   room above it, and the question headings sit a step below the h2s. */
+.about h2 + p, .about h2 + ul { margin-top: 0; }
+.about h2:not(:first-child) { margin-top: 1.6rem; }
+.about h3 { font-size: 1.02rem; margin: 1rem 0 0.35rem; }
+.about .saveActions { align-items: center; margin-bottom: 0.4rem; }

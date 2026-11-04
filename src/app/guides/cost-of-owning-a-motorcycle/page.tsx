@@ -103,7 +103,9 @@ export default function CostOfOwningAMotorcyclePage() {
       <p style={{ maxWidth: 'none' }}>
         Required annually once a bike is three years old. The test fee itself is modest, but
         it&apos;s also the moment anything you&apos;ve been putting off - tyres, brakes, lighting
-        - gets forced into the open, often as a lump cost you didn&apos;t plan for that month.
+        - gets forced into the open, often as a lump cost you didn&apos;t plan for that month. See when a
+        bike&apos;s MOT is due and what it was advised on last time with our{' '}
+        <Link href="/mot-check">MOT history check</Link>.
       </p>
 
       <h2>Riding kit</h2>

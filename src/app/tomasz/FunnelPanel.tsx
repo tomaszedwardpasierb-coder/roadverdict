@@ -29,6 +29,18 @@ const LATER: { group: string; steps: { key: string; label: string }[] }[] = [
     ],
   },
   {
+    // Paid checks themselves come from their purchase records (Monday report).
+    group: 'Full history check',
+    steps: [
+      { key: 'mot_result', label: 'Free MOT check result' },
+      { key: 'history', label: 'History check page viewed' },
+      { key: 'history__src_mot', label: 'of those, from the MOT check' },
+      { key: 'history_lookup', label: 'Registration checked (site and app)' },
+      { key: 'history_lookup__src_app', label: 'of those, in the app' },
+      { key: 'history_checkout', label: 'Paid check: checkout started (site)' },
+    ],
+  },
+  {
     group: 'Sample-bike demo',
     steps: [
       { key: 'demo', label: 'Demo page viewed' },

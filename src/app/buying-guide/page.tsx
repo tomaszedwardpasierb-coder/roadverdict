@@ -6,6 +6,7 @@ import { REPORT_PRICING_FAQ } from '@/lib/seo/reportPricingCopy';
 import { BuyingGuideFormForViewer } from '@/components/viewer/BuyingGuideFormsForViewer';
 import { RelatedTools } from '@/components/RelatedTools';
 import { buildBreadcrumbJsonLd } from '@/lib/seo/breadcrumbs';
+import { FunnelBeacon } from '@/components/FunnelBeacon';
 
 export const metadata: Metadata = pageMetadata({
   title: 'Free Motorcycle History Check: MOT & Mileage (UK)',
@@ -83,6 +84,7 @@ export default function BuyingGuidePage() {
         // eslint-disable-next-line react/no-danger
         dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }}
       />
+      <FunnelBeacon step="history" />
       <div className="hero">
         <h1>Free motorcycle history check</h1>
         <p>

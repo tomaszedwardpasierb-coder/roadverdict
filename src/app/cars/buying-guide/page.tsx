@@ -7,6 +7,7 @@ import { REPORT_PRICING_FAQ } from '@/lib/seo/reportPricingCopy';
 import { CarBuyingGuideFormForViewer } from '@/components/viewer/BuyingGuideFormsForViewer';
 import { CarRelatedTools } from '@/components/CarRelatedTools';
 import { buildBreadcrumbJsonLd } from '@/lib/seo/breadcrumbs';
+import { FunnelBeacon } from '@/components/FunnelBeacon';
 
 export const metadata: Metadata = pageMetadata({
   title: 'Free Car History Check: MOT, Mileage & Tax (UK)',
@@ -84,6 +85,7 @@ export default function CarBuyingGuidePage() {
         // eslint-disable-next-line react/no-danger
         dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }}
       />
+      <FunnelBeacon step="history" />
       <div className="hero">
         <h1>Free car history check</h1>
         <p>

@@ -1,6 +1,7 @@
 // Place at: src/app/api/cars/vdi-checkout/route.ts
 // Car equivalent of api/tracker/vdi-checkout/route.ts.
 import { NextRequest, NextResponse } from "next/server";
+import { recordFunnelStep } from "@/lib/analytics/funnel";
 import { createVdiCheckoutSession } from "@/lib/payments/vdiCheckout";
 
 export const dynamic = "force-dynamic";
@@ -31,5 +32,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error }, { status });
   }
 
+  void recordFunnelStep("history_checkout");
   return NextResponse.json({ url: result.url });
 }

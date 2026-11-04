@@ -104,6 +104,14 @@ const DEMO_ROWS: { key: string; label: string }[] = [
   { key: "demo_scanned", label: "Read a receipt" },
   { key: "demo_asked", label: "Asked a question" },
 ];
+// The full history check's steps, up to the payment (the paid checks
+// themselves are in the summary at the top, from their purchase records).
+const HISTORY_CHECK_ROWS: { key: string; label: string }[] = [
+  { key: "mot_result", label: "Free MOT check results" },
+  { key: "history", label: "History check page visits" },
+  { key: "history_lookup", label: "Registrations checked (site and app)" },
+  { key: "history_checkout", label: "Paid check: checkouts started (site)" },
+];
 const MONEY_ROWS: { key: string; label: string }[] = [
   { key: "pro", label: "Pro page visits" },
   { key: "checkout_started", label: "Checkouts started" },
@@ -193,6 +201,11 @@ ${
 
 <h2 style="${h2}">Sample bike</h2>
 ${table(DEMO_ROWS, thisWeek, lastWeek, false)}
+
+<h2 style="${h2}">Full history check</h2>
+${table(HISTORY_CHECK_ROWS, thisWeek, lastWeek, false)}
+<p style="margin:0 0 6px;font-size:13px;color:#5b5850;">History check page by source ("mot" is the MOT check's button): ${esc(sourcesLine(thisWeek, "history"))}</p>
+<p style="margin:0 0 6px;font-size:13px;color:#5b5850;">Registrations checked in the app: ${thisWeek["history_lookup__src_app"] ?? 0}. Checks bought in the app don't start a website checkout; they're in the paid checks at the top.</p>
 
 <h2 style="${h2}">Pro and shared reports</h2>
 ${table(MONEY_ROWS, thisWeek, lastWeek, false)}

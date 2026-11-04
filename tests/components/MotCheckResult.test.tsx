@@ -70,7 +70,7 @@ describe("MotCheckResult", () => {
       "href",
       `/login?redirect=${encodeURIComponent("/dashboard?addVehicle=bike&vrm=YA16MTO")}`
     );
-    expect(screen.getByRole("link", { name: "Run the full history check" })).toHaveAttribute("href", "/buying-guide");
+    expect(screen.getByRole("link", { name: "Run the full history check" })).toHaveAttribute("href", "/buying-guide?src=mot");
   });
 
   it("offers the full history check as a button with the real price, to the right guide for the vehicle", () => {
@@ -79,10 +79,10 @@ describe("MotCheckResult", () => {
     expect(within(section).getByText(/finance, theft or write-off records/)).toBeInTheDocument();
     // The price is quoted from the checkout's own constants: £14.99 with no vehicle, £12.99 with one.
     expect(within(section).getByText(/£14\.99, or £12\.99 once you’ve added a vehicle to a free account\./)).toBeInTheDocument();
-    expect(within(section).getByRole("link", { name: "Run the full history check" })).toHaveAttribute("href", "/buying-guide");
+    expect(within(section).getByRole("link", { name: "Run the full history check" })).toHaveAttribute("href", "/buying-guide?src=mot");
     unmount();
     render(<MotCheckResult record={{ ...bike, kind: "car" }} now={NOW} />);
-    expect(screen.getByRole("link", { name: "Run the full history check" })).toHaveAttribute("href", "/cars/buying-guide");
+    expect(screen.getByRole("link", { name: "Run the full history check" })).toHaveAttribute("href", "/cars/buying-guide?src=mot");
   });
 
   it("offers both kinds when it can't tell, and says when an MOT has run out", () => {

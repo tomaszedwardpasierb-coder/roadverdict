@@ -7,6 +7,7 @@
 // own; the "Unlock" button that calls this only ever renders once a
 // visitor has already passed that gate.
 import { NextRequest, NextResponse } from "next/server";
+import { recordFunnelStep } from "@/lib/analytics/funnel";
 import { createVdiCheckoutSession } from "@/lib/payments/vdiCheckout";
 
 export const dynamic = "force-dynamic";
@@ -37,5 +38,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error }, { status });
   }
 
+  void recordFunnelStep("history_checkout");
   return NextResponse.json({ url: result.url });
 }

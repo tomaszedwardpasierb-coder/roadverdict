@@ -208,6 +208,10 @@ export function PriceGuidePage({ guide }: { guide: PriceGuide }) {
               , checked {reviewedLabel(MOT_FEE_SOURCE.checked)}. You don&apos;t pay VAT on the fee.
             </p>
           </div>
+          <p>
+            Want to see what a {vehicle.noun} failed or was advised on before?{' '}
+            <Link href="/mot-check">Check its MOT history free</Link>.
+          </p>
 
           <h2>Key dates and rules</h2>
           <ul>
