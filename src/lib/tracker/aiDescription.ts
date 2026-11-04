@@ -21,14 +21,22 @@ export interface AiDescriptionInput {
 }
 
 // Composes something like:
-// "Front brake pads at Dave's Motorcycles - 14 High Street, Colchester (Service)"
+// "Front brake pads at Dave's Motorcycles - Colchester (Service)"
 // Any missing piece is simply omitted rather than leaving a stray "at" or
-// empty parentheses.
+// empty parentheses. The street address is left out: this is the entry's
+// title, and "Unit 4, Mill Lane Trading Estate" made every title read like
+// an address. The town is enough to tell two branches apart.
+// A scanned job's notes: "Full service: engine oil, oil filter, spark
+// plugs". One entry per job, so the invoice's individual lines live here
+// rather than as entries of their own.
+export function describeWithDetails(description: string, details: string | null | undefined): string {
+  return details && details.trim() ? `${description}: ${details.trim()}` : description;
+}
+
 export function buildAiDescription(input: AiDescriptionInput): string {
   const whatFor = input.merchantName ? `${input.description} at ${input.merchantName}` : input.description;
-  const place = [input.address, input.city].filter((p): p is string => Boolean(p && p.trim())).join(", ");
   const parts = [whatFor];
-  if (place) parts.push(place);
+  if (input.city && input.city.trim()) parts.push(input.city.trim());
   const withPlace = parts.join(" - ");
   return `${withPlace} (${input.categoryLabel})`;
 }

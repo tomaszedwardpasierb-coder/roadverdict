@@ -152,7 +152,7 @@ describe("service category", () => {
     expect(result.mileage).toBe(15000);
     expect(result.mileageNeedsManualEntry).toBe(false);
     expect(result.jobType).toBe("basic-service");
-    expect(result.aiDescription).toBe("Basic service at Dave's Motorcycles - 14 High Street, Colchester (Service)");
+    expect(result.aiDescription).toBe("Basic service at Dave's Motorcycles - Colchester (Service)");
 
     const [, , , payload] = callsFor("service")[0];
     expect(payload).toMatchObject({ bikeId: "bike-1", jobType: "basic-service", cost: 80, mileage: 15000, needsReview: true, attachments: [item.attachment] });
@@ -216,6 +216,13 @@ describe("service category", () => {
   it("flags the notes with an AI-confidence caveat when even the escalated read was still unsure", async () => {
     const result: any = await commitReceiptItem(email, bike, makeItem({ description: "Basic service", mileageOnReceipt: 15000, aiLowConfidence: true }));
     expect(result.notes).toBe("Basic service (AI wasn't fully confident reading this receipt - please double-check the details)");
+  });
+
+  // One entry per job, so the invoice's individual lines are kept here.
+  it("lists what the job covered in the notes", async () => {
+    const result: any = await commitReceiptItem(email, bike, makeItem({ description: "Full service", details: "engine oil, oil filter, spark plugs", mileageOnReceipt: 15000 }));
+    expect(result.notes).toBe("Full service: engine oil, oil filter, spark plugs");
+    expect(result.jobType).toBe("full-service");
   });
 
   it("prefers the currency caveat over the AI-confidence one when both apply", async () => {
@@ -351,7 +358,7 @@ describe("mods category", () => {
 
     expect(result.modCategory).toBe("heated-grips");
     expect(result.name).toBe("Heated grips");
-    expect(result.aiDescription).toBe("Heated grips at Dave's Motorcycles - 14 High Street, Colchester (Parts & Accessories)");
+    expect(result.aiDescription).toBe("Heated grips at Dave's Motorcycles - Colchester (Parts & Accessories)");
 
     const [, , , payload] = callsFor("mod")[0];
     expect(payload).toMatchObject({ bikeId: "bike-1", category: "heated-grips", name: "Heated grips", cost: 25, mileage: 15000 });
@@ -381,7 +388,7 @@ describe("labour category", () => {
     const result: any = await commitReceiptItem(email, bike, item);
 
     expect(result.labourCategory).toBe("brake-bleeding");
-    expect(result.aiDescription).toBe("Brake bleeding at Dave's Motorcycles - 14 High Street, Colchester (Labour)");
+    expect(result.aiDescription).toBe("Brake bleeding at Dave's Motorcycles - Colchester (Labour)");
 
     const [, , , payload] = callsFor("labour")[0];
     expect(payload).toMatchObject({ bikeId: "bike-1", category: "brake-bleeding", cost: 45, mileage: 15000 });
@@ -411,7 +418,7 @@ describe("bills category", () => {
     const result: any = await commitReceiptItem(email, bike, item);
 
     expect(result.billType).toBe("insurance");
-    expect(result.aiDescription).toBe("Insurance at Dave's Motorcycles - 14 High Street, Colchester (Insurance, tax, MOT & finance)");
+    expect(result.aiDescription).toBe("Insurance at Dave's Motorcycles - Colchester (Insurance, tax, MOT & finance)");
     const [, , , payload] = callsFor("bill")[0];
     expect(payload).toMatchObject({ bikeId: "bike-1", billType: "insurance", cost: 250, needsReview: true });
     expect(payload.mileage).toBeUndefined();

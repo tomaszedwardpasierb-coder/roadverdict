@@ -6,6 +6,13 @@ describe("guessJobType", () => {
     expect(guessJobType("oil and filter change")).toBe("oil-filter");
   });
 
+  // Scans are asked for these exact names; word counting alone ties
+  // "check/adjustment" lookalikes and picks the first label in the list.
+  it("takes an exact job name before counting words", () => {
+    expect(guessJobType("Chain and sprockets")).toBe("chain-and-sprockets");
+    expect(guessJobType(" full service ")).toBe("full-service");
+  });
+
   it("returns null when nothing matches", () => {
     expect(guessJobType("xyz totally unrelated qwerty")).toBeNull();
   });

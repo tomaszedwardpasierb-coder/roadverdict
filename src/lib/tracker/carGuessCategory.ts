@@ -9,6 +9,10 @@ import { CAR_BILL_LABELS } from "./carBillTypes";
 import { CAR_LABOUR_LABELS } from "./carLabourTypes";
 
 function bestMatch(description: string, labels: Record<string, string>): string | null {
+  // Receipt scans are asked to use these exact labels - an exact name wins
+  // outright, before any word counting can tie it with a lookalike.
+  const exact = Object.entries(labels).find(([, label]) => label.toLowerCase() === description.trim().toLowerCase());
+  if (exact) return exact[0];
   const words = description.toLowerCase().split(/\s+/).filter((w) => w.length > 2);
   if (words.length === 0) return null;
   let bestKey: string | null = null;

@@ -236,7 +236,7 @@ describe("labour category", () => {
     const result: any = await commitCarReceiptItem(email, car, item);
 
     expect(result.labourCategory).toBe("coolant-replacement");
-    expect(result.aiDescription).toBe("Coolant replacement at Dave's Garage - 14 High Street, Colchester (Labour)");
+    expect(result.aiDescription).toBe("Coolant replacement at Dave's Garage - Colchester (Labour)");
     const [, , , payload] = callsFor("carLabour")[0];
     expect(payload).toMatchObject({ carId: "car-1", category: "coolant-replacement", cost: 65, mileage: 42000 });
   });

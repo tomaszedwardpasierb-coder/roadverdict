@@ -10,6 +10,11 @@ describe("guessCarJobType", () => {
     expect(guessCarJobType("cambelt and water pump replacement")).toBe("cambelt");
   });
 
+  it("takes an exact job name before counting words", () => {
+    expect(guessCarJobType("Tyres (front pair)")).toBe("tyres-front-pair");
+    expect(guessCarJobType("Interim service")).toBe("interim-service");
+  });
+
   it("returns null when nothing matches", () => {
     expect(guessCarJobType("xyz totally unrelated qwerty")).toBeNull();
   });

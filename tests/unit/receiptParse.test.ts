@@ -25,7 +25,7 @@ vi.mock("@/lib/tracker/geminiUsageLog", () => ({ logGeminiUsage: mocks.logGemini
 // mods-category carve-out from the production-year check) is exactly
 // what several tests below are confirming.
 
-import { parseReceiptFile, vehicleKindOf } from "@/lib/tracker/receiptParse";
+import { parseReceiptFile, reconcileItemCosts, vehicleKindOf } from "@/lib/tracker/receiptParse";
 
 function geminiResponse(bodyText: string) {
   return { ok: true, json: async () => ({ candidates: [{ content: { parts: [{ text: bodyText }] } }] }) };
@@ -294,6 +294,52 @@ describe("parseReceiptFile", () => {
     expect((result as any).items[0].mileageOnReceipt).toBe(15235);
   });
 
+  // Asked per item, the model put the mileage on the first job only and
+  // every other job from the same invoice said "no mileage on the receipt".
+  it("uses the receipt's one mileage and registration for every job on it", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(geminiResponse(JSON.stringify({
+      ...validGeminiPayload, mileage: 12480, registration: "ab12 cde",
+      items: [
+        { category: "service", date: "2025-06-12", cost: 199, description: "Full service" },
+        { category: "service", date: "2025-06-12", cost: 290, description: "Tyres (pair)" },
+      ],
+    }))));
+    const result = await parseReceiptFile(fakeFile(), "key", bike);
+    expect((result as any).items.map((i: any) => [i.mileageOnReceipt, i.registrationOnReceipt])).toEqual([[12480, "AB12CDE"], [12480, "AB12CDE"]]);
+  });
+
+  it("keeps an item's own mileage over the receipt's", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(geminiResponse(JSON.stringify({
+      ...validGeminiPayload, mileage: 200, items: [{ ...validGeminiPayload.items[0], mileageOnReceipt: 100 }],
+    }))));
+    const result = await parseReceiptFile(fakeFile(), "key", bike);
+    expect((result as any).items[0].mileageOnReceipt).toBe(100);
+  });
+
+  it("keeps what a job covered as its details, and drops blank details", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(geminiResponse(JSON.stringify({
+      ...validGeminiPayload,
+      items: [
+        { category: "service", date: "2025-06-12", cost: 199, description: "Full service", details: " engine oil, oil filter, spark plugs " },
+        { category: "mods", date: "2025-06-12", cost: 10, description: "Chain lube", details: "  " },
+      ],
+    }))));
+    const result = await parseReceiptFile(fakeFile(), "key", bike);
+    expect((result as any).items.map((i: any) => i.details)).toEqual(["engine oil, oil filter, spark plugs", null]);
+  });
+
+  it("works out each job's cost from its printed lines and the VAT added at the end, not the model's own split", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(geminiResponse(JSON.stringify({
+      ...validGeminiPayload, total: 239.4, vatAddedAtEnd: 39.9,
+      items: [
+        { category: "service", date: "2025-06-12", cost: 154.5, linesTotal: 116.5, description: "Interim service" },
+        { category: "service", date: "2025-06-12", cost: 84.9, linesTotal: 83, description: "Brake pads (rear)" },
+      ],
+    }))));
+    const result = await parseReceiptFile(fakeFile(), "key", car);
+    expect((result as any).items.map((i: any) => i.costGbp)).toEqual([139.8, 99.6]);
+  });
+
   // They're all proof of the same physical receipt - one upload shared
   // across every item split out of it, not a separate blob per item.
   it("uploads the photo exactly once and shares the same attachment across every item split from one receipt", async () => {
@@ -524,5 +570,51 @@ describe("car-aware prompt and skip-logic", () => {
     const promptText = body.contents[0].parts[0].text as string;
     expect(promptText).toContain("UK motorcycle-related receipt");
     expect(promptText).toContain("valve clearance");
+  });
+
+  // Each job type carries its own reminder, so the model is handed the
+  // logbook's exact job names - the vehicle's own list, not the other's.
+  it("names each vehicle's own logbook jobs in the prompt", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(geminiResponse(JSON.stringify(validGeminiPayload)));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await parseReceiptFile(fakeFile(), "key", car);
+    await parseReceiptFile(fakeFile(), "key", bike);
+
+    const [carPrompt, bikePrompt] = fetchMock.mock.calls.map((c) => JSON.parse(c[1].body).contents[0].parts[0].text as string);
+    expect(carPrompt).toContain('"Interim service"');
+    expect(carPrompt).toContain('"Tyres (front pair)"');
+    expect(bikePrompt).toContain('"Chain and sprockets"');
+    expect(bikePrompt).not.toContain('"Interim service"');
+    expect(bikePrompt).not.toContain('"Other"');
+  });
+});
+
+describe("reconcileItemCosts", () => {
+  it("adds the VAT to every job in proportion, but never to an MOT fee", () => {
+    expect(
+      reconcileItemCosts(
+        [
+          { category: "bills", linesTotal: 54.85 },
+          { category: "service", linesTotal: 189 },
+        ],
+        281.65,
+        37.8
+      )
+    ).toEqual([54.85, 226.8]);
+  });
+
+  it("counts an unrelated item towards the total, as it was paid for on the same receipt", () => {
+    expect(reconcileItemCosts([{ category: "fuel", linesTotal: 18.73 }, { category: "unrelated", linesTotal: 1.1 }], 19.83, 0)).toEqual([18.73, 1.1]);
+  });
+
+  it("keeps the model's costs when the sums don't reach the printed total", () => {
+    // Lines that already include VAT, with the VAT reported as added on top.
+    expect(reconcileItemCosts([{ category: "service", linesTotal: 199 }], 199, 33.17)).toBeNull();
+  });
+
+  it("keeps the model's costs without a total, or when any item has no printed lines", () => {
+    expect(reconcileItemCosts([{ category: "service", linesTotal: 100 }], null, 20)).toBeNull();
+    expect(reconcileItemCosts([{ category: "service", linesTotal: 100 }, { category: "service", linesTotal: null }], 150, 0)).toBeNull();
   });
 });

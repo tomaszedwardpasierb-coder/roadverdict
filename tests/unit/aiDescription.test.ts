@@ -5,10 +5,10 @@ import { describe, expect, it } from "vitest";
 // supplied as input by the caller). Nothing to mock; just exercise every
 // branch of how the pieces get assembled/omitted.
 
-import { buildAiDescription } from "@/lib/tracker/aiDescription";
+import { buildAiDescription, describeWithDetails } from "@/lib/tracker/aiDescription";
 
 describe("buildAiDescription", () => {
-  it("composes merchant and place into the full form when everything is present", () => {
+  it("names the merchant and town but leaves the street address out of the title", () => {
     const result = buildAiDescription({
       description: "Front brake pads",
       merchantName: "Dave's Motorcycles",
@@ -16,7 +16,7 @@ describe("buildAiDescription", () => {
       city: "Colchester",
       categoryLabel: "Service",
     });
-    expect(result).toBe("Front brake pads at Dave's Motorcycles - 14 High Street, Colchester (Service)");
+    expect(result).toBe("Front brake pads at Dave's Motorcycles - Colchester (Service)");
   });
 
   it("omits the merchant clause entirely when merchantName is absent", () => {
@@ -26,7 +26,7 @@ describe("buildAiDescription", () => {
       city: "Colchester",
       categoryLabel: "Service",
     });
-    expect(result).toBe("Front brake pads - 14 High Street, Colchester (Service)");
+    expect(result).toBe("Front brake pads - Colchester (Service)");
   });
 
   it("omits the merchant clause when merchantName is null", () => {
@@ -56,14 +56,14 @@ describe("buildAiDescription", () => {
     expect(result).toBe("Front brake pads at Dave's Motorcycles (Service)");
   });
 
-  it("uses just the address when city is absent", () => {
+  it("drops the place entirely when only a street address is known", () => {
     const result = buildAiDescription({
       description: "Front brake pads",
       merchantName: "Dave's Motorcycles",
       address: "14 High Street",
       categoryLabel: "Service",
     });
-    expect(result).toBe("Front brake pads at Dave's Motorcycles - 14 High Street (Service)");
+    expect(result).toBe("Front brake pads at Dave's Motorcycles (Service)");
   });
 
   it("uses just the city when address is absent", () => {
@@ -103,13 +103,24 @@ describe("buildAiDescription", () => {
     expect(result).toBe("Oil change (Maintenance)");
   });
 
-  it("joins address and city with a comma-space when both are present", () => {
+  it("never puts the street address in the title, even with a town", () => {
     const result = buildAiDescription({
       description: "Tyres",
       address: "1 Main Road",
       city: "Leeds",
       categoryLabel: "Tyres",
     });
-    expect(result).toContain("1 Main Road, Leeds");
+    expect(result).toBe("Tyres - Leeds (Tyres)");
+  });
+});
+
+describe("describeWithDetails", () => {
+  it("adds what the job covered after its name", () => {
+    expect(describeWithDetails("Full service", "engine oil, oil filter")).toBe("Full service: engine oil, oil filter");
+  });
+
+  it("is just the name when there are no details", () => {
+    expect(describeWithDetails("MOT test", null)).toBe("MOT test");
+    expect(describeWithDetails("MOT test", "  ")).toBe("MOT test");
   });
 });

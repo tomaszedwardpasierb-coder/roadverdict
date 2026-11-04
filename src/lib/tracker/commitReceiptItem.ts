@@ -12,7 +12,7 @@ import { guessJobType, guessModCategory, guessBillType, guessLabourCategory } fr
 import { JOB_LABELS, JOB_REMINDER_DEFAULTS } from "@/lib/tracker/jobTypes";
 import { BILL_LABELS, BILL_REMINDER_DEFAULTS } from "@/lib/tracker/billTypes";
 import { LABOUR_LABELS } from "@/lib/tracker/labourTypes";
-import { buildAiDescription } from "@/lib/tracker/aiDescription";
+import { buildAiDescription, describeWithDetails } from "@/lib/tracker/aiDescription";
 import { findPossibleDuplicate, type DuplicateMatch } from "@/lib/tracker/duplicateCheck";
 import { checkMileageConsistency, describeMileageCheck, type HistoryPoint } from "@/lib/tracker/mileageCheck";
 import { guessFilledToFull } from "@/lib/tracker/tankGuess";
@@ -128,7 +128,7 @@ export async function commitReceiptItem(
   // file has always deliberately avoided.
   boundsOnlyHints: { date: string; mileage: number; batchIndex?: number }[] = []
 ): Promise<ReviewQueueEntry> {
-  const { category, date, costGbp, description, litres, mileageOnReceipt, registrationOnReceipt, merchantName, address, city, vehicleMakeOnReceipt, vehicleModelOnReceipt, attachment, currencyConversion, forceReview, aiLowConfidence } = item;
+  const { category, date, costGbp, description, details, litres, mileageOnReceipt, registrationOnReceipt, merchantName, address, city, vehicleMakeOnReceipt, vehicleModelOnReceipt, attachment, currencyConversion, forceReview, aiLowConfidence } = item;
 
   // The very first thing checked, before anything category- or
   // mileage-specific: does this receipt even claim to be for THIS bike?
@@ -330,7 +330,7 @@ export async function commitReceiptItem(
   if (category === "service") {
     const jobType = guessJobType(description) ?? "other";
     const notes = [
-      withAiCaveat(description, forceReview, aiLowConfidence),
+      withAiCaveat(describeWithDetails(description, details), forceReview, aiLowConfidence),
       mileageWarning ? `⚠ ${mileageWarning}` : null,
     ].filter(Boolean).join(" - ");
     const jobLabel = JOB_LABELS[jobType] ?? jobType;
@@ -403,7 +403,7 @@ export async function commitReceiptItem(
   if (category === "labour") {
     const labourCategory = guessLabourCategory(description) ?? "other";
     const notes = [
-      withAiCaveat(description, forceReview, aiLowConfidence),
+      withAiCaveat(describeWithDetails(description, details), forceReview, aiLowConfidence),
       mileageWarning ? `⚠ ${mileageWarning}` : null,
     ].filter(Boolean).join(" - ");
     const labourLabel = LABOUR_LABELS[labourCategory] ?? labourCategory;

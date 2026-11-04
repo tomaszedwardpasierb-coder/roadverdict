@@ -209,8 +209,11 @@ export function reviewReasons(entry: ReviewEntry, item: ParsedItem, vehicle: Gar
   if (item.forceReview) reasons.push('The receipt is in another currency – check the converted amount.');
   if (item.aiLowConfidence) reasons.push('The receipt was hard to read – check every figure.');
   if (entry.category !== 'bills') {
-    if (entry.mileageNeedsManualEntry) reasons.push('There’s no mileage on the receipt and not enough history to estimate it – please enter it.');
-    else if (entry.mileageWarningText) reasons.push(entry.mileageWarningText);
+    // The server's own explanation first: a receipt mileage that clashes
+    // with the history also needs manual entry, and used to be reported as
+    // "no mileage on the receipt" when the receipt clearly had one.
+    if (entry.mileageWarningText) reasons.push(entry.mileageWarningText);
+    else if (entry.mileageNeedsManualEntry) reasons.push('There’s no mileage on the receipt and not enough history to estimate it – please enter it.');
     else if (typeof item.mileageOnReceipt !== 'number') reasons.push('There’s no mileage on the receipt, so it’s been estimated from your history – check it.');
   }
   if (litresLookWrong(entry, vehicle) && entry.category === 'fuel') {
