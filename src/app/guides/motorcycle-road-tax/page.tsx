@@ -25,7 +25,10 @@ export const metadata: Metadata = pageMetadata({
   // The rates are the ones from 1 April 2026 (lib/motorcycleVed.ts), so the
   // year is accurate - and "rates 2026" is how people search for them.
   title: 'Motorcycle Road Tax 2026: Rates by Engine Size',
-  description: `Motorcycle road tax 2026/27: ${formatPounds(up150.twelveMonths)} a year up to 150cc (every 125), ${formatPounds(mid.twelveMonths)} for 151-400cc, ${formatPounds(upper.twelveMonths)} for 401-600cc, ${formatPounds(top.twelveMonths)} over 600cc. Monthly, electric and used bikes.`,
+  // Not every rate: when the snippet listed all four, searchers had their
+  // answer without clicking (1,310 impressions at position 9, 2 clicks in
+  // the 28 days to 2 November 2026).
+  description: `Motorcycle road tax 2026/27 starts at ${formatPounds(up150.twelveMonths)} a year. Find your bike's band (with real examples), what paying monthly adds, and which bikes pay nothing.`,
   path: '/guides/motorcycle-road-tax',
 });
 
