@@ -97,6 +97,9 @@ export function SiteFooterLinks() {
           <li>
             <Link href="/mot-statistics">UK MOT statistics</Link>
           </li>
+          <li>
+            <Link href="/mot-statistics/by-area">MOT fail rates by area</Link>
+          </li>
         </ul>
       </div>
       <div className="site-footer__col">

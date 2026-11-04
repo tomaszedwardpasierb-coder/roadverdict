@@ -64,5 +64,6 @@ describe("MotStatisticsPage", () => {
     render(<MotStatisticsPage />);
     expect(screen.getByRole("link", { name: "Free MOT history check" })).toHaveAttribute("href", "/mot-check");
     expect(screen.getAllByRole("link").some((a) => a.getAttribute("href") === "/cars/costs/tyres")).toBe(true);
+    expect(screen.getByRole("link", { name: "MOT fail rates by area" })).toHaveAttribute("href", "/mot-statistics/by-area");
   });
 });

@@ -255,6 +255,10 @@ export default function MotStatisticsPage() {
           {formatPounds(MOT_MAX_FEE.motorcycle)} for a motorcycle - the government limit, which hasn&apos;t changed since 2010.
         </li>
       </ul>
+      <p>
+        How does your area compare? <Link href="/mot-statistics/by-area">MOT fail rates by area</Link> ranks every postcode area
+        in Great Britain.
+      </p>
 
       <h2>MOT results by vehicle type</h2>
       <div className={styles.tableWrap}>
