@@ -13,6 +13,7 @@
 // round-trip and no concurrency dependency at all.
 import { NextRequest, NextResponse } from "next/server";
 import { getAdminSession } from "@/lib/admin/session";
+import { MANUAL_RUN_HEADER } from "@/lib/admin/cronLock";
 import { POST as updateFuelPrice } from "@/app/api/cron/update-fuel-price/route";
 import { POST as checkReminders } from "@/app/api/cron/check-reminders/route";
 import { POST as backfillBikeId } from "@/app/api/cron/backfill-bike-id/route";
@@ -65,7 +66,7 @@ export async function POST(request: Request, props: { params: Promise<{ name: st
 
   const cronRequest = new NextRequest(`http://internal/api/cron/${params.name}`, {
     method: "POST",
-    headers: { Authorization: `Bearer ${process.env.CRON_SECRET}` },
+    headers: { Authorization: `Bearer ${process.env.CRON_SECRET}`, [MANUAL_RUN_HEADER]: "1" },
   });
   const res = await handler(cronRequest);
   const data = await res.json();

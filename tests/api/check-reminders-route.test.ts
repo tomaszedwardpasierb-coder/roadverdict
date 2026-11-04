@@ -55,7 +55,11 @@ vi.mock("@/lib/cosmos", () => ({
   getContainer: () => ({ items: { upsert: mocks.upsert } }),
 }));
 vi.mock("@/lib/subscriptions", () => ({ isPro: mocks.isPro }));
-vi.mock("@/lib/admin/cronLock", () => ({ acquireCronLock: mocks.acquireCronLock, releaseCronLock: mocks.releaseCronLock }));
+vi.mock("@/lib/admin/cronLock", () => ({
+  acquireCronLock: mocks.acquireCronLock,
+  releaseCronLock: mocks.releaseCronLock,
+  MANUAL_RUN_HEADER: "x-cron-manual",
+}));
 vi.mock("@/lib/payments/proSubscription", () => ({ sendProTrialEndingReminders: mocks.sendProTrialEndingReminders }));
 
 import { POST } from "@/app/api/cron/check-reminders/route";
@@ -122,7 +126,7 @@ describe("POST /api/cron/check-reminders", () => {
   // Two schedulers fire it at 09:00 within seconds: the second must not
   // send everything the first hasn't stamped yet a second time.
   it("stops without reading or sending anything while another run holds the lock", async () => {
-    mocks.acquireCronLock.mockResolvedValue(false);
+    mocks.acquireCronLock.mockImplementation(async (name: string) => name !== "check-reminders");
     mocks.getAllReminders.mockResolvedValue([overdueDateReminder()]);
     const response = await POST(request({ authorization: "Bearer top-secret" }));
     expect(response.status).toBe(200);
@@ -132,11 +136,41 @@ describe("POST /api/cron/check-reminders", () => {
     expect(mocks.releaseCronLock).not.toHaveBeenCalled();
   });
 
-  it("takes the lock only for a caller with the secret, and gives it back when done", async () => {
+  it("takes the locks only for a caller with the secret, gives the run lock back, and keeps the day's", async () => {
     await POST(request({ authorization: "Bearer wrong" }));
     expect(mocks.acquireCronLock).not.toHaveBeenCalled();
     await POST(request({ authorization: "Bearer top-secret" }));
+    expect(mocks.acquireCronLock).toHaveBeenCalledWith("check-reminders-daily", 20 * 60 * 60 * 1000);
     expect(mocks.acquireCronLock).toHaveBeenCalledWith("check-reminders");
+    expect(mocks.releaseCronLock).toHaveBeenCalledWith("check-reminders");
+    expect(mocks.releaseCronLock).not.toHaveBeenCalledWith("check-reminders-daily");
+  });
+
+  // 4 Nov 2026: the second scheduler called 5 seconds after the first run
+  // had finished, so the run lock was already free.
+  it("stops a second scheduled call the same day, even after the first run has finished", async () => {
+    mocks.acquireCronLock.mockImplementation(async (name: string) => name !== "check-reminders-daily");
+    mocks.getAllReminders.mockResolvedValue([overdueDateReminder()]);
+    const response = await POST(request({ authorization: "Bearer top-secret" }));
+    expect(await response.json()).toEqual({ ok: true, skipped: "Already ran today." });
+    expect(mocks.acquireCronLock).not.toHaveBeenCalledWith("check-reminders");
+    expect(mocks.getAllReminders).not.toHaveBeenCalled();
+    expect(mocks.sendReminderEmail).not.toHaveBeenCalled();
+  });
+
+  it("lets \"Run now\" on /tomasz run after the day's scheduled run", async () => {
+    mocks.acquireCronLock.mockImplementation(async (name: string) => name !== "check-reminders-daily");
+    const response = await POST(request({ authorization: "Bearer top-secret", "x-cron-manual": "1" }));
+    expect((await response.json()).ok).toBe(true);
+    expect(mocks.acquireCronLock).not.toHaveBeenCalledWith("check-reminders-daily", expect.anything());
+    expect(mocks.getAllReminders).toHaveBeenCalled();
+  });
+
+  it("gives the day's lock back when the run fails, so the next call can try again", async () => {
+    mocks.getAllReminders.mockRejectedValue(new Error("database down"));
+    const response = await POST(request({ authorization: "Bearer top-secret" }));
+    expect(response.status).toBe(500);
+    expect(mocks.releaseCronLock).toHaveBeenCalledWith("check-reminders-daily");
     expect(mocks.releaseCronLock).toHaveBeenCalledWith("check-reminders");
   });
 

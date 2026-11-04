@@ -11,11 +11,16 @@
 // The lock is one document per job: whoever creates it runs, and it's
 // deleted at the end. It also expires, so a run that died halfway can't
 // block the next day's. Taken only after the cron secret is checked, so a
-// stranger can't hold it.
+// stranger can't hold it. A job that should run once a day can also take
+// a second, longer lock and simply not release it (check-reminders does).
 import { getContainer } from "@/lib/cosmos";
 
 const PK = "system";
 const DEFAULT_HOLD_MS = 15 * 60 * 1000;
+
+// Set by /tomasz's "Run now" (admin/run-cron), so a job can tell an
+// admin's deliberate run from a scheduler's call.
+export const MANUAL_RUN_HEADER = "x-cron-manual";
 
 type CronLockDoc = { id: string; pk: string; type: "cronLock"; name: string; until: string };
 

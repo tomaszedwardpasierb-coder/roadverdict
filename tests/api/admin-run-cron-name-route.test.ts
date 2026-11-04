@@ -113,6 +113,8 @@ describe("POST /api/admin/run-cron/[name]", () => {
       expect(mocks.updateFuelPrice).toHaveBeenCalledTimes(1);
       const calledWith = mocks.updateFuelPrice.mock.calls[0][0] as Request;
       expect(calledWith.headers.get("authorization")).toBe("Bearer test-cron-secret");
+      // Marks it as an admin's deliberate run (check-reminders lets it past its once-a-day marker).
+      expect(calledWith.headers.get("x-cron-manual")).toBe("1");
       expect(calledWith.method).toBe("POST");
       expect(fetchSpy).not.toHaveBeenCalled();
 

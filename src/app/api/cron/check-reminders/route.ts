@@ -1,7 +1,7 @@
 // Place at: src/app/api/cron/check-reminders/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { withCronRun } from "@/lib/admin/cronRuns";
-import { acquireCronLock, releaseCronLock } from "@/lib/admin/cronLock";
+import { acquireCronLock, MANUAL_RUN_HEADER, releaseCronLock } from "@/lib/admin/cronLock";
 import {
   getAllReminders,
   computeReminderStatus,
@@ -48,6 +48,11 @@ async function notifyReminder(email: string, data: { title: string; body: string
 // over every reminder in the database, so concurrent Cosmos/Resend load
 // stays bounded as the reminder count grows.
 const CRON_BATCH_SIZE = 20;
+
+// The once-a-day marker (see handle). 20 hours, not 24, leaves room for
+// the scheduler's own clock moving an hour at the clock changes.
+const DAILY_LOCK = "check-reminders-daily";
+const DAILY_HOLD_MS = 20 * 60 * 60 * 1000;
 
 interface ReminderCheckOutcome {
   notified: number;
@@ -201,8 +206,18 @@ async function handle(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  // The second scheduler's call, seconds behind the first, stops here
-  // rather than sending everything not yet stamped a second time.
+  // Scheduled calls run once a day. The first to arrive keeps this marker
+  // for 20 hours, so the other scheduler's call stops here even when it
+  // comes after the first run has finished (4 Nov: 09:00:00 and 09:00:05).
+  // "Run now" on /tomasz goes past it, and a failed run gives it back so
+  // the next call can try again.
+  const manual = req.headers.get(MANUAL_RUN_HEADER) === "1";
+  if (!manual && !(await acquireCronLock(DAILY_LOCK, DAILY_HOLD_MS))) {
+    return NextResponse.json({ ok: true, skipped: "Already ran today." });
+  }
+
+  // Any call while a run is going (including "Run now") stops here rather
+  // than sending everything not yet stamped a second time.
   if (!(await acquireCronLock("check-reminders"))) {
     return NextResponse.json({ ok: true, skipped: "Another run is in progress." });
   }
@@ -246,6 +261,7 @@ async function handle(req: NextRequest) {
 
     return NextResponse.json({ ok: true, checked, sent, notified, ...(trialReminders ? { trialReminders } : {}), ...(failed ? { failed } : {}) });
   } catch {
+    if (!manual) await releaseCronLock(DAILY_LOCK);
     return NextResponse.json({ error: "Unexpected error checking reminders" }, { status: 500 });
   } finally {
     await releaseCronLock("check-reminders");
