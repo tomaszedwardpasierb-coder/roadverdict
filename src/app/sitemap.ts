@@ -17,7 +17,7 @@ const PAGES: { path: string; lastModified: string; priority: number }[] = [
   { path: '/cars/quote-checker', lastModified: '2026-10-08', priority: 0.9 },
   { path: '/mot-check', lastModified: '2026-10-10', priority: 0.9 },
   { path: '/mot-statistics', lastModified: '2026-11-04', priority: 0.8 },
-  { path: '/mot-statistics/by-area', lastModified: '2026-11-04', priority: 0.8 },
+  { path: '/mot-statistics/by-area', lastModified: '2026-11-05', priority: 0.8 },
   { path: '/cost-calculator', lastModified: '2026-09-27', priority: 0.8 },
   { path: '/cars/cost-calculator', lastModified: '2026-09-27', priority: 0.8 },
   { path: '/buying-guide', lastModified: '2026-10-08', priority: 0.9 },

@@ -18,6 +18,7 @@ const mocks = vi.hoisted(() => ({
   upsert: vi.fn(),
   isPro: vi.fn(),
   sendProTrialEndingReminders: vi.fn(),
+  processMotReminders: vi.fn(),
   acquireCronLock: vi.fn(),
   releaseCronLock: vi.fn(),
 }));
@@ -61,6 +62,7 @@ vi.mock("@/lib/admin/cronLock", () => ({
   MANUAL_RUN_HEADER: "x-cron-manual",
 }));
 vi.mock("@/lib/payments/proSubscription", () => ({ sendProTrialEndingReminders: mocks.sendProTrialEndingReminders }));
+vi.mock("@/lib/mot/motReminders", () => ({ processMotReminders: mocks.processMotReminders }));
 
 import { POST } from "@/app/api/cron/check-reminders/route";
 
@@ -194,6 +196,7 @@ describe("POST /api/cron/check-reminders", () => {
     mocks.sendPushToUser.mockResolvedValue(0);
     mocks.upsert.mockResolvedValue(undefined);
     mocks.sendProTrialEndingReminders.mockResolvedValue(0);
+    mocks.processMotReminders.mockResolvedValue({ sent: 0, rolled: 0, dropped: 0, failed: 0 });
     mocks.getBike.mockResolvedValue(bike);
     mocks.getCarById.mockResolvedValue(car);
     // Default every account to Pro so the pre-existing send-path tests
@@ -276,6 +279,20 @@ describe("POST /api/cron/check-reminders", () => {
     expect(mocks.upsert).toHaveBeenCalledWith(expect.objectContaining({ id: "cronStatus::reminders", trialReminders: 2 }));
 
     mocks.sendProTrialEndingReminders.mockRejectedValue(new Error("Cosmos unavailable"));
+    mocks.getAllReminders.mockResolvedValue([overdueDateReminder()]);
+    const second = await POST(request({ authorization: "Bearer top-secret" }));
+    expect(await second.json()).toEqual({ ok: true, checked: 1, sent: 1, notified: 1 });
+  });
+
+  it("sends the no-account MOT reminders in the same run, and a failure there never stops the vehicle reminders", async () => {
+    mocks.processMotReminders.mockResolvedValue({ sent: 3, rolled: 1, dropped: 0, failed: 0 });
+    const response = await POST(request({ authorization: "Bearer top-secret" }));
+    expect(await response.json()).toEqual({
+      ok: true, checked: 0, sent: 0, notified: 0, motReminders: { sent: 3, rolled: 1, dropped: 0, failed: 0 },
+    });
+    expect(mocks.upsert).toHaveBeenCalledWith(expect.objectContaining({ id: "cronStatus::reminders", motReminders: expect.objectContaining({ sent: 3 }) }));
+
+    mocks.processMotReminders.mockRejectedValue(new Error("Cosmos unavailable"));
     mocks.getAllReminders.mockResolvedValue([overdueDateReminder()]);
     const second = await POST(request({ authorization: "Bearer top-secret" }));
     expect(await second.json()).toEqual({ ok: true, checked: 1, sent: 1, notified: 1 });

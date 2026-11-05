@@ -62,7 +62,7 @@ export function PrivacyContent() {
   return (
     <div className={styles.wrapper}>
       <h1 className={styles.title}>Privacy Policy</h1>
-      <span className={styles.updated}>Last updated: 3 November 2026</span>
+      <span className={styles.updated}>Last updated: 5 November 2026</span>
       <p className={styles.intro}>
         RoadVerdict is a small, independently run UK site. This page explains, in plain
         terms, what we collect, why, how long we keep it, who we share it with, and how
@@ -74,6 +74,7 @@ export function PrivacyContent() {
         <h2>At a glance</h2>
         <ul>
           <li>The Quote Checker, Cost Calculator, and Buying Guide need no account and collect nothing that identifies you.</li>
+          <li>The free MOT check needs no account. If you ask it to email you before an MOT is due, we keep your email address for that alone, until you stop the reminders.</li>
           <li>The free tracker needs an email address (for magic-link sign-in) and stores whatever you choose to log against your bike or car.</li>
           <li>Receipts you scan are read by an AI provider to fill in the details automatically - you always review before anything saves.</li>
           <li>We look up your registration plate against DVLA/DVSA-sourced records to show MOT history and vehicle specs.</li>
@@ -145,6 +146,25 @@ export function PrivacyContent() {
           misuse, we keep a count of how many receipts and questions each visitor has tried
           that day, under a scrambled form of the internet address (not the address itself),
           and delete it after two days.
+        </p>
+        <p>
+          The free MOT check needs no account either. The registration you type is looked up
+          in DVSA&apos;s MOT History service (or, if that is unavailable, through Vehicle Data
+          Global), and the result is kept for a day so the same plate isn&apos;t looked up
+          again. As with the demo, we count each visitor&apos;s checks that day under a
+          scrambled form of the internet address, and delete the count after two days.
+        </p>
+        <p>
+          If you ask the MOT check to <strong>email you before an MOT is due</strong>, we keep
+          your email address, that vehicle&apos;s registration, make and model, and its MOT due
+          date. Nothing is sent until you confirm from the email we send you; a request you
+          don&apos;t confirm deletes itself after 7 days. Once confirmed, we email you (through
+          Resend) about 4 weeks before each MOT, with what that vehicle&apos;s last MOT
+          recorded, looking its MOT record up again first. Every email has a link to stop
+          them, which deletes your address. We also delete it if the vehicle&apos;s MOT
+          hasn&apos;t been renewed 4 months after it ran out. We use the address for nothing
+          else and never share it. The legal basis is your consent (Article 6(1)(a)), which you
+          can withdraw at any time with that link.
         </p>
       </section>
 
@@ -624,6 +644,10 @@ export function PrivacyContent() {
             <tr>
               <td>Share link tokens and buyer receipt requests</td>
               <td>Deleted automatically once the link&apos;s chosen duration expires, or immediately if you revoke it</td>
+            </tr>
+            <tr>
+              <td>An MOT reminder set on the free MOT check (email address and registration)</td>
+              <td>Until you stop it from any reminder email; deleted after 7 days if never confirmed, or 4 months after an MOT that isn&apos;t renewed</td>
             </tr>
             <tr>
               <td>Anonymised Quote Checker data</td>

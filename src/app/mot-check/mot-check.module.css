@@ -201,3 +201,30 @@ div.page p.quiet { font-size: 0.95rem; color: var(--ink-soft); }
 .about h2:not(:first-child) { margin-top: 1.6rem; }
 .about h3 { font-size: 1.02rem; margin: 1rem 0 0.35rem; }
 .about .saveActions { align-items: center; margin-bottom: 0.4rem; }
+
+/* "Email me before this MOT is due" (MotReminderForm), under the MOT
+   status in the vehicle card. */
+.reminder { margin-top: 1rem; padding-top: 0.9rem; border-top: 1px solid var(--line-soft); }
+.reminderTitle { display: block; font-weight: 700; margin-bottom: 0.2rem; }
+div.page p.reminderNote { margin: 0 0 0.6rem; font-size: 0.95rem; color: var(--ink-soft); }
+.emailInput {
+  flex: 1 1 14rem;
+  max-width: 22rem;
+  min-height: 3rem;
+  padding: 0 0.9rem;
+  border: 2px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 1rem;
+  background: #fff;
+  color: var(--ink);
+}
+.emailInput:focus-visible { outline: 3px solid var(--blue); outline-offset: 2px; }
+div.page p.reminderDone { margin: 1rem 0 0; padding: 0.7rem 0.9rem; border-radius: var(--radius-sm); background: var(--green-tint); color: #155c40; font-weight: 600; }
+div.page p.reminderError { margin: 0.5rem 0 0; color: var(--red); font-size: 0.95rem; }
+/* The bot trap: off-screen, never seen or tabbed to. */
+.hp { position: absolute; left: -10000px; width: 1px; height: 1px; overflow: hidden; }
+
+/* The one-question poll (MotIntentPoll), under the vehicle card. */
+.poll { background: var(--paper); border: 1px dashed var(--border); border-radius: var(--radius-md); padding: 0.9rem 1.25rem; }
+.pollQuestion { font-size: 1rem; margin: 0 0 0.5rem; }
+div.page p.pollAnswer { margin: 0; color: var(--ink-soft); }

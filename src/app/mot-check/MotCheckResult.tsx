@@ -3,14 +3,18 @@
 // What the free MOT check shows for one vehicle: its MOT status, the
 // RoadVerdict MOT score with its reasons, the mileage at each test, and
 // every test with each defect explained (and costed where our price
-// tables cover it). Rendered on the server from a MotRecord - no state,
-// no client code - so it can be tested with any record.
+// tables cover it). Rendered on the server from a MotRecord, so it can be
+// tested with any record; the only client parts are the MOT reminder form
+// and the one-question poll.
 import Link from 'next/link';
 import { explainDefect, SEVERITY, CATEGORIES } from '@/lib/mot/motDefects';
 import { computeMotScore, BAND_LABEL, SCORE_RULES } from '@/lib/mot/motScore';
 import type { MotRecord, MotVehicleKind } from '@/lib/mot/motRecord';
+import { reminderDate } from '@/lib/mot/motReminders';
 import { BUYING_GUIDE_REPORT_PRICE_LABEL } from '@/lib/payments/pricing';
 import { PlayStoreLink } from '@/components/PlayStoreLink';
+import { MotReminderForm } from './MotReminderForm';
+import { MotIntentPoll } from './MotIntentPoll';
 import styles from './mot-check.module.css';
 
 function ukDate(iso: string): string {
@@ -35,6 +39,11 @@ export function MotCheckResult({ record, now = new Date() }: { record: MotRecord
   const valid = due !== null && due.getTime() >= now.getTime();
   const vehicleName = [titleCase(record.make), record.model.toUpperCase()].filter(Boolean).join(' ') || record.registration;
   const facts = [record.colour && titleCase(record.colour), record.fuelType && titleCase(record.fuelType)].filter(Boolean).join(' · ');
+  const historyHref = record.kind === 'car' ? '/cars/buying-guide?src=mot' : '/buying-guide?src=mot';
+  // The reminder needs an MOT that hasn't run out yet.
+  const remindAt = valid ? reminderDate(record.motDueDate!) : null;
+  const reminderWhen =
+    remindAt === null ? null : remindAt.getTime() > now.getTime() ? `On ${ukDate(remindAt.toISOString())}, 4 weeks before,` : 'Within a day, as it’s due in under 4 weeks,';
   // Oldest first, one per day: a fail and its same-day retest share a reading.
   const readings = [...record.tests]
     .reverse()
@@ -56,7 +65,10 @@ export function MotCheckResult({ record, now = new Date() }: { record: MotRecord
                 ? `MOT valid until ${ukDate(record.motDueDate!)}`
                 : `MOT expired on ${ukDate(record.motDueDate!)}`}
         </p>
+        {reminderWhen ? <MotReminderForm registration={record.registration} when={reminderWhen} /> : null}
       </section>
+
+      <MotIntentPoll registration={record.registration} historyHref={historyHref} hasReminder={reminderWhen !== null} />
 
       {score ? (
         <section className={styles.card} aria-labelledby="score-heading">
@@ -183,7 +195,7 @@ export function MotCheckResult({ record, now = new Date() }: { record: MotRecord
           The MOT record doesn’t show outstanding finance, theft or write-off records. The full history check does.
         </p>
         <div className={styles.saveActions}>
-          <Link className={styles.primary} href={record.kind === 'car' ? '/cars/buying-guide?src=mot' : '/buying-guide?src=mot'}>
+          <Link className={styles.primary} href={historyHref}>
             Run the full history check
           </Link>
           <span className={styles.buyingPrice}>

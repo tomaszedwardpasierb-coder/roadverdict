@@ -41,6 +41,24 @@ const LATER: { group: string; steps: { key: string; label: string }[] }[] = [
     ],
   },
   {
+    // The no-account MOT reminder on a free MOT check result (5 Nov 2026).
+    group: 'MOT reminder (no account)',
+    steps: [
+      { key: 'mot_result', label: 'Free MOT check result' },
+      { key: 'mot_reminder_requested', label: 'Reminder asked for' },
+      { key: 'mot_reminder_confirmed', label: 'Confirmed from the email' },
+    ],
+  },
+  {
+    // The one-question poll on the same result: the second row's share is
+    // buyers per owner.
+    group: 'MOT check poll: whose vehicle?',
+    steps: [
+      { key: 'mot_poll_mine', label: 'Their own' },
+      { key: 'mot_poll_buying', label: 'Thinking of buying it' },
+    ],
+  },
+  {
     group: 'Sample-bike demo',
     steps: [
       { key: 'demo', label: 'Demo page viewed' },

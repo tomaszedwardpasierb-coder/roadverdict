@@ -53,6 +53,14 @@ export const FUNNEL_STEPS = [
   "history",
   "history_lookup",
   "history_checkout",
+  // On the free MOT check result (5 Nov 2026): the no-account MOT reminder
+  // asked for, then confirmed from its email (server steps); and the
+  // one-question poll - the visitor's own vehicle, or one they're thinking
+  // of buying (page steps).
+  "mot_reminder_requested",
+  "mot_reminder_confirmed",
+  "mot_poll_mine",
+  "mot_poll_buying",
 ] as const;
 export type FunnelStep = (typeof FUNNEL_STEPS)[number];
 

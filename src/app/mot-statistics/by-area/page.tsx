@@ -5,6 +5,7 @@
 // "Key findings", is worked out from lib/mot/motAreaStatistics.ts, which is
 // generated from DVSA's test-by-test data - never typed in.
 import type { Metadata } from 'next';
+import Image from 'next/image';
 import Link from 'next/link';
 import { pageMetadata } from '@/lib/seo/pageMetadata';
 import { buildBreadcrumbTrailJsonLd } from '@/lib/seo/breadcrumbs';
@@ -17,6 +18,7 @@ import { PlayStoreLink } from '@/components/PlayStoreLink';
 import styles from '@/components/seo/PriceGuide.module.css';
 
 const PATH = '/mot-statistics/by-area';
+const MAP_SRC = `/images/mot-fail-rate-map-${A.year}.png`;
 const FINE_SOURCE = { name: 'GOV.UK: Getting an MOT', url: 'https://www.gov.uk/getting-an-mot/after-the-test' };
 
 function pc(value: number, digits = 1): string {
@@ -174,6 +176,27 @@ export default function MotAreaStatisticsPage() {
           {AREAS.length} areas.
         </li>
       </ul>
+
+      <h2>The map</h2>
+      {/* Drawn by scripts/make-mot-fail-rate-map.py from the same figures.
+          Served as the file itself (unoptimized): it's already small, and
+          the image optimiser is the slow part of the site. */}
+      <figure style={{ margin: '0 0 1.5rem' }}>
+        <a href={MAP_SRC}>
+          <Image
+            src={MAP_SRC}
+            width={1500}
+            height={1900}
+            unoptimized
+            alt={`Map of Great Britain's postcode areas shaded by the share of cars failing their first MOT in ${A.year}: highest in ${worst.name} (${pc(failRate(worst))}) and the South West, lowest in outer London, with ${best.name} at ${pc(failRate(best))}.`}
+            style={{ width: '100%', maxWidth: '40rem', height: 'auto', display: 'block' }}
+          />
+        </a>
+        <figcaption style={{ fontSize: '0.9rem', marginTop: '0.5rem' }}>
+          Tap the map for the full size. You can share it under CC BY-SA 3.0, credited to RoadVerdict. Postcode area
+          boundaries © Wikipedia contributors (CC BY-SA 3.0).
+        </figcaption>
+      </figure>
 
       <h2>Every postcode area, highest fail rate first</h2>
       <p>

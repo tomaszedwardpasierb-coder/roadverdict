@@ -112,6 +112,14 @@ const HISTORY_CHECK_ROWS: { key: string; label: string }[] = [
   { key: "history_lookup", label: "Registrations checked (site and app)" },
   { key: "history_checkout", label: "Paid check: checkouts started (site)" },
 ];
+// The free MOT check's own two asks (5 Nov 2026): the no-account MOT
+// reminder, and the poll on whose vehicle it is.
+const MOT_CHECK_ROWS: { key: string; label: string }[] = [
+  { key: "mot_reminder_requested", label: "MOT reminders asked for (no account)" },
+  { key: "mot_reminder_confirmed", label: "MOT reminders confirmed" },
+  { key: "mot_poll_mine", label: "Poll: their own vehicle" },
+  { key: "mot_poll_buying", label: "Poll: thinking of buying it" },
+];
 const MONEY_ROWS: { key: string; label: string }[] = [
   { key: "pro", label: "Pro page visits" },
   { key: "checkout_started", label: "Checkouts started" },
@@ -206,6 +214,9 @@ ${table(DEMO_ROWS, thisWeek, lastWeek, false)}
 ${table(HISTORY_CHECK_ROWS, thisWeek, lastWeek, false)}
 <p style="margin:0 0 6px;font-size:13px;color:#5b5850;">History check page by source ("mot" is the MOT check's button): ${esc(sourcesLine(thisWeek, "history"))}</p>
 <p style="margin:0 0 6px;font-size:13px;color:#5b5850;">Registrations checked in the app: ${thisWeek["history_lookup__src_app"] ?? 0}. Checks bought in the app don't start a website checkout; they're in the paid checks at the top.</p>
+
+<h2 style="${h2}">Free MOT check: reminder and poll</h2>
+${table(MOT_CHECK_ROWS, thisWeek, lastWeek, false)}
 
 <h2 style="${h2}">Pro and shared reports</h2>
 ${table(MONEY_ROWS, thisWeek, lastWeek, false)}

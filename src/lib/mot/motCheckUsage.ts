@@ -75,6 +75,13 @@ export async function takeVisitorCheck(ip: string, limit = MOT_CHECK_LIMITS.perV
   return count > limit ? "visitor_limit" : "ok";
 }
 
+// Anything else on the MOT check that needs a daily ceiling (the MOT
+// reminder sign-up, motReminders.ts): the same kind of counter, expiring
+// the same way. Returns today's count including this one.
+export async function bumpDailyCounter(name: string): Promise<number> {
+  return bump(`${name}::${dayKey()}`);
+}
+
 // Counts one new paid lookup across the site.
 export async function takeNewLookup(limit = MOT_CHECK_LIMITS.newLookupsSiteWide): Promise<MotCheckAllowance> {
   const count = await bump(`mot-check::${dayKey()}::site`);

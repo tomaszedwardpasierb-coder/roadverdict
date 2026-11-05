@@ -28,6 +28,7 @@ import { getContainer } from "@/lib/cosmos";
 import { isPro } from "@/lib/subscriptions";
 import { runInBatches } from "@/lib/concurrency";
 import { sendProTrialEndingReminders } from "@/lib/payments/proSubscription";
+import { processMotReminders } from "@/lib/mot/motReminders";
 
 export const dynamic = "force-dynamic";
 
@@ -241,6 +242,16 @@ async function handle(req: NextRequest) {
       console.error("Pro trial ending reminders failed:", err);
     }
 
+    // The no-account MOT reminders left on the free MOT check
+    // (mot/motReminders.ts) - here so they share the once-a-day guard
+    // above. Their own try, for the same reason as the trial reminders.
+    let motReminders = { sent: 0, rolled: 0, dropped: 0, failed: 0 };
+    try {
+      motReminders = await processMotReminders();
+    } catch (err) {
+      console.error("MOT reminders failed:", err);
+    }
+
     const checked = reminders.length + carReminders.length;
     const sent = bikeTally.sent + carTally.sent;
     const notified = bikeTally.notified + carTally.notified;
@@ -257,9 +268,18 @@ async function handle(req: NextRequest) {
       notified,
       failed,
       trialReminders,
+      motReminders,
     });
 
-    return NextResponse.json({ ok: true, checked, sent, notified, ...(trialReminders ? { trialReminders } : {}), ...(failed ? { failed } : {}) });
+    return NextResponse.json({
+      ok: true,
+      checked,
+      sent,
+      notified,
+      ...(trialReminders ? { trialReminders } : {}),
+      ...(motReminders.sent || motReminders.failed ? { motReminders } : {}),
+      ...(failed ? { failed } : {}),
+    });
   } catch {
     if (!manual) await releaseCronLock(DAILY_LOCK);
     return NextResponse.json({ error: "Unexpected error checking reminders" }, { status: 500 });

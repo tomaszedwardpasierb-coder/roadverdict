@@ -724,3 +724,116 @@ export async function sendFeedbackEmail(fromEmail: string, type: "feature" | "bu
     html,
   });
 }
+
+// The no-account MOT reminder (mot/motReminders.ts): the double opt-in
+// confirmation, then one email 4 weeks before each MOT runs out.
+export interface MotReminderItem {
+  // "Advisory", "Minor"... (motDefects.ts SEVERITY labels)
+  label: string;
+  // The tester's own wording.
+  text: string;
+  // The part of the vehicle it's about, e.g. "Brakes".
+  area: string;
+  costLine: string | null;
+  quoteUrl: string | null;
+}
+
+export async function sendMotReminderConfirmEmail(params: {
+  email: string;
+  registration: string;
+  vehicleName: string;
+  motDueDate: string;
+  remindOn: string;
+  confirmUrl: string;
+}) {
+  const resend = getResend();
+  const html = renderEmailLayout({
+    preheader: `Confirm, and we'll email you on ${fmtLongDate(params.remindOn)}`,
+    heading: `Confirm your MOT reminder for ${params.registration}`,
+    bodyHtml: `
+      <p style="margin:0 0 12px;">You asked for an email before the MOT on <strong>${escapeHtml(params.registration)}</strong> (${escapeHtml(params.vehicleName)}) runs out on <strong>${fmtLongDate(params.motDueDate)}</strong>.</p>
+      <p style="margin:0 0 12px;">Confirm, and we'll email you on ${fmtLongDate(params.remindOn)}, 4 weeks before, with what its last MOT flagged, what those repairs typically cost, and what to check before the test. Then the same before each MOT after that.</p>
+      ${emailButton("Confirm my MOT reminder", params.confirmUrl)}
+      <p style="margin:0;font-size:13px;color:#54555A;">Didn't ask for this? Ignore this email: nothing more will be sent, and the request deletes itself after 7 days.</p>
+    `,
+  });
+  await resend.emails.send({
+    from: FROM,
+    to: params.email,
+    subject: `Confirm your MOT reminder for ${params.registration}`,
+    html,
+  });
+}
+
+const BEFORE_THE_TEST: Record<"bike" | "car", string[]> = {
+  car: [
+    "Lights: every bulb works, including the brake lights, indicators and number plate light.",
+    "Tyres: at least 1.6mm of tread across the middle three-quarters, with no cuts or bulges.",
+    "Wipers and washers: the blades clear the screen and the washer bottle is topped up.",
+    "Windscreen: no chip or crack bigger than 10mm in the driver's line of sight.",
+    "Dashboard: no warning lights left on, such as the engine, ABS or airbag light.",
+    "Horn, seatbelts and number plates: the horn works, every belt fastens, and the plates are clean and readable.",
+  ],
+  bike: [
+    "Lights: headlight, tail light, indicators, and the brake light from both the lever and the pedal.",
+    "Tyres: at least 1mm of tread across three-quarters of the width, with no cuts or bulges.",
+    "Chain and sprockets: properly adjusted and lubricated, with no hooked teeth.",
+    "Brakes: both work, and the lever and pedal move freely.",
+    "Horn, steering and exhaust: the horn works, the steering turns freely, and the exhaust isn't blowing or too loud.",
+  ],
+};
+
+export async function sendMotReminderEmail(params: {
+  email: string;
+  registration: string;
+  vehicleName: string;
+  kind: "bike" | "car" | null;
+  motDueDate: string;
+  lastTestDate: string | null;
+  items: MotReminderItem[];
+  unsubscribeUrl: string;
+  oneClickUnsubscribeUrl: string;
+  saveUrl: string;
+}) {
+  const resend = getResend();
+  const appUrl = process.env.APP_URL ?? "https://roadverdict.co.uk";
+  const due = fmtLongDate(params.motDueDate);
+  const itemsHtml = params.items
+    .map(
+      (item) => `<li style="margin:0 0 10px;">
+        <strong>${escapeHtml(item.label)}</strong> (${escapeHtml(item.area)}): ${escapeHtml(item.text)}
+        ${item.costLine ? `<br><span style="color:#54555A;">${escapeHtml(item.costLine)}.${item.quoteUrl ? ` <a href="${item.quoteUrl}" style="color:#54555A;">Got a quote? Check it</a>` : ""}</span>` : ""}
+      </li>`
+    )
+    .join("");
+  const lastTest = params.lastTestDate
+    ? params.items.length > 0
+      ? `<p style="margin:0 0 8px;">At its last MOT, on ${fmtLongDate(params.lastTestDate)}, the tester noted:</p><ul style="margin:0 0 16px;padding-left:20px;">${itemsHtml}</ul>
+         <p style="margin:0 0 16px;">An advisory that's still there can become a fail, so these are the first things to look at.</p>`
+      : `<p style="margin:0 0 16px;">Its last MOT, on ${fmtLongDate(params.lastTestDate)}, recorded no defects or advisories.</p>`
+    : "";
+  const checks = BEFORE_THE_TEST[params.kind === "bike" ? "bike" : "car"].map((c) => `<li style="margin:0 0 6px;">${escapeHtml(c)}</li>`).join("");
+  const html = renderEmailLayout({
+    preheader: `What its last MOT flagged, and what to check before the test`,
+    heading: `MOT due ${due}: ${params.registration}`,
+    bodyHtml: `
+      <p style="margin:0 0 12px;">The MOT on <strong>${escapeHtml(params.registration)}</strong> (${escapeHtml(params.vehicleName)}) runs out on <strong>${due}</strong>. You can have the test any time from a month (minus a day) before then and keep the same renewal date.</p>
+      ${lastTest}
+      <p style="margin:0 0 8px;"><strong>Quick checks before the test</strong> - simple things that fail a lot of MOTs:</p>
+      <ul style="margin:0 0 16px;padding-left:20px;">${checks}</ul>
+      ${emailButton("See its full MOT history", `${appUrl}/mot-check?vrm=${encodeURIComponent(params.registration)}`)}
+      <p style="margin:0 0 16px;">Want its services, receipts and reminders in one place? <a href="${params.saveUrl}" style="color:#1C1D20;">Save it to a free logbook</a>.</p>
+      <p style="margin:0;font-size:13px;color:#54555A;">You're getting this because you asked for an MOT reminder for ${escapeHtml(params.registration)} on roadverdict.co.uk. <a href="${params.unsubscribeUrl}" style="color:#54555A;">Stop these reminders</a>.</p>
+    `,
+  });
+  await resend.emails.send({
+    from: FROM,
+    to: params.email,
+    subject: `MOT due ${due}: ${params.registration} - what to check`,
+    html,
+    headers: {
+      "List-Unsubscribe": `<${params.oneClickUnsubscribeUrl}>`,
+      "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+    },
+  });
+}
