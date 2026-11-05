@@ -173,12 +173,14 @@ export async function requestMotReminder(input: {
     ttl: PENDING_TTL_SECONDS,
   };
   await getContainer().items.upsert(doc);
+  const remindOn = reminderDate(doc.motDueDate);
   await sendMotReminderConfirmEmail({
     email,
     registration,
     vehicleName: doc.vehicleName,
     motDueDate: doc.motDueDate,
-    remindOn: reminderDate(doc.motDueDate).toISOString(),
+    // null: due in under 4 weeks, so the next morning's run sends it.
+    remindOn: remindOn.getTime() > now.getTime() ? remindOn.toISOString() : null,
     confirmUrl: `${input.appUrl}/api/mot-reminder/confirm?r=${key}&t=${confirm.raw}`,
   });
   void recordFunnelStep("mot_reminder_requested");

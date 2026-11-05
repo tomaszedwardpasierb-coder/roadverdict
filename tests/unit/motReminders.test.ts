@@ -121,6 +121,12 @@ describe("requestMotReminder", () => {
     expect(mocks.funnel).toHaveBeenCalledWith("mot_reminder_requested");
   });
 
+  it("says the reminder comes within a day, not on a date already past, for an MOT due in under 4 weeks", async () => {
+    mocks.cached.mockResolvedValue(found({ ...record, motDueDate: "2026-11-11T00:00:00Z" }));
+    expect((await ask()).status).toBe("sent");
+    expect(mocks.sendConfirm.mock.calls[0][0].remindOn).toBeNull();
+  });
+
   it("turns away a bad address or registration before counting or looking anything up", async () => {
     expect(await ask({ email: "not-an-email" })).toEqual({ status: "invalid_email" });
     expect(await ask({ registration: "!!" })).toEqual({ status: "invalid_registration" });

@@ -70,13 +70,20 @@ export default async function MotReminderPage(props: { searchParams: SearchParam
 
   const dueDate = validDate(due);
   if (status === 'confirmed' && vrm) {
+    // An MOT due in under 4 weeks gets its reminder from the next morning's run.
+    const remindOn = dueDate ? reminderDate(dueDate) : null;
     return (
       <Panel title="Your MOT reminder is on">
         <p className={styles.lead}>
-          {dueDate ? (
+          {dueDate && remindOn && remindOn.getTime() > Date.now() ? (
             <>
-              We’ll email you on {ukDate(reminderDate(dueDate).toISOString())}, 4 weeks before the MOT on{' '}
-              <strong>{vrm}</strong> runs out on {ukDate(dueDate)}
+              We’ll email you on {ukDate(remindOn.toISOString())}, 4 weeks before the MOT on <strong>{vrm}</strong> runs
+              out on {ukDate(dueDate)}
+            </>
+          ) : dueDate ? (
+            <>
+              The MOT on <strong>{vrm}</strong> runs out on {ukDate(dueDate)}, in under 4 weeks, so we’ll email you within a
+              day
             </>
           ) : (
             <>

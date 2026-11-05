@@ -111,6 +111,13 @@ describe("the reminder link page", () => {
     expect(screen.getByText(/We’ll email you on 12 February 2027, 4 weeks before the MOT on/)).toBeInTheDocument();
   });
 
+  it("never names a reminder date that has already passed", async () => {
+    const soon = new Date(Date.now() + 6 * 86_400_000).toISOString();
+    await show({ status: "confirmed", vrm: "AG58XTP", due: soon });
+    expect(screen.getByText(/in under 4 weeks, so we’ll email you within a day/)).toBeInTheDocument();
+    expect(screen.queryByText(/We’ll email you on/)).toBeNull();
+  });
+
   it("asks before stopping anything, posting the link's secret", async () => {
     findForUnsubscribe.mockResolvedValue({ ok: true, registration: "AB12CDE", motDueDate: "2027-03-12" });
     const { container } = await show({ unsubscribe: "a".repeat(40), t: "unsub" });

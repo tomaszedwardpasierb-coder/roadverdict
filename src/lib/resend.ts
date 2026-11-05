@@ -743,16 +743,19 @@ export async function sendMotReminderConfirmEmail(params: {
   registration: string;
   vehicleName: string;
   motDueDate: string;
-  remindOn: string;
+  // When the reminder will go; null for an MOT due in under 4 weeks, whose
+  // reminder goes the next morning.
+  remindOn: string | null;
   confirmUrl: string;
 }) {
   const resend = getResend();
+  const when = params.remindOn ? `on ${fmtLongDate(params.remindOn)}, 4 weeks before,` : "within a day, as it's due in under 4 weeks,";
   const html = renderEmailLayout({
-    preheader: `Confirm, and we'll email you on ${fmtLongDate(params.remindOn)}`,
+    preheader: params.remindOn ? `Confirm, and we'll email you on ${fmtLongDate(params.remindOn)}` : "Confirm, and we'll email you within a day",
     heading: `Confirm your MOT reminder for ${params.registration}`,
     bodyHtml: `
       <p style="margin:0 0 12px;">You asked for an email before the MOT on <strong>${escapeHtml(params.registration)}</strong> (${escapeHtml(params.vehicleName)}) runs out on <strong>${fmtLongDate(params.motDueDate)}</strong>.</p>
-      <p style="margin:0 0 12px;">Confirm, and we'll email you on ${fmtLongDate(params.remindOn)}, 4 weeks before, with what its last MOT flagged, what those repairs typically cost, and what to check before the test. Then the same before each MOT after that.</p>
+      <p style="margin:0 0 12px;">Confirm, and we'll email you ${when} with what its last MOT flagged, what those repairs typically cost, and what to check before the test. Then the same before each MOT after that.</p>
       ${emailButton("Confirm my MOT reminder", params.confirmUrl)}
       <p style="margin:0;font-size:13px;color:#54555A;">Didn't ask for this? Ignore this email: nothing more will be sent, and the request deletes itself after 7 days.</p>
     `,
