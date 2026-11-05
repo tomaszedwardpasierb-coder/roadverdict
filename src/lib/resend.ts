@@ -1,6 +1,7 @@
 ﻿// Place at: src/lib/resend.ts
 import { Resend } from "resend";
 import { PRO_MONTHLY_PRICE, PRO_ANNUAL_PRICE } from "@/lib/proPlan";
+import { CLUB_ANNUAL_PRICE, CLUB_DISCOUNT_PERCENT, CLUB_MONTHLY_PRICE, findClubOffer } from "@/lib/clubOffers";
 import { playStoreUrl } from "@/lib/playStore";
 let resendInstance: Resend | null = null;
 // Lazily created for the same reason as getContainer() in cosmos.ts:
@@ -190,15 +191,21 @@ function fmtLongDate(iso: string): string {
   return new Date(iso).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric", timeZone: "Europe/London" });
 }
 
-function proPriceAfterTrial(interval: "monthly" | "annual"): string {
+// A club member's price has the club's 10% off (see clubOffers.ts) - the
+// amount the card is actually charged, which these emails must state.
+function proPriceAfterTrial(interval: "monthly" | "annual", club?: string): string {
+  if (findClubOffer(club)) {
+    const price = interval === "annual" ? `${CLUB_ANNUAL_PRICE} a year` : `${CLUB_MONTHLY_PRICE} a month`;
+    return `${price} (your ${CLUB_DISCOUNT_PERCENT}% member discount)`;
+  }
   return interval === "annual" ? `${PRO_ANNUAL_PRICE} a year` : `${PRO_MONTHLY_PRICE} a month`;
 }
 
-export async function sendProTrialStartedEmail(email: string, trial: { trialEndsAt: string; interval: "monthly" | "annual" }) {
+export async function sendProTrialStartedEmail(email: string, trial: { trialEndsAt: string; interval: "monthly" | "annual"; club?: string }) {
   const resend = getResend();
   const appUrl = process.env.APP_URL ?? "https://roadverdict.co.uk";
   const ends = fmtLongDate(trial.trialEndsAt);
-  const price = proPriceAfterTrial(trial.interval);
+  const price = proPriceAfterTrial(trial.interval, trial.club);
   const html = renderEmailLayout({
     preheader: `Free until ${ends}`,
     heading: "Your free Pro trial has started",
@@ -218,11 +225,11 @@ export async function sendProTrialStartedEmail(email: string, trial: { trialEnds
   });
 }
 
-export async function sendProTrialEndingEmail(email: string, trial: { trialEndsAt: string; interval: "monthly" | "annual" }) {
+export async function sendProTrialEndingEmail(email: string, trial: { trialEndsAt: string; interval: "monthly" | "annual"; club?: string }) {
   const resend = getResend();
   const appUrl = process.env.APP_URL ?? "https://roadverdict.co.uk";
   const ends = fmtLongDate(trial.trialEndsAt);
-  const price = proPriceAfterTrial(trial.interval);
+  const price = proPriceAfterTrial(trial.interval, trial.club);
   const html = renderEmailLayout({
     preheader: `Your Pro trial ends on ${ends}`,
     heading: `Your Pro trial ends on ${ends}`,

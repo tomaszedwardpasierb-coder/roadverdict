@@ -31,6 +31,9 @@ export const STRICT_CSP_SEGMENTS = [
   // The free MOT check renders each lookup per request, from the
   // registration a visitor typed.
   'mot-check',
+  // A club member offer (/club/<code>) shows the signed-in account's own
+  // trial and Pro state.
+  'club',
 ] as const;
 
 // Segments that are prerendered public pages ('' is the homepage). Also

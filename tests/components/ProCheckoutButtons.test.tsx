@@ -35,6 +35,27 @@ describe("ProCheckoutButtons", () => {
       expect(screen.getByRole("button", { name: "Subscribe monthly - £5.99/mo" })).toBeInTheDocument();
     });
 
+    it("shows a club member's 3 free months and 10% off, and sends the club code to checkout", async () => {
+      (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({ ok: true, json: async () => ({ url: "https://checkout.stripe.com/club" }) });
+      const user = userEvent.setup();
+      render(<ProSubscribeButtons trialDays={90} club="DOCGB" />);
+      expect(screen.getByText(/Your first 3 months are free/)).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Start 3 months free - then £53.10/yr (10% off)" })).toBeInTheDocument();
+
+      await user.click(screen.getByRole("button", { name: "Start 3 months free - then £5.39/mo" }));
+
+      expect(fetch).toHaveBeenCalledWith(
+        "/api/pro/checkout",
+        expect.objectContaining({ body: JSON.stringify({ interval: "monthly", club: "DOCGB" }) })
+      );
+    });
+
+    it("shows a returning club member the 10% off without the free months", () => {
+      render(<ProSubscribeButtons trialDays={0} club="MAG" />);
+      expect(screen.queryByText(/are free/)).not.toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Subscribe monthly - £5.39/mo (10% off)" })).toBeInTheDocument();
+    });
+
     it("shows the general new-to-Pro line where the page doesn't know", () => {
       render(<ProSubscribeButtons />);
       expect(screen.getByText("New to Pro? Your first 14 days are free.")).toBeInTheDocument();

@@ -249,6 +249,27 @@ describe("sendBikeTransferAcceptedEmail", () => {
   });
 });
 
+describe("the Pro trial emails", () => {
+  const trialEndsAt = "2027-02-03T12:00:00.000Z";
+
+  it("state the usual price after the trial", async () => {
+    const { sendProTrialStartedEmail, sendProTrialEndingEmail } = await import("@/lib/resend");
+    await sendProTrialStartedEmail("rider@example.com", { trialEndsAt, interval: "monthly" });
+    await sendProTrialEndingEmail("rider@example.com", { trialEndsAt, interval: "annual" });
+    expect(mocks.send.mock.calls[0][0].html).toContain("£5.99 a month");
+    expect(mocks.send.mock.calls[1][0].html).toContain("£59 a year");
+  });
+
+  it("state a club member's discounted price - what the card is actually charged", async () => {
+    const { sendProTrialStartedEmail, sendProTrialEndingEmail } = await import("@/lib/resend");
+    await sendProTrialStartedEmail("rider@example.com", { trialEndsAt, interval: "monthly", club: "DOCGB" });
+    await sendProTrialEndingEmail("rider@example.com", { trialEndsAt, interval: "annual", club: "MAG" });
+    expect(mocks.send.mock.calls[0][0].html).toContain("£5.39 a month (your 10% member discount)");
+    expect(mocks.send.mock.calls[1][0].html).toContain("£53.10 a year (your 10% member discount)");
+    expect(mocks.send.mock.calls[1][0].html).not.toContain("£59 a year");
+  });
+});
+
 describe("sendHistoryFollowUpEmail", () => {
   it("links to the provided report URL and names the bike", async () => {
     const { sendHistoryFollowUpEmail } = await import("@/lib/resend");

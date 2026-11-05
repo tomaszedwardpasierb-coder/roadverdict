@@ -18,8 +18,8 @@
 import { getContainer } from "@/lib/cosmos";
 import { getStripe } from "@/lib/payments/stripe";
 import { getUserDoc, type UserDoc } from "@/lib/tracker/userDoc";
-import { PRO_TRIAL_DAYS } from "@/lib/proPlan";
-import { isEligibleForProTrial } from "@/lib/payments/proTrial";
+import { proTrialDaysFor } from "@/lib/payments/proTrial";
+import { CLUB_DISCOUNT_PERCENT, clubPath, type ClubOffer } from "@/lib/clubOffers";
 import { isProActive } from "@/lib/payments/storePro";
 import { sendProTrialStartedEmail, sendProTrialEndingEmail } from "@/lib/resend";
 import type Stripe from "stripe";
@@ -38,7 +38,36 @@ function priceIdFor(interval: ProInterval): string {
 
 export type CreateProCheckoutResult = { ok: true; url: string } | { ok: false; reason: "already_pro" | "creation_failed" };
 
-export async function createProCheckoutSession(email: string, interval: ProInterval, appUrl: string): Promise<CreateProCheckoutResult> {
+// The one coupon every club offer uses (see clubOffers.ts): 10% off every
+// invoice, for as long as the subscription lasts. Created in Stripe the
+// first time a club member checks out, so there's nothing to set up by hand.
+export const CLUB_COUPON_ID = "club-members-10";
+
+let clubCouponReady: Promise<string> | null = null;
+
+function ensureClubCoupon(): Promise<string> {
+  clubCouponReady ??= (async () => {
+    const stripe = getStripe();
+    try {
+      await stripe.coupons.retrieve(CLUB_COUPON_ID);
+    } catch (err) {
+      if ((err as { code?: string }).code !== "resource_missing") throw err;
+      try {
+        await stripe.coupons.create({ id: CLUB_COUPON_ID, percent_off: CLUB_DISCOUNT_PERCENT, duration: "forever", name: `Club member: ${CLUB_DISCOUNT_PERCENT}% off` });
+      } catch (createErr) {
+        // Another checkout created it a moment ago.
+        if ((createErr as { code?: string }).code !== "resource_already_exists") throw createErr;
+      }
+    }
+    return CLUB_COUPON_ID;
+  })().catch((err) => {
+    clubCouponReady = null;
+    throw err;
+  });
+  return clubCouponReady;
+}
+
+export async function createProCheckoutSession(email: string, interval: ProInterval, appUrl: string, club: ClubOffer | null = null): Promise<CreateProCheckoutResult> {
   const user = await getUserDoc(email);
   // Already Pro - through the website or bought in the app - so a second
   // subscription would only charge twice.
@@ -46,9 +75,12 @@ export async function createProCheckoutSession(email: string, interval: ProInter
     return { ok: false, reason: "already_pro" };
   }
 
-  const trialDays = isEligibleForProTrial(user) ? PRO_TRIAL_DAYS : 0;
+  const trialDays = proTrialDaysFor(user, club);
 
   try {
+    // A club member's 10% applies whether or not they still get the free
+    // months (someone who had Pro before gets the discount alone).
+    const discounts = club ? [{ coupon: await ensureClubCoupon() }] : undefined;
     const session = await getStripe().checkout.sessions.create({
       mode: "subscription",
       // A card is always taken, trial or not - so a trial that isn't
@@ -60,16 +92,22 @@ export async function createProCheckoutSession(email: string, interval: ProInter
       // Customer, so the two options are mutually exclusive.
       ...(user?.stripeCustomerId ? { customer: user.stripeCustomerId } : { customer_email: email }),
       line_items: [{ price: priceIdFor(interval), quantity: 1 }],
+      ...(discounts ? { discounts } : {}),
       // Checkout Session metadata (below) isn't copied onto the
       // Subscription object it creates - subscription_data.metadata is
       // the one that actually lands there, which every later
       // customer.subscription.* webhook event needs to resolve back to
-      // this account without a cross-partition Cosmos query.
-      subscription_data: { metadata: { email }, ...(trialDays > 0 ? { trial_period_days: trialDays } : {}) },
+      // this account without a cross-partition Cosmos query. The club
+      // code rides along too: it's how sign-ups per club are counted, and
+      // how the trial emails know the price after the free months.
+      subscription_data: {
+        metadata: { email, ...(club ? { club: club.code } : {}) },
+        ...(trialDays > 0 ? { trial_period_days: trialDays } : {}),
+      },
       metadata: { email, kind: "pro_subscription" },
       custom_text: submitText(PRO_SUBMIT_MESSAGE),
       success_url: `${appUrl}/pro?subscribed=1&session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${appUrl}/pro`,
+      cancel_url: `${appUrl}${club ? clubPath(club) : "/pro"}`,
     });
     if (!session.url) return { ok: false, reason: "creation_failed" };
     return { ok: true, url: session.url };
@@ -108,6 +146,7 @@ async function upsertProSubscriptionState(email: string, customerId: string, sub
     interval: subscription.items.data[0]?.price?.recurring?.interval === "year" ? "annual" : "monthly",
     ...(trialEndsAt ? { trialEndsAt } : {}),
     ...(subscription.cancel_at_period_end || subscription.cancel_at ? { cancelling: true } : {}),
+    ...(subscription.metadata?.club ? { club: subscription.metadata.club } : {}),
   };
   if (trialEndsAt && !user.proTrialStartedAt) user.proTrialStartedAt = new Date().toISOString();
   user.stripeCustomerId = customerId;
@@ -144,7 +183,7 @@ export async function applyProSubscriptionFromCheckoutSession(session: Stripe.Ch
   // self-heal below - so a browser racing the webhook can't send two.
   if (user?.plan?.trialEndsAt && user.proTrialEmails?.startedFor !== subscription.id) {
     try {
-      await sendProTrialStartedEmail(user.email, { trialEndsAt: user.plan.trialEndsAt, interval: user.plan.interval ?? "monthly" });
+      await sendProTrialStartedEmail(user.email, { trialEndsAt: user.plan.trialEndsAt, interval: user.plan.interval ?? "monthly", ...(user.plan.club ? { club: user.plan.club } : {}) });
       await markTrialEmailSent(user, "startedFor", subscription.id);
     } catch (err) {
       console.error(`Pro trial started email for subscription ${subscription.id} failed:`, err);
@@ -252,7 +291,7 @@ export async function sendProTrialEndingReminders(nowMs = Date.now()): Promise<n
     if (!subscriptionId || !trialEndsAt || user.plan?.cancelling) continue;
     if (user.proTrialEmails?.endingFor === subscriptionId) continue;
     try {
-      await sendProTrialEndingEmail(user.email, { trialEndsAt, interval: user.plan?.interval ?? "monthly" });
+      await sendProTrialEndingEmail(user.email, { trialEndsAt, interval: user.plan?.interval ?? "monthly", ...(user.plan?.club ? { club: user.plan.club } : {}) });
       await markTrialEmailSent(user, "endingFor", subscriptionId);
       sent++;
     } catch (err) {

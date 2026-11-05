@@ -44,6 +44,9 @@ export interface UserDoc {
     interval?: "monthly" | "annual";
     trialEndsAt?: string;
     cancelling?: boolean;
+    // The club offer this subscription was started with (clubOffers.ts),
+    // which sets its price after the free months.
+    club?: string;
   };
   // Pro bought inside the app (Google Play or the App Store, via
   // RevenueCat) - its own field so Stripe and the stores never overwrite

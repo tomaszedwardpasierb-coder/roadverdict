@@ -11,6 +11,8 @@ const mocks = vi.hoisted(() => ({
   getUserDoc: vi.fn(),
   sendProTrialStartedEmail: vi.fn(),
   sendProTrialEndingEmail: vi.fn(),
+  retrieveCoupon: vi.fn(),
+  createCoupon: vi.fn(),
 }));
 
 vi.mock("@/lib/payments/stripe", () => ({
@@ -18,6 +20,7 @@ vi.mock("@/lib/payments/stripe", () => ({
     checkout: { sessions: { create: mocks.create, retrieve: mocks.retrieveSession } },
     subscriptions: { retrieve: mocks.retrieveSubscription },
     billingPortal: { sessions: { create: mocks.createPortalSession } },
+    coupons: { retrieve: mocks.retrieveCoupon, create: mocks.createCoupon },
   }),
 }));
 vi.mock("@/lib/cosmos", () => ({
@@ -42,6 +45,7 @@ import {
   sendProTrialEndingReminders,
 } from "@/lib/payments/proSubscription";
 import { isEligibleForProTrial, isInProTrial } from "@/lib/payments/proTrial";
+import { findClubOffer } from "@/lib/clubOffers";
 
 const email = "rider@example.com";
 const futureExpiry = new Date(Date.now() - 1000).toISOString(); // already expired, so "not currently Pro"
@@ -128,15 +132,65 @@ describe("createProCheckoutSession", () => {
   });
 });
 
+// The coupon is looked up once per server, so these run in order: a failed
+// lookup isn't remembered, the first success creates it, later ones reuse it.
+describe("createProCheckoutSession for a club member", () => {
+  const club = findClubOffer("docgb");
+
+  it("fails the checkout, and tries again next time, when Stripe can't confirm the club coupon", async () => {
+    mocks.getUserDoc.mockResolvedValue(null);
+    mocks.retrieveCoupon.mockRejectedValue(Object.assign(new Error("stripe down"), { code: "api_error" }));
+    const result = await createProCheckoutSession(email, "monthly", "https://roadverdict.co.uk", club);
+    expect(result).toEqual({ ok: false, reason: "creation_failed" });
+    expect(mocks.createCoupon).not.toHaveBeenCalled();
+    expect(mocks.create).not.toHaveBeenCalled();
+  });
+
+  it("creates the 10% coupon on first use, and gives a new account the club's 3 free months", async () => {
+    mocks.getUserDoc.mockResolvedValue(null);
+    mocks.retrieveCoupon.mockRejectedValue(Object.assign(new Error("No such coupon"), { code: "resource_missing" }));
+    mocks.createCoupon.mockResolvedValue({ id: "club-members-10" });
+    mocks.create.mockResolvedValue({ url: "https://checkout.stripe.com/club1" });
+
+    const result = await createProCheckoutSession(email, "annual", "https://roadverdict.co.uk", club);
+
+    expect(result).toEqual({ ok: true, url: "https://checkout.stripe.com/club1" });
+    expect(mocks.createCoupon).toHaveBeenCalledWith(expect.objectContaining({ id: "club-members-10", percent_off: 10, duration: "forever" }));
+    const args = mocks.create.mock.calls[0][0];
+    expect(args.discounts).toEqual([{ coupon: "club-members-10" }]);
+    expect(args.subscription_data).toEqual({ metadata: { email, club: "DOCGB" }, trial_period_days: 90 });
+    expect(args.cancel_url).toBe("https://roadverdict.co.uk/club/docgb");
+  });
+
+  it("gives an account that had Pro before the 10% off but not the free months, reusing the coupon", async () => {
+    mocks.getUserDoc.mockResolvedValue({ email, stripeCustomerId: "cus_old" });
+    mocks.create.mockResolvedValue({ url: "https://checkout.stripe.com/club2" });
+
+    await createProCheckoutSession(email, "monthly", "https://roadverdict.co.uk", club);
+
+    expect(mocks.retrieveCoupon).not.toHaveBeenCalled();
+    const args = mocks.create.mock.calls[0][0];
+    expect(args.discounts).toEqual([{ coupon: "club-members-10" }]);
+    expect(args.subscription_data).toEqual({ metadata: { email, club: "DOCGB" } });
+  });
+
+  it("adds no discount to an ordinary checkout", async () => {
+    mocks.getUserDoc.mockResolvedValue(null);
+    mocks.create.mockResolvedValue({ url: "https://checkout.stripe.com/plain" });
+    await createProCheckoutSession(email, "monthly", "https://roadverdict.co.uk");
+    expect(mocks.create.mock.calls[0][0].discounts).toBeUndefined();
+  });
+});
+
 function subscription(
-  overrides: Partial<{ id: string; status: string; customer: string; email: string; currentPeriodEnd: number; trialEnd: number; cancelAtPeriodEnd: boolean; interval: string }> = {}
+  overrides: Partial<{ id: string; status: string; customer: string; email: string; currentPeriodEnd: number; trialEnd: number; cancelAtPeriodEnd: boolean; interval: string; club: string }> = {}
 ) {
-  const { id = "sub_1", status = "active", customer = "cus_1", email: metaEmail = email, currentPeriodEnd = 1_800_000_000, trialEnd, cancelAtPeriodEnd = false, interval = "month" } = overrides;
+  const { id = "sub_1", status = "active", customer = "cus_1", email: metaEmail = email, currentPeriodEnd = 1_800_000_000, trialEnd, cancelAtPeriodEnd = false, interval = "month", club } = overrides;
   return {
     id,
     status,
     customer,
-    metadata: { email: metaEmail },
+    metadata: { email: metaEmail, ...(club ? { club } : {}) },
     trial_end: trialEnd ?? null,
     cancel_at_period_end: cancelAtPeriodEnd,
     cancel_at: null,
@@ -194,6 +248,20 @@ describe("applyProSubscriptionFromCheckoutSession", () => {
     mocks.getUserDoc.mockResolvedValue({ id: email, pk: email, email, proTrialEmails: { startedFor: "sub_1" } });
     await applyProSubscriptionFromCheckoutSession(session);
     expect(mocks.sendProTrialStartedEmail).toHaveBeenCalledTimes(1);
+  });
+
+  it("records a club member's code on the plan, so the trial email states the member price", async () => {
+    const trialEnd = 1_800_000_000;
+    mocks.retrieveSubscription.mockResolvedValue(subscription({ status: "trialing", trialEnd, currentPeriodEnd: trialEnd, club: "MAG" }));
+    mocks.getUserDoc.mockResolvedValue({ id: email, pk: email, email });
+    mocks.sendProTrialStartedEmail.mockResolvedValue(undefined);
+    mocks.patch.mockResolvedValue(undefined);
+
+    await applyProSubscriptionFromCheckoutSession({ id: "cs_1", subscription: "sub_1", customer: "cus_1", metadata: { email, kind: "pro_subscription" } } as never);
+
+    const ends = new Date(trialEnd * 1000).toISOString();
+    expect(mocks.upsert.mock.calls[0][0].plan).toEqual(expect.objectContaining({ club: "MAG" }));
+    expect(mocks.sendProTrialStartedEmail).toHaveBeenCalledWith(email, { trialEndsAt: ends, interval: "monthly", club: "MAG" });
   });
 
   it("sends no trial email for a subscription that's paid from the start", async () => {

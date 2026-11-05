@@ -10,6 +10,7 @@
 import { useState } from 'react';
 import { VehicleSpinner } from './VehicleSpinner';
 import { PRO_MONTHLY_PRICE, PRO_ANNUAL_PRICE, PRO_TRIAL_DAYS } from '@/lib/proPlan';
+import { CLUB_ANNUAL_PRICE, CLUB_DISCOUNT_PERCENT, CLUB_MONTHLY_PRICE, CLUB_TRIAL_LABEL } from '@/lib/clubOffers';
 import styles from '@/app/pro/pro.module.css';
 
 async function redirectToUrl(
@@ -48,14 +49,17 @@ async function redirectToUrl(
 // isEligibleForProTrial) - 0 for someone who has had Pro before. Left out
 // where the page doesn't know (the inline ProGate cards), which shows the
 // general "new to Pro" line instead; checkout applies the real rule.
-export function ProSubscribeButtons({ trialDays }: { trialDays?: number }) {
+//
+// club: a club member offer's code (the /club/<code> page) - its 3 free
+// months and 10% off replace the usual trial and prices.
+export function ProSubscribeButtons({ trialDays, club }: { trialDays?: number; club?: string }) {
   const [loadingInterval, setLoadingInterval] = useState<'monthly' | 'annual' | null>(null);
   const [error, setError] = useState('');
 
   function subscribe(interval: 'monthly' | 'annual') {
     redirectToUrl(
       '/api/pro/checkout',
-      { interval },
+      club ? { interval, club } : { interval },
       setError,
       (loading) => setLoadingInterval(loading ? interval : null)
     );
@@ -63,12 +67,17 @@ export function ProSubscribeButtons({ trialDays }: { trialDays?: number }) {
 
   const busy = loadingInterval !== null;
   const trial = trialDays !== undefined && trialDays > 0;
+  const freePeriod = club ? CLUB_TRIAL_LABEL : `${trialDays} days`;
+  const monthly = club ? CLUB_MONTHLY_PRICE : PRO_MONTHLY_PRICE;
+  const annual = club ? CLUB_ANNUAL_PRICE : PRO_ANNUAL_PRICE;
+  const priceNote = club ? `${CLUB_DISCOUNT_PERCENT}% off` : '2 months free';
+  const startLabel = club ? `Start ${CLUB_TRIAL_LABEL} free` : 'Start free trial';
 
   return (
     <>
       {trial ? (
         <p className={styles.planCtaNote} style={{ marginTop: 0 }}>
-          Your first {trialDays} days are free. Nothing is charged until the trial ends, we&apos;ll email you a week
+          Your first {freePeriod} are free. Nothing is charged until the trial ends, we&apos;ll email you a week
           before, and you can cancel any time before then.
         </p>
       ) : trialDays === undefined && PRO_TRIAL_DAYS > 0 ? (
@@ -81,8 +90,8 @@ export function ProSubscribeButtons({ trialDays }: { trialDays?: number }) {
         {loadingInterval === 'monthly'
           ? 'Starting checkout…'
           : trial
-            ? `Start free trial - then ${PRO_MONTHLY_PRICE}/mo`
-            : `Subscribe monthly - ${PRO_MONTHLY_PRICE}/mo`}
+            ? `${startLabel} - then ${monthly}/mo`
+            : `Subscribe monthly - ${monthly}/mo${club ? ` (${priceNote})` : ''}`}
       </button>
       <button
         type="button"
@@ -95,8 +104,8 @@ export function ProSubscribeButtons({ trialDays }: { trialDays?: number }) {
         {loadingInterval === 'annual'
           ? 'Starting checkout…'
           : trial
-            ? `Start free trial - then ${PRO_ANNUAL_PRICE}/yr (2 months free)`
-            : `Subscribe annually - ${PRO_ANNUAL_PRICE}/yr (2 months free)`}
+            ? `${startLabel} - then ${annual}/yr (${priceNote})`
+            : `Subscribe annually - ${annual}/yr (${priceNote})`}
       </button>
       {error && <p className="error-text" role="alert">{error}</p>}
     </>

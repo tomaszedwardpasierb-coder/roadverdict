@@ -45,7 +45,21 @@ describe("POST /api/pro/checkout", () => {
   it("passes the signed-in email and interval through", async () => {
     mocks.createProCheckoutSession.mockResolvedValue({ ok: true, url: "https://checkout.stripe.com/x" });
     await POST(request({ interval: "annual" }));
-    expect(mocks.createProCheckoutSession).toHaveBeenCalledWith("rider@example.com", "annual", expect.any(String));
+    expect(mocks.createProCheckoutSession).toHaveBeenCalledWith("rider@example.com", "annual", expect.any(String), null);
+  });
+
+  it("passes a club member offer through, whatever the code's case", async () => {
+    mocks.createProCheckoutSession.mockResolvedValue({ ok: true, url: "https://checkout.stripe.com/x" });
+    await POST(request({ interval: "monthly", club: "docgb" }));
+    expect(mocks.createProCheckoutSession).toHaveBeenCalledWith("rider@example.com", "monthly", expect.any(String), expect.objectContaining({ code: "DOCGB" }));
+  });
+
+  it("returns 400 for an unknown club code rather than a quiet full-price checkout", async () => {
+    for (const club of ["nope", 42, ""]) {
+      const response = await POST(request({ interval: "monthly", club }));
+      expect(response.status).toBe(400);
+    }
+    expect(mocks.createProCheckoutSession).not.toHaveBeenCalled();
   });
 
   it("returns the checkout URL on success", async () => {

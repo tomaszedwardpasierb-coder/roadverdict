@@ -8,6 +8,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/session";
 import { createProCheckoutSession, type ProInterval } from "@/lib/payments/proSubscription";
 import { recordFunnelStep } from "@/lib/analytics/funnel";
+import { findClubOffer } from "@/lib/clubOffers";
 
 export const dynamic = "force-dynamic";
 
@@ -24,13 +25,20 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
   }
 
-  const { interval } = body as { interval?: ProInterval };
+  const { interval, club: clubCode } = body as { interval?: ProInterval; club?: unknown };
   if (interval !== "monthly" && interval !== "annual") {
     return NextResponse.json({ error: "interval must be 'monthly' or 'annual'." }, { status: 400 });
   }
 
+  // A club member offer (from a /club/<code> page) - an unknown code is an
+  // error rather than a quiet full-price checkout.
+  const club = clubCode === undefined ? null : findClubOffer(typeof clubCode === "string" ? clubCode : null);
+  if (clubCode !== undefined && !club) {
+    return NextResponse.json({ error: "That club offer isn't recognised." }, { status: 400 });
+  }
+
   const appUrl = process.env.APP_URL ?? "https://roadverdict.co.uk";
-  const result = await createProCheckoutSession(session.email, interval, appUrl);
+  const result = await createProCheckoutSession(session.email, interval, appUrl, club);
   if (!result.ok) {
     const status = result.reason === "already_pro" ? 409 : 500;
     const error = result.reason === "already_pro" ? "Your account already has Pro." : "Could not start checkout. Please try again.";
