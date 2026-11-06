@@ -49,6 +49,12 @@ describe("on the MOT check result", () => {
     expect(screen.getByText(/Within a day, as it’s due in under 4 weeks,/)).toBeInTheDocument();
   });
 
+  it("names a car once when DVSA gives its make as the model too", () => {
+    render(<MotCheckResult record={{ ...car, make: "MINI", model: "MINI" }} now={NOW} />);
+    expect(screen.getByRole("heading", { name: "Mini" })).toBeInTheDocument();
+    expect(screen.queryByText(/Mini MINI/)).toBeNull();
+  });
+
   it("has no reminder for an MOT that has already run out, but still asks the question", () => {
     render(<MotCheckResult record={{ ...car, motDueDate: "2026-10-01" }} now={NOW} />);
     expect(screen.queryByLabelText("Email me before this MOT is due")).toBeNull();

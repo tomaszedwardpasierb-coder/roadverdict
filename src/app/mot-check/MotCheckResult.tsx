@@ -10,7 +10,7 @@ import Link from 'next/link';
 import { explainDefect, SEVERITY, CATEGORIES } from '@/lib/mot/motDefects';
 import { computeMotScore, BAND_LABEL, SCORE_RULES } from '@/lib/mot/motScore';
 import type { MotRecord, MotVehicleKind } from '@/lib/mot/motRecord';
-import { reminderDate } from '@/lib/mot/motReminders';
+import { reminderDate, vehicleNameOf } from '@/lib/mot/motReminders';
 import { BUYING_GUIDE_REPORT_PRICE_LABEL } from '@/lib/payments/pricing';
 import { PlayStoreLink } from '@/components/PlayStoreLink';
 import { MotReminderForm } from './MotReminderForm';
@@ -37,7 +37,7 @@ export function MotCheckResult({ record, now = new Date() }: { record: MotRecord
   const score = computeMotScore(record, now);
   const due = record.motDueDate ? new Date(record.motDueDate) : null;
   const valid = due !== null && due.getTime() >= now.getTime();
-  const vehicleName = [titleCase(record.make), record.model.toUpperCase()].filter(Boolean).join(' ') || record.registration;
+  const vehicleName = vehicleNameOf(record);
   const facts = [record.colour && titleCase(record.colour), record.fuelType && titleCase(record.fuelType)].filter(Boolean).join(' · ');
   const historyHref = record.kind === 'car' ? '/cars/buying-guide?src=mot' : '/buying-guide?src=mot';
   // The reminder needs an MOT that hasn't run out yet.

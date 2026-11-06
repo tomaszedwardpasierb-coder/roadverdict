@@ -94,7 +94,9 @@ function titleCase(s: string): string {
 }
 
 export function vehicleNameOf(record: Pick<MotRecord, "make" | "model" | "registration">): string {
-  return [titleCase(record.make), record.model.toUpperCase()].filter(Boolean).join(" ") || record.registration;
+  // DVSA gives some cars the make as the model too (MINI MINI): say it once.
+  const model = record.model.toUpperCase() === record.make.toUpperCase() ? "" : record.model.toUpperCase();
+  return [titleCase(record.make), model].filter(Boolean).join(" ") || record.registration;
 }
 
 export function reminderDate(motDueDate: string): Date {
